@@ -97,7 +97,7 @@ for (const width of [320, 390, 768, 1440]) {
         await page.getByRole("button", { name: "Toggle synthetic currency access", exact: true }).click()
         if (module !== "reports") await expect(overview.getByRole("button", { name: /Export/ })).toHaveCount(0)
         else await expect(trend.locator(".recharts-area").first()).toBeVisible()
-        await page.getByRole("tab", { name: "Existing records workspace", exact: true }).click()
+        await page.getByRole("link", { name: "Existing records workspace", exact: true }).click()
         await expect(page.getByText("Original record workspace remains available.")).toBeVisible()
         await expect(overview).toHaveCount(0)
       })

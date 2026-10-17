@@ -8,6 +8,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, request as playwrightRequest, test, type Browser, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   callReducerBff,
@@ -96,7 +97,7 @@ test.describe(
 
       try {
         await gotoModule(page, "/purchasing", "purchasing")
-      await page.getByTestId("module-tab-purchasing-orders").click()
+      await selectModuleTab(page, "purchasing", "orders")
       await page.getByTestId("module-create-purchasing-orders").click()
       await expect(page.getByTestId("form-modal-new-purchase-order")).toBeVisible()
       await chooseSelectOptionByLabel(page, "partnerId", VENDOR_NAME)
@@ -114,7 +115,7 @@ test.describe(
       const orderId = await fetchPurchaseOrderIdByExactOrigin(page, vendorPartnerId, origin)
       const orderLabel = await fetchPurchaseOrderSelectLabel(page, orderId)
 
-      await page.getByTestId("module-tab-purchasing-lines").click()
+      await selectModuleTab(page, "purchasing", "lines")
       await page.getByTestId("entity-action-pol-add-form").click()
       await expect(page.getByTestId("form-modal-add-purchase-order-line")).toBeVisible()
       await chooseSelectOptionByLabel(page, "orderId", orderLabel)
@@ -131,7 +132,7 @@ test.describe(
       ])
       expect(lineRes.ok()).toBe(true)
 
-      await page.getByTestId("module-tab-purchasing-orders").click()
+      await selectModuleTab(page, "purchasing", "orders")
       await selectEntityRowById(page, orderId)
       await waitForEntityActionEnabled(page, "entity-action-po-confirm")
       await page.getByTestId("entity-action-po-confirm").click()

@@ -14271,6 +14271,27 @@
     }
   },
   "modules": {
+    "workspaces": {
+      "label": "Module workspaces",
+      "advanced": "Advanced / Configuration",
+      "more": "More workspaces",
+      "overview": "Overview",
+      "orders": "Orders",
+      "fulfillment": "Fulfillment",
+      "pricing": "Pricing",
+      "configuration": "Configuration",
+      "pipeline": "Pipeline",
+      "contacts": "Contacts",
+      "activities": "Activities",
+      "sourcing": "Sourcing",
+      "suppliers": "Suppliers",
+      "financial": "Financial reports",
+      "analytics": "Analytics",
+      "schedules": "Schedules",
+      "expenses": "Expenses",
+      "expenseReports": "Expense reports",
+      "operations": "Operations"
+    },
     "tabGroups": {
       "banking": "Banking",
       "billing": "Billing",

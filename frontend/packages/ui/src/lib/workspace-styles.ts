@@ -17,7 +17,7 @@ export const workspaceStyles = {
   document: "ui-document min-w-0 rounded-lg border border-border bg-card text-card-foreground shadow-sm",
   metricValue: "font-semibold tracking-tight tabular-nums text-foreground",
   workspaceNav: "flex flex-wrap items-center gap-1 rounded-xl border border-border bg-card/60 p-1.5",
-  workspaceLink: "ui-workspace-link rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+  workspaceLink: "ui-workspace-link inline-flex min-h-11 min-w-0 max-w-full items-center rounded-lg px-3 py-2 text-sm font-medium whitespace-normal [overflow-wrap:anywhere] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
   workspaceLinkActive: "bg-accent text-accent-foreground ring-1 ring-primary/25",
-  tabTrigger: "-mb-px h-auto min-h-10 flex-none rounded-none border-0 border-b-2 border-transparent px-3 py-2 after:hidden data-active:border-primary data-active:text-primary",
+  tabTrigger: "-mb-px h-auto min-h-11 min-w-0 max-w-full flex-none rounded-none border-0 border-b-2 border-transparent px-3 py-2 whitespace-normal [overflow-wrap:anywhere] after:hidden data-active:border-primary data-active:text-primary",
 } as const

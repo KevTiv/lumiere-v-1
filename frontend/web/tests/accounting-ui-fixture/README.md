@@ -17,3 +17,13 @@ navigation and existing invoice-action/status model checks.
 If a Playwright-managed Chromium is unavailable, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an installed Chromium executable. The checks cover 320px, 390px, 768px, and 1440px layouts, with coarse touch pointers below 1024px. Coverage includes drawer focus/navigation, persisted preferences, grouped views/configuration, exact queue targets, currency and permission boundaries, draft preview, synthetic action callbacks, semantic theme propagation, dark/Ocean palettes, keyboard selection, form footer access, 44px touch controls, and internal table scrolling. Screenshots are saved beneath `test-results`.
 
 These checks prove browser rendering and local interactions. They do not prove authentication, actual posting, reconciliation, canonical backend readback, or first-organization admission. The authenticated accounting end-to-end specs remain responsible for those behaviors.
+
+The `/navigation` route exercises the production ModuleView with curated
+Accounting, Sales, CRM, Purchasing, Reports and Expenses navigation metadata,
+plus an uncurated module and local-shell workspace tabs. Synthetic content proves
+group selection, canonical links, Back/Forward/reload, keyboard interaction,
+extension-tab reachability, shared appearance, wrapping and touch targets. It
+does not prove that every corresponding backend collection is available.
+
+For the focused navigation and shared-template regression checks, run
+`node node_modules/@playwright/test/cli.js test --config playwright.workspace-navigation.config.ts`.

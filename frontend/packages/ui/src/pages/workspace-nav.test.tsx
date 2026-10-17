@@ -6,7 +6,7 @@ import type { ModuleTab, ModuleWorkspaceNav } from "../lib/module-types"
 import { WorkspaceNav } from "./workspace-nav"
 
 afterEach(cleanup)
-const tabs: ModuleTab[] = ["dashboard", "invoices", "credit-control", "bills", "taxes"].map((id) => ({ id, label: id, type: "custom" }))
+const tabs: ModuleTab[] = ["dashboard", "invoices", "credit-control", "bills", "taxes", "tax-groups"].map((id) => ({ id, label: id, type: "custom" }))
 const config: ModuleWorkspaceNav = {
   label: "Accounting workspaces",
   workspaces: [
@@ -14,7 +14,7 @@ const config: ModuleWorkspaceNav = {
     { id: "receivables", label: "Receivables", tabIds: ["invoices", "credit-control"] },
     { id: "payables", label: "Payables", tabIds: ["bills"] },
   ],
-  overflow: [{ id: "setup", label: "Configuration", tabIds: ["taxes"] }],
+  overflow: [{ id: "setup", label: "Configuration", tabIds: ["taxes", "tax-groups"] }],
 }
 
 function Workspace({ initialTab = "dashboard" }: { initialTab?: string }) {
@@ -57,6 +57,7 @@ describe("WorkspaceNav", () => {
   it("keeps configuration deep links selected and opens all settings in a keyboard-accessible menu", async () => {
     render(<Workspace initialTab="taxes" />)
     expect(screen.getByRole("tab", { name: "taxes" }).getAttribute("aria-selected")).toBe("true")
+    expect(screen.getByRole("tab", { name: "tax-groups" })).toBeTruthy()
     fireEvent.keyDown(screen.getByRole("button", { name: "Advanced / Configuration" }), { key: "Enter" })
     const setting = await screen.findByRole("menuitem", { name: "taxes" })
     expect(setting.getAttribute("href")).toBe("/accounting?tab=taxes")

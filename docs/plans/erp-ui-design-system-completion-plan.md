@@ -114,7 +114,7 @@ change should update these owners, not copy utility strings across module config
 
 | Definition/input | Existing renderer path | Shared visual owner |
 | --- | --- | --- |
-| Static `ModuleConfig` and runtime list metadata | `ModuleView` → `DashboardHeader`, `WorkspaceNav`/context tabs, `EntityView` | Page/action/tab roles; shared Table/Card primitives |
+| Static `ModuleConfig` and runtime list metadata | `ModuleView` → `DashboardHeader`, `WorkspaceNav`/`ContextTabsList`, `EntityView` | One workspace navigation pattern; shared page/action/tab roles and Table/Card primitives |
 | Static `FormConfig` (plain/card/dialog) | `ModularForm`, `FormModal` | Page/section/form-action roles; shared field primitives |
 | Runtime-merged form metadata | `RuntimeFormModal` → existing `FormModal` → `ModularForm` | Same roles; no runtime-only restyling or different editor |
 | Approved saved `ModuleDraft` collection/detail nodes | `ComposedCollectionDetailHost` | Shared section/surface roles and Card/Table primitives |
@@ -168,6 +168,23 @@ Tables need column/value alignment, visible units/currency, stable row identitie
 Use native table semantics unless spreadsheet-like editing genuinely needs an accessible grid. Virtualize only after measuring actual datasets and preserving keyboard/assistive navigation. A row click cannot be the only route to opening a record.
 
 ### Record workspace
+
+Module navigation uses one visual language: rounded workspace navigation at the
+top level and shared underlined `ContextTabsList`/`ContextTabsTrigger` for the
+views inside that workspace. `ModuleView` always renders `WorkspaceNav`; curated
+`workspaceNav` metadata groups canonical tab IDs, while legacy `tabGroups` and
+ungrouped modules use the same renderer through `moduleWorkspaceNavigation`.
+Uncurated modules show at most six primary workspaces, with the rest in More
+workspaces. Runtime-added tabs remain reachable in overflow. No tab IDs, entity
+permissions, data bindings or persistence schemas are changed by this grouping.
+Small local shells (POS, AI Harness and Forensics) use `WorkspaceTabsList`/`WorkspaceTabsTrigger`
+with the same workspace tokens, preserving their existing tab semantics.
+Record pages and inspection drawers both use the shared context-tab components.
+Segmented controls are reserved for compact filters such as account category,
+not module sections or record content navigation.
+Do not add per-module navigation classes or restore the flattened group-label
+tab strip. Workspace/context controls wrap within their host, break long labels
+and have a 44px minimum touch target; keyboard and history behavior must be tested.
 
 A common record header holds reference/title, canonical status, primary next action, supporting actions and related-record links. Sales order, invoice, purchase order, production order and approval screens should make upstream/downstream continuation obvious.
 

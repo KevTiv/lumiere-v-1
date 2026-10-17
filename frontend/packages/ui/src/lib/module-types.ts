@@ -77,11 +77,11 @@ export interface ModuleConfig {
   defaultTab?: string
   tabs: ModuleTab[]
   /**
-   * Optional labelled groups for the tab row. Tabs not listed keep their place:
-   * those before the first grouped tab lead the row, the rest trail it.
+   * Optional workspace groups used by the shared navigation fallback. Tabs not
+   * listed remain individual workspaces; large sets move into the overflow menu.
    */
   tabGroups?: ModuleTabGroup[]
-  /** Job-oriented navigation over the existing canonical tab IDs. */
+  /** Curated job-oriented groups; all modules use the same WorkspaceNav renderer. */
   workspaceNav?: ModuleWorkspaceNav
 }
 

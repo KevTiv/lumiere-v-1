@@ -92,7 +92,7 @@ describe("ModuleView scoped dashboard composition", () => {
     expect(screen.queryByTestId("legacy-dashboard-grid")).toBeNull()
     expect(screen.getByTestId("dashboard-header-contract").dataset.timeRange).toBe("none")
     expect(screen.getByTestId("dashboard-header-contract").dataset.hasExport).toBe("false")
-    fireEvent.click(screen.getByRole("tab", { name: "Orders" }))
+    fireEvent.click(screen.getByRole("link", { name: "Orders" }))
     expect(screen.queryByText("Scoped financial overview")).toBeNull()
     expect(screen.getByTestId("entity-view")).toBeTruthy()
   })
@@ -199,7 +199,10 @@ describe("ModuleView collection states", () => {
   })
 
   it("leaves tab order and arrow navigation to the tab primitive", async () => {
-    const twoTabs = { ...config, tabs: [...config.tabs, { ...config.tabs[0]!, id: "other", label: "Other" }] }
+    const twoTabs = { ...config,
+      tabGroups: [{ label: "Orders workspace", tabIds: ["orders", "other"] }],
+      tabs: [...config.tabs, { ...config.tabs[0]!, id: "other", label: "Other" }],
+    }
     render(<RBACProvider initialUser={user} initialRoles={[role([])]} initialPolicies={[]}>
       <ModuleView config={twoTabs} />
     </RBACProvider>)

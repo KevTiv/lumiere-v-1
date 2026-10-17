@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ContextTabsList, ContextTabsTrigger } from "../components/context-tabs"
 import {
   Search,
   Plus,
@@ -467,10 +468,10 @@ export function ChartOfAccountsView({
   if (chartStructureContent) {
     return (
       <Tabs defaultValue="accounts" className="flex flex-col gap-6">
-        <TabsList>
-          <TabsTrigger value="accounts">{t("accounting.accounts.coasTab")}</TabsTrigger>
-          <TabsTrigger value="structure">{t("accounting.chartStructure.tabLabel")}</TabsTrigger>
-        </TabsList>
+        <ContextTabsList>
+          <ContextTabsTrigger value="accounts">{t("accounting.accounts.coasTab")}</ContextTabsTrigger>
+          <ContextTabsTrigger value="structure">{t("accounting.chartStructure.tabLabel")}</ContextTabsTrigger>
+        </ContextTabsList>
         <TabsContent value="accounts" className="mt-0">
           {main}
         </TabsContent>

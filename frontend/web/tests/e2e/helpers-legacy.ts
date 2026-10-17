@@ -70,12 +70,20 @@ export async function gotoModule(page: Page, route: string, moduleId?: string) {
 
 /** Select a module tab and wait until its panel is the active interaction surface. */
 export async function selectModuleTab(page: Page, moduleId: string, tabId: string) {
-  if (moduleId === "accounting") {
-    await openAccountingTab(page, tabId)
-    return
-  }
   const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
-  await tab.click()
+  if (await tab.isVisible()) await tab.click()
+  else {
+    // Domain tests use canonical deep links for views outside the current
+    // workspace. Dedicated navigation tests cover workspace/menu interaction.
+    const target = new URL(`/${moduleId}`, page.url())
+    const current = new URL(page.url())
+    for (const [key, value] of current.searchParams) {
+      if (!["tab", "filter", "highlight"].includes(key)) target.searchParams.append(key, value)
+    }
+    if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
+    await page.goto(target.toString())
+    await expect(page.getByTestId(`module-view-${moduleId}`)).toHaveAttribute("data-hydrated", "true")
+  }
   await expect(tab).toHaveAttribute("aria-selected", "true")
   // Base UI may regenerate the tab/tabpanel ids during the state transition.
   // The selected tab and the single visible panel are the stable behavior.
@@ -99,17 +107,7 @@ export async function openEntityCreate(
 }
 
 export async function openAccountingTab(page: Page, tabId: string) {
-  // Accounting exposes the current workspace's views, rather than all views
-  // simultaneously. Use its supported deep link so domain-flow tests can reach
-  // advanced views without depending on the navigation's grouping or labels.
-  const target = new URL("/accounting", page.url())
-  if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
-  await page.goto(target.toString())
-  const moduleView = page.getByTestId("module-view-accounting")
-  await expect(moduleView).toBeVisible()
-  await expect(moduleView).toHaveAttribute("data-hydrated", "true")
-  await expect(page.getByTestId(`module-tab-accounting-${tabId}`)).toHaveAttribute("aria-selected", "true")
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
+  await selectModuleTab(page, "accounting", tabId)
   await expectNoAppError(page)
 }
 
@@ -121,8 +119,7 @@ export async function assertModuleTabs(
   assertTab?: (page: Page, tabId: string) => Promise<void>,
 ) {
   for (const tabId of tabIds) {
-    if (moduleId === "accounting") await openAccountingTab(page, tabId)
-    else await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+    await selectModuleTab(page, moduleId, tabId)
     await expectNoAppError(page)
     if (assertTab) {
       await assertTab(page, tabId)
@@ -387,12 +384,7 @@ export async function openTabAndCancelCreate(
   tabId: string,
   formId: string,
 ) {
-  if (moduleId === "accounting") await openAccountingTab(page, tabId)
-  else {
-    const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
-    await tab.click()
-    await expect(tab).toHaveAttribute("aria-selected", "true")
-  }
+  await selectModuleTab(page, moduleId, tabId)
   // The tab switch also updates ?tab=, which can re-render the panel; click
   // (unlike scrollIntoViewIfNeeded) re-resolves a replaced element.
   const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
@@ -2608,7 +2600,7 @@ export async function openFiscalSetupWizard(page: Page) {
 
 export async function savePivotReportViaUi(page: Page, name: string) {
   await gotoModule(page, "/reports", "reports")
-  await page.getByTestId("module-tab-reports-pivot-explorer").click()
+  await selectModuleTab(page, "reports", "pivot-explorer")
   await page.getByTestId("pivot-report-name").fill(name)
   const saveBtn = page.getByTestId("pivot-save-report")
   await expect(saveBtn).toBeEnabled({ timeout: 15_000 })
@@ -2709,7 +2701,7 @@ export async function generateVatReportViaUi(
   options: { name: string; dateFrom: string; dateTo: string },
 ) {
   await gotoModule(page, "/reports", "reports")
-  await page.getByTestId("module-tab-reports-vat-report").click()
+  await selectModuleTab(page, "reports", "vat-report")
   await page.getByLabel(/name/i).first().fill(options.name)
   await page.locator('input[type="date"]').first().fill(options.dateFrom)
   await page.locator('input[type="date"]').nth(1).fill(options.dateTo)
@@ -3219,7 +3211,7 @@ export async function seedSaleOrderApprovalWorkflow(
 
 export async function openWorkflowVersionRow(page: Page, versionId: number) {
   await gotoModule(page, "/workflows", "workflows")
-  await page.getByTestId("module-tab-workflows-versions").click()
+  await selectModuleTab(page, "workflows", "versions")
   const row = activeTabEntityTable(page).getByTestId(`entity-row-${versionId}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()
