@@ -553,8 +553,8 @@ export function AIChatPanel({
                     key={message.id}
                     data-testid={`erp-ai-chat-message-${message.role}`}
                     className={cn(
-                      "flex gap-2",
-                      message.role === "user" ? "flex-row-reverse" : ""
+                      "flex w-full",
+                      message.role === "user" ? "justify-end" : "justify-start"
                     )}
                   >
                     
@@ -565,8 +565,8 @@ export function AIChatPanel({
                       <div className={cn(
                         "max-w-full min-w-0 break-words text-[14px] leading-7",
                         message.role === "user"
-                          ? "bg-primary text-primary-foreground rounded-br-sm"
-                          : "bg-muted rounded-bl-sm"
+                          ? "rounded-2xl rounded-br-md bg-muted px-4 py-2.5 text-foreground"
+                          : "text-foreground"
                       )}>
                         <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
                       </div>
