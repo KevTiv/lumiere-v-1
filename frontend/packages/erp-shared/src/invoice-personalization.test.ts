@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
+import { decodeCompaniesQueryResponse } from "@lumiere/stdb/resource-reads"
 import {
-  INVOICE_PROFILE_REPORT_TYPE, INVOICE_LOGO_MAX_BYTES, inspectInvoiceLogo, isManagedInvoiceLogoUrl, invoiceSellerFromCompany, isInvoiceSellerIdentityReady,
+  INVOICE_PROFILE_REPORT_TYPE, INVOICE_LOGO_MAX_BYTES, inspectInvoiceLogo, isManagedInvoiceLogoUrl, invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady,
   parseInvoiceContent, parseInvoiceDocumentSnapshot, parseInvoiceNotes, parseInvoiceProfileMetadata,
   resolveInvoiceContent, resolveInvoiceProfile, selectInvoiceProfileVersions, validateInvoiceProfileValues,
   invoiceBuyerFromContact, invoiceBuyerSnapshot,
@@ -132,6 +133,23 @@ describe("invoice personalization contracts", () => {
     assert.equal(isInvoiceSellerIdentityReady(wireCompany, 2n, 1), true)
     assert.deepEqual(invoiceSellerFromCompany(wireCompany, resolveInvoiceProfile()).address, ["Street", "City", "FR"])
     assert.equal(invoiceSellerFromCompany(wireCompany, resolveInvoiceProfile()).registrationNumber, "REG")
+  })
+
+  it("preserves known-empty legal identity through the real typed company decoder", () => {
+    const wire = { id: "2", organizationId: "1", name: "Alpha Ltd", addressStreet: "Street", addressCity: null, addressZip: null, addressCountryCode: "FR", taxId: null, companyRegistry: null }
+    const decoded = decodeCompaniesQueryResponse({ data: [wire] })[0]!
+    assert.equal(Object.hasOwn(decoded, "taxId"), true)
+    assert.equal(decoded.taxId, undefined)
+    const seller = invoiceSellerCompanyFromQueryRow(decoded)
+    assert.equal(isInvoiceSellerIdentityReady(seller, 2n, 1), true)
+    assert.equal(seller?.taxId, null)
+    assert.equal(invoiceSellerCompanyFromQueryRow(undefined), undefined)
+    for (const key of ["addressStreet", "addressCity", "addressZip", "addressCountryCode", "taxId", "companyRegistry"] as const) {
+      const redacted: Partial<typeof wire> = { ...wire }
+      delete redacted[key]
+      const projected = decodeCompaniesQueryResponse({ data: [redacted] })[0]!
+      assert.equal(isInvoiceSellerIdentityReady(invoiceSellerCompanyFromQueryRow(projected), 2n, 1), false, key)
+    }
   })
   it("keeps invoice content and notes distinct with inheritance-aware overrides", () => {
     assert.deepEqual(parseInvoiceContent({ invoiceContent: { schemaVersion: 1, notice: "", terms: "Payment in 30 days" }, notes: "Internal narrative", "custom:field": "retained" }), { status: "valid", value: { schemaVersion: 1, notice: "", terms: "Payment in 30 days" } })

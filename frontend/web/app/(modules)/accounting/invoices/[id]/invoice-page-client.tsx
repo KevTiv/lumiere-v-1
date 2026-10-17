@@ -11,7 +11,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CreditCard, Download, ListOrdered, Mail, MoreHorizontal, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import { useInvoicePersonalization } from '@lumiere/query-hooks/hooks/invoice-personalization';
-import { invoiceSellerFromCompany, isInvoiceSellerIdentityReady } from '@lumiere/erp-shared/invoice-personalization';
+import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from '@lumiere/erp-shared/invoice-personalization';
 import {
   Button,
   EntityDetail,
@@ -390,7 +390,7 @@ function InvoicePageLoaded({
   const status = invoiceStatus(move, t);
   const listTab = KIND_TAB[kind];
   const partner = String(move.invoicePartnerDisplayName ?? move.invoice_partner_display_name ?? '').trim();
-  const company = companiesRead.rows.find((row) => String(row.id) === String(operatingCompanyId));
+  const company = invoiceSellerCompanyFromQueryRow(companiesRead.rows.find((row) => String(row.id) === String(operatingCompanyId)));
   const capturedContent = readInvoiceDocumentContent(move.metadata, organizationId, kind === 'invoice' || kind === 'creditNote');
   const identityReady = isInvoiceSellerIdentityReady(company, operatingCompanyId, organizationId);
   const identityState = companiesRead.state.status === 'ready' && !identityReady ? { status: 'error' as const, message: 'The selected company identity is unavailable. Refresh before posting this invoice.' } : companiesRead.state;

@@ -2,7 +2,7 @@
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { AccountantOverview } from "./accountant-overview"
 import { useInvoicePersonalization } from "@lumiere/query-hooks/hooks/invoice-personalization"
-import { invoiceSellerFromCompany, isInvoiceSellerIdentityReady } from "@lumiere/erp-shared/invoice-personalization"
+import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from "@lumiere/erp-shared/invoice-personalization"
 import { formatInvoiceMoney, resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
 import { ReconciliationWorkbench, type ReconciliationOutcome } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench"
 import type { ReconciliationRequest, ReconciliationSource } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench-model"
@@ -921,12 +921,13 @@ function AccountingClientReady({
   const companies = companiesRead.rows
   const invoicePersonalization = useInvoicePersonalization({ organizationId, companyId: operatingCompanyId, enabled: organizationId > 0 && operatingCompanyId > 0n })
   const invoiceCompany = companies.find((company) => String(company.id) === String(operatingCompanyId))
-  const invoiceIdentityReady = isInvoiceSellerIdentityReady(invoiceCompany, operatingCompanyId, organizationId)
+  const invoiceSellerCompany = invoiceSellerCompanyFromQueryRow(invoiceCompany)
+  const invoiceIdentityReady = isInvoiceSellerIdentityReady(invoiceSellerCompany, operatingCompanyId, organizationId)
   const invoiceIdentityState = companiesRead.state.status === "ready" && !invoiceIdentityReady
     ? { status: "error" as const, message: "The selected company identity is unavailable. Refresh before creating or posting an invoice." }
     : companiesRead.state
   const invoiceSeller = invoicePersonalization.profile && invoiceIdentityReady
-    ? invoiceSellerFromCompany(invoiceCompany, invoicePersonalization.profile)
+    ? invoiceSellerFromCompany(invoiceSellerCompany, invoicePersonalization.profile)
     : undefined
   const currenciesRead = moduleCollection(useCurrencies())
   const currencies = currenciesRead.rows
@@ -4384,7 +4385,7 @@ function AccountingClientReady({
   // Each overview card owns its source state; an unavailable auxiliary read must
   // never become a zero balance or hide the other independently available queues.
   const manualInvoiceReadState = mergeModuleStates([
-    accountsRead.state, journalsRead.state, contactsRead.state, taxesRead.state,
+    accountsRead.state, accountTypesRead.state, journalsRead.state, contactsRead.state, taxesRead.state,
     productsRead.state, paymentTermsRead.state, currenciesRead.state, companiesRead.state, taxGroupsRead.state,
     fiscalYearsRawRead.state, accountPeriodsRawRead.state,
   ])
