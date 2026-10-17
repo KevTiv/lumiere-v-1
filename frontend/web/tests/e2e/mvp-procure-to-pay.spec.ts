@@ -165,8 +165,7 @@ async function createBillFromPo(
   if (options.loseResponse) {
     const injected = await loseNextResponse(page, "create_bill_from_purchase_order")
     await submitForm(page, "create-bill-from-purchase-order")
-    await expect(page.getByText(/Result unknown/i).first()).toBeVisible({ timeout: 30_000 })
-    expect(injected.lost()).toBe(true)
+    await expect.poll(() => injected.lost()).toBe(true)
     return null
   }
   const [billRes] = await Promise.all([
@@ -278,7 +277,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await expectNoAppError(page)
   })
 
-  test("a lost create-bill response reports an unknown outcome and the bill exists exactly once", async ({
+  test("a lost create-bill response converges by canonical readback to exactly one bill", async ({
     page,
   }) => {
     test.setTimeout(240_000)
@@ -292,7 +291,8 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     const before = await fetchPurchaseOrderInvoiceIds(page, orderId)
     await createBillFromPo(page, orderId, { loseResponse: true })
 
-    // The write committed once; the operator is not offered a blind retry.
+    // The write committed once; the workflow converges by readback and offers no blind retry.
+    await expect(page.getByText(/Result unknown/i)).toHaveCount(0)
     await expect
       .poll(async () => (await fetchPurchaseOrderInvoiceIds(page, orderId)).filter((id) => !before.includes(id)))
       .toHaveLength(1)

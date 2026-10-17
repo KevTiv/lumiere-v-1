@@ -264,7 +264,6 @@
     ],
     "operator_bypass_files": [
       "frontend/web/tests/e2e/account-deprecation-readback.spec.ts",
-      "frontend/web/tests/e2e/accounting-post-reconcile.spec.ts",
       "frontend/web/tests/e2e/ai-human-review-provenance.spec.ts",
       "frontend/web/tests/e2e/ai-rag-evidence-access.spec.ts",
       "frontend/web/tests/e2e/analytics-lifecycle.spec.ts",
@@ -297,8 +296,6 @@
       "frontend/web/tests/e2e/mobile-money-payments.spec.ts",
       "frontend/web/tests/e2e/mvp-ai-rag.spec.ts",
       "frontend/web/tests/e2e/mvp-lead-to-cash.spec.ts",
-      "frontend/web/tests/e2e/mvp-procure-to-pay.spec.ts",
-      "frontend/web/tests/e2e/o2c-certification.spec.ts",
       "frontend/web/tests/e2e/operational-messaging.spec.ts",
       "frontend/web/tests/e2e/parity-phase3-approvals-documents-mutations.spec.ts",
       "frontend/web/tests/e2e/payment-fixtures.ts",

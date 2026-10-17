@@ -124,7 +124,13 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
 
     // Operator creates the draft journal entry and adds its balanced lines through the forms.
     const movesBefore = new Set((await rows(page, "account-moves")).map((row) => scalarQueryId(row.id)))
-    await openEntityCreate(page, "/accounting", "accounting", "journal-entries", "new-journal-entry")
+    await gotoModule(page, "/accounting", "accounting")
+    // The quick action snapshots the form's lookups when it opens; let the journal lookup load.
+    await page.getByTestId("module-tab-accounting-dashboard").click()
+    await page.waitForLoadState("networkidle")
+    await page.waitForTimeout(8_000)
+    await page.getByTestId("quick-action-journal_entry").click()
+    await expect(page.getByTestId("form-modal-new-journal-entry")).toBeVisible()
     await chooseSelectOptionByLabel(page, "journalId", /miscellaneous/i)
     await fillField(page, "date", new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10))
     await fillField(page, "ref", entryRef)
@@ -168,6 +174,8 @@ test.describe("Accounting journal entry post + reconcile", { tag: "@p0" }, () =>
 
     await gotoModule(page, "/accounting", "accounting")
     await page.getByTestId("module-tab-accounting-journal-entries").click()
+    // Lists are paginated newest-first; narrow to the exact entry by its unique name.
+    await page.getByPlaceholder(/search entries/i).fill(entryRef)
     const entryRow = page.getByTestId(`entity-row-${entryMoveId}`)
     await expect(entryRow).toBeVisible({ timeout: 30_000 })
     await entryRow.click()
