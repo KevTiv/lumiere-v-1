@@ -257,7 +257,7 @@ pub async fn execute_resource_query_for_company(
             .await;
         }
         "roles" => {
-            return read_roles(client, fa).await;
+            return read_roles(client, organization_id, fa).await;
         }
         "user-roles" => {
             return read_user_roles(client, identity_hex, fa).await;
