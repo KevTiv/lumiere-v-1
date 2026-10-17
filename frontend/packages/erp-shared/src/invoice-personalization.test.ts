@@ -4,6 +4,7 @@ import {
   INVOICE_PROFILE_REPORT_TYPE, INVOICE_LOGO_MAX_BYTES, inspectInvoiceLogo, isManagedInvoiceLogoUrl, invoiceSellerFromCompany, isInvoiceSellerIdentityReady,
   parseInvoiceContent, parseInvoiceDocumentSnapshot, parseInvoiceNotes, parseInvoiceProfileMetadata,
   resolveInvoiceContent, resolveInvoiceProfile, selectInvoiceProfileVersions, validateInvoiceProfileValues,
+  invoiceBuyerFromContact, invoiceBuyerSnapshot,
   type InvoiceDocumentSnapshot, type InvoiceProfileRow,
 } from "./invoice-personalization"
 
@@ -18,6 +19,29 @@ const snapshot = (): InvoiceDocumentSnapshot => ({
 })
 
 describe("invoice personalization contracts", () => {
+  const buyerContact = () => ({ id: "4", organizationId: "1", companyId: "2", name: "Buyer Legal Ltd", street: "Billing street", street2: null, city: "Kigali", stateCode: null, zip: "1000", countryCode: "RW", taxId: "BUYER-TIN", companyRegistry: "BUYER-REG", email: "billing@example.test", phone: null, deletedAt: null, mergeTargetId: null })
+  it("captures exact scoped draft buyer legal fields while preserving V1 unavailability", () => {
+    const read = invoiceBuyerFromContact(buyerContact(), 1, 2, 4)
+    assert.equal(read.status, "valid")
+    if (read.status !== "valid") return
+    assert.deepEqual(read.value, { partnerId: "4", name: "Buyer Legal Ltd", address: ["Billing street", "Kigali", "1000", "RW"], taxId: "BUYER-TIN", registrationNumber: "BUYER-REG", email: "billing@example.test", phone: "" })
+    const issued: InvoiceDocumentSnapshot = { ...snapshot(), schemaVersion: 2, buyer: read.value }
+    assert.deepEqual(parseInvoiceDocumentSnapshot({ invoiceDocument: issued }), { status: "valid", value: issued })
+    assert.deepEqual(invoiceBuyerSnapshot(snapshot()), { status: "missing" })
+    assert.deepEqual(invoiceBuyerSnapshot(issued), read)
+    const changed = { ...buyerContact(), name: "New buyer name", taxId: "New tax" }
+    assert.equal(invoiceBuyerFromContact(changed, 1, 2, 4).status, "valid")
+    assert.equal(issued.buyer.name, "Buyer Legal Ltd")
+    assert.equal(issued.buyer.taxId, "BUYER-TIN")
+    assert.equal(invoiceBuyerFromContact({ ...buyerContact(), companyId: null }, 1, 2, 4).status, "valid")
+  })
+  it("rejects foreign, inactive, redacted and malformed buyer identity without partial fallback", () => {
+    for (const change of [{ organizationId: "9" }, { companyId: "3" }, { id: "5" }, { deletedAt: "now" }, { mergeTargetId: "9" }, { companyId: undefined }, { name: " " }, { taxId: undefined }, { deletedAt: undefined }, { street: 42 }]) assert.equal(invoiceBuyerFromContact({ ...buyerContact(), ...change }, 1, 2, 4).status, "invalid")
+    const read = invoiceBuyerFromContact(buyerContact(), 1, 2, 4)
+    if (read.status !== "valid") throw Error("fixture")
+    const v2 = { ...snapshot(), schemaVersion: 2, buyer: read.value }
+    for (const changed of [{ ...v2, buyer: undefined }, { ...v2, buyer: null }, { ...v2, schemaVersion: 3 }, { ...v2, schemaVersion: 1 }, { ...v2, buyer: { ...read.value, partnerId: "0" } }, { ...v2, buyer: { ...read.value, taxId: "x".repeat(257) } }, { ...v2, buyer: { ...read.value, address: Array(13).fill("line") } }, { ...v2, buyer: { ...read.value, extra: true } }]) assert.equal(parseInvoiceDocumentSnapshot({ invoiceDocument: changed }).status, "invalid")
+  })
   it("selects numeric latest versions only in the exact organization/company scope", () => {
     const read = selectInvoiceProfileVersions([
       row("9", null, { terms: "Old" }), row("10", null, { terms: "Latest" }), row("12", "2", { footer: "Company 2" }),

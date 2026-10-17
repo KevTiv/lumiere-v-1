@@ -3,7 +3,7 @@ import { stdbBffCommandPost, type StdbBffCommandInput } from "@lumiere/stdb/comm
 import { resolveManufacturingMaterialEffect } from "@lumiere/query-hooks/hooks/manufacturing-material-consumption"
 import { resolveManufacturingFinishedEffect, type DestinationQuantSnapshot } from "@lumiere/query-hooks/hooks/manufacturing-production-close"
 import { locationOptionsFromQuantsAndTransfers, productRowsToSelectOptions, warehouseRowsToSelectOptions } from "../../lib/form-lookup"
-import { fetchDefaultCompanyId, fetchFirstWarehouseId, gotoModule, scalarQueryId, signIn, smokeName, submitForm } from "./helpers"
+import { selectModuleTab, fetchDefaultCompanyId, fetchFirstWarehouseId, gotoModule, scalarQueryId, signIn, smokeName, submitForm } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 
 type Row = Record<string, unknown>
@@ -49,7 +49,7 @@ async function submit(page: Page, formId: string, operation: string) {
 
 async function openRow(page: Page, tab: "orders" | "workorders", recordId: number, origin?: string) {
   await gotoModule(page, "/manufacturing", "manufacturing")
-  await page.getByTestId(`module-tab-manufacturing-${tab}`).click()
+  await selectModuleTab(page, "manufacturing", tab)
   const panel = page.locator('[role="tabpanel"]:visible')
   if (origin) await panel.getByLabel("Search records").fill(origin)
   const row = panel.getByTestId(`entity-row-${recordId}`)
@@ -135,7 +135,7 @@ test.describe("COV-07i one operator-created manufacturing lifecycle", { tag: ["@
       await signIn(denied, "fixture.reader@example.test", password)
       const priorBoms = new Set((await rows(page, "mrp-boms")).map((row) => id(row.id)))
       await gotoModule(operator, "/manufacturing", "manufacturing")
-      await operator.getByTestId("module-tab-manufacturing-boms").click()
+      await selectModuleTab(operator, "manufacturing", "boms")
       await operator.getByTestId("module-create-manufacturing-boms").click()
       await select(operator, "productTmplId", productLabel)
       await operator.getByTestId("form-field-productQty").fill("1")
@@ -157,7 +157,7 @@ test.describe("COV-07i one operator-created manufacturing lifecycle", { tag: ["@
 
       const origin = smokeName("cov07i-operator")
       await gotoModule(operator, "/manufacturing", "manufacturing")
-      await operator.getByTestId("module-tab-manufacturing-orders").click()
+      await selectModuleTab(operator, "manufacturing", "orders")
       await operator.getByTestId("module-create-manufacturing-orders").click()
       await select(operator, "productId", productLabel)
       await operator.getByTestId("form-field-productQty").fill("1")

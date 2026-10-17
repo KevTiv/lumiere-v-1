@@ -576,7 +576,7 @@ export async function moveQuantViaInventoryUi(
   quantity: number,
 ): Promise<void> {
   await gotoModule(page, "/inventory", "inventory")
-  await page.getByTestId("module-tab-inventory-stock").click()
+  await selectModuleTab(page, "inventory", "stock")
   await selectEntityRowById(page, quantId)
   await page.getByTestId("entity-action-move-stock-quant").click()
   await expect(page.getByTestId("form-modal-move-stock-quant")).toBeVisible({

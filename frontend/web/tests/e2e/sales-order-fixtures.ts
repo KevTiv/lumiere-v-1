@@ -5,6 +5,7 @@ import { saleOrderHref } from "@lumiere/erp-shared/record-links"
 
 import { matchesOperationResponse } from "./operation-response"
 import {
+  selectModuleTab,
   activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
@@ -31,7 +32,7 @@ type SaleOrderQueryRow = QueryRowFor<"sale-orders">
  */
 export async function createDraftSaleOrder(page: Page, clientRef: string): Promise<number> {
   await gotoModule(page, "/sales", "sales")
-  await page.getByTestId("module-tab-sales-orders").click()
+  await selectModuleTab(page, "sales", "orders")
   await waitForBffQueryMinRows(page, "/api/query/contacts")
   await waitForBffQueryMinRows(page, "/api/query/pricelists")
   await waitForBffQueryMinRows(page, "/api/query/warehouses")
@@ -188,7 +189,7 @@ export async function confirmOrderViaUi(page: Page, orderId: number) {
 export async function openFulfillmentTab(page: Page) {
   await gotoModule(page, "/sales", "sales")
   const tab = page.getByTestId("module-tab-sales-fulfillment")
-  await tab.click()
+  await selectModuleTab(page, "sales", "fulfillment")
   await expect(tab).toHaveAttribute("aria-selected", "true")
   await expect(page.locator('[role="tabpanel"]:visible').getByTestId("entity-table")).toBeVisible({
     timeout: 30_000,
@@ -256,7 +257,7 @@ export async function expectOrderSummary(
     await page.reload({ waitUntil: "domcontentloaded" })
     await gotoModule(page, "/sales", "sales")
   }
-  await page.getByTestId("module-tab-sales-orders").click()
+  await selectModuleTab(page, "sales", "orders")
   const row = activeTabEntityTable(page).getByTestId(`entity-row-${orderId}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
   for (const label of expected.present ?? []) {

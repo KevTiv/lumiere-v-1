@@ -3,9 +3,12 @@ import { useModuleTab } from "@/hooks/use-module-tab"
 import { AccountantOverview } from "./accountant-overview"
 import { useInvoicePersonalization } from "@lumiere/query-hooks/hooks/invoice-personalization"
 import { invoiceSellerFromCompany, isInvoiceSellerIdentityReady } from "@lumiere/erp-shared/invoice-personalization"
-import { resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
+import { formatInvoiceMoney, resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
+import { ReconciliationWorkbench, type ReconciliationOutcome } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench"
+import type { ReconciliationRequest, ReconciliationSource } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench-model"
+import { bankLinkReadbackConfirms, canDispatchReviewedBankLink } from "./bank-link-review"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "@lumiere/ui/lib/module-url-filters"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
@@ -86,8 +89,6 @@ import {
   type AccountingReadinessItem,
   type AccountingSetupReadinessInput,
 } from "@lumiere/ui"
-import { Input } from "@lumiere/ui/components/input"
-import { Label } from "@lumiere/ui/components/label"
 import type { BadgeVariant, EntityAction, EntityRecordSheetConfig, FormField, EntityRow, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   accountingParamsToJson,
@@ -267,8 +268,6 @@ import {
   useUpdateAccountBankStatementLine,
   useDeleteAccountBankStatementLine,
   useBankMatchCandidates,
-  useMatchBankLine,
-  useApplyReconciliationRules,
   useReconcileAccountBankStatementLine,
   useUnreconciledAccountBankStatementLine,
   useAccountReconciliationWidgets,
@@ -447,7 +446,7 @@ import {
   toBankStatementCreateInput,
   toBankStatementUpdateParams,
 } from "./bank-statement-actions"
-import { formText, useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
+import { useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
 import type {
   AccountAnalyticAccount,
   AccountFiscalYear,
@@ -490,12 +489,7 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
-import {
-  downloadDocumentPdf,
-  useDispatchQueuedMail,
-  useMailTemplates,
-  useQueueMailFromTemplate,
-} from "@lumiere/query-hooks/hooks/templates"
+import { downloadDocumentPdf } from "@lumiere/query-hooks/hooks/templates"
 import { useCreateDocument } from "@lumiere/query-hooks/hooks/documents"
 import { archiveRenderedPdfAsDocument } from "@/lib/archive-document-pdf"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
@@ -664,12 +658,6 @@ function budgetStateStr(row: Record<string, unknown>): string {
   return String(v ?? "")
 }
 
-function bankStatementStateStr(row: Record<string, unknown>): string {
-  const v = row.state
-  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
-  return String(v ?? "")
-}
-
 function assetStateTag(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
@@ -701,13 +689,6 @@ function parseCommaSeparatedBigInts(raw: unknown): bigint[] {
     }
   }
   return out
-}
-
-function parseOptionalRuleId(s: string): number | null {
-  const x = s.trim()
-  if (x === "") return null
-  const n = Number(x)
-  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null
 }
 
 function moveLineIdsFromRow(line: Record<string, unknown>): bigint[] {
@@ -848,9 +829,12 @@ function AccountingClientReady({
   const [bankLineCreateOpen, setBankLineCreateOpen] = useState(false)
   const [bankLineEdit, setBankLineEdit] = useState<Record<string, unknown> | null>(null)
   const [bankLineMatchFocus, setBankLineMatchFocus] = useState<Record<string, unknown> | null>(null)
-  const [reconciliationRuleIdInput, setReconciliationRuleIdInput] = useState("")
-  const [manualReconcileMoveIds, setManualReconcileMoveIds] = useState("")
-  const [manualReconcileResidual, setManualReconcileResidual] = useState("0")
+  const [bankLinkLocked, setBankLinkLocked] = useState(false)
+  const bankLinkLockRef = useRef(false)
+  const handleBankLinkLock = useCallback((locked: boolean) => {
+    bankLinkLockRef.current = locked
+    setBankLinkLocked(locked)
+  }, [])
   const [reconciliationWidgetEdit, setReconciliationWidgetEdit] = useState<Record<string, unknown> | null>(null)
   const [fiscalYearEdit, setFiscalYearEdit] = useState<Record<string, unknown> | null>(null)
   const [fiscalSetupOpen, setFiscalSetupOpen] = useState(false)
@@ -946,6 +930,9 @@ function AccountingClientReady({
     : undefined
   const currenciesRead = moduleCollection(useCurrencies())
   const currencies = currenciesRead.rows
+  const currentBankStatements = bankStatements.filter((row) => String(row.id) === String(bankStatementDetail?.id)
+    && row.organizationId === orgId && row.companyId === operatingCompanyId)
+  const currentBankStatement = currentBankStatements.length === 1 ? currentBankStatements[0]! : null
   const intercompanyRulesRead = moduleCollection(useIntercompanyRules(orgId, { enabled: organizationId > 0 }))
   const intercompanyRules = intercompanyRulesRead.rows
   const intercompanyTransactionsRead = moduleCollection(useIntercompanyTransactions(orgId, {
@@ -2169,12 +2156,6 @@ function AccountingClientReady({
   const updateBudgetPost = useUpdateBudgetPost(organizationId)
   const postMove = usePostAccountMove(organizationId, operatingCompanyId)
   const createCreditNote = useCreateCreditNoteFromInvoice(organizationId)
-  const mailTemplatesQuery = useMailTemplates(organizationId, organizationId > 0)
-  const queueMailFromTemplate = useQueueMailFromTemplate(
-    organizationId,
-    Number(operatingCompanyId),
-  )
-  const dispatchQueuedMail = useDispatchQueuedMail()
   const createDocument = useCreateDocument(orgId, operatingCompanyId)
   const [invoiceDocBusy, setInvoiceDocBusy] = useState<"download" | "send" | "archive" | null>(null)
   const cancelMove = useCancelAccountMove(organizationId)
@@ -2198,8 +2179,6 @@ function AccountingClientReady({
   const createBankStatementLine = useCreateAccountBankStatementLine(organizationId, operatingCompanyId)
   const updateBankStatementLine = useUpdateAccountBankStatementLine(organizationId, operatingCompanyId)
   const deleteBankStatementLine = useDeleteAccountBankStatementLine(organizationId, operatingCompanyId)
-  const matchBankLine = useMatchBankLine(organizationId)
-  const applyReconciliationRules = useApplyReconciliationRules(organizationId)
   const reconcileBankLine = useReconcileAccountBankStatementLine(organizationId, operatingCompanyId)
   const unreconcileBankLine = useUnreconciledAccountBankStatementLine(organizationId, operatingCompanyId)
   const createReconciliationWidget = useCreateAccountReconciliationWidget(organizationId, operatingCompanyId)
@@ -2358,11 +2337,11 @@ function AccountingClientReady({
   const statementLinesPager = usePagedRows(detailStatementLines)
 
   const statementBalancesMatch = useMemo(() => {
-    if (!bankStatementDetail) return false
-    const end = Number(bankStatementDetail.balanceEnd ?? 0)
-    const real = Number(bankStatementDetail.balanceEndReal ?? 0)
-    return Math.abs(end - real) <= 0.01
-  }, [bankStatementDetail])
+    if (!currentBankStatement) return false
+    const end = currentBankStatement.balanceEnd
+    const real = currentBankStatement.balanceEndReal
+    return typeof end === "number" && typeof real === "number" && Number.isFinite(end) && Number.isFinite(real) && Math.abs(end - real) <= 0.01
+  }, [currentBankStatement])
 
   const newBankStatementLineFormConfig = useMemo(() => {
     const base = !bankStatementDetail?.id
@@ -2421,19 +2400,6 @@ function AccountingClientReady({
       },
     )
   }, [reconciliationWidgetEdit, t, glAccountFieldOptions, optionalPartnerSelectOptions])
-
-  const matchCandidatesForFocusedLine = useMemo(() => {
-    if (!bankLineMatchFocus?.id) return []
-    const lid = String(bankLineMatchFocus.id)
-    return bankMatchCandidates.filter((c) => String(c.statementLineId) === lid)
-  }, [bankLineMatchFocus, bankMatchCandidates])
-
-  useEffect(() => {
-    if (bankLineMatchFocus?.id != null) {
-      setManualReconcileResidual(String(bankLineMatchFocus.amount ?? 0))
-      setManualReconcileMoveIds("")
-    }
-  }, [bankLineMatchFocus?.id, bankLineMatchFocus?.amount])
 
   const editBankStatementLineFormConfig = useMemo(() => {
     const empty = {
@@ -4352,76 +4318,68 @@ function AccountingClientReady({
     }
   }, [selectedInvoice, operatingCompanyId, createDocument, toast])
 
-  const handleInvoiceSendEmail = useCallback(async () => {
-    if (!selectedInvoice?.id) return
-    const values = await askForm({
-      title: t("accounting.invoices.invoiceActions.send"),
-      fields: [
-        {
-          id: "recipient",
-          name: "recipient",
-          label: "Recipient email address",
-          type: "email",
-          required: true,
-        },
-      ],
-    })
-    const recipient = formText(values?.recipient)
-    if (recipient == null) return
-    const template = (mailTemplatesQuery.data ?? []).find(
-      (row) =>
-        (row.model ?? "") === "account_move" &&
-        (row.isActive ?? row.is_active) !== false,
-    )
-    if (!template?.id) {
-      toast({
-        variant: "destructive",
-        title: t("accounting.invoices.invoiceActions.send"),
-        description: "No active mail template for account_move. Create one in settings first.",
-      })
-      return
-    }
-    try {
-      setInvoiceDocBusy("send")
-      await queueMailFromTemplate.mutateAsync({
-        templateId: Number(template.id),
-        model: "account_move",
-        resId: Number(selectedInvoice.id),
-        recipientEmail: recipient,
-      })
-      const dispatchResult = await dispatchQueuedMail.mutateAsync()
-      toast({
-        title: t("accounting.invoices.invoiceActions.send"),
-        description: `Queued and dispatched ${dispatchResult.sent ?? 0} email(s).`,
-      })
-    } catch (e) {
-      toast({
-        variant: "destructive",
-        title: t("accounting.invoices.invoiceActions.send"),
-        description: e instanceof Error ? e.message : String(e),
-      })
-    } finally {
-      setInvoiceDocBusy(null)
-    }
-  }, [
-    selectedInvoice,
-    mailTemplatesQuery.data,
-    queueMailFromTemplate,
-    dispatchQueuedMail,
-    askForm,
-    toast,
-    t,
-  ])
+  const handleInvoiceSendEmail = useCallback(() => {
+    const id = optionalBigIntU64(selectedInvoice?.id)
+    if (id == null || id <= 0n) return
+    // Review a single document; never drain the organization-wide mail queue here.
+    router.push(`/accounting/invoices/${id}?review=email`)
+  }, [selectedInvoice?.id, router])
 
   // ── Derived data ────────────────────────────────────────────────────────────
   const invoices = useMemo(
-    () => allMoves.filter((m) => moveTypeTag(m as Record<string, unknown>) === "OutInvoice"),
-    [allMoves],
+    () => allMoves.filter((m) => m.organizationId === orgId && m.companyId === operatingCompanyId && moveTypeTag(m as Record<string, unknown>) === "OutInvoice"),
+    [allMoves, orgId, operatingCompanyId],
   )
   const bills = useMemo(
-    () => allMoves.filter((m) => moveTypeTag(m as Record<string, unknown>) === "InInvoice"),
-    [allMoves],
+    () => allMoves.filter((m) => m.organizationId === orgId && m.companyId === operatingCompanyId && moveTypeTag(m as Record<string, unknown>) === "InInvoice"),
+    [allMoves, orgId, operatingCompanyId],
   )
+
+  const bankStatementMoney = (value: unknown) => formatInvoiceMoney(typeof value === "number" ? value : null, {
+    id: currentBankStatement ? String(currentBankStatement.currencyId) : undefined,
+    code: invoiceCurrencyOptions.find((currency) => currency.value === String(currentBankStatement?.currencyId))?.code,
+  })
+  const bankLinkSource: ReconciliationSource = {
+    organizationId, companyId: operatingCompanyId, companyCurrencyId: invoiceCompany?.currencyId,
+    state: mergeModuleStates([bankStatementsRead.state, bankStatementLinesRead.state, allMovesRead.state,
+      accountMoveLinesRead.state, accountsRead.state, currenciesRead.state, companiesRead.state]),
+    statement: currentBankStatement,
+    line: bankStatementLines.find((row) => String(row.id) === String(bankLineMatchFocus?.id)) ?? null,
+    bankLines: bankStatementLines, moves: allMoves, moveLines: accountMoveLines,
+    accounts, currencies, suggestions: bankMatchCandidates, partners: contacts,
+  }
+  const bankLinkAccess = useRef({ source: bankLinkSource, allowed: false })
+  const canLinkBankRecords = checkPermission("account_bank_statement_line", "write").allowed
+    && !postBankStatement.isPending && !deleteBankStatement.isPending && !deleteBankStatementLine.isPending
+    && !createBankStatementLine.isPending && !updateBankStatementLine.isPending && !unreconcileBankLine.isPending
+  bankLinkAccess.current = { source: bankLinkSource, allowed: canLinkBankRecords }
+  const confirmBankLink = async (request: ReconciliationRequest): Promise<ReconciliationOutcome> => {
+    const current = bankLinkAccess.current
+    if (!canDispatchReviewedBankLink(current.source, request, current.allowed)) {
+      return { status: "rejected", message: "The company, access or bank records changed. Review the current records before linking." }
+    }
+    if ([request.organizationId, request.companyId, request.lineId, ...request.moveLineIds].some((id) => BigInt(id) > BigInt(Number.MAX_SAFE_INTEGER))) {
+      return { status: "rejected", message: "This record identifier is not supported by the current command transport. No link was submitted." }
+    }
+    try {
+      await reconcileBankLine.mutateAsync({ lineId: BigInt(request.lineId), params: bankReconcileParamsToJson(request.moveLineIds.map((id) => BigInt(id)), 0) })
+      return { status: "confirmed" }
+    } catch {
+      // The existing command hook does not retain HTTP status; no error is safe to replay automatically.
+      return { status: "unknown", message: "The original bank-line link could not be confirmed. Check its saved result; do not submit it again." }
+    }
+  }
+  const checkBankLink = async (request: ReconciliationRequest): Promise<"confirmed" | "unconfirmed"> => {
+    const sameScope = () => String(bankLinkAccess.current.source.organizationId) === request.organizationId
+      && String(bankLinkAccess.current.source.companyId) === request.companyId
+      && bankLinkAccess.current.source.state.status === "ready"
+    if (!sameScope()) return "unconfirmed"
+    const [lines, statements] = await Promise.all([
+      fetchQueryList("/api/query/bank-statement-lines", "Could not check the original bank line"),
+      fetchQueryList("/api/query/bank-statements", "Could not check the original statement"),
+    ])
+    return sameScope() && bankLinkReadbackConfirms(request, lines, statements) ? "confirmed" : "unconfirmed"
+  }
 
   // Each overview card owns its source state; an unavailable auxiliary read must
   // never become a zero balance or hide the other independently available queues.
@@ -4452,6 +4410,8 @@ function AccountingClientReady({
         deadlines: taxDeadlinesRead,
         periods: accountPeriodsRawRead,
         currencies: currenciesRead,
+        companies: companiesRead,
+        budgets: budgetsRead,
       }}
       onNavigate={setAccountingActiveTab}
       onCreateInvoice={checkPermission("account_move", "create").allowed && manualInvoiceReadState.status === "ready" ? openInvoiceCreate : undefined}
@@ -4710,7 +4670,7 @@ function AccountingClientReady({
   const bankDetailUsable = canUseModuleData(bankStatementsRead.state) && canUseModuleData(bankStatementLinesRead.state)
   const manualInvoiceDataReady = manualInvoiceReadState.status === "ready"
   useEffect(() => {
-    if (!bankDetailUsable) {
+    if (!bankDetailUsable && !bankLinkLockRef.current) {
       setBankStatementDetail(null)
       setBankLineMatchFocus(null)
       setBankLineEdit(null)
@@ -4720,7 +4680,7 @@ function AccountingClientReady({
       setShowCreateInvoice(false)
       setShowCreateBill(false)
     }
-  }, [bankDetailUsable, manualInvoiceDataReady])
+  }, [bankDetailUsable, manualInvoiceDataReady, bankLinkLocked])
   // Record sheets, row editors and prompts are opened from the active tab's rows.
   const activeTabUsable = tabUsable(accountingActiveTab)
   useEffect(() => {
@@ -4736,10 +4696,10 @@ function AccountingClientReady({
       setAnalyticAccountEdit(null)
       setAnalyticLineEdit(null)
       setAnalyticDistEdit(null)
-      setBankStatementDetail(null)
+      if (!bankLinkLockRef.current) setBankStatementDetail(null)
       setBankLineCreateOpen(false)
       setBankLineEdit(null)
-      setBankLineMatchFocus(null)
+      if (!bankLinkLockRef.current) setBankLineMatchFocus(null)
       setReconciliationWidgetEdit(null)
       setFiscalYearEdit(null)
       setFiscalSetupOpen(false)
@@ -4757,7 +4717,7 @@ function AccountingClientReady({
       setGlDrilldownAccount(null)
       cancelForm()
     }
-  }, [quickActionUsable, csvUsable, activeTabUsable, cancelForm])
+  }, [quickActionUsable, csvUsable, activeTabUsable, cancelForm, bankLinkLocked])
 
   const handleFormSubmit = async (
     _tabId: string,
@@ -5180,13 +5140,15 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <ListPivotSwitch
-                    storageId="accounting-invoices-list"
+                    storageId={`accounting-invoices-list:${organizationId}:${operatingCompanyId}:${currentUser?.id ?? "session"}`}
                     t={t}
                     rows={copyAsRecords(invoices)}
                     {...accountMovePivotSetup(t)}
                   >
                   <InvoiceListView
                     invoices={invoices}
+                    worklistScope={{ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }}
+                    sourceState={mergeModuleStates([allMovesRead.state, currenciesRead.state])}
                     currencyOptions={invoiceCurrencyOptions}
                     initialFilters={invoiceFilters}
                     onInitialFilterClear={clearInvoiceFilter}
@@ -5207,13 +5169,15 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <ListPivotSwitch
-                    storageId="accounting-bills-list"
+                    storageId={`accounting-bills-list:${organizationId}:${operatingCompanyId}:${currentUser?.id ?? "session"}`}
                     t={t}
                     rows={copyAsRecords(bills)}
                     {...accountMovePivotSetup(t)}
                   >
                   <BillsListView
                     bills={bills}
+                    worklistScope={{ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }}
+                    sourceState={mergeModuleStates([allMovesRead.state, currenciesRead.state])}
                     currencyOptions={invoiceCurrencyOptions}
                     initialFilters={invoiceFilters}
                     onInitialFilterClear={clearInvoiceFilter}
@@ -5774,6 +5738,9 @@ function AccountingClientReady({
       invoiceCurrencyOptions,
       invoiceFilters,
       clearInvoiceFilter,
+      currentUser?.id,
+      allMovesRead.state,
+      currenciesRead.state,
       chartStructurePanel,
       invoices,
       bills,
@@ -6267,7 +6234,10 @@ function AccountingClientReady({
         }
         onDownloadPdf={selectedInvoice ? () => void handleInvoiceDownloadPdf() : undefined}
         onArchivePdf={selectedInvoice ? () => void handleInvoiceArchivePdf() : undefined}
-        onSendEmail={selectedInvoice ? () => void handleInvoiceSendEmail() : undefined}
+        onSendEmail={selectedInvoice && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType)
+          && enumTag(selectedInvoice.state) === "Posted"
+          && checkPermission("mail_template", "read").allowed && checkPermission("mail_template", "write").allowed
+          ? handleInvoiceSendEmail : undefined}
         onRecalculateTotals={
           selectedInvoice
             ? () =>
@@ -6631,53 +6601,48 @@ function AccountingClientReady({
       <Dialog
         open={!!bankStatementDetail}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !bankLinkLockRef.current) {
             setBankStatementDetail(null)
             setBankLineCreateOpen(false)
             setBankLineMatchFocus(null)
-            setReconciliationRuleIdInput("")
-            setManualReconcileMoveIds("")
-            setManualReconcileResidual("0")
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[94dvh] max-w-[calc(100%-1rem)] overflow-y-auto sm:max-w-6xl [&_button]:min-h-11 [&_button]:min-w-11">
           <DialogHeader>
             <DialogTitle>
               {t("accounting.bankStatementDetail.title")}
-              {bankStatementDetail?.name != null && String(bankStatementDetail.name).trim() !== ""
-                ? ` — ${String(bankStatementDetail.name)}`
-                : bankStatementDetail?.id != null
-                  ? ` #${String(bankStatementDetail.id)}`
+              {bankLinkSource.state.status === "ready" && currentBankStatement
+                ? ` — ${currentBankStatement.name || `Statement #${currentBankStatement.id}`}`
                   : ""}
             </DialogTitle>
           </DialogHeader>
-          {bankStatementDetail ? (
-            <div className="space-y-4 text-sm">
+          {currentBankStatement && bankLinkSource.state.status === "ready" ? (
+            <fieldset disabled={bankLinkLocked} className="min-w-0 space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <div>
                   <span className="text-muted-foreground">{t("accounting.entities.bankStatements.columns.state")}</span>
-                  <div className="font-medium">{bankStatementStateStr(bankStatementDetail)}</div>
+                  <div className="font-medium">{enumTag(currentBankStatement.state)}</div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("accounting.entities.bankStatements.columns.balanceStart")}</span>
-                  <div className="font-medium">{Number(bankStatementDetail.balanceStart ?? 0).toLocaleString()}</div>
+                  <div className="font-medium">{bankStatementMoney(currentBankStatement.balanceStart)}</div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("accounting.entities.bankStatements.columns.balanceEndReal")}</span>
-                  <div className="font-medium">{Number(bankStatementDetail.balanceEndReal ?? 0).toLocaleString()}</div>
+                  <div className="font-medium">{bankStatementMoney(currentBankStatement.balanceEndReal)}</div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("accounting.entities.bankStatements.columns.balanceEnd")}</span>
-                  <div className="font-medium">{Number(bankStatementDetail.balanceEnd ?? 0).toLocaleString()}</div>
+                  <div className="font-medium">{bankStatementMoney(currentBankStatement.balanceEnd)}</div>
                 </div>
               </div>
-              {bankStatementStateStr(bankStatementDetail) === "Open" && !statementBalancesMatch ? (
+              {enumTag(currentBankStatement.state) === "Open" && !statementBalancesMatch ? (
                 <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-900 dark:text-amber-100">
                   {t("accounting.bankStatementDetail.balanceMismatch")}
                 </p>
               ) : null}
-              {bankStatementStateStr(bankStatementDetail) === "Posted" ? (
+              {enumTag(currentBankStatement.state) === "Posted" ? (
                 <p className="text-muted-foreground">{t("accounting.bankStatementDetail.postedHint")}</p>
               ) : null}
 
@@ -6686,13 +6651,13 @@ function AccountingClientReady({
                   type="button"
                   size="sm"
                   disabled={
-                    bankStatementStateStr(bankStatementDetail) !== "Open" ||
+                    enumTag(currentBankStatement.state) !== "Open" ||
                     !statementBalancesMatch ||
                     postBankStatement.isPending
                   }
                   onClick={async () => {
-                    if (!bankStatementDetail.id) return
-                    await postBankStatement.mutateAsync(BigInt(String(bankStatementDetail.id)))
+                    if (!currentBankStatement.id) return
+                    await postBankStatement.mutateAsync(BigInt(String(currentBankStatement.id)))
                     setBankStatementDetail(null)
                   }}
                 >
@@ -6702,11 +6667,11 @@ function AccountingClientReady({
                   type="button"
                   size="sm"
                   variant="secondary"
-                  disabled={bankStatementStateStr(bankStatementDetail) === "Posted" || deleteBankStatement.isPending}
+                  disabled={enumTag(currentBankStatement.state) === "Posted" || deleteBankStatement.isPending}
                   onClick={async () => {
-                    if (!bankStatementDetail.id) return
+                    if (!currentBankStatement.id) return
                     if (!(await confirmDialog({ description: t("accounting.bankStatementDetail.deleteStatementConfirm") }))) return
-                    void runMutation(() => deleteBankStatement.mutateAsync(BigInt(String(bankStatementDetail.id)))).then(
+                    void runMutation(() => deleteBankStatement.mutateAsync(BigInt(String(currentBankStatement.id)))).then(
                       (ok) => {
                         if (ok) setBankStatementDetail(null)
                       },
@@ -6719,7 +6684,7 @@ function AccountingClientReady({
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={bankStatementStateStr(bankStatementDetail) === "Posted"}
+                  disabled={enumTag(currentBankStatement.state) === "Posted"}
                   onClick={() => setBankLineCreateOpen(true)}
                 >
                   {t("accounting.bankStatementDetail.addLineButton")}
@@ -6813,7 +6778,7 @@ function AccountingClientReady({
                                     size="sm"
                                     variant="ghost"
                                     className="h-7 px-2"
-                                    disabled={bankStatementStateStr(bankStatementDetail) === "Posted"}
+                                    disabled={enumTag(currentBankStatement.state) === "Posted"}
                                     onClick={() => setBankLineEdit(lineRow)}
                                   >
                                     {t("common.edit")}
@@ -6824,7 +6789,7 @@ function AccountingClientReady({
                                     variant="ghost"
                                     className="h-7 px-2 text-destructive"
                                     disabled={
-                                      bankStatementStateStr(bankStatementDetail) === "Posted" ||
+                                      enumTag(currentBankStatement.state) === "Posted" ||
                                       deleteBankStatementLine.isPending
                                     }
                                     onClick={async () => {
@@ -6848,182 +6813,17 @@ function AccountingClientReady({
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-border pt-4">
-                <h3 className="font-semibold">{t("accounting.reconciliation.title")}</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="recon-rule-id">{t("accounting.bankStatementDetail.reconciliationRuleId")}</Label>
-                  <Input
-                    id="recon-rule-id"
-                    value={reconciliationRuleIdInput}
-                    onChange={(e) => setReconciliationRuleIdInput(e.target.value)}
-                    className="max-w-xs"
-                    placeholder="—"
-                  />
-                  <p className="text-muted-foreground text-xs">
-                    {t("accounting.bankStatementDetail.reconciliationRuleIdHint")}
-                  </p>
-                </div>
-                {bankLineMatchFocus?.id ? (
-                  <>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        disabled={matchBankLine.isPending}
-                        onClick={() => {
-                          void runMutation(() =>
-                            matchBankLine.mutateAsync({
-                              lineId: BigInt(String(bankLineMatchFocus.id)),
-                              ruleId: parseOptionalRuleId(reconciliationRuleIdInput),
-                            }),
-                          )
-                        }}
-                      >
-                        {t("accounting.bankStatementDetail.matchBankLine")}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        disabled={applyReconciliationRules.isPending}
-                        onClick={() => {
-                          void runMutation(() =>
-                            applyReconciliationRules.mutateAsync({
-                              lineId: BigInt(String(bankLineMatchFocus.id)),
-                              ruleId: parseOptionalRuleId(reconciliationRuleIdInput),
-                            }),
-                          )
-                        }}
-                      >
-                        {t("accounting.bankStatementDetail.applyRules")}
-                      </Button>
-                    </div>
-                    <div>
-                      <h4 className="mb-2 text-sm font-medium">
-                        {t("accounting.bankStatementDetail.matchCandidatesHeading")}
-                      </h4>
-                      {matchCandidatesForFocusedLine.length === 0 ? (
-                        <p className="text-muted-foreground text-sm">
-                          {t("accounting.bankStatementDetail.noCandidates")}
-                        </p>
-                      ) : (
-                        <div className="overflow-x-auto rounded-md border">
-                          <table className="w-full text-left text-xs sm:text-sm">
-                            <thead className="border-b bg-muted/50">
-                              <tr>
-                                <th className="p-2">{t("accounting.bankStatementDetail.candidateType")}</th>
-                                <th className="p-2">{t("accounting.bankStatementDetail.candidateMoveLine")}</th>
-                                <th className="p-2 text-right">{t("accounting.bankStatementDetail.candidateAmount")}</th>
-                                <th className="p-2 text-right">{t("accounting.bankStatementDetail.candidateScore")}</th>
-                                <th className="p-2 w-24" />
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {matchCandidatesForFocusedLine.map((c) => (
-                                <tr key={String(c.id)} className="border-b last:border-0">
-                                  <td className="p-2">{String(c.matchType ?? "")}</td>
-                                  <td className="p-2 font-mono">{String(c.entityId ?? "")}</td>
-                                  <td className="p-2 text-right">{Number(c.amount ?? 0).toLocaleString()}</td>
-                                  <td className="p-2 text-right">{String(c.score ?? "")}</td>
-                                  <td className="p-2">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      className="h-7 px-2"
-                                      disabled={reconcileBankLine.isPending || Boolean(bankLineMatchFocus.isReconciled)}
-                                      onClick={() => {
-                                        if (!bankLineMatchFocus.id || c.entityId == null) return
-                                        void runMutation(() =>
-                                          reconcileBankLine.mutateAsync({
-                                            lineId: BigInt(String(bankLineMatchFocus.id)),
-                                            params: bankReconcileParamsToJson(
-                                              [BigInt(String(c.entityId))],
-                                              0,
-                                            ),
-                                          }),
-                                        )
-                                      }}
-                                    >
-                                      {t("accounting.bankStatementDetail.reconcileWithCandidate")}
-                                    </Button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2 rounded-md border border-dashed p-3">
-                      <h4 className="text-sm font-medium">
-                        {t("accounting.bankStatementDetail.manualReconcileHeading")}
-                      </h4>
-                      <div className="space-y-1">
-                        <Label htmlFor="manual-move-ids">
-                          {t("accounting.bankStatementDetail.manualMoveLineIds")}
-                        </Label>
-                        <Input
-                          id="manual-move-ids"
-                          value={manualReconcileMoveIds}
-                          onChange={(e) => setManualReconcileMoveIds(e.target.value)}
-                          placeholder="e.g. 101, 102"
-                        />
-                        <p className="text-muted-foreground text-xs">
-                          {t("accounting.bankStatementDetail.manualMoveLineIdsHint")}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="manual-residual">
-                          {t("accounting.bankStatementDetail.manualAmountResidual")}
-                        </Label>
-                        <Input
-                          id="manual-residual"
-                          value={manualReconcileResidual}
-                          onChange={(e) => setManualReconcileResidual(e.target.value)}
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={
-                          reconcileBankLine.isPending ||
-                          Boolean(bankLineMatchFocus.isReconciled) ||
-                          manualReconcileMoveIds.trim() === ""
-                        }
-                        onClick={() => {
-                          if (!bankLineMatchFocus.id) return
-                          const parts = manualReconcileMoveIds
-                            .split(/[\s,]+/)
-                            .map((s) => s.trim())
-                            .filter(Boolean)
-                          const ids = parts.map((p) => BigInt(p))
-                          const res = Number(manualReconcileResidual)
-                          void runMutation(() =>
-                            reconcileBankLine.mutateAsync({
-                              lineId: BigInt(String(bankLineMatchFocus.id)),
-                              params: bankReconcileParamsToJson(
-                                ids,
-                                Number.isFinite(res) ? res : 0,
-                              ),
-                            }),
-                          )
-                        }}
-                      >
-                        {t("accounting.bankStatementDetail.reconcileManual")}
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    {t("accounting.bankStatementDetail.focusLineForMatches")}
-                  </p>
-                )}
-              </div>
-            </div>
+            </fieldset>
           ) : null}
+          <ReconciliationWorkbench
+            source={bankLinkSource}
+            canReconcile={canLinkBankRecords}
+            onConfirm={confirmBankLink}
+            onCheckStatus={checkBankLink}
+            onOperationLockChange={handleBankLinkLock}
+          />
           <DialogFooter className="sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => setBankStatementDetail(null)}>
+            <Button type="button" variant="outline" disabled={bankLinkLocked} onClick={() => { if (!bankLinkLockRef.current) setBankStatementDetail(null) }}>
               {t("common.close")}
             </Button>
           </DialogFooter>

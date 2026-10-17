@@ -21,6 +21,9 @@ export interface OverviewRow {
   deletedAt?: unknown; deleted_at?: unknown
   name?: unknown; title?: unknown; ref?: unknown; reference?: unknown; code?: unknown
   statementId?: unknown; statement_id?: unknown
+  decimalPlaces?: unknown; decimal_places?: unknown
+  dateFrom?: unknown; date_from?: unknown; dateTo?: unknown; date_to?: unknown
+  totalPlanned?: unknown; total_planned?: unknown; totalPractical?: unknown; total_practical?: unknown
   isReconciled?: unknown; is_reconciled?: unknown
   reconciledInvoiceIds?: unknown; reconciled_invoice_ids?: unknown
   reconciledBillIds?: unknown; reconciled_bill_ids?: unknown
@@ -39,6 +42,8 @@ export interface AccountantOverviewData {
   deadlines: OverviewCollection
   periods: OverviewCollection
   currencies: OverviewCollection
+  companies?: OverviewCollection
+  budgets?: OverviewCollection
 }
 export type OverviewQueueKey = "overdue" | "draft-invoices" | "draft-bills" | "bank-lines" | "unlinked-payments" | "deadlines" | "periods"
 export interface OverviewActivityMonth {

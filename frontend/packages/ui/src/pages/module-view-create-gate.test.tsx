@@ -30,8 +30,8 @@ vi.mock("../entity-views/entity-view", () => ({
 vi.mock("../entity-views/entity-record-sheet", () => ({ EntityRecordSheet: () => null }))
 vi.mock("../forms/form-modal", () => ({ FormModal: ({ open }: { open: boolean }) => (open ? <div data-testid="create-form" /> : null) }))
 vi.mock("../forms/runtime-form-modal", () => ({ RuntimeFormModal: () => null }))
-vi.mock("./dashboard-grid", () => ({ DashboardGrid: () => null }))
-vi.mock("./dashboard-header", () => ({ DashboardHeader: () => null }))
+vi.mock("./dashboard-grid", () => ({ DashboardGrid: () => <div data-testid="legacy-dashboard-grid" /> }))
+vi.mock("./dashboard-header", () => ({ DashboardHeader: ({ timeRange, onExport }: { timeRange?: string; onExport?: () => void }) => <div data-testid="dashboard-header-contract" data-time-range={timeRange ?? "none"} data-has-export={String(Boolean(onExport))} /> }))
 vi.mock("../lib/export-dashboard-png", () => ({ exportDashboardToPng: vi.fn() }))
 
 import type { ModuleDataState } from "../lib/module-data-state"
@@ -81,6 +81,32 @@ function renderView(opts: { permissions: PolicyRule[]; ready?: boolean; state?: 
 beforeAll(() => {
   // jsdom lacks scrollIntoView, which ModuleView calls for the active tab.
   Element.prototype.scrollIntoView = vi.fn()
+})
+
+describe("ModuleView scoped dashboard composition", () => {
+  const dashboardConfig: ModuleConfig = { ...config, defaultTab: "dashboard", tabs: [{ id: "dashboard", label: "Overview", type: "dashboard", sections: [] }, ...config.tabs] }
+  const view = (content?: ReactNode, state?: ModuleDataState) => <RBACProvider initialUser={user} initialRoles={[role([])]} initialPolicies={[]}><ModuleView config={dashboardConfig} dashboardContent={content} dashboardTimeRange="30d" onDashboardTimeRangeChange={() => {}} dataState={state ? { dashboard: state } : undefined} /></RBACProvider>
+  it("lets the scoped composition own controls and exports without also rendering legacy figures", () => {
+    render(view(<div>Scoped financial overview</div>))
+    expect(screen.getByText("Scoped financial overview")).toBeTruthy()
+    expect(screen.queryByTestId("legacy-dashboard-grid")).toBeNull()
+    expect(screen.getByTestId("dashboard-header-contract").dataset.timeRange).toBe("none")
+    expect(screen.getByTestId("dashboard-header-contract").dataset.hasExport).toBe("false")
+    fireEvent.click(screen.getByRole("link", { name: "Orders" }))
+    expect(screen.queryByText("Scoped financial overview")).toBeNull()
+    expect(screen.getByTestId("entity-view")).toBeTruthy()
+  })
+  it("leaves legacy dashboard rendering, controls and export available to other modules", () => {
+    render(view())
+    expect(screen.getByTestId("legacy-dashboard-grid")).toBeTruthy()
+    expect(screen.getByTestId("dashboard-header-contract").dataset.timeRange).toBe("30d")
+    expect(screen.getByTestId("dashboard-header-contract").dataset.hasExport).toBe("true")
+  })
+  it("honors dashboard denial before rendering custom or legacy content", () => {
+    render(view(<div>Scoped financial overview</div>, { status: "denied" }))
+    expect(screen.queryByText("Scoped financial overview")).toBeNull()
+    expect(screen.queryByTestId("legacy-dashboard-grid")).toBeNull()
+  })
 })
 afterEach(() => {
   cleanup()
@@ -173,7 +199,10 @@ describe("ModuleView collection states", () => {
   })
 
   it("leaves tab order and arrow navigation to the tab primitive", async () => {
-    const twoTabs = { ...config, tabs: [...config.tabs, { ...config.tabs[0]!, id: "other", label: "Other" }] }
+    const twoTabs = { ...config,
+      tabGroups: [{ label: "Orders workspace", tabIds: ["orders", "other"] }],
+      tabs: [...config.tabs, { ...config.tabs[0]!, id: "other", label: "Other" }],
+    }
     render(<RBACProvider initialUser={user} initialRoles={[role([])]} initialPolicies={[]}>
       <ModuleView config={twoTabs} />
     </RBACProvider>)

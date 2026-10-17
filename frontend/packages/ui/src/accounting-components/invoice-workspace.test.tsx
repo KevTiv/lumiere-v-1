@@ -105,7 +105,7 @@ describe("invoice workspace", () => {
     expect(changed.personalization?.profile.notice).toBe("New company notice")
     expect(changed.personalization?.profile.terms).toBe("")
     expect(saved.personalization?.profile.notice).toBe("Company notice")
-    expect(readInvoiceDocumentContent({ invoiceDocument: { ...snapshot, schemaVersion: 2 } }).personalizationError).toMatch(/unsupported/)
+    expect(readInvoiceDocumentContent({ invoiceDocument: { ...snapshot, schemaVersion: 3 } }).personalizationError).toMatch(/unsupported/)
     expect(resolveDraftInvoiceDocument({ invoiceContent: { schemaVersion: 2 } }, profile, snapshot.profileVersionIds, seller).personalizationError).toMatch(/unsupported/)
   })
 
@@ -120,6 +120,32 @@ describe("invoice workspace", () => {
     expect(paper.querySelector("b")).toBeNull()
     expect(paper.querySelector("img")).toBeNull()
     for (const section of ["Notes", "Terms", "Payment instructions", "Footer"]) expect(screen.getByLabelText(section)).toBeTruthy()
+  })
+
+  it("renders captured V2 customer details without substituting a current partner name", () => {
+    const buyer = { partnerId: "20", name: "Captured customer", address: ["10 Historic Road", "Kigali"], taxId: "TIN20", registrationNumber: "REG20", email: "buyer@example.test", phone: "+250 000 000" }
+    render(<InvoiceDocument title="Invoice" partnerLabel="Bill to" partner="Today's renamed contact" personalization={{ ...snapshot, schemaVersion: 2, buyer }} subtotal={10} tax={0} total={10} />)
+    expect(screen.getByText("Captured customer")).toBeTruthy()
+    const details = screen.getByLabelText("Captured customer billing details")
+    expect(details.textContent).toContain("10 Historic Road")
+    expect(details.textContent).toContain("TIN20")
+    expect(screen.queryByText("Today's renamed contact")).toBeNull()
+  })
+
+  it("preserves captured draft buyer while refreshing seller defaults, and rejects malformed snapshots", () => {
+    const buyer = { partnerId: "20", name: "Captured customer", address: ["Historic address"], taxId: "TIN20", registrationNumber: "", email: "", phone: "" }
+    const metadata = { invoiceDocument: { ...snapshot, schemaVersion: 2, buyer } }
+    const reviewed = resolveDraftInvoiceDocument(metadata, { ...profile, notice: "Current company notice" }, snapshot.profileVersionIds, seller)
+    expect(reviewed.personalization?.schemaVersion).toBe(2)
+    expect(reviewed.personalization?.schemaVersion === 2 ? reviewed.personalization.buyer : null).toEqual(buyer)
+    expect(reviewed.personalization?.profile.notice).toBe("Current company notice")
+    expect(resolveDraftInvoiceDocument({ invoiceDocument: { ...snapshot, schemaVersion: 2 } }, profile, snapshot.profileVersionIds, seller).personalizationError).toBeTruthy()
+  })
+
+  it("labels legacy issued billing details unavailable instead of inventing an address", () => {
+    render(<InvoiceDocument title="Invoice" partnerLabel="Bill to" partner="Legacy customer" personalization={snapshot} subtotal={10} tax={0} total={10} />)
+    expect(screen.queryByLabelText("Captured customer billing details")).toBeNull()
+    expect(screen.getByText("Customer billing details were not captured on this document.")).toBeTruthy()
   })
 
   it("blocks outgoing draft posting until the current profile is readable, while ignoring it on vendor bills", () => {

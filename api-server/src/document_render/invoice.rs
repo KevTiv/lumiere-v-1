@@ -14,6 +14,50 @@ pub(crate) struct InvoiceSnapshot {
     pub seller: Seller,
     pub profile: Profile,
     pub notes: String,
+    #[serde(default)]
+    pub buyer: Option<Buyer>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub(crate) struct Buyer {
+    pub partner_id: String,
+    pub name: String,
+    pub address: Vec<String>,
+    pub tax_id: String,
+    pub registration_number: String,
+    pub email: String,
+    pub phone: String,
+}
+
+fn validate_buyer(buyer: &Buyer, partner_id: Option<u64>) -> Result<(), ApiError> {
+    if buyer.partner_id.parse::<u64>().ok().filter(|id| *id > 0) != partner_id
+        || partner_id.is_none()
+        || partner_id.map(|id| id.to_string()).as_deref() != Some(buyer.partner_id.as_str())
+        || buyer.name.trim().is_empty()
+    {
+        return Err(ApiError::Conflict(
+            "invoice buyer identity is malformed".into(),
+        ));
+    }
+    for (key, value, limit) in [
+        ("buyer name", &buyer.name, 1024),
+        ("buyer tax ID", &buyer.tax_id, 256),
+        ("buyer registration", &buyer.registration_number, 256),
+        ("buyer email", &buyer.email, 254),
+        ("buyer phone", &buyer.phone, 64),
+    ] {
+        bounded_text(value, key, limit)?;
+    }
+    if buyer.address.len() > 12 {
+        return Err(ApiError::Conflict(
+            "invoice buyer address is oversized".into(),
+        ));
+    }
+    for line in &buyer.address {
+        bounded_text(line, "buyer address", 2048)?;
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -63,6 +107,7 @@ pub(crate) struct InvoiceDocument {
     pub title: &'static str,
     pub reference: String,
     pub customer: Seller,
+    pub buyer_available: bool,
     pub seller: Seller,
     pub profile: Profile,
     pub notes: String,
@@ -194,6 +239,9 @@ pub(crate) fn draft_invoice_snapshot(
     if !needs_draft_profile(mv) {
         return document_snapshot(mv);
     }
+    // Buyer authority is the trusted draft capture, never a mutable/denied CRM lookup.
+    // Issuance refreshes it from the exact canonical contact in the same transaction.
+    let captured_buyer = document_snapshot(mv)?.and_then(|snapshot| snapshot.buyer);
     let company_id = row_u64(mv, &["companyId", "company_id"])
         .ok_or_else(|| ApiError::Conflict("draft invoice company is unavailable".into()))?;
     let company = company
@@ -356,7 +404,7 @@ pub(crate) fn draft_invoice_snapshot(
     seller.phone = profile.phone.clone();
     seller.website = profile.website.clone();
     Ok(Some(InvoiceSnapshot {
-        schema_version: 1,
+        schema_version: if captured_buyer.is_some() { 2 } else { 1 },
         profile_version_ids: ProfileVersionIds {
             organization: selected[0]
                 .and_then(|row| row_u64(row, &["id"]))
@@ -368,6 +416,7 @@ pub(crate) fn draft_invoice_snapshot(
         seller,
         profile,
         notes,
+        buyer: captured_buyer,
     }))
 }
 
@@ -398,7 +447,7 @@ pub(crate) fn document_snapshot(mv: &Value) -> Result<Option<InvoiceSnapshot>, A
     }
     let snapshot: InvoiceSnapshot = serde_json::from_value(raw.clone())
         .map_err(|_| ApiError::Conflict("invoice document snapshot is malformed".into()))?;
-    if snapshot.schema_version != 1
+    if !matches!(snapshot.schema_version, 1 | 2)
         || !matches!(
             snapshot.profile.accent.as_str(),
             "" | "teal" | "blue" | "slate" | "violet"
@@ -407,6 +456,15 @@ pub(crate) fn document_snapshot(mv: &Value) -> Result<Option<InvoiceSnapshot>, A
         return Err(ApiError::Conflict(
             "invoice document snapshot version or accent is unsupported".into(),
         ));
+    }
+    match (snapshot.schema_version, &snapshot.buyer) {
+        (1, None) if raw.get("buyer").is_none() => {}
+        (2, Some(buyer)) => validate_buyer(buyer, row_u64(mv, &["partnerId", "partner_id"]))?,
+        _ => {
+            return Err(ApiError::Conflict(
+                "invoice buyer snapshot is malformed".into(),
+            ))
+        }
     }
     if [
         &snapshot.profile_version_ids.organization,
@@ -623,12 +681,18 @@ pub(crate) fn project_invoice(
     );
     let snapshot = if internal_record { None } else { snapshot };
     let legacy = snapshot.is_none() && !internal_record;
-    let (seller, profile, notes) = match snapshot {
-        Some(snapshot) => (snapshot.seller, snapshot.profile, snapshot.notes),
+    let (seller, profile, notes, captured_buyer) = match snapshot {
+        Some(snapshot) => (
+            snapshot.seller,
+            snapshot.profile,
+            snapshot.notes,
+            snapshot.buyer,
+        ),
         None => (
             legacy_seller(company, company_id),
             Profile::default(),
             text(&metadata(mv)?, &["notes", "legacyMetadata"]),
+            None,
         ),
     };
     let partner_id = row_u64(mv, &["partnerId", "partner_id"]);
@@ -636,18 +700,28 @@ pub(crate) fn project_invoice(
         mv,
         &["invoicePartnerDisplayName", "invoice_partner_display_name"],
     );
-    let customer = Seller {
-        name: if customer_name.is_empty() {
-            partner_id
-                .map(|id| format!("Partner #{id}"))
-                .unwrap_or_else(|| "Partner details not available".into())
-        } else {
-            customer_name
-        },
-        // Customer name is persisted on the invoice. This schema does not yet
-        // snapshot customer billing addresses; do not mix in a mutable CRM contact.
-        ..Seller::default()
-    };
+    let buyer_available = captured_buyer.is_some();
+    let customer = captured_buyer
+        .map(|buyer| Seller {
+            name: buyer.name,
+            address: buyer.address,
+            tax_id: buyer.tax_id,
+            registration_number: buyer.registration_number,
+            email: buyer.email,
+            phone: buyer.phone,
+            website: String::new(),
+        })
+        .unwrap_or_else(|| Seller {
+            name: if customer_name.is_empty() {
+                partner_id
+                    .map(|id| format!("Partner #{id}"))
+                    .unwrap_or_else(|| "Partner details not available".into())
+            } else {
+                customer_name
+            },
+            // V1/legacy customer legal details are unavailable; never resolve live CRM.
+            ..Seller::default()
+        });
     let mut commercial_lines: Vec<&Value> = lines
         .iter()
         .filter(|row| row_u64(row, &["moveId", "move_id"]) == Some(move_id))
@@ -677,6 +751,7 @@ pub(crate) fn project_invoice(
         reference: text(mv, &["name"]),
         seller,
         customer,
+        buyer_available,
         profile,
         notes,
         currency: currency_label,
@@ -861,7 +936,17 @@ thead {{ display:table-header-group; }} .items tr {{ break-inside:avoid; }} .num
         } else {
             "Bill to"
         },
-        customer = identity(&document.customer, None),
+        customer = format!(
+            "{}{}",
+            identity(&document.customer, None),
+            if !document.internal_record && !document.buyer_available {
+                "<p class=\"muted\">Billing address and tax identity were not captured for this document.</p>"
+            } else if !document.internal_record && document.state.eq_ignore_ascii_case("draft") {
+                "<p class=\"muted\">Billing details were captured when this draft was created; they will be refreshed from the linked contact when issued.</p>"
+            } else {
+                ""
+            }
+        ),
         date = escape(&document.date),
         due_date = escape(&document.due_date),
         external_reference = escape(&document.external_reference),

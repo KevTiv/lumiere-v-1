@@ -6,6 +6,7 @@ import { ORDER_SUMMARY, expectOrderSummary } from "./sales-order-fixtures"
 import { clickCanonicalHandoff, openCanonicalHandoffs } from "./cov25-link-navigation"
 
 import {
+  selectModuleTab,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   chooseSelectOptionByValue,
@@ -79,7 +80,7 @@ async function expectPaymentRegisteredOnInvoice(
 
 async function createDraftSaleOrder(page: Parameters<typeof gotoModule>[0], clientRef: string): Promise<number> {
   await gotoModule(page, "/sales", "sales")
-  await page.getByTestId("module-tab-sales-orders").click()
+  await selectModuleTab(page, "sales", "orders")
   await waitForBffQueryMinRows(page, "/api/query/contacts")
   await waitForBffQueryMinRows(page, "/api/query/pricelists")
   await waitForBffQueryMinRows(page, "/api/query/warehouses")
@@ -189,7 +190,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     ])
     expect(createLeadRes.ok()).toBe(true)
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-leads").click()
+    await selectModuleTab(page, "crm", "leads")
     await expect(page.getByText(leadName, { exact: true })).toBeVisible({ timeout: 30_000 })
 
     // Step 5 — convert lead (UI; wait for stage lookup before opening modal)
@@ -213,13 +214,13 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const opportunityName = `${leadName} - Opportunity`
     await page.reload()
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await expectSeededText(page, opportunityName, "/api/query/opportunities")
     const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
     // The conversion must survive a browser refresh and keep its persisted label.
     await page.reload({ waitUntil: "domcontentloaded" })
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await expectSeededText(page, opportunityName, "/api/query/opportunities")
     await expect(page.getByText(opportunityName, { exact: true })).toBeVisible()
 
@@ -243,7 +244,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
 
     // Step 6 — convert opportunity → sale order (UI)
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await selectEntityRowByText(page, opportunityName)
     await waitForEntityActionEnabled(page, "entity-action-convert-opp-order")
     await page.getByTestId("entity-action-convert-opp-order").click()
@@ -266,15 +267,15 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     // A fresh Sales load must render the persisted SO label and its related line.
     await page.reload({ waitUntil: "domcontentloaded" })
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     const persistedOrderLabel = await fetchSaleOrderSelectLabel(page, orderId)
     await expect(page.getByText(persistedOrderLabel, { exact: true })).toBeVisible()
-    await page.getByTestId("module-tab-sales-order-lines").click()
+    await selectModuleTab(page, "sales", "order-lines")
     await expect(page.getByText("Lumiere Dev Laptop", { exact: true }).first()).toBeVisible()
 
     // Step 7 — confirm sale order (UI; rows show SO reference, not partner name)
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
     const confirmResPromise = page.waitForResponse(
@@ -300,7 +301,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
 
     // Step 8 — confirm → assign → validate delivery (UI)
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-fulfillment").click()
+    await selectModuleTab(page, "sales", "fulfillment")
     await page
       .waitForResponse(
         (res) => res.url().includes("/api/query/stock-pickings") && res.ok(),
@@ -355,7 +356,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const incomeLabel = await fetchAccountSelectLabelByInternalType(page, "income")
     const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await openCreateInvoiceFromOrder(page, orderId)
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
@@ -485,7 +486,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
 
   test("blocks a Sales order when required configuration is missing", async ({ page }) => {
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await page.getByTestId("module-create-sales-orders").click()
     await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
 
@@ -503,7 +504,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await addLaptopLine(page, orderId, "1000000")
 
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
     const confirmResponse = page.waitForResponse(
@@ -529,7 +530,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const cancelledRef = smokeName("so-invalid-transition")
     const cancelledOrderId = await createDraftSaleOrder(page, cancelledRef)
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await selectEntityRowById(page, cancelledOrderId)
     await waitForEntityActionEnabled(page, "entity-action-cancel-orders")
     await Promise.all([
@@ -562,7 +563,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
 
     // Draft sale order without opportunity lines (UI-only create)
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await waitForBffQueryMinRows(page, "/api/query/contacts")
     await waitForBffQueryMinRows(page, "/api/query/pricelists")
     await waitForBffQueryMinRows(page, "/api/query/warehouses")
@@ -622,7 +623,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
 
     // Confirm → delivery → invoice (proves UI-added line participates in lead-to-cash)
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
     const confirmResPromise = page.waitForResponse(
@@ -639,7 +640,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     await waitForSaleOrderBillableLines(page, orderId)
 
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-fulfillment").click()
+    await selectModuleTab(page, "sales", "fulfillment")
     await page
       .waitForResponse(
         (res) => res.url().includes("/api/query/stock-pickings") && res.ok(),
@@ -689,7 +690,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     const incomeLabel = await fetchAccountSelectLabelByInternalType(page, "income")
     const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await openCreateInvoiceFromOrder(page, orderId)
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)

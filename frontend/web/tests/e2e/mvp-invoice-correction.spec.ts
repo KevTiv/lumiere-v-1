@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   expectFormModalVisible,
@@ -68,7 +69,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
     ])
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-leads").click()
+    await selectModuleTab(page, "crm", "leads")
     await selectEntityRowByText(page, leadName)
     await waitForEntityActionEnabled(page, "entity-action-convert-lead")
     await page.getByTestId("entity-action-convert-lead").click()
@@ -84,7 +85,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
 
     const opportunityName = `${leadName} - Opportunity`
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
 
     await openEntityCreate(page, "/crm", "crm", "opportunity-lines", "add-opportunity-line")
@@ -104,7 +105,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
     await waitForOpportunityLineExists(page, opportunityId)
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await selectEntityRowByText(page, opportunityName)
     await waitForEntityActionEnabled(page, "entity-action-convert-opp-order")
     await page.getByTestId("entity-action-convert-opp-order").click()
@@ -123,7 +124,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
     await waitForSaleOrderLineExists(page, orderId)
 
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
     await Promise.all([
@@ -137,7 +138,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
     await waitForSaleOrderBillableLines(page, orderId)
 
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-fulfillment").click()
+    await selectModuleTab(page, "sales", "fulfillment")
     const pickingId = await fetchFulfillmentPickingIdBySaleOrderId(page, orderId)
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-picking")
@@ -172,7 +173,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
     const incomeLabel = await fetchAccountSelectLabelByInternalType(page, "income")
     const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await openCreateInvoiceFromOrder(page, orderId)
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)

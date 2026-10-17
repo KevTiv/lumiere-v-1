@@ -4,6 +4,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { matchesOperationResponse } from "./operation-response"
 import {
+  selectModuleTab,
   activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
@@ -56,7 +57,7 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     await submitForm(page, "new-lead")
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-leads").click()
+    await selectModuleTab(page, "crm", "leads")
     await expectSeededText(page, leadName, "/api/query/leads")
     await waitForBffQueryMinRows(page, "/api/query/opportunity-stages")
     await selectEntityRowByText(page, leadName)
@@ -68,7 +69,7 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
 
     await page.reload({ waitUntil: "domcontentloaded" })
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await expectSeededText(page, opportunityName, "/api/query/opportunities")
     const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
 
@@ -87,7 +88,7 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     // First conversion must dispatch through the real CRM action and resolve to
     // one exact sale_order(opportunity_id, company_id) effect.
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await selectEntityRowByText(page, opportunityName)
     await waitForEntityActionEnabled(page, "entity-action-convert-opp-order")
     await page.getByTestId("entity-action-convert-opp-order").click()
@@ -148,7 +149,7 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     // return AlreadyApplied, close with semantic feedback, and never dispatch a
     // second consequential operation.
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await selectEntityRowByText(page, opportunityName)
     await waitForEntityActionEnabled(page, "entity-action-convert-opp-order")
     await page.getByTestId("entity-action-convert-opp-order").click()

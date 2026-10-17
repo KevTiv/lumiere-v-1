@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { assertModuleTabs, activeTabEntityTable, expectNoAppError, expectRowActionsOffered, gotoModule } from "./helpers"
+import { selectModuleTab, assertModuleTabs, activeTabEntityTable, expectNoAppError, expectRowActionsOffered, gotoModule } from "./helpers"
 
 const DOCUMENTS_TAB_IDS = [
   "dashboard",
@@ -117,7 +117,7 @@ test.describe("Phase 6 platform smoke", { tag: "@phase-6" }, () => {
 
   test("reports dashboard-widgets tab renders", async ({ page }) => {
     await gotoModule(page, "/reports", "reports")
-    await page.getByTestId("module-tab-reports-dashboard-widgets").click()
+    await selectModuleTab(page, "reports", "dashboard-widgets")
     await expect(page.getByTestId("module-create-reports-dashboard-widgets")).toBeVisible()
     await expect(page.getByTestId("entity-table")).toBeVisible()
     await expectNoAppError(page)

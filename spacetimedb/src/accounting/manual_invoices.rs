@@ -506,6 +506,7 @@ pub fn create_manual_account_invoice(
             ctx,
             organization_id,
             params.company_id,
+            Some(params.partner_id),
             params.metadata.as_deref(),
         )?)
     } else {

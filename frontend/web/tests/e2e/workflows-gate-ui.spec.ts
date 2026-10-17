@@ -8,6 +8,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   activeTabEntityTable,
   assertModuleTabs,
   callReducerBff,
@@ -192,7 +193,7 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
       .toBeGreaterThan(0)
 
     await gotoModule(page, "/workflows", "workflows")
-    await page.getByTestId("module-tab-workflows-instances").click()
+    await selectModuleTab(page, "workflows", "instances")
     const instanceRow = activeTabEntityTable(page).getByTestId(`entity-row-${instanceId}`)
     await expect(instanceRow).toBeVisible({ timeout: 30_000 })
     await instanceRow.click()
@@ -252,7 +253,7 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     })
 
     await gotoModule(page, "/workflows", "workflows")
-    await page.getByTestId("module-tab-workflows-migrations").click()
+    await selectModuleTab(page, "workflows", "migrations")
     await page.getByTestId("module-create-workflows-migrations").click()
     await expect(page.getByTestId("form-modal-create-migration-plan")).toBeVisible()
     await fillField(page, "workflowId", String(seeded.workflowId))
@@ -266,7 +267,7 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     await page.getByTestId("discard-changes-confirm").click()
     await expect(page.getByTestId("form-modal-create-migration-plan")).toBeHidden()
 
-    await page.getByTestId("module-tab-workflows-deadLetters").click()
+    await selectModuleTab(page, "workflows", "deadLetters")
     await expect(activeTabEntityTable(page)).toBeVisible()
     await expectNoAppError(page)
   })

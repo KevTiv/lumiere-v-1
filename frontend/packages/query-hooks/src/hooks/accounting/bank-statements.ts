@@ -139,7 +139,10 @@ export function resolveBankStatementReconciliationEffect(
   const actualIds = exactIdList(line.moveIds ?? line.move_ids)
   const expectedIds = [...args.moveIds].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
   const sortedActual = actualIds?.slice().sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-  const residual = Number(line.amountResidual ?? line.amount_residual)
+  const rawResidual = line.amountResidual ?? line.amount_residual
+  if (rawResidual == null || (typeof rawResidual === "string" && rawResidual.trim() === "")
+    || (typeof rawResidual !== "number" && typeof rawResidual !== "string")) return null
+  const residual = Number(rawResidual)
   const expectedReconciled = Math.abs(args.amountResidual) < 0.01
   if (
     parseStrictU64(line.organizationId ?? line.organization_id) !== args.organizationId ||

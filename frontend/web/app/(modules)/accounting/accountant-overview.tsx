@@ -8,6 +8,7 @@ import { Badge } from "@lumiere/ui/components/badge"
 import { Button } from "@lumiere/ui/components/button"
 import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
 import { invoiceRecordHref } from "./invoice-record"
+import { AccountantInsights } from "./accountant-insights"
 import {
   buildAccountantOverview, overviewDate, overviewDueDate, overviewLabel, overviewMoneyTotals,
   overviewNumber, overviewResidual, overviewTag,
@@ -115,8 +116,14 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
       </div>
     </div>
 
-    <div className={`${workspaceStyles.surface} grid grid-cols-1 overflow-hidden min-[360px]:grid-cols-2 xl:grid-cols-4`}>
-      {summaryCards.map((card, index) => {
+    <nav aria-label={t("accounting.insights.sections")} className="flex flex-wrap gap-2 text-sm">
+      {[["financial-overview-title", t("accounting.insights.title")], ["accounting-insights-title", t("accounting.insights.insightsTitle")], ["accountant-action-queues", t("accounting.insights.queuesTitle")]].map(([target, label]) => <a key={target} href={`#${target}`} className="inline-flex min-h-11 items-center rounded-md border px-3 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring">{label}</a>)}
+    </nav>
+    <AccountantInsights key={`${data.organizationId}:${data.companyId}`} data={data} now={now} />
+
+    <h2 id="accountant-action-queues" className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("accounting.insights.queuesTitle")}</h2>
+    <div className={`${workspaceStyles.surface} grid grid-cols-1 overflow-hidden min-[360px]:grid-cols-2`}>
+      {summaryCards.slice(2).map((card, index) => {
         const className = `flex min-w-0 flex-col gap-3 p-4 text-left transition-colors hover:bg-muted/40 focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-ring sm:gap-4 sm:p-5 ${index > 0 ? "border-t min-[360px]:border-t-0" : ""} ${index > 1 ? "min-[360px]:border-t xl:border-t-0" : ""} ${index % 2 === 1 ? "min-[360px]:border-l" : ""} ${index === 2 ? "xl:border-l" : ""}`
         const content = <>
         <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground"><span>{card.label}</span><span className="[&>svg]:size-4">{card.icon}</span></div>

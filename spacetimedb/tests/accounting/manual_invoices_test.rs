@@ -225,6 +225,12 @@ pub fn test_manual_invoice_is_atomic_balanced_and_idempotent(
     )
     .map_err(|error| format!("manual invoice metadata invalid: {error}"))?;
     if metadata["invoiceDocument"]["seller"]["name"] == "Forged client seller"
+        || metadata["invoiceDocument"]["schemaVersion"] != 2
+        || metadata["invoiceDocument"]["buyer"]["partnerId"]
+            != move_record
+                .partner_id
+                .map(|id| id.to_string())
+                .unwrap_or_default()
         || metadata["invoiceDocument"]["profile"]["notice"] != "Customer notice"
         || metadata["invoiceDocument"]["notes"] != "Operator notes"
         || metadata["test"] != "manual_invoice"

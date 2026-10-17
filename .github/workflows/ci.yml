@@ -313,6 +313,9 @@ jobs:
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit
 
+      - name: Unit tests (accounting and cross-module overview models)
+        run: pnpm --dir web test:accounting-ui:models
+
       - name: Verify vendored frontend contracts pin
         run: pnpm contracts:verify-vendored
 

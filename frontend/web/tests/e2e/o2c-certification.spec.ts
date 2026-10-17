@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBffResult,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
@@ -61,7 +62,7 @@ async function draftOrder(page: Page, label: string): Promise<number> {
 
 async function selectOrderForConfirm(page: Page, orderId: number) {
   await gotoModule(page, "/sales", "sales")
-  await page.getByTestId("module-tab-sales-orders").click()
+  await selectModuleTab(page, "sales", "orders")
   await selectEntityRowById(page, orderId)
   await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
 }

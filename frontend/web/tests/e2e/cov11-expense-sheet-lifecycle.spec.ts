@@ -2,6 +2,7 @@ import { createHash } from "node:crypto"
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
@@ -148,7 +149,7 @@ async function openSheetAction(
   actionId: string,
 ) {
   await gotoModule(page, "/expenses", "expenses")
-  await page.getByTestId("module-tab-expenses-expense-sheets").click()
+  await selectModuleTab(page, "expenses", "expense-sheets")
   await selectEntityRowById(page, sheetId)
   const action = page.getByTestId(`entity-action-${actionId}`)
   await expect(action).toBeVisible()
@@ -178,7 +179,7 @@ test.describe(
 
       // Create the report through the operator form so lookup and company scope
       // are exercised before the lifecycle actions begin.
-      await page.getByTestId("module-tab-expenses-expense-sheets").click()
+      await selectModuleTab(page, "expenses", "expense-sheets")
       await page.getByTestId("module-create-expenses-expense-sheets").click()
       await fillField(page, "name", sheetName)
       await chooseFirstEnabledOption(page, "pricelistId")
@@ -201,7 +202,7 @@ test.describe(
 
       // Upload real bytes through presign -> object store -> complete, then let
       // the expense form register and attach the resulting receipt row.
-      await page.getByTestId("module-tab-expenses-expenses").click()
+      await selectModuleTab(page, "expenses", "expenses")
       await page.getByTestId("module-create-expenses-expenses").click()
       await fillField(page, "name", expenseName)
       await fillField(page, "totalAmount", "73.17")

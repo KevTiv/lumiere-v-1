@@ -1,13 +1,14 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useResetAccountMoveToDraft } from '@lumiere/query-hooks/hooks/pass9-record-actions';
 import { useRBAC } from '@/lib/rbac-context';
 import { useUnsavedChangesGuard } from '@lumiere/ui';
 import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { CreditCard, Download, ListOrdered, MoreHorizontal, ShoppingCart } from 'lucide-react';
+import { CreditCard, Download, ListOrdered, Mail, MoreHorizontal, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import { useInvoicePersonalization } from '@lumiere/query-hooks/hooks/invoice-personalization';
 import { invoiceSellerFromCompany, isInvoiceSellerIdentityReady } from '@lumiere/erp-shared/invoice-personalization';
@@ -85,9 +86,6 @@ import { useCompanies } from '@lumiere/query-hooks/hooks/organization-company';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 import {
   downloadDocumentPdf,
-  useDispatchQueuedMail,
-  useMailTemplates,
-  useQueueMailFromTemplate,
 } from '@lumiere/query-hooks/hooks/templates';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
@@ -112,6 +110,9 @@ import {
 import { invoiceKind, invoiceStatus } from '../../invoice-status';
 import { RegisterPaymentOnInvoiceDialog } from '../../register-payment-on-invoice-dialog';
 import { invoiceDocumentLines, invoiceRecordAmount, invoiceRecordCurrency, invoiceRecordLines, resolveInvoiceRecord, sameCompany } from './invoice-record';
+import { InvoiceEmailReviewDialog } from '../../../../../../packages/ui/src/accounting-components/invoice-email-review-dialog';
+import { invoiceEmailDocumentKey, invoiceEmailRecordRevision, invoiceEmailScope, type InvoiceEmailDocument } from '../../../../../../packages/ui/src/accounting-components/invoice-email-review';
+import { createInvoiceEmailQueueClient, downloadInvoiceReviewPdf, useInvoiceEmailTemplates } from './invoice-email-transport';
 
 interface InvoicePageClientProps {
   moveId: string;
@@ -142,21 +143,24 @@ export function InvoicePageClient(props: InvoicePageClientProps) {
 
 function InvoicePageCompany(props: InvoicePageClientProps & { organizationId: number }) {
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(props.organizationId);
-  if (operatingCompanyId == null) {
+  const retainedCompany = useRef(operatingCompanyId);
+  if (operatingCompanyId != null) retainedCompany.current = operatingCompanyId;
+  if (retainedCompany.current == null) {
     return (
       <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">
         Select an active company to open this document.
       </div>
     );
   }
-  return <InvoicePageLoaded {...props} operatingCompanyId={operatingCompanyId} />;
+  return <InvoicePageLoaded {...props} operatingCompanyId={retainedCompany.current} companyAvailable={operatingCompanyId != null} />;
 }
 
 function InvoicePageLoaded({
   moveId,
   organizationId,
   operatingCompanyId,
-}: InvoicePageClientProps & { organizationId: number; operatingCompanyId: bigint }) {
+  companyAvailable,
+}: InvoicePageClientProps & { organizationId: number; operatingCompanyId: bigint; companyAvailable: boolean }) {
   useAccountingModuleSubscription();
   const { t } = useTranslation();
   const router = useRouter();
@@ -165,6 +169,12 @@ function InvoicePageLoaded({
   const { askForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
   const { checkPermission } = useRBAC();
+  const queryClient = useQueryClient();
+  const [emailReview, setEmailReview] = useState<{ key: string; document: InvoiceEmailDocument } | null>(null);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const emailClient = useMemo(() => createInvoiceEmailQueueClient(), []);
+  const emailScopeRef = useRef({ scope: '', documentKey: null as string | null, canQueue: false, canCheck: false });
+  const autoReviewSeen = useRef('');
   const resetMove = useResetAccountMoveToDraft(orgId);
   const resetPendingGuard = useUnsavedChangesGuard(false, resetMove.isPending);
   const { confirm: confirmReset, dialog: resetDialog } = useConfirmDialog();
@@ -182,9 +192,7 @@ function InvoicePageLoaded({
   const saleOrders = salesRead.rows;
   const purchaseOrders = purchasesRead.rows;
 
-  const mailTemplates = useMailTemplates(organizationId, true);
-  const queueMail = useQueueMailFromTemplate(organizationId, Number(operatingCompanyId));
-  const dispatchMail = useDispatchQueuedMail();
+  const emailTemplatesRead = moduleCollection(useInvoiceEmailTemplates(organizationId, emailReview !== null && checkPermission('mail_template', 'read').allowed));
   const createDocument = useCreateDocument(orgId, operatingCompanyId);
   const createCreditNote = useCreateCreditNoteFromInvoice(organizationId);
   const cancelMove = useCancelAccountMove(organizationId);
@@ -216,7 +224,7 @@ function InvoicePageLoaded({
   const [creditNoteOpen, setCreditNoteOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [docBusy, setDocBusy] = useState<'download' | 'archive' | 'send' | null>(null);
+  const [docBusy, setDocBusy] = useState<'download' | 'archive' | null>(null);
 
   const move = useMemo(
     () => resolveInvoiceRecord(moves as unknown as Row[], moveId, operatingCompanyId),
@@ -228,6 +236,76 @@ function InvoicePageLoaded({
     () => invoiceRecordLines(moveLines as unknown as Row[], moveId, operatingCompanyId),
     [moveLines, moveId, operatingCompanyId],
   );
+  const emailDocument = useMemo((): InvoiceEmailDocument | null => {
+    if (!move) return null;
+    const canonicalMove = moves.find((row) => String(row.id) === moveId && row.companyId === operatingCompanyId);
+    if (!canonicalMove) return null;
+    const company = companiesRead.rows.find((row) => String(row.id) === String(operatingCompanyId));
+    const reference = String(move.name || '').trim() || t('accounting.invoices.draftName', { defaultValue: 'Draft' });
+    const partner = String(move.invoicePartnerDisplayName ?? move.invoice_partner_display_name ?? '').trim();
+    const total = invoiceRecordAmount(move.amountTotal ?? move.amount_total);
+    const currency = invoiceRecordCurrency(move, currenciesRead.rows);
+    const state = variantTag(move.state);
+    return {
+      organizationId: orgId, companyId: operatingCompanyId, moveId: BigInt(moveId), reference,
+      partner: partner || 'Customer identity unavailable', companyName: company?.name || `Company #${operatingCompanyId}`,
+      totalLabel: formatInvoiceMoney(total, currency), pdfFilename: `account-move-${moveId}.pdf`,
+      posted: state === 'Posted' && ['invoice', 'creditNote'].includes(invoiceKind(move)),
+      revision: invoiceEmailRecordRevision(canonicalMove),
+    };
+  }, [move, moves, moveId, operatingCompanyId, orgId, companiesRead.rows, currenciesRead.rows, t]);
+  const emailRecordReady = companyAvailable && movesRead.state.status === 'ready' && linesRead.state.status === 'ready'
+    && currenciesRead.state.status === 'ready' && Boolean(emailDocument?.posted)
+    && invoiceRecordAmount(move?.amountTotal ?? move?.amount_total) !== null
+    && !readInvoiceDocumentContent(move?.metadata, organizationId, true).personalizationError;
+  const hasQueueEmailPermission = checkPermission('mail_template', 'read').allowed && checkPermission('mail_template', 'write').allowed
+    && checkPermission('mail_message', 'read').allowed;
+  const canQueueEmail = hasQueueEmailPermission && emailRecordReady;
+  const currentEmailScope = companyAvailable ? `${orgId}:${operatingCompanyId}:${moveId}` : 'no-active-company';
+  const currentEmailDocumentKey = emailRecordReady && emailDocument ? invoiceEmailDocumentKey(emailDocument) : null;
+  emailScopeRef.current = { scope: currentEmailScope, documentKey: currentEmailDocumentKey, canQueue: canQueueEmail, canCheck: checkPermission('mail_message', 'read').allowed };
+  const openEmailReview = () => {
+    if (emailReview) { setEmailOpen(true); return; }
+    if (!emailDocument) return;
+    setEmailReview((current) => current ?? { key: crypto.randomUUID(), document: { ...emailDocument } });
+    setEmailOpen(true);
+  };
+  useEffect(() => {
+    if (searchParams.get('review') !== 'email' || !emailDocument || !canQueueEmail || autoReviewSeen.current === currentEmailScope) return;
+    autoReviewSeen.current = currentEmailScope;
+    setEmailReview((current) => current ?? { key: crypto.randomUUID(), document: { ...emailDocument } });
+    setEmailOpen(true);
+  }, [searchParams, currentEmailScope, emailDocument, canQueueEmail]);
+  const emailDialog = emailReview ? <InvoiceEmailReviewDialog
+    key={emailReview.key}
+    open={emailOpen}
+    document={emailReview.document}
+    currentScopeKey={currentEmailScope}
+    currentDocumentKey={currentEmailDocumentKey}
+    templates={emailTemplatesRead.rows}
+    templateState={emailTemplatesRead.state}
+    canQueue={hasQueueEmailPermission}
+    canCheck={emailScopeRef.current.canCheck}
+    onQueue={async (submission, mayDispatch) => {
+      const result = await emailClient.queue(submission, () => mayDispatch() && emailScopeRef.current.canQueue
+        && emailScopeRef.current.scope === invoiceEmailScope(submission.document)
+        && emailScopeRef.current.documentKey === invoiceEmailDocumentKey(submission.document));
+      if (result.status === 'queued' || result.status === 'dispatched') void queryClient.invalidateQueries({ queryKey: ['mail-messages'] });
+      return result;
+    }}
+    onCheck={(submission) => emailClient.check(submission, () => emailScopeRef.current.canCheck && emailScopeRef.current.scope === invoiceEmailScope(submission.document))}
+    onReviewPdf={async (document) => {
+      if (emailScopeRef.current.scope !== invoiceEmailScope(document) || emailScopeRef.current.documentKey !== invoiceEmailDocumentKey(document)) throw new Error('The active company or invoice changed. Return to the original review before opening its PDF.');
+      await downloadInvoiceReviewPdf(document);
+    }}
+    onReloadTemplates={() => { void queryClient.invalidateQueries({ queryKey: ['invoice-email-review-templates', String(organizationId)] }); }}
+    onRefreshDocument={canQueueEmail && emailDocument ? () => {
+      setEmailReview({ key: crypto.randomUUID(), document: { ...emailDocument } });
+      setEmailOpen(true);
+    } : undefined}
+    onClose={() => setEmailOpen(false)}
+  /> : null;
+  const emailRecoveryButton = emailReview && !emailOpen ? <Button variant="outline" className="min-h-11" onClick={() => setEmailOpen(true)}>Review original email request</Button> : null;
   const accountLabelMap = useMemo(() => buildAccountLabelMap(accounts as Row[]), [accounts]);
   const sourceDocumentLabelMap = useMemo(
     () => buildSourceDocumentLabelMap([...(moves as unknown as Row[]), ...(saleOrders as unknown as Row[])]),
@@ -272,21 +350,22 @@ function InvoicePageLoaded({
     labelOf: (row) => String(row.name || row.id),
   });
 
+  if (!companyAvailable) return <>{emailDialog}{emailRecoveryButton}<div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">Select an active company to open this document. Any original email queue review has been retained.</div></>;
   if (!move) {
     if (movesRead.state.status !== 'ready' && movesRead.state.status !== 'loading') {
-      return <ModuleDataNotice state={movesRead.state} />;
+      return <>{emailDialog}{emailRecoveryButton}<ModuleDataNotice state={movesRead.state} /></>;
     }
     if (movesRead.state.status === 'loading') {
       return (
-        <div className="space-y-4" data-testid="invoice-page-loading">
+        <>{emailDialog}{emailRecoveryButton}<div className="space-y-4" data-testid="invoice-page-loading">
           <Skeleton className="h-6 w-64" />
           <Skeleton className="h-10 w-full max-w-96" />
           <Skeleton className="h-64 w-full" />
-        </div>
+        </div></>
       );
     }
     return (
-      <Empty data-testid="invoice-page-not-found">
+      <>{emailDialog}{emailRecoveryButton}<Empty data-testid="invoice-page-not-found">
         <EmptyHeader>
           <EmptyTitle>{t('accounting.invoices.notFound', { defaultValue: 'Document not found' })}</EmptyTitle>
           <EmptyDescription>
@@ -300,7 +379,7 @@ function InvoicePageLoaded({
             {t('accounting.invoices.backToInvoices', { defaultValue: 'Back to invoices' })}
           </Button>
         </EmptyContent>
-      </Empty>
+      </Empty></>
     );
   }
 
@@ -354,7 +433,7 @@ function InvoicePageLoaded({
       : false,
   );
 
-  const withBusy = async (which: 'download' | 'archive' | 'send', title: string, work: () => Promise<void>) => {
+  const withBusy = async (which: 'download' | 'archive', title: string, work: () => Promise<void>) => {
     try {
       setDocBusy(which);
       await work();
@@ -363,41 +442,6 @@ function InvoicePageLoaded({
     } finally {
       setDocBusy(null);
     }
-  };
-
-  const sendEmail = async () => {
-    const values = await askForm({
-      title: t('accounting.invoices.invoiceActions.send'),
-      fields: [
-        { id: 'recipient', name: 'recipient', label: 'Recipient email address', type: 'email', required: true },
-      ],
-    });
-    const recipient = formText(values?.recipient);
-    if (recipient == null) return;
-    const template = (mailTemplates.data ?? []).find(
-      (row) => (row.model ?? '') === 'account_move' && (row.isActive ?? row.is_active) !== false,
-    );
-    if (!template?.id) {
-      report(
-        new Error('No active mail template for account_move. Create one in settings first.'),
-        t('accounting.invoices.invoiceActions.send'),
-      );
-      return;
-    }
-    await withBusy('send', t('accounting.invoices.invoiceActions.send'), async () => {
-      await queueMail.mutateAsync({
-        templateId: Number(template.id),
-        model: 'account_move',
-        resId: Number(moveId),
-        recipientEmail: recipient,
-      });
-      const result = await dispatchMail.mutateAsync();
-      showWorkflowToast({
-        kind: 'success',
-        title: t('accounting.invoices.invoiceActions.send'),
-        description: `Queued and dispatched ${result.sent ?? 0} email(s).`,
-      });
-    });
   };
 
   const reconcilePayment = async () => {
@@ -482,12 +526,6 @@ function InvoicePageLoaded({
             description: 'PDF stored as a linked document version.',
           });
         }),
-    },
-    {
-      id: 'send-email',
-      label: t('accounting.invoices.invoiceActions.send'),
-      show: true,
-      run: sendEmail,
     },
   ].filter((action) => action.show);
 
@@ -604,6 +642,7 @@ function InvoicePageLoaded({
 
   return (
     <>
+      {emailDialog}
       <ModuleDataNotice state={movesRead.state} />
       <RecordPage
         testIdPrefix="invoice"
@@ -668,6 +707,7 @@ function InvoicePageLoaded({
               primaryActionIds={new Set(['accounting.invoice.post'])}
               pendingActionIds={workflow.isPending ? new Set(headerActions.map((action) => action.id)) : undefined}
             />
+            {kind === 'invoice' || kind === 'creditNote' ? <Button variant="outline" className="min-h-11" onClick={openEmailReview} disabled={!emailReview && !canQueueEmail} data-testid="invoice-action-send-email"><Mail className="mr-2 size-4" />Review email</Button> : null}
             <Button
               variant="outline"
               size="sm"
@@ -730,7 +770,7 @@ function InvoicePageLoaded({
                 </div>
                 <ModuleDataNotice state={currenciesRead.state} />
                 <ModuleDataNotice state={companiesRead.state} />
-                {outgoingDraft ? <><ModuleDataNotice state={draftReviewState} /><p className="text-xs text-muted-foreground">Posting captures the latest company invoice settings shown in this review.</p></> : null}
+                {outgoingDraft ? <><ModuleDataNotice state={draftReviewState} /><p className="text-xs text-muted-foreground">Customer billing details were captured when this draft was created; posting refreshes them from the linked customer. Posting also captures the latest company invoice settings shown in this review.</p></> : null}
                 <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.45fr)]">
                   <div className="min-w-0 space-y-4 rounded-xl bg-muted/40 p-3 sm:p-5">
                     <div className="flex flex-wrap items-center justify-between gap-2 px-1">

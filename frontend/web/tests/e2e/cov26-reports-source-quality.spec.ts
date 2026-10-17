@@ -5,6 +5,7 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import {
+  selectModuleTab,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
@@ -29,7 +30,7 @@ async function postNamedOperation(
 
 async function openSaleOrderQueryBuilder(page: Page): Promise<void> {
   await gotoModule(page, "/reports", "reports")
-  await page.getByTestId("module-tab-reports-query-builder").click()
+  await selectModuleTab(page, "reports", "query-builder")
   await page.getByTestId("qb-model").click()
   await page.getByRole("option", { name: "Sale Order", exact: true }).click()
 }
@@ -223,7 +224,7 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
       new RegExp(`/reports\\?tab=dashboards&filter=id%3A${dashboardId}|/reports\\?tab=dashboards&filter=id:${dashboardId}`),
     )
     await page.reload()
-    await page.getByTestId("module-tab-reports-dashboards").click()
+    await selectModuleTab(page, "reports", "dashboards")
     const dashboardRow = page.getByTestId(`entity-row-${dashboardId}`)
     await expect(dashboardRow).toBeVisible()
     await dashboardRow.click()
@@ -328,7 +329,7 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
     )
 
     await gotoModule(page, "/reports", "reports")
-    await page.getByTestId("module-tab-reports-dashboards").click()
+    await selectModuleTab(page, "reports", "dashboards")
     await page.getByTestId(`entity-row-${dashboardId}`).click()
     await page.getByTestId("entity-action-view-dashboard").click()
     await expect(page.getByRole("dialog", { name: dashboardName })).toBeVisible()
@@ -469,7 +470,7 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
     })
 
     await gotoModule(page, "/reports", "reports")
-    await page.getByTestId("module-tab-reports-pivot-explorer").click()
+    await selectModuleTab(page, "reports", "pivot-explorer")
     await page.getByTestId("pivot-saved-select").click()
 
     await expect(page.getByRole("option", { name: currentName, exact: true })).toBeVisible()
