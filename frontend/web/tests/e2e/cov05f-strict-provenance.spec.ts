@@ -137,9 +137,8 @@ test.describe(
     }) => {
       test.setTimeout(240_000)
       // Matched posting only, not variance correction or manual economic-claim
-      // certification. Default HTTP account-move-lines omits product_id,
-      // quantity and price_unit; PO lines omit invoice_lines. Native tests
-      // own those internals; never request a field-policy bypass here.
+      // certification. Native tests own those internals; never request a
+      // field-policy bypass here.
       // Requires isolated first-org fixtures, stocked untracked laptop,
       // open fiscal period and no human approval gate for this small bill.
       await signIn(page, "test@email.com", PASSWORD)

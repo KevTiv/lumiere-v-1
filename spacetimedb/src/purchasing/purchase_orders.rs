@@ -1783,10 +1783,14 @@ fn add_purchase_order_line_impl(
         ..order
     });
 
-    compute_purchase_order_line_totals(ctx, organization_id, order_id)?;
-    compute_purchase_order_totals(ctx, organization_id, order_id)?;
-    update_po_receipt_status(ctx, organization_id, order_id)?;
-    update_po_invoice_status(ctx, organization_id, order_id)?;
+    // The line mutation above is already authorized: either by the public
+    // reducer's create permission or by the narrow scheduled-replenishment
+    // service boundary. Derived-state refreshes must not re-enter interactive
+    // RBAC, because scheduled reducers execute as the scheduler identity.
+    refresh_purchase_order_line_totals(ctx, organization_id, order_id)?;
+    refresh_purchase_order_totals(ctx, organization_id, order_id)?;
+    refresh_po_receipt_status(ctx, organization_id, order_id)?;
+    refresh_po_invoice_status(ctx, organization_id, order_id)?;
 
     write_audit_log_v2(
         ctx,
@@ -2176,7 +2180,14 @@ pub fn compute_purchase_order_line_totals(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order_line", "write")?;
+    refresh_purchase_order_line_totals(ctx, organization_id, order_id)
+}
 
+fn refresh_purchase_order_line_totals(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
     let order = validate_order_in_organization(ctx, organization_id, order_id)?;
     let lines: Vec<_> = ctx
         .db
@@ -2235,7 +2246,14 @@ pub fn compute_purchase_order_totals(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
+    refresh_purchase_order_totals(ctx, organization_id, order_id)
+}
 
+fn refresh_purchase_order_totals(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
     let order = validate_order_in_organization(ctx, organization_id, order_id)?;
 
     let lines: Vec<_> = ctx
@@ -2296,7 +2314,14 @@ pub fn update_po_receipt_status(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
+    refresh_po_receipt_status(ctx, organization_id, order_id)
+}
 
+fn refresh_po_receipt_status(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
     let order = validate_order_in_organization(ctx, organization_id, order_id)?;
 
     let lines: Vec<_> = ctx

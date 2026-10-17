@@ -169,6 +169,15 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
             .map(String::from)
             .collect(),
     );
+    // Requisition lifecycle readback needs the conversion output and the
+    // independent approver identity selected by the reducer.
+    m.insert(
+        "purchase-requisitions".to_string(),
+        ["purchase_ids", "write_uid"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
     m.insert(
         "sale-orders".to_string(),
         ["picking_ids", "invoice_ids"]
@@ -1253,6 +1262,18 @@ mod tests {
     }
 
     #[test]
+    fn resolve_http_sql_columns_includes_bill_correction_fields_for_account_move_lines() {
+        let cols = resolve_http_sql_columns("account-move-lines", None)
+            .expect("account-move-lines columns");
+        for field in ["product_id", "quantity", "price_unit"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in account-move-lines projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
     fn resolve_http_sql_columns_includes_workflow_links_for_account_moves() {
         let cols = resolve_http_sql_columns("account-moves", None).expect("account-moves columns");
         for field in ["metadata", "sale_order_id", "invoice_origin"] {
@@ -1370,6 +1391,28 @@ mod tests {
                 cols.iter().any(|column| column == field),
                 "expected {field} in purchase-orders projection, got: {cols:?}"
             );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_upstream_procurement_readback() {
+        for (resource, fields) in [
+            (
+                "purchase-requisitions",
+                &["state", "origin", "user_id", "write_uid", "purchase_ids"][..],
+            ),
+            (
+                "supplier-intakes",
+                &["state", "submitted_by", "approved_by", "partner_id"][..],
+            ),
+        ] {
+            let cols = resolve_http_sql_columns(resource, None).expect("procurement columns");
+            for field in fields {
+                assert!(
+                    cols.iter().any(|column| column == field),
+                    "expected {field} in {resource} projection, got: {cols:?}"
+                );
+            }
         }
     }
 

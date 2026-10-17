@@ -26,7 +26,11 @@ export function purchaseMatchRecovery(line: Row, order?: Row) {
   else if (billed < received - tolerance) status = 'under_billed';
   else if (received < ordered - tolerance) status = 'under_received';
   const sameOrder = order?.id != null && String(order.id) === String(line.orderId ?? line.order_id);
-  const canReceive = sameOrder && tag(order?.state) === 'Purchase' && tag(line.state) === 'Confirmed';
+  // PO confirmation currently leaves its existing lines in Draft; the confirmed header is the
+  // authoritative receipt gate in the reducer. Imported/legacy rows may already be Confirmed.
+  const lineState = tag(line.state);
+  const canReceive = sameOrder && tag(order?.state) === 'Purchase'
+    && (lineState === 'Draft' || lineState === 'Confirmed');
   const shortage = billed - received;
   // Never suggest receiving beyond the order to conceal an incorrect bill.
   const receiptQty = canReceive && status === 'over_billed' && billed <= ordered && shortage > tolerance ? shortage : null;

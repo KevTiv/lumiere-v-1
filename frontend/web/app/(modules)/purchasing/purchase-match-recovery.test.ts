@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { purchaseMatchRecovery } from './purchase-match-recovery';
 const order = { id: 7, state: { tag: 'Purchase' } };
-const line = { id: 9, orderId: 7, state: 'Confirmed', productQty: 10, qtyReceived: 5, qtyInvoiced: 8 };
-test('a quantity exception suggests only the missing receipt for the exact confirmed line', () => {
+const line = { id: 9, orderId: 7, state: 'Draft', productQty: 10, qtyReceived: 5, qtyInvoiced: 8 };
+test('a quantity exception suggests only the missing receipt for a line on the confirmed order', () => {
   assert.deepEqual(purchaseMatchRecovery(line, order), { status: 'over_billed', guidance: 'receiveOrReviewBill', receiptQty: 3, variance: 3 });
+  assert.equal(purchaseMatchRecovery({ ...line, state: 'Confirmed' }, order).receiptQty, 3);
   assert.equal(purchaseMatchRecovery({ ...line, qtyReceived: 8 }, order).status, 'matched');
 });
 test('over-order bills and over-receipts require review rather than invented receipts', () => {

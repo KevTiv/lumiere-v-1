@@ -139,15 +139,34 @@ test.describe(
       const operator = await context.newPage()
       let actionRequests = 0
       let upstreamProcessed = false
-      let postCommitStockReads = 0
+      let dispatchedCompanyId: string | undefined
+      let dispatchedOperationKey: string | undefined
+      const postCommitEvidenceReads: Array<{
+        companyId: string | null
+        operationKey: string | null
+      }> = []
       operator.on("request", (request) => {
         if (request.method() === "POST" &&
             matchesOperationResponse(request, "erp.receive_po_line_once")) {
           actionRequests += 1
+          const body = request.postDataJSON() as {
+            companyId?: unknown
+            params?: { operation_key?: unknown }
+          }
+          if (typeof body.companyId === "number") {
+            dispatchedCompanyId = String(body.companyId)
+          }
+          if (typeof body.params?.operation_key === "string") {
+            dispatchedOperationKey = body.params.operation_key
+          }
         }
+        const url = new URL(request.url())
         if (upstreamProcessed &&
-            new URL(request.url()).pathname === "/api/query/stock-moves") {
-          postCommitStockReads += 1
+            url.pathname === "/api/query/purchase-receipt-operations") {
+          postCommitEvidenceReads.push({
+            companyId: url.searchParams.get("companyId"),
+            operationKey: url.searchParams.get("operationKey"),
+          })
         }
       })
 
@@ -190,7 +209,12 @@ test.describe(
         await operator.getByTestId(`form-submit-${RECEIVE_FORM}`).click()
         await expectReceiptFocus(operator, target.pickingId)
         expect(upstreamProcessed).toBe(true)
-        expect(postCommitStockReads).toBeGreaterThan(0)
+        expect(dispatchedCompanyId).toBeDefined()
+        expect(dispatchedOperationKey).toMatch(/^[A-Za-z0-9_-]{1,128}$/)
+        expect(postCommitEvidenceReads).toContainEqual({
+          companyId: dispatchedCompanyId,
+          operationKey: dispatchedOperationKey,
+        })
         expect(actionRequests, "ambiguous receipt must never be redispatched").toBe(1)
         await expect(operator.getByTestId(`form-modal-${RECEIVE_FORM}`)).toBeHidden()
 

@@ -117,6 +117,9 @@
       "balance",
       "account_id",
       "partner_id",
+      "product_id",
+      "quantity",
+      "price_unit",
       "company_id"
     ],
     "mandatory": [
@@ -5258,7 +5261,11 @@
     "default_restricted": [
       "state",
       "company_id",
-      "description"
+      "description",
+      "origin",
+      "user_id",
+      "write_uid",
+      "purchase_ids"
     ],
     "mandatory": [
       "id",
@@ -6599,7 +6606,10 @@
       "company_name",
       "contact_name",
       "email",
-      "phone"
+      "phone",
+      "submitted_by",
+      "approved_by",
+      "partner_id"
     ],
     "mandatory": [
       "id",

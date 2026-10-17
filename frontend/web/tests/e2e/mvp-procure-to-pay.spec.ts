@@ -384,7 +384,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     expect(expenseIds).toHaveLength(1)
     const expenseId = Number(expenseIds![0])
     const correctPrice = async (price: string, expectedPrice: string) => {
-      await page.goto(`/accounting/invoices/${billId}`)
+      await page.goto(`/accounting/invoices/${billId}?tab=lines`)
       await selectEntityRowById(page, expenseId)
       await page.getByTestId("entity-action-bill-line-correct-economics").click()
       await expect(page.getByTestId("form-field-quantity")).toHaveValue("3")
