@@ -216,12 +216,13 @@ export const PRODUCT_SURFACES: readonly ProductSurfaceDefinition[] = [
     href: "/settings",
     classification: "admin",
     target: "administrative",
-    firstOrgExposure: "admin-only",
+    firstOrgExposure: "review",
     owner: "COV-23",
     requiredRole: "organization-admin",
     requiredCapability: "dashboard:settings",
-    minimumEvidence: "finance alpha AI configuration",
-    hiddenReason: "organization administrators only",
+    minimumEvidence: "COV-23 U5-equivalent administrator acceptance revision",
+    hiddenReason:
+      "administrator surface remains REVIEW pending COV-23 acceptance",
   },
   {
     id: "ai-action-drafts",

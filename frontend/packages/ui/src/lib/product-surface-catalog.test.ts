@@ -45,7 +45,7 @@ describe("first-org product surface census", () => {
     ).toEqual(currentModuleRouteHrefs())
   })
 
-  it("shows only finance navigation and administrator settings in the alpha profile", () => {
+  it("shows only finance navigation in the alpha profile while settings remains in REVIEW", () => {
     const memberGroups = buildNavGroups((key) => key, {
       firstOrgProfile: true,
       isAdmin: false,
@@ -73,7 +73,6 @@ describe("first-org product surface census", () => {
       "reports",
       "subscriptions",
       "expenses",
-      "settings",
     ])
   })
 
