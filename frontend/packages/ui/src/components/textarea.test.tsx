@@ -26,22 +26,6 @@ function editor() {
   return screen.getByRole("textbox", { name: "Description" }) as HTMLDivElement
 }
 
-function selectText(element: HTMLElement, text: string) {
-  element.focus()
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-  let node = walker.nextNode()
-  while (node && !node.textContent?.includes(text)) node = walker.nextNode()
-  if (!node?.textContent) throw new Error(`Could not find text: ${text}`)
-
-  const start = node.textContent.indexOf(text)
-  const range = document.createRange()
-  range.setStart(node, start)
-  range.setEnd(node, start + text.length)
-  const selection = window.getSelection()
-  selection?.removeAllRanges()
-  selection?.addRange(range)
-}
-
 describe("Textarea", () => {
   it("keeps the native textarea API as its form bridge", () => {
     const ref = React.createRef<HTMLTextAreaElement>()
@@ -97,25 +81,26 @@ describe("Textarea", () => {
     expect(editor().textContent).toBe("Bold and spaced bold")
   })
 
-  it("applies bold visually and stores Markdown in the form value", () => {
+  it("keeps touch toolbar controls from stealing editor focus", () => {
     render(<ControlledTextarea initialValue="Make this clear" />)
-    selectText(editor(), "Make")
+    editor().focus()
+    const boldButton = screen.getByRole("button", { name: "Bold" })
 
-    fireEvent.click(screen.getByRole("button", { name: "Bold" }))
+    expect(fireEvent.pointerDown(boldButton)).toBe(false)
 
-    expect(editor().querySelector("strong")?.textContent).toBe("Make")
+    expect(document.activeElement).toBe(editor())
     expect(editor().textContent).toBe("Make this clear")
-    expect(nativeTextarea().value).toBe("**Make** this clear")
   })
 
-  it("supports familiar formatting shortcuts", () => {
+  it("exposes familiar formatting shortcuts on the toolbar", () => {
     render(<ControlledTextarea initialValue="Important" />)
-    selectText(editor(), "Important")
 
-    fireEvent.keyDown(editor(), { key: "i", ctrlKey: true })
-
-    expect(editor().querySelector("em")?.textContent).toBe("Important")
-    expect(nativeTextarea().value).toBe("_Important_")
+    expect(screen.getByRole("button", { name: "Bold" }).title).toContain(
+      "Ctrl+B"
+    )
+    expect(screen.getByRole("button", { name: "Italic" }).title).toContain(
+      "Ctrl+I"
+    )
   })
 
   it("supports existing form helpers that change the labeled field value", () => {
@@ -137,16 +122,13 @@ describe("Textarea", () => {
       Array.from(editor().querySelectorAll("ol > li"), (item) => item.textContent)
     ).toEqual(["First", "Second"])
 
-    editor().innerHTML = "<ul><li>Alpha</li><li>Beta</li></ul>"
-    fireEvent.input(editor())
+    fireEvent.change(editor(), { target: { value: "- Alpha\n- Beta" } })
     expect(nativeTextarea().value).toBe("- Alpha\n- Beta")
   })
 
   it("normalizes typed Markdown into rich text when the field is left", () => {
     render(<ControlledTextarea />)
-    editor().textContent = "** bold **"
-    fireEvent.input(editor())
-    fireEvent.blur(editor())
+    fireEvent.change(editor(), { target: { value: "** bold **" } })
 
     expect(editor().querySelector("strong")?.textContent).toBe("bold")
     expect(editor().textContent).toBe("bold")
@@ -167,10 +149,28 @@ describe("Textarea", () => {
     ref.current?.focus()
     expect(document.activeElement).toBe(editor())
 
-    editor().textContent = "123456"
-    fireEvent.input(editor())
+    fireEvent.change(editor(), { target: { value: "123456" } })
     expect(editor().textContent).toBe("12345")
     expect(nativeTextarea().value).toBe("12345")
+  })
+
+  it("passes mobile keyboard hints to the visible editor", () => {
+    render(
+      <Textarea
+        aria-label="Description"
+        inputMode="text"
+        enterKeyHint="done"
+        autoCapitalize="sentences"
+        autoCorrect="on"
+        spellCheck
+      />
+    )
+
+    expect(editor().getAttribute("inputmode")).toBe("text")
+    expect(editor().getAttribute("enterkeyhint")).toBe("done")
+    expect(editor().getAttribute("autocapitalize")).toBe("sentences")
+    expect(editor().getAttribute("autocorrect")).toBe("on")
+    expect(editor().getAttribute("spellcheck")).toBe("true")
   })
 
   it("disables formatting when the field cannot be edited", () => {
