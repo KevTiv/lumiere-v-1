@@ -1,5 +1,30 @@
 import { cn } from "@/lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
+import { isManagedInvoiceLogoUrl, parseInvoiceContent, parseInvoiceDocumentSnapshot, parseInvoiceNotes, resolveInvoiceContent, type InvoiceDocumentSnapshot, type InvoicePersonalizationProfile } from "@lumiere/erp-shared/invoice-personalization"
+
+/** Issued content never inherits settings published after the document was captured. */
+export function readInvoiceDocumentContent(metadata: unknown, organizationId?: number | string | bigint, personalized = true) {
+  const snapshot = personalized ? parseInvoiceDocumentSnapshot(metadata, organizationId) : { status: "missing" as const }
+  if (snapshot.status === "valid") return { personalization: snapshot.value, notes: snapshot.value.notes, personalizationError: undefined }
+  if (snapshot.status === "invalid") return { personalization: null, notes: "", personalizationError: snapshot.error }
+  const notes = parseInvoiceNotes(metadata)
+  return {
+    personalization: null,
+    notes: notes.status === "valid" ? notes.value : "",
+    personalizationError: notes.status === "invalid" ? notes.error : undefined,
+  }
+}
+
+/** Draft review follows current trusted defaults while keeping explicit document clears/overrides. */
+export function resolveDraftInvoiceDocument(metadata: unknown, profile: InvoicePersonalizationProfile, profileVersionIds: InvoiceDocumentSnapshot["profileVersionIds"], seller: InvoiceDocumentSnapshot["seller"]) {
+  const content = parseInvoiceContent(metadata)
+  const notes = parseInvoiceNotes(metadata)
+  if (content.status === "invalid" || notes.status === "invalid") return { personalization: null, personalizationError: content.status === "invalid" ? content.error : notes.status === "invalid" ? notes.error : undefined }
+  return {
+    personalization: { schemaVersion: 1, profileVersionIds, seller, profile: resolveInvoiceContent(profile, content.status === "valid" ? content.value : undefined), notes: notes.status === "valid" ? notes.value : "" } satisfies InvoiceDocumentSnapshot,
+    personalizationError: undefined,
+  }
+}
 
 export interface InvoiceCurrency {
   id?: string
@@ -30,12 +55,15 @@ interface InvoiceDocumentProps {
   tax: number | null
   total: number | null
   notes?: string
+  /** Server-owned document content for issued records; resolved draft content for previews. */
+  personalization?: InvoiceDocumentSnapshot | null
+  personalizationError?: string
   draft?: boolean
   className?: string
 }
 
 /** Document-style summary; generated PDF remains the authoritative printable output. */
-export function InvoiceDocument({ title, company, reference, partnerLabel, partner, date, dueDate, currency, lines, subtotal, tax, total, notes, draft, className }: InvoiceDocumentProps) {
+export function InvoiceDocument({ title, company, reference, partnerLabel, partner, date, dueDate, currency, lines, subtotal, tax, total, notes, personalization, personalizationError, draft, className }: InvoiceDocumentProps) {
   const money = (amount: number | null | undefined) => formatInvoiceMoney(amount, currency)
   const lineAmount = (line: NonNullable<InvoiceDocumentProps["lines"]>[number]) => {
     // Persisted null means unavailable; only unsaved draft lines omit amount.
@@ -43,18 +71,45 @@ export function InvoiceDocument({ title, company, reference, partnerLabel, partn
     if (line.quantity == null || line.unitPrice == null || line.discount == null) return null
     return line.quantity * line.unitPrice * (1 - line.discount / 100)
   }
-  return <article aria-label="Document preview" className={cn(workspaceStyles.document, "p-5 sm:p-8", className)}>
-    <header className="flex flex-wrap items-start justify-between gap-4 border-b pb-6">
-      <div><p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">{draft ? "Draft document" : "Accounting document"}</p><h2 className="mt-2 text-2xl font-semibold tracking-tight">{title}</h2>{company ? <p className="mt-2 text-sm text-muted-foreground">{company}</p> : null}</div>
-      <p className="max-w-full break-words font-mono text-sm text-muted-foreground">{reference || "Reference pending"}</p>
+  const profile = personalization?.profile
+  const seller = personalization?.seller
+  const accent = ({ teal: "#14635d", blue: "#2457a6", slate: "#334155", violet: "#6941a5", "": "#334155" } as const)[profile?.accent ?? "slate"]
+  const logo = profile?.logoUrl && isManagedInvoiceLogoUrl(profile.logoUrl) ? profile.logoUrl : undefined
+  const documentNotes = personalization?.notes ?? notes
+  const contentSection = (label: string, content: string | undefined) => content ? <section className="mt-6 min-w-0 border-t border-slate-200 pt-4" aria-label={label}>
+    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">{label}</h3>
+    <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">{content}</p>
+  </section> : null
+  return <article aria-label="Document preview" data-testid="invoice-document" className={cn(workspaceStyles.document, "min-w-0 p-4 [overflow-wrap:anywhere] sm:p-8", className)} style={{ backgroundColor: "#ffffff", color: "#1e293b", borderColor: "#cbd5e1", borderTopColor: accent, colorScheme: "light" }}>
+    {personalizationError ? <p role="alert" className="mb-5 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{personalizationError}</p> : null}
+    <header className="flex min-w-0 flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-6">
+      <div className="min-w-0 grow basis-64">
+        {logo ? <img src={logo} alt={seller?.name ? `${seller.name} logo` : "Company logo"} className="mb-4 max-h-20 max-w-full object-contain object-left" /> : null}
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-600">{draft ? "Draft document" : "Accounting document"}</p>
+        <h2 className="mt-2 text-2xl font-semibold tracking-tight [overflow-wrap:anywhere]" style={{ color: accent }}>{title}</h2>
+        {seller?.name || company ? <p className="mt-3 font-semibold">{seller?.name || company}</p> : null}
+        {seller ? <div className="mt-2 space-y-1 text-xs leading-relaxed text-slate-600" aria-label="Seller details">
+          {seller.address.map((line, index) => <p key={index}>{line}</p>)}
+          {seller.taxId ? <p>Tax ID: {seller.taxId}</p> : null}
+          {seller.registrationNumber ? <p>Registration number: {seller.registrationNumber}</p> : null}
+          {seller.email ? <p>Email: {seller.email}</p> : null}
+          {seller.phone ? <p>Phone: {seller.phone}</p> : null}
+          {seller.website ? <p>Website: {seller.website}</p> : null}
+        </div> : null}
+      </div>
+      <p className="max-w-full font-mono text-sm text-slate-600 [overflow-wrap:anywhere]">{reference || "Reference pending"}</p>
     </header>
     <div className="grid gap-5 py-6 sm:grid-cols-2">
-      <div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{partnerLabel}</p><p className="mt-2 break-words font-medium">{partner || "Select a partner"}</p></div>
-      <dl className="space-y-2 text-sm"><div className="flex justify-between gap-4"><dt className="text-muted-foreground">Issue date</dt><dd>{date || "—"}</dd></div><div className="flex justify-between gap-4"><dt className="text-muted-foreground">Due date</dt><dd>{dueDate || "—"}</dd></div></dl>
+      <div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-slate-600">{partnerLabel}</p><p className="mt-2 font-medium [overflow-wrap:anywhere]">{partner || "Select a partner"}</p></div>
+      <dl className="min-w-0 space-y-2 text-sm"><div className="flex flex-wrap justify-between gap-x-4 gap-y-1"><dt className="text-slate-600">Issue date</dt><dd>{date || "—"}</dd></div><div className="flex flex-wrap justify-between gap-x-4 gap-y-1"><dt className="text-slate-600">Due date</dt><dd>{dueDate || "—"}</dd></div></dl>
     </div>
-    {lines ? <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-y bg-muted/50 text-left text-xs text-muted-foreground"><th className="p-2 font-medium">Description</th><th className="p-2 text-right font-medium">Qty</th><th className="p-2 text-right font-medium">Amount</th></tr></thead><tbody>{lines.map((line) => <tr key={line.id} className="border-b"><td className="min-w-24 break-words p-2">{line.description || "Item description"}{line.discount != null && line.discount > 0 ? <span className="block text-xs text-muted-foreground">{line.discount}% discount</span> : null}</td><td className="p-2 text-right tabular-nums">{line.quantity ?? "—"}</td><td className="p-2 text-right tabular-nums">{money(lineAmount(line))}</td></tr>)}</tbody></table></div> : null}
-    <dl className="ml-auto mt-6 max-w-sm space-y-3 text-sm"><div className="flex justify-between gap-4"><dt className="text-muted-foreground">Subtotal</dt><dd className="text-right tabular-nums">{money(subtotal)}</dd></div><div className="flex justify-between gap-4"><dt className="text-muted-foreground">Tax</dt><dd className="text-right tabular-nums">{money(tax)}</dd></div><div className="flex justify-between gap-4 border-t pt-4 text-base font-semibold"><dt>Total</dt><dd className="text-right tabular-nums">{money(total)}</dd></div></dl>
-    {notes ? <section className="mt-8 border-t pt-5"><h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm">{notes}</p></section> : null}
-    {draft ? <p className="mt-8 text-xs text-muted-foreground">Draft preview. Review and confirm totals before posting.</p> : null}
+    {profile?.notice ? <section aria-label="Notice" className="mb-6 rounded-md border p-3" style={{ borderColor: accent }}><h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: accent }}>Notice</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">{profile.notice}</p></section> : null}
+    {lines ? <div className="min-w-0 overflow-x-auto"><table className="w-full table-fixed text-sm"><thead><tr className="border-y border-slate-200 bg-slate-50 text-left text-xs text-slate-600"><th className="w-[43%] p-2 font-medium">Description</th><th className="w-[16%] p-2 text-right font-medium">Qty</th><th className="p-2 text-right font-medium">Amount</th></tr></thead><tbody>{lines.map((line) => <tr key={line.id} className="border-b border-slate-200"><td className="p-2 align-top [overflow-wrap:anywhere]">{line.description || "Item description"}{line.discount != null && line.discount > 0 ? <span className="block text-xs text-slate-600">{line.discount}% discount</span> : null}</td><td className="p-2 text-right align-top tabular-nums [overflow-wrap:anywhere]">{line.quantity ?? "—"}</td><td className="p-2 text-right align-top tabular-nums [overflow-wrap:anywhere]">{money(lineAmount(line))}</td></tr>)}</tbody></table></div> : null}
+    <dl className="ml-auto mt-6 max-w-sm space-y-3 text-sm"><div className="flex justify-between gap-4"><dt className="text-slate-600">Subtotal</dt><dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">{money(subtotal)}</dd></div><div className="flex justify-between gap-4"><dt className="text-slate-600">Tax</dt><dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">{money(tax)}</dd></div><div className="flex justify-between gap-4 border-t border-slate-200 pt-4 text-base font-semibold"><dt>Total</dt><dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">{money(total)}</dd></div></dl>
+    {contentSection("Notes", documentNotes)}
+    {contentSection("Terms", profile?.terms)}
+    {contentSection("Payment instructions", profile?.paymentInstructions)}
+    {contentSection("Footer", profile?.footer)}
+    {draft ? <p className="mt-8 text-xs text-slate-600">Draft preview. Review and confirm totals before posting.</p> : null}
   </article>
 }

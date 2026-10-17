@@ -3,6 +3,11 @@
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::messaging::{mail_message, MailMessage};
+use crate::core::organization::require_company_in_organization;
+use crate::documents::invoice_profile::{
+    ensure_invoice_profile_update_allowed, validate_invoice_profile_metadata,
+    INVOICE_PROFILE_REPORT_TYPE,
+};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::MailMessageType;
 
@@ -141,6 +146,22 @@ pub fn create_document_template(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "document_template", "create")?;
 
+    if params.report_type == INVOICE_PROFILE_REPORT_TYPE {
+        match company_id {
+            Some(company_id) => {
+                require_company_in_organization(ctx, organization_id, company_id)?;
+                check_permission(ctx, organization_id, "company", "write")?;
+            }
+            None => check_permission(ctx, organization_id, "organization", "write")?,
+        }
+        if params.model.trim() != "account_move" || !params.is_default || !params.is_active {
+            return Err(
+                "invoice profiles must be active default account_move templates".to_string(),
+            );
+        }
+        validate_invoice_profile_metadata(organization_id, params.metadata.as_deref())?;
+    }
+
     if params.name.trim().is_empty() {
         return Err("name is required".to_string());
     }
@@ -214,6 +235,7 @@ pub fn update_document_template(
     if template.company_id != company_id {
         return Err("document template does not belong to this company scope".to_string());
     }
+    ensure_invoice_profile_update_allowed(&template.report_type, params.report_type.as_deref())?;
 
     let updated = DocumentTemplate {
         name: params.name.unwrap_or(template.name),

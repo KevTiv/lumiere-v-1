@@ -1,6 +1,9 @@
 "use client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { AccountantOverview } from "./accountant-overview"
+import { useInvoicePersonalization } from "@lumiere/query-hooks/hooks/invoice-personalization"
+import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from "@lumiere/erp-shared/invoice-personalization"
+import { resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
 import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -19,8 +22,6 @@ import {
   ListPivotSwitch,
   useRBAC,
   newJournalEntryForm,
-  newTaxForm,
-  newFiscalYearForm,
   editFiscalYearForm,
   fiscalYearsTableConfig,
   newAccountPeriodForm,
@@ -32,7 +33,6 @@ import {
   editBankStatementLineForm,
   newReconciliationWidgetForm,
   editReconciliationWidgetForm,
-  reconciliationWidgetsTableConfig,
   analyticLinesTableConfig,
   editAnalyticAccountForm,
   editAnalyticLineForm,
@@ -820,10 +820,10 @@ function AccountingClientReady({
   )
   /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
   const { orgId } = orgBigInts(organizationId)
-  async function persistAccountMoveCustomFieldsExact(metadata: unknown, recordId: string) {
+  async function persistAccountMoveCustomFieldsExact(metadata: unknown, recordId: string, companyId: bigint) {
     await persistCustomFieldsToEav({
       organizationId,
-      companyId: operatingCompanyId,
+      companyId,
       model: "account_move",
       recordId: BigInt(recordId),
       metadata,
@@ -936,6 +936,16 @@ function AccountingClientReady({
   const depreciationLines = depreciationLinesRead.rows
   const companiesRead = moduleCollection(useCompanies(organizationId, organizationId > 0))
   const companies = companiesRead.rows
+  const invoicePersonalization = useInvoicePersonalization({ organizationId, companyId: operatingCompanyId, enabled: organizationId > 0 && operatingCompanyId > 0n })
+  const invoiceCompany = companies.find((company) => String(company.id) === String(operatingCompanyId))
+  const invoiceSellerCompany = invoiceSellerCompanyFromQueryRow(invoiceCompany)
+  const invoiceIdentityReady = isInvoiceSellerIdentityReady(invoiceSellerCompany, operatingCompanyId, organizationId)
+  const invoiceIdentityState = companiesRead.state.status === "ready" && !invoiceIdentityReady
+    ? { status: "error" as const, message: "The selected company identity is unavailable. Refresh before creating or posting an invoice." }
+    : companiesRead.state
+  const invoiceSeller = invoicePersonalization.profile && invoiceIdentityReady
+    ? invoiceSellerFromCompany(invoiceSellerCompany, invoicePersonalization.profile)
+    : undefined
   const currenciesRead = moduleCollection(useCurrencies())
   const currencies = currenciesRead.rows
   const intercompanyRulesRead = moduleCollection(useIntercompanyRules(orgId, { enabled: organizationId > 0 }))
@@ -4421,6 +4431,15 @@ function AccountingClientReady({
     productsRead.state, paymentTermsRead.state, currenciesRead.state, companiesRead.state, taxGroupsRead.state,
     fiscalYearsRawRead.state, accountPeriodsRawRead.state,
   ])
+  const draftReviewState = mergeModuleStates([invoiceIdentityState, invoicePersonalization.state])
+  const selectedInvoiceCompanyMatches = selectedInvoice != null && String(selectedInvoice.companyId) === String(operatingCompanyId)
+  const selectedDraftReviewState = !selectedInvoiceCompanyMatches
+    ? { status: "error" as const, message: "Select this invoice’s company before reviewing or posting it." }
+    : draftReviewState
+  const selectedInvoiceMoveType = enumTag(selectedInvoice?.moveType)
+  const draftInvoicePersonalization = selectedInvoice && selectedInvoiceCompanyMatches && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType) && invoicePersonalization.profile && invoiceSeller
+    ? resolveDraftInvoiceDocument(selectedInvoice.metadata, invoicePersonalization.profile, invoicePersonalization.profileVersionIds, invoiceSeller)
+    : null
   const accountantOverview = (
     <AccountantOverview
       companyName={companyLabelMap.get(String(operatingCompanyId))}
@@ -6224,11 +6243,19 @@ function AccountingClientReady({
       {/* Invoice detail */}
       <InvoiceDetailModal
         invoice={selectedInvoice}
+        organizationId={organizationId}
+        draftPersonalization={draftInvoicePersonalization?.personalization}
+        draftPersonalizationState={selectedInvoice && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType)
+          ? draftInvoicePersonalization?.personalizationError ? { status: "error", message: draftInvoicePersonalization.personalizationError } : selectedDraftReviewState
+          : undefined}
         currencyId={selectedInvoice ? String(selectedInvoice.currencyId ?? "") : undefined}
         currencyCode={selectedInvoice ? invoiceCurrencyOptions.find((currency) => currency.value === String(selectedInvoice.currencyId))?.code : undefined}
         open={!!selectedInvoice}
         onClose={() => setSelectedInvoice(null)}
-        onPostDraft={selectedInvoice ? () => postDraft(selectedInvoice) : undefined}
+        onPostDraft={selectedInvoice ? () => {
+          if (["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType) && (selectedDraftReviewState.status !== "ready" || !draftInvoicePersonalization?.personalization)) return
+          postDraft(selectedInvoice)
+        } : undefined}
         onCreateCreditNote={
           selectedInvoice &&
             moveTypeTag(selectedInvoice as Record<string, unknown>) === "OutInvoice" &&
@@ -6289,6 +6316,10 @@ function AccountingClientReady({
         companyId={operatingCompanyId}
         onClose={() => setShowCreateInvoice(false)}
         organizationId={organizationId}
+        profile={invoicePersonalization.profile}
+        profileVersionIds={invoicePersonalization.profileVersionIds}
+        seller={invoiceSeller}
+        personalizationState={draftReviewState}
         journalOptions={manualInvoiceOptions.invoice.journals}
         currencyOptions={invoiceCurrencyOptions}
         partnerOptions={manualInvoiceOptions.invoice.partners}
@@ -6300,13 +6331,13 @@ function AccountingClientReady({
         onSave={async (params: CreateManualAccountInvoiceParams) => {
           const outcome = await createManualInvoice.mutateAsync(params)
           if (outcome.kind === "converged" || outcome.kind === "already-applied") {
-            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id)
+            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id, params.companyId)
           }
           return outcome
         }}
         onCheckStatus={async (params) => {
           const ref = await readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)
-          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id)
+          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id, params.companyId)
           return ref
         }}
         onResolved={(ref) => ref.href && router.push(ref.href)}
@@ -6330,13 +6361,13 @@ function AccountingClientReady({
         onSave={async (params: CreateManualAccountInvoiceParams) => {
           const outcome = await createManualInvoice.mutateAsync(params)
           if (outcome.kind === "converged" || outcome.kind === "already-applied") {
-            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id)
+            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id, params.companyId)
           }
           return outcome
         }}
         onCheckStatus={async (params) => {
           const ref = await readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)
-          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id)
+          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id, params.companyId)
           return ref
         }}
         onResolved={(ref) => ref.href && router.push(ref.href)}

@@ -118,6 +118,67 @@ Open work:
   Projects, Messages and administration. Those module-specific layouts remain
   separate implementation work; the common shell already applies to them.
 
+### Invoice appearance and content — alpha implementation
+
+The invoice-personalization follow-up adds a dedicated panel under Organization
+settings, alongside the selected company's canonical legal/address/tax settings.
+It does not use the legacy general organization-settings Save payload as its
+branding authority.
+
+- Organization defaults and exact-company overrides are immutable publications
+  in the existing `document_template` table, reserved model `account_move` and
+  report type `lumiere-invoice-profile-v1`. Missing values inherit; an explicit
+  empty string clears a value. Restoring inheritance publishes an empty override.
+- Approved fields are managed logo, renderer-owned accent choice, email, phone,
+  website, notice, terms, payment instructions and footer. The editor uses plain
+  text and a live sample, not tenant-authored executable templates or raw HTML.
+- The existing completed-upload pipeline supplies PNG/JPEG logos capped at 2 MiB,
+  4096px per dimension and four million pixels. A SHA-256 pin is part of the saved
+  managed URL; browser downloads and PDF reads reject a changed asset rather
+  than silently replacing historical branding. This is not an archive of every
+  historical blob if its stored bytes are lost or corrupted.
+- Publishing requires existing template-create and organization/company-write
+  permissions. Saves check the previous version, append once, then confirm the
+  exact scoped publication by readback. An uncertain result retains a read-only
+  reconciliation path. Concurrent publications are latest-wins: the preflight is
+  not an atomic compare-and-swap or an exclusive editor lock.
+- The composer exposes customer-facing overrides separately from notes and
+  retains existing custom-field metadata. Dirty or uncertain drafts cannot be
+  silently rebound to another company or overwritten by a late defaults read.
+- Server-generated outgoing invoice/credit snapshots capture trusted company
+  identity, profile version IDs and resolved content. Posting refreshes the
+  snapshot once from trusted current settings; issued views/PDFs never inherit
+  later defaults. Draft review/export resolves current approved settings.
+  Incoming vendor bills and ordinary journal entries do not become branded
+  outgoing invoices. Reserved client-supplied snapshots are replaced or stripped.
+- Invoice PDF output uses escaped, paginated HTML through the existing trusted
+  Chromium service, with completed-blob ownership/integrity checks and no remote
+  logo fetches. Renderer absence, corrupt logos and malformed reserved content
+  produce explicit failures, not a deceptively successful minimal PDF.
+
+The customer name comes from the persisted invoice partner display name. PDFs
+are rendered on demand from the saved snapshot; automatically archiving the exact
+PDF bytes at issuance is not included. This slice does not add a historical
+customer billing-address/tax snapshot. Public
+custom-field selection/order, multiple elaborate layouts, email personalization,
+signatures and multilingual template variants remain follow-up work. No financial
+formula, posting permission, reducer signature, table schema, contract release,
+deployment or first-organization admission is changed by this slice.
+
+Verification covers the shared UI suite (652 tests), web unit suite (388 tests),
+invoice models, focused profile/wire-format tests, UI/web type checking and a
+production web build. Both production Rust paths and the standalone module's test
+targets compile (`cargo check --locked --tests`). Thirty-one exact-source Rust
+projection/blob/profile helper tests pass in isolated harnesses, and the actual
+Chromium worker renders a checked 200-line, 14-page personalized invoice. The
+full native API test build exceeded this environment's memory while compiling
+unchanged generated contracts; a whole-module native test build was also stopped
+for memory pressure. Neither is counted as a passing full-suite run. Database
+authorization verification and execution of the added posting/replay scenarios
+still require the configured runtime test stack. Parent PR security
+classification and authenticated workflow gates
+remain prerequisites for merging this follow-up.
+
 ### 1. Rebuild the application shell and navigation
 
 - Replace the seven-group, 25-destination sidebar with:

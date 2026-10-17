@@ -10,7 +10,10 @@ import { invoiceStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import { microsSinceEpochToDate, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
-import { formatInvoiceMoney, InvoiceDocument } from "./invoice-document"
+import { formatInvoiceMoney, InvoiceDocument, readInvoiceDocumentContent } from "./invoice-document"
+import type { InvoiceDocumentSnapshot } from "@lumiere/erp-shared/invoice-personalization"
+import type { ModuleDataState } from "../lib/module-data-state"
+import { ModuleDataNotice } from "../pages/module-data-notice"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null, long = false): string {
   if (!ts) return "—"
@@ -25,11 +28,14 @@ function moveStateStr(state: unknown): string {
 }
 
 interface InvoiceDetailModalProps {
-  invoice: AccountMove | null
+  invoice: (AccountMove & { metadata?: string | null }) | null
   open: boolean
   onClose: () => void
   currencyCode?: string
   currencyId?: string
+  draftPersonalization?: InvoiceDocumentSnapshot | null
+  draftPersonalizationState?: ModuleDataState
+  organizationId?: number
   onPostDraft?: () => void
   onCreateCreditNote?: () => void
   onRecordPayment?: () => void
@@ -45,7 +51,7 @@ interface InvoiceDetailModalProps {
   sendEmailPending?: boolean
 }
 
-export function InvoiceDetailModal({ invoice, open, onClose, currencyCode, currencyId, onPostDraft, onCreateCreditNote, onRecordPayment, onRecalculateTotals, onDownloadPdf, onArchivePdf, onSendEmail, postDraftPending, recordPaymentPending, recalculateTotalsPending, downloadPdfPending, archivePdfPending, sendEmailPending }: InvoiceDetailModalProps) {
+export function InvoiceDetailModal({ invoice, open, onClose, currencyCode, currencyId, draftPersonalization, draftPersonalizationState, organizationId, onPostDraft, onCreateCreditNote, onRecordPayment, onRecalculateTotals, onDownloadPdf, onArchivePdf, onSendEmail, postDraftPending, recordPaymentPending, recalculateTotalsPending, downloadPdfPending, archivePdfPending, sendEmailPending }: InvoiceDetailModalProps) {
   const { t } = useTranslation()
   if (!invoice) return null
   const state = moveStateStr(invoice.state)
@@ -54,6 +60,10 @@ export function InvoiceDetailModal({ invoice, open, onClose, currencyCode, curre
   const isPosted = state === "Posted"
   const moveType = moveStateStr(invoice.moveType)
   const isBill = moveType === "InInvoice" || moveType === "InRefund"
+  const outgoing = moveType === "OutInvoice" || moveType === "OutRefund"
+  const documentContent = readInvoiceDocumentContent(invoice.metadata, organizationId, outgoing)
+  const personalization = outgoing && isDraft && draftPersonalization ? draftPersonalization : documentContent.personalization
+  const draftProfileReady = !outgoing || draftPersonalizationState == null || draftPersonalizationState.status === "ready"
   const due = microsSinceEpochToDate(invoice.invoiceDateDue)
   const daysUntilDue = due ? Math.ceil((due.getTime() - Date.now()) / 86_400_000) : null
   const balance = invoice.amountResidual ?? 0
@@ -74,7 +84,7 @@ export function InvoiceDetailModal({ invoice, open, onClose, currencyCode, curre
         <DialogDescription>{invoice.invoicePartnerDisplayName ?? `Partner #${invoice.partnerId}`}</DialogDescription>
       </DialogHeader>
       <div className="grid min-h-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 bg-muted/30 p-4 sm:p-6"><InvoiceDocument title={isBill ? "Vendor bill" : "Invoice"} reference={invoice.name} partnerLabel={isBill ? "Vendor" : t("accounting.invoices.billTo")} partner={invoice.invoicePartnerDisplayName ?? `Partner #${invoice.partnerId}`} date={formatTimestamp(invoice.invoiceDate, true)} dueDate={formatTimestamp(invoice.invoiceDateDue, true)} currency={currency} subtotal={invoice.amountUntaxed ?? null} tax={invoice.amountTax ?? null} total={invoice.amountTotal ?? null} draft={isDraft} />{invoice.ref ? <p className="mt-3 break-words text-xs text-muted-foreground">Reference: {invoice.ref}</p> : null}</div>
+        <div className="min-w-0 bg-muted/30 p-4 sm:p-6">{isDraft && outgoing ? <><ModuleDataNotice state={draftPersonalizationState} /><p className="mb-3 text-xs text-muted-foreground">Posting captures the latest company invoice settings shown in this review.</p></> : null}<InvoiceDocument title={isBill ? "Vendor bill" : moveType === "OutRefund" ? "Credit note" : "Invoice"} reference={invoice.name} partnerLabel={isBill ? "Vendor" : t("accounting.invoices.billTo")} partner={invoice.invoicePartnerDisplayName ?? `Partner #${invoice.partnerId}`} date={formatTimestamp(invoice.invoiceDate, true)} dueDate={formatTimestamp(invoice.invoiceDateDue, true)} currency={currency} subtotal={invoice.amountUntaxed ?? null} tax={invoice.amountTax ?? null} total={invoice.amountTotal ?? null} personalization={personalization} notes={documentContent.notes} personalizationError={documentContent.personalizationError} draft={isDraft} />{invoice.ref ? <p className="mt-3 break-words text-xs text-muted-foreground">Reference: {invoice.ref}</p> : null}</div>
         <aside className="order-first space-y-6 border-b p-5 lg:order-none lg:border-b-0 lg:border-l lg:p-6">
           <section>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("accounting.invoices.balanceDue")}</p><p className={cn("mt-2 break-words text-2xl font-semibold tabular-nums", invoice.amountResidual == null ? "text-muted-foreground" : balance > 0 ? "text-foreground" : "text-success")}>{money(invoice.amountResidual)}</p>
@@ -82,7 +92,7 @@ export function InvoiceDetailModal({ invoice, open, onClose, currencyCode, curre
             {balance > 0 && daysUntilDue !== null ? <div className="mt-3 flex items-center gap-2 text-xs"><Clock className="size-4 shrink-0 text-muted-foreground" /><span>{daysUntilDue < 0 ? t("accounting.invoices.daysOverdue", { count: Math.abs(daysUntilDue) }) : t("accounting.invoices.daysRemaining", { count: daysUntilDue })}</span></div> : null}
           </section>
           <section className="space-y-3 border-t pt-5"><h3 className="text-sm font-semibold">Next action</h3><p className="text-xs leading-relaxed text-muted-foreground">{isDraft ? "Review the document, then post it to the ledger." : canRecordPayment ? "Record a payment to reduce the outstanding balance." : state === "Cancelled" ? "This document has been cancelled." : invoice.amountResidual != null && balance <= 0 ? "No outstanding balance remains on this document." : "Review this document’s status and available actions."}</p>
-            {isDraft && onPostDraft ? <Button type="button" className="w-full justify-between" data-testid="invoice-detail-post-draft" disabled={postDraftPending} onClick={onPostDraft}>{t("accounting.invoices.invoiceActions.postDraft")}<ArrowRight className="size-4" /></Button> : null}
+            {isDraft && onPostDraft ? <Button type="button" className="w-full justify-between" data-testid="invoice-detail-post-draft" disabled={postDraftPending || !draftProfileReady || Boolean(documentContent.personalizationError)} onClick={onPostDraft}>{t("accounting.invoices.invoiceActions.postDraft")}<ArrowRight className="size-4" /></Button> : null}
             {canRecordPayment ? <Button type="button" className="w-full justify-between" disabled={recordPaymentPending} onClick={onRecordPayment}>{t("accounting.invoices.invoiceActions.recordPayment")}<ArrowRight className="size-4" /></Button> : null}
             {onDownloadPdf ? <Button type="button" variant="outline" className="w-full justify-start gap-2" disabled={downloadPdfPending} onClick={onDownloadPdf}><Download className="size-4" />{t("accounting.invoices.invoiceActions.download")}</Button> : null}
             {canCreateCreditNote ? <Button type="button" variant="ghost" className="w-full justify-start gap-2" data-testid="invoice-detail-create-credit-note" onClick={onCreateCreditNote}><FileText className="size-4" />{t("accounting.invoices.invoiceActions.createCreditNote")}</Button> : null}

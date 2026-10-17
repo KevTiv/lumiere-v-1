@@ -4,7 +4,8 @@ import { defineConfig } from "@playwright/test"
 // not authenticate, dispatch accounting operations, or prove backend behavior.
 export default defineConfig({
   testDir: "./tests",
-  testMatch: ["accounting-ui.spec.ts", "style-templates-ui.spec.ts"],
+  testMatch: ["accounting-ui.spec.ts", "style-templates-ui.spec.ts", "invoice-personalization-ui.spec.ts"],
+  globalSetup: "./tests/accounting-ui-warmup.ts",
   workers: 1,
   use: {
     baseURL: "http://127.0.0.1:3111",

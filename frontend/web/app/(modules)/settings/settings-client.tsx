@@ -47,10 +47,6 @@ import {
 import type {
   CreateDataClassificationParams,
   CreateDataClassificationRuleParams,
-  UpdateCompanyAddressParams,
-  UpdateCompanyBusinessParams,
-  UpdateCompanyHierarchyParams,
-  UpdateCompanyParams,
 } from "@lumiere/stdb/types"
 import { GuidedImportWizard } from "@/lib/guided-import-wizard"
 import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -59,6 +55,15 @@ import { currencyOptionsFromRows } from "@/lib/form-lookup"
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { uploadDocumentBlob } from "@/lib/document-blob-upload"
+
+async function uploadInvoiceLogo(file: File, companyId: string | null): Promise<string> {
+  if (companyId !== null && (!/^[1-9]\d*$/.test(companyId) || !Number.isSafeInteger(Number(companyId)))) {
+    throw new Error("This company identifier cannot be safely used for logo upload")
+  }
+  const uploaded = await uploadDocumentBlob({ file, companyId: companyId === null ? undefined : BigInt(companyId) })
+  return `${uploaded.url}?sha256=${uploaded.checksum}`
+}
 
 type SettingsAction =
   | "createAuditRule"
@@ -979,7 +984,7 @@ function SettingsLoaded({
   return (
     <div className="space-y-6">
       <DashboardHeader title={title} description={description} />
-      <SettingsModule />
+      <SettingsModule uploadInvoiceLogo={uploadInvoiceLogo} />
 
       <section className="rounded-xl border border-border bg-card p-4">
         <GuidedImportWizard organizationId={organizationId} />

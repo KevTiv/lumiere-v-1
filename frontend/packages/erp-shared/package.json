@@ -12,6 +12,7 @@
     "./stb-timestamp": "./src/stb-timestamp.ts",
     "./record-links": "./src/record-links.ts",
     "./accounting-defaults": "./src/accounting-defaults.ts",
+    "./invoice-personalization": "./src/invoice-personalization.ts",
     "./form-coercion": "./src/form-coercion.ts",
     "./create-params-helpers": "./src/create-params-helpers.ts",
     "./accounting-create-params": "./src/accounting-create-params.ts",
@@ -61,7 +62,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/form-coercion.test.ts src/u64.test.ts src/accounting-create-params.test.ts src/accounting-account-classification.test.ts src/accounting-import-reconciliation.test.ts src/outstanding-document-import.test.ts src/manufacturing-create-params.test.ts src/reports-dashboard-params.test.ts src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts src/contact-matching.test.ts src/timestamp-values.test.ts src/row-values.test.ts src/record-links.test.ts"
+    "test": "node --import tsx --test src/form-coercion.test.ts src/u64.test.ts src/accounting-create-params.test.ts src/accounting-account-classification.test.ts src/accounting-import-reconciliation.test.ts src/outstanding-document-import.test.ts src/manufacturing-create-params.test.ts src/reports-dashboard-params.test.ts src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts src/contact-matching.test.ts src/timestamp-values.test.ts src/row-values.test.ts src/record-links.test.ts src/invoice-personalization.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
