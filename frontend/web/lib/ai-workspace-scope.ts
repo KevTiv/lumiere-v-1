@@ -37,7 +37,7 @@ export function resolveAiWorkspaceScope(
   selection: AiEntitySelection | null
   usesCurrentPage: boolean
 } {
-  const option = AI_WORKSPACE_SCOPES.find((scope) => scope.value === selected) ?? AI_WORKSPACE_SCOPES[0]
+  const option = AI_WORKSPACE_SCOPES.find((scope) => scope.value === selected) ?? AI_WORKSPACE_SCOPES[0]!
   const usesCurrentPage = option.value === "current"
   return {
     label: option.label,
