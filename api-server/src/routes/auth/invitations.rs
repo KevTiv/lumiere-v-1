@@ -522,11 +522,41 @@ mod hosted_invite_tests {
     #[test]
     fn requires_matching_approved_organization_and_verified_email() {
         let cases = [
-            (Some(7), "approved@example.test", 7, "approved@example.test", true),
-            (Some(7), "APPROVED@example.test", 7, "approved@example.test", true),
-            (None, "approved@example.test", 7, "approved@example.test", false),
-            (Some(8), "approved@example.test", 7, "approved@example.test", false),
-            (Some(7), "other@example.test", 7, "approved@example.test", false),
+            (
+                Some(7),
+                "approved@example.test",
+                7,
+                "approved@example.test",
+                true,
+            ),
+            (
+                Some(7),
+                "APPROVED@example.test",
+                7,
+                "approved@example.test",
+                true,
+            ),
+            (
+                None,
+                "approved@example.test",
+                7,
+                "approved@example.test",
+                false,
+            ),
+            (
+                Some(8),
+                "approved@example.test",
+                7,
+                "approved@example.test",
+                false,
+            ),
+            (
+                Some(7),
+                "other@example.test",
+                7,
+                "approved@example.test",
+                false,
+            ),
             (Some(7), "", 7, "approved@example.test", false),
         ];
         for (org, email, invite_org, invite_email, expected) in cases {
