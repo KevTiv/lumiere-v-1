@@ -1487,6 +1487,55 @@ mod tests {
     }
 
     #[test]
+    fn bank_matching_has_currency_and_eligibility_evidence_without_bypassing_field_masks() {
+        for (resource, fields) in [
+            ("account-accounts", vec!["reconcile"]),
+            (
+                "account-move-lines",
+                vec![
+                    "parent_state",
+                    "company_currency_id",
+                    "currency_id",
+                    "amount_residual",
+                    "blocked",
+                ],
+            ),
+            ("bank-statements", vec!["currency_id"]),
+            (
+                "bank-statement-lines",
+                vec![
+                    "date",
+                    "currency_id",
+                    "journal_currency_id",
+                    "foreign_currency_id",
+                ],
+            ),
+        ] {
+            let columns = resolve_http_sql_columns(resource, None).unwrap();
+            for field in &fields {
+                assert!(
+                    columns.iter().any(|column| column == field),
+                    "missing {resource}.{field}"
+                );
+            }
+            let mut access = field_access(&[
+                "account_account:read",
+                "account_move_line:read",
+                "account_bank_statement:read",
+                "account_bank_statement_line:read",
+            ]);
+            select_fields(&mut access, resource, &["id"]);
+            let masked = resolve_http_sql_columns(resource, Some(&access)).unwrap();
+            for field in fields {
+                assert!(
+                    !masked.iter().any(|column| column == field),
+                    "field mask exposed {resource}.{field}"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn resolve_http_sql_columns_includes_location_and_lock_for_lots() {
         let cols = resolve_http_sql_columns("stock-production-lots", None)
             .expect("stock-production-lots columns");
