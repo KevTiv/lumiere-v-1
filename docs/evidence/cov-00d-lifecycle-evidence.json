@@ -355,15 +355,15 @@
       "surface_ids": ["settings"],
       "primary_lifecycle": "organization bootstrap, membership, role, company, invitation, recovery and switching",
       "current_floor": "U3",
-      "launch_admission": "review",
-      "operator_evidence_mode": "route-only",
+      "launch_admission": "admin-only",
+      "operator_evidence_mode": "ui-primary",
       "dimensions": {
         "D": {"status": "proven", "reason": "Organization, permission and user domain suites cover tenant and privilege invariants.", "evidence": [{"path": "spacetimedb/tests/core/tests/organization_tests.rs", "claim": "organization and membership invariants"}]},
         "A": {"status": "proven", "reason": "Authentication and permission enforcement have persisted API/browser integration coverage.", "evidence": [{"path": "frontend/web/tests/e2e/auth-permission-enforcement.spec.ts", "claim": "authenticated permission and denial integration"}]},
-        "O": {"status": "partial", "reason": "Grant, company switch, revoke and recovery now run as one Settings operator lifecycle; organization bootstrap is not covered, so O stays partial.", "evidence": [{"path": "frontend/web/tests/e2e/phase-0-settings-smoke.spec.ts", "role": "route-or-affordance-only", "claim": "settings and invitation affordances"}, {"path": "frontend/web/tests/e2e/cov23-operator-lifecycle.spec.ts", "role": "route-or-affordance-only", "claim": "Settings Users edit and company switcher drive grant, switch, revoke and recovery; bootstrap not covered"}]},
+        "O": {"status": "proven", "reason": "Organization bootstrap through the onboarding form, then grant, company switch, revoke and recovery through Settings and the company switcher, run as one executed operator lifecycle; fixtures only seed accounts, a role, a member and a branch company.", "evidence": [{"path": "frontend/web/tests/e2e/cov23-operator-lifecycle.spec.ts", "role": "principal-operator-transition", "claim": "onboarding bootstrap then Settings grant, company switch, revoke and re-grant in the new organization"}, {"path": "frontend/web/tests/e2e/phase-0-settings-smoke.spec.ts", "role": "route-or-affordance-only", "claim": "settings and invitation affordances"}]},
         "E": {"status": "proven", "reason": "Revoked-session, company-switch and recovery convergence executed on one live persona session: grant, switch, revoke and re-grant through Settings converge on persona reloads without re-login, ending with one active assignment.", "evidence": [{"path": "frontend/web/tests/e2e/auth-permission-enforcement.spec.ts", "claim": "permission denial and scoped readback"}, {"path": "frontend/web/tests/e2e/cov23-operator-lifecycle.spec.ts", "claim": "live persona session converges on grant, revoke under an active company switch, and re-grant recovery"}, {"path": "frontend/web/tests/e2e/cov23-role-assignment.spec.ts", "claim": "stale and denied replay plus forged company selection repair"}]}
       },
-      "missing_proof": ["organization bootstrap operator lifecycle", "shared first-org persona fixture", "hidden internal settings"],
+      "missing_proof": ["shared first-org persona fixture", "hidden internal settings"],
       "next_packages": ["COV-23", "COV-02", "COV-27"]
     },
     {
