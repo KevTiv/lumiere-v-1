@@ -1,6 +1,6 @@
 "use client"
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { queryOptions, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch, fetchQueryList, coalesceQueryInitialData, type QueryRows, rqBigIntKey } from "../../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -113,17 +113,31 @@ import type {
   CreateStockQuantParams,
 } from '@lumiere/stdb/types';
 
-export function useProducts(
+export function productsQueryOptions(
   organizationId: bigint,
   initialData?: Product[],
+  options?: { authoritativeOnMount?: boolean },
 ) {
-  return useQuery<Product[]>({
+  return queryOptions<Product[]>({
     queryKey: ['products', rqBigIntKey(organizationId)],
     queryFn: () =>
       fetchQueryList('/api/query/products', 'Failed to fetch products'),
     staleTime: 30_000,
     initialData: coalesceQueryInitialData(initialData),
+    // Product selectors are long-lived master-data consumers. Workflows that
+    // create dependent records across navigations must reconcile their SSR
+    // seed with the authoritative query instead of trusting a still-fresh
+    // React Query entry from the previous surface.
+    refetchOnMount: options?.authoritativeOnMount ? "always" : undefined,
   });
+}
+
+export function useProducts(
+  organizationId: bigint,
+  initialData?: Product[],
+  options?: { authoritativeOnMount?: boolean },
+) {
+  return useQuery(productsQueryOptions(organizationId, initialData, options));
 }
 
 /** Read-only list served by the authorized HTTP query path (`/api/query/product-attributes`). */

@@ -1274,6 +1274,17 @@ mod tests {
     }
 
     #[test]
+    fn resolve_http_sql_columns_includes_bill_correction_fields_for_account_moves() {
+        let cols = resolve_http_sql_columns("account-moves", None).expect("account-moves columns");
+        for field in ["company_currency_id", "posted_before"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in account-moves projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
     fn resolve_http_sql_columns_includes_workflow_links_for_account_moves() {
         let cols = resolve_http_sql_columns("account-moves", None).expect("account-moves columns");
         for field in ["metadata", "sale_order_id", "invoice_origin"] {

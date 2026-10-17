@@ -142,6 +142,7 @@
       "journal_id",
       "partner_id",
       "currency_id",
+      "company_currency_id",
       "invoice_date",
       "invoice_date_due",
       "invoice_origin",
@@ -152,6 +153,7 @@
       "amount_total",
       "amount_residual",
       "payment_state",
+      "posted_before",
       "metadata"
     ],
     "mandatory": [

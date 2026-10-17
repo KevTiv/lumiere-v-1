@@ -369,6 +369,26 @@ fn validate_order_in_organization(
     organization_id: u64,
     order_id: u64,
 ) -> Result<PurchaseOrder, String> {
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        order.company_id,
+        ctx.sender(),
+    )?;
+    Ok(order)
+}
+
+/// Load an order through its tenant-owned parent without applying interactive
+/// company membership. Crate-internal service paths use this only after their
+/// own narrow authorization and relation checks have established company
+/// scope; user-facing reducers must continue to use
+/// `validate_order_in_organization`.
+fn load_order_in_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<PurchaseOrder, String> {
     let order = ctx
         .db
         .purchase_order()
@@ -379,12 +399,6 @@ fn validate_order_in_organization(
     if order.organization_id != organization_id {
         return Err("Purchase order does not belong to this organization".to_string());
     }
-    crate::workflow::authorization::require_workflow_company_access(
-        ctx,
-        organization_id,
-        order.company_id,
-        ctx.sender(),
-    )?;
     Ok(order)
 }
 
@@ -1686,7 +1700,11 @@ fn add_purchase_order_line_impl(
         check_permission(ctx, organization_id, "purchase_order_line", "create")?;
     }
 
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    let order = if enforce_user_permission {
+        validate_order_in_organization(ctx, organization_id, order_id)?
+    } else {
+        load_order_in_organization(ctx, organization_id, order_id)?
+    };
 
     if order.state != PoState::Draft {
         return Err("Can only add lines to draft purchase orders".to_string());
@@ -2180,6 +2198,7 @@ pub fn compute_purchase_order_line_totals(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order_line", "write")?;
+    validate_order_in_organization(ctx, organization_id, order_id)?;
     refresh_purchase_order_line_totals(ctx, organization_id, order_id)
 }
 
@@ -2188,7 +2207,7 @@ fn refresh_purchase_order_line_totals(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
     let lines: Vec<_> = ctx
         .db
         .purchase_order_line()
@@ -2246,6 +2265,7 @@ pub fn compute_purchase_order_totals(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
+    validate_order_in_organization(ctx, organization_id, order_id)?;
     refresh_purchase_order_totals(ctx, organization_id, order_id)
 }
 
@@ -2254,7 +2274,7 @@ fn refresh_purchase_order_totals(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
 
     let lines: Vec<_> = ctx
         .db
@@ -2314,6 +2334,7 @@ pub fn update_po_receipt_status(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
+    validate_order_in_organization(ctx, organization_id, order_id)?;
     refresh_po_receipt_status(ctx, organization_id, order_id)
 }
 
@@ -2322,7 +2343,7 @@ fn refresh_po_receipt_status(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
 
     let lines: Vec<_> = ctx
         .db
@@ -2442,6 +2463,7 @@ pub fn update_po_invoice_status(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
+    validate_order_in_organization(ctx, organization_id, order_id)?;
 
     refresh_po_invoice_status(ctx, organization_id, order_id)
 }
@@ -2452,7 +2474,7 @@ pub(crate) fn refresh_po_invoice_status(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
 
     let invoice_status = invoice_status_for_received_quantities(
         ctx.db

@@ -163,7 +163,10 @@ function ManufacturingClientLoaded({
         ? "Unavailable"
         : "Loading"
   const { data: qualityChecks = [] } = useQualityChecks(orgId);
-  const { data: products = [] } = useProducts(orgId, initialProducts);
+  // BOM creation and manufacturing-order creation are commonly consecutive
+  // steps. Reconcile the product seed on every manufacturing mount so a fresh
+  // product cannot disappear behind a still-fresh cross-navigation cache.
+  const { data: products = [] } = useProducts(orgId, initialProducts, { authoritativeOnMount: true });
   const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
   const { data: transfers = [] } = useStockPickings(
     orgId,
