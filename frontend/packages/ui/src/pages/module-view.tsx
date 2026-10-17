@@ -3,7 +3,7 @@
 import { ModuleDataNotice } from "./module-data-notice"
 import { canUseModuleData, type ModuleDataState } from "../lib/module-data-state"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback, type ReactNode } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { buildEntitySelection, resolveAiEntityType } from "@lumiere/query-hooks/ai-ui-context"
 import {
@@ -67,6 +67,8 @@ interface ModuleViewProps {
   /** Dashboard time range — shown in header only on the dashboard tab. */
   dashboardTimeRange?: TimeRangeValue
   onDashboardTimeRangeChange?: (value: TimeRangeValue) => void
+  /** Scoped overview composition owns its controls/exports; other module tabs are unchanged. */
+  dashboardContent?: ReactNode
   /**
    * Filters applied to the active entity tab. Defaults to the URL's `?filter=key:value` entries,
    * so chart drill-downs and record links work in every module without per-client wiring.
@@ -97,6 +99,7 @@ export function ModuleView({
   dataState,
   dashboardTimeRange,
   onDashboardTimeRangeChange,
+  dashboardContent,
   urlFilters: urlFiltersProp,
   runtimeForms,
   kpiStrips,
@@ -178,8 +181,8 @@ export function ModuleView({
 
   const activeTabConfig = config.tabs.find((tab) => tab.id === activeTab)
   const showDashboardTimeRange =
-    activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
-  const showDashboardExport = activeTabConfig?.type === "dashboard" && activeTabUsable
+    dashboardContent == null && activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
+  const showDashboardExport = dashboardContent == null && activeTabConfig?.type === "dashboard" && activeTabUsable
 
   return (
     <div
@@ -253,7 +256,8 @@ export function ModuleView({
           >
             <ModuleDataNotice state={dataState?.[tab.id]} />
             {dataState?.[tab.id]?.status !== "error" && dataState?.[tab.id]?.status !== "denied" && (<>
-            {tab.type === "dashboard" && tab.sections && (
+            {tab.type === "dashboard" && dashboardContent != null && dashboardContent}
+            {tab.type === "dashboard" && dashboardContent == null && tab.sections && (
               <DashboardGrid
                 ref={dashboardGridRef}
                 sections={tab.sections}

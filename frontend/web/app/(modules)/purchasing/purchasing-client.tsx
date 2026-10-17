@@ -1,5 +1,7 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights } from "../../../components/module-insights"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import type { QueryResourceState } from "@lumiere/api-client"
@@ -514,7 +516,8 @@ function PurchasingClientLoaded({
     }
   }, [quickActionForm])
 
-  const { data: orders = [], isLoading: ordersLoading } = usePurchaseOrders(orgId, initialOrders)
+  const ordersQuery = usePurchaseOrders(orgId, initialOrders)
+  const { data: orders = [], isLoading: ordersLoading } = ordersQuery
   const billOrder = useMemo(
     () =>
       billOrderId == null
@@ -559,7 +562,8 @@ function PurchasingClientLoaded({
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId)
-  const { data: currencies = [] } = useCurrencies()
+  const currenciesQuery = useCurrencies()
+  const { data: currencies = [] } = currenciesQuery
   const { data: blanketOrders = [] } = usePurchaseBlanketOrders(orgId)
   const { data: blanketOrderLines = [] } = usePurchaseBlanketOrderLines(orgId)
   const { data: blanketReleases = [] } = usePurchaseBlanketReleases(orgId)
@@ -2739,6 +2743,7 @@ function PurchasingClientLoaded({
       )}
       <ModuleView
         config={configWithOperations}
+        dashboardContent={<ModuleInsights input={{ module: "purchasing", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: moduleQueryState(ordersQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataLoading={{ orders: ordersLoading }}
         kpiStrips={kpiStrips}

@@ -15,7 +15,7 @@
     "test:e2e": "playwright test",
     "test:e2e:navigation": "playwright test --config playwright.navigation-guards.config.ts",
     "test:e2e:accounting-ui": "playwright test --config playwright.accounting-ui.config.ts",
-    "test:accounting-ui:models": "node --import tsx --test \"app/(modules)/accounting/accountant-overview-model.test.ts\" \"app/(modules)/accounting/accountant-insights-model.test.ts\" \"app/(modules)/accounting/invoice-actions.test.ts\" \"app/(modules)/accounting/invoice-status.test.ts\" lib/module-tab-navigation.test.ts && node --import tsx \"app/(modules)/accounting/invoices/[id]/invoice-record.test.ts\"",
+    "test:accounting-ui:models": "node --import tsx --test \"app/(modules)/accounting/accountant-overview-model.test.ts\" \"app/(modules)/accounting/accountant-insights-model.test.ts\" \"app/(modules)/accounting/invoice-actions.test.ts\" \"app/(modules)/accounting/invoice-status.test.ts\" lib/module-tab-navigation.test.ts lib/module-insights-model.test.ts && node --import tsx \"app/(modules)/accounting/invoices/[id]/invoice-record.test.ts\"",
     "test:e2e:p0": "playwright test --grep @p0 --grep-invert @dev-fixture",
     "test:e2e:pretenant": "playwright test --grep @pretenant",
     "test:e2e:full": "playwright test",

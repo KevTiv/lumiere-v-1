@@ -71,6 +71,8 @@ export interface AreaChartWidget extends BaseWidget {
     series: { name: string; color: string }[]
     values: Array<{ [key: string]: string | number }>
     xAxisKey: string
+    /** False for counts; omitted for continuous monetary measures. */
+    allowDecimals?: boolean
   }
 }
 
@@ -89,6 +91,8 @@ export interface BarChartWidget extends BaseWidget {
     series: { name: string; color: string }[]
     values: Array<{ [key: string]: string | number }>
     categoryKey: string
+    /** False for counts; omitted for continuous monetary measures. */
+    allowDecimals?: boolean
     layout?: "horizontal" | "vertical"
     stacked?: boolean
     onSegmentClick?: (name: string) => void

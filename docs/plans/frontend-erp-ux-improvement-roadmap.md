@@ -288,6 +288,57 @@ opaque-record debt remained 2339/2339. Desktop/mobile light/dark screenshots
 were visually inspected. These are synthetic component checks, not authenticated
 backend or deployment verification; existing rollout and merge gates still apply.
 
+### Shared overview presentation — Sales, CRM, Purchasing, Reports and Expenses
+
+The Accounting restoration's visual language now extends to five additional
+modules through one `ModuleInsights` composition and an optional `ModuleView`
+dashboard-content slot. The slot owns its currency/period controls and scoped
+chart exports; it replaces legacy dashboard figures rather than adding another
+layer of contradictory dollar totals. Other tabs and modules without the slot
+retain their existing behavior. Shared chart renderers, workspace surfaces,
+theme tokens, native controls, 44px targets and scroll-contained data tables
+carry Quiet Precision across desktop, mobile, dark and Ocean appearances.
+
+Each overview has current-state summary tiles, separate 30/90/180-day UTC
+activity comparisons, monthly area and horizontal state-count charts, exact
+record action queues, recent-record links and retained create/workspace actions.
+The measures remain specific to the canonical source:
+
+- Sales: draft/sent quotation value and confirmed/completed order value by
+  order date. Not recognized revenue, invoice AR or cash received.
+- CRM: explicitly company-assigned open opportunity expected value and
+  creation cohorts currently open/won. Not weighted commitments or historical
+  pipeline snapshots; organization-level unassigned opportunities are excluded.
+- Purchasing: open confirmed PO value and confirmed/completed PO value by
+  order date, with late unreceived-order review. No inferred on-time rate,
+  billed-spend or cash-paid claims.
+- Expenses: report-header values only, excluding draft/refused reports from
+  period activity; submitted claims remain a current-state queue. Lines are not
+  added to report headers. Operations remains the receipt/card path. The new
+  overview does not link to the existing unimplemented Inbox tab; exposing that
+  separate panel requires its own scope/read-state/action-safety work.
+- Reports: report-header creation and current outcome counts, with distinct
+  draft/prepared-output measures. No cross-period report snapshots, currencies
+  or trial-balance rows are summed as financial totals. Statements, trial
+  balances, schedules and saved dashboards remain separate workspaces.
+
+Money uses one exact currency ID, authoritative decimal precision and safe
+minor-unit arithmetic. Company/org boundaries, exact u64 links, unknown fields,
+missing dates, zero baselines and unavailable sources are explicitly handled.
+Affected figures/exports/queues discard cached data on loading, denial, failure
+or partial reads; independent count measures can remain available when only
+amount fields are unreadable. Activity is grouped by creation/order date and
+current eligible state, not reconstructed as a past-state/event-time series.
+Queue previews show up to five exact records; complete workspaces remain linked.
+Charts export source/basis/company/currency/window metadata through existing
+helpers. Shared area gradients now have instance-unique SVG-safe IDs rather
+than translated labels, and count axes support whole-number ticks. Sales retains
+direct operational queue links without legacy unscoped totals. The existing CRM
+forecast action uses the new selected period, while retaining its canonical
+company scope independently of the analysis currency.
+The shared model suite is registered in frontend CI. No backend, permission,
+schema, new financial-command or deployment changes are included.
+
 ### 1. Rebuild the application shell and navigation
 
 - Replace the seven-group, 25-destination sidebar with:

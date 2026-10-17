@@ -1,4 +1,103 @@
 {
+  "moduleInsights": {
+    "overview": "Overview",
+    "insights": "Insights",
+    "actions": "Action queues",
+    "sections": "Overview sections",
+    "currency": "Analysis currency",
+    "unknownCurrency": "Currency details unavailable",
+    "period": "Analysis period",
+    "lastDays": "Last {{count}} days",
+    "comparedWith": "compared with",
+    "utc": "UTC calendar days; today is still in progress.",
+    "currentHint": "Current state, independent of the period selector.",
+    "previous": "Previous period",
+    "noBaseline": "No previous-period baseline",
+    "vsPrevious": "versus previous period",
+    "records": "Records",
+    "browseRecords": "Browse records",
+    "moreQueues": "More operational queues",
+    "forecastHint": "Forecast snapshots use the selected analysis period and the company's canonical forecast scope. Changing the analysis currency does not convert or narrow the snapshot.",
+    "month": "Month",
+    "state": "State",
+    "zero": "All amounts or counts in this selection are zero.",
+    "viewData": "View chart data",
+    "distributionHint": "Current record counts by state, independent of the period selector. Company scope and any currency selection still apply.",
+    "queueHint": "Current work in the selected scope. Choose a queue to review its exact records; changing the analysis period does not change the queue.",
+    "firstFive": "Preview: up to five records, ordered by exact record ID. Browse the workspace for the complete list.",
+    "queueEmpty": "No records in this selection.",
+    "recent": "Recent records",
+    "recentHint": "Up to five latest records by creation or order date, including all states in this scope. Not limited to the analysis period.",
+    "source": {
+      "loading": "Loading this insight…",
+      "denied": "You do not have access to this insight's source.",
+      "partial": "This insight needs complete, readable source fields. No partial totals are shown.",
+      "error": "This insight's source could not be loaded. Cached figures are hidden."
+    },
+    "states": {
+      "draft": "Draft", "sent": "Sent", "toapprove": "Awaiting approval",
+      "sale": "Confirmed", "done": "Completed", "cancelled": "Cancelled",
+      "open": "Open", "won": "Won", "lost": "Lost", "overdue": "Past deadline",
+      "purchase": "Confirmed", "late": "Late receipts", "submitted": "Submitted",
+      "approved": "Approved", "posted": "Posted", "refused": "Refused",
+      "generated": "Generated", "exported": "Exported", "archived": "Archived"
+    },
+    "workspaces": {
+      "ops": "Operations", "operations": "Operations", "deliveries": "Deliveries", "returns": "Returns",
+      "commission-plans": "Commission plans", "leads": "Leads", "activities": "Activities",
+      "contacts": "Contacts", "requisitions": "Purchase agreements", "vendors": "Vendors",
+      "lines": "Order lines", "inbox": "Receipt and card inbox", "expenses": "Expense lines",
+      "statements": "Financial statements", "trial-balance": "Trial balance",
+      "scheduled-reports": "Scheduled reports", "dashboards": "Saved dashboards"
+    },
+    "modules": {
+      "sales": {
+        "title": "Sales overview", "description": "Understand order activity, then move the next customer decision forward.",
+        "currentValue": "Open quotation value", "currentCount": "Open quotations",
+        "periodValue": "Confirmed order value", "periodCount": "Confirmed orders placed",
+        "trend": "Confirmed order trends", "measure": "Order value", "distribution": "Orders by current state",
+        "trendHint": "Confirmed and completed order totals by order month, clipped to the selected period. Partial months are not extrapolated.",
+        "basis": "Order totals include tax. Quotations are draft or sent orders. Confirmed order value is grouped by order date and current state, not a historical booking snapshot, recognized revenue, invoiced AR or cash received. Currencies are never combined.",
+        "browse": "Browse orders in this currency"
+      },
+      "crm": {
+        "title": "CRM overview", "description": "See the opportunity pipeline and keep the next relationship action in view.",
+        "currentValue": "Open pipeline value", "currentCount": "Open opportunities",
+        "periodValue": "New opportunity value", "periodCount": "New opportunities",
+        "trend": "Opportunity creation trends", "measure": "Expected value", "distribution": "Opportunity outcomes",
+        "trendHint": "Expected value of opportunities created in the selected period that are currently open or won. Lost opportunities are excluded; partial months are not extrapolated.",
+        "basis": "Pipeline is the current unweighted expected value, not committed sales or a historical pipeline snapshot. Only opportunities explicitly assigned to this company and currency are included. Organization-level unassigned opportunities are excluded. Currencies are never combined.",
+        "browse": "Browse opportunities in this currency"
+      },
+      "purchasing": {
+        "title": "Purchasing overview", "description": "See purchasing commitments and focus on approvals and late receipts.",
+        "currentValue": "Open confirmed PO value", "currentCount": "Open confirmed POs",
+        "periodValue": "Confirmed PO value placed", "periodCount": "Confirmed POs placed",
+        "trend": "Purchase order trends", "measure": "PO value", "distribution": "Purchase orders by current state",
+        "trendHint": "Confirmed and completed PO totals by order month, clipped to the selected period. Partial months are not extrapolated.",
+        "basis": "PO totals include tax. Open confirmed POs are currently in the Purchase state. These are current document commitments grouped by order date, not billed expenses, cash paid or historical commitments. Late receipt queues exclude fully received orders; no on-time delivery rate is inferred. Currencies are never combined.",
+        "browse": "Browse POs in this currency"
+      },
+      "expenses": {
+        "title": "Expenses overview", "description": "Understand expense report activity and keep employee claims moving.",
+        "currentValue": "Submitted report value", "currentCount": "Submitted reports",
+        "periodValue": "Report value created", "periodCount": "Reports created",
+        "trend": "Expense report trends", "measure": "Report value", "distribution": "Expense reports by current state",
+        "trendHint": "Submitted, approved, posted and completed report totals by creation month. Draft and refused reports are excluded; partial months are not extrapolated.",
+        "basis": "Figures use expense report headers only, not report headers plus expense lines. They describe current document states grouped by creation date, not approval-date history, ledger spend or reimbursement cash. Receipt/card review remains in the operations workspace. Currencies are never combined.",
+        "browse": "Browse reports in this currency"
+      },
+      "reports": {
+        "title": "Reporting overview", "description": "See reporting activity and find drafts or prepared outputs to review.",
+        "currentValue": "Prepared outputs", "currentCount": "Drafts to review",
+        "periodValue": "Reports created", "periodCount": "Prepared reports created",
+        "trend": "Report creation trends", "measure": "Reports created", "distribution": "Reports by current state",
+        "trendHint": "Financial report header counts by creation month, not the reports' covered accounting periods. Partial months are not extrapolated.",
+        "basis": "Prepared outputs are currently generated or exported reports. Counts span currencies within the selected company; no financial amounts, different report periods, snapshots or ledger lines are added together. Exported is a recorded state, not proof of recipient delivery. Statements, trial balances, schedules and saved dashboards retain their existing workspaces.",
+        "browse": "Browse financial reports"
+      }
+    }
+  },
   "workspaceShell": {
     "preferences": "Workspace preferences",
     "preferencesDescription": "Make this workspace comfortable for you.",

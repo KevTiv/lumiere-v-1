@@ -1,4 +1,6 @@
 "use client"
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights } from "../../../components/module-insights"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState, useRef, useCallback } from "react"
@@ -209,7 +211,8 @@ function ReportsClientLoaded({
     [router],
   )
 
-  const { data: reportsRaw = [] } = useFinancialReports(orgId, initialReports)
+  const reportsQuery = useFinancialReports(orgId, initialReports)
+  const { data: reportsRaw = [] } = reportsQuery
   const { data: trialBalances = [] } = useTrialBalances(orgId, initialBalances)
   const { data: reportTemplates = [] } = useReportTemplates(orgId, initialReportTemplates)
   const { data: scheduledReports = [] } = useScheduledReports(orgId, initialScheduledReports)
@@ -218,7 +221,8 @@ function ReportsClientLoaded({
   const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
-  const { data: currencies = [] } = useCurrencies()
+  const currenciesQuery = useCurrencies()
+  const { data: currencies = [] } = currenciesQuery
 
   const reports = useMemo(
     () =>
@@ -1074,6 +1078,7 @@ function ReportsClientLoaded({
     <>
       <ModuleView
         config={config}
+        dashboardContent={<ModuleInsights input={{ module: "reports", organizationId, companyId: operatingCompanyId ?? 0n, records: { rows: reportsRaw, state: moduleQueryState(reportsQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
