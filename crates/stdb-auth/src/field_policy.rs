@@ -123,6 +123,13 @@ static GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashSet<String>> = Lazy::new(|| {
 static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy::new(|| {
     let mut m = HashMap::new();
     m.insert(
+        "purchase-requisitions".to_string(),
+        ["line_ids", "purchase_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
+    m.insert(
         "account-moves".to_string(),
         ["metadata"].into_iter().map(String::from).collect(),
     );
@@ -1387,6 +1394,52 @@ mod tests {
         assert!(selected.iter().any(|column| column == "company_id"));
         assert!(!selected.iter().any(|column| column == "filter_json"));
         assert!(!selected.iter().any(|column| column == "column_dimension"));
+    }
+
+    #[test]
+    fn requisition_projection_preserves_operator_identity_and_exact_po_handoff() {
+        let cols = resolve_http_sql_columns("purchase-requisitions", None).unwrap();
+        for field in [
+            "origin",
+            "user_id",
+            "vendor_id",
+            "line_ids",
+            "purchase_ids",
+            "order_count",
+        ] {
+            assert!(cols.iter().any(|column| column == field), "missing {field}");
+        }
+        let mut access = field_access(&["purchase_requisition:read"]);
+        select_fields(&mut access, "purchase-requisitions", &["state"]);
+        let selected = resolve_http_sql_columns("purchase-requisitions", Some(&access)).unwrap();
+        for field in ["origin", "user_id", "vendor_id", "line_ids", "purchase_ids"] {
+            assert!(
+                !selected.iter().any(|column| column == field),
+                "field selection leaked {field}"
+            );
+        }
+        assert!(
+            filter_http_sql_unsafe_columns(&["purchase_ids".into()], Some("products")).is_empty()
+        );
+    }
+
+    #[test]
+    fn replenishment_projection_exposes_configuration_and_scheduler_readback() {
+        let cols = resolve_http_sql_columns("replenishment-rules", None).unwrap();
+        for field in [
+            "product_min_qty",
+            "product_max_qty",
+            "qty_to_order",
+            "trigger",
+            "last_run",
+            "next_run",
+        ] {
+            assert!(cols.iter().any(|column| column == field), "missing {field}");
+        }
+        let mut access = field_access(&["replenishment_rule:read"]);
+        select_fields(&mut access, "replenishment-rules", &["active"]);
+        let selected = resolve_http_sql_columns("replenishment-rules", Some(&access)).unwrap();
+        assert!(!selected.iter().any(|column| column == "last_run"));
     }
 
     #[test]
