@@ -9,7 +9,7 @@ test('anonymous production traffic cannot render ERP, onboarding or signup pages
 })
 
 test('public authentication and static resources remain reachable', () => {
-  for (const path of ['/sign-in', '/forgot-password', '/reset-password', '/accept-invite', '/auth/callback',
+  for (const path of ['/sign-in', '/forgot-password', '/reset-password', '/accept-invite', '/auth/invite/prepare', '/auth/callback',
     '/api/health', '/api/auth/signin', '/_next/static/chunk.js', '/robots.txt', '/favicon.ico']) {
     assert.equal(requiresPrivatePageLogin(path, true, false), false, path)
   }
