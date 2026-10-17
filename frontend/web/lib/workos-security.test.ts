@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm'
 import ts from 'typescript'
 import { NextRequest, NextResponse } from 'next/server'
 import { safeAuthReturnTo } from './auth-mode'
+import * as crypto from 'node:crypto'
 
 function loadSource(file: string, dependencies: Record<string, unknown>, globals: Record<string, unknown> = {}) {
   const source = readFileSync(new URL(file, import.meta.url), 'utf8')
@@ -132,4 +133,117 @@ test('WorkOS rejects insecure production callbacks and authority or URL suffix i
     })
     assert.throws(() => config.workOsRedirectUri())
   }
+})
+
+test('hosted invite cookie keeps the bearer secret out of the URL, is authenticated and expires', () => {
+  const source = './hosted-invite-token.ts'
+  const deps = { 'server-only': {}, 'node:crypto': crypto }
+  const settings = (secret: string) => ({
+    Buffer,
+    process: { env: { NODE_ENV: 'production', WORKOS_COOKIE_PASSWORD: secret } },
+  })
+  const invite = loadSource(source, { ...deps }, settings('a-secret-password-at-least-32-chars-long'))
+  const token = 'Abc_'.repeat(10) + '123'
+  assert.equal(invite.validInviteToken(token), true)
+  assert.equal(invite.validInviteToken(token + '!'), false)
+  const sealed = invite.sealHostedInvite(token, 1_000_000)
+  assert.ok(!sealed.includes(token))
+  assert.equal(invite.openHostedInvite(sealed, 1_020_000), token)
+  assert.equal(invite.openHostedInvite(sealed, 1_600_001), null)
+  assert.equal(invite.openHostedInvite('broken'), null)
+  assert.equal(invite.openHostedInvite(sealed.slice(0, -2) + 'xx', 1_020_000), null)
+  const other = loadSource(source, { ...deps }, settings('another-password-with-at-least-32-chars'))
+  assert.equal(other.openHostedInvite(sealed, 1_020_000), null)
+  assert.equal(invite.hostedInviteCookieName(), '__Host-lumiere-invite')
+  assert.equal(invite.hostedInviteCookieOptions().httpOnly, true)
+  assert.equal(invite.hostedInviteCookieOptions().secure, true)
+})
+
+test('invite preparation clears query secrets and stores only sealed HTTP-only state', () => {
+  const sealed = 'opaque.ciphertext'
+  const handler = loadSource('../app/auth/invite/prepare/route.ts', {
+    '@/lib/auth-mode': { isWorkOsEnabled: () => true },
+    '@/lib/hosted-invite-token': {
+      hostedInviteCookieName: () => '__Host-lumiere-invite',
+      hostedInviteCookieOptions: () => ({ httpOnly: true, secure: true, sameSite: 'lax', path: '/' }),
+      INVITE_COOKIE_MAX_AGE: 600,
+      validInviteToken: (value: string) => /^[A-Za-z0-9_-]{43}$/.test(value),
+      sealHostedInvite: () => sealed,
+    },
+    'next/server': { NextRequest, NextResponse },
+  })
+  const token = 'a'.repeat(43)
+  const response = handler.GET(new NextRequest(`https://web.test/auth/invite/prepare?token=${token}`))
+  assert.equal(response.status, 303)
+  assert.equal(response.headers.get('location'), 'https://web.test/accept-invite')
+  assert.match(response.headers.get('set-cookie') ?? '', /HttpOnly/)
+  assert.match(response.headers.get('set-cookie') ?? '', /Secure/)
+  assert.match(response.headers.get('set-cookie') ?? '', /opaque.ciphertext/)
+  assert.ok(!(response.headers.get('set-cookie') ?? '').includes(token))
+  assert.equal(response.headers.get('Referrer-Policy'), 'no-referrer')
+  const bad = handler.GET(new NextRequest('https://web.test/auth/invite/prepare?token=bad'))
+  assert.equal(bad.headers.get('location'), 'https://web.test/accept-invite')
+  assert.match(bad.headers.get('set-cookie') ?? '', /Max-Age=0/)
+})
+
+test('WorkOS invitation completion uses only the server cookie, not a forged browser token', async () => {
+  const token = 'x'.repeat(43)
+  const sent: Array<{ token: string }> = []
+  const handler = loadSource('../app/api/auth/accept-invite/route.ts', {
+    '@/lib/api-server-forward': { forwardToApiServerRequired: async (request: NextRequest) => {
+      sent.push(await request.json())
+      return NextResponse.json({ redirectTo: '/overview' })
+    } },
+    '@/lib/auth-mode': { isWorkOsEnabled: () => true },
+    '@/lib/hosted-invite-token': {
+      hostedInviteCookieName: () => 'lumiere-invite',
+      hostedInviteCookieOptions: () => ({ httpOnly: true, sameSite: 'lax', path: '/', secure: false }),
+      openHostedInvite: (value: string) => value === 'sealed-state' ? token : null,
+    },
+    'next/server': { NextRequest, NextResponse },
+  })
+  const request = (cookie: string, extra: Record<string, string> = {}) => new NextRequest(
+    'https://web.test/api/auth/accept-invite',
+    { method: 'POST', headers: { cookie, 'content-type': 'application/json', ...extra }, body: '{"token":"forged"}' },
+  )
+  const rejected = await handler.POST(request('lumiere-invite=sealed-state', { authorization: 'Bearer override' }))
+  assert.equal(rejected.status, 403)
+  assert.equal(sent.length, 0)
+  const expired = await handler.POST(request('lumiere-invite=invalid'))
+  assert.equal(expired.status, 400)
+  assert.equal(sent.length, 0)
+  const accepted = await handler.POST(request('lumiere-invite=sealed-state'))
+  assert.equal(accepted.status, 200)
+  assert.deepEqual(sent, [{ token }])
+  assert.match(accepted.headers.get('set-cookie') ?? '', /Max-Age=0/)
+  assert.ok(!(await accepted.text()).includes(token))
+})
+
+test('hosted invite redirect returns to the secret-free acceptance page', async () => {
+  const destinations: string[] = []
+  const action = loadSource('../app/actions/workos-auth.ts', {
+    '@/lib/workos-config': { workOsRedirectUri: () => 'https://web.test/auth/callback' },
+    '@/lib/auth-mode': { isWorkOsEnabled: () => true, safeAuthReturnTo },
+    '@workos-inc/authkit-nextjs': {
+      getSignInUrl: async ({ returnTo }: { returnTo: string }) => {
+        destinations.push(returnTo); return 'https://provider.test/login'
+      },
+      getSignUpUrl: async () => 'https://provider.test/signup',
+    },
+    'next/navigation': { redirect: (_url: string) => undefined },
+    '@/lib/post-auth-destination': { POST_AUTH_PATHS: { overview: '/overview', onboarding: '/onboarding' } },
+  })
+  await action.redirectToWorkOsForInvite(new FormData())
+  assert.deepEqual(destinations, ['/accept-invite'])
+})
+
+test('hosted auth screen guards never render the native sign-in/signup forms in WorkOS mode', () => {
+  for (const file of ['../app/(auth)/sign-in/page.tsx', '../app/(auth)/sign-up/page.tsx']) {
+    const content = readFileSync(new URL(file, import.meta.url), 'utf8')
+    assert.match(content, /!useWorkOsAuth && \(/)
+  }
+  const hosted = readFileSync(new URL('../app/(auth)/accept-invite/hosted-accept-invite.tsx', import.meta.url), 'utf8')
+  assert.ok(!hosted.includes('searchParams.get("token")'))
+  assert.ok(!hosted.includes('localStorage'))
+  assert.ok(!hosted.includes('sessionStorage'))
 })
