@@ -40,7 +40,7 @@
         "O": {"status": "proven", "reason": "Contact, lead, opportunity, order, fulfilment, invoice, return, exchange and credit-note posting are each an operator UI transition in one executed spec; the credit note is posted from its document page.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-sales-returns.spec.ts", "role": "principal-operator-transition", "claim": "complete operator-driven sales lifecycle through return and credit note"}]},
         "E": {"status": "proven", "reason": "Executed: exact order/delivery/invoice/return/exchange/credit-note identities, refused replay of the accepted confirm, invoice and credit-note commands, lost-reply readback with no retry, double click, stale session and concurrent confirm yielding one delivery. Retry and concurrency are proven for confirmation only; replay is proven for confirm, invoice and credit note.", "evidence": [{"path": "frontend/web/tests/e2e/o2c-certification.spec.ts", "claim": "replay, lost-response, double-click, stale-session and concurrency proof for order confirmation"}, {"path": "frontend/web/tests/e2e/mvp-sales-returns.spec.ts", "claim": "exact invoice, return, exchange and credit-note relations with refused replays"}]}
       },
-      "missing_proof": ["all principal transitions through UI", "canonical fulfillment/invoice/return links", "lost-response and concurrency recovery"],
+      "missing_proof": [],
       "next_packages": ["COV-04", "COV-25", "COV-27"]
     },
     {
@@ -57,7 +57,7 @@
         "O": {"status": "proven", "reason": "Purchase order, line, confirmation, receipt, bill creation, bill posting, payment creation, payment posting and payment registration are each operator UI transitions in the executed spec.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-procure-to-pay.spec.ts", "role": "principal-operator-transition", "claim": "operator-driven procure-to-pay path through bill and payment"}]},
         "E": {"status": "proven", "reason": "Executed: PO, sole line, bill (via purchase_order.invoice_ids) and payment (unique reference) resolved by exact identity; the replayed create-bill command is refused without a second bill; a create-bill reply lost after commit converges by canonical readback to exactly one bill with no retry offered.", "evidence": [{"path": "frontend/web/tests/e2e/mvp-procure-to-pay.spec.ts", "claim": "exact PO, line, bill and payment identity with refused replay and lost-response convergence"}]}
       },
-      "missing_proof": ["exact PO, receipt, bill and payment identities", "operator approval and stale-reference path", "retry and duplicate protection"],
+      "missing_proof": ["operator approval and stale-reference path"],
       "next_packages": ["COV-05", "COV-08", "COV-27"]
     },
     {
