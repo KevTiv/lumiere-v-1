@@ -1,18 +1,24 @@
+import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
+  chooseSelectOptionByLabel,
   fetchSessionOrganizationId,
   fillField,
   gotoModule,
   scalarQueryId,
   selectEntityRowById,
+  signIn,
   waitForBffQueryMinRows,
   smokeName,
   submitForm,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
+
+const PERSONA_PASSWORD =
+  process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
 
 type Row = Record<string, unknown>
 
@@ -32,6 +38,8 @@ async function openDashboardView(page: Page, dashboardId: number) {
   await expect(view).toBeEnabled()
   await view.click()
 }
+
+test.describe.configure({ mode: "serial" })
 
 test.describe(
   "COV-20 dashboard compose → reject → view → export",
@@ -75,7 +83,7 @@ test.describe(
           request.method() === "POST" &&
           new URL(request.url()).pathname === "/api/operations/erp.create_dashboard_widget"
         ) {
-          widgetRequest = request
+          widgetRequest ??= request
         }
       })
       await page.getByTestId("module-tab-reports-query-builder").click()
@@ -123,6 +131,57 @@ test.describe(
           return (ids ?? []).map((id) => scalarQueryId(id))
         })
         .toEqual([widgetId])
+
+      // --- compose: a CRM-model widget; CRM reads are permission-gated ------
+      const leadWidgetName = smokeName("cov20-lead-widget")
+      await page.getByTestId("module-tab-reports-query-builder").click()
+      await page.getByTestId("qb-model").click()
+      await page.getByRole("option", { name: "Lead", exact: true }).click()
+      await expect(page.getByTestId("qb-source-row-count")).toContainText(
+        /\d+ rows? loaded/,
+      )
+      await page.getByTestId("qb-group-by").click()
+      await page
+        .locator('[role="listbox"]:visible')
+        .getByRole("option")
+        .nth(1)
+        .click()
+      await page.getByTestId("qb-name").fill(leadWidgetName)
+      await page.getByTestId("qb-attach-dashboard").click()
+      await page
+        .getByRole("option", { name: dashboardName, exact: true })
+        .first()
+        .click()
+      const [leadCreated, leadAttached] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url().includes("/api/operations/erp.create_dashboard_widget"),
+          { timeout: 45_000 },
+        ),
+        page.waitForResponse(
+          (response) =>
+            response.url().includes("/api/operations/erp.add_widget_to_dashboard"),
+          { timeout: 45_000 },
+        ),
+        page.getByTestId("qb-save").click(),
+      ])
+      expect(leadCreated.ok(), await leadCreated.text()).toBe(true)
+      expect(leadAttached.ok(), await leadAttached.text()).toBe(true)
+      const leadWidgetId = scalarQueryId(
+        (await rows(page, "dashboard-widgets")).find(
+          (row) => row.name === leadWidgetName,
+        )?.id,
+      )
+      if (leadWidgetId == null) throw new Error("created lead widget not found")
+      await expect
+        .poll(async () => {
+          const row = (await rows(page, "dashboards")).find(
+            (candidate) => scalarQueryId(candidate.id) === dashboardId,
+          )
+          const ids = (row?.widgetIds ?? row?.widget_ids) as unknown[] | undefined
+          return (ids ?? []).map((id) => scalarQueryId(id)).sort()
+        })
+        .toEqual([widgetId, leadWidgetId].sort())
 
       // --- write-time rejection (live reducer): malformed stored definitions
       const created = (widgetRequest as Request | null)
@@ -204,7 +263,7 @@ test.describe(
         organizationId: String(organizationId),
         companyId: String(companyId),
         dashboardId: String(dashboardId),
-        model: "sale_order",
+        model: "lead,sale_order",
       })
       expect(provenance.artifact.filename).toBe(pngName)
       expect(provenance.artifact.mimeType).toBe("image/png")
@@ -212,6 +271,191 @@ test.describe(
         createHash("sha256").update(png).digest("hex"),
       )
       expect(String(provenance.domain)).toContain(String(widgetId))
+      expect(String(provenance.domain)).toContain(String(leadWidgetId))
+
+      // --- drill: a chart category opens the admitted list filtered by it ---
+      await page
+        .getByTestId("stored-dashboard-view-grid")
+        .locator(".recharts-bar-rectangle")
+        .first()
+        .click()
+      await expect
+        .poll(() => {
+          const url = new URL(page.url())
+          return {
+            path: url.pathname,
+            tab: url.searchParams.get("tab"),
+            filter: url.searchParams.getAll("filter").length === 1
+              ? (url.searchParams.get("filter") ?? "").split(":")[0]
+              : null,
+          }
+        }, { timeout: 30_000 })
+        .toEqual({ path: "/sales", tab: "orders", filter: "state" })
+
+      // --- live denial: the lead source answers 403 for a persona without CRM
+      // read, so the dashboard shows a denied alert and cannot be exported. ---
+      const financeContext = await page.context().browser()!.newContext({
+        storageState: { cookies: [], origins: [] },
+      })
+      const financePage = await financeContext.newPage()
+      try {
+        await signIn(
+          financePage,
+          "fixture.finance@example.test",
+          PERSONA_PASSWORD,
+        )
+        const denied = await financePage.request.get("/api/query/leads")
+        expect(denied.status()).toBe(403)
+        await openDashboardView(financePage, dashboardId)
+        const alert = financePage.getByTestId("stored-dashboard-denied")
+        await expect(alert).toBeVisible({ timeout: 45_000 })
+        await expect(alert).toHaveAttribute("role", "alert")
+        await expect(
+          financePage.getByRole("button", { name: /export/i }).first(),
+        ).toBeDisabled()
+      } finally {
+        await financeContext.close()
+      }
+    })
+
+    test("a real read-API outage shows an unavailable source, blocks export, and recovers on retry", async ({
+      page,
+    }) => {
+      test.setTimeout(300_000)
+      const container =
+        process.env.E2E_API_CONTAINER ?? "lumiere-dev-api-server-1"
+      await gotoModule(page, "/reports", "reports")
+      // Reuse the dashboard the previous test composed (serial mode): the seeded
+      // dashboard's legacy widget settings are rejected by the fail-closed
+      // resolver, so it can never be exported.
+      const composed = (await rows(page, "dashboards"))
+        .filter((row) => String(row.name ?? "").startsWith("smoke-cov20-dash"))
+        .sort((a, b) => Number(scalarQueryId(b.id)) - Number(scalarQueryId(a.id)))[0]
+      const dashboardId = scalarQueryId(composed?.id)
+      if (dashboardId == null) throw new Error("the composed dashboard is required")
+
+      await page.getByTestId("module-tab-reports-dashboards").click()
+      await selectEntityRowById(page, dashboardId)
+      const view = page.getByTestId("entity-action-view-dashboard")
+      await expect(view).toBeEnabled()
+
+      let stopped = false
+      try {
+        // Stop the real read API (no route mocking), then open the dashboard so
+        // its source reads fail against the missing dependency.
+        execFileSync("docker", ["stop", "--time", "2", container])
+        stopped = true
+        await view.click()
+        const alert = page.getByTestId("stored-dashboard-error")
+        await expect(alert).toBeVisible({ timeout: 60_000 })
+        await expect(alert).toHaveAttribute("role", "alert")
+        await expect(page.getByTestId("stored-dashboard-denied")).toHaveCount(0)
+        await expect(
+          page.getByRole("button", { name: /export/i }).first(),
+        ).toBeDisabled()
+
+        execFileSync("docker", ["start", container])
+        stopped = false
+        await expect
+          .poll(
+            async () => {
+              const res = await page.request.get("/api/query/sale-orders")
+              return res.ok()
+            },
+            { timeout: 180_000 },
+          )
+          .toBe(true)
+
+        await page.getByTestId("stored-dashboard-retry").click()
+        await expect(page.getByTestId("stored-dashboard-error")).toHaveCount(0, {
+          timeout: 60_000,
+        })
+        await expect(page.getByTestId("stored-dashboard-view-grid")).toBeVisible({
+          timeout: 60_000,
+        })
+        await expect(
+          page.getByRole("button", { name: /export/i }).first(),
+        ).toBeEnabled()
+      } finally {
+        if (stopped) execFileSync("docker", ["start", container])
+      }
+    })
+
+    test("creates a template and a schedule through the operator forms and records its run", async ({
+      page,
+    }) => {
+      test.setTimeout(240_000)
+      await gotoModule(page, "/reports", "reports")
+      const organizationId = await fetchSessionOrganizationId(page)
+
+      const templateName = smokeName("cov20-op-template")
+      await page.getByTestId("module-tab-reports-report-templates").click()
+      await page.getByTestId("module-create-reports-report-templates").click()
+      await fillField(page, "name", templateName)
+      await fillField(page, "model", "sale_order")
+      const [templateCreated] = await Promise.all([
+        page.waitForResponse(
+          (response) => matchesOperationResponse(response, "create_report_template"),
+          { timeout: 45_000 },
+        ),
+        submitForm(page, "new-report-template"),
+      ])
+      expect(templateCreated.ok(), await templateCreated.text()).toBe(true)
+      const template = (await rows(page, "report-templates")).filter(
+        (row) => row.name === templateName,
+      )
+      expect(template).toHaveLength(1)
+      const templateId = scalarQueryId(template[0]?.id)
+      if (templateId == null) throw new Error("created template not found")
+
+      const scheduleName = smokeName("cov20-op-schedule")
+      await page.getByTestId("module-tab-reports-scheduled-reports").click()
+      await page.getByTestId("module-create-reports-scheduled-reports").click()
+      await fillField(page, "name", scheduleName)
+      await chooseSelectOptionByLabel(page, "reportTemplateId", templateName)
+      await fillField(page, "model", "sale_order")
+      await page.getByTestId("form-field-nextRun").fill("2034-01-02T06:00")
+      await fillField(page, "recipients", "ops@example.test")
+      const [scheduleCreated] = await Promise.all([
+        page.waitForResponse(
+          (response) => matchesOperationResponse(response, "create_scheduled_report"),
+          { timeout: 45_000 },
+        ),
+        submitForm(page, "new-scheduled-report"),
+      ])
+      expect(scheduleCreated.ok(), await scheduleCreated.text()).toBe(true)
+      const schedules = (await rows(page, "scheduled-reports")).filter(
+        (row) => row.name === scheduleName,
+      )
+      expect(schedules).toHaveLength(1)
+      const reportId = scalarQueryId(schedules[0]?.id)
+      if (reportId == null) throw new Error("created schedule not found")
+      expect(
+        scalarQueryId(schedules[0]?.organizationId ?? schedules[0]?.organization_id),
+      ).toBe(organizationId)
+      expect(Number(schedules[0]?.runCount ?? schedules[0]?.run_count ?? 0)).toBe(0)
+
+      await selectEntityRowById(page, reportId)
+      const action = page.getByTestId("entity-action-record-run")
+      await expect(action).toBeEnabled()
+      await action.click()
+      await page.getByTestId("form-field-nextRun").fill("2035-01-02T06:00")
+      const [recorded] = await Promise.all([
+        page.waitForResponse(
+          (response) => matchesOperationResponse(response, "record_report_run"),
+          { timeout: 30_000 },
+        ),
+        page.getByTestId("form-submit-record-scheduled-run").click(),
+      ])
+      expect(recorded.ok(), await recorded.text()).toBe(true)
+      await expect
+        .poll(async () => {
+          const row = (await rows(page, "scheduled-reports")).find(
+            (candidate) => scalarQueryId(candidate.id) === reportId,
+          )
+          return Number(row?.runCount ?? row?.run_count ?? -1)
+        })
+        .toBe(1)
     })
   },
 )

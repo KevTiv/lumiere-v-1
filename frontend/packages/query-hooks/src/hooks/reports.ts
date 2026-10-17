@@ -526,8 +526,8 @@ export function useCreateReportTemplate(organizationId: bigint) {
     mutationFn: async (formData) => {
       const params = toCreateReportTemplateParams(formData)
       if (!params) throw new Error('Invalid template parameters')
-      const companyId = companyIdStringOrNull(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_report_template", { companyId: companyId, params: stdbParamsToJson(params) })
+      const companyId = companyIdNumberOrNull(formData)
+      const { urlPath, init } = stdbBffCommandPost("create_report_template", { companyId: companyId, params: stdbParamsToJson(params, "CreateReportTemplateParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create report template')
@@ -567,7 +567,7 @@ export function useCreateScheduledReport(organizationId: bigint) {
       const params = toCreateScheduledReportParams(formData)
       if (!params) throw new Error('Invalid scheduled report parameters')
       const companyId = companyIdNumberOrNull(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_scheduled_report", { companyId: companyId, params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("create_scheduled_report", { companyId: companyId, params: stdbParamsToJson(params, "CreateScheduledReportParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create scheduled report')

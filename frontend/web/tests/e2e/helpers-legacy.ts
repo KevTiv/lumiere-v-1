@@ -51,6 +51,10 @@ export async function signIn(
 }
 
 export async function expectAuthenticatedShell(page: Page) {
+  // While a streamed page is still resolving, its server-rendered shell and the
+  // client shell can briefly coexist; wait for exactly one before asserting on it
+  // (a strict-mode violation is not retried).
+  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
   await expect(page.getByTestId("sidebar-user")).toBeVisible()
   await expect(page.getByTestId("sidebar-sign-out")).toBeVisible()

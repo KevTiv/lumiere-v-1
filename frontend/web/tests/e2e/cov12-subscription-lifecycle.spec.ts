@@ -5,6 +5,8 @@ import {
   createDraftSaleOrder,
 } from "./sales-order-fixtures"
 import {
+  fetchAccountSelectLabelByInternalType,
+  fetchSalesInvoiceJournalLabel,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   fetchSaleOrderSelectLabel,
@@ -26,6 +28,16 @@ const PERSONA_PASSWORD =
   process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
 
 type Row = Record<string, unknown>
+
+function tagged(value: unknown): string {
+  if (typeof value === "string") return value
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    if ("tag" in value) return String((value as { tag?: unknown }).tag ?? "")
+    const keys = Object.keys(value)
+    if (keys.length === 1) return keys[0]!.charAt(0).toUpperCase() + keys[0]!.slice(1)
+  }
+  return ""
+}
 
 async function rows(page: Page, resource: string): Promise<Row[]> {
   const response = await page.request.get(`/api/query/${resource}`)
@@ -95,6 +107,115 @@ async function openSubscriptionAction(
   const action = page.getByTestId(`entity-action-${actionId}`)
   await expect(action).toBeEnabled()
   return action
+}
+
+async function labelByCode(page: Page, resource: string, code: string) {
+  const row = (await rows(page, resource)).find(
+    (candidate) => String(candidate.code ?? "").toUpperCase() === code,
+  )
+  if (!row) throw new Error(`${resource} row not found: ${code}`)
+  const name = String(row.name ?? "")
+  return name ? `${code} — ${name}` : code
+}
+
+/** Sale order → subscription → activate → generate the period invoice, all in the UI. */
+async function provisionBilledSubscription(page: Page, label: string) {
+  const saleOrderId = await createDraftSaleOrder(page, smokeName(`${label}-so`))
+  await addLaptopLine(page, saleOrderId, "1")
+  await gotoModule(page, "/sales", "sales")
+  await page.getByTestId("module-tab-sales-orders").click()
+  await selectEntityRowById(page, saleOrderId)
+  await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
+  await page.getByTestId("entity-action-confirm-orders").click()
+  await waitForSaleOrderConfirmed(page, saleOrderId)
+  const saleOrderLabel = await fetchSaleOrderSelectLabel(page, saleOrderId)
+
+  const incomeLabel = await fetchAccountSelectLabelByInternalType(page, "income")
+  const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
+  const journalLabel = await fetchSalesInvoiceJournalLabel(page)
+
+  await gotoModule(page, "/subscriptions", "subscriptions")
+  await selectModuleTab(page, "subscriptions", "subscriptions")
+  const code = smokeName(label).toUpperCase().slice(0, 40)
+  await page.getByTestId("module-create-subscriptions-subscriptions").click()
+  await chooseSelectOptionByLabel(page, "saleOrderId", saleOrderLabel)
+  await chooseFirstEnabledOption(page, "planId")
+  await fillField(page, "code", code)
+  await fillField(page, "dateStart", isoDate(0))
+  await Promise.all([
+    page.waitForResponse(
+      (response) => matchesOperationResponse(response, "create_subscription_from_sale_order"),
+      { timeout: 45_000 },
+    ),
+    submitForm(page, "new-subscription"),
+  ])
+  const subscriptionId = scalarQueryId(
+    (await rows(page, "subscriptions")).find((row) => row.code === code)?.id,
+  )
+  if (subscriptionId == null) throw new Error("created subscription not found")
+  const activate = await openSubscriptionAction(page, subscriptionId, "activate-sub")
+  await Promise.all([
+    page.waitForResponse(
+      (response) => matchesOperationResponse(response, "activate_subscription"),
+      { timeout: 45_000 },
+    ),
+    activate.click(),
+  ])
+  await expect.poll(() => subscriptionSnapshot(page, subscriptionId)).toMatchObject({ state: "active" })
+  const lines = await linesOf(page, subscriptionId)
+  expect(lines).toHaveLength(1)
+
+  const generate = await openSubscriptionAction(page, subscriptionId, "gen-inv")
+  await generate.click()
+  await expect(page.getByTestId("form-modal-generate-subscription-invoice")).toBeVisible({
+    timeout: 15_000,
+  })
+  const billingRunKey = smokeName(`${label}-run`)
+  await fillField(page, "invoiceDate", isoDate(0))
+  await fillField(page, "billingRunKey", billingRunKey)
+  await chooseSelectOptionByLabel(page, "journalId", journalLabel)
+  await chooseSelectOptionByLabel(page, "incomeAccountId", incomeLabel)
+  await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
+  const [generated] = await Promise.all([
+    page.waitForResponse(
+      (response) => matchesOperationResponse(response, "generate_subscription_invoice"),
+      { timeout: 45_000 },
+    ),
+    submitForm(page, "generate-subscription-invoice"),
+  ])
+  expect(generated.ok(), await generated.text()).toBe(true)
+  const run = (await rows(page, "subscription-billing-runs")).find(
+    (row) => String(field(row, "billingRunKey", "billing_run_key")) === billingRunKey,
+  )
+  const invoiceMoveId = scalarQueryId(field(run ?? {}, "invoiceMoveId", "invoice_move_id"))
+  if (invoiceMoveId == null) throw new Error("billing run has no invoice")
+  return {
+    subscriptionId,
+    lines,
+    invoiceMoveId,
+    incomeLabel,
+    receivableLabel,
+    journalLabel,
+  }
+}
+
+async function cancelThroughUi(page: Page, subscriptionId: number, creditNote: boolean) {
+  const cancelAction = await openSubscriptionAction(page, subscriptionId, "cancel-sub")
+  await cancelAction.click()
+  await expect(page.getByTestId("form-modal-cancel-subscription")).toBeVisible({
+    timeout: 15_000,
+  })
+  const box = page.getByTestId("form-field-createCreditNote")
+  if (((await box.getAttribute("aria-checked")) === "true") !== creditNote) await box.click()
+  const [cancelled] = await Promise.all([
+    page.waitForResponse(
+      (response) => matchesOperationResponse(response, "cancel_subscription"),
+      { timeout: 45_000 },
+    ),
+    submitForm(page, "cancel-subscription"),
+  ])
+  expect(cancelled.ok(), await cancelled.text()).toBe(true)
+  await expect.poll(() => subscriptionSnapshot(page, subscriptionId)).toMatchObject({ state: "closed" })
 }
 
 test.describe(
@@ -313,6 +434,119 @@ test.describe(
       )
       expect(await amendmentsOf(page, subscriptionId)).toHaveLength(
         afterCancel.length,
+      )
+    })
+
+    test("amendment proration posts one exact adjustment move", async ({ page }) => {
+      test.setTimeout(300_000)
+      const billed = await provisionBilledSubscription(page, "cov12-pr")
+      const { subscriptionId, lines } = billed
+      const before = await rows(page, "account-moves")
+      const amendAction = await openSubscriptionAction(page, subscriptionId, "amend-sub")
+      await amendAction.click()
+      await expect(page.getByTestId("form-modal-amend-subscription")).toBeVisible({
+        timeout: 15_000,
+      })
+      await page.getByTestId("form-field-amendmentType").click()
+      await page
+        .locator('[role="listbox"]:visible')
+        .getByRole("option", { name: "Quantity", exact: true })
+        .click()
+      await chooseFirstEnabledOption(page, "lineId")
+      await fillField(page, "newQuantity", String(lines[0]!.quantity + 3))
+      const prorate = page.getByTestId("form-field-prorate")
+      if ((await prorate.getAttribute("aria-checked")) !== "true") await prorate.click()
+      await chooseSelectOptionByLabel(page, "journalId", billed.journalLabel)
+      await chooseSelectOptionByLabel(page, "incomeAccountId", billed.incomeLabel)
+      await chooseSelectOptionByLabel(page, "receivableAccountId", billed.receivableLabel)
+      const [amended] = await Promise.all([
+        page.waitForResponse(
+          (response) => matchesOperationResponse(response, "amend_subscription"),
+          { timeout: 45_000 },
+        ),
+        submitForm(page, "amend-subscription"),
+      ])
+      expect(amended.ok(), await amended.text()).toBe(true)
+      const amendment = (await amendmentsOf(page, subscriptionId)).find(
+        (row) => String(field(row, "amendmentType", "amendment_type")) === "quantity",
+      )
+      if (!amendment) throw new Error("amendment not found")
+      const prorationMoveId = scalarQueryId(field(amendment, "prorationMoveId", "proration_move_id"))
+      expect(prorationMoveId).not.toBeNull()
+      expect(Number(field(amendment, "prorationAmount", "proration_amount"))).toBeGreaterThan(0)
+      const after = await rows(page, "account-moves")
+      expect(after).toHaveLength(before.length + 1)
+      const adjustment = after.find((row) => scalarQueryId(row.id) === prorationMoveId)
+      expect(adjustment).toBeTruthy()
+      const snapshot = await subscriptionSnapshot(page, subscriptionId)
+      expect(scalarQueryId(field(adjustment!, "companyId", "company_id"))).toBe(snapshot.companyId)
+      expect(scalarQueryId(field(adjustment!, "organizationId", "organization_id"))).toBe(
+        snapshot.organizationId,
+      )
+      expect(await linesOf(page, subscriptionId)).toEqual(
+        lines.map((line) => ({ ...line, quantity: line.quantity + 3 })),
+      )
+      await cancelThroughUi(page, subscriptionId, false)
+    })
+
+    test("cancel after payment issues exactly one credit note for the paid invoice", async ({
+      page,
+    }) => {
+      test.setTimeout(300_000)
+      const billed = await provisionBilledSubscription(page, "cov12-cn")
+      const { subscriptionId, invoiceMoveId } = billed
+
+      const payAction = await openSubscriptionAction(page, subscriptionId, "pay-inv")
+      await payAction.click()
+      await expect(page.getByTestId("form-modal-pay-subscription-invoice")).toBeVisible({
+        timeout: 15_000,
+      })
+      const invoiceRow = (await rows(page, "account-moves")).find(
+        (row) => scalarQueryId(row.id) === invoiceMoveId,
+      )
+      const ref = String(invoiceRow?.ref ?? invoiceRow?.name ?? "").trim()
+      const invoiceLabel = `${ref || `Move #${invoiceMoveId}`} (OutInvoice)`
+      await chooseSelectOptionByLabel(page, "invoiceMoveId", invoiceLabel)
+      await chooseSelectOptionByLabel(page, "paymentJournalId", await labelByCode(page, "account-journals", "BNK"))
+      await chooseSelectOptionByLabel(page, "bankAccountId", await labelByCode(page, "account-accounts", "1200"))
+      await chooseSelectOptionByLabel(page, "receivableAccountId", billed.receivableLabel)
+      await chooseSelectOptionByLabel(page, "cogsAccountId", await labelByCode(page, "account-accounts", "5000"))
+      await chooseSelectOptionByLabel(page, "inventoryAccountId", await labelByCode(page, "account-accounts", "1400"))
+      const [paid] = await Promise.all([
+        page.waitForResponse(
+          (response) => matchesOperationResponse(response, "pay_subscription_invoice"),
+          { timeout: 45_000 },
+        ),
+        submitForm(page, "pay-subscription-invoice"),
+      ])
+      expect(paid.ok(), await paid.text()).toBe(true)
+      await expect
+        .poll(async () => {
+          const row = (await rows(page, "account-moves")).find(
+            (candidate) => scalarQueryId(candidate.id) === invoiceMoveId,
+          )
+          return tagged(row?.state)
+        })
+        .toBe("Posted")
+
+      const refundsBefore = (await rows(page, "account-moves")).filter(
+        (row) => tagged(field(row, "moveType", "move_type")) === "OutRefund",
+      ).length
+      await cancelThroughUi(page, subscriptionId, true)
+      const cancelRow = (await amendmentsOf(page, subscriptionId)).find(
+        (row) => String(field(row, "amendmentType", "amendment_type")) === "cancel",
+      )
+      if (!cancelRow) throw new Error("cancel amendment not found")
+      const creditNoteId = scalarQueryId(field(cancelRow, "creditNoteMoveId", "credit_note_move_id"))
+      expect(creditNoteId).not.toBeNull()
+      const after = await rows(page, "account-moves")
+      expect(
+        after.filter((row) => tagged(field(row, "moveType", "move_type")) === "OutRefund"),
+      ).toHaveLength(refundsBefore + 1)
+      const refund = after.find((row) => scalarQueryId(row.id) === creditNoteId)
+      expect(tagged(field(refund ?? {}, "moveType", "move_type"))).toBe("OutRefund")
+      expect(scalarQueryId(field(refund!, "companyId", "company_id"))).toBe(
+        (await subscriptionSnapshot(page, subscriptionId)).companyId,
       )
     })
   },
