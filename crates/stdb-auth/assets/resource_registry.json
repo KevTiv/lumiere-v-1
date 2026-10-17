@@ -27,6 +27,7 @@
       "code",
       "name",
       "deprecated",
+      "reconcile",
       "used",
       "company_id",
       "internal_type",
@@ -115,6 +116,11 @@
       "debit",
       "credit",
       "balance",
+      "parent_state",
+      "company_currency_id",
+      "currency_id",
+      "amount_residual",
+      "blocked",
       "account_id",
       "partner_id",
       "company_id"
@@ -750,6 +756,10 @@
     "default_restricted": [
       "amount",
       "amount_currency",
+      "date",
+      "currency_id",
+      "journal_currency_id",
+      "foreign_currency_id",
       "partner_id",
       "statement_id",
       "journal_id",
@@ -776,6 +786,7 @@
       "date",
       "balance_start",
       "balance_end",
+      "currency_id",
       "state",
       "journal_id",
       "company_id"
