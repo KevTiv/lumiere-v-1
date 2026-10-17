@@ -116,7 +116,14 @@ function DetailPreview({
       <CardContent>
         {!values ? <p className="text-sm text-muted-foreground">Select a record to inspect it.</p> : (
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {node.fields.map((field) => <div key={field}><dt className="text-xs text-muted-foreground">{field}</dt><dd className="text-sm" data-testid={`composed-detail-value-${node.id}-${field}`}>{values.get(field) ?? "—"}</dd></div>)}
+            {node.fields.map((field) => (
+              <div key={field} className="min-w-0 [overflow-wrap:anywhere]">
+                <dt className="text-xs text-muted-foreground">{field}</dt>
+                <dd className="text-sm" data-testid={`composed-detail-value-${node.id}-${field}`}>
+                  {values.get(field) ?? "—"}
+                </dd>
+              </div>
+            ))}
           </dl>
         )}
       </CardContent>
