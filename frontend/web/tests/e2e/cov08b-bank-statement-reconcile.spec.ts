@@ -107,8 +107,15 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
       ref: { some: invoiceReference }, payment_reference: { none: [] }, metadata: { none: [] },
       lines: [{ account_id: accounts[1], name: invoiceReference, quantity: 1, price_unit: 25, discount: 0, tax_ids: [], product_id: { none: [] } }],
     }])
-    const move = (await queryRows(page, "account-moves")).find((row) => (row.ref ?? row.ref_) === invoiceReference)
-    const moveId = scalarQueryId(move?.id)
+    // The governed move projection omits the optional reference. Resolve the
+    // exact fixture through its unique, company-bound revenue line instead.
+    const invoiceLines = (await queryRows(page, "account-move-lines")).filter((row) =>
+      row.name === invoiceReference &&
+      scalarQueryId(row.companyId ?? row.company_id) === companyId &&
+      scalarQueryId(row.accountId ?? row.account_id) === accounts[1],
+    )
+    expect(invoiceLines).toHaveLength(1)
+    const moveId = scalarQueryId(invoiceLines[0]?.moveId ?? invoiceLines[0]?.move_id)
     if (moveId == null) throw new Error("bank-link fixture invoice not found")
     await callOwnerRaw("post_invoice", [organizationId, moveId, accounts[2], accounts[3]])
     const moveLine = (await queryRows(page, "account-move-lines")).find((row) =>
