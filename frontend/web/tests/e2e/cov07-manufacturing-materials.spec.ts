@@ -24,15 +24,6 @@ import { createStockQuantFixture } from "./inventory-quant-fixtures"
 const PERSONA_PASSWORD =
   process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
 
-type ProductRow = {
-  id?: unknown
-  uomId?: unknown
-  uom_id?: unknown
-  tracking?: unknown
-  type?: unknown
-  type_?: unknown
-}
-
 type BomRow = {
   id?: unknown
 }

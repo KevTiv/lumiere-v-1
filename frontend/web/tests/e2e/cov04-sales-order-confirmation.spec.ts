@@ -12,7 +12,6 @@ import {
   seedSaleOrderApprovalWorkflow,
   signIn,
   smokeName,
-  waitForPendingApprovalRequest,
 } from "./helpers"
 import { addLaptopLine, confirmOrderViaUi, createDraftSaleOrder, fetchOrderPickings } from "./sales-order-fixtures"
 import { isolatedSalesApprovalFixture } from "./sales-approval-fixture"
