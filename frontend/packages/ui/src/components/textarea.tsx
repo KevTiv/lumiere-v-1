@@ -13,6 +13,10 @@ import {
   Strikethrough,
 } from "lucide-react"
 
+import {
+  markdownToRichTextHtml,
+  richTextElementToMarkdown,
+} from "./rich-text-markdown"
 import { cn } from "@lumiere/ui/lib/utils"
 
 type TextareaProps = React.ComponentProps<"textarea">
@@ -64,21 +68,78 @@ function assignRef<T>(ref: React.Ref<T> | undefined, value: T | null) {
   }
 }
 
+function setNativeTextareaValue(textarea: HTMLTextAreaElement, value: string) {
+  const valueSetter = Object.getOwnPropertyDescriptor(
+    HTMLTextAreaElement.prototype,
+    "value"
+  )?.set
+  valueSetter?.call(textarea, value)
+  textarea.dispatchEvent(new Event("input", { bubbles: true }))
+}
+
+function selectionBelongsTo(editor: HTMLElement) {
+  const selection = window.getSelection()
+  if (!selection?.rangeCount) return false
+  const range = selection.getRangeAt(0)
+  return editor.contains(range.commonAncestorContainer)
+}
+
+function fallbackInlineFormat(editor: HTMLElement, tagName: string, placeholder: string) {
+  const selection = window.getSelection()
+  if (!selection?.rangeCount || !selectionBelongsTo(editor)) return
+
+  const range = selection.getRangeAt(0)
+  const element = document.createElement(tagName)
+  if (range.collapsed) {
+    element.textContent = placeholder
+  } else {
+    element.append(range.extractContents())
+  }
+  range.insertNode(element)
+  range.selectNodeContents(element)
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
 /**
- * A Jira-inspired rich text panel that preserves the native textarea contract.
- * Formatting is stored as Markdown, so existing forms continue to submit a
- * plain string and callers can keep using native textarea props and refs.
+ * Jira-inspired visual rich-text editing with a native textarea form bridge.
+ * Users see formatted content while forms continue to store and submit Markdown.
  */
 function Textarea({
   className,
   disabled,
   readOnly,
   ref,
+  onBlur,
+  onFocus,
+  onInvalid,
   onKeyDown,
+  autoFocus,
+  id,
+  placeholder,
+  maxLength,
+  rows,
+  style,
+  value,
+  defaultValue,
+  "aria-label": ariaLabel,
+  "aria-labelledby": ariaLabelledBy,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
   ...props
 }: TextareaProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
-  const editorDisabled = disabled || readOnly
+  const editorRef = React.useRef<HTMLDivElement | null>(null)
+  const isControlled = value !== undefined
+  const [uncontrolledValue, setUncontrolledValue] = React.useState(() =>
+    String(defaultValue ?? "")
+  )
+  const [labelDerivedEditorName, setLabelDerivedEditorName] = React.useState<
+    string | undefined
+  >()
+  const markdownValue = isControlled ? String(value ?? "") : uncontrolledValue
+  const lastEditorValue = React.useRef(markdownValue)
+  const editorDisabled = Boolean(disabled || readOnly)
 
   const setTextareaRef = React.useCallback(
     (node: HTMLTextAreaElement | null) => {
@@ -88,82 +149,123 @@ function Textarea({
     [ref]
   )
 
-  const replaceSelection = React.useCallback(
+  React.useLayoutEffect(() => {
+    const editor = editorRef.current
+    if (!editor || markdownValue === lastEditorValue.current) return
+    editor.innerHTML = markdownToRichTextHtml(markdownValue)
+    lastEditorValue.current = markdownValue
+  }, [markdownValue])
+
+  React.useLayoutEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    editor.innerHTML = markdownToRichTextHtml(markdownValue)
+  }, []) // Initial DOM hydration only; later values are handled above.
+
+  React.useEffect(() => {
+    if (autoFocus) editorRef.current?.focus()
+  }, [autoFocus])
+
+  React.useLayoutEffect(() => {
+    if (ariaLabel || ariaLabelledBy) return
+    const labelText = textareaRef.current?.labels?.[0]?.textContent?.trim()
+    setLabelDerivedEditorName(
+      labelText ? `${labelText} rich text editor` : undefined
+    )
+  }, [ariaLabel, ariaLabelledBy, id])
+
+  const limitMarkdown = React.useCallback(
+    (nextValue: string) =>
+      maxLength === undefined ? nextValue : nextValue.slice(0, maxLength),
+    [maxLength]
+  )
+
+  const syncFormValue = React.useCallback(() => {
+    const editor = editorRef.current
+    const textarea = textareaRef.current
+    if (!editor || !textarea) return ""
+
+    const serializedValue = richTextElementToMarkdown(editor)
+    const nextValue = limitMarkdown(serializedValue)
+    if (nextValue !== serializedValue) {
+      editor.innerHTML = markdownToRichTextHtml(nextValue)
+    }
+    lastEditorValue.current = nextValue
+    if (!isControlled) setUncontrolledValue(nextValue)
+    setNativeTextareaValue(textarea, nextValue)
+    return nextValue
+  }, [isControlled, limitMarkdown])
+
+  React.useLayoutEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+
+    // Preserve the practical `.value` contract used by form helpers while the
+    // contenteditable surface owns the visible editing experience.
+    Object.defineProperty(editor, "value", {
+      configurable: true,
+      get: () => textareaRef.current?.value ?? richTextElementToMarkdown(editor),
+      set: (rawValue: unknown) => {
+        const nextValue = limitMarkdown(String(rawValue ?? ""))
+        editor.innerHTML = markdownToRichTextHtml(nextValue)
+        lastEditorValue.current = nextValue
+        if (!isControlled) setUncontrolledValue(nextValue)
+        if (textareaRef.current) {
+          setNativeTextareaValue(textareaRef.current, nextValue)
+        }
+      },
+    })
+
+    return () => {
+      delete (editor as HTMLElement & { value?: string }).value
+    }
+  }, [isControlled, limitMarkdown])
+
+  const runCommand = React.useCallback(
     (
-      replacement: string,
-      selectionStart: number,
-      selectionEnd: number
+      command: string,
+      value?: string,
+      fallback?: () => void
     ) => {
-      const textarea = textareaRef.current
-      if (!textarea || editorDisabled) return
+      const editor = editorRef.current
+      if (!editor || editorDisabled) return
 
-      const start = textarea.selectionStart
-      const end = textarea.selectionEnd
-
-      textarea.setRangeText(replacement, start, end, "end")
-      textarea.dispatchEvent(
-        new InputEvent("input", {
-          bubbles: true,
-          inputType: "insertText",
-          data: replacement,
-        })
-      )
-
-      textarea.focus()
-      textarea.setSelectionRange(start + selectionStart, start + selectionEnd)
+      editor.focus()
+      const commandSupported = typeof document.execCommand === "function"
+      const applied = commandSupported
+        ? document.execCommand(command, false, value)
+        : false
+      if (!applied) fallback?.()
+      syncFormValue()
     },
-    [editorDisabled]
+    [editorDisabled, syncFormValue]
   )
 
-  const wrapSelection = React.useCallback(
-    (before: string, after: string, placeholder: string) => {
-      const textarea = textareaRef.current
-      if (!textarea) return
-
-      const selected = textarea.value.slice(
-        textarea.selectionStart,
-        textarea.selectionEnd
-      )
-      const content = selected || placeholder
-      const replacement = `${before}${content}${after}`
-      replaceSelection(
-        replacement,
-        before.length,
-        before.length + content.length
-      )
+  const formatInline = React.useCallback(
+    (command: string, tagName: string, placeholder: string) => {
+      runCommand(command, undefined, () => {
+        const editor = editorRef.current
+        if (editor) fallbackInlineFormat(editor, tagName, placeholder)
+      })
     },
-    [replaceSelection]
+    [runCommand]
   )
 
-  const prefixSelectedLines = React.useCallback(
-    (prefix: string | ((index: number) => string), placeholder: string) => {
-      const textarea = textareaRef.current
-      if (!textarea) return
-
-      const value = textarea.value
-      const selectionStart = textarea.selectionStart
-      const selectionEnd = textarea.selectionEnd
-      const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1
-      const nextLineBreak = value.indexOf("\n", selectionEnd)
-      const lineEnd = nextLineBreak === -1 ? value.length : nextLineBreak
-      const selectedBlock = value.slice(lineStart, lineEnd) || placeholder
-      const replacement = selectedBlock
-        .split("\n")
-        .map((line, index) => {
-          const linePrefix = typeof prefix === "function" ? prefix(index) : prefix
-          return `${linePrefix}${line}`
-        })
-        .join("\n")
-
-      textarea.setSelectionRange(lineStart, lineEnd)
-      replaceSelection(replacement, 0, replacement.length)
+  const handleEditorBlur = React.useCallback(
+    (event: React.FocusEvent<HTMLDivElement>) => {
+      const nextValue = syncFormValue()
+      const editor = editorRef.current
+      if (editor) {
+        editor.innerHTML = markdownToRichTextHtml(nextValue)
+      }
+      onBlur?.(event as unknown as React.FocusEvent<HTMLTextAreaElement>)
     },
-    [replaceSelection]
+    [onBlur, syncFormValue]
   )
 
-  const handleKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      onKeyDown?.(event)
+  const handleEditorKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      onKeyDown?.(event as unknown as React.KeyboardEvent<HTMLTextAreaElement>)
       if (
         event.defaultPrevented ||
         editorDisabled ||
@@ -175,17 +277,25 @@ function Textarea({
       const key = event.key.toLowerCase()
       if (key === "b") {
         event.preventDefault()
-        wrapSelection("**", "**", "bold text")
+        formatInline("bold", "strong", "bold text")
       } else if (key === "i") {
         event.preventDefault()
-        wrapSelection("_", "_", "italic text")
+        formatInline("italic", "em", "italic text")
       } else if (key === "k") {
         event.preventDefault()
-        wrapSelection("[", "](https://)", "link text")
+        const href = window.prompt("Link URL", "https://")
+        if (href) runCommand("createLink", href)
       }
     },
-    [editorDisabled, onKeyDown, wrapSelection]
+    [editorDisabled, formatInline, onKeyDown, runCommand]
   )
+
+  const handleLink = React.useCallback(() => {
+    const href = window.prompt("Link URL", "https://")
+    if (href) runCommand("createLink", href)
+  }, [runCommand])
+
+  const editorMinHeight = rows ? `${Math.max(rows, 3) * 24 + 20}px` : undefined
 
   return (
     <div
@@ -200,7 +310,7 @@ function Textarea({
         <ToolbarButton
           label="Heading"
           disabled={editorDisabled}
-          onClick={() => prefixSelectedLines("## ", "Heading")}
+          onClick={() => runCommand("formatBlock", "h2")}
         >
           <Heading2 />
         </ToolbarButton>
@@ -209,7 +319,7 @@ function Textarea({
           label="Bold"
           shortcut="Ctrl+B"
           disabled={editorDisabled}
-          onClick={() => wrapSelection("**", "**", "bold text")}
+          onClick={() => formatInline("bold", "strong", "bold text")}
         >
           <Bold />
         </ToolbarButton>
@@ -217,21 +327,21 @@ function Textarea({
           label="Italic"
           shortcut="Ctrl+I"
           disabled={editorDisabled}
-          onClick={() => wrapSelection("_", "_", "italic text")}
+          onClick={() => formatInline("italic", "em", "italic text")}
         >
           <Italic />
         </ToolbarButton>
         <ToolbarButton
           label="Strikethrough"
           disabled={editorDisabled}
-          onClick={() => wrapSelection("~~", "~~", "strikethrough text")}
+          onClick={() => formatInline("strikeThrough", "s", "strikethrough text")}
         >
           <Strikethrough />
         </ToolbarButton>
         <ToolbarButton
           label="Inline code"
           disabled={editorDisabled}
-          onClick={() => wrapSelection("`", "`", "code")}
+          onClick={() => formatInline("inlineCode", "code", "code")}
         >
           <Code2 />
         </ToolbarButton>
@@ -239,23 +349,21 @@ function Textarea({
         <ToolbarButton
           label="Bulleted list"
           disabled={editorDisabled}
-          onClick={() => prefixSelectedLines("- ", "List item")}
+          onClick={() => runCommand("insertUnorderedList")}
         >
           <List />
         </ToolbarButton>
         <ToolbarButton
           label="Numbered list"
           disabled={editorDisabled}
-          onClick={() =>
-            prefixSelectedLines((index) => `${index + 1}. `, "List item")
-          }
+          onClick={() => runCommand("insertOrderedList")}
         >
           <ListOrdered />
         </ToolbarButton>
         <ToolbarButton
           label="Quote"
           disabled={editorDisabled}
-          onClick={() => prefixSelectedLines("> ", "Quote")}
+          onClick={() => runCommand("formatBlock", "blockquote")}
         >
           <Quote />
         </ToolbarButton>
@@ -264,25 +372,62 @@ function Textarea({
           label="Link"
           shortcut="Ctrl+K"
           disabled={editorDisabled}
-          onClick={() => wrapSelection("[", "](https://)", "link text")}
+          onClick={handleLink}
         >
           <Link />
         </ToolbarButton>
         <span className="ml-auto hidden shrink-0 px-2 text-[10px] font-medium tracking-wide text-muted-foreground/80 uppercase sm:inline">
-          Markdown
+          Rich text
         </span>
       </div>
 
-      <textarea
-        ref={setTextareaRef}
-        data-slot="textarea"
+      <div
+        ref={editorRef}
+        role="textbox"
+        aria-multiline="true"
+        aria-label={ariaLabel ?? labelDerivedEditorName}
+        aria-labelledby={ariaLabelledBy}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        aria-required={props.required}
+        data-slot="rich-text-editor"
+        data-placeholder={placeholder}
+        contentEditable={!editorDisabled}
+        suppressContentEditableWarning
         className={cn(
-          "flex field-sizing-content min-h-24 w-full resize-y border-0 bg-transparent px-3 py-2.5 text-base leading-6 outline-none placeholder:text-muted-foreground focus-visible:ring-0 disabled:cursor-not-allowed disabled:bg-transparent disabled:opacity-100 md:text-sm",
+          "min-h-24 w-full overflow-y-auto border-0 bg-transparent px-3 py-2.5 text-base leading-6 outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] [&_a]:text-primary [&_a]:underline [&_blockquote]:my-1 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_h2]:my-1 [&_h2]:text-lg [&_h2]:font-semibold [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:min-h-6 [&_s]:text-muted-foreground [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-6 md:text-sm",
+          editorDisabled && "cursor-not-allowed",
           className
         )}
+        style={{ minHeight: editorMinHeight, ...style }}
+        onInput={syncFormValue}
+        onBlur={handleEditorBlur}
+        onFocus={(event) =>
+          onFocus?.(event as unknown as React.FocusEvent<HTMLTextAreaElement>)
+        }
+        onKeyDown={handleEditorKeyDown}
+      />
+
+      <textarea
+        ref={setTextareaRef}
+        id={id}
+        data-slot="textarea"
+        className="sr-only"
+        aria-hidden="true"
         disabled={disabled}
         readOnly={readOnly}
-        onKeyDown={handleKeyDown}
+        tabIndex={-1}
+        value={value}
+        defaultValue={defaultValue}
+        autoFocus={false}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        rows={rows}
+        onFocus={() => editorRef.current?.focus()}
+        onInvalid={(event) => {
+          editorRef.current?.focus()
+          onInvalid?.(event)
+        }}
         {...props}
       />
     </div>
