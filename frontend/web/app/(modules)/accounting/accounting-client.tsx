@@ -1,6 +1,7 @@
 "use client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { AccountantOverview } from "./accountant-overview"
+import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -1375,8 +1376,7 @@ function AccountingClientReady({
     return {
       companyConfigured: company != null,
       baseCurrencyConfigured:
-        manualInvoiceCurrencyId > 0n &&
-        currencies.some((currency) => currency.id === manualInvoiceCurrencyId),
+        currencyCatalogContainsId(currencies, manualInvoiceCurrencyId),
       fiscalYearConfigured: companyFiscalYears.length > 0,
       openPeriodAvailable: companyPeriods.some(
         (period) => accountPeriodStateTag(copyAsRecord(period)) === "Open",
