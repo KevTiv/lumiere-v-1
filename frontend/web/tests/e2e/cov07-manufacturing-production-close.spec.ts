@@ -195,7 +195,7 @@ async function createSetupBom(
       params: stdbParamsToJson(params, "CreateBomParams"),
     }),
   )
-  expect(response.ok()).toBe(true)
+  expect(response.ok(), await response.text()).toBe(true)
 
   let createdId: number | undefined
   await expect
@@ -310,7 +310,7 @@ async function runSetupCommand(
       moId: BigInt(moId),
     }),
   )
-  expect(response.ok()).toBe(true)
+  expect(response.ok(), await response.text()).toBe(true)
 }
 
 async function fetchExactMo(

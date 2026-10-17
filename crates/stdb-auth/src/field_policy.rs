@@ -190,6 +190,20 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
             .map(String::from)
             .collect(),
     );
+    // Immutable cost snapshots expose their exact source/output relations for
+    // readback and record links. Field selection still runs before this filter.
+    m.insert(
+        "mrp-production-costs".to_string(),
+        [
+            "raw_move_ids",
+            "output_move_ids",
+            "productivity_cost_ids",
+            "account_move_line_ids",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect(),
+    );
     m
 });
 
@@ -1326,6 +1340,15 @@ mod tests {
             ),
             ("mrp-workorders", &["time_ids"][..]),
             ("mrp-workcenters", &["order_ids", "productivity_ids"][..]),
+            (
+                "mrp-production-costs",
+                &[
+                    "raw_move_ids",
+                    "output_move_ids",
+                    "productivity_cost_ids",
+                    "account_move_line_ids",
+                ][..],
+            ),
         ] {
             let cols = resolve_http_sql_columns(resource, None).expect("columns");
             for field in fields {
@@ -1335,6 +1358,35 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn manufacturing_cost_relations_respect_field_selection_and_resource_scope() {
+        let mut access = field_access(&["mrp_production:read"]);
+        select_fields(&mut access, "mrp-production-costs", &["total_value"]);
+        let cols = resolve_http_sql_columns("mrp-production-costs", Some(&access))
+            .expect("selected cost columns");
+        assert!(cols.iter().any(|column| column == "total_value"));
+        assert!(!cols.iter().any(|column| column == "output_move_ids"));
+        assert!(
+            filter_http_sql_unsafe_columns(&["output_move_ids".to_string()], Some("products"))
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn saved_report_projection_preserves_company_and_persisted_definition() {
+        let cols = resolve_http_sql_columns("saved-reports", None).expect("saved report columns");
+        for field in ["company_id", "column_dimension", "filter_json"] {
+            assert!(cols.iter().any(|column| column == field), "missing {field}");
+        }
+        let mut access = field_access(&["saved_report:read"]);
+        select_fields(&mut access, "saved-reports", &["name"]);
+        let selected = resolve_http_sql_columns("saved-reports", Some(&access))
+            .expect("selected saved report columns");
+        assert!(selected.iter().any(|column| column == "company_id"));
+        assert!(!selected.iter().any(|column| column == "filter_json"));
+        assert!(!selected.iter().any(|column| column == "column_dimension"));
     }
 
     #[test]
@@ -1480,13 +1532,15 @@ mod tests {
     fn resolve_http_sql_columns_exposes_helpdesk_lifecycle_without_customer_pii() {
         let cols =
             resolve_http_sql_columns("helpdesk-tickets", None).expect("helpdesk-tickets columns");
-        for field in ["state", "priority"] {
+        // The canonical registry exposes the assigned agent's identity for
+        // ticket routing/editing. It is not the customer's personal payload.
+        for field in ["state", "priority", "user_id"] {
             assert!(
                 cols.iter().any(|column| column == field),
                 "expected {field} in helpdesk-tickets projection, got: {cols:?}"
             );
         }
-        for field in ["description", "partner_name", "partner_email", "user_id"] {
+        for field in ["description", "partner_name", "partner_email"] {
             assert!(
                 !cols.iter().any(|column| column == field),
                 "{field} must remain excluded from the default helpdesk projection: {cols:?}"

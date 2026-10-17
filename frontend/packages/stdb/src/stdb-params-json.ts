@@ -30,6 +30,9 @@ const NESTED_ARRAY_STRUCTS: Partial<
   CreatePurchaseRfqParams: {
     lines: "CreatePurchaseRfqLineParams",
   },
+  CreatePurchaseRequisitionParams: {
+    lines: "CreatePurchaseRequisitionLineParams",
+  },
   CreatePurchaseReturnParams: {
     lines: "CreatePurchaseReturnLineParams",
   },

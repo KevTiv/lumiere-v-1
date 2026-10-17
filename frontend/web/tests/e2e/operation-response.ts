@@ -25,3 +25,13 @@ export function matchesOperationResponse(
   const operationPath = stdbBffCallUrl(operationName)
   return pathname === operationPath || pathname === `/v1${operationPath.slice(4)}`
 }
+
+/** Resolve named/legacy fault targets to current operation routes, never substrings. */
+export function matchesOperationFaultTarget(url: URL, target: string): boolean {
+  const legacyName = target.match(/^\/(?:api|v1)\/compat\/reducer\/([^/]+)$/)?.[1]
+  const operationName = legacyName ?? target
+  return url.pathname === target || matchesOperationResponse(
+    { url: () => url.toString() },
+    operationName,
+  )
+}

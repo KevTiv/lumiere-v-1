@@ -5768,13 +5768,16 @@
       "name",
       "model",
       "row_dimension",
+      "column_dimension",
       "measure_field",
       "measure_op",
+      "filter_json",
       "is_active"
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id"
     ],
     "table": "saved_report"
   },

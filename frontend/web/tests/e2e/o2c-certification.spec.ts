@@ -16,6 +16,7 @@ import {
   waitForSaleOrderLineQtyDelivered,
 } from "./helpers"
 import { loseNextResponse, openOwnerPages } from "./pretenant-support"
+import { matchesOperationFaultTarget } from "./operation-response"
 import {
   ORDER_SUMMARY,
   addLaptopLine,
@@ -102,7 +103,7 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
 
     let requests = 0
     await page.route(
-      (url) => url.pathname.includes("confirm_sales_order"),
+      (url) => matchesOperationFaultTarget(url, "confirm_sales_order"),
       async (route) => {
         requests += 1
         await route.continue()

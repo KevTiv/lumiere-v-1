@@ -8,6 +8,7 @@ import {
   scalarQueryId,
   smokeName,
 } from "./helpers"
+import { provisionActor, withActor } from "./pretenant-support"
 
 const none = { none: [] as [] }
 const some = <T,>(value: T) => ({ some: value })
@@ -43,7 +44,8 @@ function rowCompanyId(row: QueryRow): number | null {
 }
 
 test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
-  test("isolates same-organization companies and strips sensitive payload fields", async ({ page }) => {
+  test("isolates same-organization companies and strips sensitive payload fields", async ({ page, browser }) => {
+    test.setTimeout(180_000)
     const organizationId = await fetchSessionOrganizationId(page)
     const defaultCompanyId = await fetchDefaultCompanyId(page)
     const companies = await queryRows(page, "companies", defaultCompanyId)
@@ -97,22 +99,32 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
     ])
     await callReducerBff(page, "generate_hub_pairing_token", [organizationId, defaultCompanyId])
 
-    // Creating a sibling company does not silently expand the signed-in
-    // principal's company scope. Exercise the trusted BFF boundary instead of
-    // using that principal to manufacture a cross-company fixture.
-    const forgedBranchWrite = await callReducerBffResult(page, "register_iot_hub", [
-      organizationId,
-      branchCompanyId,
-      {
-        name: branchSerial,
-        serial: branchSerial,
-        ip_address: some("192.0.2.11"),
-        firmware_version: some("1.0.0"),
-        metadata: none,
-      },
+    // Organization owners deliberately have organization-wide company access.
+    // Prove isolation with a company-bound member who has the IoT capability,
+    // not an owner whose legitimate authority includes the sibling company.
+    const actor = await provisionActor(page, "iot-company-scope", [
+      "iot_hub:create", "iot_hub:read", "iot_action:read", "iot_alert:read",
+      "iot_device:read", "iot_pairing_token:read", "iot_telemetry:read", "iot_threshold:read",
     ])
-    expect(forgedBranchWrite.status).toBe(403)
-    expect(forgedBranchWrite.error ?? "").toMatch(/company scope mismatch/i)
+    await withActor(browser, actor, async (scopedPage) => {
+      await callReducerBff(scopedPage, "register_iot_hub", [organizationId, defaultCompanyId, {
+        name: `${suffix}-scoped-hub`, serial: `${suffix}-scoped-hub`,
+        ip_address: none, firmware_version: none, metadata: none,
+      }])
+      const forgedBranchWrite = await callReducerBffResult(scopedPage, "register_iot_hub", [
+        organizationId,
+        branchCompanyId,
+        {
+          name: branchSerial,
+          serial: branchSerial,
+          ip_address: some("192.0.2.11"),
+          firmware_version: some("1.0.0"),
+          metadata: none,
+        },
+      ])
+      expect(forgedBranchWrite.status).toBe(403)
+      expect(forgedBranchWrite.error ?? "").toMatch(/company scope mismatch/i)
+    })
 
     const defaultHub = await waitForRow(
       page,
@@ -192,17 +204,21 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
     expect(telemetry).not.toHaveProperty("rawValue")
     expect(telemetry).not.toHaveProperty("raw_value")
 
-    for (const resource of [
-      "iot-actions",
-      "iot-alerts",
-      "iot-devices",
-      "iot-hubs",
-      "iot-pairing-tokens",
-      "iot-telemetry",
-      "iot-thresholds",
-    ]) {
-      const response = await page.request.get(`/api/query/${resource}?companyId=${branchCompanyId}`)
-      expect(response.status(), resource).toBe(403)
-    }
+    await withActor(browser, actor, async (scopedPage) => {
+      for (const resource of [
+        "iot-actions",
+        "iot-alerts",
+        "iot-devices",
+        "iot-hubs",
+        "iot-pairing-tokens",
+        "iot-telemetry",
+        "iot-thresholds",
+      ]) {
+        const own = await scopedPage.request.get(`/api/query/${resource}?companyId=${defaultCompanyId}`)
+        expect(own.status(), `${resource} own-company read`).toBe(200)
+        const response = await scopedPage.request.get(`/api/query/${resource}?companyId=${branchCompanyId}`)
+        expect(response.status(), resource).toBe(403)
+      }
+    })
   })
 })
