@@ -652,9 +652,9 @@ export interface SettingsSectionExposurePolicy {
 }
 
 /**
- * Authoritative first-organization Settings exposure manifest. Every section
- * must be classified exactly once; tests fail if a new internal/admin panel is
- * added without an explicit launch disposition.
+ * Authoritative standard Settings exposure manifest. Every section must be
+ * classified exactly once. The finance alpha profile applies its narrower
+ * AI-only overlay in `isSettingsSectionVisibleForProfile`.
  */
 export const SETTINGS_SECTION_EXPOSURE: readonly SettingsSectionExposurePolicy[] = [
   { id: "profile", exposure: "enabled", owner: "COV-23", minimumEvidence: "authenticated profile settings", hiddenReason: null },
@@ -667,7 +667,7 @@ export const SETTINGS_SECTION_EXPOSURE: readonly SettingsSectionExposurePolicy[]
   { id: "form-config", exposure: "admin-only", owner: "COV-22", minimumEvidence: "versioned form publish and stale rejection", hiddenReason: "organization administrators only" },
   { id: "audit", exposure: "admin-only", owner: "COV-23", minimumEvidence: "organization-scoped audit read", hiddenReason: "organization administrators only" },
   { id: "organization", exposure: "admin-only", owner: "COV-23", minimumEvidence: "organization and company lifecycle", hiddenReason: "organization administrators only" },
-  { id: "ai", exposure: "hidden", owner: "GOV/CAP", minimumEvidence: "governed AI settings admission", hiddenReason: "AI governance is outside the first-organization ERP denominator" },
+  { id: "ai", exposure: "hidden", owner: "GOV/CAP", minimumEvidence: "governed AI settings admission", hiddenReason: "AI governance is outside the standard ERP settings surface" },
 ] as const
 
 const settingsExposureById = new Map(
@@ -678,6 +678,15 @@ export function isSettingsSectionAdmitted(sectionId: string, isAdmin: boolean): 
   const policy = settingsExposureById.get(sectionId)
   if (!policy || policy.exposure === "hidden") return false
   return policy.exposure === "enabled" || isAdmin
+}
+
+export function isSettingsSectionVisibleForProfile(
+  sectionId: string,
+  isAdmin: boolean,
+  firstOrgProfile: boolean,
+): boolean {
+  if (!firstOrgProfile) return isSettingsSectionAdmitted(sectionId, isAdmin)
+  return sectionId === "ai" && isAdmin
 }
 
 // Dashboard view to permission mapping

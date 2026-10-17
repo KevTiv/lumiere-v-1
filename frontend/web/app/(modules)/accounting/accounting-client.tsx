@@ -4,6 +4,7 @@ import { useModuleTab } from "@/hooks/use-module-tab"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useErpSession } from "@lumiere/erp-session"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
@@ -784,11 +785,30 @@ export function AccountingClient(props: AccountingClientProps) {
 }
 
 function AccountingClientLoaded(props: AccountingClientLoadedProps) {
+  const { companyIds, setActiveCompanyId } = useErpSession()
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(props.organizationId)
+  useEffect(() => {
+    const rawCompanyId = new URLSearchParams(window.location.search).get("companyId")
+    if (!rawCompanyId) return
+    const companyId = Number(rawCompanyId)
+    if (
+      !Number.isSafeInteger(companyId) ||
+      companyId <= 0 ||
+      !companyIds?.includes(companyId)
+    ) return
+    setActiveCompanyId?.(companyId)
+    window.history.replaceState(window.history.state, "", "/accounting")
+  }, [companyIds, setActiveCompanyId])
   if (operatingCompanyId == null) {
     return (
-      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">
-        Select an active company to open the accounting workspace.
+      <div className="space-y-4 rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">
+        <p>Select an active company to open the accounting workspace.</p>
+        <a
+          href="/settings?section=finance-setup"
+          className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+        >
+          Complete Finance setup
+        </a>
       </div>
     )
   }
@@ -1500,8 +1520,17 @@ function AccountingClientReady({
 
   const handleReadinessResolve = useCallback(
     (item: AccountingReadinessItem) => {
-      if (item.id === "company" || item.id === "base-currency") {
-        window.location.assign("/settings")
+      if (item.id === "company") {
+        window.location.assign("/settings?section=finance-setup")
+        return
+      }
+      if (item.id === "base-currency") {
+        toast({
+          title: "Base currency needs administrator repair",
+          description:
+            "This operating company has no valid base currency. Keep this company selected and repair its company record before posting or importing accounting history.",
+          variant: "destructive",
+        })
         return
       }
       if (item.id === "fiscal-year") setAccountingActiveTab("fiscal-years")
@@ -1511,7 +1540,7 @@ function AccountingClientReady({
       } else if (item.id.endsWith("-account")) setAccountingActiveTab("accounts")
       else setAccountingActiveTab("taxes")
     },
-    [setAccountingActiveTab],
+    [setAccountingActiveTab, toast],
   )
 
   const partnerSelectOptions = useMemo(() => {
