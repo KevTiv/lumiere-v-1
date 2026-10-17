@@ -906,7 +906,7 @@ function ReportsClientLoaded({
           }
         }
         if (tab.id === "dashboards") return { ...tab, entityConfig: dashboardsEntityConfig, createForm: dashboardFormConfig }
-        if (tab.id === "dashboard-widgets") return { ...tab, entityConfig: dashboardWidgetsEntityConfig }
+        if (tab.id === "dashboard-widgets") return { ...tab, entityConfig: dashboardWidgetsEntityConfig, createForm: dashboardWidgetFormConfig }
         if (tab.id === "owner-reports") {
           return {
             ...tab,
@@ -993,6 +993,7 @@ function ReportsClientLoaded({
       dashboardsEntityConfig,
       dashboardWidgetsEntityConfig,
       dashboardFormConfig,
+      dashboardWidgetFormConfig,
       scheduledReportFormConfig,
       reportTemplateFormConfig,
       analyticsMetricFormConfig,

@@ -264,27 +264,24 @@ pub(crate) fn validate_widget_definition(
         }
     }
 
-    // Configuration is free-form widget settings, except when it carries a
-    // time/measure binding (a `version` key), which must be a valid v1 binding.
+    // The stored configuration is the widget's time/measure binding; the
+    // resolver fails closed on anything else, so reject it here as well.
     if let Some(config) = configuration.map(str::trim).filter(|c| !c.is_empty()) {
-        if let Ok(Value::Object(map)) = serde_json::from_str::<Value>(config) {
-            let carries_binding = ["version", "timeField", "measureField"]
-                .iter()
-                .any(|key| map.contains_key(*key));
-            if carries_binding {
-                let optional_text = |key: &str| match map.get(key) {
-                    None | Some(Value::Null) | Some(Value::String(_)) => true,
-                    _ => false,
+        let valid = match serde_json::from_str::<Value>(config) {
+            Ok(Value::Object(map)) => {
+                let optional_text = |key: &str| {
+                    matches!(map.get(key), None | Some(Value::Null) | Some(Value::String(_)))
                 };
-                let valid = map.get("version").and_then(Value::as_u64) == Some(1)
+                map.get("version").and_then(Value::as_u64) == Some(1)
                     && optional_text("timeField")
                     && optional_text("measureField")
                     && map.get("missingTimestampPolicy").and_then(Value::as_str) == Some("reject")
-                    && map.get("missingMeasurePolicy").and_then(Value::as_str) == Some("reject");
-                if !valid {
-                    return Err("Widget time or measure binding is invalid".to_string());
-                }
+                    && map.get("missingMeasurePolicy").and_then(Value::as_str) == Some("reject")
             }
+            _ => false,
+        };
+        if !valid {
+            return Err("Widget time or measure binding is invalid".to_string());
         }
     }
     Ok(())

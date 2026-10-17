@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises"
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
+  chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   fetchSessionOrganizationId,
   fillField,
@@ -456,6 +457,37 @@ test.describe(
           return Number(row?.runCount ?? row?.run_count ?? -1)
         })
         .toBe(1)
+    })
+
+    test("creates a widget through the Widgets tab form with the operating company", async ({
+      page,
+    }) => {
+      test.setTimeout(120_000)
+      await gotoModule(page, "/reports", "reports")
+      await waitForBffQueryMinRows(page, "/api/query/companies")
+      const widgetName = smokeName("cov20-tab-widget")
+      await page.getByTestId("module-tab-reports-dashboard-widgets").click()
+      await page.getByTestId("module-create-reports-dashboard-widgets").click()
+      await fillField(page, "name", widgetName)
+      await chooseFirstEnabledOption(page, "widgetType")
+      await fillField(page, "dataSource", "sale_order")
+      const [created] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url().includes("/api/operations/erp.create_dashboard_widget"),
+          { timeout: 45_000 },
+        ),
+        submitForm(page, "new-dashboard-widget"),
+      ])
+      expect(created.ok(), await created.text()).toBe(true)
+      const widgets = (await rows(page, "dashboard-widgets")).filter(
+        (row) => row.name === widgetName,
+      )
+      expect(widgets).toHaveLength(1)
+      expect(String(widgets[0]?.model ?? "")).toBe("sale_order")
+      expect(
+        scalarQueryId(widgets[0]?.companyId ?? widgets[0]?.company_id),
+      ).not.toBeNull()
     })
   },
 )

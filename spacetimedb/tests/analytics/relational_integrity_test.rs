@@ -530,6 +530,8 @@ pub fn test_dashboard_widget_definition_validated_at_write(
         ("sort-dir", CreateDashboardWidgetParams { sort_order: Some(r#"{"amount":"sideways"}"#.into()), ..base("COV20 sort dir") }, "asc or desc"),
         ("sort-multi", CreateDashboardWidgetParams { sort_order: Some(r#"{"a":"asc","b":"desc"}"#.into()), ..base("COV20 sort multi") }, "exactly one"),
         ("binding", CreateDashboardWidgetParams { configuration: Some(r#"{"version":2,"timeField":"date"}"#.into()), ..base("COV20 binding") }, "binding"),
+        ("freeform-config", CreateDashboardWidgetParams { configuration: Some(r#"{"stacked":true}"#.into()), ..base("COV20 freeform config") }, "binding"),
+        ("config-not-json", CreateDashboardWidgetParams { configuration: Some("nope".into()), ..base("COV20 config junk") }, "binding"),
     ];
     for (label, params, expect) in bad {
         let before = count(ctx);
@@ -557,17 +559,8 @@ pub fn test_dashboard_widget_definition_validated_at_write(
             ..base("COV20 valid")
         },
     )?;
-    create_dashboard_widget(
-        ctx,
-        fixture.organization_id,
-        None,
-        CreateDashboardWidgetParams {
-            configuration: Some(r#"{"stacked":true}"#.into()),
-            ..base("COV20 freeform config")
-        },
-    )?;
-    if count(ctx) != 2 {
-        return Err("valid definitions must both persist".to_string());
+    if count(ctx) != 1 {
+        return Err("the valid definition must persist".to_string());
     }
     Ok(())
 }
