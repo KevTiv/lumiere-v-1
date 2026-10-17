@@ -67,7 +67,7 @@ async function activeCompanyId(page: Page) {
   })
 }
 
-test.describe("COV-23 operator lifecycle", { tag: ["@p0", "@cov23", "@unauthenticated"] }, () => {
+test.describe("COV-23 operator lifecycle", { tag: ["@p0", "@cov23"] }, () => {
   test("grant, company switch, revoke and recovery converge on one live persona session", async ({
     browser,
     page,
