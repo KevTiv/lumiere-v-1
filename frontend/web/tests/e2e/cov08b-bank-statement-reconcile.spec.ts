@@ -186,6 +186,7 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
     await expect(dialog).toBeVisible()
     await dialog.getByRole("button", { name: "Focus line" }).click()
     const desk = dialog.getByTestId("reconciliation-workbench")
+    await expect(desk.getByTestId(`reconciliation-candidate-${moveLineId}`)).toBeVisible()
     await desk.getByTestId(`reconciliation-candidate-${moveLineId}`).getByRole("checkbox").check()
     await desk.getByRole("checkbox", { name: /I reviewed the statement/ }).check()
     await expect(desk.getByTestId("reconciliation-confirm")).toBeEnabled()
