@@ -4476,6 +4476,16 @@ function AccountingClientReady({
     () => allMoves.filter((m) => moveTypeTag(m as Record<string, unknown>) === "OutInvoice"),
     [allMoves],
   )
+  // Customer credit notes (OutRefund) are listed beside invoices so an operator can
+  // open and post a draft credit note; KPIs above keep using invoices only.
+  const invoiceListRows = useMemo(
+    () =>
+      allMoves.filter((m) => {
+        const tag = moveTypeTag(m as Record<string, unknown>)
+        return tag === "OutInvoice" || tag === "OutRefund"
+      }),
+    [allMoves],
+  )
   const bills = useMemo(
     () => allMoves.filter((m) => moveTypeTag(m as Record<string, unknown>) === "InInvoice"),
     [allMoves],
@@ -5401,11 +5411,11 @@ function AccountingClientReady({
                   <ListPivotSwitch
                     storageId="accounting-invoices-list"
                     t={t}
-                    rows={copyAsRecords(invoices)}
+                    rows={copyAsRecords(invoiceListRows)}
                     {...accountMovePivotSetup(t)}
                   >
                   <InvoiceListView
-                    invoices={invoices}
+                    invoices={invoiceListRows}
                     onSelectInvoice={(invoice) => setInvoiceSheetRecord(copyAsRecord(invoice))}
                     onCreateInvoice={openInvoiceCreate}
                     onRecalculateTotals={(inv) =>
@@ -5986,6 +5996,7 @@ function AccountingClientReady({
       liveSections,
       chartStructurePanel,
       invoices,
+      invoiceListRows,
       bills,
       accountTypes,
       accounts,

@@ -16,7 +16,6 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
-  postDraftCreditNoteMove,
   postDraftInvoiceViaUi,
   selectEntityRowById,
   selectEntityRowByText,
@@ -298,7 +297,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForReturnOrderState(page, returnOrderId, "refunded")
 
     const creditNoteId = await fetchDraftCreditNoteMoveIdForReturnOrder(page, returnOrderId)
-    await postDraftCreditNoteMove(page, creditNoteId)
+    await postDraftInvoiceViaUi(page, creditNoteId)
 
     await expect
       .poll(async () => {

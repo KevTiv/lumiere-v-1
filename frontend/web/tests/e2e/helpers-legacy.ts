@@ -88,6 +88,7 @@ export async function gotoModule(page: Page, route: string, moduleId?: string) {
 export async function selectModuleTab(page: Page, moduleId: string, tabId: string) {
   const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
   await tab.click()
+  await expect(tab).toHaveCount(1, { timeout: 30_000 })
   await expect(tab).toHaveAttribute("aria-selected", "true")
   // Base UI may regenerate the tab/tabpanel ids during the state transition.
   // The selected tab and the single visible panel are the stable behavior.
@@ -389,6 +390,7 @@ export async function openTabAndCancelCreate(
 ) {
   const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
   await tab.click()
+  await expect(tab).toHaveCount(1, { timeout: 30_000 })
   await expect(tab).toHaveAttribute("aria-selected", "true")
   // The tab switch also updates ?tab=, which can re-render the panel; click
   // (unlike scrollIntoViewIfNeeded) re-resolves a replaced element.
@@ -845,6 +847,7 @@ export async function waitForEntityActionEnabled(page: Page, actionTestId: strin
 /** Open a sale order's own page and wait for its header. */
 export async function openSaleOrderPage(page: Page, orderId: number | string) {
   await page.goto(`/sales/orders/${orderId}`)
+  await expect(page.getByTestId("sale-order-title")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("sale-order-title")).toBeVisible({ timeout: 30_000 })
 }
 
