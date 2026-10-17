@@ -1,6 +1,7 @@
 "use client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { AccountantOverview } from "./accountant-overview"
+import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
 import { useInvoicePersonalization } from "@lumiere/query-hooks/hooks/invoice-personalization"
 import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from "@lumiere/erp-shared/invoice-personalization"
 import { formatInvoiceMoney, resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
@@ -1372,8 +1373,7 @@ function AccountingClientReady({
     return {
       companyConfigured: company != null,
       baseCurrencyConfigured:
-        manualInvoiceCurrencyId > 0n &&
-        currencies.some((currency) => currency.id === manualInvoiceCurrencyId),
+        currencyCatalogContainsId(currencies, manualInvoiceCurrencyId),
       fiscalYearConfigured: companyFiscalYears.length > 0,
       openPeriodAvailable: companyPeriods.some(
         (period) => accountPeriodStateTag(copyAsRecord(period)) === "Open",
