@@ -4417,8 +4417,9 @@ function AccountingClientReady({
   // Each overview card owns its source state; an unavailable auxiliary read must
   // never become a zero balance or hide the other independently available queues.
   const manualInvoiceReadState = mergeModuleStates([
-    accountsRead.state, journalsRead.state, contactsRead.state, taxesRead.state,
+    accountsRead.state, accountTypesRead.state, journalsRead.state, contactsRead.state, taxesRead.state,
     productsRead.state, paymentTermsRead.state, currenciesRead.state, companiesRead.state, taxGroupsRead.state,
+    fiscalYearsRawRead.state, accountPeriodsRawRead.state,
   ])
   const accountantOverview = (
     <AccountantOverview
