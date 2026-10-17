@@ -339,6 +339,27 @@ company scope independently of the analysis currency.
 The shared model suite is registered in frontend CI. No backend, permission,
 schema, new financial-command or deployment changes are included.
 
+Verification on runtime commit `72cf9e231103245662d866b321118796b6e18607`:
+all **112/112** isolated browser cases passed (13.2 minutes, exit 0), retaining
+the existing 92 cases and adding 20 module cases across 320/390/768/1440px.
+New cases exercise currency/period/company changes, exact queue links, scoped
+CSV metadata, source invalidation, period callbacks, retained workspaces/actions,
+long unbroken names, 44px exports, whole-count ticks, valid SVG gradient references,
+dark/Ocean tokens, no page overflow, no runtime errors and no unexpected ERP API
+requests. No assertion or timeout was weakened. The synthetic previous-period
+fixture date was corrected before the source freeze.
+
+Shared UI passed **706 tests / 113 files**, web unit passed **395**, and combined
+Accounting/overview model-record checks passed **65**. UI/web TypeScript,
+production Next build, focused shared/new-code lint, i18n checks, operation
+transport and whitespace checks passed; opaque-record debt stayed **2339/2339**.
+Integration-file lint has the same **11 unused-import errors and seven warnings**
+as base commit `3ee0fbaf`; these are not new failures or a clean repository-wide
+lint claim. Desktop/mobile captures for every module and dark/Ocean captures were
+visually inspected. Verification uses production components with synthetic inputs,
+not authenticated operations, live forecast capture or backend/deployment checks.
+The existing PR-stack, review and authenticated CI gates remain applicable.
+
 ### 1. Rebuild the application shell and navigation
 
 - Replace the seven-group, 25-destination sidebar with:
