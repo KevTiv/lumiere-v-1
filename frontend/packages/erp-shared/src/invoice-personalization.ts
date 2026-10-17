@@ -1,4 +1,5 @@
 import type { RowValueMap } from "./row-values"
+import type { CompanyQueryRow } from "@lumiere/stdb/resource-reads"
 
 /** Append-only document_template profiles; no renderer code or arbitrary styles are persisted. */
 export const INVOICE_PROFILE_MODEL = "account_move"
@@ -161,6 +162,21 @@ const sellerIdentityFields = [
   ["addressZip", "address_zip"], ["addressCountryCode", "address_country_code"],
   ["taxId", "tax_id"], ["companyRegistry", "company_registry"],
 ] as const
+
+/** Generated query codecs keep present Option::None fields as own undefined
+ * properties; permission-redacted columns are omitted entirely. Preserve that
+ * distinction at the typed boundary before reviewing seller identity. */
+export function invoiceSellerCompanyFromQueryRow(company: CompanyQueryRow | undefined): InvoiceSellerCompany | undefined {
+  if (!company) return undefined
+  const seller: InvoiceSellerCompany = { ...company }
+  for (const [key] of sellerIdentityFields) {
+    if (Object.prototype.hasOwnProperty.call(company, key) && company[key] === undefined) {
+      seller[key] = null
+    }
+  }
+  return seller
+}
+
 function sellerIdentityField(company: InvoiceSellerCompany, keys: typeof sellerIdentityFields[number]): unknown {
   const key = keys.find((candidate) => Object.prototype.hasOwnProperty.call(company, candidate))
   return key === undefined ? undefined : company[key]
