@@ -15,6 +15,8 @@ import {
   waitForPendingApprovalRequest,
 } from "./helpers"
 import { addLaptopLine, confirmOrderViaUi, createDraftSaleOrder, fetchOrderPickings } from "./sales-order-fixtures"
+import { isolatedSalesApprovalFixture } from "./sales-approval-fixture"
+import { matchesOperationResponse } from "./operation-response"
 
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
 
@@ -29,8 +31,8 @@ async function confirmRequest(page: Page, companyId: number, orderId: number) {
   })
 }
 
-async function exactActiveApprovalTaskIds(page: Page, orderId: number): Promise<number[]> {
-  const response = await page.request.get("/api/query/workflow-human-tasks-inbox")
+async function exactActiveApprovalTaskIds(page: Page, orderId: number, companyId?: number): Promise<number[]> {
+  const response = await page.request.get(`/api/query/workflow-human-tasks-inbox${companyId == null ? "" : `?companyId=${companyId}`}`)
   expect(response.ok()).toBe(true)
   const rows = ((await response.json()) as { data?: Array<Record<string, unknown>> }).data ?? []
   return rows.flatMap((row) => {
@@ -78,37 +80,44 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
   }) => {
     test.setTimeout(300_000)
     await signIn(page, "test@email.com", PERSONA_PASSWORD)
+    const { organizationId, companyId, orderId, requester: requesterActor } = await isolatedSalesApprovalFixture(page)
     const workflow = await seedSaleOrderApprovalWorkflow(page, {
       workflowKey: smokeName("cov04_sales_approval").toLowerCase().replace(/-/g, "_"),
       name: smokeName("COV04 sales approval"),
+      companyId,
     })
-    const companyId = await fetchDefaultCompanyId(page)
-    const orderId = await createDraftSaleOrder(page, smokeName("cov04-approval-race"))
-    await addLaptopLine(page, orderId, "1")
+    // Select only this test's operating company; the shared demo approval
+    // workflow and other concurrent sales tests remain unchanged.
+    await page.evaluate(({ organizationId, companyId }) => localStorage.setItem("lumiere:active-company", JSON.stringify({ organizationId, companyId })), { organizationId, companyId })
+    await page.reload({ waitUntil: "domcontentloaded" })
 
     const requesterContext = await browser.newContext({
       storageState: { cookies: [], origins: [] },
     })
     const requester = await requesterContext.newPage()
     try {
-      await signIn(requester, "fixture.sales@example.test", PERSONA_PASSWORD)
+      await signIn(requester, requesterActor.email, requesterActor.password)
       const requested = await confirmRequest(requester, companyId, orderId)
       expect(requested.ok(), await requested.text()).toBe(true)
 
-      const taskId = await waitForPendingApprovalRequest(page, "sale_order", orderId)
-      await expect.poll(() => exactActiveApprovalTaskIds(page, orderId)).toEqual([taskId])
+      let taskId = 0
+      await expect.poll(async () => {
+        const tasks = await exactActiveApprovalTaskIds(page, orderId, companyId)
+        if (tasks.length === 1) taskId = tasks[0]!
+        return tasks.length
+      }).toBe(1)
       // The candidate-scoped inbox does not expose an admin-only task to its
       // requester. The Sales client must keep the outcome unknown rather than
       // infer a task by order state, name, or time.
-      expect(await exactActiveApprovalTaskIds(requester, orderId)).toEqual([])
-      expect(await fetchOrderPickings(page, orderId)).toEqual([])
+      expect(await exactActiveApprovalTaskIds(requester, orderId, companyId)).toEqual([])
+      expect(await fetchOrderPickings(page, orderId, companyId)).toEqual([])
 
       await gotoApprovals(page)
       await expect(page.getByTestId(`approval-card-${taskId}`)).toBeVisible({
         timeout: 30_000,
       })
       const decision = page.waitForResponse(
-        (response) => response.url().includes("decide_workflow_human_task") && response.ok(),
+        (response) => matchesOperationResponse(response, "decide_workflow_human_task"),
         { timeout: 60_000 },
       )
       const [replayed] = await Promise.all([
@@ -116,13 +125,14 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
         page.getByTestId(`approval-approve-${taskId}`).click(),
       ])
       expect([200, 422]).toContain(replayed.status())
-      await decision
+      const decided = await decision
+      expect(decided.ok(), await decided.text()).toBe(true)
 
-      await expect.poll(() => fetchOrderPickings(page, orderId), { timeout: 30_000 }).toHaveLength(1)
-      expect(await exactActiveApprovalTaskIds(page, orderId)).toEqual([])
+      await expect.poll(() => fetchOrderPickings(page, orderId, companyId), { timeout: 30_000 }).toHaveLength(1)
+      expect(await exactActiveApprovalTaskIds(page, orderId, companyId)).toEqual([])
       const stale = await confirmRequest(requester, companyId, orderId)
       expect(stale.status()).toBe(422)
-      expect(await fetchOrderPickings(page, orderId)).toHaveLength(1)
+      expect(await fetchOrderPickings(page, orderId, companyId)).toHaveLength(1)
     } finally {
       await requesterContext.close()
       await callReducerBff(page, "retire_workflow_version", [

@@ -2906,7 +2906,7 @@ export async function waitForWorkflowVersionStatus(
 /** Seed a minimal publishable linear draft (start → end) via BFF reducers. */
 export async function seedPublishableWorkflowDraft(
   page: Page,
-  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string },
+  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string; companyId?: number },
 ): Promise<{
   organizationId: number
   companyId: number
@@ -2916,7 +2916,7 @@ export async function seedPublishableWorkflowDraft(
   draftRevision: number
 }> {
   const organizationId = await fetchSessionOrganizationId(page)
-  const companyId = await fetchDefaultCompanyId(page)
+  const companyId = options?.companyId ?? await fetchDefaultCompanyId(page)
   const workflowKey = (options?.workflowKey ?? smokeName("wf")).toLowerCase().replace(/-/g, "_")
   const model = options?.model ?? "e2e.subject"
   const name = options?.name ?? `E2E ${workflowKey}`
@@ -3110,7 +3110,7 @@ export async function seedPurchaseOrderApprovalWorkflow(
 /** Publish a company-scoped approval workflow for the guarded Sales confirm action. */
 export async function seedSaleOrderApprovalWorkflow(
   page: Page,
-  options: { workflowKey: string; name: string },
+  options: { workflowKey: string; name: string; companyId?: number },
 ): Promise<{ organizationId: number; versionId: number; revision: number }> {
   const seeded = await seedPublishableWorkflowDraft(page, {
     ...options,
