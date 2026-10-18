@@ -20,6 +20,7 @@ import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { dispatchNamedOperation } from "../operation-dispatch"
 import { invalidateResourceQueries } from "../subscription-query"
 import { toCreateAuditRuleParams } from "@lumiere/erp-shared/settings-create-params"
 import { encodeIdentity, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -567,7 +568,7 @@ export function useSetMemberAccess(organizationId: bigint) {
     user: SettingsUserRecord; primaryRoleId: string; roleIds: string[]; isActive: boolean; jobTitle?: string
   }>({
     mutationFn: async ({ user, primaryRoleId, roleIds, isActive, jobTitle }) => {
-      const { urlPath, init } = stdbBffCommandPost('set_member_access', {
+      await dispatchNamedOperation('set_member_access', {
         userIdentity: encodeIdentity(user.id),
         params: stdbParamsToJson({
           primary_role_id: toScalarU64(primaryRoleId),
@@ -577,9 +578,7 @@ export function useSetMemberAccess(organizationId: bigint) {
           expected_is_active: user.status === 'active', is_active: isActive,
           job_title: jobTitle ?? null,
         }, 'SetMemberAccessParams'),
-      })
-      const response = await apiFetch(urlPath, init)
-      if (!response.ok) throw await authResponseError(response, 'Failed to update member access')
+      }, 'Failed to update member access')
     },
     onSuccess: () => invalidateAuthModule(qc, organizationId),
   })
