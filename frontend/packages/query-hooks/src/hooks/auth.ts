@@ -272,6 +272,7 @@ export type SettingsUserRecord = {
   id: string
   userOrgId: string | null
   primaryRoleId: string
+  accessRevision?: string
   name: string
   email: string
   department?: string
@@ -436,6 +437,8 @@ export function mapSettingsUsers(
       id: identity,
       userOrgId: userOrgIdRaw != null ? scalarIdString(userOrgIdRaw) : null,
       primaryRoleId,
+      accessRevision: pickField(profile, 'accessRevision', 'access_revision') == null ? undefined
+        : scalarIdString(pickField(profile, 'accessRevision', 'access_revision')),
       name: String(pickField(profile, 'name') ?? ''),
       email: String(pickField(profile, 'email') ?? ''),
       department,
@@ -580,6 +583,7 @@ export function useSetMemberAccess(organizationId: bigint) {
     user: SettingsUserRecord; primaryRoleId: string; roleIds: string[]; isActive: boolean; jobTitle?: string
   }>({
     mutationFn: async ({ user, primaryRoleId, roleIds, isActive, jobTitle }) => {
+      if (user.accessRevision == null) throw new Error('Reload users before changing member access')
       await dispatchNamedOperation('set_member_access', {
         userIdentity: encodeIdentity(user.id),
         params: stdbParamsToJson({
@@ -587,6 +591,7 @@ export function useSetMemberAccess(organizationId: bigint) {
           additional_role_ids: roleIds.filter(id => id !== primaryRoleId).map(toScalarU64),
           expected_primary_role_id: toScalarU64(user.primaryRoleId),
           expected_role_ids: user.roles.map(toScalarU64),
+          expected_access_revision: toScalarU64(user.accessRevision),
           expected_is_active: user.status === 'active', is_active: isActive,
           job_title: jobTitle ?? null,
         }, 'SetMemberAccessParams'),

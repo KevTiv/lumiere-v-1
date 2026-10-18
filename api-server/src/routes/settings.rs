@@ -51,6 +51,46 @@ fn list_meta(total: usize, offset: usize, limit: usize) -> Value {
     })
 }
 
+fn scalar_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(|v| v.as_u64().or_else(|| v.as_str()?.parse().ok()))
+}
+
+// Must match access_lifecycle::member_access_revision in the reducer authority.
+fn member_access_revision(
+    org: u64,
+    membership: &Value,
+    assignments: &[Value],
+    audits: &[Value],
+) -> u64 {
+    let membership_id = scalar_u64(membership, "id", "id");
+    let assignment_ids: std::collections::HashSet<_> = assignments
+        .iter()
+        .filter_map(|a| scalar_u64(a, "id", "id"))
+        .collect();
+    audits
+        .iter()
+        .filter(|a| {
+            scalar_u64(a, "organizationId", "organization_id") == Some(org)
+                && match a
+                    .get("tableName")
+                    .or_else(|| a.get("table_name"))
+                    .and_then(Value::as_str)
+                {
+                    Some("user_organization") => {
+                        scalar_u64(a, "recordId", "record_id") == membership_id
+                    }
+                    Some("user_role_assignment") => scalar_u64(a, "recordId", "record_id")
+                        .is_some_and(|id| assignment_ids.contains(&id)),
+                    _ => false,
+                }
+        })
+        .filter_map(|a| scalar_u64(a, "id", "id"))
+        .max()
+        .unwrap_or(0)
+}
+
 async fn users_get(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -109,6 +149,8 @@ async fn users_get(
         .await.map_err(ApiError::internal)?;
     let assignments = client.query_sql(&format!("SELECT id, user_identity, role_id, is_active, expires_at FROM user_role_assignment WHERE organization_id = {org_id}"))
         .await.map_err(ApiError::internal)?;
+    let access_audits = client.query_sql(&format!("SELECT id, organization_id, table_name, record_id FROM audit_log WHERE organization_id = {org_id} AND (table_name = 'user_organization' OR table_name = 'user_role_assignment')"))
+        .await.map_err(ApiError::internal)?;
     let profile_columns = stdb_auth::resolve_http_sql_columns("user-profile", Some(access))
         .map_err(ApiError::Internal)?
         .join(", ");
@@ -142,6 +184,16 @@ async fn users_get(
             .cloned()
             .collect();
         if let Some(row) = profile.as_object_mut() {
+            row.insert(
+                "accessRevision".into(),
+                json!(member_access_revision(
+                    org_id,
+                    membership,
+                    &role_assignments,
+                    &access_audits
+                )
+                .to_string()),
+            );
             row.insert("membership".into(), membership.clone());
             row.insert("roleAssignments".into(), json!(role_assignments));
         }
@@ -207,4 +259,28 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/settings/users", get(users_get))
         .route("/settings/roles", get(roles_get))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn access_revision_includes_inactive_assignments_and_excludes_other_members_and_tenants() {
+        let membership = json!({"id": "7"});
+        let assignments = vec![json!({"id": 8, "is_active": false})];
+        let audits = vec![
+            json!({"id": 10, "organization_id": 1, "table_name": "user_organization", "record_id": 7}),
+            json!({"id": 11, "organizationId": 1, "tableName": "user_role_assignment", "recordId": 8}),
+            json!({"id": 12, "organization_id": 2, "table_name": "user_organization", "record_id": 7}),
+            json!({"id": 13, "organization_id": 1, "table_name": "user_organization", "record_id": 9}),
+            json!({"id": 14, "organization_id": 1, "table_name": "user_role_assignment", "record_id": 9}),
+        ];
+        assert_eq!(
+            member_access_revision(1, &membership, &assignments, &audits),
+            11
+        );
+        assert_eq!(member_access_revision(1, &membership, &[], &audits), 10);
+        assert_eq!(member_access_revision(1, &membership, &[], &[]), 0);
+    }
 }

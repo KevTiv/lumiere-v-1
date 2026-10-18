@@ -42,7 +42,7 @@ function memberMutation() {
 
 test("member access saves encode optional job titles and preserve the optimistic access snapshot", async () => {
   const { calls, mutation } = memberMutation()
-  const user = { id: "ab".repeat(32), primaryRoleId: "7", roles: ["7", "8"], status: "active" }
+  const user = { id: "ab".repeat(32), primaryRoleId: "7", accessRevision: "41", roles: ["7", "8"], status: "active" }
   for (const jobTitle of [undefined, "", "Manager"]) {
     await mutation.mutationFn({ user, primaryRoleId: "7", roleIds: ["7", "9"], isActive: false, jobTitle })
   }
@@ -52,8 +52,15 @@ test("member access saves encode optional job titles and preserve the optimistic
     assert.deepEqual(call.body.userIdentity, { __identity__: `0x${user.id}` })
     assert.deepEqual(call.body.params, {
       primary_role_id: 7, additional_role_ids: [9], expected_primary_role_id: 7,
-      expected_role_ids: [7, 8], expected_is_active: true, is_active: false,
+      expected_role_ids: [7, 8], expected_access_revision: 41, expected_is_active: true, is_active: false,
       job_title: [{ none: [] }, { some: "" }, { some: "Manager" }][index],
     })
   }
+})
+
+
+test("member access cannot save a row without its server revision", async () => {
+  const { calls, mutation } = memberMutation()
+  await assert.rejects(mutation.mutationFn({ user: {}, primaryRoleId: "7", roleIds: ["7"], isActive: true }), /Reload users/)
+  assert.equal(calls.length, 0)
 })

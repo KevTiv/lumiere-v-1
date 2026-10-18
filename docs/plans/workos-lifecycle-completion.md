@@ -94,3 +94,13 @@ The ignored PostgreSQL lifecycle test runs against an isolated database with
 `WORKOS_TEST_DATABASE_URL=... cargo test -p api-server postgres_identity_and_profile_lifecycle_is_atomic --lib -- --ignored`.
 It covers concurrent provider callbacks, immutable explicit links, inactive-account
 rollback, profile/outbox transaction rollback, and verified-email synchronization.
+
+
+Member-access replay correction: saves now include `expected_access_revision`,
+derived from the last append-only audit ID for the membership and all its role
+assignments (including inactive assignments). This detects state cycles such as
+grant → revoke → replay and deactivate → reactivate → replay. Exact retries of
+the current committed state remain no-ops. The settings read returns the matching
+revision, and clients without one must reload before saving. This changes the
+operation input contract; the release workflow must regenerate and pin it before
+merge. No storage schema or forward migration is added for this correction.

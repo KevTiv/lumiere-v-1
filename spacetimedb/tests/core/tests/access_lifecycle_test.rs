@@ -72,7 +72,7 @@ pub fn test_effective_access_and_atomic_updates(ctx: &ReducerContext) -> Result<
     let mut update = crate::core::access_lifecycle::current_access_params(ctx, &membership);
     update.additional_role_ids = vec![writer];
     crate::core::access_lifecycle::set_member_access(ctx, org, member, update.clone())?;
-    crate::core::access_lifecycle::set_member_access(ctx, org, member, update)?;
+    crate::core::access_lifecycle::set_member_access(ctx, org, member, update.clone())?;
     let roles = effective_roles(ctx, org, member)?;
     if roles.len() != 2 {
         return Err("Expected base and additive role".into());
@@ -115,6 +115,46 @@ pub fn test_effective_access_and_atomic_updates(ctx: &ReducerContext) -> Result<
     }
     if effective_roles(ctx, org, member)?.len() != 2 {
         return Err("Stale edit changed access".into());
+    }
+    // Reverting to the original state must still invalidate the old command.
+    let mut revoke = crate::core::access_lifecycle::current_access_params(ctx, &saved);
+    revoke.additional_role_ids.clear();
+    crate::core::access_lifecycle::set_member_access(ctx, org, member, revoke.clone())?;
+    crate::core::access_lifecycle::set_member_access(ctx, org, member, revoke)?;
+    if crate::core::access_lifecycle::set_member_access(ctx, org, member, update).is_ok()
+        || effective_roles(ctx, org, member)?.len() != 1
+    {
+        return Err("Replaying a pre-revocation save restored access".into());
+    }
+    let current = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(membership.id)
+        .ok_or("Member missing")?;
+    let mut fresh = crate::core::access_lifecycle::current_access_params(ctx, &current);
+    fresh.additional_role_ids = vec![writer];
+    crate::core::access_lifecycle::set_member_access(ctx, org, member, fresh)?;
+    let current = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(membership.id)
+        .ok_or("Member missing")?;
+    let mut deactivate = crate::core::access_lifecycle::current_access_params(ctx, &current);
+    deactivate.is_active = false;
+    crate::core::access_lifecycle::set_member_access(ctx, org, member, deactivate.clone())?;
+    let current = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(membership.id)
+        .ok_or("Member missing")?;
+    let mut reactivate = crate::core::access_lifecycle::current_access_params(ctx, &current);
+    reactivate.is_active = true;
+    crate::core::access_lifecycle::set_member_access(ctx, org, member, reactivate)?;
+    if crate::core::access_lifecycle::set_member_access(ctx, org, member, deactivate).is_ok() {
+        return Err("Replaying a pre-reactivation save deactivated the member".into());
     }
     if update_role(
         ctx,

@@ -61,7 +61,10 @@ Settings → Users now saves primary role, additive roles, active status and job
 through the atomic `erp.set_member_access` operation. The legacy assign/revoke hooks
 remain available, but the browser proof observes the member editor's operation.
 The generated `SetMemberAccessParams` encoder preserves optional job-title values
-on the wire. Exact retries acknowledge an already-committed state; replaying an
+on the wire. Each save also checks the last monotonic audit revision for the
+membership and all its role assignments, including inactive assignments. Returning
+to an earlier role/status combination cannot make an old command current again.
+Rows without a server revision must reload before saving. Exact retries acknowledge an already-committed state; replaying an
 older assignment after revocation returns 422 and cannot restore access. Reader
 replays remain denied with 403.
 

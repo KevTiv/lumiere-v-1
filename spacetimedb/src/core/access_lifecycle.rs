@@ -1,4 +1,5 @@
 //! Transactional membership access changes and invitation completion.
+use crate::core::audit::audit_log;
 use crate::core::permissions::{
     effective_permission_strings, effective_roles, ensure_delegated_admin_may_assign_role, role,
     touch_policy_snapshot_for_user, user_role_assignment, validate_sod_for_permissions, Role,
@@ -16,6 +17,8 @@ pub struct SetMemberAccessParams {
     pub expected_primary_role_id: u64,
     pub expected_role_ids: Vec<u64>,
     pub expected_is_active: bool,
+    /// Last audit revision for this membership and its role assignments.
+    pub expected_access_revision: u64,
     pub is_active: bool,
     /// None preserves the existing job title; an empty string clears it.
     pub job_title: Option<String>,
@@ -53,6 +56,30 @@ pub(crate) fn member_is_admin(
         })
 }
 
+/// Audit IDs are monotonic even when several access changes share a timestamp.
+/// Include inactive assignments so grant/revoke cycles cannot reuse an old version.
+pub(crate) fn member_access_revision(ctx: &ReducerContext, membership: &UserOrganization) -> u64 {
+    let assignment_ids: std::collections::HashSet<_> = ctx
+        .db
+        .user_role_assignment()
+        .role_assign_by_user()
+        .filter(&membership.user_identity)
+        .filter(|a| a.organization_id == membership.organization_id)
+        .map(|a| a.id)
+        .collect();
+    ctx.db
+        .audit_log()
+        .audit_by_org()
+        .filter(&membership.organization_id)
+        .filter(|a| {
+            (a.table_name == "user_organization" && a.record_id == membership.id)
+                || (a.table_name == "user_role_assignment" && assignment_ids.contains(&a.record_id))
+        })
+        .map(|a| a.id)
+        .max()
+        .unwrap_or(0)
+}
+
 pub(crate) fn current_access_params(
     ctx: &ReducerContext,
     membership: &UserOrganization,
@@ -82,6 +109,7 @@ pub(crate) fn current_access_params(
         expected_primary_role_id: membership.role_id,
         expected_role_ids: ids,
         expected_is_active: membership.is_active,
+        expected_access_revision: member_access_revision(ctx, membership),
         is_active: membership.is_active,
         job_title: None,
     }
@@ -162,7 +190,8 @@ pub fn set_member_access(
     desired_ids.push(params.primary_role_id);
     desired_ids.sort_unstable();
     desired_ids.dedup();
-    if membership.role_id != params.expected_primary_role_id
+    if member_access_revision(ctx, membership) != params.expected_access_revision
+        || membership.role_id != params.expected_primary_role_id
         || current_ids != expected
         || membership.is_active != params.expected_is_active
     {
