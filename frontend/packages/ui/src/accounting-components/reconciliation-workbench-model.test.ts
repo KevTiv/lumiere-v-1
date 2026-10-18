@@ -81,6 +81,18 @@ describe("reconciliation review projection", () => {
     expect(result.status === "ready" ? result.candidates.map((row) => row.id) : []).toEqual(["41"])
     expect(projectReconciliation({ ...linked, bankLines: [...linked.bankLines, { organizationId: 1n }] }).status).toBe("blocked")
   })
+  it("rejects known matching conflicts and inconsistent base-currency source amounts", () => {
+    for (const patch of [{ isMatching: true }, { amountCurrency: 799.99 }, { amountCurrency: 800.001 }, { amountCurrency: "invalid" }]) {
+      const source = reconciliationFixture()
+      source.moveLines = [{ ...source.moveLines[0]!, ...patch }]
+      expect(projectReconciliation(source)).toMatchObject({ status: "ready", candidates: [] })
+    }
+    for (const patch of [{ isMatching: false, amountCurrency: 800 }, { isMatching: undefined, amountCurrency: undefined }, { isMatching: null, amountCurrency: null }]) {
+      const source = reconciliationFixture()
+      source.moveLines = [{ ...source.moveLines[0]!, ...patch }]
+      expect(projectReconciliation(source)).toMatchObject({ status: "ready", candidates: [{ id: "40" }] })
+    }
+  })
   it("supports signed payable credits without pretending a missing amount is zero", () => {
     const source = reconciliationFixture()
     source.bankLines = [{ ...source.line!, amount: -1000 }]

@@ -116,7 +116,7 @@ describe("bank settlement recovery command transport", () => {
     return bankSettlementRecoveryRequest({ ...scope, statementId: "31" }, bankSettlementAttempt({ bankSettlement: { ...f.attempt, status: "settled" } })!,
       { action: "reverse", reason: "Wrong bank receipt", date: "2026-10-18", idempotencyKey: "recovery-1" })!
   }
-  const intercept = (rows: BankSettlementCanonicalRows, firstStatus = 200) => {
+  const intercept = (rows: BankSettlementCanonicalRows, firstStatus = 200, acknowledge = true) => {
     const calls: { url: string; body: string | undefined; method: string }[] = []
     let posts = 0
     const collections: Record<string, readonly Record<string, unknown>[]> = { "bank-statement-lines": rows.lines, "bank-statements": rows.statements,
@@ -127,7 +127,9 @@ describe("bank settlement recovery command transport", () => {
       if (method === "POST") {
         posts += 1
         const status = posts === 1 ? firstStatus : 200
-        return new Response(JSON.stringify(status === 200 ? {} : { error: "Synthetic response lost" }), { status, headers: { "Content-Type": "application/json" } })
+        return new Response(JSON.stringify(status === 200
+          ? acknowledge ? { ok: true, operationId: "erp.reverse_bank_statement_settlement", correlationId: "synthetic-bank-recovery" } : {}
+          : { error: "Synthetic response lost", correlationId: "synthetic-bank-recovery" }), { status, headers: { "Content-Type": "application/json" } })
       }
       const resource = new URL(url).pathname.split("/").at(-1)!
       return new Response(JSON.stringify({ data: collections[resource] ?? [] }), { status: 200, headers: { "Content-Type": "application/json" } })
@@ -149,6 +151,9 @@ describe("bank settlement recovery command transport", () => {
     assert.equal(reads.every((call) => new URL(call.url).searchParams.get("companyId") === "8"), true)
   })
   it("does not report success when the bank clears but the compensating journal cannot be read", async () => {
+    const malformedCalls = intercept(reversedFixture().rows, 200, false)
+    await assert.rejects(recoverBankStatementSettlement(reviewedRequest(), () => true), /expected acknowledgement/)
+    assert.equal(malformedCalls.length, 1)
     const f = reversedFixture(), calls = intercept({ ...f.rows, moves: f.rows.moves.filter((row) => row.id !== "80") })
     await assert.rejects(recoverBankStatementSettlement(reviewedRequest(), () => true), /did not read back exactly/)
     assert.equal(calls.filter((call) => call.method === "POST").length, 1)
@@ -156,6 +161,8 @@ describe("bank settlement recovery command transport", () => {
   it("fences company/actor loss and unsupported identifiers before dispatch", async () => {
     const calls = intercept(reversedFixture().rows), request = reviewedRequest()
     await assert.rejects(recoverBankStatementSettlement(request, () => false), /original user and company/)
+    let fenceCalls = 0
+    await assert.rejects(recoverBankStatementSettlement(request, () => ++fenceCalls < 2), /review is no longer active/)
     await assert.rejects(recoverBankStatementSettlement({ ...request, paymentId: "9007199254740993" }, () => true), /identifier is not supported/)
     assert.equal(calls.length, 0)
   })

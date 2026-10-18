@@ -17,6 +17,7 @@ export interface ReconciliationMoveLineSource extends ScopedRow {
   moveId?: unknown; accountId?: unknown; name?: unknown; ref?: unknown; ref_?: unknown
   parentState?: unknown; companyCurrencyId?: unknown; currencyId?: unknown
   balance?: unknown; debit?: unknown; credit?: unknown; amountResidual?: unknown; blocked?: unknown; partnerId?: unknown
+  isMatching?: unknown; amountCurrency?: unknown
 }
 export interface ReconciliationMoveSource extends ScopedRow {
   name?: unknown; ref?: unknown; state?: unknown; moveType?: unknown; partnerId?: unknown; invoicePartnerDisplayName?: unknown
@@ -163,7 +164,7 @@ export function projectReconciliation(source: ReconciliationSource): Reconciliat
   const suggestions = new Set((source.suggestions ?? []).filter((row) => reconciliationId(row.organizationId) === organizationId && reconciliationId(row.statementLineId) === lineId).map((row) => reconciliationId(row.entityId)))
   const candidates: ReconciliationCandidate[] = []
   for (const [id, row] of uniqueRows(source.moveLines)) {
-    if (!inScope(row, organizationId, companyId) || linkedIds.has(id) || row.blocked !== false || tag(row.parentState) !== "Posted") continue
+    if (!inScope(row, organizationId, companyId) || linkedIds.has(id) || row.blocked !== false || row.isMatching === true || tag(row.parentState) !== "Posted") continue
     if (reconciliationId(row.companyCurrencyId) !== currencyId || reconciliationId(row.currencyId) !== currencyId) continue
     const moveId = reconciliationId(row.moveId)
     const accountId = reconciliationId(row.accountId)
@@ -179,6 +180,10 @@ export function projectReconciliation(source: ReconciliationSource): Reconciliat
     if (balance === null || debit === null || credit === null || residual === null || debit < 0 || credit < 0 || residual === 0 || Math.sign(residual) !== Math.sign(bankAmount) || Math.sign(residual) !== Math.sign(balance)) continue
     const balanceMinor = minorUnits(balance, decimalPlaces), debitMinor = minorUnits(debit, decimalPlaces), creditMinor = minorUnits(credit, decimalPlaces), residualMinor = minorUnits(residual, decimalPlaces)
     if (balanceMinor === null || debitMinor === null || creditMinor === null || residualMinor === null || debitMinor - creditMinor !== balanceMinor || Math.abs(residualMinor) > Math.abs(balanceMinor)) continue
+    if (row.amountCurrency != null) {
+      const amountCurrency = amount(row.amountCurrency)
+      if (amountCurrency == null || minorUnits(amountCurrency, decimalPlaces) !== balanceMinor) continue
+    }
     const documentLabel = text(move.name).trim() || `Journal entry #${moveId}`
     candidates.push({ id, moveId, partnerId, accountId, documentLabel, description: text(row.name) || text(row.ref) || text(row.ref_) || text(move.ref) || "Journal item", partner: text(move.invoicePartnerDisplayName), accountLabel: [text(account.code), text(account.name)].filter(Boolean).join(" · ") || `Account #${accountId}`, amount: residual, suggested: suggestions.has(id), href: `/accounting/invoices/${encodeURIComponent(moveId)}` })
   }

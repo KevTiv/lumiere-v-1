@@ -12,6 +12,7 @@ import type {
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
 import { apiFetch, fetchQueryList } from "../../http"
+import { dispatchNamedOperation } from "../../operation-dispatch"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   paymentParamsToJson,
@@ -65,7 +66,7 @@ import {
 } from "../stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
-import { httpResponseError, responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 import { AmbiguousOperationEffectError, type CanonicalRecordRef } from "../operation-effect"
 
 export type BankStatementImportWorkspace = {
@@ -560,23 +561,22 @@ export async function recoverBankStatementSettlement(
     return parsed == null || parsed <= 0n || parsed > BigInt(Number.MAX_SAFE_INTEGER)
   })) throw Object.assign(new Error("This record identifier is not supported by the current command transport. No recovery was submitted."), { status: 400 })
   const common = { paymentId: BigInt(request.paymentId), idempotencyKey: request.idempotencyKey, reason: request.reason }
-  const command = request.action === "abandon"
-    ? stdbBffCommandPost("abandon_bank_statement_settlement", {
+  const dispatch = request.action === "abandon"
+    ? () => dispatchNamedOperation("abandon_bank_statement_settlement", {
       companyId: BigInt(request.companyId), lineId: BigInt(request.lineId),
       params: stdbParamsToJson(common, "AbandonBankStatementSettlementParams"),
-    })
+    }, "The bank settlement abandonment was not confirmed")
     : request.action === "resubmit"
-      ? stdbBffCommandPost("resubmit_bank_statement_settlement", {
+      ? () => dispatchNamedOperation("resubmit_bank_statement_settlement", {
         companyId: BigInt(request.companyId), lineId: BigInt(request.lineId),
         params: stdbParamsToJson({ ...common, moveIds: request.moveLineIds.map(BigInt) }, "ResubmitBankStatementSettlementParams"),
-      })
-      : stdbBffCommandPost("reverse_bank_statement_settlement", {
+      }, "The bank settlement resubmission was not confirmed")
+      : () => dispatchNamedOperation("reverse_bank_statement_settlement", {
         companyId: BigInt(request.companyId), lineId: BigInt(request.lineId),
         params: stdbParamsToJson({ ...common, date: { microsSinceUnixEpoch: BigInt(request.dateMicros!) } }, "ReverseBankStatementSettlementParams"),
-      })
+      }, "The bank settlement reversal was not confirmed")
   if (!mayDispatch()) throw Object.assign(new Error("The original settlement review is no longer active."), { status: 409 })
-  const response = await apiFetch(command.urlPath, command.init)
-  if (!response.ok) throw await httpResponseError(response, "The bank settlement recovery was not confirmed")
+  await dispatch()
   const effect = await readBankStatementSettlementLifecycle(request.organizationId, request.companyId, request.lineId, request)
   if (!mayDispatch() || !effect) throw new Error("The original recovery result did not read back exactly. Keep this request and check its status.")
   return effect
