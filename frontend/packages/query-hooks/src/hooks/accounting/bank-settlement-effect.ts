@@ -4,6 +4,8 @@ import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 /** Finite canonical fields used to verify settlement and reversal effects. */
 export interface BankSettlementReadbackRow {
   readonly id?: unknown
+  readonly name?: unknown
+  readonly amountTotal?: unknown
   readonly metadata?: unknown
   readonly amount?: unknown
   readonly state?: unknown
