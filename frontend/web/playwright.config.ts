@@ -18,7 +18,7 @@ export default defineConfig({
     : process.env.CI
       ? 4
       : undefined,
-  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
+  reporter: process.env.CI ? [["list"], ["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL,
     trace: "retain-on-failure",
