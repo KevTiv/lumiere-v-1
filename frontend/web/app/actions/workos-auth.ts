@@ -13,13 +13,15 @@ function returnToFromForm(formData: FormData, fallback: string): string {
 }
 
 export async function redirectToWorkOsSignIn(formData: FormData) {
-  const returnTo = returnToFromForm(formData, POST_AUTH_PATHS.overview)
+  const next = returnToFromForm(formData, POST_AUTH_PATHS.overview)
+  const returnTo = `/auth/complete?next=${encodeURIComponent(next)}`
   const url = await getSignInUrl({ returnTo, redirectUri: workOsRedirectUri() })
   redirect(url)
 }
 
 export async function redirectToWorkOsSignUp(formData: FormData) {
-  const returnTo = returnToFromForm(formData, POST_AUTH_PATHS.onboarding)
+  const next = returnToFromForm(formData, POST_AUTH_PATHS.onboarding)
+  const returnTo = `/auth/complete?next=${encodeURIComponent(next)}`
   const url = await getSignUpUrl({ returnTo, redirectUri: workOsRedirectUri() })
   redirect(url)
 }

@@ -25,6 +25,8 @@ fn access(permissions: &[&str]) -> FieldAccessContext {
             .collect(),
         identity_hex: actor(),
         field_permissions: vec![],
+        role_ids: Vec::new(),
+        org_permissions: Vec::new(),
     }
 }
 

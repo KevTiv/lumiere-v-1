@@ -10,13 +10,34 @@ pub(crate) async fn read_roles(
     client: &StdbClient,
     field_access: Option<&FieldAccessContext>,
 ) -> Result<Vec<Value>, ApiError> {
-    let full_sql = "SELECT * FROM role WHERE is_active = true";
-    if let Ok(rows) = client.query_sql(full_sql).await {
+    let access = field_access.ok_or(ApiError::Unauthorized)?;
+    let mut filter = format!(" AND organization_id = {}", access.organization_id);
+    if !stdb_auth::permission_allowed(access, "role", "read") {
+        let mut ids = access.role_ids.clone();
+        ids.push(access.role_id);
+        ids.sort_unstable();
+        ids.dedup();
+        filter.push_str(&format!(
+            " AND ({})",
+            ids.iter()
+                .map(|id| format!("id = {id}"))
+                .collect::<Vec<_>>()
+                .join(" OR ")
+        ));
+    }
+    if let Ok(rows) = client
+        .query_sql(&format!(
+            "SELECT * FROM role WHERE is_active = true{filter}"
+        ))
+        .await
+    {
         return Ok(rows);
     }
-
     let sql = stdb_auth::select_roles_active_sql(field_access).map_err(ApiError::Internal)?;
-    client.query_sql(&sql).await.map_err(ApiError::internal)
+    client
+        .query_sql(&format!("{sql}{filter}"))
+        .await
+        .map_err(ApiError::internal)
 }
 
 pub(crate) async fn read_user_roles(

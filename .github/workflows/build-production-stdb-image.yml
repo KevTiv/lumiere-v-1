@@ -6,6 +6,8 @@ on:
     paths:
       - spacetimedb/**
       - crates/presentation-core/**
+      - crates/policy-core/**
+      - lumiere-codegen/storage-policy-manifest.json
       - scripts/railway-publish-spacetimedb.sh
       - Dockerfile.spacetimedb-publisher-artifact
       - .github/workflows/build-contracts-module.yml

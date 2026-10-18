@@ -2,7 +2,7 @@
 
 import { NavigationGuardProvider } from "@lumiere/ui"
 
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query"
+import { QueryClient, QueryClientProvider, useQueryClient, useQuery } from "@tanstack/react-query"
 import { Suspense, useMemo, useState } from "react"
 import { I18nProvider } from "@lumiere/i18n"
 import {
@@ -12,14 +12,11 @@ import {
   type User,
   type Role,
   type PolicyRule,
-  type BackendRoleRow,
   mapBackendRolesToRoles,
-  buildRbacUserFromServer,
 } from "@lumiere/ui"
 import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
 import { LumiereApiProvider } from "@lumiere/api-client"
-import { useStdbQuery, realtimeQueryKeysForResource } from "@lumiere/query-hooks/hooks/stdb"
-import { usePolicySnapshot } from "@/lib/use-policy-snapshot"
+import { realtimeQueryKeysForResource } from "@lumiere/query-hooks/hooks/stdb"
 import { useLumiereRealtime } from "@lumiere/query-hooks/hooks/realtime"
 import type { FieldAccessContext } from "@lumiere/stdb/field-policy"
 import {
@@ -31,6 +28,7 @@ import { useStdbConnection } from "@lumiere/stdb"
 import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 import { webApi } from "@/lib/lumiere-web-http"
 import { PostHogPageView } from "@/lib/posthog-pageview"
+import { apiFetch } from "@/lib/api-fetch"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
 function RBACBridge({
@@ -45,34 +43,41 @@ function RBACBridge({
   organizationId?: number
 }) {
   const hasIdentity = Boolean(serverIdentity && serverIdentity !== "unknown")
-  const { data: rolesData = [], isLoading: rolesLoading } = useStdbQuery("roles", 0, {
-    enabled: hasIdentity,
+  const accessQuery = useQuery({
+    queryKey: ['auth-access', organizationId, serverIdentity],
+    enabled: hasIdentity && Boolean(organizationId),
+    queryFn: async () => {
+      const response = await apiFetch('/api/session/field-access')
+      if (!response.ok) throw new Error('Unable to resolve current permissions')
+      const result = await response.json() as { identityHex: string; organizationId?: number; fieldAccess?: FieldAccessContext }
+      if (result.identityHex !== serverIdentity || result.organizationId !== organizationId || !result.fieldAccess) {
+        throw new Error('Session identity or organization changed')
+      }
+      return result.fieldAccess
+    },
+    staleTime: 0,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: 'always',
+    retry: false,
   })
-
-  const { orgPolicyRules, isLoading: policiesLoading } = usePolicySnapshot(organizationId, serverIdentity)
-
-  const rbacRoles = useMemo<Role[]>(() => {
-    return mapBackendRolesToRoles(rolesData as unknown as BackendRoleRow[])
-  }, [rolesData])
-
-  const rbacUser = useMemo<User | null>(() => {
-    return buildRbacUserFromServer(rbacRoles, serverRoleNames, serverIdentity)
-  }, [serverIdentity, serverRoleNames, rbacRoles])
-
-  const mergedPolicies = useMemo<PolicyRule[]>(() => {
-    const rolePolicies = rbacRoles.flatMap((role) =>
-      rbacUser?.roles.includes(role.id) ? role.permissions : [],
-    )
-    return [...rolePolicies, ...orgPolicyRules]
-  }, [rbacRoles, rbacUser, orgPolicyRules])
-
+  const access = accessQuery.isError ? undefined : accessQuery.data
+  const rbacRoles = useMemo<Role[]>(() => access ? mapBackendRolesToRoles([{
+    id: '__effective_access__', name: 'Effective permissions', isActive: true,
+    permissions: [...access.rolePermissions],
+  }]) : [], [access])
+  const rbacUser = useMemo<User | null>(() => access && serverIdentity ? {
+    id: serverIdentity, email: '', name: '', roles: ['__effective_access__', ...(access.roleIds ?? [access.roleId]).map(String)],
+    status: 'active', department: '', isSuperuser: access.isSuperuser,
+    lastLogin: '', createdAt: '', updatedAt: '',
+  } : null, [access, serverIdentity])
+  const policies = useMemo<PolicyRule[]>(() => (access?.orgPermissions ?? []).map((grant, index) => ({
+    id: `effective-grant-${index}`, subject: serverIdentity ?? '', resource: grant.resource,
+    action: (grant.action === 'all' ? '*' : grant.action) as PolicyRule['action'],
+    effect: grant.allow ? 'allow' : 'deny',
+  })), [access, serverIdentity])
   return (
-    <RBACProvider
-      initialUser={hasIdentity ? rbacUser : null}
-      initialRoles={hasIdentity ? rbacRoles : undefined}
-      initialPolicies={hasIdentity ? mergedPolicies : undefined}
-      permissionsReady={!hasIdentity || !(rolesLoading || policiesLoading)}
-    >
+    <RBACProvider initialUser={rbacUser} initialRoles={rbacRoles} initialPolicies={policies}
+      permissionsReady={!hasIdentity || Boolean(access)}>
       {children}
     </RBACProvider>
   )

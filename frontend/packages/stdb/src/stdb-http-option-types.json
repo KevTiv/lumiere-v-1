@@ -5269,6 +5269,9 @@
   "SetHelpdeskRelatedRecordParams": {
     "target": "HelpdeskRelatedRecord"
   },
+  "SetMemberAccessParams": {
+    "job_title": "string"
+  },
   "SetPurchaseApprovalDelegateParams": {
     "metadata": "string"
   },
@@ -6785,7 +6788,8 @@
     "name": "string",
     "description": "string",
     "permissions": "array<string>",
-    "is_active": "bool"
+    "is_active": "bool",
+    "metadata": "string"
   },
   "UpdateSaleOrderLineParams": {
     "product_id": "u64",

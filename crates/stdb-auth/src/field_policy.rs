@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::resource_registry::registry_get;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FieldAccessContext {
     pub organization_id: u64,
@@ -19,6 +19,94 @@ pub struct FieldAccessContext {
     pub role_permissions: Vec<String>,
     pub identity_hex: String,
     pub field_permissions: Vec<FieldPermissionLike>,
+    pub role_ids: Vec<u64>,
+    pub org_permissions: Vec<ActionPermission>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActionPermission {
+    pub resource: String,
+    pub action: String,
+    pub allow: bool,
+}
+
+/// Resolve only declared registry aliases; arbitrary names never confer authority.
+fn canonical_policy_resource(resource: &str) -> String {
+    static ALIASES: Lazy<HashMap<String, String>> = Lazy::new(|| {
+        let mut result = HashMap::new();
+        for key in crate::resource_registry::registry_keys() {
+            let entry = registry_get(&key).expect("registered resource");
+            for alias in std::iter::once(&key)
+                .chain(std::iter::once(&entry.table))
+                .chain(entry.aliases.iter())
+            {
+                result.insert(alias.replace('-', "_"), entry.table.clone());
+            }
+        }
+        result
+    });
+    ALIASES
+        .get(&resource.replace('-', "_"))
+        .cloned()
+        .unwrap_or_else(|| resource.to_owned())
+}
+
+fn evaluate_permission(
+    access: &FieldAccessContext,
+    resource: &str,
+    action: &str,
+    permissions: &[String],
+    superuser: bool,
+) -> bool {
+    let resource = canonical_policy_resource(resource);
+    let resources: Vec<_> = access
+        .org_permissions
+        .iter()
+        .map(|g| canonical_policy_resource(&g.resource))
+        .collect();
+    let grants: Vec<_> = access
+        .org_permissions
+        .iter()
+        .enumerate()
+        .map(|(i, g)| lumiere_policy_core::Grant {
+            resource: &resources[i],
+            action: &g.action,
+            allow: g.allow,
+        })
+        .collect();
+    let permissions: Vec<_> = permissions
+        .iter()
+        .map(|p| {
+            p.rsplit_once(':')
+                .map(|(r, a)| format!("{}:{a}", canonical_policy_resource(r)))
+                .unwrap_or_else(|| p.clone())
+        })
+        .collect();
+    lumiere_policy_core::allows_in_module(
+        superuser,
+        &permissions,
+        &grants,
+        &resource,
+        action,
+        resource_module(&resource),
+    )
+}
+
+/// Evaluate only server-scoped grants; role names never confer authority.
+pub fn permission_allowed(access: &FieldAccessContext, resource: &str, action: &str) -> bool {
+    evaluate_permission(
+        access,
+        resource,
+        action,
+        &access.role_permissions,
+        access.is_superuser,
+    )
+}
+
+fn resource_action_denied(access: &FieldAccessContext, resource: &str, action: &str) -> bool {
+    static ALL: Lazy<Vec<String>> = Lazy::new(|| vec!["*:*".into()]);
+    !access.is_superuser && !evaluate_permission(access, resource, action, &ALL, false)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -271,16 +359,50 @@ fn field_resource_matches(configured: &str, resource_key: &str) -> bool {
 /// registry prevents HTTP and realtime authorization from disagreeing on
 /// aliases such as `employees`/`hr_employee` and `iot-hubs`/`iot_hub`.
 fn resource_module(resource_key: &str) -> Option<&'static str> {
+    static MODULES: Lazy<HashMap<String, String>> = Lazy::new(|| {
+        let document: serde_json::Value =
+            serde_json::from_str(lumiere_contracts::manifests::STORAGE_POLICY_MANIFEST)
+                .expect("released storage policy manifest");
+        document["policies"]
+            .as_array()
+            .expect("released storage policies")
+            .iter()
+            .filter_map(|p| {
+                Some((
+                    p["table"].as_str()?.to_owned(),
+                    p["module"].as_str()?.to_owned(),
+                ))
+            })
+            .collect()
+    });
     let table = registry_get(resource_key)
-        .map(|entry| entry.table.as_str())
+        .map(|r| r.table.as_str())
         .unwrap_or(resource_key);
-    if table.starts_with("hr_") {
-        Some("hr")
-    } else if table.starts_with("iot_") {
-        Some("iot")
-    } else {
-        None
-    }
+    MODULES.get(table).map(String::as_str)
+}
+
+/// Explicit denials apply before module grants, inherited reads and session hydration.
+pub fn resource_read_denied(access: &FieldAccessContext, resource: &str) -> bool {
+    resource_action_denied(access, resource, "read")
+}
+
+/// These reads hydrate only the authenticated actor's session and shared reference data.
+pub fn session_read_resource(resource: &str) -> bool {
+    matches!(
+        resource,
+        "auth"
+            | "user-profile"
+            | "user-organization"
+            | "user-roles"
+            | "roles"
+            | "policy-snapshots"
+            | "companies"
+            | "currencies"
+            | "countries"
+            | "states"
+            | "uoms"
+            | "uom-categories"
+    )
 }
 
 fn has_module_permission(access: &FieldAccessContext, module: &str, action: &str) -> bool {
@@ -294,7 +416,7 @@ fn has_module_permission(access: &FieldAccessContext, module: &str, action: &str
 
 fn field_permission_applies(rule: &FieldPermissionLike, ctx: &FieldAccessContext) -> bool {
     if let Some(role_id) = rule.subject_role_id {
-        if role_id == ctx.role_id {
+        if role_id == ctx.role_id || ctx.role_ids.contains(&role_id) {
             return true;
         }
     }
@@ -304,7 +426,8 @@ fn field_permission_applies(rule: &FieldPermissionLike, ctx: &FieldAccessContext
         }
     }
     // Fallback: denormalized role_id column.
-    rule.role_id == Some(ctx.role_id)
+    rule.role_id
+        .is_some_and(|id| id == ctx.role_id || ctx.role_ids.contains(&id))
 }
 
 pub fn has_resource_read_permission(
@@ -314,12 +437,13 @@ pub fn has_resource_read_permission(
     let Some(access) = field_access else {
         return false;
     };
-    if access.is_superuser
-        || access
-            .role_permissions
-            .iter()
-            .any(|permission| permission == "*:*")
-    {
+    if access.is_superuser {
+        return true;
+    }
+    if resource_read_denied(access, resource_key) {
+        return false;
+    }
+    if permission_allowed(access, resource_key, "read") {
         return true;
     }
     let Some(resource) = registry_get(resource_key) else {
@@ -419,6 +543,12 @@ pub fn has_hr_permission(
         return false;
     };
     if fa.is_superuser {
+        return true;
+    }
+    if resource_action_denied(fa, resource, action) {
+        return false;
+    }
+    if permission_allowed(fa, resource, action) {
         return true;
     }
     if action == "read"
@@ -769,6 +899,42 @@ pub fn sql_column_list_for_generated_type(type_name: &str) -> Result<Vec<String>
 mod tests {
     use super::*;
 
+    #[test]
+    fn explicit_denies_override_wildcard_reads_and_writes() {
+        let mut access = field_access(&["*:*"]);
+        access.org_permissions = vec![ActionPermission {
+            resource: "sale_order".into(),
+            action: "read".into(),
+            allow: false,
+        }];
+        assert!(!has_resource_read_permission(Some(&access), "sale-orders"));
+        access.org_permissions[0].action = "write".into();
+        assert!(!permission_allowed(&access, "sale_order", "update"));
+        assert!(permission_allowed(&access, "sale_order", "create"));
+        access.is_superuser = true;
+        assert!(permission_allowed(&access, "sale_order", "update"));
+    }
+
+    #[test]
+    fn additive_role_field_grants_apply_without_changing_primary_role() {
+        let mut access = field_access(&["contact:read"]);
+        access.role_ids = vec![access.role_id, 42];
+        let mut rule = FieldPermissionLike {
+            id: None,
+            organization_id: Some(access.organization_id),
+            role_id: Some(42),
+            resource: "contacts".into(),
+            action: "read".into(),
+            allowed_fields: vec!["name".into()],
+            subject_user_hex: None,
+            subject_role_id: Some(42),
+        };
+        assert!(field_permission_applies(&rule, &access));
+        rule.subject_role_id = Some(99);
+        rule.role_id = Some(99);
+        assert!(!field_permission_applies(&rule, &access));
+    }
+
     fn field_access(permissions: &[&str]) -> FieldAccessContext {
         FieldAccessContext {
             organization_id: 7,
@@ -781,6 +947,8 @@ mod tests {
                 .collect(),
             identity_hex: "actor".into(),
             field_permissions: Vec::new(),
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         }
     }
 

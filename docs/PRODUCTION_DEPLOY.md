@@ -96,11 +96,13 @@ single-use and grants only the administrator-selected active role. A provider
 sign-in or email-domain match alone never grants membership. Newly admitted
 identities must not be linked automatically to existing email accounts.
 
-Hosted acceptance currently uses a fail-closed ordered reducer handoff:
-invite consumption precedes membership and binding. If a later reducer fails,
-the invite stays consumed and an administrator must verify membership and reissue
-a new invitation. This is **not** a cross-reducer atomic transaction; do not
-interpret a transient error as success or retry a consumed token.
+Hosted acceptance uses the internal `accept_user_invite` operation. Invitation
+consumption, membership, bindings and the trusted retry receipt commit in one
+module transaction. The same identity can recover a lost response without
+regranting access after revocation. Deploy the matching generated contract and
+module together. See [hosted lifecycle completion](plans/workos-lifecycle-completion.md)
+for explicit legacy-account linking, verified email updates, profile projection
+retries and role administration.
 
 Verify approved and denied sign-in, founder bootstrap, cross-tenant denial,
 invitation acceptance/replay/expiry, refresh, logout, and provider outage on an

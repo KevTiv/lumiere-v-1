@@ -55,83 +55,15 @@ pub(super) async fn invite(
 
     let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     let client = context.client();
-    let sql = stdb_auth::select_user_role_assignments_for_identity_sql(&identity_hex, None)
-        .map_err(ApiError::Internal)?;
-    let assignments = client.query_sql(&sql).await.map_err(ApiError::internal)?;
-    let assignments: Vec<_> = assignments
-        .into_iter()
-        .filter(|row| {
-            row.get("organizationId")
-                .or_else(|| row.get("organization_id"))
-                .and_then(json_u64)
-                == Some(body.organization_id)
-                && row
-                    .get("expiresAt")
-                    .or_else(|| row.get("expires_at"))
-                    .filter(|v| !v.is_null())
-                    .map(|v| {
-                        v.as_i64()
-                            .or_else(|| v.as_str()?.parse().ok())
-                            .is_some_and(|expiry| i128::from(expiry) > now_micros())
-                    })
-                    .unwrap_or(true)
-        })
-        .collect();
-    if assignments.is_empty() {
+    let access = session
+        .field_access
+        .as_ref()
+        .ok_or(ApiError::Unauthorized)?;
+    if !stdb_auth::permission_allowed(access, "user_organization", "create")
+        || !stdb_auth::permission_allowed(access, "user_role_assignment", "create")
+    {
         return Err(ApiError::Forbidden(
-            "Forbidden: not a member of this organization".into(),
-        ));
-    }
-
-    let role_ids: Vec<u64> = assignments
-        .iter()
-        .filter_map(|r| {
-            r.get("roleId")
-                .or_else(|| r.get("role_id"))
-                .and_then(|v| v.as_u64().or_else(|| v.as_str()?.parse().ok()))
-        })
-        .collect();
-
-    if role_ids.is_empty() {
-        return Err(ApiError::Forbidden(
-            "Forbidden: not a member of this organization".into(),
-        ));
-    }
-
-    // SpacetimeDB HTTP SQL does not support `IN (...)` — fetch org roles and filter in Rust.
-    let roles_sql = format!(
-        "SELECT id, name FROM role WHERE is_active = true AND organization_id = {}",
-        body.organization_id
-    );
-    let all_roles = client
-        .query_sql(&roles_sql)
-        .await
-        .map_err(ApiError::internal)?;
-    let role_id_set: std::collections::HashSet<u64> = role_ids.iter().copied().collect();
-    let roles: Vec<serde_json::Value> = all_roles
-        .into_iter()
-        .filter(|r| {
-            r.get("id")
-                .and_then(|v| {
-                    v.as_u64()
-                        .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
-                })
-                .is_some_and(|id| role_id_set.contains(&id))
-        })
-        .collect();
-
-    let is_admin = roles.iter().any(|r| {
-        r.get("name")
-            .and_then(|v| v.as_str())
-            .map(|n| {
-                let l = n.to_lowercase();
-                l == "owner" || l == "admin" || l == "administrator"
-            })
-            .unwrap_or(false)
-    });
-    if !is_admin {
-        return Err(ApiError::Forbidden(
-            "Forbidden: insufficient permissions".into(),
+            "You cannot invite organization members".into(),
         ));
     }
 
@@ -438,9 +370,6 @@ async fn accept_workos_invite(
     let invite = find_invite_by_token_hash(state, &hash)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Invalid or expired invitation".into()))?;
-    if invite.accepted_at.is_some() || invite.expires_at <= now_micros() as i64 {
-        return Err(ApiError::BadRequest("Invalid or expired invitation".into()));
-    }
     if !hosted_invite_matches(
         binding.organization_id,
         &binding.email,
@@ -451,62 +380,19 @@ async fn accept_workos_invite(
             "Invitation is not approved for this WorkOS identity and organization".into(),
         ));
     }
-    let role_name = get_role_name_in_organization(state, invite.role_id, invite.organization_id)
-        .await?
-        .ok_or_else(|| ApiError::BadRequest("Invite role not found".into()))?;
-
-    // Existing trusted reducers enforce invite single-use, active issuer authority,
-    // active role and the organization member cap. An interrupted handoff fails
-    // closed; operator reissue is required if a subsequent reducer fails.
+    // The trusted module transaction validates expiry, issuer authority and role,
+    // then consumes the invite and materializes membership/bindings together.
     dispatch_internal_reducer(
         state,
         InternalRouteAuthority::InvitationAcceptance,
         Some(invite.organization_id),
-        "mark_invite_accepted",
-        json!([invite.id]),
-    )
-    .await?;
-    dispatch_internal_reducer(
-        state,
-        InternalRouteAuthority::InvitationAcceptance,
-        Some(invite.organization_id),
-        "add_org_member",
+        "accept_user_invite",
         json!([
-            identity_json_for_reducer_call(&binding.identity_hex),
             invite.organization_id,
-            {
-                "role_name": role_name,
-                "company_id": Value::Null,
-                "job_title": Value::Null,
-                "department_id": Value::Null,
-                "employee_id": Value::Null,
-                "is_active": true,
-                "is_default": true,
-                "metadata": Value::Null,
-            }
-        ]),
-    )
-    .await?;
-    dispatch_internal_reducer(
-        state,
-        InternalRouteAuthority::InvitationAcceptance,
-        Some(invite.organization_id),
-        "bind_user_credential",
-        json!([
+            invite.id,
             binding.platform_user_id.as_str(),
             identity_json_for_reducer_call(&binding.identity_hex),
             binding.email,
-        ]),
-    )
-    .await?;
-    dispatch_internal_reducer(
-        state,
-        InternalRouteAuthority::InvitationAcceptance,
-        Some(invite.organization_id),
-        "bind_user_profile",
-        json!([
-            binding.platform_user_id.as_str(),
-            identity_json_for_reducer_call(&binding.identity_hex),
         ]),
     )
     .await?;

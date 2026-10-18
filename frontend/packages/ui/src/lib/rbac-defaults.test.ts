@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { actionsMatch, parsePermissionString } from "./rbac-defaults"
+import { actionsMatch, parsePermissionString, mapBackendRoleToRole } from "./rbac-defaults"
 
 describe("RBAC action vocabulary", () => {
   it("parses the server admin action without replacing it with manage", () => {
@@ -20,4 +20,16 @@ describe("RBAC action vocabulary", () => {
     expect(actionsMatch("manage", "read")).toBe(true)
     expect(actionsMatch("manage", "update")).toBe(true)
   })
+
+  it("does not grant create through write", () => {
+    expect(actionsMatch('write', 'create')).toBe(false)
+    expect(actionsMatch('write', 'update')).toBe(true)
+  })
+  it('restores display color without restoring permissions from metadata', () => {
+    const role = mapBackendRoleToRole({ id: 7, name: 'Reader', isActive: true, permissions: [],
+      metadata: JSON.stringify({ color: 'teal', uiPermissions: ['*:*'] }) })
+    expect(role?.color).toBe('teal')
+    expect(role?.permissions).toEqual([])
+  })
+
 })

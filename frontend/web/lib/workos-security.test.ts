@@ -247,3 +247,33 @@ test('hosted auth screen guards never render the native sign-in/signup forms in 
   assert.ok(!hosted.includes('localStorage'))
   assert.ok(!hosted.includes('sessionStorage'))
 })
+
+test('ordinary hosted login resolves the saved destination, invitation, onboarding and suspension', async () => {
+  const cases = [
+    { status: 'ready', next: '/accounting?tab=invoices', destination: '/accounting?tab=invoices' },
+    { status: 'ready', next: '/auth/complete', destination: '/overview' },
+    { status: 'onboarding', next: '/overview', destination: '/onboarding' },
+    { status: 'membership_suspended', next: '/overview', destination: '/sign-in?error=membership_suspended' },
+    { status: 'invitation_required', next: '/overview', destination: '/sign-in?error=invitation_required' },
+    { status: 'ready', next: '/overview', invite: true, destination: '/accept-invite' },
+    { status: 'ready', next: '/overview', unavailable: true, destination: '/sign-in?error=authentication_unavailable' },
+  ]
+  for (const scenario of cases) {
+    const page = loadSource('../app/auth/complete/page.tsx', {
+      '@workos-inc/authkit-nextjs': { withAuth: async () => ({ accessToken: 'provider-access' }) },
+      'next/headers': { cookies: async () => ({ get: () => ({ value: 'sealed-invite' }) }) },
+      'next/navigation': { redirect: (path: string) => { throw new Error(path) } },
+      '@/lib/api-server-forward': { resolveApiServerBaseUrl: () => 'http://api.test' },
+      '@/lib/auth-mode': { isWorkOsEnabled: () => true, safeAuthReturnTo },
+      '@/lib/hosted-invite-token': { hostedInviteCookieName: () => 'invite', openHostedInvite: () => scenario.invite ? 'invite-credential' : null },
+      '@/lib/post-auth-destination': { POST_AUTH_PATHS: { overview: '/overview', onboarding: '/onboarding' } },
+    }, {
+      fetch: async (_url: string, init: RequestInit) => {
+        assert.equal((init.headers as Record<string, string>).authorization, 'Bearer provider-access')
+        return { ok: !scenario.unavailable, json: async () => ({ status: scenario.status }) }
+      },
+    })
+    await assert.rejects(page.default({ searchParams: Promise.resolve({ next: scenario.next }) }),
+      (error: Error) => error.message === scenario.destination)
+  }
+})

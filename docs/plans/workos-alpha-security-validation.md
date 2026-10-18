@@ -98,3 +98,12 @@ five-minute cache expires; open sockets recheck revocation within 60 seconds.
   code work and requires a pinned contracts release.
 - Tests cover token sealing/tampering/expiry, frontend routing and hosted
   organization matching. Live provider/browser acceptance is still required.
+
+
+## Hosted lifecycle completion
+
+The ordered invitation handoff described above is superseded by the atomic
+`accept_user_invite` operation and trusted retry receipts. Effective primary and
+additional roles, profile editing, explicit account linking, role retirement and
+validation requirements are documented in [the lifecycle report](workos-lifecycle-completion.md).
+Live provider acceptance remains a separate release requirement.

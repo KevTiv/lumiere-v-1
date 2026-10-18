@@ -20,6 +20,9 @@ pub struct Admission {
     pub workos_organization_id: Option<String>,
     #[serde(default)]
     pub allow_provision: bool,
+    /// Explicit operator-approved migration target; never inferred from email.
+    #[serde(default)]
+    pub link_platform_user_id: Option<String>,
 }
 
 #[derive(Clone)]
@@ -90,6 +93,12 @@ fn validate_admissions(entries: &[Admission]) -> anyhow::Result<()> {
             "duplicate alpha identity/email"
         );
         anyhow::ensure!(a.organization_id != Some(0), "invalid alpha organization");
+        if let Some(id) = &a.link_platform_user_id {
+            anyhow::ensure!(
+                a.allow_provision && platform_control::PlatformId::new(id.clone()).is_ok(),
+                "identity linking requires explicit provisioning approval and a valid platform id"
+            );
+        }
         anyhow::ensure!(
             a.workos_organization_id
                 .as_deref()
@@ -112,6 +121,8 @@ struct ProviderUser {
     id: String,
     email: String,
     email_verified: bool,
+    first_name: Option<String>,
+    last_name: Option<String>,
 }
 #[derive(Deserialize)]
 struct ProviderSession {
@@ -311,11 +322,40 @@ pub async fn verify_binding(
         .await
         .map_err(ApiError::internal)?;
     let (platform_user_id, identity_hex, stdb_token) = if let Some(row) = row {
-        if row.get::<_, String>("email").to_lowercase() != admission.email
-            || row.get::<_, Option<String>>("workos_user_id").as_deref()
-                != Some(claims.sub.as_str())
-        {
+        if row.get::<_, Option<String>>("workos_user_id").as_deref() != Some(claims.sub.as_str()) {
             return Err(ApiError::Unauthorized);
+        }
+        if row.get::<_, String>("email").to_lowercase() != admission.email {
+            // A verified address update for the same immutable subject is accepted
+            // only after the operator has changed the exact alpha admission pin.
+            let id = PlatformId::new(row.get::<_, String>("platform_user_id"))
+                .map_err(ApiError::internal)?;
+            let identity =
+                stdb_auth::identity_sql_literal(&row.get::<_, String>("stdb_identity_hex"))
+                    .map_err(ApiError::Internal)?;
+            let memberships = state.stdb.query_sql(&format!("SELECT organization_id FROM user_organization WHERE user_identity = {identity} AND is_active = true"))
+                .await.map_err(ApiError::internal)?;
+            let organizations: Vec<i64> = memberships
+                .iter()
+                .filter_map(|r| r.get("organizationId").or_else(|| r.get("organization_id")))
+                .filter_map(|v| v.as_i64().or_else(|| v.as_str()?.parse().ok()))
+                .filter(|id| *id > 0)
+                .collect();
+            if !platform_control::sync_workos_email(
+                pool,
+                &id,
+                &claims.sub,
+                &admission.email,
+                &organizations,
+            )
+            .await
+            .map_err(|_| {
+                ApiError::Conflict(
+                    "Verified email change conflicts with an existing account".into(),
+                )
+            })? {
+                return Err(ApiError::Unauthorized);
+            }
         }
         (
             PlatformId::new(row.get::<_, String>("platform_user_id"))
@@ -329,37 +369,79 @@ pub async fn verify_binding(
                 "Identity provisioning requires operator approval".into(),
             ));
         }
-        if platform_control::find_user_credential_by_email(pool, &admission.email)
-            .await
-            .map_err(ApiError::internal)?
-            .is_some()
+        if let Some(existing) =
+            platform_control::find_user_credential_by_email(pool, &admission.email)
+                .await
+                .map_err(ApiError::internal)?
         {
-            return Err(ApiError::Conflict(
-                "Existing account requires explicit identity linking".into(),
-            ));
-        }
-        let (identity, token) = state
-            .stdb
-            .provision_identity()
+            let target = existing.get::<_, String>("platform_user_id");
+            if admission.link_platform_user_id.as_deref() != Some(target.as_str()) {
+                return Err(ApiError::Conflict(
+                    "Existing account requires explicit identity linking".into(),
+                ));
+            }
+            let id = PlatformId::new(target).map_err(ApiError::internal)?;
+            let profile = platform_control::find_user_profile_by_platform_id(pool, &id)
+                .await
+                .map_err(ApiError::internal)?
+                .ok_or(ApiError::Unauthorized)?;
+            if !profile.get::<_, bool>("is_active") {
+                return Err(ApiError::Unauthorized);
+            }
+            if !platform_control::attach_workos_subject(pool, &id, &claims.sub, true)
+                .await
+                .map_err(ApiError::internal)?
+            {
+                return Err(ApiError::Conflict(
+                    "Account is linked to another provider identity".into(),
+                ));
+            }
+        } else {
+            if admission.link_platform_user_id.is_some() {
+                return Err(ApiError::Conflict(
+                    "Approved account linking target was not found".into(),
+                ));
+            }
+            let (identity, token) = state
+                .stdb
+                .provision_identity()
+                .await
+                .map_err(ApiError::internal)?;
+            let identity = parse_stdb_identity_hex(&identity).ok_or(ApiError::Unauthorized)?;
+            platform_control::insert_workos_identity(
+                pool,
+                &platform_control::UserCredential {
+                    platform_user_id: PlatformId::generate(),
+                    email: admission.email.clone(),
+                    stdb_identity_hex: identity,
+                    password_hash: None,
+                    workos_user_id: Some(claims.sub.clone()),
+                    stdb_token_enc: encrypt_token(key, &token)?,
+                    email_verified: true,
+                },
+                user.first_name.as_deref(),
+                user.last_name.as_deref(),
+            )
             .await
             .map_err(ApiError::internal)?;
-        let identity = parse_stdb_identity_hex(&identity).ok_or(ApiError::Unauthorized)?;
-        let id = PlatformId::generate();
-        platform_control::insert_workos_identity(
-            pool,
-            &platform_control::UserCredential {
-                platform_user_id: id.clone(),
-                email: admission.email.clone(),
-                stdb_identity_hex: identity.clone(),
-                password_hash: None,
-                workos_user_id: Some(claims.sub.clone()),
-                stdb_token_enc: encrypt_token(key, &token)?,
-                email_verified: true,
-            },
+        }
+        // Unique subject constraints choose the winner of simultaneous callbacks.
+        // Always read that canonical binding, including after an insert conflict.
+        let row = platform_control::find_user_credential_by_workos_user_id(pool, &claims.sub)
+            .await
+            .map_err(ApiError::internal)?
+            .ok_or_else(|| {
+                ApiError::Conflict("Identity provisioning conflicted; retry sign-in".into())
+            })?;
+        if row.get::<_, String>("email") != admission.email {
+            return Err(ApiError::Unauthorized);
+        }
+        (
+            PlatformId::new(row.get::<_, String>("platform_user_id"))
+                .map_err(ApiError::internal)?,
+            row.get::<_, String>("stdb_identity_hex"),
+            decrypt_token(key, &row.get::<_, String>("stdb_token_enc"))?,
         )
-        .await
-        .map_err(ApiError::internal)?;
-        (id, identity, token)
     };
     let profile = platform_control::find_user_profile_by_platform_id(pool, &platform_user_id)
         .await
@@ -383,6 +465,17 @@ pub async fn verify_binding(
     let identity_hex = parse_stdb_identity_hex(&identity_hex).ok_or(ApiError::Unauthorized)?;
     if parse_stdb_identity_hex(&actual_identity).as_deref() != Some(identity_hex.as_str()) {
         return Err(ApiError::Unauthorized);
+    }
+    if allow_provision {
+        if let Some(org) = admission
+            .organization_id
+            .and_then(|org| i64::try_from(org).ok())
+        {
+            pool.get().await.map_err(ApiError::internal)?.execute(
+                "INSERT INTO lumiere_platform.profile_projection_pending (platform_user_id,organization_id) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+                &[&platform_user_id.as_str(), &org],
+            ).await.map_err(ApiError::internal)?;
+        }
     }
     Ok(VerifiedBinding {
         platform_user_id,
@@ -441,6 +534,14 @@ pub async fn resolve_session(
         ));
     };
     let organization_id = org_id(member).ok_or(ApiError::Unauthorized)?;
+    // Reconcile previously committed profile changes before hydrating this tenant.
+    crate::routes::auth::profile::flush_profile_projection(
+        state,
+        &binding.platform_user_id,
+        &binding.identity_hex,
+        organization_id,
+    )
+    .await?;
     let field_access =
         load_field_access_context(&state.stdb, &binding.identity_hex, organization_id)
             .await
@@ -464,8 +565,31 @@ fn may_bootstrap_without_membership(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     use jsonwebtoken::{encode, EncodingKey, Header};
+    use rsa::{pkcs8::EncodePrivateKey, traits::PublicKeyParts, RsaPrivateKey};
     use serde_json::json;
+
+    fn test_signing_key() -> &'static (EncodingKey, JwkSet) {
+        static KEY: std::sync::OnceLock<(EncodingKey, JwkSet)> = std::sync::OnceLock::new();
+        KEY.get_or_init(|| {
+            let key = RsaPrivateKey::new(&mut rand::thread_rng(), 2048)
+                .expect("generate ephemeral test key");
+            let pem = key
+                .to_pkcs8_pem(rsa::pkcs8::LineEnding::LF)
+                .expect("encode test key");
+            let jwks = serde_json::from_value(json!({"keys":[{
+                "kty":"RSA", "kid":"test-key", "alg":"RS256", "use":"sig",
+                "n":URL_SAFE_NO_PAD.encode(key.n().to_bytes_be()),
+                "e":URL_SAFE_NO_PAD.encode(key.e().to_bytes_be()),
+            }]}))
+            .expect("ephemeral test JWKS");
+            (
+                EncodingKey::from_rsa_pem(pem.as_bytes()).expect("test encoding key"),
+                jwks,
+            )
+        })
+    }
     fn config() -> WorkosAuthConfig {
         WorkosAuthConfig {
             client_id: "client_test".into(),
@@ -477,6 +601,7 @@ mod tests {
                 organization_id: Some(1),
                 workos_organization_id: Some("org_allowed".into()),
                 allow_provision: false,
+                link_platform_user_id: None,
             }],
         }
     }
@@ -490,17 +615,12 @@ mod tests {
     fn token(claims: &serde_json::Value, kid: &str) -> String {
         let mut header = Header::new(Algorithm::RS256);
         header.kid = Some(kid.into());
-        encode(
-            &header,
-            claims,
-            &EncodingKey::from_rsa_pem(include_bytes!("fixtures/workos-test-private.pem")).unwrap(),
-        )
-        .unwrap()
+        encode(&header, claims, &test_signing_key().0).unwrap()
     }
     #[test]
     fn only_trusted_current_rsa_tokens_are_accepted() {
         let config = config();
-        let keys = serde_json::from_str(include_str!("fixtures/workos-test-jwks.json")).unwrap();
+        let keys = test_signing_key().1.clone();
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -539,6 +659,8 @@ mod tests {
         let config = config();
         let c: Claims = serde_json::from_value(claims()).unwrap();
         let mut user = ProviderUser {
+            first_name: None,
+            last_name: None,
             id: "user_allowed".into(),
             email: "approved@example.test".into(),
             email_verified: true,

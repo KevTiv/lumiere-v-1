@@ -27,7 +27,13 @@ export default function SignInPage() {
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(searchParams.get("error") === "admission_denied" ? "Your account is not approved for this alpha. Contact your administrator." : null)
+  const messages: Record<string, string> = {
+    admission_denied: 'Your account needs administrator approval or explicit linking to an existing account.',
+    membership_suspended: 'Your organization access is suspended. Contact your administrator.',
+    invitation_required: 'You are signed in. Open your organization invitation to finish joining.',
+    authentication_unavailable: 'Authentication is temporarily unavailable. Please retry.',
+  }
+  const [error, setError] = useState<string | null>(messages[searchParams.get('error') ?? ''] ?? null)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
