@@ -1608,7 +1608,8 @@ fn test_coordinated_reversal_approval_identity(ctx: &ReducerContext) -> Result<(
     let second_task = latest_reversal_task(ctx, org, payment_id)?;
     if second_request.id == first_request.id
         || second_task.id == first_task.id
-        || second_task.condition_revision_hash == first_task.condition_revision_hash
+        || second_task.subject_revision_hash == first_task.subject_revision_hash
+        || second_task.condition_revision_hash != first_task.condition_revision_hash
     {
         return Err("new reversal request reused the rejected request's approval identity".into());
     }
@@ -1629,7 +1630,7 @@ fn test_coordinated_reversal_approval_identity(ctx: &ReducerContext) -> Result<(
     )?;
     unchanged(ctx, org, &before, "old reversal request approval")?;
     // An annotation changes the pinned full material without changing economics
-    // or the immutable reversal request ID used by the condition snapshot.
+    // or the immutable request identity pinned by the full material snapshot.
     let line = ctx
         .db
         .account_bank_statement_line()
@@ -1702,13 +1703,23 @@ fn test_coordinated_reversal_approval_identity(ctx: &ReducerContext) -> Result<(
     let final_task = latest_reversal_task(ctx, org, payment_id)?;
     if final_request.id == second_request.id
         || final_task.id == second_task.id
-        || final_task.condition_revision_hash == second_task.condition_revision_hash
+        || final_task.subject_revision_hash == second_task.subject_revision_hash
+        || final_task.condition_revision_hash != second_task.condition_revision_hash
         || economic_snapshot(ctx, org)? != economic
     {
         return Err(
             "fresh reversal request did not create a new no-effect approval identity".into(),
         );
     }
+    // Replayed historical callbacks must not project an old terminal status
+    // onto this new request. Its immutable Create event binds a different ID.
+    let invalidated_task = task_by_id(ctx, second_task.id)?;
+    if invalidated_task.status != WorkflowHumanTaskStatus::Invalidated {
+        return Err("old reversal task did not retain its invalidated identity".into());
+    }
+    let before = snapshot(ctx, org)?;
+    crate::accounting::bank_settlement_lifecycle::synchronize_bank_task(ctx, &invalidated_task)?;
+    unchanged(ctx, org, &before, "old invalidated reversal callback")?;
     let before = snapshot(ctx, org)?;
     denied(
         decide_workflow_human_task_for_actor(
@@ -1717,7 +1728,7 @@ fn test_coordinated_reversal_approval_identity(ctx: &ReducerContext) -> Result<(
             second_actor,
             decision(
                 ctx,
-                &task_by_id(ctx, second_task.id)?,
+                &invalidated_task,
                 WorkflowHumanTaskDecision::Approve,
                 "stale-invalidated-reversal",
             )?,
