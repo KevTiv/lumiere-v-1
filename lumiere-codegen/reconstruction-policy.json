@@ -13,6 +13,8 @@
   },
   "table_actions": {
     "ai_agent_run_policy_snapshot": "restore",
+    "bank_statement_settlement_attempt": "restore",
+    "bank_statement_settlement_reversal": "restore",
     "capacity_forecast_snapshot": "restore",
     "cold_tier_service_identity": "recreate",
     "crm_forecast_snapshot": "restore",

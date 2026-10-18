@@ -3295,6 +3295,76 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "bank_statement_settlement_attempt",
+      "module": "accounting",
+      "rationale": "Authoritative bank settlement generations, immutable pre-bank financial snapshots and mutable recovery lifecycle. Retain every generation; restore the exact captured balances rather than recreate them.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "account_bank_statement_line",
+          "child_column": "line_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:accounting/bank-settlement-lifecycle/authoritative-financial-snapshots/retain-all-generations",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "bank_statement_settlement_reversal",
+      "module": "accounting",
+      "rationale": "Authoritative approval-bound bank settlement reversal requests and results. Immutable request inputs and replay identity must survive restore; retain completed and pending requests.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "bank_statement_settlement_attempt",
+          "child_column": "attempt_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "auto_increment",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:accounting/bank-settlement-lifecycle/authoritative-financial-snapshots/retain-all-generations",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "barcode_nomenclature",
       "module": "inventory",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
