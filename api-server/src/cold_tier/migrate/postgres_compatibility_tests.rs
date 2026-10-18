@@ -168,13 +168,17 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     ensure!(migration_count(pool).await? == prefix_length as i64);
     let previous_history = applied_migration_history(pool).await?;
     let previous_tables = public_table_names(pool).await?;
+    // Startup upgrades the frozen v13 prefix through the whole current catalog.
     let expected_new_tables = [
+        "bank_statement_settlement_attempt",
+        "bank_statement_settlement_reversal",
         "mrp_production_cost",
         "mrp_productivity_cost",
         "mrp_valuation_config",
         "mrp_workcenter_cost_rate",
         "purchase_order_creation_operation",
         "purchase_receipt_operation",
+        "user_invite_acceptance",
     ];
     for table in expected_new_tables {
         ensure!(
