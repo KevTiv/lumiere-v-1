@@ -191,8 +191,12 @@ test.describe(
         await accounting.goto(`/accounting?tab=journal-entries&filter=id:${exactBillId}`)
         await expectBillFocus(accounting, exactBillId)
         await activeTabEntityTable(accounting).getByTestId(`entity-row-${exactBillId}`).click()
-        const post = accounting.getByRole("dialog").getByRole("button", { name: "Post", exact: true })
-        await expect(post).toBeVisible()
+        // The initial record sheet also has a discussion "Post" action.
+        // Enter the invoice workflow, rather than submitting a chatter post.
+        await accounting.getByTestId("entity-record-sheet-tab-actions").click()
+        await accounting.getByTestId("accounting-invoice-record-actions").click()
+        const post = accounting.getByTestId("invoice-detail-post-draft")
+        await expect(post).toBeEnabled()
         const responsePromise = accounting.waitForResponse(
           (response) => matchesOperationResponse(response, "post_invoice"),
           { timeout: 30_000 },
