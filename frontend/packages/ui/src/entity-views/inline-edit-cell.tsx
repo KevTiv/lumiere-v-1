@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { Loader2 } from "lucide-react"
 
 import type { EntityInlineEdit, EntityRow } from "../lib/entity-view-types"
@@ -8,6 +8,13 @@ import { isUnchangedInline, parseInlineValue } from "../lib/inline-edit"
 import { showWorkflowToast } from "../lib/workflow-toast"
 import { Input } from "../components/input"
 import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/select"
 
 interface InlineEditCellProps {
   edit: EntityInlineEdit
@@ -27,6 +34,8 @@ export function InlineEditCell({ edit, row, columnKey, label, value, children }:
   const [draft, setDraft] = useState("")
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The select popup takes focus while open; that must not count as leaving the field.
+  const selectOpenRef = useRef(false)
   const navigationDialog = useUnsavedChangesGuard(editing && draft !== String(value ?? ""), pending)
 
   if (edit.canEdit && !edit.canEdit(row)) return <>{children}</>
@@ -42,9 +51,9 @@ export function InlineEditCell({ edit, row, columnKey, label, value, children }:
     setError(null)
   }
 
-  const commit = async () => {
+  const commit = async (next: string = draft) => {
     if (pending) return
-    const parsed = parseInlineValue(edit.kind, draft)
+    const parsed = parseInlineValue(edit.kind, next)
     if (!parsed.ok) {
       setError(parsed.error)
       return
@@ -109,18 +118,33 @@ export function InlineEditCell({ edit, row, columnKey, label, value, children }:
     <span className="flex flex-col gap-1" data-testid={`entity-inline-editor-${columnKey}`}>
       <span className="flex items-center gap-1">
         {edit.kind === "select" ? (
-          <select
-            {...common}
-            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+          <Select
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onValueChange={(next) => {
+              setDraft(next)
+              void commit(next)
+            }}
+            onOpenChange={(open) => {
+              selectOpenRef.current = open
+            }}
           >
-            {edit.options?.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              {...common}
+              className="h-8"
+              onBlur={() => {
+                if (!selectOpenRef.current) void commit()
+              }}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {edit.options?.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : (
           <Input
             {...common}

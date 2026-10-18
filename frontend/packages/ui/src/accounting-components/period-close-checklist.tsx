@@ -23,6 +23,13 @@ import { mergeModuleStates, type ModuleDataState } from "../lib/module-data-stat
 import { ModuleDataNotice } from "../pages/module-data-notice"
 import { periodReportHref } from "../lib/period-report-context"
 import { stbTimestampMicros, stbTimestampToExactIso } from "@lumiere/erp-shared/stb-timestamp"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/select"
 
 type StepStatus = "done" | "pending" | "blocked"
 
@@ -445,25 +452,24 @@ export function PeriodCloseChecklist({
         <label className="mt-4 block max-w-sm text-sm font-medium" htmlFor="period-close-target">
           {t("accounting.periodClose.targetPeriod.label", { defaultValue: "Accounting period" })}
         </label>
-        <select
-          id="period-close-target"
-          data-testid="period-close-target"
-          className="mt-1 h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm"
+        <Select
           value={selectionCompany === companyId ? targetPeriodId : ""}
           disabled={fiscalSource.status !== "ready"}
-          onChange={(event) => setTargetPeriodId(event.target.value)}
+          onValueChange={setTargetPeriodId}
         >
-          <option value="">
-            {t("accounting.periodClose.targetPeriod.placeholder", {
+          <SelectTrigger id="period-close-target" data-testid="period-close-target" className="mt-1 w-full max-w-sm">
+            <SelectValue placeholder={t("accounting.periodClose.targetPeriod.placeholder", {
               defaultValue: "Select a period to evaluate",
-            })}
-          </option>
-          {companyPeriods.map((period) => (
-            <option key={String(period.id)} value={String(period.id)}>
-              {String(period.name ?? period.code ?? period.id)}
-            </option>
-          ))}
-        </select>
+            })} />
+          </SelectTrigger>
+          <SelectContent>
+            {companyPeriods.map((period) => (
+              <SelectItem key={String(period.id)} value={String(period.id)}>
+                {String(period.name ?? period.code ?? period.id)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {targetRange ? <p className="mt-2 text-sm text-muted-foreground" data-testid="period-close-range">{t("accounting.periodClose.exactPeriod", { defaultValue: "Reviewing company {{company}} · {{from}} to {{to}}. Report evidence must cover these exact dates.", company: String(companyId), from: targetRange.dateFrom.toISOString().slice(0, 10), to: targetRange.dateTo.toISOString().slice(0, 10) })}</p> : null}
       </div>
 

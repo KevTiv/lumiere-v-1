@@ -15,6 +15,7 @@ import {
   callReducerBff,
   callReducerOwner,
   callReducerBffResult,
+  chooseFirstSelectOptionByTrigger,
   chooseSelectOptionByLabel,
   expectNoAppError,
   fetchAccountIdByCode,
@@ -68,10 +69,8 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
 
     const employee = page.getByTestId("expenses-capture-employee")
     const pricelist = page.getByTestId("expenses-capture-pricelist")
-    await expect(employee.locator("option")).not.toHaveCount(1, { timeout: 30_000 })
-    await employee.selectOption({ index: 1 })
-    await expect(pricelist.locator("option")).not.toHaveCount(1, { timeout: 30_000 })
-    await pricelist.selectOption({ index: 1 })
+    await chooseFirstSelectOptionByTrigger(page, employee)
+    await chooseFirstSelectOptionByTrigger(page, pricelist)
 
     const name = smokeName("capture")
     await page.getByTestId("expenses-capture-name").fill(name)

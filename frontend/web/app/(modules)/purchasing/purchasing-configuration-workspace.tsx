@@ -13,6 +13,16 @@ import {
   type PurchasingConfigurationValues,
 } from "./purchasing-configuration"
 
+/** Radix Select cannot use "" as an item value; stands in for an unset optional reference. */
+const NONE_VALUE = "__none__"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
 type Row = EntityRow
 
 export interface PurchasingConfigurationWorkspaceProps {
@@ -118,20 +128,23 @@ function SelectField({
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
-      <select
-        id={id}
-        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
+      <Select
+        value={optional && value === "" ? NONE_VALUE : value}
+        onValueChange={(next) => onChange(next === NONE_VALUE ? "" : next)}
         required={!optional}
       >
-        <option value="">{optional ? t("purchasing.configuration.none", { defaultValue: "None" }) : t("purchasing.configuration.placeholders.select", { defaultValue: "Select {{label}}", label: label.toLowerCase() })}</option>
-        {rows.map((row) => (
-          <option key={rowId(row)} value={rowId(row)}>
-            {rowLabel(row, fallback)}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id={id}>
+          <SelectValue placeholder={t("purchasing.configuration.placeholders.select", { defaultValue: "Select {{label}}", label: label.toLowerCase() })} />
+        </SelectTrigger>
+        <SelectContent>
+          {optional ? <SelectItem value={NONE_VALUE}>{t("purchasing.configuration.none", { defaultValue: "None" })}</SelectItem> : null}
+          {rows.map((row) => (
+            <SelectItem key={rowId(row)} value={rowId(row)}>
+              {rowLabel(row, fallback)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   )
 }
@@ -259,16 +272,16 @@ export function PurchasingConfigurationWorkspace({
       <form className="space-y-4" onSubmit={submit}>
         <div className="space-y-1.5">
           <Label htmlFor="purchasing-configuration-kind">{t("purchasing.configuration.fields.type", { defaultValue: "Configuration type" })}</Label>
-          <select
-            id="purchasing-configuration-kind"
-            className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-            value={kind}
-            onChange={(event) => switchKind(event.target.value as PurchasingConfigurationKind)}
-          >
-            {(Object.keys(KIND_LABEL_KEYS) as PurchasingConfigurationKind[]).map((value) => (
-              <option key={value} value={value}>{kindLabel(value, t)}</option>
-            ))}
-          </select>
+          <Select value={kind} onValueChange={(value) => switchKind(value as PurchasingConfigurationKind)}>
+            <SelectTrigger id="purchasing-configuration-kind">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(KIND_LABEL_KEYS) as PurchasingConfigurationKind[]).map((value) => (
+                <SelectItem key={value} value={value}>{kindLabel(value, t)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {(kind === "contract" || kind === "consignment") ? (
@@ -300,7 +313,7 @@ export function PurchasingConfigurationWorkspace({
 
         {kind === "riskFlag" ? (
           <>
-            <div className="space-y-1.5"><Label htmlFor="purchasing-risk-level">{t("purchasing.configuration.fields.riskLevel", { defaultValue: "Risk level" })}</Label><select id="purchasing-risk-level" className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm" value={String(values.riskLevel ?? "medium")} onChange={(event) => setValue("riskLevel", event.target.value)}><option value="low">{t("purchasing.configuration.risk.low", { defaultValue: "Low" })}</option><option value="medium">{t("purchasing.configuration.risk.medium", { defaultValue: "Medium" })}</option><option value="high">{t("purchasing.configuration.risk.high", { defaultValue: "High" })}</option><option value="critical">{t("purchasing.configuration.risk.critical", { defaultValue: "Critical" })}</option></select></div>
+            <div className="space-y-1.5"><Label htmlFor="purchasing-risk-level">{t("purchasing.configuration.fields.riskLevel", { defaultValue: "Risk level" })}</Label><Select value={String(values.riskLevel ?? "medium")} onValueChange={(value) => setValue("riskLevel", value)}><SelectTrigger id="purchasing-risk-level"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">{t("purchasing.configuration.risk.low", { defaultValue: "Low" })}</SelectItem><SelectItem value="medium">{t("purchasing.configuration.risk.medium", { defaultValue: "Medium" })}</SelectItem><SelectItem value="high">{t("purchasing.configuration.risk.high", { defaultValue: "High" })}</SelectItem><SelectItem value="critical">{t("purchasing.configuration.risk.critical", { defaultValue: "Critical" })}</SelectItem></SelectContent></Select></div>
             <div className="space-y-1.5"><Label htmlFor="purchasing-risk-reason">{t("purchasing.configuration.fields.reason", { defaultValue: "Reason" })}</Label><Input id="purchasing-risk-reason" value={String(values.reason ?? "")} onChange={(event) => setValue("reason", event.target.value)} /></div>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={values.isFlagged === true} onChange={(event) => setValue("isFlagged", event.target.checked)} /> {t("purchasing.configuration.fields.vendorFlagged", { defaultValue: "Vendor is flagged" })}</label>
           </>

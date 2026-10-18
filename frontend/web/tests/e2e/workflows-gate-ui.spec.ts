@@ -12,6 +12,7 @@ import {
   activeTabEntityTable,
   assertModuleTabs,
   callReducerBff,
+  chooseSelectOptionByTriggerValue,
   expectNoAppError,
   fillField,
   gotoModule,
@@ -198,7 +199,7 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
     await expect(instanceRow).toBeVisible({ timeout: 30_000 })
     await instanceRow.click()
     await expect(page.getByTestId("workflow-row-dialog-instances")).toBeVisible()
-    await page.getByTestId("workflow-instance-signal-key").selectOption("complete")
+    await chooseSelectOptionByTriggerValue(page, page.getByTestId("workflow-instance-signal-key"), "complete")
 
     const signalSnapshotWait = page.waitForResponse(
       (res) => matchesOperationResponse(res, "request_workflow_subject_snapshot"),

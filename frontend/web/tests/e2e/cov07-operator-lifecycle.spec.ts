@@ -3,7 +3,7 @@ import { stdbBffCommandPost, type StdbBffCommandInput } from "@lumiere/stdb/comm
 import { resolveManufacturingMaterialEffect } from "@lumiere/query-hooks/hooks/manufacturing-material-consumption"
 import { resolveManufacturingFinishedEffect, type DestinationQuantSnapshot } from "@lumiere/query-hooks/hooks/manufacturing-production-close"
 import { locationOptionsFromQuantsAndTransfers, productRowsToSelectOptions, warehouseRowsToSelectOptions } from "../../lib/form-lookup"
-import { selectModuleTab, fetchDefaultCompanyId, fetchFirstWarehouseId, gotoModule, scalarQueryId, signIn, smokeName, submitForm } from "./helpers"
+import { chooseSelectOptionByTriggerValue, selectModuleTab, fetchDefaultCompanyId, fetchFirstWarehouseId, gotoModule, scalarQueryId, signIn, smokeName, submitForm } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 import { product as createProductFixture } from "./cov-scheduler-manufacturing-fixtures"
 import { createStockQuantFixture } from "./inventory-quant-fixtures"
@@ -135,7 +135,7 @@ test.describe("COV-07i one operator-created manufacturing lifecycle", { tag: ["@
       await operator.getByTestId("form-field-productQty").fill("1")
       await select(operator, "type", "Manufacture")
       await operator.getByTestId("bom-component-add").click()
-      await operator.getByTestId("bom-component-product-0").selectOption(String(componentId))
+      await chooseSelectOptionByTriggerValue(operator, operator.getByTestId("bom-component-product-0"), componentId)
       await operator.getByTestId("bom-component-quantity-0").fill("1")
       await submit(operator, "new-bom", "create_bom")
       let bomId = 0

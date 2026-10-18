@@ -27,14 +27,14 @@ test.describe("Owner reports e2e", { tag: "@dev-fixture" }, () => {
     return { date, timezone }
   }
 
-  test("catalog exposes all ten owner-report previews", async ({ page }) => {
+  test("catalog exposes all eleven owner-report previews", async ({ page }) => {
     const res = await page.request.get("/api/reports/catalog")
     expect(res.ok()).toBeTruthy()
     const catalog = (await res.json()) as {
       reports: Array<{ key: string; availability: string }>
     }
     const preview = catalog.reports.filter((entry) => entry.availability === "preview")
-    expect(preview).toHaveLength(10)
+    expect(preview).toHaveLength(11)
     expect(preview.map((entry) => entry.key).sort()).toEqual(
       [
         "cash_mobile_money_v1",
@@ -47,6 +47,7 @@ test.describe("Owner reports e2e", { tag: "@dev-fixture" }, () => {
         "purchase_spend_v1",
         "payment_fee_summary_v1",
         "monthly_owner_report_v1",
+        "margin_supply_outlook_v1",
       ].sort(),
     )
   })

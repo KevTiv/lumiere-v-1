@@ -28,6 +28,13 @@ import type {
   SimulateWorkflowParams,
 } from "@lumiere/stdb/types"
 import { instanceStateTag, versionStatusTag } from "@/lib/workflow-enum"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 function rowId(row: Record<string, unknown>): string {
   const v = row.id
@@ -421,20 +428,18 @@ export function WorkflowsRowDialog({
                   <p className="font-medium">Signal instance</p>
                   <div className="space-y-2">
                     <Label htmlFor="workflow-instance-signal-key">Signal</Label>
-                    <select
-                      id="workflow-instance-signal-key"
-                      className="flex h-9 w-full rounded-md border bg-background px-3 text-sm"
-                      value={signalKey}
-                      onChange={(event) => setSignalKey(event.target.value)}
-                      data-testid="workflow-instance-signal-key"
-                    >
-                      <option value="">Select signal…</option>
-                      {signalKeys.map((key) => (
-                        <option key={key} value={key}>
-                          {key}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={signalKey} onValueChange={setSignalKey}>
+                      <SelectTrigger id="workflow-instance-signal-key" data-testid="workflow-instance-signal-key">
+                        <SelectValue placeholder="Select signal…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {signalKeys.map((key) => (
+                          <SelectItem key={key} value={key}>
+                            {key}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <Button
                     size="sm"
@@ -466,22 +471,20 @@ export function WorkflowsRowDialog({
                   <p className="font-medium">Migrate instance</p>
                   <div className="space-y-2">
                     <Label htmlFor="mig-plan">Active plan id</Label>
-                    <select
-                      id="mig-plan"
-                      className="flex h-9 w-full rounded-md border bg-background px-3 text-sm"
-                      value={migratePlanId}
-                      onChange={(e) => setMigratePlanId(e.target.value)}
-                      data-testid="workflow-instance-migrate-plan"
-                    >
-                      <option value="">Select plan…</option>
-                      {activePlans.map((p) => (
-                        <option key={String(p.id)} value={String(p.id)}>
-                          #{String(p.id)} · wf {String(p.workflowId ?? p.workflow_id)} ·{" "}
-                          {String(p.sourceWorkflowVersionId ?? p.source_workflow_version_id)} →{" "}
-                          {String(p.targetWorkflowVersionId ?? p.target_workflow_version_id)}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={migratePlanId} onValueChange={setMigratePlanId}>
+                      <SelectTrigger id="mig-plan" data-testid="workflow-instance-migrate-plan">
+                        <SelectValue placeholder="Select plan…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activePlans.map((p) => (
+                          <SelectItem key={String(p.id)} value={String(p.id)}>
+                            #{String(p.id)} · wf {String(p.workflowId ?? p.workflow_id)} ·{" "}
+                            {String(p.sourceWorkflowVersionId ?? p.source_workflow_version_id)} →{" "}
+                            {String(p.targetWorkflowVersionId ?? p.target_workflow_version_id)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="mig-reason">Reason</Label>

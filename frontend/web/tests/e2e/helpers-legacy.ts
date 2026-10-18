@@ -1,7 +1,7 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { expect, type Page } from "@playwright/test"
+import { expect, type Locator, type Page } from "@playwright/test"
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
 import { matchesOperationResponse } from "./operation-response"
@@ -757,6 +757,50 @@ export async function chooseSelectOptionByLabel(
         return await option.count()
       },
       { timeout: optionTimeoutMs },
+    )
+    .toBeGreaterThan(0)
+
+  await option.click()
+}
+
+/** Pick a shared Select option by its value (`SelectItem` mirrors it as `data-value`). */
+export async function chooseSelectOptionByTriggerValue(
+  page: Page,
+  trigger: Locator,
+  value: string | number | bigint,
+) {
+  const listbox = page.locator('[role="listbox"]:visible')
+  const option = listbox.locator(`[role="option"][data-value="${String(value)}"]`)
+
+  await expect
+    .poll(
+      async () => {
+        if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
+        const count = await option.count()
+        if (count === 0) await page.keyboard.press("Escape")
+        return count
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+
+  await option.click()
+}
+
+/** Pick the first real option of a shared Select located by its trigger. */
+export async function chooseFirstSelectOptionByTrigger(page: Page, trigger: Locator) {
+  const listbox = page.locator('[role="listbox"]:visible')
+  const option = listbox.getByRole("option", { disabled: false }).first()
+
+  await expect
+    .poll(
+      async () => {
+        if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
+        const count = await option.count()
+        if (count === 0) await page.keyboard.press("Escape")
+        return count
+      },
+      { timeout: 30_000 },
     )
     .toBeGreaterThan(0)
 

@@ -134,6 +134,13 @@ import {
 } from "lucide-react"
 import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
 import { useOpenErpAiChat } from "@/lib/erp-ai-context"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { PivotExplorer } from "./pivot-explorer"
 import { VatReportPanel } from "./vat-report-panel"
 import { StatementsPanel } from "./statements-panel"
@@ -1384,23 +1391,27 @@ function ReportsClientLoaded({
               </div>
               {viewDashboard ? (
                 <div className="flex shrink-0 items-center gap-2">
-                  <select
-                    aria-label={t("reports.actions.dashboardTimeRange")}
-                    className="h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  <Select
                     value={viewDashboardRange}
-                    onChange={(event) =>
-                      setViewDashboardRange(
-                        event.target.value as "all" | "7d" | "30d" | "90d" | "ytd",
-                      )
+                    onValueChange={(value) =>
+                      setViewDashboardRange(value as "all" | "7d" | "30d" | "90d" | "ytd")
                     }
-                    data-testid="stored-dashboard-time-range"
                   >
-                    <option value="all">All time</option>
-                    <option value="7d">Last 7 days</option>
-                    <option value="30d">Last 30 days</option>
-                    <option value="90d">Last 90 days</option>
-                    <option value="ytd">Year to date</option>
-                  </select>
+                    <SelectTrigger
+                      aria-label={t("reports.actions.dashboardTimeRange")}
+                      className="h-9 w-[150px]"
+                      data-testid="stored-dashboard-time-range"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All time</SelectItem>
+                      <SelectItem value="7d">Last 7 days</SelectItem>
+                      <SelectItem value="30d">Last 30 days</SelectItem>
+                      <SelectItem value="90d">Last 90 days</SelectItem>
+                      <SelectItem value="ytd">Year to date</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button
                     type="button"
                     variant="outline"
