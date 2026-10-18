@@ -614,6 +614,10 @@
       "name": "claim_queue_job",
       "shape_fingerprint": "sha256:0a2536500c7b9a96fb8e4f2f37f32920c5afb4935bd2d8472e00cc529b67769d"
     },
+    "erp.claim_reviewed_mail_delivery": {
+      "name": "claim_reviewed_mail_delivery",
+      "shape_fingerprint": "sha256:cc6ab7d782d9fdece65d1c9137b801946d6da655f0b8cb27c3e19f990cb94eec"
+    },
     "erp.claim_workflow_human_task": {
       "name": "claim_workflow_human_task",
       "shape_fingerprint": "sha256:45865da0d02caf4813495a4fc64591435c7439605747517092022d5b45ea386a"
@@ -3092,7 +3096,7 @@
     },
     "erp.reconcile_account_bank_statement_line": {
       "name": "reconcile_account_bank_statement_line",
-      "shape_fingerprint": "sha256:208d7e38dd6533e0ba35f6c91a0192b4f0c46a112099faa38a01888f34986dbb"
+      "shape_fingerprint": "sha256:54966591ab3c66badf5ae08bfe59c0dd9430490e1a581a1f00a75ced60eb345b"
     },
     "erp.reconcile_ai_provider_attempt": {
       "name": "reconcile_ai_provider_attempt",
@@ -6056,6 +6060,14 @@
       "current_operations_fingerprint": "sha256:6e5694ae968ca8a791ca4f744c0028d7887742c0fa0ecbb5f9374198450797bf",
       "operation_count": 1452,
       "reason": "release on top of v0.3.109: add create_purchase_order_once, receive_po_line_once, run_purchasing_keyed_operations_test; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.120",
+      "previous_ir_sha256": "sha256:aa4c2a9d049b36e51aab0f30e5848e17e12cee9330e222f4402da430181e5d3b",
+      "previous_operations_fingerprint": "sha256:6e5694ae968ca8a791ca4f744c0028d7887742c0fa0ecbb5f9374198450797bf",
+      "current_operations_fingerprint": "sha256:98018ad367067fc5ed3f37c73949336ff211aea30d829c5fbfa2d162e6e70051",
+      "operation_count": 1453,
+      "reason": "Accounting alpha: add denied reviewed email dispatch claim and declare bank settlement resource invalidation; preserve existing public ABI"
     }
   ]
 }
