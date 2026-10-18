@@ -112,9 +112,27 @@ pub fn test_bank_statement_settlement_exact_effect(ctx: &ReducerContext) -> Resu
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org = fixture.organization_id;
     let company_id = fixture.company_id;
+    let ar_account_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("settlement AR account missing")?;
     let invoice_ids = [
-        create_balanced_customer_invoice(ctx, &fixture, 0.1, true)?,
-        create_balanced_customer_invoice(ctx, &fixture, 0.2, true)?,
+        create_balanced_customer_invoice_on_account(
+            ctx,
+            &fixture,
+            0.1,
+            ar_account_id,
+            "bank-settlement-decimal-first",
+            true,
+        )?,
+        create_balanced_customer_invoice_on_account(
+            ctx,
+            &fixture,
+            0.2,
+            ar_account_id,
+            "bank-settlement-decimal-second",
+            true,
+        )?,
     ];
     let (journal_id, liquidity_id) = seed_bank_journal(ctx, &fixture)?;
     create_account_bank_statement(
@@ -176,7 +194,11 @@ pub fn test_bank_statement_settlement_exact_effect(ctx: &ReducerContext) -> Resu
                 .account_move_line()
                 .move_line_by_move()
                 .filter(invoice_id)
-                .find(|row| row.account_internal_type.as_deref() == Some("receivable"))
+                .find(|row| {
+                    row.account_internal_type
+                        .as_deref()
+                        .is_some_and(|kind| kind.eq_ignore_ascii_case("receivable"))
+                })
                 .map(|row| row.id)
                 .ok_or("invoice receivable missing")
         })
@@ -343,7 +365,10 @@ pub fn test_bank_statement_settlement_exact_effect(ctx: &ReducerContext) -> Resu
         .iter()
         .any(|row| row.account_id == liquidity_id && row.debit == 0.3 && row.credit == 0.0)
         || posted_lines.iter().any(|row| {
-            row.account_internal_type.as_deref() == Some("receivable") && row.amount_residual != 0.0
+            row.account_internal_type
+                .as_deref()
+                .is_some_and(|kind| kind.eq_ignore_ascii_case("receivable"))
+                && row.amount_residual != 0.0
         })
         || invoice_ids.iter().any(|id| {
             ctx.db.account_move().id().find(id).is_none_or(|row| {
@@ -411,6 +436,13 @@ pub fn test_bank_statement_settlement_exact_effect(ctx: &ReducerContext) -> Resu
             metadata: None,
         },
     );
+    if !matches!(&reverse, Err(error) if error.contains("bank-linked payments require a dedicated bank settlement reversal"))
+    {
+        return Err(
+            "operational reversal did not reach the bank-ownership guard before mutation"
+                .to_string(),
+        );
+    }
     ctx.db.payment_transaction().id().delete(&operational.id);
     let edit = update_account_bank_statement_line(
         ctx,
@@ -496,7 +528,11 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
         .account_move_line()
         .move_line_by_move()
         .filter(&invoice_id)
-        .find(|row| row.account_internal_type.as_deref() == Some("receivable"))
+        .find(|row| {
+            row.account_internal_type
+                .as_deref()
+                .is_some_and(|kind| kind.eq_ignore_ascii_case("receivable"))
+        })
         .ok_or("last-cent target missing")?;
     let target_id = target.id;
     // Reproduce a residual persisted by the previous f64 allocation implementation.
