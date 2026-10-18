@@ -567,31 +567,29 @@ mod tests {
     use super::*;
     use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
     use jsonwebtoken::{encode, EncodingKey, Header};
-    use openssl::rsa::Rsa;
+    use rsa::{pkcs8::EncodePrivateKey, traits::PublicKeyParts, RsaPrivateKey};
     use serde_json::json;
-    use std::sync::LazyLock;
 
-    struct TestSigningKeys {
-        encoding: EncodingKey,
-        jwks: JwkSet,
+    fn test_signing_key() -> &'static (EncodingKey, JwkSet) {
+        static KEY: std::sync::OnceLock<(EncodingKey, JwkSet)> = std::sync::OnceLock::new();
+        KEY.get_or_init(|| {
+            let key = RsaPrivateKey::new(&mut rand::thread_rng(), 2048)
+                .expect("generate ephemeral test key");
+            let pem = key
+                .to_pkcs8_pem(rsa::pkcs8::LineEnding::LF)
+                .expect("encode test key");
+            let jwks = serde_json::from_value(json!({"keys":[{
+                "kty":"RSA", "kid":"test-key", "alg":"RS256", "use":"sig",
+                "n":URL_SAFE_NO_PAD.encode(key.n().to_bytes_be()),
+                "e":URL_SAFE_NO_PAD.encode(key.e().to_bytes_be()),
+            }]}))
+            .expect("ephemeral test JWKS");
+            (
+                EncodingKey::from_rsa_pem(pem.as_bytes()).expect("test encoding key"),
+                jwks,
+            )
+        })
     }
-
-    // Test-only trust roots are generated in memory, never committed or written
-    // to disk. This reuses the OpenSSL library already in the API dependency tree.
-    static SIGNING_KEYS: LazyLock<TestSigningKeys> = LazyLock::new(|| {
-        let rsa = Rsa::generate(2048).expect("ephemeral test RSA key");
-        let pem = rsa
-            .private_key_to_pem()
-            .expect("ephemeral test RSA encoding");
-        let encoding = EncodingKey::from_rsa_pem(&pem).expect("generated RSA signing key");
-        let jwks = serde_json::from_value(json!({"keys": [{
-            "kty": "RSA", "kid": "test-key", "use": "sig", "alg": "RS256",
-            "n": URL_SAFE_NO_PAD.encode(rsa.n().to_vec()),
-            "e": URL_SAFE_NO_PAD.encode(rsa.e().to_vec())
-        }]}))
-        .expect("ephemeral test JWKS");
-        TestSigningKeys { encoding, jwks }
-    });
     fn config() -> WorkosAuthConfig {
         WorkosAuthConfig {
             client_id: "client_test".into(),
@@ -617,17 +615,17 @@ mod tests {
     fn token(claims: &serde_json::Value, kid: &str) -> String {
         let mut header = Header::new(Algorithm::RS256);
         header.kid = Some(kid.into());
-        encode(&header, claims, &SIGNING_KEYS.encoding).unwrap()
+        encode(&header, claims, &test_signing_key().0).unwrap()
     }
     #[test]
     fn only_trusted_current_rsa_tokens_are_accepted() {
         let config = config();
-        let keys = &SIGNING_KEYS.jwks;
+        let keys = test_signing_key().1.clone();
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        assert!(verify_claims(&token(&claims(), "test-key"), keys, &config, now).is_ok());
+        assert!(verify_claims(&token(&claims(), "test-key"), &keys, &config, now).is_ok());
         for (name, value) in [
             ("iss", json!("https://attacker.test")),
             ("exp", json!(now - 1)),
@@ -640,21 +638,21 @@ mod tests {
             let mut c = claims();
             c[name] = value;
             assert!(
-                verify_claims(&token(&c, "test-key"), keys, &config, now).is_err(),
+                verify_claims(&token(&c, "test-key"), &keys, &config, now).is_err(),
                 "{name}"
             );
         }
-        assert!(verify_claims(&token(&claims(), "unknown-key"), keys, &config, now).is_err());
+        assert!(verify_claims(&token(&claims(), "unknown-key"), &keys, &config, now).is_err());
         let hs = encode(
             &Header::default(),
             &claims(),
             &EncodingKey::from_secret(b"test"),
         )
         .unwrap();
-        assert!(verify_claims(&hs, keys, &config, now).is_err());
+        assert!(verify_claims(&hs, &keys, &config, now).is_err());
         let mut long = claims();
         long["exp"] = json!(now + 3601);
-        assert!(verify_claims(&token(&long, "test-key"), keys, &config, now).is_err());
+        assert!(verify_claims(&token(&long, "test-key"), &keys, &config, now).is_err());
     }
     #[test]
     fn admission_requires_exact_verified_subject_email_and_organization() {

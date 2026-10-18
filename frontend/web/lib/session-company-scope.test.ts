@@ -17,11 +17,11 @@ const companies = [
 
 test("organization admins may select every organization company", () => {
   assert.deepEqual(
-    resolveSessionCompanyIds({ companies, membershipCompanyId: 3, roleNames: ["Admin"] }),
+    resolveSessionCompanyIds({ companies, membershipCompanyId: 3, roleNames: ["Admin"], organizationWideAccess: true }),
     [3, 5, 9],
   )
   assert.deepEqual(
-    resolveSessionCompanyIds({ companies, membershipCompanyId: 3, roleNames: ["organization-admin"] }),
+    resolveSessionCompanyIds({ companies, membershipCompanyId: 3, roleNames: ["organization-admin"], organizationWideAccess: true }),
     [3, 5, 9],
   )
 })
@@ -110,4 +110,8 @@ test("policy snapshot refreshes when authority expired after its generation", ()
   assert.equal(sessionPolicySnapshotNeedsRefresh({ assignments, refreshedAt: 100, nowMicros: 149 }), false)
   assert.equal(sessionPolicySnapshotNeedsRefresh({ assignments, refreshedAt: 100, nowMicros: 150 }), true)
   assert.equal(sessionPolicySnapshotNeedsRefresh({ assignments, refreshedAt: 200, nowMicros: 250 }), false)
+})
+
+test("an administrator role name alone never expands company access", () => {
+  assert.deepEqual(resolveSessionCompanyIds({ companies, membershipCompanyId: 9, roleNames: ["Admin"] }), [9])
 })

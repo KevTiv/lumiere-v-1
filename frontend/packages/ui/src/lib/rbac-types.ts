@@ -94,6 +94,7 @@ export interface BackendRoleRow {
 
 // User with role assignments
 export interface User {
+  isSuperuser?: boolean
   id: string
   email: string
   name: string

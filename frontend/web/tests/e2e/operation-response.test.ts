@@ -73,3 +73,12 @@ test("fault injection resolves names and legacy URLs to immutable operations", (
   assert.equal(matchesOperationFaultTarget(new URL(`${url}/extra`), url.pathname), false)
   assert.equal(matchesOperationFaultTarget(new URL("http://localhost/api/compat/reducer/confirm_sales_order"), "confirm_sales_order"), true)
 })
+
+
+test("matches an exact immutable member access operation", () => {
+  for (const prefix of ["/api", "/v1"]) {
+    assert.equal(matchesOperationResponse(response(`${prefix}/operations/erp.set_member_access`), "erp.set_member_access"), true)
+    assert.equal(matchesOperationResponse(response(`${prefix}/operations/erp.set_member_access/extra`), "erp.set_member_access"), false)
+    assert.equal(matchesOperationResponse(response(`${prefix}/operations/erp.assign_role`), "erp.set_member_access"), false)
+  }
+})

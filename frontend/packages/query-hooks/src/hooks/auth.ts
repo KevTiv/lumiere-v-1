@@ -272,6 +272,7 @@ export type SettingsUserRecord = {
   id: string
   userOrgId: string | null
   primaryRoleId: string
+  accessRevision?: string
   name: string
   email: string
   department?: string
@@ -436,6 +437,8 @@ export function mapSettingsUsers(
       id: identity,
       userOrgId: userOrgIdRaw != null ? scalarIdString(userOrgIdRaw) : null,
       primaryRoleId,
+      accessRevision: pickField(profile, 'accessRevision', 'access_revision') == null ? undefined
+        : scalarIdString(pickField(profile, 'accessRevision', 'access_revision')),
       name: String(pickField(profile, 'name') ?? ''),
       email: String(pickField(profile, 'email') ?? ''),
       department,
@@ -490,6 +493,18 @@ export function useUserOrganizations(organizationId: bigint) {
   })
 }
 
+type SettingsMembershipProjection = {
+  id?: unknown
+  userIdentity?: unknown
+  user_identity?: unknown
+  roleId?: unknown
+  role_id?: unknown
+  isActive?: unknown
+  is_active?: unknown
+  jobTitle?: unknown
+  job_title?: unknown
+}
+
 export function useSettingsUsers(organizationId: bigint, search?: string) {
   const searchTerm = search?.trim() ?? ''
   return useQuery<SettingsUserRecord[]>({
@@ -501,7 +516,7 @@ export function useSettingsUsers(organizationId: bigint, search?: string) {
       const profiles = await collectSettingsRows((offset, limit) => fetchSettingsList(
         `/api/settings/users?limit=${limit}&offset=${offset}${searchQuery}`, 'Failed to fetch settings users',
       ))
-      const memberships = profiles.flatMap(row => row.membership && typeof row.membership === 'object' ? [row.membership as Partial<UserOrganization>] : [])
+      const memberships = profiles.flatMap(row => row.membership && typeof row.membership === 'object' ? [row.membership as SettingsMembershipProjection] : [])
       const assignments = profiles.flatMap(row => Array.isArray(row.roleAssignments) ? row.roleAssignments as QueryRows : [])
       return mapSettingsUsers(profiles, memberships, assignments)
     },
@@ -568,6 +583,7 @@ export function useSetMemberAccess(organizationId: bigint) {
     user: SettingsUserRecord; primaryRoleId: string; roleIds: string[]; isActive: boolean; jobTitle?: string
   }>({
     mutationFn: async ({ user, primaryRoleId, roleIds, isActive, jobTitle }) => {
+      if (user.accessRevision == null) throw new Error('Reload users before changing member access')
       await dispatchNamedOperation('set_member_access', {
         userIdentity: encodeIdentity(user.id),
         params: stdbParamsToJson({
@@ -575,6 +591,7 @@ export function useSetMemberAccess(organizationId: bigint) {
           additional_role_ids: roleIds.filter(id => id !== primaryRoleId).map(toScalarU64),
           expected_primary_role_id: toScalarU64(user.primaryRoleId),
           expected_role_ids: user.roles.map(toScalarU64),
+          expected_access_revision: toScalarU64(user.accessRevision),
           expected_is_active: user.status === 'active', is_active: isActive,
           job_title: jobTitle ?? null,
         }, 'SetMemberAccessParams'),

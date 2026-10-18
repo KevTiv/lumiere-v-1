@@ -15,7 +15,7 @@ use crate::core::organization::{
     company, create_company, insert_organization_with_owner, organization, CreateCompanyParams,
     CreateOrganizationParams,
 };
-use crate::core::permissions::{effective_roles, policy_snapshot};
+use crate::core::permissions::policy_snapshot;
 use crate::core::persistence::{
     organization_commit, organization_commit_cursor, organization_row_change,
 };
@@ -24,8 +24,8 @@ use crate::core::reference::{
     CreateCountryParams, CreateCurrencyParams,
 };
 use crate::core::users::{
-    add_user_to_organization, ensure_user_profile_for_organization, remove_user_from_organization,
-    user_organization, user_profile, AddUserToOrganizationParams, UserOrganization,
+    ensure_user_profile_for_organization, remove_user_from_organization, user_organization,
+    user_profile, UserOrganization,
 };
 use crate::crm::contact_identities::{
     configure_contact_identity_verification_authority, contact_identity_verification_authority,
@@ -331,13 +331,6 @@ pub fn test_adversarial_tenant_command_matrix(ctx: &ReducerContext) -> Result<()
     // This is intentionally last: the native harness cannot invoke a reducer
     // as a different Identity, but it can prove the same actor loses access
     // immediately after its membership is deactivated.
-    let owner_membership = ctx
-        .db
-        .user_organization()
-        .user_org_by_user()
-        .filter(&ctx.sender())
-        .find(|row| row.organization_id == org_b && row.is_active)
-        .ok_or("C9 active owner membership missing")?;
     let access_snapshot = || -> Result<String, String> {
         let mut tables = serde_json::Map::new();
         macro_rules! capture {
@@ -379,26 +372,7 @@ pub fn test_adversarial_tenant_command_matrix(ctx: &ReducerContext) -> Result<()
         return Err("Rejected last-admin removal changed membership, profile, audit, policy or commit state".into());
     }
 
-    let backup_identity = spacetimedb::Identity::from_byte_array(ctx.rng().gen::<[u8; 32]>());
-    add_user_to_organization(
-        ctx,
-        backup_identity,
-        org_b,
-        AddUserToOrganizationParams {
-            role_id: owner_membership.role_id,
-            company_id: None,
-            department_id: None,
-            job_title: Some("C9 backup administrator".into()),
-            employee_id: None,
-            is_active: true,
-            is_default: false,
-            metadata: Some(r#"{"c9_fixture":"backup_admin"}"#.into()),
-        },
-    )?;
-    let backup_roles = effective_roles(ctx, org_b, backup_identity)?;
-    if !crate::core::access_lifecycle::member_is_admin(ctx, org_b, backup_identity, &backup_roles) {
-        return Err("C9 backup identity is not an effective active administrator".into());
-    }
+    foreign.seed_additional_admin(ctx)?;
     remove_user_from_organization(ctx, ctx.sender(), org_b)?;
     let before_inactive_actor = access_snapshot()?;
     let inactive_actor = create_company(

@@ -1,5 +1,7 @@
 "use client"
 
+import { useWorkOsAuthMode } from "@/lib/auth-mode-context"
+
 import { useMemo, useState } from "react"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useTranslation, i18n } from "@lumiere/i18n"
@@ -749,6 +751,7 @@ function SettingsLoaded({
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   useSettingsModuleSubscription()
   const { orgId } = orgBigInts(organizationId)
+  const hostedAuth = useWorkOsAuthMode()
   const [activeAction, setActiveAction] = useState<SettingsAction | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -1072,7 +1075,7 @@ function SettingsLoaded({
     INTEGRATION_SETTINGS_ACTIONS.includes(action.id),
   )
   const adminActions = actions.filter(
-    (action) => !INTEGRATION_SETTINGS_ACTIONS.includes(action.id),
+    (action) => !INTEGRATION_SETTINGS_ACTIONS.includes(action.id) && !(hostedAuth && action.id === "updateEmail"),
   )
 
   const openAction = (id: SettingsAction) => {

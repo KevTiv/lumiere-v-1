@@ -41,6 +41,8 @@ export interface FieldAccessContext {
   rolePermissions: readonly string[]
   identityHex: string
   fieldPermissions: ReadonlyArray<FieldPermissionLike>
+  roleIds?: readonly number[]
+  orgPermissions?: ReadonlyArray<{ resource: string; action: string; allow: boolean }>
 }
 
 export function assertSafeSqlIdentifiers(cols: string[]): string[] {
@@ -104,7 +106,7 @@ function hasModulePermission(
 
 function fieldPermissionApplies(rule: FieldPermissionLike, ctx: FieldAccessContext): boolean {
   const subjectRoleId = rule.subjectRoleId ?? rule.subject_role_id
-  if (subjectRoleId != null && Number(subjectRoleId) === ctx.roleId) {
+  if (subjectRoleId != null && (Number(subjectRoleId) === ctx.roleId || ctx.roleIds?.includes(Number(subjectRoleId)))) {
     return true
   }
 

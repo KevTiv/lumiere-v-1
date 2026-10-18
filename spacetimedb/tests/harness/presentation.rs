@@ -2,7 +2,6 @@
 
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use spacetimedb::rand::Rng;
 use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::ai::evidence_lineage::{
@@ -11,14 +10,10 @@ use crate::ai::evidence_lineage::{
     RecordAiEvidenceDecisionParams, ReviewAiEvidenceDecisionParams,
 };
 use crate::core::audit::audit_log;
-use crate::core::permissions::effective_roles;
 use crate::core::persistence::{
     organization_commit, organization_commit_cursor, organization_row_change,
 };
-use crate::core::users::{
-    add_user_to_organization, remove_user_from_organization, user_organization,
-    AddUserToOrganizationParams,
-};
+use crate::core::users::{remove_user_from_organization, user_organization};
 use crate::presentation::{
     presentation_module, presentation_module_version, save_presentation_module, PresentationModule,
 };
@@ -489,40 +484,7 @@ pub fn test_presentation_module_rejects_inactive_cross_org_actor(
 ) -> Result<(), String> {
     let owner = OrgFixture::seed_minimal(ctx)?;
     let other = OrgFixture::seed_minimal(ctx)?;
-    // Deactivate this actor through the public reducer without violating the
-    // invariant that every organization retains an effective administrator.
-    let owner_membership = ctx
-        .db
-        .user_organization()
-        .user_org_by_user()
-        .filter(&ctx.sender())
-        .find(|row| row.organization_id == other.organization_id && row.is_active)
-        .ok_or("presentation isolation fixture owner membership missing")?;
-    let backup_identity = Identity::from_byte_array(ctx.rng().gen::<[u8; 32]>());
-    add_user_to_organization(
-        ctx,
-        backup_identity,
-        other.organization_id,
-        AddUserToOrganizationParams {
-            role_id: owner_membership.role_id,
-            company_id: None,
-            department_id: None,
-            job_title: Some("Presentation isolation backup administrator".into()),
-            employee_id: None,
-            is_active: true,
-            is_default: false,
-            metadata: None,
-        },
-    )?;
-    let backup_roles = effective_roles(ctx, other.organization_id, backup_identity)?;
-    if !crate::core::access_lifecycle::member_is_admin(
-        ctx,
-        other.organization_id,
-        backup_identity,
-        &backup_roles,
-    ) {
-        return Err("presentation isolation backup is not an effective administrator".into());
-    }
+    other.seed_additional_admin(ctx)?;
     remove_user_from_organization(ctx, ctx.sender(), other.organization_id)?;
     if ctx
         .db

@@ -454,6 +454,11 @@ pub fn session_read_resource(resource: &str) -> bool {
             | "states"
             | "uoms"
             | "uom-categories"
+            | "form-configs"
+            | "form-config-fields"
+            | "form-role-configs"
+            | "form-field-labels"
+            | "user-custom-fields"
     )
 }
 
@@ -1001,6 +1006,22 @@ mod tests {
             field_permissions: Vec::new(),
             role_ids: Vec::new(),
             org_permissions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn payroll_read_uses_the_declared_payslip_alias_and_still_honors_denies() {
+        for resource in ["payslips", "payslips-to-export"] {
+            let mut access = field_access(&["hr_payroll:read"]);
+            assert!(has_resource_read_permission(Some(&access), resource));
+            access.org_permissions.push(ActionPermission {
+                resource: "hr_payslip".into(),
+                action: "read".into(),
+                allow: false,
+            });
+            assert!(!has_resource_read_permission(Some(&access), resource));
+            let access = field_access(&["hr_payroll:confirm"]);
+            assert!(!has_resource_read_permission(Some(&access), resource));
         }
     }
 

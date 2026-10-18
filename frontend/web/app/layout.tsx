@@ -87,6 +87,7 @@ export default async function RootLayout({
         companies: validCompanies,
         membershipCompanyId,
         roleNames: serverRoleNames,
+        organizationWideAccess: Boolean(session.fieldAccess?.isSuperuser || session.fieldAccess?.rolePermissions.includes("*:*")),
       })
       companyIds = allowedCompanyIds.length === 0 ? undefined : allowedCompanyIds
     }

@@ -15,6 +15,7 @@ export default function NativeAcceptInvitePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get("token")
+  const inviteErr = searchParams.get("inviteErr")
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")

@@ -293,31 +293,30 @@ impl Drop for MockStdb {
 }
 
 async fn mock_stdb(replies: Vec<Reply>) -> MockStdb {
-    // An active company-bound membership must also pass the persisted role
-    // checks. No administrative role is granted by these hostile-scope fixtures.
-    let replies: Vec<_> = replies
-        .into_iter()
-        .flat_map(|reply| {
-            let has_membership = reply.body_contains == "FROM user_organization"
-                && reply.response[0]["rows"]
-                    .as_array()
-                    .is_some_and(|rows| !rows.is_empty());
-            let mut expanded = vec![reply];
-            if has_membership {
-                expanded.extend([
-                    sql_reply("SELECT role_id FROM user_organization", &[]),
-                    sql_reply("FROM user_role_assignment", &[]),
-                    sql_reply("FROM role", &[]),
-                ]);
-            }
-            expanded
-        })
-        .collect();
     async fn respond(
         State(replies): State<Replies>,
         uri: Uri,
         body: String,
     ) -> (StatusCode, String) {
+        // Resolve the same current, non-owner company scope as a real session.
+        let authority_rows = if body.starts_with("SELECT role_id FROM user_organization") {
+            Some(vec![json!({"role_id": 9})])
+        } else if body.starts_with("SELECT role_id, expires_at FROM user_role_assignment") {
+            Some(vec![])
+        } else if body.starts_with("SELECT id, name, permissions, is_active FROM role") {
+            Some(vec![
+                json!({"id":9,"name":"hr-test","permissions":[],"is_active":true}),
+            ])
+        } else {
+            None
+        };
+        if let Some(rows) = authority_rows {
+            assert!(body.contains("organization_id = 3"));
+            if !body.contains(" FROM role ") {
+                assert!(body.contains(&format!("user_identity = 0x{}", actor())));
+            }
+            return (StatusCode::OK, sql_reply("", &rows).response.to_string());
+        }
         let reply = replies
             .lock()
             .await

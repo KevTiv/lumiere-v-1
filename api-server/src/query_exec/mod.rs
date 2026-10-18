@@ -674,6 +674,38 @@ mod tests {
     }
 
     #[test]
+    fn runtime_form_metadata_reads_require_the_active_tenant_context_and_honor_denies() {
+        let identity = "ab".repeat(32);
+        let mut access = authoritative_access("organization:read");
+        access.identity_hex = identity.clone();
+        for resource in [
+            "form-configs",
+            "form-config-fields",
+            "form-role-configs",
+            "form-field-labels",
+            "user-custom-fields",
+        ] {
+            assert!(
+                require_ui_child_read_permission(resource, 42, &identity, Some(&access)).is_ok()
+            );
+            assert!(
+                require_ui_child_read_permission(resource, 43, &identity, Some(&access)).is_err()
+            );
+            assert!(require_ui_child_read_permission(resource, 42, &identity, None).is_err());
+            let mut denied = access.clone();
+            denied.org_permissions.push(stdb_auth::ActionPermission {
+                resource: resource.into(),
+                action: "read".into(),
+                allow: false,
+            });
+            assert!(
+                require_ui_child_read_permission(resource, 42, &identity, Some(&denied)).is_err()
+            );
+        }
+        assert!(require_ui_child_read_permission("leads", 42, &identity, Some(&access)).is_err());
+    }
+
+    #[test]
     fn ui_child_reads_reuse_domain_permissions_without_accepting_write_grants() {
         let identity = "ab".repeat(32);
         for (resource, grant) in [

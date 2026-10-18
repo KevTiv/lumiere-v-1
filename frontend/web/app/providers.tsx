@@ -2,8 +2,8 @@
 
 import { NavigationGuardProvider } from "@lumiere/ui"
 
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query"
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { QueryClient, QueryClientProvider, useQueryClient, useQuery } from "@tanstack/react-query"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { I18nProvider } from "@lumiere/i18n"
 import {
   RBACProvider,
@@ -12,15 +12,11 @@ import {
   type User,
   type Role,
   type PolicyRule,
-  type BackendRoleRow,
   mapBackendRolesToRoles,
-  buildRbacUserFromServer,
-  permissionStringsToPolicyRules,
 } from "@lumiere/ui"
 import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
 import { LumiereApiProvider } from "@lumiere/api-client"
-import { useStdbQuery, useStdbReducer, realtimeQueryKeysForResource } from "@lumiere/query-hooks/hooks/stdb"
-import { usePolicySnapshot } from "@/lib/use-policy-snapshot"
+import { useStdbReducer, realtimeQueryKeysForResource } from "@lumiere/query-hooks/hooks/stdb"
 import { useLumiereRealtime } from "@lumiere/query-hooks/hooks/realtime"
 import type { FieldAccessContext } from "@lumiere/stdb/field-policy"
 import {
@@ -32,129 +28,54 @@ import { useStdbConnection } from "@lumiere/stdb"
 import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 import { webApi } from "@/lib/lumiere-web-http"
 import { PostHogPageView } from "@/lib/posthog-pageview"
-import { sessionPolicySnapshotNeedsRefresh } from "@/lib/session-company-scope"
+import { apiFetch } from "@/lib/api-fetch"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
 function RBACBridge({
   children,
   serverIdentity,
-  serverRoleIds,
-  serverPermissions,
   organizationId,
-  authorityUnavailable,
-  onAuthorityUnavailable,
 }: {
   children: React.ReactNode
   serverIdentity?: string
-  serverRoleIds?: readonly number[]
-  serverPermissions?: readonly string[]
   organizationId?: number
-  authorityUnavailable: boolean
-  onAuthorityUnavailable: () => void
 }) {
   const hasIdentity = Boolean(serverIdentity && serverIdentity !== "unknown")
-  const { data: rolesData = [], isLoading: rolesLoading } = useStdbQuery("roles", 0, {
-    enabled: hasIdentity,
+  const accessQuery = useQuery({
+    queryKey: ['auth-access', organizationId, serverIdentity],
+    enabled: hasIdentity && Boolean(organizationId),
+    queryFn: async () => {
+      const response = await apiFetch('/api/session/field-access')
+      if (!response.ok) throw new Error('Unable to resolve current permissions')
+      const result = await response.json() as { identityHex: string; organizationId?: number; fieldAccess?: FieldAccessContext }
+      if (result.identityHex !== serverIdentity || result.organizationId !== organizationId || !result.fieldAccess) {
+        throw new Error('Session identity or organization changed')
+      }
+      return result.fieldAccess
+    },
+    staleTime: 0,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: 'always',
+    retry: false,
   })
-  const { data: assignmentsData = [], isLoading: assignmentsLoading } = useStdbQuery(
-    "user-roles",
-    organizationId ?? 0,
-    { enabled: hasIdentity && organizationId != null && organizationId > 0 },
-  )
-  const { data: membershipsData = [], isLoading: membershipsLoading } = useStdbQuery(
-    "user-organization",
-    organizationId ?? 0,
-    { enabled: hasIdentity && organizationId != null && organizationId > 0 },
-  )
-  const assignmentSignature = useMemo(() => JSON.stringify(
-    assignmentsData,
-    (_key, value) => typeof value === "bigint" ? value.toString() : value,
-  ), [assignmentsData])
-  const initialAssignmentSignature = useRef<string | null>(null)
-  useEffect(() => {
-    if (assignmentsLoading) return
-    if (initialAssignmentSignature.current == null) {
-      initialAssignmentSignature.current = assignmentSignature
-      return
-    }
-    if (initialAssignmentSignature.current !== assignmentSignature) window.location.reload()
-  }, [assignmentSignature, assignmentsLoading])
-  const membershipSignature = useMemo(() => JSON.stringify(
-    membershipsData,
-    (_key, value) => typeof value === "bigint" ? value.toString() : value,
-  ), [membershipsData])
-  const initialMembershipSignature = useRef<string | null>(null)
-  useEffect(() => {
-    if (membershipsLoading) return
-    if (initialMembershipSignature.current == null) {
-      initialMembershipSignature.current = membershipSignature
-      return
-    }
-    if (initialMembershipSignature.current !== membershipSignature) window.location.reload()
-  }, [membershipSignature, membershipsLoading])
-
-  const {
-    orgPolicyRules,
-    snapshot,
-    versionHash,
-    isLoading: policiesLoading,
-  } = usePolicySnapshot(organizationId, serverIdentity)
-  const snapshotRefreshedAt = snapshot?.refreshedAt
-  const snapshotSignature = useMemo(() => JSON.stringify(
-    [versionHash, snapshotRefreshedAt],
-    (_key, value) => typeof value === "bigint" ? value.toString() : value,
-  ), [versionHash, snapshotRefreshedAt])
-  const initialSnapshotSignature = useRef<string | null>(null)
-  useEffect(() => {
-    if (policiesLoading) return
-    if (initialSnapshotSignature.current == null) {
-      initialSnapshotSignature.current = snapshotSignature
-      return
-    }
-    if (initialSnapshotSignature.current !== snapshotSignature) window.location.reload()
-  }, [policiesLoading, snapshotSignature])
-
-  const { mutate: refreshExpiredSnapshot } = useStdbReducer("refresh_policy_snapshot")
-  const expiredSnapshotRefreshStarted = useRef(false)
-  const snapshotNeedsRefresh = useMemo(() => sessionPolicySnapshotNeedsRefresh({
-    assignments: assignmentsData,
-    refreshedAt: snapshotRefreshedAt,
-  }), [assignmentsData, snapshotRefreshedAt])
-  useEffect(() => {
-    if (assignmentsLoading || policiesLoading || !snapshotNeedsRefresh) return
-    if (expiredSnapshotRefreshStarted.current) return
-    expiredSnapshotRefreshStarted.current = true
-    refreshExpiredSnapshot({}, {
-      onSuccess: () => window.location.reload(),
-      onError: onAuthorityUnavailable,
-    })
-  }, [assignmentsLoading, onAuthorityUnavailable, policiesLoading, refreshExpiredSnapshot, snapshotNeedsRefresh])
-
-  const rbacRoles = useMemo<Role[]>(() => {
-    return mapBackendRolesToRoles(rolesData as unknown as BackendRoleRow[])
-  }, [rolesData])
-
-  const rbacUser = useMemo<User | null>(() => {
-    return buildRbacUserFromServer(rbacRoles, serverRoleIds, serverIdentity)
-  }, [serverIdentity, serverRoleIds, rbacRoles])
-
-  const mergedPolicies = useMemo<PolicyRule[]>(() => {
-    const rolePolicies = rbacRoles.flatMap((role) =>
-      rbacUser?.roles.includes(role.id) ? role.permissions : [],
-    )
-    const effectiveRolePolicies = rbacUser
-      ? permissionStringsToPolicyRules(rbacUser.id, serverPermissions ?? [])
-      : []
-    return [...rolePolicies, ...effectiveRolePolicies, ...orgPolicyRules]
-  }, [rbacRoles, rbacUser, serverPermissions, orgPolicyRules])
-
+  const access = accessQuery.isError ? undefined : accessQuery.data
+  const rbacRoles = useMemo<Role[]>(() => access ? mapBackendRolesToRoles([{
+    id: '__effective_access__', name: 'Effective permissions', isActive: true,
+    permissions: [...access.rolePermissions],
+  }]) : [], [access])
+  const rbacUser = useMemo<User | null>(() => access && serverIdentity ? {
+    id: serverIdentity, email: '', name: '', roles: ['__effective_access__', ...(access.roleIds ?? [access.roleId]).map(String)],
+    status: 'active', department: '', isSuperuser: access.isSuperuser,
+    lastLogin: '', createdAt: '', updatedAt: '',
+  } : null, [access, serverIdentity])
+  const policies = useMemo<PolicyRule[]>(() => (access?.orgPermissions ?? []).map((grant, index) => ({
+    id: `effective-grant-${index}`, subject: serverIdentity ?? '', resource: grant.resource,
+    action: (grant.action === 'all' ? '*' : grant.action) as PolicyRule['action'],
+    effect: grant.allow ? 'allow' : 'deny',
+  })), [access, serverIdentity])
   return (
-    <RBACProvider
-      initialUser={hasIdentity && !authorityUnavailable ? rbacUser : null}
-      initialRoles={hasIdentity ? rbacRoles : undefined}
-      initialPolicies={hasIdentity && !authorityUnavailable ? mergedPolicies : []}
-      permissionsReady={!hasIdentity || !(rolesLoading || assignmentsLoading || membershipsLoading || policiesLoading)}
-    >
+    <RBACProvider initialUser={rbacUser} initialRoles={rbacRoles} initialPolicies={policies}
+      permissionsReady={!hasIdentity || Boolean(access)}>
       {children}
     </RBACProvider>
   )
@@ -253,7 +174,6 @@ export function Providers({
   children,
   serverIdentity,
   serverRoleNames,
-  serverRoleIds,
   authorityExpiresAtMicros,
   organizationId,
   companyIds,
@@ -309,11 +229,7 @@ export function Providers({
                   />
                   <RBACBridge
                     serverIdentity={serverIdentity}
-                    serverRoleIds={serverRoleIds}
-                    serverPermissions={fieldAccess?.rolePermissions}
                     organizationId={organizationId}
-                    authorityUnavailable={authorityUnavailable}
-                    onAuthorityUnavailable={markAuthorityUnavailable}
                   >
                     <NavigationGuardProvider>{children}</NavigationGuardProvider>
                   </RBACBridge>

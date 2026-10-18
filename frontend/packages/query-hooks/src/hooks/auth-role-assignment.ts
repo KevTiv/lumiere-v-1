@@ -22,7 +22,11 @@ export function roleAssignmentIsCurrent(row: RoleAssignmentProjection, nowMicros
   if (expiry == null) return true
   const micros = (value: unknown): bigint | null => {
     if (value && typeof value === 'object') {
-      const record = value as { __timestamp_micros_since_unix_epoch__?: unknown; microsSinceUnixEpoch?: unknown; some?: unknown }
+      const record = value as {
+        __timestamp_micros_since_unix_epoch__?: unknown
+        microsSinceUnixEpoch?: unknown
+        some?: unknown
+      }
       return micros(record.__timestamp_micros_since_unix_epoch__ ?? record.microsSinceUnixEpoch ?? record.some)
     }
     try { return typeof value === 'number' && !Number.isSafeInteger(value) ? null : BigInt(String(value)) } catch { return null }
