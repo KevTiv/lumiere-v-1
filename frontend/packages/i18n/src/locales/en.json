@@ -14489,5 +14489,46 @@
         "shelf": "Shelf"
       }
     }
+  },
+  "workspace": {
+    "myWork": "My work",
+    "viewAll": "View all",
+    "sections": {
+      "today": "Today",
+      "projects": "Projects in flight"
+    },
+    "widgets": {
+      "todayTasks": "My tasks",
+      "calendar": "Calendar",
+      "projects": "Project progress",
+      "notes": "Recent notes",
+      "quickActions": "Quick actions"
+    },
+    "todayTasks": {
+      "empty": "Nothing due. Enjoy the calm.",
+      "toggle": "Mark {{title}} done",
+      "today": "Today"
+    },
+    "projects": {
+      "empty": "No active projects",
+      "progress": "{{name}} progress",
+      "openTasks": "{{open}} open of {{total}}",
+      "due": "due {{date}}"
+    },
+    "calendar": {
+      "nothing": "Nothing scheduled",
+      "event": "Event",
+      "deadline": "Task deadline",
+      "open": "Open calendar"
+    },
+    "notes": {
+      "empty": "No notes yet"
+    },
+    "actions": {
+      "newTask": "New task",
+      "upload": "Upload file",
+      "logTime": "Log time",
+      "newEvent": "New event"
+    }
   }
 }

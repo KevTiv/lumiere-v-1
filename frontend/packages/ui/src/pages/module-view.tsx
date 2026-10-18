@@ -150,7 +150,7 @@ export function ModuleView({
       }
     }
     setAltViewChoice(restored)
-  }, [config.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [config.id]) // tabs are read once per module
   const chooseAltView = (tabId: string, choice: "alt" | "table") => {
     setAltViewChoice((prev) => ({ ...prev, [tabId]: choice }))
     try {

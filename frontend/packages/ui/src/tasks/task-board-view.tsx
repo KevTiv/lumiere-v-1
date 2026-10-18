@@ -20,8 +20,8 @@ import {
   AvatarStack,
   KanbanCardContent,
   type KanbanCardPerson,
-  type KanbanCardTone,
 } from "../kanban/kanban-card"
+import { TASK_PRIORITY_TONES } from "../lib/task-priority"
 
 /** A task as the board shows it; callers map their rows into this shape. */
 export interface TaskBoardItem {
@@ -49,12 +49,6 @@ const VIEW_MODES: readonly TaskBoardViewMode[] = ["board", "list", "table"]
 const ALL = "__all__"
 const UNASSIGNED = "__unassigned__"
 
-export const TASK_PRIORITY_TONES: Readonly<Partial<Record<string, KanbanCardTone>>> = {
-  "0": "info",
-  "1": "neutral",
-  "2": "warning",
-  "3": "destructive",
-}
 
 export interface TaskBoardViewProps {
   items: TaskBoardItem[]
@@ -112,7 +106,7 @@ export function TaskBoardView({
   useEffect(() => {
     const stored = readStoredMode(storageKey, modes)
     if (stored) setViewMode(stored)
-  }, [storageKey, renderTable !== undefined]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [storageKey, renderTable !== undefined]) // modes only change with renderTable
 
   const changeMode = (mode: TaskBoardViewMode) => {
     setViewMode(mode)
