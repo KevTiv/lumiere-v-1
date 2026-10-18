@@ -29,7 +29,7 @@ export function documentOptional(value: unknown): unknown { return value != null
 export const documentId = (value: unknown) => { const parsed = parseStrictU64(documentOptional(value)); return parsed != null && parsed > 0n ? parsed.toString() : undefined }
 export function documentActorId(value: unknown): string {
   const raw = documentOptional(value)
-  if (raw != null && typeof raw === "object") { const object = raw as Record<string, unknown>; return documentActorId(object.hex ?? object.Hex ?? object.__identity__) }
+  if (raw != null && typeof raw === "object") { const object = raw as { hex?: unknown; Hex?: unknown; __identity__?: unknown }; return documentActorId(object.hex ?? object.Hex ?? object.__identity__) }
   return typeof raw === "string" ? raw.trim().replace(/^0x/i, "").toLowerCase() : ""
 }
 

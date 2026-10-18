@@ -9,7 +9,7 @@ export function stbTimestampFromDate(d: Date): Timestamp {
 export function stbTimestampMicros(value: unknown): bigint | null {
   if (value instanceof Date) return Number.isFinite(value.getTime()) ? BigInt(value.getTime()) * 1000n : null
   if (value != null && typeof value === "object") {
-    const row = value as Record<string, unknown>
+    const row = value as { microsSinceUnixEpoch?: unknown; micros_since_unix_epoch?: unknown; __timestamp_micros_since_unix_epoch__?: unknown }
     const raw = row.microsSinceUnixEpoch ?? row.micros_since_unix_epoch ?? row.__timestamp_micros_since_unix_epoch__
     if (typeof raw === "number" && !Number.isSafeInteger(raw)) return null
     if (typeof raw !== "number" && typeof raw !== "bigint" && !(typeof raw === "string" && /^-?\d+$/.test(raw))) return null

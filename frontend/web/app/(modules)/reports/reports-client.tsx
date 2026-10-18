@@ -241,12 +241,12 @@ function ReportsClientLoaded({
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const currenciesQuery = useCurrencies()
   const { data: currencies = [] } = currenciesQuery
-  const periodState = periodReportContextState(periodContext, { organizationId: orgId, companyId: operatingCompanyId, periods: (periodsQuery.data ?? []) as Record<string, unknown>[], periodState: moduleQueryState(periodsQuery), reportState: moduleQueryState(reportsQuery) })
+  const periodState = periodReportContextState(periodContext, { organizationId: orgId, companyId: operatingCompanyId, periods: periodsQuery.data ?? [], periodState: moduleQueryState(periodsQuery), reportState: moduleQueryState(reportsQuery) })
   const validPeriodContext = periodRequested && periodState.status === "ready" ? periodContext : null
 
   const reports = useMemo(
     () =>
-      reportsRaw.filter((report) => !periodRequested || Boolean(validPeriodContext && reportMatchesPeriodContext(report as Record<string, unknown>, validPeriodContext))).map((r) => ({
+      reportsRaw.filter((report) => !periodRequested || Boolean(validPeriodContext && reportMatchesPeriodContext(report, validPeriodContext))).map((r) => ({
         ...r,
         state: reportStateTag((r as { state?: unknown }).state),
       })),

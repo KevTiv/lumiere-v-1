@@ -78,8 +78,7 @@ function key(value: unknown): string {
 function tag(value: unknown): string {
   const unwrapped = unwrapSome(value)
   if (unwrapped && typeof unwrapped === "object" && !Array.isArray(unwrapped)) {
-    const record = unwrapped as Record<string, unknown>
-    return tag(record.tag ?? (Object.keys(record).length === 1 ? Object.keys(record)[0] : ""))
+    return tag(("tag" in unwrapped ? unwrapped.tag : undefined) ?? (Object.keys(unwrapped).length === 1 ? Object.keys(unwrapped)[0] : ""))
   }
   return typeof unwrapped === "string" ? unwrapped.replace(/[^a-z]/gi, "").toLowerCase() : ""
 }

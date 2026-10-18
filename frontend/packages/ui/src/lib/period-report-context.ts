@@ -12,6 +12,15 @@ export interface PeriodReportContext {
   reportType: "trial-balance" | "vat-report"
 }
 
+export interface PeriodReportRow {
+  id?: unknown
+  organizationId?: unknown; organization_id?: unknown
+  companyId?: unknown; company_id?: unknown
+  dateFrom?: unknown; date_from?: unknown
+  dateTo?: unknown; date_to?: unknown
+  reportType?: unknown; report_type?: unknown
+}
+
 function positiveId(value: unknown): string | null {
   const id = parseStrictU64(value)
   return id != null && id > 0n ? String(id) : null
@@ -51,7 +60,7 @@ export function readPeriodReportContext(params: { get: (key: string) => string |
 export function periodReportContextState(context: PeriodReportContext | null, args: {
   organizationId: bigint | number | string
   companyId?: bigint | number | string
-  periods: readonly Record<string, unknown>[]
+  periods: readonly PeriodReportRow[]
   periodState: ModuleDataState
   reportState: ModuleDataState
 }): ModuleDataState {
@@ -64,7 +73,7 @@ export function periodReportContextState(context: PeriodReportContext | null, ar
   return { status: "ready" }
 }
 
-export function reportMatchesPeriodContext(row: Record<string, unknown>, context: PeriodReportContext): boolean {
+export function reportMatchesPeriodContext(row: PeriodReportRow, context: PeriodReportContext): boolean {
   const type = stbEnumTag(row.reportType ?? row.report_type).replaceAll("_", "").toLowerCase()
   return positiveId(row.organizationId ?? row.organization_id) === context.organizationId &&
     positiveId(row.companyId ?? row.company_id) === context.companyId &&
@@ -74,10 +83,10 @@ export function reportMatchesPeriodContext(row: Record<string, unknown>, context
 }
 
 /** Keep source dates exact even when the date input only displays the calendar day. */
-export function periodReportFormDefaults(context: PeriodReportContext): Record<string, unknown> {
+export function periodReportFormDefaults(context: PeriodReportContext) {
   return { dateFrom: context.dateFrom.slice(0, 10), dateTo: context.dateTo.slice(0, 10), reportType: "trialBalance", targetMove: "posted", name: `Trial balance ${context.dateFrom.slice(0, 10)} – ${context.dateTo.slice(0, 10)}` }
 }
 
-export function applyPeriodReportFormContext(formData: Record<string, unknown>, context: PeriodReportContext): Record<string, unknown> {
+export function applyPeriodReportFormContext<T extends object>(formData: T, context: PeriodReportContext) {
   return { ...formData, dateFrom: context.dateFrom, dateTo: context.dateTo, reportType: "trialBalance", targetMove: "posted" }
 }

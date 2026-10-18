@@ -24,7 +24,7 @@ export function resolveBillDocumentAttempt(documents: readonly BillSourceDocumen
   const matches = linked.filter((document) => {
     let metadata: unknown
     try { metadata = JSON.parse(String(documentOptional(document.metadata) ?? "")) } catch { return false }
-    const provenance = metadata != null && typeof metadata === "object" ? metadata as Record<string, unknown> : null
+    const provenance = metadata != null && typeof metadata === "object" ? metadata as { source?: unknown; object_key?: unknown; uploaded_by?: unknown } : null
     return String(documentOptional(document.checksum) ?? "").toLowerCase() === uploaded.checksum.toLowerCase() &&
       documentOptional(document.url) === uploaded.url &&
       documentId(document.fileSize ?? document.file_size) === String(uploaded.fileSize) &&

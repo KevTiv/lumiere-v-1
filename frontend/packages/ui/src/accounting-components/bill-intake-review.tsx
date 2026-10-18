@@ -7,13 +7,13 @@ import type { ModuleDataState } from "../lib/module-data-state"
 import { ModuleDataNotice } from "../pages/module-data-notice"
 import { Button, buttonVariants } from "../components/button"
 import { Badge } from "../components/badge"
-import { billIntakeReview, type BillIntakeIssue } from "./bill-intake-review-model"
+import { billIntakeReview, type BillIntakeIssue, type BillIntakeLine } from "./bill-intake-review-model"
 
 export interface BillIntakeReviewProps {
   organizationId: bigint | number | string
   companyId: bigint | number | string
   bills: readonly AccountMove[]
-  lines: readonly Record<string, unknown>[]
+  lines: readonly BillIntakeLine[]
   sourceState: ModuleDataState
   onOpenBill?: (bill: AccountMove) => void
   renderDocuments?: (bill: AccountMove) => ReactNode

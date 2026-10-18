@@ -7,12 +7,23 @@ export type BillIntakeIssue = "supplier" | "reference" | "invoice-date" | "lines
 export interface BillIntakeItem { bill: AccountMove; issues: BillIntakeIssue[]; lineCount: number }
 export interface BillIntakeReviewModel { available: boolean; items: BillIntakeItem[] }
 
+/** Fields required to validate a scoped supplier-bill line. */
+export interface BillIntakeLine {
+  id?: unknown
+  organizationId?: unknown; organization_id?: unknown
+  companyId?: unknown; company_id?: unknown
+  moveId?: unknown; move_id?: unknown
+  accountId?: unknown; account_id?: unknown
+  debit?: unknown
+  credit?: unknown
+}
+
 /** Canonical parent/line joins only; incomplete scope must never become an empty, healthy queue. */
 export function billIntakeReview(args: {
   organizationId: bigint | number | string
   companyId: bigint | number | string
   bills: readonly AccountMove[]
-  lines: readonly Record<string, unknown>[]
+  lines: readonly BillIntakeLine[]
 }): BillIntakeReviewModel {
   const org = worklistId(args.organizationId)
   const company = worklistId(args.companyId)
@@ -32,7 +43,7 @@ export function billIntakeReview(args: {
     if (!["draft", "posted", "cancelled", "cancel"].includes(state)) return unavailable
     if (state === "draft") draftBills.push(bill)
   }
-  const linesByMove = new Map<string, Record<string, unknown>[]>()
+  const linesByMove = new Map<string, BillIntakeLine[]>()
   const lineIds = new Set<string>()
   for (const line of args.lines) {
     const lineOrg = worklistId(line.organizationId ?? line.organization_id)

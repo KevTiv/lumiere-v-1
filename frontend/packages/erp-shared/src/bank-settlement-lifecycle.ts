@@ -39,7 +39,31 @@ export interface BankSettlementRecoveryRequest {
   readonly dateMicros?: string
 }
 
-const record = (value: unknown): Record<string, unknown> | null => value != null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null
+/** Untrusted metadata fields are validated individually before becoming an attempt. */
+interface BankSettlementMetadata {
+  bankSettlement?: unknown
+  attemptId?: unknown
+  generation?: unknown
+  paymentId?: unknown
+  selectedMoveLineIds?: unknown
+  selectedResiduals?: unknown
+  status?: unknown
+  allocationApplied?: unknown
+  paymentMoveId?: unknown
+  reversalRequestId?: unknown
+  reversalDateMicros?: unknown
+  reversalReason?: unknown
+  reversalMoveId?: unknown
+  recoveryAction?: unknown
+  recoveryKey?: unknown
+  recoveryReason?: unknown
+  previousPaymentId?: unknown
+  lineId?: unknown
+  moveId?: unknown
+  residual?: unknown
+  residualCurrency?: unknown
+}
+const record = (value: unknown): BankSettlementMetadata | null => value != null && typeof value === "object" && !Array.isArray(value) ? value as BankSettlementMetadata : null
 const exactId = (value: unknown): string | null => { const id = parseStrictU64(value); return id != null && id > 0n ? String(id) : null }
 const boundedText = (value: unknown, maximum = 256): string | null => typeof value === "string" && value.trim() !== "" && value.length <= maximum ? value : null
 const finiteAmount = (value: unknown): number | null => {

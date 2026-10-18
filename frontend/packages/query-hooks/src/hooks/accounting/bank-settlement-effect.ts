@@ -1,7 +1,65 @@
 import { bankSettlementAttempt, bankSettlementRecoveryCorrelates, type BankSettlementAttempt, type BankSettlementPhase, type BankSettlementRecoveryRequest } from "@lumiere/erp-shared/bank-settlement-lifecycle"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
-type Row = Readonly<Record<string, unknown>>
+/** Finite canonical fields used to verify settlement and reversal effects. */
+export interface BankSettlementReadbackRow {
+  readonly id?: unknown
+  readonly metadata?: unknown
+  readonly amount?: unknown
+  readonly state?: unknown
+  readonly balance?: unknown
+  readonly debit?: unknown
+  readonly credit?: unknown
+  readonly date?: unknown
+  readonly microsSinceUnixEpoch?: unknown
+  readonly micros_since_unix_epoch?: unknown
+  readonly __timestamp_micros_since_unix_epoch__?: unknown
+  readonly reverses_payment_move_id?: unknown
+  readonly account_payment_id?: unknown
+  readonly organizationId?: unknown
+  readonly organization_id?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly statementId?: unknown
+  readonly statement_id?: unknown
+  readonly journalId?: unknown
+  readonly journal_id?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
+  readonly partnerId?: unknown
+  readonly partner_id?: unknown
+  readonly paymentType?: unknown
+  readonly payment_type?: unknown
+  readonly partnerType?: unknown
+  readonly partner_type?: unknown
+  readonly moveId?: unknown
+  readonly move_id?: unknown
+  readonly moveType?: unknown
+  readonly move_type?: unknown
+  readonly reversalMoveId?: unknown
+  readonly reversal_move_id?: unknown
+  readonly parentState?: unknown
+  readonly parent_state?: unknown
+  readonly accountInternalType?: unknown
+  readonly account_internal_type?: unknown
+  readonly accountId?: unknown
+  readonly account_id?: unknown
+  readonly amountResidual?: unknown
+  readonly amount_residual?: unknown
+  readonly amountResidualCurrency?: unknown
+  readonly amount_residual_currency?: unknown
+  readonly paymentState?: unknown
+  readonly payment_state?: unknown
+  readonly matchingNumber?: unknown
+  readonly matching_number?: unknown
+  readonly moveIds?: unknown
+  readonly move_ids?: unknown
+  readonly paymentIds?: unknown
+  readonly payment_ids?: unknown
+  readonly isReconciled?: unknown
+  readonly is_reconciled?: unknown
+}
+type Row = BankSettlementReadbackRow
 export interface BankSettlementLifecycleEffect {
   status: BankSettlementPhase
   attempt: BankSettlementAttempt
@@ -19,7 +77,7 @@ export interface BankSettlementCanonicalRows {
   moves: readonly Row[]
   moveLines: readonly Row[]
 }
-const field = (row: Row, name: string): unknown => row[name] ?? row[name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)]
+const field = (row: Row, name: keyof Row): unknown => row[name] ?? row[name.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`) as keyof Row]
 const id = (value: unknown): string | null => { const parsed = parseStrictU64(value); return parsed != null && parsed > 0n ? String(parsed) : null }
 const tag = (value: unknown): string => typeof value === "string" ? value.toLowerCase() : value && typeof value === "object" && "tag" in value ? String(value.tag).toLowerCase() : ""
 const number = (value: unknown): number | null => {

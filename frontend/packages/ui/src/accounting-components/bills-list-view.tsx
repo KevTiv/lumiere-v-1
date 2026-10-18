@@ -4,6 +4,7 @@ import type { AccountMove } from "../lib/accounting-types"
 import type { ModuleDataState } from "../lib/module-data-state"
 import type { ReactNode } from "react"
 import { BillIntakeReview } from "./bill-intake-review"
+import type { BillIntakeLine } from "./bill-intake-review-model"
 import {
   AccountingWorklistView,
   type AccountingWorklistProps,
@@ -15,7 +16,7 @@ export interface BillsListViewProps extends AccountingWorklistProps {
   onCreateBill?: () => void
   onPayBill?: (bill: AccountMove) => void
   onRecalculateTotals?: (bill: AccountMove) => void
-  intake?: { lines: readonly Record<string, unknown>[]; sourceState: ModuleDataState; renderDocuments?: (bill: AccountMove) => ReactNode }
+  intake?: { lines: readonly BillIntakeLine[]; sourceState: ModuleDataState; renderDocuments?: (bill: AccountMove) => ReactNode }
 }
 
 export function BillsListView({

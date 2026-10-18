@@ -184,7 +184,7 @@ function requireOperatingCompany(companyId: bigint | undefined): bigint {
  */
 export function useCreateFinancialReportFlow(organizationId: bigint, companyId?: bigint, options?: { mayDispatch?: () => boolean; scopeKey?: string }) {
   const qc = useQueryClient()
-  const attempts = useRef(new Map<string, { requestId: string; before: Record<string, unknown>[]; generatedDispatched: boolean }>())
+  const attempts = useRef(new Map<string, { requestId: string; before: { id?: unknown }[]; generatedDispatched: boolean }>())
   const inFlight = useRef(new Set<string>())
   return useMutation<void, Error, Record<string, unknown>>({
     retry: false,

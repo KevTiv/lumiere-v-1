@@ -21,7 +21,7 @@ import {
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
 import { parseStrictU64, scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
 import { hasBankSettlementAttempt, type BankSettlementRecoveryRequest } from "@lumiere/erp-shared/bank-settlement-lifecycle"
-import { resolveBankSettlementLifecycleEffect, type BankSettlementLifecycleEffect } from "./bank-settlement-effect"
+import { resolveBankSettlementLifecycleEffect, type BankSettlementLifecycleEffect, type BankSettlementReadbackRow } from "./bank-settlement-effect"
 import type {
   AccountFiscalYear,
   AccountPeriod,
@@ -119,9 +119,9 @@ export interface BankReconciliationEffectRef extends CanonicalRecordRef {
 export type BankSettlementEffect = (BankReconciliationEffectRef & { status: "confirmed"; paymentId: string })
   | { status: "awaiting_approval"; paymentId: string; resource: "account-payments"; id: string }
 export interface BankSettlementFinancialReadback {
-  payments: readonly Record<string, unknown>[]
-  moves: readonly Record<string, unknown>[]
-  moveLines: readonly Record<string, unknown>[]
+  payments: readonly BankSettlementReadbackRow[]
+  moves: readonly BankSettlementReadbackRow[]
+  moveLines: readonly BankSettlementReadbackRow[]
 }
 
 /** A matched flag alone is never proof of invoice or ledger settlement. */
@@ -130,9 +130,8 @@ export function resolveBankStatementSettlementEffect(
   financial: BankSettlementFinancialReadback,
   args: { organizationId: bigint; companyId: bigint; lineId: bigint; moveIds: readonly bigint[]; amountResidual: number },
 ): BankSettlementEffect | null {
-  const field = (row: object, camel: string, snake: string) => {
-    const values = row as Record<string, unknown>
-    return values[camel] ?? values[snake]
+  const field = (row: BankSettlementReadbackRow, camel: keyof BankSettlementReadbackRow, snake: keyof BankSettlementReadbackRow) => {
+    return row[camel] ?? row[snake]
   }
   const exact = <T extends { readonly id?: unknown }>(rows: readonly T[], id: bigint | null | undefined): T | undefined => {
     if (id == null) return undefined

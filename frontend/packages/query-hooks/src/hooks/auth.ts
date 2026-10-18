@@ -501,7 +501,7 @@ export function useSettingsUsers(organizationId: bigint, search?: string) {
       const profiles = await collectSettingsRows((offset, limit) => fetchSettingsList(
         `/api/settings/users?limit=${limit}&offset=${offset}${searchQuery}`, 'Failed to fetch settings users',
       ))
-      const memberships = profiles.flatMap(row => row.membership && typeof row.membership === 'object' ? [row.membership as Record<string, unknown>] : [])
+      const memberships = profiles.flatMap(row => row.membership && typeof row.membership === 'object' ? [row.membership as Partial<UserOrganization>] : [])
       const assignments = profiles.flatMap(row => Array.isArray(row.roleAssignments) ? row.roleAssignments as QueryRows : [])
       return mapSettingsUsers(profiles, memberships, assignments)
     },
