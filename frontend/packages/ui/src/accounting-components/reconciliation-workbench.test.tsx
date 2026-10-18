@@ -271,6 +271,7 @@ describe("reviewed bank settlement lifecycle recovery", () => {
     render(<ReconciliationWorkbench actorKey="operator-1" source={lifecycleSource(saved)} canReconcile canRecover={() => true} onConfirm={vi.fn()} onCheckStatus={onCheckStatus} onRecover={onRecover} />)
     fireEvent.click(await screen.findByText("Check settlement status"))
     await screen.findByText("Settlement reversal awaiting approval")
+    expect(screen.getByRole("link", { name: "Review reversal approval #9" }).getAttribute("href")).toBe("/approvals?model=account_payment&resId=88")
     expect(screen.queryByText("Complete approved reversal")).toBeNull()
     expect(screen.queryByText("Retry original recovery")).toBeNull()
     fireEvent.click(screen.getByText("Check original action"))

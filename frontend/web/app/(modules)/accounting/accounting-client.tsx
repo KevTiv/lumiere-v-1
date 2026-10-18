@@ -8,7 +8,7 @@ import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSe
 import { formatInvoiceMoney, resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
 import { ReconciliationWorkbench, type ReconciliationOutcome, type ReconciliationStatusResult } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench"
 import type { ReconciliationRequest, ReconciliationSource } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench-model"
-import { bankLineFromQueryRow, canDispatchReviewedBankLink } from "./bank-link-review"
+import { bankLineFromQueryRow, bankSettlementRecoveryPermissions, canDispatchReviewedBankLink } from "./bank-link-review"
 import { resolveBankStatementSettlementEffect, useRecoverBankStatementSettlement } from "@lumiere/query-hooks/hooks/accounting/bank-statements"
 import { resolveBankSettlementLifecycleEffect } from "@lumiere/query-hooks/hooks/accounting/bank-settlement-effect"
 import { bankSettlementAttempt, bankSettlementRecoveryAllowed, bankSettlementRecoveryCorrelates, hasBankSettlementAttempt, type BankSettlementRecoveryAction, type BankSettlementRecoveryRequest } from "@lumiere/erp-shared/bank-settlement-lifecycle"
@@ -4470,12 +4470,7 @@ function AccountingClientReady({
     && !createBankStatementLine.isPending && !updateBankStatementLine.isPending && !unreconcileBankLine.isPending
   const canLinkBankRecords = canCreateBankSettlement && bankMutationAvailable
     && !recoverBankSettlement.isPending
-  const bankRecoveryPermissions = {
-    abandon: companyAvailable && bankMutationAvailable && checkPermission("account_bank_statement_line", "write").allowed && checkPermission("payment", "cancel").allowed,
-    resubmit: canCreateBankSettlement && bankMutationAvailable,
-    reverse: companyAvailable && bankMutationAvailable && checkPermission("account_bank_statement_line", "write").allowed && checkPermission("payment", "reverse").allowed
-      && checkPermission("account_move", "write").allowed && checkPermission("account_bank_statement", "write").allowed,
-  }
+  const bankRecoveryPermissions = bankSettlementRecoveryPermissions(companyAvailable && bankMutationAvailable, canCreateBankSettlement, checkPermission)
   bankLinkAccess.current = { source: bankLinkSource, allowed: canLinkBankRecords, recovery: bankRecoveryPermissions, actorKey: currentUser?.id ?? null }
   const confirmBankLink = async (request: ReconciliationRequest): Promise<ReconciliationOutcome> => {
     const current = bankLinkAccess.current

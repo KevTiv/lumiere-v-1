@@ -1,12 +1,34 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { bankLineFromQueryRow, bankLinkReadbackConfirms, canDispatchReviewedBankLink } from "./bank-link-review"
+import { bankLineFromQueryRow, bankLinkReadbackConfirms, bankSettlementRecoveryPermissions, canDispatchReviewedBankLink } from "./bank-link-review"
 import { decodeTypedResourceQueryResponse } from "@lumiere/stdb/resource-reads"
 import type { ReconciliationRequest, ReconciliationSource } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench-model"
 
 const request: ReconciliationRequest = { organizationId: "7", companyId: "11", statementId: "30", lineId: "31", moveLineIds: ["9007199254740992", "9007199254740993"], amountResidual: 0 }
 const statement = { id: "30", organizationId: "7", companyId: "11", state: "Open" }
 const line = { id: "31", organizationId: "7", statementId: "30", isReconciled: true, amountResidual: 0, moveIds: [...request.moveLineIds] }
+
+test("resubmission requires cancelling the original draft even when creating its replacement is allowed", () => {
+  const grants = new Set(["account_bank_statement_line:write"])
+  const checkPermission = (resource: string, action: string) => ({ allowed: grants.has(`${resource}:${action}`) })
+  assert.deepEqual(bankSettlementRecoveryPermissions(true, true, checkPermission), { abandon: false, resubmit: false, reverse: false })
+  grants.add("payment:cancel")
+  assert.deepEqual(bankSettlementRecoveryPermissions(true, true, checkPermission), { abandon: true, resubmit: true, reverse: false })
+  assert.equal(bankSettlementRecoveryPermissions(true, false, checkPermission).resubmit, false)
+  assert.deepEqual(bankSettlementRecoveryPermissions(false, true, checkPermission), { abandon: false, resubmit: false, reverse: false })
+})
+
+test("coordinated reversal requires the statement, journal and payment permissions independently of cancellation", () => {
+  const required = ["account_bank_statement_line:write", "payment:reverse", "account_move:write", "account_bank_statement:write"]
+  const grants = new Set(required)
+  const checkPermission = (resource: string, action: string) => ({ allowed: grants.has(`${resource}:${action}`) })
+  assert.deepEqual(bankSettlementRecoveryPermissions(true, false, checkPermission), { abandon: false, resubmit: false, reverse: true })
+  for (const permission of required) {
+    grants.delete(permission)
+    assert.equal(bankSettlementRecoveryPermissions(true, false, checkPermission).reverse, false, permission)
+    grants.add(permission)
+  }
+})
 
 test("bank currency options retain known-empty values through the real typed decoder, not redaction", () => {
   const decoded = decodeTypedResourceQueryResponse("bank-statement-lines", {

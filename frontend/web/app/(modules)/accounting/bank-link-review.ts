@@ -10,6 +10,24 @@ import type {
   BankReconciliationLineProjection,
   BankReconciliationStatementProjection,
 } from "@lumiere/query-hooks/hooks/accounting/bank-statements"
+import type { RBACContext } from "../../../../packages/ui/src/lib/rbac-types"
+import type { BankSettlementRecoveryAction } from "@lumiere/erp-shared/bank-settlement-lifecycle"
+
+/** Recovery must also authorize retiring or compensating the original payment. */
+export function bankSettlementRecoveryPermissions(
+  available: boolean,
+  canCreateSettlement: boolean,
+  checkPermission: RBACContext["checkPermission"],
+): Record<BankSettlementRecoveryAction, boolean> {
+  const canWriteLine = available && checkPermission("account_bank_statement_line", "write").allowed
+  const canCancelPayment = available && checkPermission("payment", "cancel").allowed
+  return {
+    abandon: canWriteLine && canCancelPayment,
+    resubmit: available && canCreateSettlement && canCancelPayment,
+    reverse: canWriteLine && checkPermission("payment", "reverse").allowed
+      && checkPermission("account_move", "write").allowed && checkPermission("account_bank_statement", "write").allowed,
+  }
+}
 
 /** Preserve decoded Option::None as known-empty, never invent redacted fields. */
 export function bankLineFromQueryRow(row: ReconciliationBankLineSource): ReconciliationBankLineSource {
