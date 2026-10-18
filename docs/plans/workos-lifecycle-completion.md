@@ -101,6 +101,11 @@ derived from the last append-only audit ID for the membership and all its role
 assignments (including inactive assignments). This detects state cycles such as
 grant → revoke → replay and deactivate → reactivate → replay. Exact retries of
 the current committed state remain no-ops. The settings read returns the matching
-revision, and clients without one must reload before saving. This changes the
-operation input contract; the release workflow must regenerate and pin it before
-merge. No storage schema or forward migration is added for this correction.
+revision, and clients without one must reload before saving. The revised operation input contract is published and pinned in
+`lumiere-contracts v0.3.123`. Native runtime and browser coverage verifies exact
+retries, stale saves after revocation, and reader denial. No storage schema or forward migration is added for this correction.
+
+Runtime form definitions, labels, role form settings and custom field definitions
+are organization-scoped reference reads for authenticated members. They do not
+grant business record reads or writes, and explicit read denies still apply.
+The established `hr_payroll:read` grant is recognized for payslip and export reads.
