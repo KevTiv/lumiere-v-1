@@ -93,7 +93,7 @@ certification remain separate from the
 
 The RRA foundation was initially validated against contracts `0.3.122`; that
 milestone added no canonical tables or reducer signatures. The subsequent
-WorkOS reconciliation targets union contracts `0.3.124`, which retain the alpha
+WorkOS reconciliation pins union contracts `0.3.124`, which retain the alpha
 schema and add the access-revision parameter from the independent `0.3.123`
 release. Rebuild the application/module artifacts and
 retain their exact hashes before deployment. See
@@ -125,3 +125,6 @@ schema hash remains
 That RRA-only change did not require a contracts release. The later WorkOS
 reconciliation requires the union release described above. Deployment
 configuration generation remains 6.
+
+The union release and exact preservation checks are recorded in
+[contracts v0.3.124 evidence](evidence/contracts-0.3.124-release-2026-10-18.json).
