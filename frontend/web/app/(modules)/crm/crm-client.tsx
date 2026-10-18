@@ -429,11 +429,13 @@ function CrmClientLoaded({
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
   const [insightPeriodRange, setInsightPeriodRange] = useState<InsightPeriodRange | null>(null)
 
-  const { data: leads = [], isLoading: leadsLoading } = useLeads(orgId, initialLeads)
+  const leadsQuery = useLeads(orgId, initialLeads)
+  const { data: leads = [], isLoading: leadsLoading } = leadsQuery
   const opportunitiesQuery = useOpportunities(orgId, initialOpportunities)
   const { data: opportunities = [], isLoading: opportunitiesLoading } = opportunitiesQuery
   const { data: opportunityLines = [] } = useOpportunityLines(orgId)
-  const { data: contacts = [], isLoading: contactsLoading } = useContacts(orgId, initialContacts)
+  const contactsQuery = useContacts(orgId, initialContacts)
+  const { data: contacts = [], isLoading: contactsLoading } = contactsQuery
   const { data: contactTags = [] } = useContactTags(orgId)
   const { data: contactCategories = [] } = useContactCategories(orgId)
   const { data: contactSegments = [] } = useContactSegments(orgId)
@@ -2465,6 +2467,11 @@ function CrmClientLoaded({
         dashboardContent={<ModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: moduleQueryState(opportunitiesQuery) }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange} />}
         data={data}
         dataLoading={dataLoading}
+        dataState={{
+          leads: moduleQueryState(leadsQuery),
+          opportunities: moduleQueryState(opportunitiesQuery),
+          contacts: moduleQueryState(contactsQuery),
+        }}
         kpiStrips={kpiStrips}
         entityBoardContext={entityBoardContext}
         onFormSubmit={handleFormSubmit}
