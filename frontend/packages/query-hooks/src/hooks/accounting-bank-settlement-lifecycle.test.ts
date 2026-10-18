@@ -30,7 +30,7 @@ function openTargets(rows: BankSettlementCanonicalRows): BankSettlementCanonical
 }
 function reversedFixture() {
   const f = fixture()
-  const attempt = { ...f.attempt, status: "reversed", reversalMoveId: "80", recoveryAction: "reverse", recoveryKey: "recovery-1", recoveryReason: "Wrong bank receipt", reversalDateMicros: "1792281600000000", reversalReason: "Wrong bank receipt" }
+  const attempt = { ...f.attempt, status: "reversed", reversalMoveId: "80", recoveryAction: "reverse", recoveryKey: "recovery-1", reversalDateMicros: "1792281600000000", reversalReason: "Wrong bank receipt" }
   const rows = openTargets(f.rows)
   const reversal = { id: "80", ...f.common, journalId: "5", state: "Posted", date: { microsSinceUnixEpoch: "1792281600000000" }, metadata: { reverses_payment_move_id: "60", account_payment_id: "50" } }
   return { ...f, attempt, rows: { ...rows,

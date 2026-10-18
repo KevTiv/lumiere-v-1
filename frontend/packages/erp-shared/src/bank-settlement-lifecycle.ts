@@ -141,7 +141,7 @@ export function bankSettlementRecoveryRequest(
 
 export function bankSettlementRecoveryCorrelates(attempt: BankSettlementAttempt, request: BankSettlementRecoveryRequest): boolean {
   return attempt.recoveryAction === request.action && attempt.recoveryKey === request.idempotencyKey
-    && attempt.recoveryReason === request.reason
+    && (request.action === "reverse" || attempt.recoveryReason === request.reason)
     && (request.action === "resubmit" ? attempt.previousPaymentId === request.paymentId && attempt.paymentId !== request.paymentId && attempt.attemptId !== request.attemptId : attempt.paymentId === request.paymentId && attempt.attemptId === request.attemptId)
     && (request.action !== "reverse" || attempt.reversalDateMicros === request.dateMicros && attempt.reversalReason === request.reason)
     && attempt.selectedMoveLineIds.length === request.moveLineIds.length
