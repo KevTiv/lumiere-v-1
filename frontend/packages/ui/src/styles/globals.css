@@ -8,3 +8,31 @@
 @source "../**/*.{ts,tsx}";
 
 @import "./app-theme.css";
+
+/* Invoice printing: show only the invoice sheet (see PrintableInvoice) on a clean white page. */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .invoice-print-only,
+  .invoice-print-only * {
+    visibility: visible !important;
+  }
+  .invoice-print-only {
+    display: block !important;
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    background: #fff;
+  }
+  .invoice-print-only [data-invoice-print-root] {
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+  @page {
+    margin: 16mm;
+  }
+}

@@ -32,6 +32,10 @@ import { invoiceStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import { microsSinceEpochToDate, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
+import { PrintableInvoice } from "./printable-invoice"
+import { printInvoice } from "./invoice-print"
+import { invoicePreviewModelFromMove } from "./invoice-preview-model"
+import type { InvoicePreviewLine } from "./invoice-preview"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null, long = false): string {
   if (!ts) return "—"
@@ -69,6 +73,10 @@ interface InvoiceDetailModalProps {
   downloadPdfPending?: boolean
   archivePdfPending?: boolean
   sendEmailPending?: boolean
+  /** Lines for the printed sheet; without them the printout carries the totals only. */
+  printLines?: InvoicePreviewLine[]
+  /** ISO code of the document currency, for the printed amounts. */
+  currencyCode?: string
 }
 
 export function InvoiceDetailModal({
@@ -88,6 +96,8 @@ export function InvoiceDetailModal({
   downloadPdfPending,
   archivePdfPending,
   sendEmailPending,
+  printLines,
+  currencyCode,
 }: InvoiceDetailModalProps) {
   const { t } = useTranslation()
 
@@ -140,6 +150,11 @@ export function InvoiceDetailModal({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="invoice-detail-modal">
+        {open ? (
+          <PrintableInvoice
+            model={invoicePreviewModelFromMove(invoice, printLines, { currencyCode, statusLabel: label })}
+          />
+        ) : null}
         <DialogHeader className="pb-4">
           <div className="flex items-start justify-between">
             <div>
@@ -173,7 +188,7 @@ export function InvoiceDetailModal({
             >
               <Download className="h-4 w-4" />{t("accounting.invoices.invoiceActions.download")}
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" type="button" disabled={!onDownloadPdf || downloadPdfPending} onClick={() => onDownloadPdf?.()}>
+            <Button variant="outline" size="sm" className="gap-2" type="button" data-testid="invoice-print" onClick={printInvoice}>
               <Printer className="h-4 w-4" />{t("accounting.invoices.invoiceActions.print")}
             </Button>
             {onArchivePdf ? (

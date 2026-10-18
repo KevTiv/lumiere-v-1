@@ -27,6 +27,12 @@ import { ActivityRingWidget } from "./widgets/activity-ring-widget"
 import { CountdownWidget } from "./widgets/countdown-widget"
 import { IosTileWidget } from "./widgets/ios-tile-widget"
 import { QuickActionsWidget } from "./widgets/quick-actions-widget"
+import { TabbedTableWidget } from "./widgets/tabbed-table-widget"
+import { ComboTrendChart } from "../charts/combo-trend-chart"
+import { StepAnomalyChart } from "../charts/step-anomaly-chart"
+import { RankedBarList } from "../charts/ranked-bar-list"
+import { SegmentedShareBar } from "../charts/segmented-share-bar"
+import { RadialGauge } from "../charts/radial-gauge"
 
 interface WidgetRendererProps {
   widget: DashboardWidget
@@ -50,8 +56,32 @@ function chartIsEmpty(widget: DashboardWidget): boolean {
     }
     case "funnel-chart":
       return !widget.data.stages.some((stage) => stage.value !== 0)
+    case "combo-chart": {
+      const keys = [...widget.data.bars.map((bar) => bar.key), widget.data.line.key]
+      return !widget.data.values.some((point) => keys.some((key) => Number(point[key] ?? 0) !== 0))
+    }
+    case "step-chart":
+      return !widget.data.values.some((point) => Number(point[widget.data.series.key] ?? 0) !== 0)
+    case "ranked-bars":
+      return !widget.data.items.some((item) => item.value > 0)
+    case "share-bar":
+      return !widget.data.rows.some((row) => Object.values(row.values).some((value) => value > 0))
+    case "radial-gauge":
+      return !(widget.data.max > 0)
     default:
       return false
+  }
+}
+
+/** The widget's own empty-state wording, when it sets one. */
+function emptyLabelOf(widget: DashboardWidget): string | undefined {
+  switch (widget.type) {
+    case "donut-chart":
+    case "ranked-bars":
+    case "share-bar":
+      return widget.data.emptyLabel
+    default:
+      return undefined
   }
 }
 
@@ -61,13 +91,18 @@ const CHART_WIDGET_TYPES = new Set<WidgetType>([
   "bar-chart",
   "donut-chart",
   "funnel-chart",
+  "combo-chart",
+  "step-chart",
+  "ranked-bars",
+  "share-bar",
+  "radial-gauge",
 ])
 
 export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading = false, exportProvenance }: WidgetRendererProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const useCard = widget.useCard !== false
   const isChart = CHART_WIDGET_TYPES.has(widget.type)
-  const canExportCsv = isChart || widget.type === "table"
+  const canExportCsv = (isChart && widget.type !== "radial-gauge") || widget.type === "table" || widget.type === "tabbed-table"
 
   const renderContent = () => {
     if (isLoading && widget.type !== "quick-actions" && widget.type !== "custom") {
@@ -81,7 +116,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
     if (isChart && chartIsEmpty(widget)) {
       return (
         <div className="flex h-56 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-          No data for this period yet.
+          {emptyLabelOf(widget) ?? "No data for this period yet."}
         </div>
       )
     }
@@ -137,6 +172,18 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
         return <IosTileWidget data={widget.data} />
       case "quick-actions":
         return <QuickActionsWidget data={widget.data} />
+      case "combo-chart":
+        return <ComboTrendChart {...widget.data} />
+      case "step-chart":
+        return <StepAnomalyChart {...widget.data} />
+      case "ranked-bars":
+        return <RankedBarList {...widget.data} />
+      case "share-bar":
+        return <SegmentedShareBar {...widget.data} />
+      case "radial-gauge":
+        return <RadialGauge {...widget.data} />
+      case "tabbed-table":
+        return <TabbedTableWidget data={widget.data} />
       case "custom": {
         const CustomComponent = widget.component
         return <CustomComponent data={widget.data} />

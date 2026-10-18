@@ -71,6 +71,12 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useEmployees, type HrEmployee } from "@lumiere/query-hooks/hooks/hr"
+import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import type { ChartValueFormat } from "@lumiere/ui/lib/chart-format"
+import type { TabbedTableRow } from "@lumiere/ui"
+import { approvalBacklog, monthlySpend, spendByCategory } from "./expenses-dashboard-charts"
 import {
   newExpenseClientRequestId,
   newExpenseReceiptClientRequestId,
@@ -202,6 +208,8 @@ function ExpensesClientLoaded({
   )
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: employees = [] } = useEmployees(orgId, initialEmployees)
+  const { data: products = [] } = useProducts(orgId)
+  const { data: currencies = [] } = useCurrencies()
   const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
   const { data: perDiemRates = [] } = useExpensePerDiemRates(orgId)
 
@@ -371,7 +379,70 @@ function ExpensesClientLoaded({
       return st === "Approved" || st === "Posted" || st === "Done"
     }).length
 
+    const now = new Date()
+    const nowMs = now.getTime()
+    const currencyCodeById = currencyCodeMap(currencies)
+    const productNames = new Map(products.map((product) => [String(product.id), String(product.name ?? "")]))
+    const employeeNames = new Map(employees.map((employee) => [String(employee.id), String(employee.name ?? "")]))
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
+    const expenseCurrencies = new Set(expensesRaw.map((expense) => currencyCodeById.get(String(expense.currencyId)) ?? ""))
+    const money: ChartValueFormat =
+      expenseCurrencies.size === 1 && [...expenseCurrencies][0]
+        ? { kind: "currency", currency: [...expenseCurrencies][0]! }
+        : { kind: "number" }
+
     return mapDashboardWidgets(moduleConfig, (w) => {
+        if (w.type === "combo-chart" && w.id === "exp-monthly-spend") {
+          return { ...w, data: { ...w.data, values: monthlySpend(expensesRaw, now), valueFormat: money } }
+        }
+        if (w.type === "ranked-bars" && w.id === "exp-spend-by-category") {
+          return {
+            ...w,
+            data: {
+              ...w.data,
+              items: spendByCategory(
+                expensesRaw,
+                productNames,
+                { startMs: monthStart, endMs: nowMs },
+                { startMs: lastMonthStart, endMs: monthStart - 1 },
+              ),
+              valueFormat: money,
+              changeLabel: "vs last month",
+            },
+          }
+        }
+        if (w.type === "tabbed-table" && w.id === "exp-approval-backlog") {
+          return {
+            ...w,
+            data: {
+              tabs: [
+                { id: "all", label: "All" },
+                { id: "awaiting-approval", label: "Awaiting approval" },
+                { id: "awaiting-posting", label: "Awaiting posting" },
+              ],
+              columns: [
+                { key: "report", label: "Report" },
+                { key: "employee", label: "Employee" },
+                { key: "submitted", label: "Created" },
+                { key: "ageDays", label: "Age (days)", type: "number", align: "right" },
+                { key: "amount", label: "Amount", type: "currency", currencyKey: "currency", align: "right" },
+                {
+                  key: "status",
+                  label: "Status",
+                  type: "badge",
+                  badgeVariants: { "Awaiting approval": "warning", "Awaiting posting": "info" },
+                },
+              ],
+              rows: approvalBacklog(sheetsRaw, employeeNames, currencyCodeById, nowMs),
+              emptyMessage: "Nothing waiting — every expense report is handled.",
+              onRowClick: (row: TabbedTableRow) => {
+                const sheet = sheetsRaw.find((candidate) => String(candidate.id) === String(row.id))
+                if (sheet) setTimelineSheet(sheet)
+              },
+            },
+          }
+        }
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -409,6 +480,11 @@ function ExpensesClientLoaded({
   }, [
     expenses,
     sheets,
+    expensesRaw,
+    sheetsRaw,
+    products,
+    employees,
+    currencies,
     sheetsToApprove.length,
     missingReceipts.length,
     unmatchedCards.length,

@@ -102,7 +102,17 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
-import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
+import {
+  useAccountAccounts,
+  useAccountMoveLines,
+  useAccountMoves,
+  useAccountPayments,
+} from "@lumiere/query-hooks/hooks/accounting"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import { formatChartValue, type ChartValueFormat } from "@lumiere/ui/lib/chart-format"
+import { variantTag } from "@lumiere/erp-workflows"
+import { dominantCurrencyCode } from "../accounting/accounting-dashboard-charts"
+import { cashRunway, expenseBreakdown, profitAndLossByMonth } from "./finance-dashboard-charts"
 import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources"
 import {
   companyRowsToSelectOptions,
@@ -225,6 +235,9 @@ function ReportsClientLoaded({
   const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
+  const { data: accountMoves = [] } = useAccountMoves(orgId, { enabled: organizationId > 0 })
+  const { data: accountMoveLines = [] } = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
+  const { data: accountPayments = [] } = useAccountPayments(orgId, { enabled: organizationId > 0 })
   const { data: currencies = [] } = useCurrencies()
 
   const reports = useMemo(
@@ -812,7 +825,56 @@ function ReportsClientLoaded({
     const generated = reports.filter((r) => String(r.state) === "generated").length
     const exported = reports.filter((r) => String(r.state) === "exported").length
 
+    const now = new Date()
+    const accountsById = new Map(accountAccounts.map((account) => [String(account.id), account]))
+    const money: ChartValueFormat = {
+      kind: "currency",
+      currency: dominantCurrencyCode(accountMoves, currencyCodeMap(currencies)),
+    }
+    const bills = accountMoves.filter((move) => variantTag(move.moveType) === "InInvoice")
+    const runway = cashRunway(accountAccounts, accountPayments, bills, now)
+    const RUNWAY_SCALE_MONTHS = 12
+    const ninetyDays = 90 * 86_400_000
+    const currentWindow = { startMs: now.getTime() - ninetyDays, endMs: now.getTime() }
+    const previousWindow = { startMs: now.getTime() - 2 * ninetyDays, endMs: now.getTime() - ninetyDays - 1 }
+
     return mapDashboardWidgets(moduleConfig, (w) => {
+        if (w.type === "combo-chart" && w.id === "rep-pl-trend") {
+          return {
+            ...w,
+            data: { ...w.data, values: profitAndLossByMonth(accountMoveLines, accountsById, now), valueFormat: money },
+          }
+        }
+        if (w.type === "radial-gauge" && w.id === "rep-cash-runway") {
+          const months = runway.months
+          return {
+            ...w,
+            data: {
+              ...w.data,
+              value: months == null ? RUNWAY_SCALE_MONTHS : Math.min(months, RUNWAY_SCALE_MONTHS),
+              max: runway.cash !== 0 || runway.monthlyBurn > 0 ? RUNWAY_SCALE_MONTHS : 0,
+              display: months == null ? "∞" : months > RUNWAY_SCALE_MONTHS ? `${RUNWAY_SCALE_MONTHS}+` : months.toFixed(1),
+              label: months == null ? "no spend in the last 3 months" : "months of runway",
+              tone: months == null || months >= 6 ? "success" : months >= 3 ? "warning" : "destructive",
+              stats: [
+                { label: "Cash", value: formatChartValue(runway.cash, money) },
+                { label: "Monthly burn", value: formatChartValue(runway.monthlyBurn, money) },
+                { label: "Runway", value: months == null ? "∞" : `${months.toFixed(1)} mo` },
+              ],
+            },
+          }
+        }
+        if (w.type === "ranked-bars" && w.id === "rep-expense-breakdown") {
+          return {
+            ...w,
+            data: {
+              ...w.data,
+              items: expenseBreakdown(accountMoveLines, accountsById, currentWindow, previousWindow),
+              valueFormat: money,
+              changeLabel: "vs prior 90 days",
+            },
+          }
+        }
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -885,6 +947,11 @@ function ReportsClientLoaded({
           })
   }, [
     reports,
+    accountAccounts,
+    accountMoves,
+    accountMoveLines,
+    accountPayments,
+    currencies,
     trialBalances,
     reportTemplates,
     scheduledReports,

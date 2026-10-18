@@ -30,7 +30,7 @@ import {
 import { Badge } from "@lumiere/ui/components/badge"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
-import { DashboardGrid } from "@lumiere/ui"
+import { DashboardGrid, RankedBarList } from "@lumiere/ui"
 import {
   AlertCircle,
   Building2,
@@ -87,6 +87,10 @@ function formatMoney(amount: MoneyAmount): string {
     minimumFractionDigits: amount.scale,
     maximumFractionDigits: amount.scale,
   })
+}
+
+function moneyValue(amount: MoneyAmount): number {
+  return amount.minorUnits / 10 ** amount.scale
 }
 
 function todayInputValue(): string {
@@ -567,6 +571,23 @@ function ReportPreviewPanel({ preview }: ReportPreviewPanelProps) {
           gross={formatMoney(report.purchases.gross)}
         />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Where the money went</CardTitle>
+          <CardDescription>Purchases, fees and fee tax for the day, largest first.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RankedBarList
+            items={[
+              { label: t("reports.ownerReports.sections.purchases"), value: moneyValue(report.purchases.gross), hint: t("reports.ownerReports.ordersCount", { count: report.purchases.orderCount }) },
+              { label: t("reports.ownerReports.columns.fees"), value: moneyValue(report.expensesAndFees.fees) },
+              { label: t("reports.ownerReports.columns.tax"), value: moneyValue(report.expensesAndFees.tax) },
+            ]}
+            emptyLabel="No spending recorded for this day."
+          />
+        </CardContent>
+      </Card>
 
       <ReceiptsCard receipts={report.receipts} />
       <ExpensesAndFeesCard expenses={report.expensesAndFees} />
