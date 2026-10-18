@@ -17,14 +17,11 @@ use tower_cookies::Cookies;
 use super::documents::accounting::{
     invoice_revision_matches, render_account_move_pdf, InvoicePdfReview,
 };
-use crate::auth_password::send_resend_email;
 use crate::commands::{
-    authorize_reducer_company_scope, dispatch_reviewed_mail_mutation, dispatch_session_reducer,
-    ReviewedMailDeliveryAuthority,
+    authorize_reducer_company_scope, dispatch_reviewed_mail_mutation, ReviewedMailDeliveryAuthority,
 };
 use crate::document_render::invoice::row_u64;
 use crate::error::ApiError;
-use crate::query_exec::execute_resource_query;
 use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
@@ -38,26 +35,10 @@ pub fn router() -> Router<Arc<AppState>> {
         )
 }
 
-fn parse_delivery_meta(raw: Option<&str>) -> Option<Value> {
-    raw.and_then(|s| serde_json::from_str(s).ok())
-}
-
 fn row_id(row: &Value) -> Option<u64> {
     row.get("id")
         .and_then(|v| v.as_u64())
         .or_else(|| row.get("id").and_then(|v| v.as_str())?.parse().ok())
-}
-
-fn is_reviewed_meta(metadata: &Value) -> bool {
-    metadata
-        .get("context_json")
-        .and_then(Value::as_str)
-        .is_some_and(|context| {
-            context.contains("invoiceReview")
-                || serde_json::from_str::<Value>(context)
-                    .ok()
-                    .is_some_and(|value| value.get("invoiceReview").is_some())
-        })
 }
 
 #[derive(Deserialize)]
@@ -404,119 +385,32 @@ async fn dispatch_reviewed_mail(
     ))
 }
 
-async fn dispatch_queued_mail(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    cookies: Cookies,
-) -> Result<Json<Value>, ApiError> {
-    let session = resolve_session(&state, &headers, &cookies)
-        .await?
-        .ok_or(ApiError::Unauthorized)?;
-    let org_id = require_org(&session)?;
-
-    let resend_key = std::env::var("RESEND_API_KEY").unwrap_or_default();
-    let from = std::env::var("RESEND_FROM_EMAIL")
-        .unwrap_or_else(|_| "Lumiere ERP <onboarding@resend.dev>".to_string());
-
-    if resend_key.trim().is_empty() {
-        return Err(ApiError::BadRequest(
-            "RESEND_API_KEY is not configured on api-server".into(),
-        ));
-    }
-
-    let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
-    let client = trusted.client();
-    let rows = execute_resource_query(
-        &client,
-        "queued-mail-messages",
-        org_id,
-        &session.identity_hex,
-        session.field_access.as_ref(),
+/// The legacy batch route cannot prove a single reviewed provider claim. Keep
+/// it permanently disabled rather than sending before a denied receipt write.
+async fn dispatch_queued_mail() -> (StatusCode, Json<Value>) {
+    (
+        StatusCode::GONE,
+        Json(json!({
+            "error": "Batch email dispatch is unavailable. Open the invoice, review its email, then send that single reviewed message.",
+            "code": "reviewed_message_dispatch_required",
+        })),
     )
-    .await?;
-
-    let mut sent = 0_u64;
-    let mut skipped = 0_u64;
-    let mut errors: Vec<String> = Vec::new();
-
-    for row in rows {
-        let message_id = match row_id(&row) {
-            Some(id) => id,
-            None => {
-                skipped += 1;
-                continue;
-            }
-        };
-
-        let meta = parse_delivery_meta(
-            row.get("metadata")
-                .or_else(|| row.get("metadata"))
-                .and_then(|v| v.as_str()),
-        );
-        let Some(meta) = meta else {
-            skipped += 1;
-            continue;
-        };
-
-        // Reviewed invoices require a per-message claim, revision check and managed PDF path.
-        // Malformed tagged contexts must also stay out of this legacy batch dispatcher.
-        if is_reviewed_meta(&meta)
-            || meta.get("delivery").and_then(|v| v.as_str()) != Some("queued")
-        {
-            skipped += 1;
-            continue;
-        }
-
-        let to = meta
-            .get("to")
-            .and_then(|v| v.as_str())
-            .map(str::trim)
-            .filter(|s| !s.is_empty() && s.contains('@'));
-        let Some(to) = to else {
-            skipped += 1;
-            continue;
-        };
-
-        let subject = meta
-            .get("subject")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Lumiere ERP notification");
-        let text = row
-            .get("body")
-            .or_else(|| row.get("body"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-
-        match send_resend_email(&state.http, &resend_key, &from, to, subject, text).await {
-            Ok(()) => {
-                let mark_args = json!([org_id, message_id, null]);
-                if let Err(e) = dispatch_session_reducer(
-                    &state,
-                    &session,
-                    "mark_mail_message_delivered",
-                    mark_args,
-                )
-                .await
-                {
-                    errors.push(format!("message {message_id} sent but mark failed: {e}"));
-                } else {
-                    sent += 1;
-                }
-            }
-            Err(e) => errors.push(format!("message {message_id}: {e}")),
-        }
-    }
-
-    Ok(Json(json!({
-        "sent": sent,
-        "skipped": skipped,
-        "errors": errors,
-    })))
 }
 
 #[cfg(test)]
 mod reviewed_dispatch_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn legacy_batch_route_is_gone_without_any_credentials_or_provider_work() {
+        let (status, Json(body)) = dispatch_queued_mail().await;
+        assert_eq!(status, StatusCode::GONE);
+        assert_eq!(body["code"], "reviewed_message_dispatch_required");
+        assert!(body["error"]
+            .as_str()
+            .expect("message")
+            .contains("single reviewed message"));
+    }
 
     fn row() -> Value {
         let context = json!({ "invoiceReview": { "schemaVersion": 2, "reviewId": "review-1", "organizationId": "1", "companyId": "2",
@@ -577,13 +471,6 @@ mod reviewed_dispatch_tests {
             row["metadata"] = json!(metadata.to_string());
             assert!(reviewed_dispatch(&row, 1, "review-1").is_err(), "{key}");
         }
-        assert!(is_reviewed_meta(
-            &json!({"context_json":"{\"invoiceReview\":malformed"})
-        ));
-        let metadata: Value =
-            serde_json::from_str(row()["metadata"].as_str().expect("metadata")).expect("json");
-        assert!(is_reviewed_meta(&metadata));
-        assert!(!is_reviewed_meta(&json!({"context_json":"legacy context"})));
     }
 
     #[test]

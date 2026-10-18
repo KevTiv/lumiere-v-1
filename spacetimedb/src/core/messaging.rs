@@ -436,23 +436,23 @@ fn validate_reviewed_delivery_receipt(
     provided: Option<&str>,
 ) -> Result<bool, String> {
     let Some(metadata) = metadata_object(existing) else {
-        return Ok(false);
+        return validate_legacy_delivery_metadata(provided).map(|()| false);
     };
     let Some(context) = metadata
         .get("context_json")
         .and_then(serde_json::Value::as_str)
     else {
-        return Ok(false);
+        return validate_legacy_delivery_metadata(provided).map(|()| false);
     };
     let context: serde_json::Value = match serde_json::from_str(context) {
         Ok(value) => value,
         Err(_) if context.contains("invoiceReview") => {
             return Err("reviewed delivery context is malformed".into())
         }
-        Err(_) => return Ok(false),
+        Err(_) => return validate_legacy_delivery_metadata(provided).map(|()| false),
     };
     if context.get("invoiceReview").is_none() {
-        return Ok(false);
+        return validate_legacy_delivery_metadata(provided).map(|()| false);
     }
     let receipt =
         metadata_object(provided).ok_or("reviewed delivery requires its exact provider receipt")?;
@@ -482,6 +482,38 @@ fn validate_reviewed_delivery_receipt(
         return Err("reviewed delivery receipt does not match the claimed request".into());
     }
     Ok(true)
+}
+
+/// Provider extras cannot promote legacy chatter into reviewed dispatch evidence.
+/// Only the queue/claim reducers may establish the review and dispatch namespace.
+fn validate_legacy_delivery_metadata(provided: Option<&str>) -> Result<(), String> {
+    let has_review_context = |value: &serde_json::Value| {
+        value.get("invoiceReview").is_some()
+            || value.as_str().is_some_and(|raw| {
+                raw.contains("invoiceReview")
+                    || serde_json::from_str::<serde_json::Value>(raw)
+                        .ok()
+                        .is_some_and(|context| context.get("invoiceReview").is_some())
+            })
+    };
+    let reserved = match metadata_object(provided) {
+        Some(extra) => {
+            extra
+                .keys()
+                .any(|key| key == "invoiceReview" || key.starts_with("dispatch_"))
+                || extra.get("context_json").is_some_and(has_review_context)
+        }
+        None => {
+            provided.is_some_and(|raw| raw.contains("invoiceReview") || raw.contains("dispatch_"))
+        }
+    };
+    if reserved {
+        return Err(
+            "legacy delivery metadata cannot introduce invoice review or dispatch claim evidence"
+                .into(),
+        );
+    }
+    Ok(())
 }
 
 /// Preserve queue-review evidence across delivery, including legacy malformed metadata.
@@ -647,6 +679,52 @@ pub fn mark_all_notifications_read(
 #[cfg(test)]
 mod delivery_tests {
     use super::*;
+
+    #[test]
+    fn legacy_receipts_cannot_introduce_review_or_dispatch_evidence() {
+        let review = serde_json::json!({"invoiceReview":{"reviewId":"forged-review"}});
+        for extra in [
+            serde_json::json!({"context_json":review.to_string(),"dispatch_review_id":"forged-review","dispatch_request_digest":"a".repeat(64)}),
+            serde_json::json!({"context_json":review.to_string()}),
+            serde_json::json!({"context_json":review}),
+            serde_json::json!({"context_json":r#"{"\u0069nvoiceReview":{}}"#}),
+            serde_json::json!({"invoiceReview":{}}),
+            serde_json::json!({"dispatch_review_id":"forged-review"}),
+            serde_json::json!({"dispatch_request_digest":"a".repeat(64)}),
+            serde_json::json!({"dispatch_claimed_at":123}),
+        ] {
+            for existing in [
+                None,
+                Some(r#"{"idempotency_key":"legacy-comment"}"#),
+                Some("legacy raw"),
+            ] {
+                assert!(
+                    validate_reviewed_delivery_receipt(existing, Some(&extra.to_string())).is_err(),
+                    "{extra}"
+                );
+            }
+        }
+        assert!(validate_reviewed_delivery_receipt(
+            None,
+            Some(r#"{"context_json":"{\"invoiceReview\":malformed"#)
+        )
+        .is_err());
+        assert_eq!(
+            validate_reviewed_delivery_receipt(
+                None,
+                Some(r#"{"provider_id":"legacy-provider-id"}"#)
+            )
+            .expect("legacy receipt"),
+            false
+        );
+        let context = serde_json::json!({"invoiceReview":{"reviewId":"review-1"}}).to_string();
+        let claimed = serde_json::json!({"context_json":context,"delivery":"dispatching","dispatch_review_id":"review-1","dispatch_request_digest":"a".repeat(64)}).to_string();
+        let receipt = serde_json::json!({"dispatch_review_id":"review-1","dispatch_request_digest":"a".repeat(64)}).to_string();
+        assert!(
+            validate_reviewed_delivery_receipt(Some(&claimed), Some(&receipt))
+                .expect("exact claimed receipt")
+        );
+    }
 
     #[test]
     fn delivery_preserves_exact_review_evidence_and_updates_status() {

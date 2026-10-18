@@ -539,6 +539,65 @@ fn test_reviewed_invoice_mail_claim_lifecycle(ctx: &ReducerContext) -> Result<()
     {
         return Err("ordinary direct SDK caller forged provider acceptance after claiming".into());
     }
+    // Ordinary comment creation plus legacy delivery metadata must not synthesize
+    // a reviewed sent row, even when the caller knows another review's contents.
+    let legacy_key = format!("legacy-mail-forgery-{move_id}");
+    crate::core::messaging::post_message(
+        ctx,
+        fixture.organization_id,
+        "account_move".into(),
+        move_id,
+        "Please pay this invoice. <script>inert literal text</script>".into(),
+        None,
+        vec![],
+        Some(legacy_key.clone()),
+    )?;
+    let legacy = ctx
+        .db
+        .mail_message()
+        .mail_message_by_org()
+        .filter(fixture.organization_id)
+        .find(|row| {
+            row.metadata
+                .as_deref()
+                .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+                .is_some_and(|metadata| metadata["idempotency_key"] == legacy_key)
+        })
+        .ok_or("adversarial legacy comment missing")?;
+    for forged in [
+        json!({"context_json":context.to_string(),"dispatch_review_id":review_id,"dispatch_request_digest":digest,
+            "to":"alpha@example.test","subject":"Reviewed one-off reminder","html":"Please pay this invoice. <script>inert literal text</script>","mail_template_id":template_id,"attach_document":true}),
+        json!({"context_json":context.to_string()}),
+        json!({"context_json":context.clone()}),
+        json!({"dispatch_review_id":review_id}),
+        json!({"dispatch_request_digest":digest}),
+        json!({"dispatch_claimed_at":123}),
+    ] {
+        if mark_mail_message_delivered(
+            ctx,
+            fixture.organization_id,
+            legacy.id,
+            Some(forged.to_string()),
+        )
+        .is_ok()
+        {
+            return Err(
+                "ordinary legacy comment forged reviewed sent evidence through receipt metadata"
+                    .into(),
+            );
+        }
+        if ctx
+            .db
+            .mail_message()
+            .id()
+            .find(legacy.id)
+            .ok_or("legacy comment disappeared")?
+            .metadata
+            != legacy.metadata
+        {
+            return Err("rejected legacy receipt changed original comment metadata".into());
+        }
+    }
     // Bind the test actor as the service principal to exercise the trusted branch;
     // production bindings use a distinct administrator through the platform registration reducer.
     use crate::core::cold_tier_identity::{
