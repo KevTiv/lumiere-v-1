@@ -529,7 +529,7 @@ export function useCreateRole(organizationId: bigint) {
             ? String(formData.metadata)
             : null,
       }
-      const { urlPath, init } = stdbBffCommandPost("create_role", { params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("create_role", { params: stdbParamsToJson(params, "CreateRoleParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create role')
     },
