@@ -134,6 +134,9 @@ pub fn mask_report_preview(
         ReportPreview::MonthlyOwnerReportV1(envelope) => {
             ReportPreview::MonthlyOwnerReportV1(envelope)
         }
+        ReportPreview::MarginSupplyOutlookV1(envelope) => {
+            ReportPreview::MarginSupplyOutlookV1(envelope)
+        }
     }
 }
 

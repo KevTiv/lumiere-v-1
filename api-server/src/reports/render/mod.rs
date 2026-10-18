@@ -29,6 +29,7 @@ fn preview_key(preview: &ReportPreview) -> &'static str {
         ReportPreview::PurchaseSpendV1(_) => "purchase-spend",
         ReportPreview::PaymentFeeSummaryV1(_) => "payment-fee-summary",
         ReportPreview::MonthlyOwnerReportV1(_) => "monthly-owner-report",
+        ReportPreview::MarginSupplyOutlookV1(_) => "margin-supply-outlook",
     }
 }
 
@@ -99,6 +100,19 @@ fn render_html(preview: &ReportPreview) -> String {
                 format_money(&envelope.report.purchase_spend),
                 format_money(&envelope.report.payment_fees),
                 format_money(&envelope.report.stock_movement_value)
+            ),
+        ),
+        ReportPreview::MarginSupplyOutlookV1(envelope) => render_commercial(
+            "Margin & Supply Outlook",
+            &envelope.scope,
+            &envelope.watermark,
+            &format!(
+                "Baseline gross profit {} · stressed gross profit {} · profit at risk {} · {} warning(s), {} critical",
+                format_money(&envelope.report.baseline_gross_profit),
+                format_money(&envelope.report.stressed_gross_profit),
+                format_money(&envelope.report.profit_at_risk),
+                envelope.report.warning_count,
+                envelope.report.critical_count
             ),
         ),
     }
