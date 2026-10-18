@@ -515,13 +515,15 @@ pub(crate) fn generated_restore_order(table: &str) -> Option<u32> {
         "workflow_version" => Some(502),
         "ai_knowledge_review" => Some(503),
         "ai_knowledge_skill_promotion" => Some(504),
-        "form_field_label" => Some(505),
-        "workflow_calendar_exception" => Some(506),
+        "bank_statement_settlement_attempt" => Some(505),
+        "form_field_label" => Some(506),
+        "workflow_calendar_exception" => Some(507),
+        "bank_statement_settlement_reversal" => Some(508),
         _ => None,
     }
 }
 
-pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 506;
+pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 508;
 
 pub(crate) fn apply_generated_reconstruction_row(
     ctx: &ReducerContext,
@@ -23354,6 +23356,52 @@ pub(crate) fn apply_generated_reconstruction_row(
                 }
             }
         },
+        "bank_statement_settlement_attempt" => {
+            use crate::accounting::bank_settlement_lifecycle::{bank_statement_settlement_attempt as _, BankStatementSettlementAttempt};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BankStatementSettlementAttempt>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for bank_statement_settlement_attempt: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.bank_statement_settlement_attempt();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing bank_statement_settlement_attempt row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming bank_statement_settlement_attempt row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BankStatementSettlementAttempt>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for bank_statement_settlement_attempt: {error}"))?;
+                    let inserted = rows.insert(BankStatementSettlementAttempt {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for bank_statement_settlement_attempt advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
         "form_field_label" => {
             use crate::forms::{form_field_label as _, FormFieldLabel};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -23441,6 +23489,52 @@ pub(crate) fn apply_generated_reconstruction_row(
                     if generated_id > desired_id {
                         break Err(format!(
                             "reconstruction sequence for workflow_calendar_exception advanced past restored primary key {desired_id}"
+                        ));
+                    }
+                }
+            }
+        },
+        "bank_statement_settlement_reversal" => {
+            use crate::accounting::bank_settlement_lifecycle::{bank_statement_settlement_reversal as _, BankStatementSettlementReversal};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BankStatementSettlementReversal>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for bank_statement_settlement_reversal: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.bank_statement_settlement_reversal();
+            if let Some(existing) = rows.id().find(&row.id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing bank_statement_settlement_reversal row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming bank_statement_settlement_reversal row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                let desired_id = row.id;
+                loop {
+                    let spacetimedb_sats::serde::SerdeWrapper(candidate) =
+                        serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<BankStatementSettlementReversal>>(row_json)
+                            .map_err(|error| format!("invalid canonical row JSON for bank_statement_settlement_reversal: {error}"))?;
+                    let inserted = rows.insert(BankStatementSettlementReversal {
+                        id: 0,
+                        ..candidate
+                    });
+                    if inserted.id == desired_id {
+                        break Ok(GeneratedApplyOutcome::Inserted);
+                    }
+                    let generated_id = inserted.id;
+                    rows.id().delete(&generated_id);
+                    if generated_id > desired_id {
+                        break Err(format!(
+                            "reconstruction sequence for bank_statement_settlement_reversal advanced past restored primary key {desired_id}"
                         ));
                     }
                 }

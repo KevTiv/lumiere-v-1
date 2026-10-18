@@ -6,6 +6,10 @@
     "canonicalization": "json_sorted_keys_semantic_type_refs"
   },
   "operations": {
+    "erp.abandon_bank_statement_settlement": {
+      "name": "abandon_bank_statement_settlement",
+      "shape_fingerprint": "sha256:01cb3a679329c7de8714ca3e2ee5f5d9d637719676b9d7c0fdcdc80b18daf730"
+    },
     "erp.accept_ai_provider_attempt": {
       "name": "accept_ai_provider_attempt",
       "shape_fingerprint": "sha256:f5c4e3ec4296678bad9058f8b830257c7ba900edd4acd31fdd7f0db20d64e10f"
@@ -140,7 +144,7 @@
     },
     "erp.add_workflow_human_task_comment": {
       "name": "add_workflow_human_task_comment",
-      "shape_fingerprint": "sha256:7fe2eb4d4c384b9d26f86997d4161c070f33a3299212a1df165e3864543084b6"
+      "shape_fingerprint": "sha256:816db1a3020cd054faaad6b169d05a205eba114048a9973f44c2020a6f93f563"
     },
     "erp.advance_ai_run_checkpoint": {
       "name": "advance_ai_run_checkpoint",
@@ -584,7 +588,7 @@
     },
     "erp.cancel_workflow": {
       "name": "cancel_workflow",
-      "shape_fingerprint": "sha256:9e06e80c5e17ef2d38c1bd1b31743a5618647f62a0a9b679a49d41d31f087f7b"
+      "shape_fingerprint": "sha256:6870c12529fe19c7aaafe368222913e3f63ebcb824d8a60435f53484ed904967"
     },
     "erp.cancel_workflow_outbox": {
       "name": "cancel_workflow_outbox",
@@ -620,7 +624,7 @@
     },
     "erp.claim_workflow_human_task": {
       "name": "claim_workflow_human_task",
-      "shape_fingerprint": "sha256:45865da0d02caf4813495a4fc64591435c7439605747517092022d5b45ea386a"
+      "shape_fingerprint": "sha256:b3a266de4d278fe33d4b294d36e2d273f03730bde1e87996b35c2fb18e81776a"
     },
     "erp.cleanup_abandoned_account_move_import": {
       "name": "cleanup_abandoned_account_move_import",
@@ -1984,7 +1988,7 @@
     },
     "erp.decide_workflow_human_task": {
       "name": "decide_workflow_human_task",
-      "shape_fingerprint": "sha256:9f3fa51a349c856103443065c9025592ea8020dd6af70627a6ed64b43d04520c"
+      "shape_fingerprint": "sha256:66a0e0ca04598edcc244ea06304f9dd9fdeceae7f037903331e3ddede86a1214"
     },
     "erp.delete_account_asset": {
       "name": "delete_account_asset",
@@ -2752,7 +2756,7 @@
     },
     "erp.invalidate_workflow_human_task": {
       "name": "invalidate_workflow_human_task",
-      "shape_fingerprint": "sha256:37a5918e8e9b7e74dab1849e07441e86953e549331f6235e2e2e98e06916d076"
+      "shape_fingerprint": "sha256:6b63a9516126ca0784a934f09ec4b49b874507459dd89d58eb3cf09db22a7bdd"
     },
     "erp.invoice_po_line": {
       "name": "invoice_po_line",
@@ -2960,7 +2964,7 @@
     },
     "erp.post_payment": {
       "name": "post_payment",
-      "shape_fingerprint": "sha256:d3c6ecef2d8ae78d0829d74ebb25dff6383be8c47586825d2ff9e1edff5d5f04"
+      "shape_fingerprint": "sha256:d090258bc3bbfd02b7139c5e70654b7255dd721c61c5fdecfbd6a7339feffc88"
     },
     "erp.post_payment_transaction": {
       "name": "post_payment_transaction",
@@ -3554,6 +3558,10 @@
       "name": "restore_proposal_version",
       "shape_fingerprint": "sha256:4b2ba3d523146b998bec4f4f4684235362fe48818e901a867fca3a37773c1c73"
     },
+    "erp.resubmit_bank_statement_settlement": {
+      "name": "resubmit_bank_statement_settlement",
+      "shape_fingerprint": "sha256:db3b7e46c443e56bb313a3a5c3fe96d7620365d15fae05bfcc9808554cc937ff"
+    },
     "erp.resume_ai_run_checked": {
       "name": "resume_ai_run_checked",
       "shape_fingerprint": "sha256:5301f7bb2eb84963c29c8dc58f4a3a76041738b24a725a3b6c28945ccdebbc32"
@@ -3577,6 +3585,10 @@
     "erp.retry_iot_action": {
       "name": "retry_iot_action",
       "shape_fingerprint": "sha256:57cb86858927a671d4692c164c7fe6f35a96f595da1011507cecc782a59fe408"
+    },
+    "erp.reverse_bank_statement_settlement": {
+      "name": "reverse_bank_statement_settlement",
+      "shape_fingerprint": "sha256:aec70c6436d7b86260786d0333bf7ad7ab04e3b976d6451843e64ee8a57b2b1d"
     },
     "erp.reverse_payment_transaction": {
       "name": "reverse_payment_transaction",
@@ -6065,9 +6077,9 @@
       "previous_release": "v0.3.120",
       "previous_ir_sha256": "sha256:aa4c2a9d049b36e51aab0f30e5848e17e12cee9330e222f4402da430181e5d3b",
       "previous_operations_fingerprint": "sha256:6e5694ae968ca8a791ca4f744c0028d7887742c0fa0ecbb5f9374198450797bf",
-      "current_operations_fingerprint": "sha256:98018ad367067fc5ed3f37c73949336ff211aea30d829c5fbfa2d162e6e70051",
-      "operation_count": 1453,
-      "reason": "Accounting alpha: add denied reviewed email dispatch claim and declare bank settlement resource invalidation; preserve existing public ABI"
+      "current_operations_fingerprint": "sha256:fd560fad37e89b5a3ce8b10c23311237c7a23418e0bc4db876f247f04c40c30a",
+      "operation_count": 1456,
+      "reason": "Accounting alpha: add private reviewed mail claim and guarded bank settlement recovery/reversal operations; declare settlement and approval lifecycle resource invalidations without changing existing public operation ABI"
     }
   ]
 }

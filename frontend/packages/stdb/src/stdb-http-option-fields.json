@@ -845,6 +845,13 @@
   "BankMatchCandidate": [
     "rule_id"
   ],
+  "BankSettlementInvoiceSnapshot": [
+    "sale_order_id"
+  ],
+  "BankSettlementLineSnapshot": [
+    "matching_number_before",
+    "matching_label_before"
+  ],
   "BankStatementImport": [
     "file_name",
     "approved_statement_id",
@@ -858,6 +865,16 @@
     "description",
     "validation_error",
     "created_statement_line_id"
+  ],
+  "BankStatementSettlementAttempt": [
+    "previous_payment_id",
+    "recovery_key",
+    "recovery_reason",
+    "reversal_request_id",
+    "closed_at"
+  ],
+  "BankStatementSettlementReversal": [
+    "reversal_move_id"
   ],
   "BarcodeNomenclature": [
     "description",

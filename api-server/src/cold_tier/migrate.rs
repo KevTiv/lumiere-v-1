@@ -203,6 +203,15 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0017_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 18,
+        name: "bank_statement_settlement_lifecycle",
+        change_set: 10,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0018_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
