@@ -1,6 +1,6 @@
 # Accounting alpha implementation and release handoff
 
-Updated 2026-10-18 for `codex/draft-backend-accounting-alpha-gaps`. Implementation and the coherent local 0.3.122 pin are complete, with all local checks passing. Remote contracts publication is next; service configuration, deployment and deployed acceptance remain gated. Local validation does not establish deployed accountant acceptance, provider delivery, production recovery readiness or Rwanda statutory certification.
+Updated 2026-10-18 for `codex/draft-backend-accounting-alpha-gaps`. Implementation and the coherent local 0.3.122 pin are complete, with all local checks passing. Contracts 0.3.122 is published and its remote CI passed. The application source remains locally committed; service configuration, deployment and deployed acceptance remain gated. Local validation does not establish deployed accountant acceptance, provider delivery, production recovery readiness or Rwanda statutory certification.
 
 ## Implemented workflows
 
@@ -30,9 +30,9 @@ The release also preserves the published invitation/access lifecycle: trusted in
 
 ## Coherent contract release
 
-The validated local candidate is `lumiere-contracts` **0.3.122**, revision `b2c43fd99b5e0938da3f9a33908d0029cabb9163`. It combines the purchasing controls published in 0.3.120 and the invitation/access operations published in 0.3.121 with the accounting settlement/reversal and reviewed-mail changes. Existing purchasing tables/reducers and every `UpdateAccountMoveLineParams` field remain present; the two access operations, private invitation receipt table and `UpdateRoleParams.metadata` are retained.
+Published `lumiere-contracts` **0.3.122**, revision `b2c43fd99b5e0938da3f9a33908d0029cabb9163`, is available at tag [`v0.3.122`](https://github.com/KevTiv/lumiere-contracts/tree/v0.3.122). The normal atomic push advanced contracts `main` and created the annotated tag, whose object is `d23ff26dead176d816a498549d441ab7c2d4f371`. It combines the purchasing controls published in 0.3.120 and the invitation/access operations published in 0.3.121 with the accounting settlement/reversal and reviewed-mail changes. Existing purchasing tables/reducers and every `UpdateAccountMoveLineParams` field remain present; the two access operations, private invitation receipt table and `UpdateRoleParams.metadata` are retained.
 
-Application pin commit `1a1b3054018b63bfbff94fb807ee669c955ec4c2` installs the candidate locally across the Rust/npm archives, lockfiles, generated metadata, presentation consumers and `release-compatibility-manifest.json`. Final application validation is recorded below; catalog and manifest verification pass. The application source branch is locally committed. Remote contracts publication and deployment have not been performed. Published operation-history snapshots are preserved in the linear union history.
+Application pin commit `1a1b3054018b63bfbff94fb807ee669c955ec4c2` installs this version locally across the Rust/npm archives, lockfiles, generated metadata, presentation consumers and `release-compatibility-manifest.json`. Final application validation is recorded below; catalog and manifest verification pass. The application source branch is locally committed and has not been pushed; deployment has not been performed. Published operation-history snapshots are preserved in the linear union history.
 
 | Frozen module/contract evidence | Value |
 | --- | --- |
@@ -49,7 +49,7 @@ The exact union comparison preserves both published operation/table/resource set
 | `lumiere-contracts-rust-0.3.122.tar.gz` | `56a5f223d36f0169bc25a4b925332a25afc9d2793f5926d30969d524bc5495af` |
 | `lumiere-contracts-0.3.122.tgz` | `09c0c3d176b41f88530340c24c7e9e0d8cdfc2f729d76b33fa8bffc8346c2591` |
 
-Candidate checks pass: Rust all features, TypeScript typecheck/build, generator drift, 30 Python emitter tests, two Rust v2 codec tests and nine Node codec/capability tests. Evidence: `/tmp/lumiere-0.3.122-local-candidate-evidence.json`.
+Published-artifact local checks pass: Rust all features, TypeScript typecheck/build, generator drift, 30 Python emitter tests, two Rust v2 codec tests and nine Node codec/capability tests. Evidence: `/tmp/lumiere-0.3.122-local-candidate-evidence.json`.
 
 The reviewed application migration lineage is:
 
@@ -72,7 +72,8 @@ An existing database that recorded the onboarding branch's **platform identity l
 | Accounting/bank runtime | **PASS:** all three final bank/payment domain runners on the exact frozen WASM, including recovery, coordinated reversal, prior-payment preservation, module denial and six native company-scope denials with unchanged state. |
 | Access and policy integration | Independent source review passed. Hosted invitation tests: 14 pass; private routing: 3 pass; role-assignment projection: 8 pass; shared pure policy: 5 pass. **PASS:** final `run_core_sod_test` covers atomic member access, trusted invite retries, canonical/module duty checks, explicit financial capabilities and field-write intersections. |
 | Accounting frontend/browser | **PASS:** final C2, COV00C/D, transport and i18n checks; 1,092 direct tests across 191 files (166 shared, 460 query-hook, 466 web), plus 785 UI tests across 119 files: **1,877 frontend unit/component tests**. The 10 bank-lifecycle hook cases are included. UI, query-hook and full-web TypeScript checks pass. **PASS:** 14 Chromium cases at 390px/1440px with intercepted APIs, including four resubmit/reversal cases covering retained attempts, scope changes and withheld compensation proof. Screenshots: `/tmp/lumiere-122-accounting-operations-artifacts`. |
-| Contracts and durability | **PASS:** clean canonical generation, published-union comparison and local 0.3.122 candidate/package checks. The pin is installed in all consumers. Runtime catalog checksum, configuration example, release-manifest verification, 12 manifest tests and eight IR pin tests pass. Remote publication remains a separate release step. |
+| Contracts and durability | **PASS:** clean canonical generation, published-union comparison and local 0.3.122 artifact/package checks. The pin is installed in all consumers. Runtime catalog checksum, configuration example, release-manifest verification, 12 manifest tests and eight IR pin tests pass. Contracts `main` and annotated tag `v0.3.122` are published. |
+| Published contracts CI | **PASS:** [run 39130462978](https://github.com/KevTiv/lumiere-contracts/actions/runs/39130462978) completed successfully at `2026-10-18T13:13:56Z` for `b2c43fd99b5e0938da3f9a33908d0029cabb9163`, including offline IR/no-source/no-network generation and package validation. Remote `main` and the peeled tag both resolve to the published revision; the annotated tag object matches the value above. |
 | API/auth/policy checks | **PASS:** 655 Rust tests against the local 0.3.122 pin: 578 API, 72 auth and five policy. Three tests remain deliberately ignored: two performance benchmarks and one live STDB/Postgres drill. |
 | External release | Service configuration, external deployment, real provider delivery, production restore rehearsal and deployed accountant acceptance have not been established by these local tests. |
 
@@ -80,7 +81,7 @@ All four final runtime runner results and the exact observed module hash are rec
 
 Before release:
 
-1. Publish the reviewed immutable contracts release and record its final provenance before deployment. Verify the target database migration lineage; the incompatible onboarding version-17 history still requires a reviewed transition. Keep the reviewed-mail claim and trusted invitation acceptance unavailable to generic session operations.
+1. Retain the exact published release provenance with the deployed artifacts. Verify the target database migration lineage; the incompatible onboarding version-17 history still requires a reviewed transition. Keep the reviewed-mail claim and trusted invitation acceptance unavailable to generic session operations.
 2. Configure and verify provider credentials, the managed PDF renderer when selected, and `LUMIERE_REVIEWED_MAIL_STDB_TOKEN` with an active per-organization `reviewed_mail_dispatcher` binding. Apply explicit persona permissions and document read/create access; do not bypass field redaction to make a checklist ready.
 3. Deploy one consistent web/API/module/contracts set to the intended environment. Rehearse settlement approval/recovery/reversal, bill-document uncertainty, imports, exact-period reports and email outcomes with deployed identities and services. Record the named user's/accountant's acceptance and production recovery evidence.
 4. Keep Rwanda statutory approval separate. Real RRA/VSDC exchange remains deferred pending official specifications and an approved integration/certification plan. The existing adapter stub is not statutory integration; country-pack, tax/legal review and the [Rwanda rehearsal's statutory gate](RWANDA_ACCOUNTING_ALPHA_REHEARSAL.md) still apply.
