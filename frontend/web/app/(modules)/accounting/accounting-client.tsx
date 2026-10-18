@@ -1890,6 +1890,7 @@ function AccountingClientReady({
             <Button
               type="button"
               variant="outline"
+              data-testid="accounting-invoice-record-actions"
               onClick={() => {
                 setInvoiceSheetRecord(null)
                 // ACC-RI-018 rationale: safe because this generic sheet is installed only on AccountMove tabs.
