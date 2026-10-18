@@ -9,8 +9,8 @@ use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line,
-    is_receivable_or_payable_line_type, reconcile_payment_with_invoice_impl, AccountMove,
-    AccountMoveLine, AddAccountMoveLineParams,
+    is_receivable_or_payable_line_type, reconcile_payment_with_invoice_impl,
+    require_invoice_not_bank_payment, AccountMove, AccountMoveLine, AddAccountMoveLineParams,
 };
 use crate::accounting::relations::{
     require_active_account, require_active_currency_id, require_active_journal,
@@ -1291,6 +1291,7 @@ fn register_payment_on_invoice_impl(
 
     // Company/org guard before mutating residuals or reconciled_* lists.
     for inv_id in &invoice_ids {
+        require_invoice_not_bank_payment(ctx, organization_id, *inv_id)?;
         let invoice = ctx
             .db
             .account_move()

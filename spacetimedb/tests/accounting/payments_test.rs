@@ -523,6 +523,33 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
         .ok_or("prior payment missing")?;
     post_payment(ctx, org, prior.id)?;
     register_payment_on_invoice(ctx, org, prior.id, vec![invoice_id], false)?;
+    // An ordinary posted, unallocated payment exercises the second-argument
+    // registration bypass without depending on an already exhausted payment.
+    create_payment(
+        ctx,
+        org,
+        CreatePaymentParams {
+            idempotency_key: "bank-counterpart-adversarial-payment".to_string(),
+            company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount: 0.01,
+            currency_id: fixture.currency_id,
+            date: Some(ctx.timestamp),
+            journal_id,
+            ref_: Some("bank-counterpart-adversarial".to_string()),
+            memo: None,
+        },
+    )?;
+    let ordinary_payment = ctx
+        .db
+        .account_payment()
+        .payment_by_org()
+        .filter(&org)
+        .find(|row| row.ref_.as_deref() == Some("bank-counterpart-adversarial"))
+        .ok_or("adversarial ordinary payment missing")?;
+    post_payment(ctx, org, ordinary_payment.id)?;
     let target = ctx
         .db
         .account_move_line()
@@ -845,8 +872,20 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
         .move_id
         .ok_or("approved bank payment entry missing")?;
     let direct_reconcile = reconcile_payment_with_invoice(ctx, org, payment_move_id, invoice_id);
+    let reversed_reconcile = reconcile_payment_with_invoice(ctx, org, invoice_id, payment_move_id);
+    let counterpart_register =
+        register_payment_on_invoice(ctx, org, ordinary_payment.id, vec![payment_move_id], false);
+    for result in [&reversed_reconcile, &counterpart_register] {
+        if !matches!(result, Err(error) if error.contains("bank-linked payments require")) {
+            return Err(
+                "bank-owned payment was accepted as the invoice-side counterpart".to_string(),
+            );
+        }
+    }
     if direct_register.is_ok()
         || direct_reconcile.is_ok()
+        || reversed_reconcile.is_ok()
+        || counterpart_register.is_ok()
         || settlement_financial_snapshot(ctx, org) != approved_snapshot
     {
         return Err("generic invoice registration diverted a bank-owned payment".to_string());

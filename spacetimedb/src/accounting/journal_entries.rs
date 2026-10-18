@@ -4871,7 +4871,9 @@ pub fn reconcile_payment_with_invoice(
         .account_payment()
         .payment_by_org()
         .filter(&organization_id)
-        .filter(|payment| payment.move_id == Some(payment_move_id))
+        .filter(|payment| {
+            payment.move_id == Some(payment_move_id) || payment.move_id == Some(invoice_move_id)
+        })
     {
         crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
             ctx,
@@ -4882,6 +4884,30 @@ pub fn reconcile_payment_with_invoice(
     reconcile_payment_with_invoice_impl(ctx, organization_id, payment_move_id, invoice_move_id)
 }
 
+/// A bank-owned payment can only be the payment side of its authorized settlement.
+/// Generic invoice registration must validate this before recording invoice links.
+pub(super) fn require_invoice_not_bank_payment(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    invoice_move_id: u64,
+) -> Result<(), String> {
+    use crate::accounting::payments::account_payment;
+    for payment in ctx
+        .db
+        .account_payment()
+        .payment_by_org()
+        .filter(&organization_id)
+        .filter(|payment| payment.move_id == Some(invoice_move_id))
+    {
+        crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
+            ctx,
+            organization_id,
+            payment.id,
+        )?;
+    }
+    Ok(())
+}
+
 pub(super) fn reconcile_payment_with_invoice_impl(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -4889,6 +4915,7 @@ pub(super) fn reconcile_payment_with_invoice_impl(
     invoice_move_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "write")?;
+    require_invoice_not_bank_payment(ctx, organization_id, invoice_move_id)?;
 
     let payment_move = ctx
         .db
