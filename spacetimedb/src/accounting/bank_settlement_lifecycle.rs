@@ -27,7 +27,10 @@ use crate::workflow::action_registry::{
 use crate::workflow::approval_gate::{
     request_guarded_action, GuardedActionGateOutcome, RequestGuardedActionParams,
 };
-use crate::workflow::approvals::{workflow_human_task, WorkflowHumanTask, WorkflowHumanTaskStatus};
+use crate::workflow::approvals::{
+    workflow_human_task, workflow_human_task_event, WorkflowHumanTask,
+    WorkflowHumanTaskCommandKind, WorkflowHumanTaskStatus,
+};
 use crate::workflow::runtime::{workflow_instance, WorkflowInstanceState};
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -377,6 +380,12 @@ pub(super) fn prepare_attempt(
             return Err(
                 "bank settlement line has inconsistent base-currency residuals".to_string(),
             );
+        }
+        if row.is_matching
+            || pilot_money_minor_units(row.amount_currency, currency.decimal_places)?
+                != pilot_money_minor_units(row.balance, currency.decimal_places)?
+        {
+            return Err("bank settlement requires unmatched items with consistent base-currency ledger amounts".to_string());
         }
         let invoice = ctx
             .db
@@ -1470,17 +1479,8 @@ pub fn reverse_bank_statement_settlement(
                 );
             }
         }
-        let next_id = ctx
-            .db
-            .bank_statement_settlement_reversal()
-            .iter()
-            .map(|row| row.id)
-            .max()
-            .unwrap_or(0)
-            .checked_add(1)
-            .ok_or("bank reversal request id exhausted")?;
         let proposed = BankStatementSettlementReversal {
-            id: next_id,
+            id: 0,
             organization_id,
             company_id,
             attempt_id: attempt.id,
@@ -1502,7 +1502,6 @@ pub fn reverse_bank_statement_settlement(
             organization_id,
             company_id,
             params.payment_id,
-            proposed.id,
         )?;
         let request = ctx.db.bank_statement_settlement_reversal().insert(proposed);
         attempt.reversal_request_id = Some(request.id);
@@ -1779,17 +1778,29 @@ pub(crate) fn synchronize_bank_task(
             if request.status != "reversal_awaiting_approval" {
                 return Ok(());
             }
-            let snapshot = crate::workflow::action_registry::snapshot_guarded_action(
-                ctx,
-                task.organization_id,
-                task.company_id,
-                action.key.clone(),
-                action.schema_version,
-                GuardedActionInput::ReverseBankStatementSettlement {
-                    payment_id: task.subject_id,
-                },
-            )?;
-            if snapshot.condition_snapshot.subject_revision_hash != task.condition_revision_hash {
+            // Task correlation is mutable on decisions. Its append-only CREATE
+            // evidence retains the server gate's exact persisted request identity.
+            let correlation = format!("bank-settlement-reversal:{}", request.id);
+            let belongs_to_current = ctx
+                .db
+                .workflow_human_task_event()
+                .human_task_event_by_task()
+                .filter(&task.id)
+                .any(|event| {
+                    event.organization_id == task.organization_id
+                        && event.company_id == task.company_id
+                        && event.workflow_instance_id == task.workflow_instance_id
+                        && event.workflow_version_id == task.workflow_version_id
+                        && event.command_kind == WorkflowHumanTaskCommandKind::Create
+                        && event.subject_revision_hash == task.subject_revision_hash
+                        && event.correlation_id == correlation
+                });
+            if !belongs_to_current {
+                // A later cancellation of a superseded workflow still has durable
+                // runtime evidence, without changing the current request or hint.
+                if task_is_cancelled(ctx, task) {
+                    return record_cancelled_bank_approval(ctx, attempt);
+                }
                 return Ok(());
             }
             request.status = format!("reversal_{suffix}");

@@ -330,6 +330,28 @@ pub fn test_bank_statement_settlement_exact_effect(ctx: &ReducerContext) -> Resu
     if stale.is_ok() || settlement_financial_snapshot(ctx, org) != stale_before {
         return Err("stale bank settlement changed financial state".to_string());
     }
+    ctx.db.account_move_line().id().update(target.clone());
+    // An accepted attempt must have an exact, reversible base-currency snapshot.
+    // Neither malformed source may create even a draft, receipt, task or audit.
+    for malformed in [
+        crate::accounting::journal_entries::AccountMoveLine {
+            is_matching: true,
+            ..target.clone()
+        },
+        crate::accounting::journal_entries::AccountMoveLine {
+            amount_currency: target.balance + 1.0,
+            ..target.clone()
+        },
+    ] {
+        ctx.db.account_move_line().id().update(malformed);
+        let before = super::bank_settlement_lifecycle_test::snapshot(ctx, org)?;
+        if reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, params.clone())
+            .is_ok()
+            || super::bank_settlement_lifecycle_test::snapshot(ctx, org)? != before
+        {
+            return Err("non-reversible bank source item created financial, receipt, approval or durable effects".to_string());
+        }
+    }
     ctx.db.account_move_line().id().update(target);
     reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, params.clone())?;
     let settled = ctx

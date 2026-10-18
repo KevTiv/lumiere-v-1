@@ -818,7 +818,7 @@ fn bank_settlement_reversal_snapshot(
     company_id: u64,
     payment_id: u64,
 ) -> Result<MaterialSnapshot, String> {
-    let (snapshot, amount, currency_id, state, request_id) =
+    let (snapshot, amount, currency_id, state, _request_id) =
         crate::accounting::bank_settlement_lifecycle::reversal_material(
             ctx,
             organization_id,
@@ -835,10 +835,6 @@ fn bank_settlement_reversal_snapshot(
         vec![
             condition_field("amount", ConditionValue::Money(amount)),
             condition_field("state", ConditionValue::Code(state)),
-            condition_field(
-                "reversal_request_id",
-                ConditionValue::Code(request_id.to_string()),
-            ),
         ],
     ))
 }
@@ -849,7 +845,6 @@ pub(crate) fn preflight_bank_settlement_reversal_gate(
     organization_id: u64,
     company_id: u64,
     payment_id: u64,
-    request_id: u64,
 ) -> Result<(), String> {
     let mut snapshot = snapshot_guarded_action(
         ctx,
@@ -872,10 +867,6 @@ pub(crate) fn preflight_bank_settlement_reversal_gate(
         condition_field(
             "state",
             ConditionValue::Code(format!("{:?}", payment.state)),
-        ),
-        condition_field(
-            "reversal_request_id",
-            ConditionValue::Code(request_id.to_string()),
         ),
     ];
     snapshot.condition_snapshot.subject_revision_hash =
