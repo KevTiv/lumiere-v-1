@@ -1004,6 +1004,12 @@ impl BankSettlementCommitSnapshot {
                 &row,
             )?);
         }
+        // Several retained tasks may share one pinned workflow/version. Emit one
+        // complete current row per identity while preserving parent-first order.
+        let mut seen = std::collections::BTreeSet::new();
+        changes.retain(|change| {
+            seen.insert((change.table_name.clone(), change.row_identity.to_string()))
+        });
         record_organization_commit(
             ctx,
             OrganizationCommitInput {
