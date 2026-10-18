@@ -1,6 +1,7 @@
 //! Accounting domain test suite — invoke via `run_all_accounting_tests` reducer.
 pub mod active_company_matrix_test;
 pub mod adversarial_p0_fixes_test;
+pub mod bank_settlement_lifecycle_test;
 pub mod budgeting_test;
 pub mod fixed_assets_test;
 pub mod fx_revaluation_test;
@@ -104,6 +105,10 @@ pub fn run_accounting_payment_reconcile_test(ctx: &ReducerContext) -> Result<(),
         .map_err(|e| format!("bank_statement_settlement_exact_effect: {e}"))?;
     payments_test::test_bank_settlement_approval_and_last_cent(ctx)
         .map_err(|e| format!("bank_settlement_approval_and_last_cent: {e}"))?;
+    payments_test::test_bank_reversal_multi_invoice_shared_order_and_supplier(ctx)
+        .map_err(|e| format!("bank_reversal_multi_invoice_shared_order_and_supplier: {e}"))?;
+    bank_settlement_lifecycle_test::test_bank_settlement_recovery_replay_and_denials(ctx)
+        .map_err(|e| format!("bank_settlement_recovery_replay_and_denials: {e}"))?;
     payments_test::test_payment_reconciles_invoice(ctx)
         .map_err(|e| format!("payment_reconciles_invoice: {e}"))?;
     payments_test::test_reconciled_payment_unwind_and_cancel_exact_effect(ctx)
