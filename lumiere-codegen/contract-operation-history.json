@@ -6096,6 +6096,14 @@
       "current_operations_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
       "operation_count": 1458,
       "reason": "Accounting alpha: guarded bank approval recovery and coordinated reversal, private reviewed mail claim, and resource invalidations; preserve published onboarding and restore v0.3.120 purchasing operations and optional accounting fields"
+    },
+    {
+      "previous_release": "v0.3.122",
+      "previous_ir_sha256": "sha256:0656e152af761f88c2bbfd4693029196bdc3f7e0bd32af63d3ec248f92157213",
+      "previous_operations_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
+      "current_operations_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
+      "operation_count": 1458,
+      "reason": "Reconcile the independently published v0.3.123 access revision ABI (contracts355c98d34415b268804d4399c9bb3670036fe1d3; IR058376eec556dd0aeadb74bfef11f7432f273ac70975d7e2a0cba3ed33c55f4e) with the v0.3.122 alpha bank, purchasing and accounting contracts. Preserve the exact prior history; SetMemberAccessParams.expected_access_revision is a named-type ABI addition even though operation reference fingerprints are unchanged."
     }
   ]
 }

@@ -391,9 +391,11 @@ names/phases/checksums, or both current and legacy relations fail closed.
 Matching recorded history does not prove that all projected tables or business
 data exist; readiness and recovery checks remain separate.
 
-For contracts 0.3.122, the intended tail is purchasing keyed operations at 17,
+The canonical catalog retained from contracts 0.3.122 has purchasing keyed operations at 17,
 invitation receipts at 18, bank lifecycle at 19 and platform identity at 20.
-A target recording platform identity at 17 requires a reviewed transition;
+The independent WorkOS-only 0.3.123 release records platform identity at 17.
+A target with that history requires a reviewed transition before using the
+reconciled application and union contracts;
 these audit commands do not rewrite its history. The default invocation and
 `--apply` retain the existing migration behavior.
 

@@ -91,8 +91,11 @@ certification remain separate from the
 
 ## Release preparation
 
-The published contracts pin remains `0.3.122`; this milestone adds no canonical
-tables or reducer signatures. Rebuild the application/module artifacts and
+The RRA foundation was initially validated against contracts `0.3.122`; that
+milestone added no canonical tables or reducer signatures. The subsequent
+WorkOS reconciliation targets union contracts `0.3.124`, which retain the alpha
+schema and add the access-revision parameter from the independent `0.3.123`
+release. Rebuild the application/module artifacts and
 retain their exact hashes before deployment. See
 [Production deployment](PRODUCTION_DEPLOY.md) for read-only migration lineage
 auditing, reviewed-mail verification and persistent document storage checks.
@@ -119,5 +122,6 @@ Its actual HTTP schema matches the 0.3.122 baseline after sorting only
 `misc_exports`: 515 tables, 1,452 reducers and 1,398 named types. The normalized
 schema hash remains
 `db9bdab0ece275882d43327b2f897df76ac4c9903790514d55cfc842003d652b`.
-No new contracts release or pin is needed for this source change. Deployment
-configuration generation is now 6.
+That RRA-only change did not require a contracts release. The later WorkOS
+reconciliation requires the union release described above. Deployment
+configuration generation remains 6.
