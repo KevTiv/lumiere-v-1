@@ -18,6 +18,10 @@
       "name": "accept_sale_order_quotation",
       "shape_fingerprint": "sha256:01824a849506b81f964c47a068a49724441a458904555204642e87e3b9960a5a"
     },
+    "erp.accept_user_invite": {
+      "name": "accept_user_invite",
+      "shape_fingerprint": "sha256:6fa6d6c167a24015f34951d847cd09242bec46039ea704863e8c3b0b91200e38"
+    },
     "erp.accrue_sale_commission": {
       "name": "accrue_sale_commission",
       "shape_fingerprint": "sha256:db38d3dd3ed6ad87597288dad7c9b4d8f1d87a8473d1aff5476324df69898536"
@@ -4802,6 +4806,10 @@
       "name": "set_iot_threshold",
       "shape_fingerprint": "sha256:948544db0bf9912c3019590c6daf9fe3614b28986e17dba4477912f5e4d9535b"
     },
+    "erp.set_member_access": {
+      "name": "set_member_access",
+      "shape_fingerprint": "sha256:f71c62a02309ec8fa82c1eacabdd7610a51727c5835782ba64cfeb85bb2948af"
+    },
     "erp.set_project_active": {
       "name": "set_project_active",
       "shape_fingerprint": "sha256:b9c680bd5259df4382f222f427ea7c3aaa855108f560fa8043e56599110adfa1"
@@ -6077,9 +6085,17 @@
       "previous_release": "v0.3.120",
       "previous_ir_sha256": "sha256:aa4c2a9d049b36e51aab0f30e5848e17e12cee9330e222f4402da430181e5d3b",
       "previous_operations_fingerprint": "sha256:6e5694ae968ca8a791ca4f744c0028d7887742c0fa0ecbb5f9374198450797bf",
-      "current_operations_fingerprint": "sha256:fd560fad37e89b5a3ce8b10c23311237c7a23418e0bc4db876f247f04c40c30a",
-      "operation_count": 1456,
-      "reason": "Accounting alpha: add private reviewed mail claim and guarded bank settlement recovery/reversal operations; declare settlement and approval lifecycle resource invalidations without changing existing public operation ABI"
+      "current_operations_fingerprint": "sha256:c6c1a33c18c0d7619085bf68d32900965f112a9b94564182a92a0f7fcc189bbb",
+      "operation_count": 1451,
+      "reason": "Record the exact published v0.3.121 onboarding snapshot after v0.3.120; its source history overwrote the prior revision and its omitted purchasing operations are restored in the following union"
+    },
+    {
+      "previous_release": "v0.3.121",
+      "previous_ir_sha256": "sha256:d0fe132ffd28e5f3fb32ac4f35b5dd8d6433b0bbc664ed3ce9d6268a536128a9",
+      "previous_operations_fingerprint": "sha256:c6c1a33c18c0d7619085bf68d32900965f112a9b94564182a92a0f7fcc189bbb",
+      "current_operations_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
+      "operation_count": 1458,
+      "reason": "Accounting alpha: guarded bank approval recovery and coordinated reversal, private reviewed mail claim, and resource invalidations; preserve published onboarding and restore v0.3.120 purchasing operations and optional accounting fields"
     }
   ]
 }

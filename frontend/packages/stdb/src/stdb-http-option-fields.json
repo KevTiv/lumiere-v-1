@@ -5310,6 +5310,9 @@
   "SetHelpdeskRelatedRecordParams": [
     "target"
   ],
+  "SetMemberAccessParams": [
+    "job_title"
+  ],
   "SetPurchaseApprovalDelegateParams": [
     "metadata"
   ],
@@ -6830,7 +6833,8 @@
     "name",
     "description",
     "permissions",
-    "is_active"
+    "is_active",
+    "metadata"
   ],
   "UpdateSaleOrderLineParams": [
     "product_id",

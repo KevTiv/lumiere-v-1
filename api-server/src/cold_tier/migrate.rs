@@ -212,6 +212,22 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0018_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 19,
+        name: "bank_statement_settlement_lifecycle",
+        change_set: 11,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0019_durable_projection_delta.sql"
+        ),
+    },
+    Migration {
+        version: 20,
+        name: "platform_identity_lifecycle",
+        change_set: 12,
+        phase: MigrationPhase::Expand,
+        sql: platform_control::PLATFORM_IDENTITY_LIFECYCLE_DDL,
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
