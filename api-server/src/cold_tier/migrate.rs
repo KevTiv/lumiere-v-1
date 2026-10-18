@@ -194,6 +194,22 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Expand,
         sql: COUNTRY_PACK_VERSIONING_SQL,
     },
+    Migration {
+        version: 17,
+        name: "platform_identity_lifecycle",
+        change_set: 9,
+        phase: MigrationPhase::Expand,
+        sql: platform_control::PLATFORM_IDENTITY_LIFECYCLE_DDL,
+    },
+    Migration {
+        version: 18,
+        name: "durable_invite_acceptance_receipts",
+        change_set: 10,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0018_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

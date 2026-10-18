@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { SaleOrderPageClient } from "./order-page-client"
 
 const SSR_RESOURCES = ["sale-orders", "sale-order-lines", "stock-pickings", "contacts"] as const
@@ -15,7 +15,7 @@ export default async function SaleOrderPage({ params }: SaleOrderPageProps) {
     return <SaleOrderPageClient orderId={id} />
   }
 
-  const [orders, orderLines, stockPickings, contacts] = await serverFetchQueryListsRequired(
+  const [orders, orderLines, stockPickings, contacts] = await serverPrefetchQueryLists(
     session,
     SSR_RESOURCES,
   )

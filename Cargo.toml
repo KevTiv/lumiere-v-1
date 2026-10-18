@@ -9,6 +9,7 @@ members = [
     "crates/stdb-client",
     "crates/stdb-auth",
     "crates/presentation-core",
+    "crates/policy-core",
 ]
 
 [workspace.package]

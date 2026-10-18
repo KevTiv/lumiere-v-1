@@ -5,7 +5,7 @@ mod admin;
 mod ai_capabilities;
 mod ai_certifications;
 mod ai_evidence;
-mod auth;
+pub(crate) mod auth;
 mod billing;
 mod bootstrap;
 mod country_packs;

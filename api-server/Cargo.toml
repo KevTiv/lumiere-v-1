@@ -86,6 +86,7 @@ spacetimedb-sdk = "2.0.1"
 spacetimedb-sats = "=2.8.2"
 
 [dev-dependencies]
+rsa = { version = "0.9", features = ["pem"] }
 base64.workspace = true
 tokio.workspace = true
 tower.workspace = true

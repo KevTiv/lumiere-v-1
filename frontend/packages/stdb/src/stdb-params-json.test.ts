@@ -11,6 +11,17 @@ import {
 } from "./stdb-params-json"
 
 describe("stdbParamsToJson", () => {
+  it("preserves optional permission-list presence, including an explicit clear", () => {
+    for (const permissions of [["contact:read"], []]) {
+      assert.deepEqual(stdbParamsToJson({ permissions }, "UpdateRoleParams").permissions, { some: permissions })
+      assert.deepEqual(stdbParamsToJson({ permissions }, "CreateRoleParams").permissions, permissions)
+      assert.deepEqual(stdbParamsToJson({ permissions: { some: permissions } }, "UpdateRoleParams").permissions, { some: permissions })
+    }
+    assert.deepEqual(stdbParamsToJson({}, "UpdateRoleParams").permissions, { none: [] })
+    assert.deepEqual(stdbParamsToJson({ permissions: null }, "UpdateRoleParams").permissions, { none: [] })
+    assert.deepEqual(stdbParamsToJson({ roleIds: [1n, 2n] }), { role_ids: [1, 2] })
+  })
+
   it("fills every Option field of nested BOM lines", () => {
     const params = stdbParamsToJson(
       {

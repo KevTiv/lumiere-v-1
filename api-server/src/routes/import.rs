@@ -1159,6 +1159,8 @@ mod tests {
             role_permissions: vec!["hr_employee:read".into()],
             identity_hex: ACTOR.into(),
             field_permissions: vec![],
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         };
         assert!(
             import_read_columns(resolve_import_entity("hr_employee").unwrap(), &access).is_ok()

@@ -328,5 +328,14 @@
   ],
   "update_stock_picking": [
     "stock-pickings"
+  ],
+  "accept_user_invite": [
+    "user-organization",
+    "user-role-assignment"
+  ],
+  "set_member_access": [
+    "user-organization",
+    "user-role-assignment",
+    "user-roles"
   ]
 }
