@@ -2092,6 +2092,8 @@ function SalesClientLoaded({
               customContent: (
                 <InvoiceListView
                   invoices={salesInvoices}
+                  onSelectInvoice={(inv) => router.push(`/accounting/invoices/${encodeURIComponent(String(inv.id))}`)}
+                  onCreateInvoice={() => router.push(buildModuleTabHref('accounting', 'invoices'))}
                   onRecalculateTotals={(inv) =>
                     void computeInvoiceTotals
                       .mutateAsync(inv.id as string | number | bigint)
@@ -2243,6 +2245,7 @@ function SalesClientLoaded({
       linesForSelectedReturn,
       returnOrderFormConfig,
       salesInvoices,
+      router,
       computeInvoiceTotals,
       loyaltyCardFormConfig,
       t,

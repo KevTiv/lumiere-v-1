@@ -101,6 +101,9 @@ interface InvoiceListViewProps {
   onSelectInvoice?: (invoice: AccountMove) => void
   onCreateInvoice?: () => void
   onRecalculateTotals?: (invoice: AccountMove) => void
+  onSendInvoice?: (invoice: AccountMove) => void
+  onDownloadPdf?: (invoice: AccountMove) => void
+  onDeleteInvoice?: (invoice: AccountMove) => void
 }
 
 export function InvoiceListView({
@@ -108,6 +111,9 @@ export function InvoiceListView({
   onSelectInvoice,
   onCreateInvoice,
   onRecalculateTotals,
+  onSendInvoice,
+  onDownloadPdf,
+  onDeleteInvoice,
 }: InvoiceListViewProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
@@ -174,7 +180,9 @@ export function InvoiceListView({
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle>{t("accounting.invoices.title")}</CardTitle>
-            <Button onClick={onCreateInvoice} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newInvoice")}</Button>
+            {onCreateInvoice ? (
+              <Button onClick={onCreateInvoice} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newInvoice")}</Button>
+            ) : null}
           </div>
           <div className="flex items-center gap-4 mt-4">
             <div className="relative flex-1 max-w-sm">
@@ -298,10 +306,24 @@ export function InvoiceListView({
                                 {t("accounting.invoices.invoiceActions.recalculateTotals")}
                               </DropdownMenuItem>
                             )}
-                          <DropdownMenuItem><Send className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.sendInvoice")}</DropdownMenuItem>
-                          <DropdownMenuItem><Download className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.downloadPDF")}</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive"><Trash2 className="h-4 w-4 mr-2" />{t("common.delete")}</DropdownMenuItem>
+                          {onSendInvoice && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSendInvoice(inv) }}>
+                              <Send className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.sendInvoice")}
+                            </DropdownMenuItem>
+                          )}
+                          {onDownloadPdf && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDownloadPdf(inv) }}>
+                              <Download className="h-4 w-4 mr-2" />{t("accounting.invoices.invoiceActions.downloadPDF")}
+                            </DropdownMenuItem>
+                          )}
+                          {onDeleteInvoice && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteInvoice(inv) }}>
+                                <Trash2 className="h-4 w-4 mr-2" />{t("common.delete")}
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

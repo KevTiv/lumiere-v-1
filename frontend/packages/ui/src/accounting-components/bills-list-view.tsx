@@ -99,6 +99,8 @@ interface BillsListViewProps {
   onCreateBill?: () => void
   onPayBill?: (bill: AccountMove) => void
   onRecalculateTotals?: (bill: AccountMove) => void
+  onDownloadBill?: (bill: AccountMove) => void
+  onDeleteBill?: (bill: AccountMove) => void
 }
 
 export function BillsListView({
@@ -107,6 +109,8 @@ export function BillsListView({
   onCreateBill,
   onPayBill,
   onRecalculateTotals,
+  onDownloadBill,
+  onDeleteBill,
 }: BillsListViewProps) {
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
@@ -174,7 +178,9 @@ export function BillsListView({
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle>{t("accounting.bills.title")}</CardTitle>
-            <Button onClick={onCreateBill} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newBill")}</Button>
+            {onCreateBill ? (
+              <Button onClick={onCreateBill} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newBill")}</Button>
+            ) : null}
           </div>
           <div className="flex items-center gap-4 mt-4">
             <div className="relative flex-1 max-w-sm">
@@ -299,14 +305,24 @@ export function BillsListView({
                                 {t("accounting.bills.billActions.recalculateTotals")}
                               </DropdownMenuItem>
                             )}
-                          {(bill.amountResidual ?? 0) > 0 && (
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onPayBill?.(bill) }}>
+                          {onPayBill && (bill.amountResidual ?? 0) > 0 && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onPayBill(bill) }}>
                               <CreditCard className="h-4 w-4 mr-2" />{t("accounting.bills.billActions.payBill")}
                             </DropdownMenuItem>
                           )}
-                          <DropdownMenuItem><Download className="h-4 w-4 mr-2" />{t("accounting.bills.billActions.download")}</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive"><Trash2 className="h-4 w-4 mr-2" />{t("common.delete")}</DropdownMenuItem>
+                          {onDownloadBill && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDownloadBill(bill) }}>
+                              <Download className="h-4 w-4 mr-2" />{t("accounting.bills.billActions.download")}
+                            </DropdownMenuItem>
+                          )}
+                          {onDeleteBill && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDeleteBill(bill) }}>
+                                <Trash2 className="h-4 w-4 mr-2" />{t("common.delete")}
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
