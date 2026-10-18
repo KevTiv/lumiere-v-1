@@ -3915,7 +3915,8 @@
   "payslips": {
     "aliases": [
       "payslips",
-      "hr_payslip"
+      "hr_payslip",
+      "hr_payroll"
     ],
     "default_restricted": [
       "name",
@@ -3945,7 +3946,8 @@
   "payslips-to-export": {
     "aliases": [
       "payslips-to-export",
-      "hr_payslip"
+      "hr_payslip",
+      "hr_payroll"
     ],
     "default_restricted": [
       "name",

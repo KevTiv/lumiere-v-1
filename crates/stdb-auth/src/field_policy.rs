@@ -952,6 +952,22 @@ mod tests {
         }
     }
 
+    #[test]
+    fn payroll_read_uses_the_declared_payslip_alias_and_still_honors_denies() {
+        for resource in ["payslips", "payslips-to-export"] {
+            let mut access = field_access(&["hr_payroll:read"]);
+            assert!(has_resource_read_permission(Some(&access), resource));
+            access.org_permissions.push(ActionPermission {
+                resource: "hr_payslip".into(),
+                action: "read".into(),
+                allow: false,
+            });
+            assert!(!has_resource_read_permission(Some(&access), resource));
+            let access = field_access(&["hr_payroll:confirm"]);
+            assert!(!has_resource_read_permission(Some(&access), resource));
+        }
+    }
+
     fn select_fields(access: &mut FieldAccessContext, resource: &str, fields: &[&str]) {
         access.field_permissions.push(FieldPermissionLike {
             id: Some(1),
