@@ -327,6 +327,7 @@ pub fn test_adversarial_tenant_command_matrix(ctx: &ReducerContext) -> Result<()
     // This is intentionally last: the native harness cannot invoke a reducer
     // as a different Identity, but it can prove the same actor loses access
     // immediately after its membership is deactivated.
+    foreign.seed_additional_admin(ctx)?;
     remove_user_from_organization(ctx, ctx.sender(), org_b)?;
     let inactive_actor = create_company(
         ctx,

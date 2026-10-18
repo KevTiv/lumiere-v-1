@@ -484,6 +484,7 @@ pub fn test_presentation_module_rejects_inactive_cross_org_actor(
 ) -> Result<(), String> {
     let owner = OrgFixture::seed_minimal(ctx)?;
     let other = OrgFixture::seed_minimal(ctx)?;
+    other.seed_additional_admin(ctx)?;
     remove_user_from_organization(ctx, ctx.sender(), other.organization_id)?;
 
     let before = ctx.db.presentation_module().iter().count();
