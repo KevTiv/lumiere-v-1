@@ -25,6 +25,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { MarkdownView } from "@/components/ui/markdown-view"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
@@ -595,7 +596,7 @@ function TimelineItem({
         <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground mb-1">
           <span className="uppercase">{messageTypeLabel(entry.messageType)}</span>
         </div>
-        <p className="whitespace-pre-wrap break-words">{entry.body}</p>
+        <MarkdownView value={entry.body} />
       </li>
     )
   }
@@ -626,7 +627,7 @@ function TimelineItem({
       </div>
       <p className="font-medium">{entry.summary}</p>
       {entry.note ? (
-        <p className="text-muted-foreground whitespace-pre-wrap break-words mt-1">{entry.note}</p>
+        <MarkdownView value={entry.note} className="mt-1 text-muted-foreground" />
       ) : null}
       {!entry.isDone ? (
         <Button
