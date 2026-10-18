@@ -84,4 +84,35 @@ Before release:
 1. Retain the exact published release provenance with the deployed artifacts. Verify the target database migration lineage; the incompatible onboarding version-17 history still requires a reviewed transition. Keep the reviewed-mail claim and trusted invitation acceptance unavailable to generic session operations.
 2. Configure and verify provider credentials, the managed PDF renderer when selected, and `LUMIERE_REVIEWED_MAIL_STDB_TOKEN` with an active per-organization `reviewed_mail_dispatcher` binding. Apply explicit persona permissions and document read/create access; do not bypass field redaction to make a checklist ready.
 3. Deploy one consistent web/API/module/contracts set to the intended environment. Rehearse settlement approval/recovery/reversal, bill-document uncertainty, imports, exact-period reports and email outcomes with deployed identities and services. Record the named user's/accountant's acceptance and production recovery evidence.
-4. Keep Rwanda statutory approval separate. Real RRA/VSDC exchange remains deferred pending official specifications and an approved integration/certification plan. The existing adapter stub is not statutory integration; country-pack, tax/legal review and the [Rwanda rehearsal's statutory gate](RWANDA_ACCOUNTING_ALPHA_REHEARSAL.md) still apply.
+4. Keep Rwanda statutory approval separate. [RRA/VSDC local implementation](RWANDA_VSDC_IMPLEMENTATION.md) now uses the public RRA v1.0.5 specification as its development baseline. The private client and read-only readiness report do not enable submission. Sandbox enrollment, reviewed mappings, canonical fiscal snapshots, durable dispatch/receipt recovery and certification remain required; country-pack, tax/legal review and the [Rwanda rehearsal's statutory gate](RWANDA_ACCOUNTING_ALPHA_REHEARSAL.md) still apply.
+
+## Subsequent local release preparation
+
+The PASS table and frozen module hashes above describe the earlier 0.3.122
+accounting baseline. They do not represent runtime proof for the subsequent
+fiscal archive changes.
+
+The Rwanda follow-up adds strict document pack-pin validation for fiscal
+creation, revision and restore; read-only `storage-migrate --audit/--verify`
+lineage checks; reviewed-mail bootstrap/verification; and persistent document
+storage checks in Compose and Railway preflight. These source changes do not
+alter the published 0.3.122 contracts or establish deployed acceptance.
+
+The follow-up's [local evidence](evidence/rwanda-vsdc-local-2026-10-18.json)
+records 607 passing API/CLI tests, 10 real disposable-PostgreSQL read-only audit
+cases, and eight passing module runners including the full platform suite.
+The final development module has no errors or panics in its own logs and its
+actual schema matches the earlier baseline. Configuration generation is 6;
+the immutable contracts pin remains 0.3.122. Full statutory issuance still
+requires the implementation and enrollment work listed in the
+[RRA/VSDC implementation notes](RWANDA_VSDC_IMPLEMENTATION.md).
+
+A read-only Railway inspection on 2026-10-18 found web, API, SpacetimeDB and
+renderer running with older artifacts, and the module publisher marked crashed.
+The publisher log records a successful module update before its exit; the
+crashed service state alone does not establish that publication failed.
+The API has a single replica and a `/data` volume. Provider sender/key and
+dedicated reviewed-mail token names were absent from the API configuration;
+the renderer and document-blob variable names were present, with their values
+withheld by the connector. No production variables, credentials, identities,
+database history or deployments were changed by this inspection.

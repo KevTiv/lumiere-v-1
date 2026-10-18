@@ -149,6 +149,24 @@ class RailwayStackWorkflowTests(unittest.TestCase):
                 "positive-id-list",
             )
 
+    def test_document_blobs_use_persistent_single_replica_api_storage(self):
+        manifest = json.loads(
+            (ROOT / "infra/railway/production-eu-services.json").read_text()
+        )
+        api = next(service for service in manifest["services"] if service["name"] == "api-server")
+        storage = api["localStorage"]
+        self.assertEqual(storage["mountPath"], "/data")
+        self.assertEqual(storage["maxReplicas"], 1)
+        self.assertTrue(storage["directory"].startswith(storage["mountPath"] + "/"))
+        self.assertEqual(api["requiredVariables"]["LUMIERE_DOCUMENT_BLOB_DIR"], {
+            "kind": "exact", "value": storage["directory"],
+        })
+        compose = (ROOT / "docker-compose.yml").read_text()
+        api_config = compose.split("  api-server:\n", 1)[1].split("  chromium-worker:\n", 1)[0]
+        self.assertIn("LUMIERE_DOCUMENT_BLOB_DIR: /var/lib/lumiere/document-blobs", api_config)
+        self.assertIn("document-blobs:/var/lib/lumiere/document-blobs", api_config)
+        self.assertIn("  document-blobs:\n", compose.split("\nvolumes:\n", 1)[1])
+
     def test_web_release_resolves_production_service_by_name(self):
         workflow = (ROOT / ".github/workflows/release-railway-web.yml").read_text()
         self.assertIn("RAILWAY_ENVIRONMENT: production", workflow)

@@ -87,6 +87,7 @@ services:
       LUMIERE_WORKOS_ALPHA_ADMISSIONS: ${LUMIERE_WORKOS_ALPHA_ADMISSIONS:-}
       LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
+      LUMIERE_DOCUMENT_BLOB_DIR: /var/lib/lumiere/document-blobs
       # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). Readiness and
       # PG-backed reads fail closed when this durable store is unavailable.
       # Point at the managed Postgres instance. Use PG_TLS_MODE=require unless
@@ -100,6 +101,7 @@ services:
       PG_TLS_MODE: ${PG_TLS_MODE:-require}
     volumes:
       - owner-report-artifacts:/var/lib/lumiere/owner-reports
+      - document-blobs:/var/lib/lumiere/document-blobs
     expose:
       - "8082"
     restart: unless-stopped
@@ -260,3 +262,4 @@ services:
 volumes:
   qdrant-data:
   owner-report-artifacts:
+  document-blobs:

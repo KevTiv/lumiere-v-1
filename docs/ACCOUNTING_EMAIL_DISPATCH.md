@@ -12,6 +12,10 @@ The API server requires:
 
 Register the dedicated identity for each enabled organization through the existing operator-only `register_cold_tier_service_identity` procedure, with a platform-owned opaque binding ID and `service_name = "reviewed_mail_dispatcher"`. The registering administrator must be distinct from the registered identity. This repository change does not create, register or rotate production credentials.
 
+Production bootstrap and the read-only `--verify-reviewed-mail` check are
+covered in [Production deployment](./PRODUCTION_DEPLOY.md#optional-reviewed-email-readiness).
+The check verifies existing bindings only and never rotates a dispatcher token.
+
 The API verifies the token against the database-authenticated identity and active organization service binding before claiming a message or contacting Resend. Missing provider credentials, service credentials, binding or required rendering fails before provider delivery. The database independently requires the active registered service identity to record provider acceptance for reviewed invoice email; an ordinary SDK caller cannot mark a claimed reviewed message as sent or promote legacy chatter into reviewed dispatch evidence through supplied receipt metadata.
 
 ## Authority and consistency
