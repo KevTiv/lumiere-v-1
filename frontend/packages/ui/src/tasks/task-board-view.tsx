@@ -50,9 +50,11 @@ import { TablePager, usePagedRows } from "../components/table-pager"
 
 interface TaskBoardViewProps {
   className?: string
+  onEditTask?: (task: Task) => void
+  onDeleteTask?: (task: Task) => void
 }
 
-export function TaskBoardView({ className }: TaskBoardViewProps) {
+export function TaskBoardView({ className, onEditTask, onDeleteTask }: TaskBoardViewProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language
   const statusLabels: Record<TaskStatus, string> = {
@@ -408,10 +410,14 @@ export function TaskBoardView({ className }: TaskBoardViewProps) {
                         <DropdownMenuItem onClick={() => handleTaskClick(task)}>
                           {t("tasks.actions.viewDetails")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem>{t("common.edit")}</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
-                          {t("common.delete")}
-                        </DropdownMenuItem>
+                        {onEditTask && (
+                          <DropdownMenuItem onClick={() => onEditTask(task)}>{t("common.edit")}</DropdownMenuItem>
+                        )}
+                        {onDeleteTask && (
+                          <DropdownMenuItem className="text-destructive" onClick={() => onDeleteTask(task)}>
+                            {t("common.delete")}
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>

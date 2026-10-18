@@ -28,7 +28,6 @@ import {
   Shield,
   TrendingUp,
   ExternalLink,
-  Download,
   Printer,
   ChevronRight,
   Circle,
@@ -145,11 +144,14 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
               <p className="text-sm text-muted-foreground mt-1">{report.summary}</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" title={t("forensics.detailModal.printReport")}>
+              <Button
+                variant="outline"
+                size="icon"
+                title={t("forensics.detailModal.printReport")}
+                aria-label={t("forensics.detailModal.printReport")}
+                onClick={() => window.print()}
+              >
                 <Printer className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" title={t("forensics.detailModal.downloadPdf")}>
-                <Download className="h-4 w-4" />
               </Button>
             </div>
           </div>
