@@ -875,7 +875,23 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
     let reversed_reconcile = reconcile_payment_with_invoice(ctx, org, invoice_id, payment_move_id);
     let counterpart_register =
         register_payment_on_invoice(ctx, org, ordinary_payment.id, vec![payment_move_id], false);
-    for result in [&reversed_reconcile, &counterpart_register] {
+    let bank_write_off = crate::accounting::credit_control::create_bad_debt_write_off(
+        ctx,
+        org,
+        company_id,
+        crate::accounting::credit_control::CreateBadDebtWriteOffParams {
+            partner_id: fixture.partner_id,
+            move_id: payment_move_id,
+            amount: 0.01,
+            journal_id,
+            receivable_account_id: fixture.chart_account_ids[chart_keys::AR],
+            write_off_account_id: fixture.chart_account_ids[chart_keys::REVENUE],
+            date: ctx.timestamp,
+            reference: None,
+            metadata: None,
+        },
+    );
+    for result in [&reversed_reconcile, &counterpart_register, &bank_write_off] {
         if !matches!(result, Err(error) if error.contains("bank-linked payments require")) {
             return Err(
                 "bank-owned payment was accepted as the invoice-side counterpart".to_string(),
@@ -886,6 +902,7 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
         || direct_reconcile.is_ok()
         || reversed_reconcile.is_ok()
         || counterpart_register.is_ok()
+        || bank_write_off.is_ok()
         || settlement_financial_snapshot(ctx, org) != approved_snapshot
     {
         return Err("generic invoice registration diverted a bank-owned payment".to_string());
