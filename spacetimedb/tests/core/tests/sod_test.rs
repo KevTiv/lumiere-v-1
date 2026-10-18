@@ -352,7 +352,7 @@ pub fn test_field_write_policy_blocks_disallowed_columns(
         .user_role_assignment()
         .insert(crate::core::permissions::UserRoleAssignment {
             id: 0,
-            user_identity: ctx.sender(),
+            user_identity: member,
             role_id: supplemental_role.id,
             organization_id: org_id,
             assigned_by: ctx.sender(),
@@ -361,6 +361,14 @@ pub fn test_field_write_policy_blocks_disallowed_columns(
             is_active: true,
             metadata: Some(r#"{"test":"field-intersection"}"#.to_string()),
         });
+
+    let effective_roles = crate::core::permissions::effective_roles(ctx, org_id, member)?;
+    if ![limited_role.id, supplemental_role.id]
+        .iter()
+        .all(|id| effective_roles.iter().any(|role| role.id == *id))
+    {
+        return Err("field intersection fixture is missing a target member role".into());
+    }
 
     ensure_resource_fields_writable(
         ctx,
