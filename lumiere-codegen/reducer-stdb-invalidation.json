@@ -399,5 +399,15 @@
     "bank-statement-lines",
     "workflow-instances",
     "audit-log"
+  ],
+  "claim_workflow_human_task": [
+    "bank-statement-lines",
+    "workflow-instances",
+    "audit-log"
+  ],
+  "add_workflow_human_task_comment": [
+    "bank-statement-lines",
+    "workflow-instances",
+    "audit-log"
   ]
 }

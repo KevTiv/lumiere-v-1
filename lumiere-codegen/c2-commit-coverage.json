@@ -512,6 +512,22 @@
           "operations": {
             "decide_workflow_human_task": "erp.decide_workflow_human_task"
           }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "record_bank_task_claim",
+          "argument": "\"erp.claim_workflow_human_task\"",
+          "operations": {
+            "claim_workflow_human_task": "erp.claim_workflow_human_task"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "record_bank_task_comment",
+          "argument": "\"erp.add_workflow_human_task_comment\"",
+          "operations": {
+            "add_workflow_human_task_comment": "erp.add_workflow_human_task_comment"
+          }
         }
       ]
     }
