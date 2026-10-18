@@ -1038,6 +1038,12 @@ fn scoped_settlement(
     payment_id: u64,
 ) -> Result<ScopedSettlement, String> {
     require_company_in_organization(ctx, organization_id, company_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        company_id,
+        ctx.sender(),
+    )?;
     let attempt = attempt_for_payment(ctx, payment_id)
         .ok_or("bank settlement has no reversible authoritative snapshot")?;
     let line = ctx

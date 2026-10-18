@@ -934,6 +934,36 @@ pub fn test_bank_settlement_recovery_replay_and_denials(
         ),
         "foreign-company recovery",
     )?;
+    super::payments_test::assert_bank_company_denial(
+        ctx,
+        org,
+        sibling,
+        "abandon rejected company-B settlement",
+        || {
+            abandon_bank_statement_settlement(
+                ctx,
+                org,
+                company,
+                line_id,
+                abandon(first_payment, "company-restricted-abandon"),
+            )
+        },
+    )?;
+    super::payments_test::assert_bank_company_denial(
+        ctx,
+        org,
+        sibling,
+        "resubmit rejected company-B settlement",
+        || {
+            resubmit_bank_statement_settlement(
+                ctx,
+                org,
+                company,
+                line_id,
+                resubmit(first_payment, second, "company-restricted-resubmit"),
+            )
+        },
+    )?;
     let profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
         .ok_or("recovery operator missing")?;
     ctx.db.role().id().update(Role {

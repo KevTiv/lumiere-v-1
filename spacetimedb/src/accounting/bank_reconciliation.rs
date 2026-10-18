@@ -1435,6 +1435,12 @@ pub(super) fn bank_settlement_selection(
         return Err("bank settlement requires an exact full-amount selection".to_string());
     }
     require_company_in_organization(ctx, statement.organization_id, statement.company_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        statement.organization_id,
+        statement.company_id,
+        ctx.sender(),
+    )?;
     let company = ctx
         .db
         .company()
@@ -1812,6 +1818,12 @@ pub fn reconcile_account_bank_statement_line(
     params: ReconcileAccountBankStatementLineParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_bank_statement_line", "write")?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        company_id,
+        ctx.sender(),
+    )?;
 
     let line = ctx
         .db

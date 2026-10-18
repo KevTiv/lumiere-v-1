@@ -105,6 +105,83 @@ fn settlement_financial_snapshot(ctx: &ReducerContext, organization_id: u64) -> 
     serde_json::json!([moves, lines, payments, bank, audit]).to_string()
 }
 
+/// An org-level financial capability must not escape a company-scoped membership.
+/// Policy changes are fixture setup; compare the complete outcome after that setup.
+pub(super) fn assert_bank_company_denial(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    allowed_company_id: u64,
+    label: &str,
+    action: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    use crate::core::users::UserOrganization;
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == organization_id && row.is_active)
+        .ok_or("company-denial fixture membership missing")?;
+    let membership_id = membership.id;
+    let original_company_id = membership.company_id;
+    ctx.db.user_organization().id().update(UserOrganization {
+        company_id: Some(allowed_company_id),
+        ..membership
+    });
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
+        .ok_or("company-denial fixture profile missing")?;
+    let profile_id = profile.id;
+    let was_superuser = profile.is_superuser;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..profile
+    });
+    // Prove the rejection is company authority, rather than a missing financial
+    // action. These current capabilities cover all settlement lifecycle routes.
+    for (resource, capability) in [
+        ("account_bank_statement_line", "write"),
+        ("account_bank_statement", "write"),
+        ("payment", "create"),
+        ("payment", "post"),
+        ("payment", "reconcile"),
+        ("payment", "cancel"),
+        ("payment", "reverse"),
+        ("account_move", "write"),
+    ] {
+        crate::helpers::check_permission(ctx, organization_id, resource, capability)
+            .map_err(|error| format!("{label}: fixture lacks {resource}:{capability}: {error}"))?;
+    }
+    let before = super::bank_settlement_lifecycle_test::snapshot(ctx, organization_id)?;
+    let result = action();
+    let unchanged =
+        super::bank_settlement_lifecycle_test::snapshot(ctx, organization_id)? == before;
+    let membership = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(&membership_id)
+        .ok_or("restricted membership missing after denied command")?;
+    ctx.db.user_organization().id().update(UserOrganization {
+        company_id: original_company_id,
+        ..membership
+    });
+    let profile = ctx
+        .db
+        .user_profile()
+        .id()
+        .find(&profile_id)
+        .ok_or("restricted profile missing after denied command")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: was_superuser,
+        ..profile
+    });
+    match result {
+        Err(error) if error.contains("workflow actor has no active access to this company") && unchanged=>Ok(()),
+        Err(error)=>Err(format!("{label}: expected company-access denial with zero financial/approval/counter/audit writes, unchanged={unchanged}: {error}")),
+        Ok(())=>Err(format!("{label}: company-restricted member changed a different company's bank settlement")),
+    }
+}
+
 /// Exact bank settlement creates one posted payment, actually clears invoice and
 /// clearing residuals, and rejects stale/replayed/denied commands without effects.
 pub fn test_bank_statement_settlement_exact_effect(ctx: &ReducerContext) -> Result<(), String> {
@@ -353,6 +430,14 @@ pub fn test_bank_statement_settlement_exact_effect(ctx: &ReducerContext) -> Resu
         }
     }
     ctx.db.account_move_line().id().update(target);
+    let restricted_company = seed_sibling_company(ctx, &fixture)?;
+    assert_bank_company_denial(
+        ctx,
+        org,
+        restricted_company,
+        "initial exact bank settlement",
+        || reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, params.clone()),
+    )?;
     reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, params.clone())?;
     let settled = ctx
         .db
@@ -820,6 +905,14 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
     {
         return Err("bank settlement bypassed the payment approval gate".to_string());
     }
+    let restricted_company = seed_sibling_company(ctx, &fixture)?;
+    assert_bank_company_denial(
+        ctx,
+        org,
+        restricted_company,
+        "native bank-owned payment posting",
+        || post_payment(ctx, org, payment_id),
+    )?;
     let task = ctx
         .db
         .workflow_human_task()
@@ -988,6 +1081,13 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
     {
         return Err("generic invoice registration diverted a bank-owned payment".to_string());
     }
+    assert_bank_company_denial(
+        ctx,
+        org,
+        restricted_company,
+        "approved bank settlement completion",
+        || reconcile_account_bank_statement_line(ctx, org, company_id, bank_id, params.clone()),
+    )?;
     reconcile_account_bank_statement_line(ctx, org, company_id, bank_id, params)?;
     let invoice = ctx
         .db
@@ -1018,7 +1118,13 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
         );
     }
     test_bank_reversal_prior_last_cent_and_generation(
-        ctx, &fixture, bank_id, invoice_id, target_id, prior.id,
+        ctx,
+        &fixture,
+        bank_id,
+        invoice_id,
+        target_id,
+        prior.id,
+        restricted_company,
     )?;
     Ok(())
 }
@@ -2230,6 +2336,7 @@ fn test_bank_reversal_prior_last_cent_and_generation(
     invoice_id: u64,
     target_id: u64,
     prior_payment_id: u64,
+    restricted_company: u64,
 ) -> Result<(), String> {
     use super::bank_settlement_lifecycle_test::snapshot;
     use crate::accounting::bank_reconciliation::{
@@ -2278,6 +2385,13 @@ fn test_bank_reversal_prior_last_cent_and_generation(
         idempotency_key: format!("bank-last-cent-reversal-{bank_id}"),
         reason: "Reverse only the reviewed bank receipt".to_string(),
     };
+    assert_bank_company_denial(
+        ctx,
+        org,
+        restricted_company,
+        "direct posted bank reversal",
+        || reverse_bank_statement_settlement(ctx, org, company_id, bank_id, params.clone()),
+    )?;
     let target = ctx
         .db
         .account_move_line()

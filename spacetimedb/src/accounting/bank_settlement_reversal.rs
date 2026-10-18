@@ -168,6 +168,12 @@ pub(super) fn prepare_bank_settlement_reversal(
     check_permission(ctx, attempt.organization_id, "payment", "reverse")?;
     check_permission(ctx, attempt.organization_id, "account_move", "write")?;
     require_company_in_organization(ctx, attempt.organization_id, attempt.company_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        attempt.organization_id,
+        attempt.company_id,
+        ctx.sender(),
+    )?;
     let company = ctx
         .db
         .company()
