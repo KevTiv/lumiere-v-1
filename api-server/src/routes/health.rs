@@ -372,7 +372,12 @@ mod tests {
                 .unwrap()
                 .version
         );
-        // The application consumes a deterministic vendored release bundle.
+        // Cargo consumes the checksum-verified vendored release, not a git tag.
+        // Compare the manifest to the release materialized for this build.
+        let workspace = include_str!("../../../Cargo.toml");
+        assert!(workspace.contains(
+            "lumiere-contracts = { path = \"vendor/lumiere-contracts/crates/lumiere-contracts\""
+        ));
         assert_eq!(
             release.contract_release,
             include_str!("../../../vendor/lumiere-contracts/CONTRACT_VERSION").trim()

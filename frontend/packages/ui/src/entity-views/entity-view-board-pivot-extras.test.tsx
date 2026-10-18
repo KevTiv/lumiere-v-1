@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { chooseSelectValue } from "../components/select-test-utils"
 
 const csv = vi.hoisted(() => ({ download: vi.fn() }))
 vi.mock("../lib/export-csv", async (orig) => ({
@@ -76,11 +77,11 @@ describe("board filters", () => {
     render(<EntityView config={config} data={rows} />)
     fireEvent.click(screen.getByRole("button", { name: "Board" }))
     expect(screen.getByTestId("entity-board-card-1")).toBeTruthy()
-    fireEvent.change(screen.getByTestId("entity-board-filter-kind"), { target: { value: "B" } })
+    chooseSelectValue(screen.getByTestId("entity-board-filter-kind"), "B")
     expect(screen.queryByTestId("entity-board-card-1")).toBeNull()
     expect(screen.queryByTestId("entity-board-card-3")).toBeNull()
     expect(screen.getByTestId("entity-board-card-2")).toBeTruthy()
-    fireEvent.change(screen.getByTestId("entity-board-filter-kind"), { target: { value: "__all__" } })
+    chooseSelectValue(screen.getByTestId("entity-board-filter-kind"), "__all__")
     expect(screen.getByTestId("entity-board-card-1")).toBeTruthy()
     expect(window.localStorage.getItem("lumiere:entity-view-mode:extras-test")).toBe("board")
   })
@@ -128,14 +129,14 @@ describe("pivot columns by and CSV", () => {
   it("remembers the columns-by choice in the mode's entry", () => {
     const { unmount } = render(<EntityView config={config} data={rows} />)
     fireEvent.click(screen.getByRole("button", { name: "Summary" }))
-    fireEvent.change(screen.getByTestId("entity-pivot-columns"), { target: { value: "kind" } })
+    chooseSelectValue(screen.getByTestId("entity-pivot-columns"), "kind")
     expect(JSON.parse(window.localStorage.getItem("lumiere:entity-view-mode:extras-test")!)).toEqual({
       mode: "pivot",
       columnKey: "kind",
     })
     unmount()
     render(<EntityView config={config} data={rows} />)
-    expect((screen.getByTestId("entity-pivot-columns") as HTMLSelectElement).value).toBe("kind")
+    expect(screen.getByTestId("entity-pivot-columns").textContent).toBe("Kind")
   })
 
   it("remembers it per list for custom list views too, and still reads plain mode entries", () => {
@@ -146,13 +147,13 @@ describe("pivot columns by and CSV", () => {
         <div />
       </ListPivotSwitch>,
     )
-    fireEvent.change(screen.getByTestId("entity-pivot-columns"), { target: { value: "kind" } })
+    chooseSelectValue(screen.getByTestId("entity-pivot-columns"), "kind")
     unmount()
     render(
       <ListPivotSwitch storageId="list-x" t={t} rows={rows} table={table} pivot={pivot}>
         <div />
       </ListPivotSwitch>,
     )
-    expect((screen.getByTestId("entity-pivot-columns") as HTMLSelectElement).value).toBe("kind")
+    expect(screen.getByTestId("entity-pivot-columns").textContent).toBe("Kind")
   })
 })

@@ -26,6 +26,13 @@ import {
 import type { AiSkillListItem } from "@lumiere/query-hooks/hooks/ai-skills"
 import { Button, Input } from "@lumiere/ui"
 import { Textarea } from "@lumiere/ui/components/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const DEFAULT_MANIFEST = `{"limits":{"max_steps":8,"max_tool_calls":16},"output_types":["application/json"],"permissions":["report:read"],"resources":["reports.daily_business_summary.v1"],"risk":"green","schema_version":1,"skill_key":"report_composer","source_hash":"sha256:${"a".repeat(64)}","version":"1.0.1"}`
 
@@ -229,17 +236,18 @@ export function SkillRegistryPanel({ organizationId, companyId, skills }: SkillR
         <div className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-muted-foreground">{t("aiSkills.registry.fields.skill")}</span>
-            <select
-              className="min-w-[220px] rounded-md border border-border bg-background px-3 py-2"
-              value={effectiveSkillId}
-              onChange={(event) => setSelectedSkillId(Number(event.target.value))}
-            >
-              {skills.map((skill) => (
-                <option key={skill.id} value={skill.id}>
-                  {skill.name} ({skill.skill_key})
-                </option>
-              ))}
-            </select>
+            <Select value={String(effectiveSkillId)} onValueChange={(value) => setSelectedSkillId(Number(value))}>
+              <SelectTrigger className="min-w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {skills.map((skill) => (
+                  <SelectItem key={skill.id} value={String(skill.id)}>
+                    {skill.name} ({skill.skill_key})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
           {activeRelease ? (
             <p className="text-sm text-muted-foreground">

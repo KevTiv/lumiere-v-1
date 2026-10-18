@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { PeriodCloseChecklist, type PeriodCloseChecklistProps } from "./period-close-checklist"
+import { chooseSelectValue } from "../components/select-test-utils"
 
 vi.mock("@lumiere/i18n", () => ({
   useTranslation: () => ({
@@ -43,7 +44,7 @@ function props(overrides: Partial<PeriodCloseChecklistProps> = {}): PeriodCloseC
 }
 
 function selectTargetPeriod(): void {
-  fireEvent.change(screen.getByTestId("period-close-target"), { target: { value: "10" } })
+  chooseSelectValue(screen.getByTestId("period-close-target"), "10")
 }
 
 function stepStatus(id: string): string | null {
