@@ -20,6 +20,7 @@ import {
   waitForBffQueryMinRows,
   waitForSaleOrderConfirmed,
   waitForSaleOrderLineExists,
+  reloadSettled,
 } from "./helpers"
 
 export const SEEDED_CUSTOMER_NAME = "Acme Corporation"
@@ -180,6 +181,7 @@ export async function fetchOrderDeliveredQty(page: Page, orderId: number): Promi
 export async function confirmOrderViaUi(page: Page, orderId: number) {
   // Exact focus also keeps later fixtures operable after the first table page fills.
   await gotoModule(page, saleOrderHref(orderId), "sales")
+  await expect(page.getByTestId("module-tab-sales-orders")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
   await selectEntityRowById(page, orderId)
   await clickEntityActionAndWaitForReducer(page, "entity-action-confirm-orders", "confirm_sales_order")
@@ -254,7 +256,7 @@ export async function expectOrderSummary(
 ) {
   await gotoModule(page, "/sales", "sales")
   if (expected.reload) {
-    await page.reload({ waitUntil: "domcontentloaded" })
+    await reloadSettled(page)
     await gotoModule(page, "/sales", "sales")
   }
   await selectModuleTab(page, "sales", "orders")

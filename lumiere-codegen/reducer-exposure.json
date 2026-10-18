@@ -1664,6 +1664,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "create_purchase_order_once",
+      "exposure": "session",
+      "reason": "reviewed keyed purchase-order create: producer rechecks current create permission, actor/company scope and exact immutable request identity"
+    },
+    {
       "name": "create_purchase_requisition",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3155,6 +3160,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "receive_po_line_once",
+      "exposure": "session",
+      "reason": "Purchasing operator keyed receipt workflow; producer rechecks current write permission, scope and exact invocation identity"
+    },
+    {
       "name": "recognize_amortization_line",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3683,6 +3693,11 @@
       "name": "run_manufacturing_tracked_output_test",
       "exposure": "denied",
       "reason": "isolated persisted domain proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_purchasing_keyed_operations_test",
+      "exposure": "denied",
+      "reason": "isolated persisted keyed purchasing replay proof; never exposed through the session BFF"
     },
     {
       "name": "run_manufacturing_bom_to_close_domain_lifecycle_test",

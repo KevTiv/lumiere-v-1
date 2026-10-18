@@ -82,8 +82,11 @@ export function RBACProvider({
     const userRoles = activeRoles.filter((r) => user.roles.includes(r.id))
     const rolePolicies = userRoles.flatMap((r) => r.permissions)
     
-    // Also get direct user policies
-    const directPolicies = policies.filter((p) => p.subject === user.id)
+    // Policies can target the user directly or any effective role assigned to
+    // the user (including supplemental role assignments).
+    const directPolicies = policies.filter(
+      (p) => p.subject === user.id || user.roles.includes(p.subject),
+    )
     
     return [...rolePolicies, ...directPolicies]
   }, [activeRoles, policies])

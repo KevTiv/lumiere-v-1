@@ -47,16 +47,21 @@ function assignmentIsCurrent(row: SessionRoleRow, nowMicros: number): boolean {
   return micros != null && micros > nowMicros
 }
 
-/** Resolve the same effective base + additive role set used by API authorization. */
-export function resolveSessionRoleNames(input: {
+type SessionRoleInput = {
+  readonly organizationId: number
   readonly roles: readonly SessionRoleRow[]
   readonly memberships: readonly SessionRoleRow[]
   readonly assignments: readonly SessionRoleRow[]
   readonly nowMicros?: number
-}): string[] {
+}
+
+function resolveSessionRoles(input: SessionRoleInput): Array<{ id: number; name: string }> {
+  const organizationId = positiveId(input.organizationId)
+  if (organizationId == null) return []
   const activeRoles = new Map<number, string>()
   for (const role of input.roles) {
     if (rowValue(role, "isActive", "is_active") !== true) continue
+    if (positiveId(rowValue(role, "organizationId", "organization_id")) !== organizationId) continue
     const id = positiveId(role.id)
     const name = typeof role.name === "string" ? role.name.trim() : ""
     if (id != null && name) activeRoles.set(id, name)
@@ -65,7 +70,8 @@ export function resolveSessionRoleNames(input: {
   // Authorization requires exactly one active organization membership. Match
   // that fail-closed boundary instead of hydrating UI authority ambiguously.
   const activeMemberships = input.memberships.filter(
-    (row) => rowValue(row, "isActive", "is_active") === true,
+    (row) => rowValue(row, "isActive", "is_active") === true
+      && positiveId(rowValue(row, "organizationId", "organization_id")) === organizationId,
   )
   if (activeMemberships.length !== 1) return []
 
@@ -80,11 +86,52 @@ export function resolveSessionRoleNames(input: {
   const nowMicros = input.nowMicros ?? Date.now() * 1_000
   for (const assignment of input.assignments) {
     if (!assignmentIsCurrent(assignment, nowMicros)) continue
+    if (positiveId(rowValue(assignment, "organizationId", "organization_id")) !== organizationId) continue
     const roleId = positiveId(rowValue(assignment, "roleId", "role_id"))
     if (roleId != null && activeRoles.has(roleId)) roleIds.add(roleId)
   }
 
-  return [...roleIds].map((id) => activeRoles.get(id)!)
+  return [...roleIds].map((id) => ({ id, name: activeRoles.get(id)! }))
+}
+
+/** Resolve the same effective base + additive role set used by API authorization. */
+export function resolveSessionRoleNames(input: SessionRoleInput): string[] {
+  return [...new Set(resolveSessionRoles(input).map((role) => role.name))]
+}
+
+export function resolveSessionRoleIds(input: SessionRoleInput): number[] {
+  return resolveSessionRoles(input).map((role) => role.id)
+}
+
+export function resolveSessionAuthorityExpiryMicros(input: SessionRoleInput): number | null {
+  const organizationId = positiveId(input.organizationId)
+  if (organizationId == null) return null
+  const nowMicros = input.nowMicros ?? Date.now() * 1_000
+  const roleIds = new Set(resolveSessionRoles(input).map((role) => role.id))
+  const expiries = input.assignments.flatMap((assignment) => {
+    if (rowValue(assignment, "isActive", "is_active") !== true) return []
+    if (positiveId(rowValue(assignment, "organizationId", "organization_id")) !== organizationId) return []
+    const roleId = positiveId(rowValue(assignment, "roleId", "role_id"))
+    const expiry = timestampMicros(rowValue(assignment, "expiresAt", "expires_at"))
+    return roleId != null && roleIds.has(roleId) && expiry != null && expiry > nowMicros ? [expiry] : []
+  })
+  return expiries.length > 0 ? Math.min(...expiries) : null
+}
+
+/** Whether an active assignment expired after the currently cached policy snapshot. */
+export function sessionPolicySnapshotNeedsRefresh(input: {
+  readonly assignments: readonly SessionRoleRow[]
+  readonly refreshedAt: unknown
+  readonly nowMicros?: number
+}): boolean {
+  const refreshedAt = timestampMicros(input.refreshedAt)
+  if (refreshedAt == null) return false
+  const nowMicros = input.nowMicros ?? Date.now() * 1_000
+  return input.assignments.some((assignment) => {
+    if (rowValue(assignment, "isActive", "is_active") !== true) return false
+    const expiry = timestampMicros(rowValue(assignment, "expiresAt", "expires_at"))
+    return expiry != null && expiry > refreshedAt && expiry <= nowMicros
+  })
 }
 
 /**

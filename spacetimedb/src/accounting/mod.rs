@@ -35,6 +35,7 @@ pub mod amortization;
 /// ```
 pub mod analytic_accounting;
 pub mod bank_reconciliation;
+pub(crate) mod bill_economics;
 pub mod budgeting;
 pub mod chart_of_accounts;
 pub mod consolidation;

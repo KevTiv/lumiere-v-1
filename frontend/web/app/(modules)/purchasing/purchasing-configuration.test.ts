@@ -42,6 +42,19 @@ test("rejects an approval delegation to the same identity", () => {
   )
 })
 
+test("a Purchasing delegate requires a bounded window while revocation needs no new grant", () => {
+  const identities = { principalIdentity: "ab".repeat(32), delegateIdentity: "cd".repeat(32) }
+  assert.throws(() => buildPurchasingConfigurationSubmission("approvalDelegate", { ...identities, isActive: true }), /valid start/)
+  const created = buildPurchasingConfigurationSubmission("approvalDelegate", {
+    ...identities, isActive: true, validFrom: "2030-01-01T10:00:00Z", validUntil: "2030-01-01T11:00:00Z", reason: "Cover leave",
+  })
+  assert.equal(created.kind, "approvalDelegate")
+  if (created.kind === "approvalDelegate") assert.equal(JSON.parse(created.params.metadata!).reason, "Cover leave")
+  assert.deepEqual(buildPurchasingConfigurationSubmission("approvalDelegate", { ...identities, isActive: false }), {
+    kind: "approvalDelegate", params: { ...identities, isActive: false, metadata: null },
+  })
+})
+
 test("builds an idempotent integration intent with an optional order", () => {
   assert.deepEqual(
     buildPurchasingConfigurationSubmission("integrationIntent", {

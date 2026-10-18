@@ -64,6 +64,7 @@ function isCanonicalOrderUrl(url: URL, orderId: number): boolean {
 
 async function expectCanonicalOrderFocus(page: Page, orderId: number) {
   await expect(page).toHaveURL((url) => isCanonicalOrderUrl(url, orderId))
+  await expect(page.getByTestId("module-tab-sales-orders")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
 
   const table = activeTabEntityTable(page)
@@ -105,10 +106,10 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
         if (tasks.length === 1) taskId = tasks[0]!
         return tasks.length
       }).toBe(1)
-      // The candidate-scoped inbox does not expose an admin-only task to its
-      // requester. The Sales client must keep the outcome unknown rather than
-      // infer a task by order state, name, or time.
-      expect(await exactActiveApprovalTaskIds(requester, orderId, companyId)).toEqual([])
+      // The sales role has no workflow-read grant: its private candidate inbox
+      // must fail closed before exposing the admin-only approval task.
+      const requesterInbox = await requester.request.get("/api/query/workflow-human-tasks-inbox")
+      expect(requesterInbox.status()).toBe(403)
       expect(await fetchOrderPickings(page, orderId, companyId)).toEqual([])
 
       await gotoApprovals(page)

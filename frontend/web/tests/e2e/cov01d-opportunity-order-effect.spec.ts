@@ -28,6 +28,7 @@ import {
   waitForEntityActionEnabled,
   waitForOpportunityLineExists,
   waitForSaleOrderLineExists,
+  reloadSettled,
 } from "./helpers"
 
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -67,7 +68,7 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     await chooseFirstEnabledOption(page, "opportunityStageId")
     await submitForm(page, "convert-lead")
 
-    await page.reload({ waitUntil: "domcontentloaded" })
+    await reloadSettled(page)
     await gotoModule(page, "/crm", "crm")
     await selectModuleTab(page, "crm", "opportunities")
     await expectSeededText(page, opportunityName, "/api/query/opportunities")
@@ -119,6 +120,7 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
         url.searchParams.get("filter") === `id:${orderId}`
       )
     })
+    await expect(page.getByTestId("module-tab-sales-orders")).toHaveCount(1, { timeout: 30_000 })
     await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute(
       "aria-selected",
       "true",
@@ -126,7 +128,7 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     await expect(
       activeTabEntityTable(page).getByTestId(`entity-row-${orderId}`),
     ).toBeVisible({ timeout: 30_000 })
-    await page.reload({ waitUntil: "domcontentloaded" })
+    await reloadSettled(page)
     await expect(page).toHaveURL((url) => {
       return (
         url.pathname === "/sales" &&

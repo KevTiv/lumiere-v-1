@@ -80,6 +80,7 @@ test.describe("COV-26 CRM/Sales resilience", { tag: ["@cov03", "@cov04", "@cov26
     )
     await page.reload({ waitUntil: "domcontentloaded" })
     await crmRefetch
+    await expect(page.getByTestId("module-tab-crm-contacts")).toHaveCount(1, { timeout: 30_000 })
     await expect(page.getByTestId("module-tab-crm-contacts")).toHaveAttribute("aria-selected", "true")
 
     await gotoModule(page, "/sales?tab=orders", "sales")
@@ -93,6 +94,7 @@ test.describe("COV-26 CRM/Sales resilience", { tag: ["@cov03", "@cov04", "@cov26
     )
     await page.reload({ waitUntil: "domcontentloaded" })
     await salesRefetch
+    await expect(page.getByTestId("module-tab-sales-orders")).toHaveCount(1, { timeout: 30_000 })
     await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
     await expectNoAppError(page)
   })

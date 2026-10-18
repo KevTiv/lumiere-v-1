@@ -300,10 +300,10 @@ fn permission_effect_label(effect: &PermissionEffect) -> &'static str {
 fn org_permission_applies_to_user(
     p: &OrgPermission,
     user_identity: Identity,
-    role_id: u64,
+    role_ids: &[u64],
 ) -> bool {
     match &p.subject {
-        PermissionSubject::Role(r) => *r == role_id,
+        PermissionSubject::Role(r) => role_ids.contains(r),
         PermissionSubject::User(id) => *id == user_identity,
     }
 }
@@ -311,10 +311,10 @@ fn org_permission_applies_to_user(
 fn field_permission_applies_to_user(
     p: &FieldPermission,
     user_identity: Identity,
-    role_id: u64,
+    role_ids: &[u64],
 ) -> bool {
     match &p.subject {
-        PermissionSubject::Role(r) => *r == role_id,
+        PermissionSubject::Role(r) => role_ids.contains(r),
         PermissionSubject::User(id) => *id == user_identity,
     }
 }
@@ -370,12 +370,50 @@ pub(crate) fn build_policy_snapshot_row(
         .id()
         .find(&user_org.role_id)
         .ok_or("Role not found")?;
+    if role.organization_id != organization_id || !role.is_active {
+        return Err("Membership role is inactive or belongs to another organization".to_string());
+    }
+
+    let mut effective_roles = vec![role.clone()];
+    for assignment in ctx
+        .db
+        .user_role_assignment()
+        .role_assign_by_user()
+        .filter(&user_identity)
+        .filter(|assignment| {
+            assignment.organization_id == organization_id
+                && assignment.is_active
+                && assignment
+                    .expires_at
+                    .is_none_or(|expires_at| expires_at > ctx.timestamp)
+        })
+    {
+        let Some(assigned_role) = ctx.db.role().id().find(&assignment.role_id) else {
+            continue;
+        };
+        if assigned_role.organization_id == organization_id && assigned_role.is_active {
+            effective_roles.push(assigned_role);
+        }
+    }
+    effective_roles.sort_by_key(|effective_role| effective_role.id);
+    effective_roles.dedup_by_key(|effective_role| effective_role.id);
+    let effective_role_ids = effective_roles
+        .iter()
+        .map(|effective_role| effective_role.id)
+        .collect::<Vec<_>>();
+    let mut effective_role_permissions = effective_roles
+        .iter()
+        .flat_map(|effective_role| effective_role.permissions.iter().cloned())
+        .collect::<Vec<_>>();
+    effective_role_permissions.sort();
+    effective_role_permissions.dedup();
 
     let mut org_permission_grants = Vec::new();
     let mut hash_parts: Vec<String> = Vec::new();
 
     hash_parts.push(format!("role:{}", role.id));
-    hash_parts.push(format!("perms:{}", role.permissions.join(",")));
+    hash_parts.push(format!("roles:{effective_role_ids:?}"));
+    hash_parts.push(format!("perms:{}", effective_role_permissions.join(",")));
 
     for p in ctx
         .db
@@ -383,7 +421,7 @@ pub(crate) fn build_policy_snapshot_row(
         .perm_by_org()
         .filter(&organization_id)
     {
-        if !org_permission_applies_to_user(&p, user_identity, role.id) {
+        if !org_permission_applies_to_user(&p, user_identity, &effective_role_ids) {
             continue;
         }
         let action = permission_action_label(&p.action).to_string();
@@ -403,7 +441,7 @@ pub(crate) fn build_policy_snapshot_row(
         .field_perm_by_org()
         .filter(&organization_id)
     {
-        if !field_permission_applies_to_user(&p, user_identity, role.id) {
+        if !field_permission_applies_to_user(&p, user_identity, &effective_role_ids) {
             continue;
         }
         // Snapshot surfaces read allowlists for UI/API column projection.
@@ -436,7 +474,7 @@ pub(crate) fn build_policy_snapshot_row(
         user_identity,
         role_id: role.id,
         role_name: role.name.clone(),
-        role_permissions: role.permissions.clone(),
+        role_permissions: effective_role_permissions,
         org_permission_grants,
         field_permissions,
         is_superuser: user.is_superuser,
@@ -503,6 +541,19 @@ pub(crate) fn touch_policy_snapshot_for_user(
 ) {
     if let Ok(snapshot) = build_policy_snapshot_row(ctx, organization_id, user_identity) {
         let _ = upsert_policy_snapshot(ctx, snapshot);
+    } else {
+        let stale_ids = ctx
+            .db
+            .policy_snapshot()
+            .iter()
+            .filter(|row| {
+                row.organization_id == organization_id && row.user_identity == user_identity
+            })
+            .map(|row| row.id)
+            .collect::<Vec<_>>();
+        for id in stale_ids {
+            ctx.db.policy_snapshot().id().delete(&id);
+        }
     }
 }
 
@@ -539,21 +590,46 @@ fn permission_strings_for_user(
 ) -> Result<Vec<String>, String> {
     let mut perms: Vec<String> = Vec::new();
 
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&user_identity)
+        .find(|membership| membership.organization_id == organization_id && membership.is_active)
+        .ok_or("Not a member of this organization")?;
+    let base_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&membership.role_id)
+        .ok_or("Membership role not found")?;
+    if base_role.organization_id != organization_id || !base_role.is_active {
+        return Err("Membership role is inactive or belongs to another organization".to_string());
+    }
+    perms.extend(base_role.permissions);
+
     for assignment in ctx
         .db
         .user_role_assignment()
         .role_assign_by_user()
         .filter(&user_identity)
-        .filter(|a| a.organization_id == organization_id && a.is_active)
+        .filter(|a| {
+            a.organization_id == organization_id
+                && a.is_active
+                && a.expires_at
+                    .is_none_or(|expires_at| expires_at > ctx.timestamp)
+        })
     {
         if let Some(role) = ctx.db.role().id().find(&assignment.role_id) {
-            perms.extend(role.permissions.clone());
+            if role.organization_id == organization_id && role.is_active {
+                perms.extend(role.permissions.clone());
+            }
         }
     }
 
     if let Some(role_id) = extra_role_id {
         if let Some(role) = ctx.db.role().id().find(&role_id) {
-            if role.organization_id == organization_id {
+            if role.organization_id == organization_id && role.is_active {
                 perms.extend(role.permissions.clone());
             }
         }
@@ -686,6 +762,30 @@ pub(crate) fn ensure_resource_fields_writable(
         return Ok(());
     }
 
+    let mut effective_role_ids = vec![role_id];
+    for assignment in ctx
+        .db
+        .user_role_assignment()
+        .role_assign_by_user()
+        .filter(&user_identity)
+        .filter(|assignment| {
+            assignment.organization_id == organization_id
+                && assignment.is_active
+                && assignment
+                    .expires_at
+                    .is_none_or(|expires_at| expires_at > ctx.timestamp)
+        })
+    {
+        let Some(assigned_role) = ctx.db.role().id().find(&assignment.role_id) else {
+            continue;
+        };
+        if assigned_role.organization_id == organization_id && assigned_role.is_active {
+            effective_role_ids.push(assigned_role.id);
+        }
+    }
+    effective_role_ids.sort_unstable();
+    effective_role_ids.dedup();
+
     let mut allowed: Option<Vec<String>> = None;
     for rule in ctx
         .db
@@ -696,14 +796,19 @@ pub(crate) fn ensure_resource_fields_writable(
         if rule.action != FieldPermissionAction::Write {
             continue;
         }
-        if !field_permission_applies_to_user(&rule, user_identity, role_id) {
+        if !field_permission_applies_to_user(&rule, user_identity, &effective_role_ids) {
             continue;
         }
         if !field_resource_matches(&rule.resource, resource) {
             continue;
         }
-        allowed = Some(rule.allowed_fields.clone());
-        break;
+        allowed = Some(match allowed {
+            None => rule.allowed_fields.clone(),
+            Some(mut intersection) => {
+                intersection.retain(|field| rule.allowed_fields.contains(field));
+                intersection
+            }
+        });
     }
 
     let Some(allowed_fields) = allowed else {
@@ -1390,6 +1495,9 @@ pub fn assign_role(
 
     if role.organization_id != organization_id {
         return Err("Role does not belong to this organization".to_string());
+    }
+    if !role.is_active {
+        return Err("Cannot assign an inactive role".to_string());
     }
 
     ensure_delegated_admin_may_assign_role(ctx, organization_id, &role)?;

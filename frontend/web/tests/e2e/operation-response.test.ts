@@ -36,6 +36,23 @@ test("matches explicitly named compatibility traffic", () => {
   )
 })
 
+test("matches an immutable contract operation", () => {
+  assert.equal(
+    matchesOperationResponse(
+      response("/api/operations/erp.create_purchase_order_once"),
+      "erp.create_purchase_order_once",
+    ),
+    true,
+  )
+  assert.equal(
+    matchesOperationResponse(
+      response("/api/operations/erp.create_purchase_order"),
+      "erp.create_purchase_order_once",
+    ),
+    false,
+  )
+})
+
 test("does not match a different operation", () => {
   assert.equal(
     matchesOperationResponse(

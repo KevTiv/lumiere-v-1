@@ -3,9 +3,7 @@ import type { Page } from "@playwright/test"
 
 import {
   selectModuleTab,
-  callReducerBffResult,
   fetchDefaultCompanyId,
-  fetchSessionOrganizationId,
   gotoModule,
   scalarQueryId,
   scalarQueryString,
@@ -15,8 +13,9 @@ import {
   waitForSaleOrderConfirmed,
   waitForSaleOrderLineQtyDelivered,
 } from "./helpers"
+import { postGeneratedOperation } from "./generated-operation"
+import { matchesOperationFaultTarget, matchesOperationResponse } from "./operation-response"
 import { loseNextResponse, openOwnerPages } from "./pretenant-support"
-import { matchesOperationFaultTarget } from "./operation-response"
 import {
   ORDER_SUMMARY,
   addLaptopLine,
@@ -118,7 +117,31 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
     expect(await fetchOrderPickings(page, orderId)).toHaveLength(1)
   })
 
-  test("a reply lost after the server committed reports an unknown outcome, refreshes, and offers no retry", async ({
+  test("a reply lost after the server committed is resolved by canonical readback and offers no retry", async ({
+    page,
+  }) => {
+    test.setTimeout(240_000)
+    const orderId = await draftOrder(page, "so-o2c-lost-response")
+    await selectOrderForConfirm(page, orderId)
+
+    const injected = await loseNextResponse(page, "confirm_sales_order")
+    await page.getByTestId("entity-action-confirm-orders").click()
+
+    // The response was lost, but exact order and delivery readback proves that
+    // the write committed. The workflow therefore converges without presenting
+    // an unknown result or offering a potentially duplicating retry.
+    await waitForSaleOrderConfirmed(page, orderId)
+    expect(injected.lost()).toBe(true)
+    await expect(page.getByText(/Result unknown/i)).toHaveCount(0)
+    await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0)
+    expect(await fetchOrderPickings(page, orderId)).toHaveLength(1)
+
+    // The list converged on the committed state, so confirm is no longer offered for the order.
+    await selectEntityRowById(page, orderId)
+    await expect(page.getByTestId("entity-action-confirm-orders")).toBeDisabled({ timeout: 30_000 })
+  })
+
+  test("a lost reply with unavailable canonical readback stays unknown until refresh and offers no retry", async ({
     page,
   }) => {
     test.setTimeout(240_000)
@@ -147,6 +170,8 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
 
     // The write did commit, exactly once, and re-issuing it is not offered.
     await waitForSaleOrderConfirmed(page, orderId)
+    expect(injected.lost()).toBe(true)
+    await expect(page.getByText(/Result unknown/i)).toHaveCount(0)
     await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0)
     expect(await fetchOrderPickings(page, orderId)).toHaveLength(1)
 
@@ -158,19 +183,18 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
   test("a stale second session cannot confirm an order again", async ({ page, browser }) => {
     test.setTimeout(240_000)
     const orderId = await draftOrder(page, "so-o2c-stale-session")
-    const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
-    const args = [organizationId, companyId, orderId]
+    const input = { companyId: BigInt(companyId), orderId: BigInt(orderId) }
 
     const { pages, close } = await openOwnerPages(browser, 2)
     try {
       const [first, second] = pages as [Page, Page]
-      const confirmed = await callReducerBffResult(first, "confirm_sales_order", args)
+      const confirmed = await postGeneratedOperation(first, "confirm_sales_order", input)
       expect(confirmed.ok, `first confirm: ${confirmed.error ?? ""}`).toBe(true)
       await waitForSaleOrderConfirmed(page, orderId)
 
       // The second session still believes the order is a draft.
-      const stale = await callReducerBffResult(second, "confirm_sales_order", args)
+      const stale = await postGeneratedOperation(second, "confirm_sales_order", input)
       expect(stale.ok, "a stale second confirm must be refused").toBe(false)
       expect(stale.error ?? "").not.toBe("")
     } finally {
@@ -179,16 +203,41 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
     expect(await fetchOrderPickings(page, orderId)).toHaveLength(1)
   })
 
+  test("replaying the exact accepted confirm request is refused and creates no second delivery", async ({
+    page,
+  }) => {
+    test.setTimeout(240_000)
+    const orderId = await draftOrder(page, "so-o2c-replay")
+    await selectOrderForConfirm(page, orderId)
+
+    const [accepted] = await Promise.all([
+      page.waitForResponse((res) => matchesOperationResponse(res, "confirm_sales_order") && res.ok(), {
+        timeout: 30_000,
+      }),
+      page.getByTestId("entity-action-confirm-orders").click(),
+    ])
+    await waitForSaleOrderConfirmed(page, orderId)
+    const pickingsAfterAccept = await fetchOrderPickings(page, orderId)
+    expect(pickingsAfterAccept).toHaveLength(1)
+
+    const replay = await page.request.post(new URL(accepted.url()).pathname, {
+      headers: { "Content-Type": "application/json" },
+      data: accepted.request().postDataJSON(),
+    })
+    expect(replay.ok(), "the exact accepted request must not be accepted twice").toBe(false)
+    expect(await fetchOrderPickings(page, orderId)).toEqual(pickingsAfterAccept)
+    expect(await saleOrderState(page, orderId)).not.toMatch(/draft/i)
+  })
+
   test("two sessions confirming at the same moment produce one delivery", async ({ page, browser }) => {
     test.setTimeout(240_000)
     const orderId = await draftOrder(page, "so-o2c-concurrent-confirm")
-    const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
-    const args = [organizationId, companyId, orderId]
+    const input = { companyId: BigInt(companyId), orderId: BigInt(orderId) }
 
     const { pages, close } = await openOwnerPages(browser, 2)
     try {
-      const results = await Promise.all(pages.map((session) => callReducerBffResult(session, "confirm_sales_order", args)))
+      const results = await Promise.all(pages.map((session) => postGeneratedOperation(session, "confirm_sales_order", input)))
       expect(results.filter((result) => result.ok), "exactly one confirm may win").toHaveLength(1)
     } finally {
       await close()
@@ -197,18 +246,16 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
     expect(await fetchOrderPickings(page, orderId)).toHaveLength(1)
   })
 
-  test("another tenant's organization id cannot confirm this order", async ({ page }) => {
+  test("another tenant's company id cannot confirm this order", async ({ page }) => {
     test.setTimeout(240_000)
     const orderId = await draftOrder(page, "so-o2c-cross-tenant")
-    const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
 
-    const foreign = await callReducerBffResult(page, "confirm_sales_order", [
-      organizationId + 1_000_000,
-      companyId,
-      orderId,
-    ])
-    expect(foreign.ok, "a foreign organization id must be refused").toBe(false)
+    const foreign = await postGeneratedOperation(page, "confirm_sales_order", {
+      companyId: BigInt(companyId + 1_000_000),
+      orderId: BigInt(orderId),
+    })
+    expect(foreign.ok, "a foreign company id must be refused").toBe(false)
 
     // Nothing changed for the real owner.
     expect(await saleOrderState(page, orderId)).toMatch(/draft/i)

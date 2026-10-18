@@ -255,27 +255,23 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
     await expect(page).toHaveURL(/\/sales\?tab=orders&filter=state%3A/)
   })
 
-  test("surfaces a malformed persisted operator as a card diagnostic", async ({ page }) => {
+  test("rejects a malformed operator at write time instead of persisting it", async ({ page }) => {
+    // Render-time diagnostics for already-persisted malformed definitions are
+    // covered by stored-dashboard-resolver.test.ts; the reducer now refuses to
+    // create such a widget in the first place.
     const dashboardsResponse = await page.request.get("/api/query/dashboards")
     expect(dashboardsResponse.ok()).toBe(true)
     const dashboard = ((await dashboardsResponse.json()) as {
-      data?: Array<{ id?: unknown; name?: unknown; companyId?: unknown; company_id?: unknown }>
+      data?: Array<{ id?: unknown; companyId?: unknown; company_id?: unknown }>
     }).data?.find((row) => (scalarQueryId(row.id) ?? 0) > 0)
-    const dashboardId = scalarQueryId(dashboard?.id)
     const companyId = scalarQueryId(dashboard?.companyId ?? dashboard?.company_id)
-    const dashboardName = String(dashboard?.name ?? "")
-    if (dashboardId == null || companyId == null) {
-      throw new Error("Seeded dashboard and company are required")
-    }
+    if (companyId == null) throw new Error("Seeded dashboard and company are required")
 
-    const creationRequestId = `malformed-${Date.now()}`
-    const metadata = `lumiere.dashboard-widget.create/v1:${creationRequestId}`
-    await postNamedOperation(
-      page,
-      stdbBffCommandPost("create_dashboard_widget", {
-        companyId,
-        params: stdbParamsToJson(toCreateDashboardWidgetParams({
-        name: `COV-26 malformed filter ${Date.now()}`,
+    const widgetName = `COV-26 malformed filter ${Date.now()}`
+    const command = stdbBffCommandPost("create_dashboard_widget", {
+      companyId,
+      params: stdbParamsToJson(toCreateDashboardWidgetParams({
+        name: widgetName,
         widgetType: "chart",
         dataSource: "sale_order",
         fields: [],
@@ -289,55 +285,20 @@ test.describe("COV-26 Reports source quality", { tag: "@dev-fixture" }, () => {
         aggregation: "count",
         chartType: "bar",
         limit: 10,
-        configuration: JSON.stringify({
-          version: 1,
-          timeField: null,
-          measureField: null,
-          missingTimestampPolicy: "reject",
-          missingMeasurePolicy: "reject",
-        }),
-        creationRequestId,
+        creationRequestId: `malformed-${Date.now()}`,
       }), "CreateDashboardWidgetParams"),
-      }),
-    )
+    })
+    const rejected = await page.request.post(command.urlPath, {
+      headers: { "Content-Type": "application/json" },
+      data: JSON.parse(String(command.init.body)),
+    })
+    expect(rejected.status()).toBe(422)
+    expect(await rejected.text()).toContain("Unsupported widget filter operator")
 
-    await expect.poll(async () => {
-      const response = await page.request.get("/api/query/dashboard-widgets")
-      if (!response.ok()) return null
-      const rows = ((await response.json()) as {
-        data?: Array<{ id?: unknown; metadata?: unknown }>
-      }).data ?? []
-      return scalarQueryId(rows.find((row) => row.metadata === metadata)?.id)
-    }).not.toBeNull()
-
-    const resolvedWidgetId = await page.request
-      .get("/api/query/dashboard-widgets")
-      .then(async (response) => {
-        const rows = ((await response.json()) as {
-          data?: Array<{ id?: unknown; metadata?: unknown }>
-        }).data ?? []
-        return scalarQueryId(rows.find((row) => row.metadata === metadata)?.id)
-      })
-    if (resolvedWidgetId == null) throw new Error("Malformed widget readback is required")
-
-    await postNamedOperation(
-      page,
-      stdbBffCommandPost("add_widget_to_dashboard", {
-        dashboardId,
-        widgetId: resolvedWidgetId,
-      }),
-    )
-
-    await gotoModule(page, "/reports", "reports")
-    await selectModuleTab(page, "reports", "dashboards")
-    await page.getByTestId(`entity-row-${dashboardId}`).click()
-    await page.getByTestId("entity-action-view-dashboard").click()
-    await expect(page.getByRole("dialog", { name: dashboardName })).toBeVisible()
-
-    const card = page.getByTestId(`stored-dashboard-widget-${resolvedWidgetId}`)
-    await expect(card).toBeVisible()
-    await expect(card.getByTestId("dashboard-widget-diagnostic")).toHaveAttribute("role", "alert")
-    await expect(card).toContainText("unsupported filter operator: $regex")
+    const widgets = await page.request.get("/api/query/dashboard-widgets")
+    expect(widgets.ok()).toBe(true)
+    const rows = ((await widgets.json()) as { data?: Array<{ name?: unknown }> }).data ?? []
+    expect(rows.some((row) => row.name === widgetName)).toBe(false)
   })
 
   test("distinguishes loading from a successful empty result at a mobile viewport", async ({

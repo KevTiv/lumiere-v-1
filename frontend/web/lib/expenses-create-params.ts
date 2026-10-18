@@ -100,9 +100,12 @@ export function toCreateExpenseParams(
   if (employeeId === undefined || parsedCurrencyId === undefined || date === null) return null
 
   const lineKind = parseLineKind(formData.lineKind)
-  // Optional numeric inputs are empty strings, not undefined. A blank quantity
-  // means one item; Number("") would instead send zero and fail reducer validation.
-  const quantity = optionalString(formData.quantity) ?? "1"
+  const quantityRaw = formData.quantity
+  // React Hook Form represents an untouched optional number input as an empty
+  // string. The create contract's default quantity is one, so preserve that
+  // default instead of coercing the empty string to zero.
+  const quantity =
+    quantityRaw == null || String(quantityRaw).trim() === "" ? 1 : Number(quantityRaw)
   const mileageDistance =
     formData.mileageDistance != null && String(formData.mileageDistance).trim() !== ""
       ? Number(formData.mileageDistance)
@@ -117,7 +120,7 @@ export function toCreateExpenseParams(
     name: String(formData.name ?? ""),
     date,
     unitAmount: Number(formData.totalAmount ?? formData.unitAmount ?? 0),
-    quantity: Number(quantity),
+    quantity,
     currencyId: parsedCurrencyId,
     description: optionalString(formData.description),
     productId: optionalBigIntU64(formData.productId),

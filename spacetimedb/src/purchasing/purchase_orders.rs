@@ -23,9 +23,9 @@ use crate::inventory::product::{product, product_supplier_info, product_variant,
 use crate::inventory::tracking::stock_production_lot;
 use crate::manufacturing::relations::{require_uom_compatible, require_uom_in_org};
 use crate::sales::oms_extensions::{account_fiscal_position, account_incoterm};
-use crate::types::TaxTypeUse;
 use crate::types::{
     ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState,
+    TaxAmountType, TaxTypeUse,
 };
 use crate::workflow::action_registry::{
     GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
@@ -369,6 +369,26 @@ fn validate_order_in_organization(
     organization_id: u64,
     order_id: u64,
 ) -> Result<PurchaseOrder, String> {
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        order.company_id,
+        ctx.sender(),
+    )?;
+    Ok(order)
+}
+
+/// Load an order through its tenant-owned parent without applying interactive
+/// company membership. Crate-internal service paths use this only after their
+/// own narrow authorization and relation checks have established company
+/// scope; user-facing reducers must continue to use
+/// `validate_order_in_organization`.
+fn load_order_in_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<PurchaseOrder, String> {
     let order = ctx
         .db
         .purchase_order()
@@ -400,6 +420,12 @@ fn require_requisition_in_organization(
         return Err("Purchase requisition does not belong to this organization".to_string());
     }
     require_company_in_organization(ctx, organization_id, requisition.company_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        requisition.company_id,
+        ctx.sender(),
+    )?;
     Ok(requisition)
 }
 
@@ -492,6 +518,44 @@ fn require_purchase_taxes(
         }
     }
     Ok(())
+}
+
+fn purchase_line_amounts(
+    ctx: &ReducerContext,
+    tax_ids: &[u64],
+    gross: f64,
+) -> Result<(f64, f64, f64), String> {
+    let taxes: Vec<_> = tax_ids
+        .iter()
+        .map(|tax_id| {
+            ctx.db
+                .account_tax()
+                .id()
+                .find(tax_id)
+                .ok_or_else(|| "Purchase tax not found".to_string())
+        })
+        .collect::<Result<_, _>>()?;
+    if taxes
+        .iter()
+        .all(|tax| tax.amount_type == TaxAmountType::Percent && tax.amount >= 0.0)
+    {
+        let rules: Vec<_> = taxes
+            .iter()
+            .map(|tax| crate::accounting::bill_economics::PercentageTax {
+                id: tax.id,
+                rate: tax.amount,
+                included: tax.price_include,
+            })
+            .collect();
+        let economics = crate::accounting::bill_economics::percentage_tax_amounts(gross, &rules)?;
+        return Ok((
+            economics.subtotal,
+            economics.taxes.values().sum(),
+            economics.total,
+        ));
+    }
+    let tax = calculate_tax(ctx, tax_ids, gross);
+    Ok((gross, tax, gross + tax))
 }
 
 fn require_product_variant_for_product(
@@ -1636,7 +1700,11 @@ fn add_purchase_order_line_impl(
         check_permission(ctx, organization_id, "purchase_order_line", "create")?;
     }
 
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    let order = if enforce_user_permission {
+        validate_order_in_organization(ctx, organization_id, order_id)?
+    } else {
+        load_order_in_organization(ctx, organization_id, order_id)?
+    };
 
     if order.state != PoState::Draft {
         return Err("Can only add lines to draft purchase orders".to_string());
@@ -1675,8 +1743,8 @@ fn add_purchase_order_line_impl(
         params.lot_id,
     )?;
 
-    let subtotal = params.quantity * params.price_unit;
-    let tax = calculate_tax(ctx, &params.tax_ids, subtotal);
+    let (subtotal, tax, total) =
+        purchase_line_amounts(ctx, &params.tax_ids, params.quantity * params.price_unit)?;
     let company_id = order.company_id;
 
     let line = ctx.db.purchase_order_line().insert(PurchaseOrderLine {
@@ -1695,7 +1763,7 @@ fn add_purchase_order_line_impl(
         product_template_id: None,
         price_unit: params.price_unit,
         price_subtotal: subtotal,
-        price_total: subtotal + tax,
+        price_total: total,
         price_tax: tax,
         order_id,
         account_analytic_id: params.account_analytic_id,
@@ -1733,19 +1801,14 @@ fn add_purchase_order_line_impl(
         ..order
     });
 
-    if enforce_user_permission {
-        compute_purchase_order_line_totals(ctx, organization_id, order_id)?;
-        compute_purchase_order_totals(ctx, organization_id, order_id)?;
-        update_po_receipt_status(ctx, organization_id, order_id)?;
-        update_po_invoice_status(ctx, organization_id, order_id)?;
-    } else {
-        // The bounded replenishment service has already validated its supplier,
-        // company and product. A scheduled sender is not an interactive user.
-        refresh_purchase_order_line_totals(ctx, organization_id, order_id)?;
-        refresh_purchase_order_totals(ctx, organization_id, order_id)?;
-        refresh_po_receipt_status(ctx, organization_id, order_id)?;
-        refresh_po_invoice_status(ctx, organization_id, order_id)?;
-    }
+    // The line mutation above is already authorized: either by the public
+    // reducer's create permission or by the narrow scheduled-replenishment
+    // service boundary. Derived-state refreshes must not re-enter interactive
+    // RBAC, because scheduled reducers execute as the scheduler identity.
+    refresh_purchase_order_line_totals(ctx, organization_id, order_id)?;
+    refresh_purchase_order_totals(ctx, organization_id, order_id)?;
+    refresh_po_receipt_status(ctx, organization_id, order_id)?;
+    refresh_po_invoice_status(ctx, organization_id, order_id)?;
 
     write_audit_log_v2(
         ctx,
@@ -1987,17 +2050,20 @@ pub fn update_purchase_order_line(
         lot_id,
     )?;
 
-    let subtotal = quantity * price_unit;
-    // Preserve existing tax when caller omits tax_ids (do not wipe to []).
-    let tax = match &params.tax_ids {
-        Some(ids) => calculate_tax(ctx, ids, subtotal),
-        None => {
-            if line.price_subtotal.abs() > f64::EPSILON {
-                subtotal * (line.price_tax / line.price_subtotal)
-            } else {
-                line.price_tax
+    // Tax identities are not retained on legacy PO lines. Repricing a taxed
+    // line without explicit identities would manufacture new aggregate evidence.
+    let (subtotal, tax, total) = match &params.tax_ids {
+        Some(ids) => purchase_line_amounts(ctx, ids, quantity * price_unit)?,
+        None if params.quantity.is_some() || params.price_unit.is_some() => {
+            if line.price_tax.abs() > 1e-8 {
+                return Err(
+                    "Taxed PO line repricing requires explicit purchase tax identities".into(),
+                );
             }
+            let subtotal = quantity * price_unit;
+            (subtotal, 0.0, subtotal)
         }
+        None => (line.price_subtotal, line.price_tax, line.price_total),
     };
 
     let date_planned = params.date_planned.or(line.date_planned);
@@ -2017,7 +2083,7 @@ pub fn update_purchase_order_line(
         price_unit,
         price_subtotal: subtotal,
         price_tax: tax,
-        price_total: subtotal + tax,
+        price_total: total,
         date_planned,
         product_variant_id,
         account_analytic_id,
@@ -2132,7 +2198,7 @@ pub fn compute_purchase_order_line_totals(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order_line", "write")?;
-
+    validate_order_in_organization(ctx, organization_id, order_id)?;
     refresh_purchase_order_line_totals(ctx, organization_id, order_id)
 }
 
@@ -2141,7 +2207,7 @@ fn refresh_purchase_order_line_totals(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
     let lines: Vec<_> = ctx
         .db
         .purchase_order_line()
@@ -2199,7 +2265,7 @@ pub fn compute_purchase_order_totals(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
-
+    validate_order_in_organization(ctx, organization_id, order_id)?;
     refresh_purchase_order_totals(ctx, organization_id, order_id)
 }
 
@@ -2208,7 +2274,7 @@ fn refresh_purchase_order_totals(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
 
     let lines: Vec<_> = ctx
         .db
@@ -2268,7 +2334,7 @@ pub fn update_po_receipt_status(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
-
+    validate_order_in_organization(ctx, organization_id, order_id)?;
     refresh_po_receipt_status(ctx, organization_id, order_id)
 }
 
@@ -2277,7 +2343,7 @@ fn refresh_po_receipt_status(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
 
     let lines: Vec<_> = ctx
         .db
@@ -2397,6 +2463,7 @@ pub fn update_po_invoice_status(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
+    validate_order_in_organization(ctx, organization_id, order_id)?;
 
     refresh_po_invoice_status(ctx, organization_id, order_id)
 }
@@ -2407,7 +2474,7 @@ pub(crate) fn refresh_po_invoice_status(
     organization_id: u64,
     order_id: u64,
 ) -> Result<(), String> {
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
 
     let invoice_status = invoice_status_for_received_quantities(
         ctx.db
@@ -3075,6 +3142,10 @@ pub fn submit_purchase_requisition(
         return Err("Purchase requisition must be in Draft state to submit".to_string());
     }
 
+    if requisition_lines(ctx, requisition_id).is_empty() {
+        return Err("Purchase requisition must have lines before submission".to_string());
+    }
+
     ctx.db
         .purchase_requisition()
         .id()
@@ -3119,13 +3190,10 @@ pub fn approve_purchase_requisition(
         return Err("Purchase requisition must be in InProgress state to approve".to_string());
     }
 
-    // A requisition is created on behalf of `user_id` and that identity stays
-    // immutable throughout the request lifecycle.  Permission to approve is
-    // necessary, but it must never let a requester approve their own spend.
-    // Keep this check at the reducer boundary so alternate clients cannot
-    // bypass the UI's separation-of-duties guard.
-    if requisition.user_id == ctx.sender() {
-        return Err("Requester cannot approve their own purchase requisition".to_string());
+    // A requisition is created on behalf of `user_id`; `create_uid` records
+    // who inserted it. Neither actor may approve the spend they initiated.
+    if requisition.user_id == ctx.sender() || requisition.create_uid == ctx.sender() {
+        return Err("Purchase requisition requires an independent approver".to_string());
     }
 
     ctx.db

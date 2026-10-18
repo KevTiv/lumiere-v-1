@@ -123,6 +123,9 @@
       "blocked",
       "account_id",
       "partner_id",
+      "product_id",
+      "quantity",
+      "price_unit",
       "company_id"
     ],
     "mandatory": [
@@ -145,6 +148,7 @@
       "journal_id",
       "partner_id",
       "currency_id",
+      "company_currency_id",
       "invoice_date",
       "invoice_date_due",
       "invoice_origin",
@@ -155,6 +159,7 @@
       "amount_total",
       "amount_residual",
       "payment_state",
+      "posted_before",
       "metadata"
     ],
     "mandatory": [
@@ -280,7 +285,8 @@
       "price_include",
       "include_base_amount",
       "is_base_affected",
-      "sequence"
+      "sequence",
+      "invoice_repartition_line_ids"
     ],
     "mandatory": [
       "id",
@@ -3041,9 +3047,21 @@
     "table": "hr_labor_cost_snapshot"
   },
   "landed-cost-applications": {
-    "aliases": ["landed-cost-applications", "stock_landed_cost_application"],
-    "default_restricted": ["company_id", "landed_cost_id", "allocation_count", "applied_at"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "landed-cost-applications",
+      "stock_landed_cost_application"
+    ],
+    "default_restricted": [
+      "company_id",
+      "landed_cost_id",
+      "allocation_count",
+      "applied_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "stock_landed_cost_application"
   },
   "landed-cost-lines": {
@@ -3431,41 +3449,91 @@
     "table": "mrp_production"
   },
   "mrp-production-costs": {
-    "aliases": ["mrp-production-costs", "mrp_production_cost"],
-    "default_restricted": [
-      "company_id", "currency_id", "material_value", "workcenter_value",
-      "total_value", "inventory_value", "variance_value", "raw_move_ids",
-      "output_move_ids", "productivity_cost_ids", "account_move_id",
-      "account_move_line_ids", "created_at"
+    "aliases": [
+      "mrp-production-costs",
+      "mrp_production_cost"
     ],
-    "mandatory": ["production_id", "organization_id"],
+    "default_restricted": [
+      "company_id",
+      "currency_id",
+      "material_value",
+      "workcenter_value",
+      "total_value",
+      "inventory_value",
+      "variance_value",
+      "raw_move_ids",
+      "output_move_ids",
+      "productivity_cost_ids",
+      "account_move_id",
+      "account_move_line_ids",
+      "created_at"
+    ],
+    "mandatory": [
+      "production_id",
+      "organization_id"
+    ],
     "table": "mrp_production_cost"
   },
   "mrp-productivity-costs": {
-    "aliases": ["mrp-productivity-costs", "mrp_productivity_cost"],
-    "default_restricted": [
-      "company_id", "production_id", "workorder_id", "workcenter_id",
-      "currency_id", "duration_minutes", "hourly_rate", "configured",
-      "value", "created_at"
+    "aliases": [
+      "mrp-productivity-costs",
+      "mrp_productivity_cost"
     ],
-    "mandatory": ["productivity_id", "organization_id"],
+    "default_restricted": [
+      "company_id",
+      "production_id",
+      "workorder_id",
+      "workcenter_id",
+      "currency_id",
+      "duration_minutes",
+      "hourly_rate",
+      "configured",
+      "value",
+      "created_at"
+    ],
+    "mandatory": [
+      "productivity_id",
+      "organization_id"
+    ],
     "table": "mrp_productivity_cost"
   },
   "mrp-valuation-configs": {
-    "aliases": ["mrp-valuation-configs", "mrp_valuation_config"],
-    "default_restricted": [
-      "currency_id", "journal_id", "material_account_id", "output_account_id",
-      "workcenter_account_id", "variance_account_id", "updated_at", "updated_by"
+    "aliases": [
+      "mrp-valuation-configs",
+      "mrp_valuation_config"
     ],
-    "mandatory": ["company_id", "organization_id"],
+    "default_restricted": [
+      "currency_id",
+      "journal_id",
+      "material_account_id",
+      "output_account_id",
+      "workcenter_account_id",
+      "variance_account_id",
+      "updated_at",
+      "updated_by"
+    ],
+    "mandatory": [
+      "company_id",
+      "organization_id"
+    ],
     "table": "mrp_valuation_config"
   },
   "mrp-workcenter-cost-rates": {
-    "aliases": ["mrp-workcenter-cost-rates", "mrp_workcenter_cost_rate"],
-    "default_restricted": [
-      "company_id", "currency_id", "hourly_rate", "updated_by", "updated_at"
+    "aliases": [
+      "mrp-workcenter-cost-rates",
+      "mrp_workcenter_cost_rate"
     ],
-    "mandatory": ["workcenter_id", "organization_id"],
+    "default_restricted": [
+      "company_id",
+      "currency_id",
+      "hourly_rate",
+      "updated_by",
+      "updated_at"
+    ],
+    "mandatory": [
+      "workcenter_id",
+      "organization_id"
+    ],
     "table": "mrp_workcenter_cost_rate"
   },
   "mrp-routing-workcenters": {
@@ -5039,51 +5107,164 @@
     "table": "public_holiday"
   },
   "commodity-price-indexes": {
-    "aliases": ["commodity-price-indexes", "commodity_price_index"],
-    "default_restricted": ["company_id", "code", "rate", "as_of"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "commodity-price-indexes",
+      "commodity_price_index"
+    ],
+    "default_restricted": [
+      "company_id",
+      "code",
+      "rate",
+      "as_of"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "commodity_price_index"
   },
   "consignment-agreements": {
-    "aliases": ["consignment-agreements", "consignment_agreement"],
-    "default_restricted": ["company_id", "name", "partner_id", "product_id", "warehouse_id", "state"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "consignment-agreements",
+      "consignment_agreement"
+    ],
+    "default_restricted": [
+      "company_id",
+      "name",
+      "partner_id",
+      "product_id",
+      "warehouse_id",
+      "state"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "consignment_agreement"
   },
   "purchase-approval-delegates": {
-    "aliases": ["purchase-approval-delegates", "purchase_approval_delegate"],
-    "default_restricted": ["company_id", "principal_identity", "delegate_identity", "is_active"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchase-approval-delegates",
+      "purchase_approval_delegate"
+    ],
+    "default_restricted": [
+      "company_id",
+      "principal_identity",
+      "delegate_identity",
+      "is_active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchase_approval_delegate"
   },
   "purchase-blanket-order-lines": {
-    "aliases": ["purchase-blanket-order-lines", "purchase_blanket_order_line"],
-    "default_restricted": ["company_id", "blanket_order_id", "product_id", "product_uom", "committed_quantity", "released_quantity", "price_unit"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchase-blanket-order-lines",
+      "purchase_blanket_order_line"
+    ],
+    "default_restricted": [
+      "company_id",
+      "blanket_order_id",
+      "product_id",
+      "product_uom",
+      "committed_quantity",
+      "released_quantity",
+      "price_unit"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchase_blanket_order_line"
   },
   "purchase-blanket-orders": {
-    "aliases": ["purchase-blanket-orders", "purchase_blanket_order"],
-    "default_restricted": ["company_id", "name", "partner_id", "currency_id", "state", "date_start", "date_end", "release_count", "last_release_po_id"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchase-blanket-orders",
+      "purchase_blanket_order"
+    ],
+    "default_restricted": [
+      "company_id",
+      "name",
+      "partner_id",
+      "currency_id",
+      "state",
+      "date_start",
+      "date_end",
+      "release_count",
+      "last_release_po_id"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchase_blanket_order"
   },
   "purchase-blanket-releases": {
-    "aliases": ["purchase-blanket-releases", "purchase_blanket_release"],
-    "default_restricted": ["company_id", "blanket_order_id", "purchase_order_id", "idempotency_key", "request_fingerprint"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchase-blanket-releases",
+      "purchase_blanket_release"
+    ],
+    "default_restricted": [
+      "company_id",
+      "blanket_order_id",
+      "purchase_order_id",
+      "idempotency_key",
+      "request_fingerprint"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchase_blanket_release"
   },
   "purchase-contracts": {
-    "aliases": ["purchase-contracts", "purchase_contract"],
-    "default_restricted": ["company_id", "name", "partner_id", "state", "date_start", "date_end"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchase-contracts",
+      "purchase_contract"
+    ],
+    "default_restricted": [
+      "company_id",
+      "name",
+      "partner_id",
+      "state",
+      "date_start",
+      "date_end"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchase_contract"
   },
   "purchasing-integration-intents": {
-    "aliases": ["purchasing-integration-intents", "purchasing_integration_intent"],
-    "default_restricted": ["company_id", "provider", "intent_type", "purchase_order_id", "idempotency_key", "status", "external_reference", "attempt_count"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchasing-integration-intents",
+      "purchasing_integration_intent"
+    ],
+    "default_restricted": [
+      "company_id",
+      "provider",
+      "intent_type",
+      "purchase_order_id",
+      "idempotency_key",
+      "status",
+      "external_reference",
+      "attempt_count"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchasing_integration_intent"
   },
   "purchase-order-lines": {
@@ -5093,8 +5274,11 @@
     ],
     "default_restricted": [
       "product_id",
+      "product_uom",
       "product_qty",
       "price_unit",
+      "state",
+      "invoice_lines",
       "qty_received",
       "qty_invoiced",
       "qty_to_invoice"
@@ -5117,6 +5301,8 @@
       "product_id",
       "product_qty",
       "price_unit",
+      "state",
+      "invoice_lines",
       "qty_received",
       "qty_invoiced",
       "qty_to_invoice"
@@ -5128,6 +5314,25 @@
       "order_id"
     ],
     "table": "purchase_order_line"
+  },
+  "purchase-order-creations": {
+    "aliases": [
+      "purchase-order-creations",
+      "purchase_order_creation_operation"
+    ],
+    "default_restricted": [
+      "operation_key",
+      "purchase_order_id",
+      "payload_hash",
+      "created_by",
+      "created_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "purchase_order_creation_operation"
   },
   "purchase-orders": {
     "aliases": [
@@ -5195,6 +5400,33 @@
     ],
     "table": "purchase_order"
   },
+  "purchase-receipt-operations": {
+    "aliases": [
+      "purchase-receipt-operations",
+      "purchase_receipt_operation"
+    ],
+    "default_restricted": [
+      "operation_key",
+      "line_id",
+      "order_id",
+      "quantity",
+      "lot_id",
+      "received_before",
+      "received_after",
+      "move_id",
+      "picking_id",
+      "continuation_move_id",
+      "continuation_picking_id",
+      "created_by",
+      "created_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "purchase_receipt_operation"
+  },
   "purchase-requisition-lines": {
     "aliases": [
       "purchase-requisition-lines",
@@ -5229,7 +5461,8 @@
       "vendor_id",
       "line_ids",
       "purchase_ids",
-      "order_count"
+      "order_count",
+      "write_uid"
     ],
     "mandatory": [
       "id",
@@ -5285,7 +5518,8 @@
       "partner_id",
       "price_unit",
       "amount_total",
-      "state"
+      "state",
+      "notes"
     ],
     "mandatory": [
       "id",
@@ -5321,7 +5555,9 @@
       "company_id",
       "requisition_id",
       "awarded_bid_id",
-      "purchase_order_id"
+      "purchase_order_id",
+      "notes",
+      "currency_id"
     ],
     "mandatory": [
       "id",
@@ -5429,7 +5665,8 @@
       "trigger",
       "group_id",
       "last_run",
-      "next_run"
+      "next_run",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -5533,9 +5770,21 @@
     "table": "resource_utilisation_snapshot"
   },
   "return-order-creations": {
-    "aliases": ["return-order-creations", "return_order_creation"],
-    "default_restricted": ["company_id", "return_order_id", "idempotency_key", "request_fingerprint"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "return-order-creations",
+      "return_order_creation"
+    ],
+    "default_restricted": [
+      "company_id",
+      "return_order_id",
+      "idempotency_key",
+      "request_fingerprint"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "return_order_creation"
   },
   "return-order-lines": {
@@ -6383,7 +6632,15 @@
     "default_restricted": [
       "name",
       "company_id",
-      "active"
+      "subscription_id",
+      "product_id",
+      "product_uom_qty",
+      "price_unit",
+      "discount",
+      "price_subtotal",
+      "recurring_rule_type",
+      "recurring_interval",
+      "line_is_recurring"
     ],
     "mandatory": [
       "id",
@@ -6582,7 +6839,10 @@
       "company_name",
       "contact_name",
       "email",
-      "phone"
+      "phone",
+      "submitted_by",
+      "approved_by",
+      "partner_id"
     ],
     "mandatory": [
       "id",
@@ -6936,15 +7196,40 @@
     "table": "warehouse_3_d_zone"
   },
   "vendor-risk-flags": {
-    "aliases": ["vendor-risk-flags", "vendor_risk_flag"],
-    "default_restricted": ["company_id", "partner_id", "is_flagged", "risk_level", "reason"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "vendor-risk-flags",
+      "vendor_risk_flag"
+    ],
+    "default_restricted": [
+      "company_id",
+      "partner_id",
+      "is_flagged",
+      "risk_level",
+      "reason"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "vendor_risk_flag"
   },
   "vendor-scorecards": {
-    "aliases": ["vendor-scorecards", "vendor_scorecard"],
-    "default_restricted": ["company_id", "partner_id", "otif_score", "quality_score"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "vendor-scorecards",
+      "vendor_scorecard"
+    ],
+    "default_restricted": [
+      "company_id",
+      "partner_id",
+      "otif_score",
+      "quality_score"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "vendor_scorecard"
   },
   "warehouse-geo": {

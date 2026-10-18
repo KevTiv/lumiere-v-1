@@ -1646,6 +1646,10 @@
       "name": "create_purchase_order",
       "shape_fingerprint": "sha256:72c3563be3fe13e2bee2c88145886ed73fcbd6d74dbedb53e034be598ec72d62"
     },
+    "erp.create_purchase_order_once": {
+      "name": "create_purchase_order_once",
+      "shape_fingerprint": "sha256:fe8389e742aa0a34165a1c65d1e803551480847ff58ec6a7de42004d4e5d7d16"
+    },
     "erp.create_purchase_requisition": {
       "name": "create_purchase_requisition",
       "shape_fingerprint": "sha256:2bd104fe03947cfea9a8abedc40bcc042adb5e390ce841332a533c8ae3fc76ab"
@@ -3058,6 +3062,10 @@
       "name": "receive_po_line",
       "shape_fingerprint": "sha256:273ab43f8c5af8e01ae9a4cfa555a52a01986f81bfe8d40032f2942fe8896d63"
     },
+    "erp.receive_po_line_once": {
+      "name": "receive_po_line_once",
+      "shape_fingerprint": "sha256:ed72f39907b8dbea680b43eaaea086c17504aa180cd0908b0d04141ba565f92f"
+    },
     "erp.recognize_amortization_line": {
       "name": "recognize_amortization_line",
       "shape_fingerprint": "sha256:89504b28b03f27217a65d50652c76e18c53767999e9092b6013408e54dac4815"
@@ -4325,6 +4333,10 @@
     "erp.run_purchasing_incoming_picking_test": {
       "name": "run_purchasing_incoming_picking_test",
       "shape_fingerprint": "sha256:de820769ab54df2a59e8ccfc7ffe0df69eb932d9088e2576ce269457b5ace895"
+    },
+    "erp.run_purchasing_keyed_operations_test": {
+      "name": "run_purchasing_keyed_operations_test",
+      "shape_fingerprint": "sha256:3acfce83782bbb15815aba0ebd2dd32de0e241e9b2527a330a0b7321c3da390e"
     },
     "erp.run_purchasing_lot_receive_test": {
       "name": "run_purchasing_lot_receive_test",
@@ -6036,6 +6048,14 @@
       "current_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
       "operation_count": 1449,
       "reason": "release on top of v0.3.108: add cleanup_abandoned_account_move_import; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.109",
+      "previous_ir_sha256": "sha256:7cc56b148646660b0c43d4b3332cb1855c273c84e09ef36eafad1ee5913a2152",
+      "previous_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
+      "current_operations_fingerprint": "sha256:6e5694ae968ca8a791ca4f744c0028d7887742c0fa0ecbb5f9374198450797bf",
+      "operation_count": 1452,
+      "reason": "release on top of v0.3.109: add create_purchase_order_once, receive_po_line_once, run_purchasing_keyed_operations_test; change the shape of none"
     }
   ]
 }

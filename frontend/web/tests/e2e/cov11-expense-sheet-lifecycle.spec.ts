@@ -3,7 +3,6 @@ import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
   selectModuleTab,
-  callReducerBff,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   fetchAccountIdByCode,
@@ -331,14 +330,14 @@ test.describe(
         )
         if (!existingFinanceEmployee) {
           const financeEmployeeName = smokeName("cov11-finance-approver")
-          await callReducerBff(page, "create_employee", [
+          await callOwnerRaw("create_employee", [
             organizationId,
             {
               company_id: some(companyId),
               name: financeEmployeeName,
               job_id: none,
               department_id: none,
-              employment_type: { tag: "FullTime" },
+              employment_type: { fullTime: [] },
               work_email: some("fixture.finance@example.test"),
               employee_number: none,
               job_title: some("Expense approver"),

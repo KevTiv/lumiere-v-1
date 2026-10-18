@@ -10,6 +10,7 @@
     "./org-scoped": "./src/org-scoped.ts",
     "./stdb-params-json": "./src/stdb-params-json.ts",
     "./stb-timestamp": "./src/stb-timestamp.ts",
+    "./workflow-delegation": "./src/workflow-delegation.ts",
     "./record-links": "./src/record-links.ts",
     "./accounting-defaults": "./src/accounting-defaults.ts",
     "./invoice-personalization": "./src/invoice-personalization.ts",
