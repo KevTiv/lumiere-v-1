@@ -415,6 +415,7 @@ export async function openTabAndCancelCreate(
 
 export async function fillField(scope: Page | Locator, name: string, value: string) {
   const field = scope.getByTestId(`form-field-${name}`)
+  await expect(field, `Missing form field "${name}" in the active form`).toHaveCount(1, { timeout: 15_000 })
   // Textarea retains its test id on the native form bridge. User input belongs
   // in the visible editor inside that same panel, including within a dialog.
   if (
@@ -2541,23 +2542,28 @@ export async function addCustomFormFieldViaSettings(
       const parsed = JSON.parse(String(value ?? "[]")) as unknown
       return Array.isArray(parsed) ? parsed.map(String) : []
     }
-    const enabledFields = stringArray(
-      adminRegistryConfig.enabledFieldsJson ?? adminRegistryConfig.enabled_fields_json,
-    )
-    await callReducerBff(page, "set_form_role_config", [
-      orgId,
-      configId,
-      {
-        role_id: String(adminRoleId),
-        enabled_fields: [...new Set([...enabledFields, fieldId])],
-        required_fields: stringArray(
-          adminRegistryConfig.requiredFieldsJson ?? adminRegistryConfig.required_fields_json,
-        ),
-        default_prompts: stringArray(
-          adminRegistryConfig.defaultPromptsJson ?? adminRegistryConfig.default_prompts_json,
-        ),
-      },
-    ])
+    // The runtime may use the registry role or its persisted numeric identity.
+    // Preserve each role's current visibility policy when adding a fixture field.
+    for (const roleId of new Set(["role-admin", String(adminRoleId)])) {
+      const current = (roleConfigsJson.data ?? []).find(
+        (row) =>
+          scalarQueryId(row.configurationId ?? row.configuration_id) === configId &&
+          String(row.roleId ?? row.role_id) === roleId,
+      ) ?? adminRegistryConfig
+      await callReducerBff(page, "set_form_role_config", [
+        orgId,
+        configId,
+        {
+          role_id: roleId,
+          enabled_fields: [...new Set([
+            ...stringArray(current.enabledFieldsJson ?? current.enabled_fields_json),
+            fieldId,
+          ])],
+          required_fields: stringArray(current.requiredFieldsJson ?? current.required_fields_json),
+          default_prompts: stringArray(current.defaultPromptsJson ?? current.default_prompts_json),
+        },
+      ])
+    }
     await openFormConfigLeadForm(page)
     await expect(page.getByTestId(`form-config-field-row-${fieldId}`)).toBeVisible({
       timeout: 30_000,
