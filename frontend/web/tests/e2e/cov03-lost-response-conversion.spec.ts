@@ -16,6 +16,7 @@ import {
   openEntityCreate,
   reloadSettled,
   selectEntityRowByText,
+  selectModuleTab,
   signIn,
   smokeName,
   submitForm,
@@ -38,7 +39,7 @@ async function createConvertibleOpportunity(page: Page, label: string) {
   await submitForm(page, "new-lead")
 
   await gotoModule(page, "/crm", "crm")
-  await page.getByTestId("module-tab-crm-leads").click()
+  await selectModuleTab(page, "crm", "leads")
   await expectSeededText(page, leadName, "/api/query/leads")
   await waitForBffQueryMinRows(page, "/api/query/opportunity-stages")
   await selectEntityRowByText(page, leadName)
@@ -50,7 +51,7 @@ async function createConvertibleOpportunity(page: Page, label: string) {
 
   await reloadSettled(page)
   await gotoModule(page, "/crm", "crm")
-  await page.getByTestId("module-tab-crm-opportunities").click()
+  await selectModuleTab(page, "crm", "opportunities")
   await expectSeededText(page, opportunityName, "/api/query/opportunities")
   const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
 
@@ -68,7 +69,7 @@ async function createConvertibleOpportunity(page: Page, label: string) {
 
 async function openConversionForm(page: Page, opportunityName: string) {
   await gotoModule(page, "/crm", "crm")
-  await page.getByTestId("module-tab-crm-opportunities").click()
+  await selectModuleTab(page, "crm", "opportunities")
   await selectEntityRowByText(page, opportunityName)
   await waitForEntityActionEnabled(page, "entity-action-convert-opp-order")
   await page.getByTestId("entity-action-convert-opp-order").click()
@@ -88,13 +89,17 @@ test.describe("COV-03 opportunity conversion recovery", { tag: ["@p0", "@cov03",
       await signIn(page, "fixture.sales@example.test", PERSONA_PASSWORD)
       await signIn(stalePage, "fixture.sales@example.test", PERSONA_PASSWORD)
       const companyId = await fetchDefaultCompanyId(page)
-      const { opportunityName, opportunityId } = await createConvertibleOpportunity(page, "cov03-lost")
+      const { opportunityName, opportunityId } = await test.step(
+        "Create and qualify the convertible opportunity",
+        () => createConvertibleOpportunity(page, "cov03-lost"),
+        { timeout: 120_000 },
+      )
 
       // A second session opens the conversion form while no order exists yet.
-      await openConversionForm(stalePage, opportunityName)
+      await test.step("Open stale-session conversion", () => openConversionForm(stalePage, opportunityName), { timeout: 45_000 })
 
       // Session one converts, but the browser loses the reply after the server committed.
-      await openConversionForm(page, opportunityName)
+      await test.step("Open active-session conversion", () => openConversionForm(page, opportunityName), { timeout: 45_000 })
       const drop = await loseNextResponse(page, "convert_opportunity_to_sale_order")
       await submitForm(page, "convert-opportunity-order").catch(() => undefined)
       await expect.poll(() => drop.lost()).toBe(true)
@@ -102,7 +107,7 @@ test.describe("COV-03 opportunity conversion recovery", { tag: ["@p0", "@cov03",
         .poll(() => fetchSaleOrderIdsByOpportunityId(page, opportunityId, companyId), { timeout: 30_000 })
         .toHaveLength(1)
       const [orderId] = await fetchSaleOrderIdsByOpportunityId(page, opportunityId, companyId)
-      await page.unroute(() => true).catch(() => undefined)
+      await page.unrouteAll({ behavior: "wait" })
 
       // Operator recovery: reopen and submit again. The pre-read finds the committed
       // effect, reports it, and dispatches nothing.
@@ -154,11 +159,13 @@ test.describe("COV-03 opportunity conversion recovery", { tag: ["@p0", "@cov03",
       await signIn(page, "fixture.reader@example.test", PERSONA_PASSWORD)
       const denied = await page.request.get("/api/query/leads")
       expect(denied.status()).toBe(403)
-      await page.goto("/crm")
-      const alert = page.getByTestId("module-load-error")
-      await expect(alert).toBeVisible({ timeout: 30_000 })
-      await expect(alert.getByRole("alert")).toBeVisible()
-      await expect(page.getByTestId("module-load-error-retry")).toBeEnabled()
+      await gotoModule(page, "/crm", "crm")
+      await selectModuleTab(page, "crm", "leads")
+      // Denied optional SSR reads are represented by the client panel rather
+      // than throwing to the Next.js route error boundary.
+      await expect(page.getByTestId("module-panel-crm-leads").getByRole("status")).toBeVisible()
+      await expect(page.getByTestId("module-create-crm-leads")).toHaveCount(0)
+      await expect(page.getByTestId("entity-action-convert-lead")).toHaveCount(0)
       await expect(page.getByText("Application error")).toHaveCount(0)
     } finally {
       await readerContext.close()
