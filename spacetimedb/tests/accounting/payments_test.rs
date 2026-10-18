@@ -2279,6 +2279,15 @@ fn test_bank_reversal_prior_last_cent_and_generation(
                 .to_string(),
         );
     }
+    let protected_prior = snapshot(ctx, org)?;
+    let prior_unwind = unregister_payment_allocations(ctx, org, prior_payment_id);
+    let prior_reverse = cancel_payment(ctx, org, prior_payment_id);
+    if !matches!(prior_unwind,Err(ref error) if error.contains("owned by another payment"))
+        || !matches!(prior_reverse,Err(ref error) if error.contains("owned by another payment"))
+        || snapshot(ctx, org)? != protected_prior
+    {
+        return Err("ordinary earlier-payment unwind/reversal overrode the active bank allocation or wrote before ownership denial".to_string());
+    }
     post_account_bank_statement(ctx, org, company_id, line.statement_id)?;
     let period = ctx
         .db
@@ -2455,6 +2464,21 @@ fn test_bank_reversal_prior_last_cent_and_generation(
         return Err("closed bank history lost a required retained parent".to_string());
     }
     ctx.db.account_period().id().update(period);
+    // The bank dependency disappears after exact compensation. Ordinary earlier
+    // allocation management can proceed again under its restored matching owner.
+    unregister_payment_allocations(ctx, org, prior_payment_id)?;
+    if ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("ordinary unwind invoice missing")?
+        .amount_residual
+        != 100.0
+    {
+        return Err("closed bank attempt incorrectly pinned independent earlier-payment allocation management".to_string());
+    }
+    register_payment_on_invoice(ctx, org, prior_payment_id, vec![invoice_id], false)?;
     reconcile_account_bank_statement_line(
         ctx,
         org,
