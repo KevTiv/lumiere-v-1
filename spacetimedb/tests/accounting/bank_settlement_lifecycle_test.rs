@@ -238,7 +238,7 @@ fn publish_approval(
         .db
         .workflow()
         .workflow_by_key()
-        .filter(key)
+        .filter(&key)
         .find(|row| row.organization_id == fixture.organization_id)
         .ok_or("recovery workflow missing")?;
     let version = ctx
@@ -628,9 +628,10 @@ pub fn test_bank_settlement_recovery_replay_and_denials(
         permissions: vec![],
         ..owner.clone()
     });
+    let was_superuser = profile.is_superuser;
     ctx.db.user_profile().id().update(UserProfile {
         is_superuser: false,
-        ..profile.clone()
+        ..profile
     });
     let denied_abandon = abandon_bank_statement_settlement(
         ctx,
@@ -647,7 +648,12 @@ pub fn test_bank_settlement_recovery_replay_and_denials(
         resubmit(first_payment, second, "denied-resubmit"),
     );
     ctx.db.role().id().update(owner);
-    ctx.db.user_profile().id().update(profile);
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
+        .ok_or("recovery operator disappeared")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: was_superuser,
+        ..profile
+    });
     denied(denied_abandon, "operator without cancel/write authority")?;
     denied(
         denied_resubmit,
