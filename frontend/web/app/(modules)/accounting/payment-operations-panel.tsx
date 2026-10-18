@@ -6,17 +6,15 @@ import { ArrowLeftRightIcon, Building2Icon, CircleDollarSignIcon, FileUpIcon, Pl
 import { useTranslation } from "@lumiere/i18n"
 import {
   allocateOperationalPaymentForm,
-  mergeFieldDefaultValues,
-  mergeSelectOptionsForFields,
   newOperationalPaymentAccountForm,
   newOperationalPaymentFeeForm,
   newOperationalPaymentTransactionForm,
   reverseOperationalPaymentForm,
-  RuntimeFormModal,
   stageBankStatementImportForm,
-} from "@lumiere/ui"
+} from "@lumiere/ui/lib/accounting-form-configs"
+import { mergeFieldDefaultValues, mergeSelectOptionsForFields } from "@lumiere/ui/lib/form-config-merge"
+import { RuntimeFormModal } from "../../../../packages/ui/src/forms/runtime-form-modal"
 import {
-  useApproveBankStatementImport,
   useAllocatePaymentTransaction,
   useCreatePaymentAccount,
   useCreatePaymentFee,
@@ -28,10 +26,9 @@ import {
   usePaymentTransactions,
   usePostPaymentTransaction,
   useReversePaymentTransaction,
-  useStageBankStatementImport,
   useVoidPaymentTransaction,
-  useBankStatementImports,
-} from "@lumiere/query-hooks/hooks/accounting"
+} from "@lumiere/query-hooks/hooks/accounting/payments"
+import { useApproveBankStatementImport, useStageBankStatementImport, useBankStatementImports } from "@lumiere/query-hooks/hooks/accounting/bank-statements"
 import type { PartnerType, PaymentDirection, PaymentFeeBearer, PaymentProviderCode } from "@lumiere/stdb/types"
 import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"

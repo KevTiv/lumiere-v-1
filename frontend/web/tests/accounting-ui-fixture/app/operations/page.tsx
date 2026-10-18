@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import dynamic from "next/dynamic"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { I18nProvider } from "@lumiere/i18n"
 import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
@@ -16,7 +17,7 @@ import { InvoiceEmailReviewDialog } from "../../../../../packages/ui/src/account
 import { invoiceEmailDocumentKey, invoiceEmailScope, type InvoiceEmailDocument } from "../../../../../packages/ui/src/accounting-components/invoice-email-review"
 import type { AccountMove } from "../../../../../packages/ui/src/lib/accounting-types"
 import type { ModuleDataState } from "../../../../../packages/ui/src/lib/module-data-state"
-import { PaymentOperationsPanel } from "../../../../app/(modules)/accounting/payment-operations-panel"
+const PaymentOperationsPanel = dynamic(() => import("../../../../app/(modules)/accounting/payment-operations-panel").then((module) => module.PaymentOperationsPanel), { ssr: false, loading: () => <p role="status">Loading actual payment operations…</p> })
 
 const NOW = new Date("2026-10-18T12:00:00Z")
 const date = (value: string) => ({ microsSinceUnixEpoch: BigInt(Date.parse(`${value}T00:00:00Z`)) * 1000n })

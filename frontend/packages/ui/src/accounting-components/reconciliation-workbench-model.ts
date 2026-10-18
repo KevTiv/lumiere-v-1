@@ -147,7 +147,7 @@ export function projectReconciliation(source: ReconciliationSource): Reconciliat
     const move = moveId ? moves.get(moveId) : undefined
     const account = accountId ? accounts.get(accountId) : undefined
     const partnerId = reconciliationId(move?.partnerId)
-    if (!moveId || !move || !inScope(move, organizationId, companyId) || tag(move.state) !== "Posted" || !account || !inScope(account, organizationId, companyId) || account.reconcile !== true || account.deprecated !== false
+    if (!moveId || !accountId || !move || !inScope(move, organizationId, companyId) || tag(move.state) !== "Posted" || !account || !inScope(account, organizationId, companyId) || account.reconcile !== true || account.deprecated !== false
       || tag(move.moveType) !== (bankAmount > 0 ? "OutInvoice" : "InInvoice")
       || tag(account.internalType).toLowerCase() !== (bankAmount > 0 ? "receivable" : "payable")
       || !partnerId || reconciliationId(row.partnerId) !== partnerId
