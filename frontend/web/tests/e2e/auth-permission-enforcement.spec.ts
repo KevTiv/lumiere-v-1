@@ -579,8 +579,9 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
 
     await withLimitedUserSession(browser, async (limitedPage) => {
       await callReducerBff(limitedPage, "post_account_move", args)
-      await waitForMovePosted(limitedPage, moveId)
     })
+    // A write grant does not grant read access. Observe the effect as admin.
+    await waitForMovePosted(page, moveId)
 
     permissionId = await fetchOrgPermissionId(page, "account_move", {
       roleId: limitedRoleId,

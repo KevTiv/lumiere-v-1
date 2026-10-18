@@ -55,6 +55,21 @@ Admin + non-admin personas (first-org fixture has them).
 - **No contract delta:** `user-role-assignment` already projects id, user_identity, role_id,
   organization_id and is_active.
 
+## WorkOS access editor update (2026-10-18)
+
+Settings → Users now saves primary role, additive roles, active status and job title
+through the atomic `erp.set_member_access` operation. The legacy assign/revoke hooks
+remain available, but the browser proof observes the member editor's operation.
+The generated `SetMemberAccessParams` encoder preserves optional job-title values
+on the wire. Exact retries acknowledge an already-committed state; replaying an
+older assignment after revocation returns 422 and cannot restore access. Reader
+replays remain denied with 403.
+
+Module SSR prefetches leave denied resources unseeded so the authoritative client
+query can display their permission state without crashing readable sibling tabs.
+A write-only operation is observed using an administrator readback in the browser
+proof; write permission does not imply read permission.
+
 ## Wave 2 closure evidence (2026-10-13)
 
 - The browser proof now observes a unique settings-read permission appear in a fresh target session

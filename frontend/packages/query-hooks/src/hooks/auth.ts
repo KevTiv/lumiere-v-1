@@ -15,12 +15,12 @@
  * Wraps REST API calls with React Query for the Auth module.
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
-import { stringifyReducerCommandBody } from "@lumiere/api-client"
-import { stdbBffCommandPost, type StdbBffCommandInput } from "@lumiere/stdb/commands";
+import { stdbBffCommandPost } from "@lumiere/stdb/commands";
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { dispatchNamedOperation } from "../operation-dispatch"
 import { invalidateResourceQueries } from "../subscription-query"
 import { toCreateAuditRuleParams } from "@lumiere/erp-shared/settings-create-params"
 import { encodeIdentity, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
@@ -541,7 +541,7 @@ export function useCreateRole(organizationId: bigint) {
             ? String(formData.metadata)
             : null,
       }
-      const { urlPath, init } = stdbBffCommandPost("create_role", { params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("create_role", { params: stdbParamsToJson(params, "CreateRoleParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create role')
     },
@@ -559,7 +559,7 @@ export function useUpdateRole(organizationId: bigint) {
     { roleId: string | number | bigint; params: Record<string, unknown> }
   >({
     mutationFn: async ({ roleId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_role", { roleId: toScalarU64(roleId), params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("update_role", { roleId: toScalarU64(roleId), params: stdbParamsToJson(params, "UpdateRoleParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw await authResponseError(r, 'Failed to update role')
     },
@@ -580,22 +580,17 @@ export function useSetMemberAccess(organizationId: bigint) {
     user: SettingsUserRecord; primaryRoleId: string; roleIds: string[]; isActive: boolean; jobTitle?: string
   }>({
     mutationFn: async ({ user, primaryRoleId, roleIds, isActive, jobTitle }) => {
-      const input = {
+      await dispatchNamedOperation('set_member_access', {
         userIdentity: encodeIdentity(user.id),
-        params: {
+        params: stdbParamsToJson({
           primary_role_id: toScalarU64(primaryRoleId),
           additional_role_ids: roleIds.filter(id => id !== primaryRoleId).map(toScalarU64),
           expected_primary_role_id: toScalarU64(user.primaryRoleId),
           expected_role_ids: user.roles.map(toScalarU64),
           expected_is_active: user.status === 'active', is_active: isActive,
           job_title: jobTitle ?? null,
-        },
-      } satisfies StdbBffCommandInput<'set_member_access'>
-      const response = await apiFetch('/api/operations/erp.set_member_access', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: stringifyReducerCommandBody(input),
-      })
-      if (!response.ok) throw await authResponseError(response, 'Failed to update member access')
+        }, 'SetMemberAccessParams'),
+      }, 'Failed to update member access')
     },
     onSuccess: () => invalidateAuthModule(qc, organizationId),
   })
