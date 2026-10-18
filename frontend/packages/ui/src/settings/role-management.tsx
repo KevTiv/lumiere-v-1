@@ -199,6 +199,7 @@ export function RoleManagement() {
             name,
             description: description || null,
             permissions: permissionStrings,
+            metadata,
           },
         })
       } else {

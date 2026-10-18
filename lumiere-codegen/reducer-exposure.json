@@ -12,6 +12,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "accept_user_invite",
+      "exposure": "denied",
+      "reason": "trusted provider-verified invitation acceptance only"
+    },
+    {
       "name": "accrue_sale_commission",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3903,6 +3908,11 @@
       "name": "set_iot_threshold",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "set_member_access",
+      "exposure": "session",
+      "reason": "atomic organization-scoped member access editor"
     },
     {
       "name": "set_project_active",

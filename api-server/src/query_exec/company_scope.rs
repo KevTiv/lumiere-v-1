@@ -200,18 +200,6 @@ async fn has_organization_wide_company_access(
         if !active || !id.is_some_and(|id| role_ids.contains(&id)) {
             return false;
         }
-        let name = role
-            .get("name")
-            .and_then(|value| value.as_str())
-            .unwrap_or("")
-            .trim()
-            .to_lowercase()
-            .replace(' ', "-")
-            .replace('_', "-");
-        let named_admin = matches!(
-            name.as_str(),
-            "admin" | "administrator" | "organization-admin" | "owner"
-        );
         let wildcard = role
             .get("permissions")
             .and_then(|value| value.as_array())
@@ -220,7 +208,7 @@ async fn has_organization_wide_company_access(
                     .iter()
                     .any(|value| value.as_str() == Some("*:*"))
             });
-        named_admin || wildcard
+        wildcard
     }))
 }
 

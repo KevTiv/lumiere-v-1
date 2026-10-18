@@ -11,6 +11,16 @@
       },
       "evidence": "spacetimedb/src/ai/spend.rs: receipt/key or deterministic update returns before duplicate writes"
     },
+    "accept_user_invite": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/auth.rs: trusted acceptance receipt or expected access precondition guards retries"
+    },
     "acknowledge_insight": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -4737,6 +4747,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/forms/mod.rs: body writes or refreshes deterministic state and safely repeats the same input"
+    },
+    "set_member_access": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/core/access_lifecycle.rs: trusted acceptance receipt or expected access precondition guards retries"
     },
     "set_record_custom_field_values": {
       "semantic_kind": "command",

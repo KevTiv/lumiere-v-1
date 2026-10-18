@@ -1,4 +1,5 @@
 //! Core domain test suite — invoke via `run_all_core_tests` reducer.
+mod access_lifecycle_test;
 pub mod bootstrap_commit_test;
 pub mod chatter_post_message_test;
 pub mod operational_messaging_test;
@@ -43,6 +44,12 @@ fn run_core_chatter_post_message_test(ctx: &ReducerContext) -> Result<(), String
 
 #[spacetimedb::reducer]
 pub fn run_core_sod_test(ctx: &ReducerContext) -> Result<(), String> {
+    access_lifecycle_test::test_canonical_duties_and_explicit_payment_capabilities(ctx)
+        .map_err(|error| format!("canonical_duty_policy: {error}"))?;
+    access_lifecycle_test::test_effective_access_and_atomic_updates(ctx)
+        .map_err(|e| format!("atomic_member_access: {e}"))?;
+    access_lifecycle_test::test_invitation_acceptance_retries_do_not_regrant(ctx)
+        .map_err(|e| format!("atomic_invitation: {e}"))?;
     sod_test::test_sod_blocks_conflicting_roles(ctx).map_err(|e| format!("sod_validate: {e}"))?;
     sod_test::test_sod_assign_role_blocks_conflicting_roles(ctx)
         .map_err(|e| format!("sod_assign_role: {e}"))?;

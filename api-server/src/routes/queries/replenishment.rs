@@ -80,6 +80,8 @@ mod tests {
             role_permissions: permissions.iter().map(|p| (*p).into()).collect(),
             identity_hex: "01".repeat(32),
             field_permissions: vec![],
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         }
     }
 

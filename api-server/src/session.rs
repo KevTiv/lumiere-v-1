@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::error::ApiError;
 use crate::state::AppState;
 use stdb_auth::{
-    identity_sql_literal, select_field_permissions_for_org_sql, select_roles_active_sql,
+    select_field_permissions_for_org_sql, select_roles_active_sql,
     select_user_organization_for_identity_sql, select_user_profile_for_organization_sql,
     FieldAccessContext, FieldPermissionLike,
 };
@@ -41,6 +41,24 @@ pub fn parse_stdb_identity_hex(raw: &str) -> Option<String> {
     None
 }
 
+/// Identity-bound membership discovery at the authentication boundary, including
+/// accounts that have not yet selected or joined an organization. Callers pass
+/// only the identity established by provider verification or session resolution.
+pub(crate) async fn membership_rows_for_identity(
+    state: &AppState,
+    identity_hex: &str,
+    active_only: bool,
+) -> Result<Vec<Value>, ApiError> {
+    let identity = stdb_auth::identity_sql_literal(identity_hex).map_err(ApiError::Internal)?;
+    let active = if active_only {
+        " AND is_active = true"
+    } else {
+        ""
+    };
+    state.stdb.query_sql(&format!("SELECT organization_id, is_active FROM user_organization WHERE user_identity = {identity}{active}"))
+        .await.map_err(ApiError::internal)
+}
+
 pub async fn load_field_access_context(
     client: &StdbClient,
     identity_hex: &str,
@@ -59,7 +77,7 @@ pub async fn load_field_access_context(
         .query_sql(&sql_profile)
         .await
         .map_err(|e| e.to_string())?;
-    let Some(profile) = profiles.first() else {
+    let [profile] = profiles.as_slice() else {
         return Ok(None);
     };
     if profile
@@ -79,22 +97,27 @@ pub async fn load_field_access_context(
     let sql_uo =
         select_user_organization_for_identity_sql(identity_hex, None).map_err(|e| e.to_string())?;
     let orgs = client.query_sql(&sql_uo).await.map_err(|e| e.to_string())?;
-    let uo = orgs.iter().find(|o| {
-        o.get("organizationId")
-            .and_then(|v| v.as_u64())
-            .or_else(|| {
-                o.get("organizationId")
-                    .and_then(|x| x.as_str())
-                    .and_then(|s| s.parse().ok())
-            })
-            == Some(organization_id)
-    });
-    let Some(uo) = uo else {
+    let memberships: Vec<_> = orgs
+        .iter()
+        .filter(|o| {
+            o.get("organizationId")
+                .and_then(|v| v.as_u64())
+                .or_else(|| {
+                    o.get("organizationId")
+                        .and_then(|x| x.as_str())
+                        .and_then(|s| s.parse().ok())
+                })
+                == Some(organization_id)
+        })
+        .collect();
+    let [uo] = memberships.as_slice() else {
         return Ok(None);
     };
 
     let roles = match client
-        .query_sql("SELECT * FROM role WHERE is_active = true")
+        .query_sql(&format!(
+            "SELECT * FROM role WHERE organization_id = {organization_id} AND is_active = true"
+        ))
         .await
     {
         Ok(rows) => rows,
@@ -106,6 +129,17 @@ pub async fn load_field_access_context(
                 .map_err(|e| e.to_string())?
         }
     };
+    let roles: Vec<_> = roles
+        .into_iter()
+        .filter(|r| {
+            json_u64(r.get("organizationId").or_else(|| r.get("organization_id")))
+                == Some(organization_id)
+                && r.get("isActive")
+                    .or_else(|| r.get("is_active"))
+                    .and_then(Value::as_bool)
+                    == Some(true)
+        })
+        .collect();
 
     let role_id = uo
         .get("roleId")
@@ -148,51 +182,52 @@ pub async fn load_field_access_context(
         }
     }
 
-    let perms = role.get("permissions").cloned().unwrap_or(Value::Null);
-    let mut role_permissions: Vec<String> = match perms {
-        Value::Array(a) => a
-            .into_iter()
-            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-            .collect(),
-        _ => vec![],
-    };
-
-    // Supplemental role assignments are additive authority. Resolve them with
-    // the trusted session authority client so the browser never needs access
-    // to private role permission definitions.
-    let identity = identity_sql_literal(identity_hex).map_err(|e| e.to_string())?;
-    let assignment_sql = format!(
+    let identity = stdb_auth::identity_sql_literal(identity_hex).map_err(|e| e.to_string())?;
+    let assignments = client.query_sql(&format!(
         "SELECT role_id, expires_at FROM user_role_assignment WHERE organization_id = {organization_id} AND user_identity = {identity} AND is_active = true"
-    );
-    let assignments = client
-        .query_sql(&assignment_sql)
-        .await
-        .map_err(|e| e.to_string())?;
-    let (supplemental_role_ids, supplemental_permissions) = supplemental_role_authority(
+    )).await.map_err(|e| e.to_string())?;
+    let (additional_role_ids, _) = supplemental_role_authority(
         &roles,
         &assignments,
         organization_id,
         chrono::Utc::now().timestamp_micros(),
     );
-    let mut effective_role_ids = vec![role_id];
-    effective_role_ids.extend(supplemental_role_ids);
-    role_permissions.extend(supplemental_permissions);
-    effective_role_ids.sort_unstable();
-    effective_role_ids.dedup();
+    let mut role_ids = vec![role_id];
+    role_ids.extend(additional_role_ids);
+    role_ids.sort_unstable();
+    role_ids.dedup();
+    let mut role_permissions: Vec<String> = roles
+        .iter()
+        .filter(|r| json_u64(r.get("id")).is_some_and(|id| role_ids.contains(&id)))
+        .flat_map(|r| {
+            r.get("permissions")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+        })
+        .filter_map(|p| p.as_str().map(str::to_owned))
+        .collect();
     role_permissions.sort();
     role_permissions.dedup();
-
-    // FieldAccessContext retains the primary role for compatibility. Convert
-    // supplemental role rules into direct rules for this session so the
-    // field-policy evaluator applies every effective role.
-    for permission in &mut field_permissions {
-        let subject_role_id = permission.subject_role_id.or(permission.role_id);
-        if subject_role_id
-            .is_some_and(|id| id != role_id && effective_role_ids.binary_search(&id).is_ok())
-        {
-            permission.subject_user_hex = Some(identity_hex.to_string());
-        }
-    }
+    let rows = client
+        .query_sql(&format!(
+            "SELECT * FROM org_permission WHERE organization_id = {organization_id}"
+        ))
+        .await
+        .map_err(|e| e.to_string())?;
+    let org_permissions = rows
+        .iter()
+        .filter(|r| subject_applies(r, &role_ids, identity_hex))
+        .map(|r| stdb_auth::ActionPermission {
+            resource: r
+                .get("resource")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .into(),
+            action: enum_label(r.get("action")).to_lowercase(),
+            allow: enum_label(r.get("effect")).eq_ignore_ascii_case("allow"),
+        })
+        .collect();
 
     Ok(Some(FieldAccessContext {
         organization_id,
@@ -202,27 +237,47 @@ pub async fn load_field_access_context(
         role_permissions,
         identity_hex: identity_hex.to_string(),
         field_permissions,
+        role_ids,
+        org_permissions,
     }))
 }
 
-fn value_u64(value: &Value) -> Option<u64> {
-    value
-        .as_u64()
-        .or_else(|| value.as_str().and_then(|raw| raw.parse().ok()))
+fn json_u64(value: Option<&Value>) -> Option<u64> {
+    value?.as_u64().or_else(|| value?.as_str()?.parse().ok())
 }
 
 fn timestamp_micros(value: &Value) -> Option<i64> {
     value
         .as_i64()
-        .or_else(|| value.as_u64().and_then(|raw| i64::try_from(raw).ok()))
-        .or_else(|| value.as_str().and_then(|raw| raw.parse().ok()))
+        .or_else(|| value.as_str()?.parse().ok())
         .or_else(|| {
-            value
-                .get("__timestamp_micros_since_unix_epoch__")
-                .and_then(timestamp_micros)
+            [
+                "__timestamp_micros_since_unix_epoch__",
+                "microsSinceUnixEpoch",
+                "some",
+            ]
+            .iter()
+            .find_map(|key| value.get(*key).and_then(timestamp_micros))
         })
-        .or_else(|| value.get("microsSinceUnixEpoch").and_then(timestamp_micros))
-        .or_else(|| value.get("some").and_then(timestamp_micros))
+}
+
+fn enum_label(value: Option<&Value>) -> String {
+    let Some(value) = value else {
+        return String::new();
+    };
+    value
+        .as_str()
+        .or_else(|| value.get("tag").and_then(Value::as_str))
+        .map(str::to_owned)
+        .or_else(|| value.as_object()?.keys().next().cloned())
+        .unwrap_or_default()
+}
+
+fn subject_applies(row: &Value, roles: &[u64], identity: &str) -> bool {
+    parse_field_permission_row(row, identity).is_some_and(|rule| {
+        rule.subject_role_id.is_some_and(|id| roles.contains(&id))
+            || rule.subject_user_hex.as_deref() == Some(identity)
+    })
 }
 
 fn supplemental_role_authority(
@@ -255,16 +310,16 @@ fn supplemental_role_authority(
         let Some(assigned_role_id) = assignment
             .get("roleId")
             .or_else(|| assignment.get("role_id"))
-            .and_then(value_u64)
+            .and_then(|v| json_u64(Some(v)))
         else {
             continue;
         };
         let Some(assigned_role) = roles.iter().find(|candidate| {
-            candidate.get("id").and_then(value_u64) == Some(assigned_role_id)
+            candidate.get("id").and_then(|v| json_u64(Some(v))) == Some(assigned_role_id)
                 && candidate
                     .get("organizationId")
                     .or_else(|| candidate.get("organization_id"))
-                    .and_then(value_u64)
+                    .and_then(|v| json_u64(Some(v)))
                     == Some(organization_id)
                 && candidate
                     .get("isActive")
@@ -301,14 +356,7 @@ fn parse_field_permission_row(row: &Value, identity_hex: &str) -> Option<FieldPe
         return None;
     }
 
-    let action = row
-        .get("action")
-        .and_then(|v| {
-            v.as_str()
-                .map(|s| s.to_string())
-                .or_else(|| v.as_object().and_then(|o| o.keys().next().cloned()))
-        })
-        .unwrap_or_default();
+    let action = enum_label(row.get("action"));
 
     let allowed_fields: Vec<String> = row
         .get("allowedFields")
@@ -332,6 +380,18 @@ fn parse_field_permission_row(row: &Value, identity_hex: &str) -> Option<FieldPe
     let mut subject_role_id = role_id;
     let mut subject_user_hex = None;
     if let Some(subject) = row.get("subject") {
+        let label = enum_label(Some(subject));
+        let payload = subject.get("value").or_else(|| subject.get(&label));
+        let payload = payload.and_then(|p| p.as_array().and_then(|a| a.first()).or(Some(p)));
+        if label.eq_ignore_ascii_case("role") {
+            subject_role_id = json_u64(payload).or(role_id);
+        }
+        if label.eq_ignore_ascii_case("user") {
+            subject_role_id = None;
+            subject_user_hex = payload
+                .and_then(|p| p.as_str().or_else(|| p.get("__identity__")?.as_str()))
+                .map(normalize_identity_hex_for_sql);
+        }
         if let Some(obj) = subject.as_object() {
             if let Some(rid) = obj.get("Role").and_then(|v| {
                 v.as_u64()

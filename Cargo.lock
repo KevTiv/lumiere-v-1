@@ -2081,6 +2081,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumiere-policy-core"
+version = "0.1.0"
+
+[[package]]
 name = "lumiere-presentation-core"
 version = "0.1.0"
 dependencies = [
@@ -3836,6 +3840,7 @@ name = "stdb-auth"
 version = "0.1.0"
 dependencies = [
  "lumiere-contracts",
+ "lumiere-policy-core",
  "once_cell",
  "serde",
  "serde_json",

@@ -291,6 +291,23 @@ pub fn test_field_write_policy_blocks_disallowed_columns(
         .find(|r| r.name == "Contact Name Only")
         .ok_or("Limited role not found")?;
 
+    let member = Identity::__dummy();
+    add_user_to_organization(
+        ctx,
+        member,
+        org_id,
+        AddUserToOrganizationParams {
+            role_id: limited_role.id,
+            company_id: Some(fixture.company_id),
+            job_title: None,
+            department_id: None,
+            employee_id: None,
+            is_active: true,
+            is_default: false,
+            metadata: None,
+        },
+    )?;
+
     grant_field_permission(
         ctx,
         org_id,
@@ -348,7 +365,7 @@ pub fn test_field_write_policy_blocks_disallowed_columns(
     ensure_resource_fields_writable(
         ctx,
         org_id,
-        ctx.sender(),
+        member,
         limited_role.id,
         &limited_role.name,
         false,
@@ -359,7 +376,7 @@ pub fn test_field_write_policy_blocks_disallowed_columns(
     match ensure_resource_fields_writable(
         ctx,
         org_id,
-        ctx.sender(),
+        member,
         limited_role.id,
         &limited_role.name,
         false,
@@ -499,6 +516,23 @@ pub fn test_opportunity_field_write_policy(ctx: &ReducerContext) -> Result<(), S
         .find(|r| r.name == "Opportunity Name Only")
         .ok_or("Limited role not found")?;
 
+    let member = Identity::__dummy();
+    add_user_to_organization(
+        ctx,
+        member,
+        org_id,
+        AddUserToOrganizationParams {
+            role_id: limited_role.id,
+            company_id: Some(fixture.company_id),
+            job_title: None,
+            department_id: None,
+            employee_id: None,
+            is_active: true,
+            is_default: false,
+            metadata: None,
+        },
+    )?;
+
     grant_field_permission(
         ctx,
         org_id,
@@ -513,7 +547,7 @@ pub fn test_opportunity_field_write_policy(ctx: &ReducerContext) -> Result<(), S
     match ensure_resource_fields_writable(
         ctx,
         org_id,
-        ctx.sender(),
+        member,
         limited_role.id,
         &limited_role.name,
         false,

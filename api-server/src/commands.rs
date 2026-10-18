@@ -33,6 +33,7 @@ impl InternalRouteAuthority {
                     | "bind_user_credential"
                     | "bind_user_profile"
                     | "mark_invite_accepted"
+                    | "accept_user_invite"
             ),
             Self::PasswordRecovery => matches!(
                 reducer,

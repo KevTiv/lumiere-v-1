@@ -11,11 +11,11 @@ use spacetimedb::{Identity, ReducerContext, Table};
 use crate::accounting::tax_management::account_tax;
 use crate::core::audit::{audit_log, AuditLog};
 use crate::core::permissions::{
-    org_permission, role, user_role_assignment, PermissionAction, PermissionEffect,
-    PermissionSubject,
+    effective_permission_strings, effective_roles, org_permission, PermissionAction,
+    PermissionEffect, PermissionSubject,
 };
 use crate::core::reference::{document_sequence, DocumentSequence};
-use crate::core::users::{find_user_profile_for_organization, user_organization};
+use crate::core::users::find_user_profile_for_organization;
 use crate::types::TaxAmountType;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,52 +29,112 @@ pub enum PermissionResolution {
 ///
 /// Resolution order:
 ///   1. Superuser → Allow
-///   2. Matching OrgPermission **Deny** rows
-///   3. Role.permissions string list (`"resource:action"` or `"resource:*"`)
-///   4. Matching OrgPermission **Allow** rows
+///   2. Explicit denies across every effective role and the identity
+///   3. Effective role permissions and explicit grants
 pub fn resolve_permission(
     ctx: &ReducerContext,
     organization_id: u64,
     user_identity: Identity,
-    role_ids: &[u64],
+    _role_id: u64,
     _role_name: &str,
-    role_permissions: &[String],
+    _role_permissions: &[String],
     is_superuser: bool,
     resource: &str,
     action: &str,
 ) -> PermissionResolution {
-    if is_superuser {
-        return PermissionResolution::Allow;
-    }
-
-    let permission = format!("{}:{}", resource, action);
-    let wildcard = format!("{}:*", resource);
-    let global_wildcard = "*:*".to_string();
-
-    let org_permission = try_org_permission(
+    let Ok(roles) = effective_roles(ctx, organization_id, user_identity) else {
+        return PermissionResolution::NotGranted;
+    };
+    if roles_allow_permission(
         ctx,
         organization_id,
+        user_identity,
+        &roles,
+        is_superuser,
         resource,
         action,
-        role_ids,
-        user_identity,
+    ) {
+        PermissionResolution::Allow
+    } else {
+        PermissionResolution::Deny
+    }
+}
+
+/// Evaluate an explicit proposed effective role set for the same actor and tenant.
+pub(crate) fn roles_allow_permission(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    user_identity: Identity,
+    roles: &[crate::core::permissions::Role],
+    is_superuser: bool,
+    resource: &str,
+    action: &str,
+) -> bool {
+    let rows: Vec<_> = ctx
+        .db
+        .org_permission()
+        .perm_by_org()
+        .filter(&organization_id)
+        .filter(|p| match p.subject {
+            PermissionSubject::Role(id) => roles.iter().any(|r| r.id == id),
+            PermissionSubject::User(id) => id == user_identity,
+        })
+        .collect();
+    let resource = crate::core::permissions::canonical_policy_resource(resource);
+    let grant_resources: Vec<_> = rows
+        .iter()
+        .map(|p| crate::core::permissions::canonical_policy_resource(&p.resource))
+        .collect();
+    let grants: Vec<_> = rows
+        .iter()
+        .enumerate()
+        .map(|(i, p)| lumiere_policy_core::Grant {
+            resource: &grant_resources[i],
+            action: match p.action {
+                PermissionAction::Read => "read",
+                PermissionAction::Write => "write",
+                PermissionAction::Create => "create",
+                PermissionAction::Delete => "delete",
+                PermissionAction::All => "*",
+            },
+            allow: p.effect == PermissionEffect::Allow,
+        })
+        .collect();
+    let permissions = crate::core::permissions::canonical_permission_strings(
+        &effective_permission_strings(roles),
     );
-    if matches!(&org_permission, Some(Err(_))) {
-        return PermissionResolution::Deny;
-    }
+    lumiere_policy_core::allows_in_module(
+        is_superuser,
+        &permissions,
+        &grants,
+        &resource,
+        action,
+        permission_resource_module(&resource),
+    )
+}
 
-    if role_permissions.contains(&permission)
-        || role_permissions.contains(&wildcard)
-        || role_permissions.contains(&global_wildcard)
-    {
-        return PermissionResolution::Allow;
-    }
-
-    if matches!(org_permission, Some(Ok(()))) {
-        return PermissionResolution::Allow;
-    }
-
-    PermissionResolution::NotGranted
+pub(crate) fn permission_resource_module(resource: &str) -> Option<&'static str> {
+    static MODULES: std::sync::OnceLock<std::collections::HashMap<String, String>> =
+        std::sync::OnceLock::new();
+    let modules = MODULES.get_or_init(|| {
+        let manifest: serde_json::Value = serde_json::from_str(include_str!(
+            "../../lumiere-codegen/storage-policy-manifest.json"
+        ))
+        .expect("checked storage policy manifest");
+        manifest["policies"]
+            .as_array()
+            .expect("storage policies")
+            .iter()
+            .filter_map(|p| {
+                Some((
+                    p["table"].as_str()?.to_owned(),
+                    p["module"].as_str()?.to_owned(),
+                ))
+            })
+            .collect()
+    });
+    lumiere_policy_core::operation_resource_module(resource)
+        .or_else(|| modules.get(&resource.replace('-', "_")).map(String::as_str))
 }
 
 /// Returns `Ok(())` when allowed, `Err(reason)` otherwise.
@@ -91,63 +151,16 @@ pub fn check_permission(
         return Err("User account is inactive".to_string());
     }
 
-    let user_org = ctx
-        .db
-        .user_organization()
-        .user_org_by_user()
-        .filter(&ctx.sender())
-        .find(|uo| uo.organization_id == organization_id && uo.is_active)
-        .ok_or("Not a member of this organization")?;
-
-    let role = ctx
-        .db
-        .role()
-        .id()
-        .find(&user_org.role_id)
-        .ok_or("Role not found")?;
-    if role.organization_id != organization_id || !role.is_active {
-        return Err("Membership role is inactive or belongs to another organization".to_string());
-    }
-
-    // A membership role is the base authority. Active, unexpired
-    // UserRoleAssignment rows add the permissions of their organization-local
-    // roles; this is the same additive model exposed by Settings role
-    // assignment and by session role hydration.
-    let mut effective_role_ids = vec![role.id];
-    let mut effective_permissions = role.permissions.clone();
-    for assignment in ctx
-        .db
-        .user_role_assignment()
-        .role_assign_by_user()
-        .filter(&ctx.sender())
-        .filter(|assignment| {
-            assignment.organization_id == organization_id
-                && assignment.is_active
-                && assignment
-                    .expires_at
-                    .is_none_or(|expires_at| expires_at > ctx.timestamp)
-        })
-    {
-        let Some(assigned_role) = ctx.db.role().id().find(&assignment.role_id) else {
-            continue;
-        };
-        if assigned_role.organization_id == organization_id && assigned_role.is_active {
-            effective_role_ids.push(assigned_role.id);
-            effective_permissions.extend(assigned_role.permissions);
-        }
-    }
-    effective_role_ids.sort_unstable();
-    effective_role_ids.dedup();
-    effective_permissions.sort();
-    effective_permissions.dedup();
+    let roles = effective_roles(ctx, organization_id, ctx.sender())?;
+    let role = &roles[0];
 
     match resolve_permission(
         ctx,
         organization_id,
         ctx.sender(),
-        &effective_role_ids,
+        role.id,
         &role.name,
-        &effective_permissions,
+        &role.permissions,
         user.is_superuser,
         resource,
         action,
@@ -162,77 +175,6 @@ pub fn check_permission(
             Err(format!("Permission denied: {} on {}", action, resource))
         }
     }
-}
-
-fn org_perm_subject_matches(
-    subject: &PermissionSubject,
-    sender: Identity,
-    role_ids: &[u64],
-) -> bool {
-    match subject {
-        PermissionSubject::Role(r) => role_ids.contains(r),
-        PermissionSubject::User(id) => *id == sender,
-    }
-}
-
-fn org_perm_resource_matches(rule_res: &str, resource: &str) -> bool {
-    rule_res == "*" || rule_res == resource
-}
-
-fn org_perm_action_matches(rule_action: &PermissionAction, action: &str) -> bool {
-    matches!(rule_action, PermissionAction::All)
-        || matches!(
-            (rule_action, action),
-            (PermissionAction::Read, "read")
-                | (PermissionAction::Write, "write")
-                | (PermissionAction::Create, "create")
-                | (PermissionAction::Delete, "delete")
-        )
-}
-
-/// `Some(Ok)` / `Some(Err)` when org-permission rows match; `None` if none apply.
-fn try_org_permission(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    resource: &str,
-    action: &str,
-    role_ids: &[u64],
-    user_identity: Identity,
-) -> Option<Result<(), String>> {
-    let mut saw_deny = false;
-    let mut saw_allow = false;
-
-    for p in ctx
-        .db
-        .org_permission()
-        .perm_by_org()
-        .filter(&organization_id)
-    {
-        if !org_perm_subject_matches(&p.subject, user_identity, role_ids) {
-            continue;
-        }
-        if !org_perm_resource_matches(&p.resource, resource) {
-            continue;
-        }
-        if !org_perm_action_matches(&p.action, action) {
-            continue;
-        }
-        match p.effect {
-            PermissionEffect::Deny => saw_deny = true,
-            PermissionEffect::Allow => saw_allow = true,
-        }
-    }
-
-    if saw_deny {
-        return Some(Err(format!(
-            "Permission denied: {} on {}",
-            action, resource
-        )));
-    }
-    if saw_allow {
-        return Some(Ok(()));
-    }
-    None
 }
 
 /// Params for `write_audit_log_v2`. All fields are named — no positional `None` ambiguity.

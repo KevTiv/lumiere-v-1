@@ -514,6 +514,8 @@ mod tests {
                 .collect(),
             identity_hex: "01".repeat(32),
             field_permissions: Vec::new(),
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         }
     }
 

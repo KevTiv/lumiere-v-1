@@ -95,11 +95,10 @@ fn require_ui_child_read_permission(
             documents::has_document_read_permission(field_access)
         }
         _ => {
-            let Some(parent) = accounting_read_permission_resource(resource) else {
-                return Ok(());
-            };
-            has_resource_read_permission(field_access, resource)
-                || has_resource_read_permission(field_access, parent)
+            stdb_auth::session_read_resource(resource)
+                || has_resource_read_permission(field_access, resource)
+                || accounting_read_permission_resource(resource)
+                    .is_some_and(|parent| has_resource_read_permission(field_access, parent))
         }
     };
     let context_matches = field_access.is_some_and(|access| {
@@ -111,7 +110,10 @@ fn require_ui_child_read_permission(
                     identity_sql_literal(&access.identity_hex).ok().as_ref() == Some(&identity)
                 })
     });
-    if !allowed || !context_matches {
+    if !allowed
+        || !context_matches
+        || field_access.is_some_and(|a| stdb_auth::resource_read_denied(a, resource))
+    {
         return Err(ApiError::Forbidden(format!(
             "Read permission denied for resource '{resource}'"
         )));
@@ -666,6 +668,8 @@ mod tests {
             role_permissions: vec![permission.into()],
             identity_hex: "actor".into(),
             field_permissions: Vec::new(),
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         }
     }
 
@@ -736,7 +740,7 @@ mod tests {
                 );
             }
         }
-        assert!(require_ui_child_read_permission("products", 42, &identity, None).is_ok());
+        assert!(require_ui_child_read_permission("products", 42, &identity, None).is_err());
     }
 
     #[tokio::test]

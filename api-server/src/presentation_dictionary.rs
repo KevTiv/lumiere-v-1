@@ -83,6 +83,8 @@ mod tests {
 
     fn access(fields: Vec<&str>) -> FieldAccessContext {
         FieldAccessContext {
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
             organization_id: 7,
             role_id: 9,
             role_name: "reader".into(),
