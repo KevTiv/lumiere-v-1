@@ -211,13 +211,6 @@ static GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashSet<String>> = Lazy::new(|| {
 static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy::new(|| {
     let mut m = HashMap::new();
     m.insert(
-        "purchase-requisitions".to_string(),
-        ["line_ids", "purchase_ids"]
-            .into_iter()
-            .map(String::from)
-            .collect(),
-    );
-    m.insert(
         "account-moves".to_string(),
         ["metadata"].into_iter().map(String::from).collect(),
     );
@@ -264,11 +257,11 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
             .map(String::from)
             .collect(),
     );
-    // Requisition lifecycle readback needs the conversion output and the
-    // independent approver identity selected by the reducer.
+    // Requisition lifecycle readback needs its lines, conversion output and
+    // the independent approver identity selected by the reducer.
     m.insert(
         "purchase-requisitions".to_string(),
-        ["purchase_ids", "write_uid"]
+        ["line_ids", "purchase_ids", "write_uid"]
             .into_iter()
             .map(String::from)
             .collect(),
@@ -1682,6 +1675,7 @@ mod tests {
         for field in [
             "origin",
             "user_id",
+            "write_uid",
             "vendor_id",
             "line_ids",
             "purchase_ids",
@@ -1692,7 +1686,14 @@ mod tests {
         let mut access = field_access(&["purchase_requisition:read"]);
         select_fields(&mut access, "purchase-requisitions", &["state"]);
         let selected = resolve_http_sql_columns("purchase-requisitions", Some(&access)).unwrap();
-        for field in ["origin", "user_id", "vendor_id", "line_ids", "purchase_ids"] {
+        for field in [
+            "origin",
+            "user_id",
+            "write_uid",
+            "vendor_id",
+            "line_ids",
+            "purchase_ids",
+        ] {
             assert!(
                 !selected.iter().any(|column| column == field),
                 "field selection leaked {field}"
