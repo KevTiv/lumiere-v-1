@@ -11,6 +11,12 @@ edition = "2021"
 # in-module test reducers (see tests/harness/mod.rs) inside the SpacetimeDB runtime.
 crate-type = ["cdylib"]
 
+[features]
+# Local development and E2E need the seed and in-module test reducers. The
+# production artifact uses --no-default-features so these reducers are absent.
+default = ["dev-module"]
+dev-module = []
+
 [dependencies]
 lumiere-presentation-core = { path = "../crates/presentation-core" }
 spacetimedb = { version = "=2.8.2" }

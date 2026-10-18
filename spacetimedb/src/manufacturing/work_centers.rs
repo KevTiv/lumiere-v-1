@@ -9,6 +9,7 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 
 use crate::core::organization::company_id_from_scope;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::manufacturing::effects::ManufacturingEffectSnapshot;
 use crate::manufacturing::relations::{
     validate_positive_capacity, validate_positive_duration,
 };
@@ -557,6 +558,7 @@ pub fn log_workcenter_productivity(
         }
     }
 
+    let effects = ManufacturingEffectSnapshot::capture(ctx, &_mo)?;
     let productivity = ctx
         .db
         .mrp_workcenter_productivity()
@@ -578,6 +580,8 @@ pub fn log_workcenter_productivity(
             write_date: ctx.timestamp,
             metadata: params.metadata,
         });
+
+    crate::manufacturing::costing::snapshot_productivity_cost(ctx, productivity.id, workorder.production_id)?;
 
     let mut prod_ids = wc.productivity_ids.clone();
     prod_ids.push(productivity.id);
@@ -633,6 +637,7 @@ pub fn log_workcenter_productivity(
         },
     );
 
+    effects.record(ctx, "erp.log_workcenter_productivity")?;
     log::info!(
         "Work center productivity logged: id={}, wc={}, duration={}",
         productivity.id,

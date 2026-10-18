@@ -101,6 +101,7 @@ import {
   qualityChecksTableConfig,
   cycleCountsTableConfig,
   pickingWavesTableConfig,
+  stockPackagesTableConfig,
   warehouseTasksTableConfig,
   stockRoutesTableConfig,
   stockRulesTableConfig,
@@ -131,6 +132,7 @@ import {
   manufacturingOrdersTableConfig,
   bomsTableConfig,
   bomLinesTableConfig,
+  bomByproductsTableConfig,
   workordersTableConfig,
   workcentersTableConfig,
   routingOperationsTableConfig,
@@ -140,6 +142,7 @@ import {
   employeesTableConfig,
   departmentsTableConfig,
   leaveRequestsTableConfig,
+  leaveAllocationsTableConfig,
   contractsTableConfig,
   payslipsTableConfig,
   newEmployeeForm,
@@ -198,6 +201,7 @@ import {
   subscriptionPriceTiersTableConfig,
   subscriptionPastDueTableConfig,
   subscriptionDueToBillTableConfig,
+  subscriptionBundlesTableConfig,
   subscriptionEntitlementsTableConfig,
   subscriptionPaymentIntentsTableConfig,
   createSubscriptionPriceTierForm,
@@ -364,7 +368,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
     { label: t("modules.tabGroups.banking", { defaultValue: "Banking" }), tabIds: ["bank-statements", "reconciliation-widgets", "fx-revaluation"] },
     { label: t("modules.tabGroups.planning", { defaultValue: "Planning" }), tabIds: ["budgets", "analytic", "analytic-lines", "analytic-distribution", "fixed-assets", "amortization"] },
     { label: t("modules.tabGroups.close", { defaultValue: "Close" }), tabIds: ["period-close", "fiscal-years", "account-periods", "consolidation", "intercompany-rules", "intercompany-transactions"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "payment-terms", "payment-term-lines"] },
+    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "tax-groups", "tax-jurisdictions", "tax-schedules", "tax-deadlines", "payment-terms", "payment-term-lines"] },
   ],
   tabs: [
     {
@@ -401,6 +405,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newInvoiceForm(t),
       createLabel: "New Invoice",
       createAction: "createInvoice",
+      createPermission: { resource: "account_move", action: "create" },
     },
     {
       id: "bills",
@@ -410,6 +415,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newBillForm(t),
       createLabel: "New Bill",
       createAction: "createBill",
+      createPermission: { resource: "account_move", action: "create" },
     },
     {
       id: "taxes",
@@ -433,6 +439,30 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       id: "payment-operations",
       label: t("accounting.tabs.operationalPayments"),
       type: "custom",
+    },
+    {
+      id: "tax-groups",
+      label: t("accounting.tabs.taxGroups", { defaultValue: "Tax Groups" }),
+      type: "entity",
+      entityConfig: { id: "tax-groups-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
+    },
+    {
+      id: "tax-jurisdictions",
+      label: t("accounting.tabs.taxJurisdictions", { defaultValue: "Tax Jurisdictions" }),
+      type: "entity",
+      entityConfig: { id: "tax-jurisdictions-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
+    },
+    {
+      id: "tax-schedules",
+      label: t("accounting.tabs.taxSchedules", { defaultValue: "Tax Schedules" }),
+      type: "entity",
+      entityConfig: { id: "tax-schedules-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
+    },
+    {
+      id: "tax-deadlines",
+      label: t("accounting.tabs.taxDeadlines", { defaultValue: "Tax Deadlines" }),
+      type: "entity",
+      entityConfig: { id: "tax-deadlines-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
     },
     {
       id: "payment-terms",
@@ -710,7 +740,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     { label: t("modules.tabGroups.orders", { defaultValue: "Orders" }), tabIds: ["orders", "order-lines", "invoices", "returns"] },
     { label: t("modules.tabGroups.fulfillment", { defaultValue: "Fulfillment" }), tabIds: ["deliveries", "fulfillment"] },
     { label: t("modules.tabGroups.pricing", { defaultValue: "Pricing" }), tabIds: ["pricelists", "pricelist-items", "loyalty-programs", "loyalty-cards"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["delivery-price-rules", "delivery-carriers", "shipping-methods", "pos-payment-methods"] },
+    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["delivery-price-rules", "delivery-carriers", "shipping-methods", "pos-payment-methods", "commission-plans"] },
   ],
   tabs: [
     {
@@ -734,6 +764,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newSaleOrderForm(t),
       createLabel: "New Order",
       createAction: "createSaleOrder",
+      createPermission: { resource: "sale_order", action: "create" },
     },
     {
       id: "order-lines",
@@ -780,6 +811,11 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     {
       id: "invoices",
       label: t("sales.tabs.invoices"),
+      type: "custom" as const,
+    },
+    {
+      id: "commission-plans",
+      label: t("sales.tabs.commissionPlans", { defaultValue: "Commission plans" }),
       type: "custom" as const,
     },
     {
@@ -963,6 +999,7 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newLeadForm(t),
       createLabel: "New Lead",
       createAction: "createLead",
+      createPermission: { resource: "lead", action: "create" },
     },
     {
       id: "opportunities",
@@ -972,6 +1009,7 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newOpportunityForm(t),
       createLabel: "New Opportunity",
       createAction: "createOpportunity",
+      createPermission: { resource: "opportunity", action: "create" },
     },
     {
       id: "opportunity-lines",
@@ -989,6 +1027,7 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newContactForm(t),
       createLabel: "New Contact",
       createAction: "createContact",
+      createPermission: { resource: "contact", action: "create" },
     },
     {
       id: "activities",
@@ -1155,7 +1194,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
   defaultTab: "dashboard",
   tabGroups: [
     { label: t("modules.tabGroups.stock", { defaultValue: "Stock" }), tabIds: ["products", "product-categories", "stock", "valuations", "lots", "serials"] },
-    { label: t("modules.tabGroups.movements", { defaultValue: "Movements" }), tabIds: ["transfers", "stock-moves", "adjustments", "picking-waves", "warehouse-tasks", "replenishment"] },
+    { label: t("modules.tabGroups.movements", { defaultValue: "Movements" }), tabIds: ["transfers", "stock-moves", "adjustments", "picking-waves", "stock-packages", "warehouse-tasks", "replenishment"] },
     { label: t("modules.tabGroups.warehouse", { defaultValue: "Warehouse" }), tabIds: ["warehouses", "locations", "location-tree", "3d-view", "routes", "rules"] },
     { label: t("modules.tabGroups.quality", { defaultValue: "Quality" }), tabIds: ["quality", "quality-alerts", "cycle-counts", "cycle-wizard", "traceability-records", "traceability-reports"] },
     { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["barcode-rules", "barcode-nomenclatures", "adjustment-reasons"] },
@@ -1182,6 +1221,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newProductForm(t),
       createLabel: "New Product",
       createAction: "createProduct",
+      createPermission: { resource: "product", action: "create" },
     },
     {
       id: "product-categories",
@@ -1209,6 +1249,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newTransferForm(t),
       createLabel: "New Transfer",
       createAction: "createStockPicking",
+      createPermission: { resource: "stock_picking", action: "create" },
     },
     {
       id: "stock-moves",
@@ -1272,6 +1313,12 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("inventory.pickingWaves.title"),
       type: "entity",
       entityConfig: pickingWavesTableConfig(t),
+    },
+    {
+      id: "stock-packages",
+      label: t("inventory.stockPackages.title", { defaultValue: "Packages" }),
+      type: "entity",
+      entityConfig: stockPackagesTableConfig(t),
     },
     {
       id: "warehouse-tasks",
@@ -1481,6 +1528,7 @@ export const purchasingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newPurchaseOrderForm(t),
       createLabel: "New Order",
       createAction: "createPurchaseOrder",
+      createPermission: { resource: "purchase_order", action: "create" },
     },
     {
       id: "lines",
@@ -1628,7 +1676,7 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
   defaultTab: "dashboard",
   tabGroups: [
     { label: t("modules.tabGroups.people", { defaultValue: "People" }), tabIds: ["employees", "departments", "org-chart", "job-positions", "recruitment", "onboarding-templates", "performance"] },
-    { label: t("modules.tabGroups.timeoff", { defaultValue: "Time off" }), tabIds: ["leaves", "attendance", "leave-types"] },
+    { label: t("modules.tabGroups.timeoff", { defaultValue: "Time off" }), tabIds: ["leaves", "leave-allocations", "attendance", "leave-types"] },
     { label: t("modules.tabGroups.pay", { defaultValue: "Pay" }), tabIds: ["contracts", "payslips", "payroll-structures", "salary-rules", "benefits"] },
   ],
   tabs: [
@@ -1646,6 +1694,7 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newEmployeeForm(t),
       createLabel: "New Employee",
       createAction: "createEmployee",
+      createPermission: { resource: "hr_employee", action: "create" },
     },
     {
       id: "departments",
@@ -1661,6 +1710,12 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newLeaveRequestForm(t),
       createLabel: "New Request",
       createAction: "createLeaveRequest",
+    },
+    {
+      id: "leave-allocations",
+      label: t("hr.leaveAllocations.tab", { defaultValue: "Allocations" }),
+      type: "entity",
+      entityConfig: leaveAllocationsTableConfig(t),
     },
     {
       id: "attendance",
@@ -1864,6 +1919,7 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newManufacturingOrderForm(t),
       createLabel: "New Order",
       createAction: "createManufacturingOrder",
+      createPermission: { resource: "mrp_production", action: "create" },
     },
     {
       id: "boms",
@@ -1879,6 +1935,12 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("manufacturing.bomLines.tabLabel"),
       type: "entity",
       entityConfig: bomLinesTableConfig(t),
+    },
+    {
+      id: "bom-byproducts",
+      label: "BOM Byproducts",
+      type: "entity",
+      entityConfig: bomByproductsTableConfig(t),
     },
     {
       id: "workorders",
@@ -1906,6 +1968,11 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
       label: "Quality Checks",
       type: "entity",
       entityConfig: qualityChecksTableConfig(t),
+    },
+    {
+      id: "cost-settings",
+      label: "Costing & Valuation",
+      type: "custom",
     },
   ],
 })
@@ -2028,6 +2095,7 @@ export const projectsModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newProjectForm(t),
       createLabel: "New Project",
       createAction: "createProject",
+      createPermission: { resource: "project_project", action: "create" },
     },
     {
       id: "tasks",
@@ -2599,6 +2667,11 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
       type: "custom",
     },
     {
+      id: "statements",
+      label: t("reports.tabs.statements", { defaultValue: "Statements" }),
+      type: "custom",
+    },
+    {
       id: "vat-report",
       label: t("reports.tabs.vatReport"),
       type: "custom",
@@ -2619,7 +2692,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
   description: "Recurring revenue, plans, and subscription management",
   defaultTab: "dashboard",
   tabGroups: [
-    { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "entitlements"] },
+    { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "bundles", "entitlements"] },
     { label: t("modules.tabGroups.billing", { defaultValue: "Billing" }), tabIds: ["usage-events", "usage-charges", "rating-backlog", "price-tiers", "due-to-bill", "past-due", "payment-intents"] },
     { label: t("modules.tabGroups.revenue", { defaultValue: "Revenue" }), tabIds: ["deferred-schedules", "deferred-lines", "recognition-rules"] },
   ],
@@ -2688,6 +2761,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newSubscriptionForm(t),
       createLabel: "New Subscription",
       createAction: "createSubscription",
+      createPermission: { resource: "subscription", action: "create" },
     },
     {
       id: "plans",
@@ -2748,6 +2822,12 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("subscriptions.dueToBill.tabLabel", { defaultValue: "Due to bill" }),
       type: "entity",
       entityConfig: subscriptionDueToBillTableConfig(t),
+    },
+    {
+      id: "bundles",
+      label: t("subscriptions.bundles.tabLabel", { defaultValue: "Bundles" }),
+      type: "entity",
+      entityConfig: subscriptionBundlesTableConfig(t),
     },
     {
       id: "entitlements",
@@ -2848,6 +2928,7 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newExpenseForm(t),
       createLabel: "New Expense",
       createAction: "createExpense",
+      createPermission: { resource: "hr_expense", action: "create" },
     },
     {
       id: "expense-sheets",
@@ -2926,6 +3007,7 @@ export const helpdeskModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newHelpdeskTicketForm(t),
       createLabel: "New Ticket",
       createAction: "createTicket",
+      createPermission: { resource: "helpdesk_ticket", action: "create" },
     },
     {
       id: "teams",

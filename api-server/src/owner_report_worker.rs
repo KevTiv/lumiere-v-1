@@ -7,7 +7,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    fs,
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -27,7 +26,7 @@ use crate::{
     config::Config,
     integration_worker::ScheduledService,
     reports::{
-        artifacts::artifact_path,
+        artifacts::artifact_exists,
         common::{ReportKey, ReportPreviewRequest},
         execution_context::{
             ClaimedOwnerReportJob, ScheduledOwnerReportFacts, ScheduledReportContext,
@@ -153,7 +152,7 @@ struct DocumentRow {
 
 /// Start a bounded polling worker and its internal health endpoint.
 pub async fn serve() -> anyhow::Result<()> {
-    let config = Config::from_worker_env()?;
+    let config = Config::from_owner_report_worker_env()?;
     let worker_token = config.require_dedicated_worker_token("STDB_OWNER_REPORT_WORKER_TOKEN")?;
     let port = config.owner_report_worker_port;
     let mut app_state = AppState::new(config);
@@ -525,6 +524,7 @@ async fn process_job(
             company_id: payload.company_id,
             date,
             timezone: payload.timezone.clone(),
+            scenario: None,
         },
     )
     .await
@@ -689,14 +689,12 @@ async fn recover_completed_job(
             "completed owner-report document binding is invalid"
         ));
     }
-    let path = artifact_path(&state.config.report_artifact_dir, &artifact.artifact_key)
-        .map_err(|error| anyhow::anyhow!(error.to_string()))?;
-    if !fs::metadata(path)
-        .map(|metadata| metadata.is_file())
-        .unwrap_or(false)
+    if !artifact_exists(&state.config.report_artifact_store, &artifact.artifact_key)
+        .await
+        .map_err(|error| anyhow::anyhow!(error.to_string()))?
     {
         return Err(anyhow::anyhow!(
-            "completed owner-report artifact file is missing"
+            "completed owner-report artifact is missing"
         ));
     }
     Ok(artifact.output_hash)
@@ -881,7 +879,10 @@ fn complete_params_json(
 
 fn report_date(report_key: ReportKey, timezone: Tz) -> anyhow::Result<String> {
     let today = Utc::now().with_timezone(&timezone).date_naive();
-    let date = if report_key == ReportKey::MonthlyOwnerReportV1 {
+    let date = if matches!(
+        report_key,
+        ReportKey::MonthlyOwnerReportV1 | ReportKey::MarginSupplyOutlookV1
+    ) {
         let current_month = today
             .with_day(1)
             .ok_or_else(|| anyhow::anyhow!("invalid local date"))?;
@@ -929,6 +930,9 @@ mod tests {
         let timezone = "UTC".parse::<Tz>().expect("UTC timezone");
         let date = report_date(ReportKey::MonthlyOwnerReportV1, timezone).expect("report date");
         assert!(date.ends_with("-01"));
+        let outlook_date =
+            report_date(ReportKey::MarginSupplyOutlookV1, timezone).expect("outlook date");
+        assert_eq!(outlook_date, date);
     }
 
     #[test]

@@ -429,6 +429,7 @@ fn is_owner_report_key(key: &str) -> bool {
             | "purchase_spend_v1"
             | "payment_fee_summary_v1"
             | "monthly_owner_report_v1"
+            | "margin_supply_outlook_v1"
     )
 }
 
@@ -1583,6 +1584,105 @@ pub struct SavedReport {
     pub metadata: Option<String>,
 }
 
+const SAVED_REPORT_DIMENSIONS: &[&str] = &["accountCode", "accountName", "accountType"];
+const SAVED_REPORT_MEASURES: &[&str] = &[
+    "closingDebit",
+    "closingCredit",
+    "periodDebit",
+    "periodCredit",
+];
+const SAVED_REPORT_OPERATIONS: &[&str] = &["sum", "avg", "min", "max", "count"];
+
+fn validate_saved_report_filter(filter_json: Option<&str>) -> Result<(), String> {
+    let Some(raw) = filter_json else {
+        return Ok(());
+    };
+    let value: serde_json::Value = serde_json::from_str(raw)
+        .map_err(|_| "Saved report filter_json must be valid JSON".to_string())?;
+    if !value.is_object() {
+        return Err("Saved report filter_json must be a JSON object".to_string());
+    }
+    Ok(())
+}
+
+fn validate_saved_report_definition(
+    model: &str,
+    row_dimension: &str,
+    column_dimension: Option<&str>,
+    measure_field: &str,
+    measure_op: &str,
+    filter_json: Option<&str>,
+) -> Result<(), String> {
+    if model != "trial_balance" {
+        return Err("Unsupported saved report model".to_string());
+    }
+    if !SAVED_REPORT_DIMENSIONS.contains(&row_dimension) {
+        return Err("Unsupported saved report row dimension".to_string());
+    }
+    if let Some(column) = column_dimension {
+        if !SAVED_REPORT_DIMENSIONS.contains(&column) || column == row_dimension {
+            return Err("Unsupported saved report column dimension".to_string());
+        }
+    }
+    if !SAVED_REPORT_MEASURES.contains(&measure_field) {
+        return Err("Unsupported saved report measure field".to_string());
+    }
+    if !SAVED_REPORT_OPERATIONS.contains(&measure_op) {
+        return Err("Unsupported saved report measure operation".to_string());
+    }
+    validate_saved_report_filter(filter_json)
+}
+
+#[cfg(test)]
+mod saved_report_definition_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_supported_trial_balance_definition() {
+        assert!(validate_saved_report_definition(
+            "trial_balance",
+            "accountCode",
+            Some("accountType"),
+            "closingDebit",
+            "sum",
+            Some(r#"{"accountType":{"$in":["Asset"]}}"#),
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn rejects_malformed_or_non_object_filters() {
+        assert!(validate_saved_report_filter(Some("{"))
+            .expect_err("malformed JSON must fail")
+            .contains("valid JSON"));
+        assert!(validate_saved_report_filter(Some("[]"))
+            .expect_err("array filters must fail")
+            .contains("JSON object"));
+    }
+
+    #[test]
+    fn rejects_unknown_fields_and_duplicate_dimensions() {
+        assert!(validate_saved_report_definition(
+            "trial_balance",
+            "accountCode",
+            Some("accountCode"),
+            "closingDebit",
+            "sum",
+            None,
+        )
+        .is_err());
+        assert!(validate_saved_report_definition(
+            "trial_balance",
+            "accountCode",
+            None,
+            "arbitraryField",
+            "sum",
+            None,
+        )
+        .is_err());
+    }
+}
+
 #[reducer]
 pub fn create_saved_report(
     ctx: &ReducerContext,
@@ -1591,9 +1691,18 @@ pub fn create_saved_report(
     params: CreateSavedReportParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "saved_report", "create")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
     if params.name.trim().is_empty() {
         return Err("Saved report name is required".to_string());
     }
+    validate_saved_report_definition(
+        &params.model,
+        &params.row_dimension,
+        params.column_dimension.as_deref(),
+        &params.measure_field,
+        &params.measure_op,
+        params.filter_json.as_deref(),
+    )?;
     let row = ctx.db.saved_report().insert(SavedReport {
         id: 0,
         organization_id,
@@ -1650,6 +1759,40 @@ pub fn update_saved_report(
     if existing.company_id != company_id {
         return Err("Saved report does not belong to this company".to_string());
     }
+    if params
+        .name
+        .as_ref()
+        .is_some_and(|name| name.trim().is_empty())
+    {
+        return Err("Saved report name is required".to_string());
+    }
+    let next_row_dimension = params
+        .row_dimension
+        .as_deref()
+        .unwrap_or(&existing.row_dimension);
+    let next_column_dimension = params
+        .column_dimension
+        .as_ref()
+        .map(|column| column.as_deref())
+        .unwrap_or(existing.column_dimension.as_deref());
+    let next_measure_field = params
+        .measure_field
+        .as_deref()
+        .unwrap_or(&existing.measure_field);
+    let next_measure_op = params.measure_op.as_deref().unwrap_or(&existing.measure_op);
+    let next_filter_json = params
+        .filter_json
+        .as_ref()
+        .map(|filter| filter.as_deref())
+        .unwrap_or(existing.filter_json.as_deref());
+    validate_saved_report_definition(
+        &existing.model,
+        next_row_dimension,
+        next_column_dimension,
+        next_measure_field,
+        next_measure_op,
+        next_filter_json,
+    )?;
     ctx.db.saved_report().id().update(SavedReport {
         name: params.name.unwrap_or(existing.name),
         row_dimension: params.row_dimension.unwrap_or(existing.row_dimension),

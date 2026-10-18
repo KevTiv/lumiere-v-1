@@ -6,7 +6,7 @@
 /// it from authenticated context rather than supplying a writable tenant field.
 use spacetimedb::{ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::organization::company;
+use crate::core::organization::{company, organization};
 use crate::core::users::find_user_profile_for_identity;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -255,6 +255,79 @@ pub struct DocumentSequence {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Install missing canonical countries only. Callers must enter through tenant
+/// bootstrap or the permission-checked organization migration runner. Existing
+/// rows (including inactive/customized rows) are never changed. No currencies,
+/// tax rules, memberships, or platform privileges are created here.
+pub(crate) fn seed_country_catalog_for_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+) -> Result<Vec<Country>, String> {
+    let organization = ctx
+        .db
+        .organization()
+        .id()
+        .find(&organization_id)
+        .ok_or("Organization not found")?;
+    if organization_id == 0 || organization.organization_id != organization_id {
+        return Err("country provisioning requires a valid organization".to_string());
+    }
+    let mut inserted = Vec::new();
+    for definition in crate::core::country_catalog::COUNTRIES {
+        let key = format!("{organization_id}:{}", definition.code);
+        if let Some(existing) = ctx.db.country().organization_code_key().find(&key) {
+            if existing.organization_id != organization_id || existing.code != definition.code {
+                return Err("country reference ownership is inconsistent".to_string());
+            }
+            continue;
+        }
+        let currency_id = ctx
+            .db
+            .currency()
+            .organization_code_key()
+            .find(format!("{organization_id}:{}", definition.currency_code))
+            .filter(|row| row.organization_id == organization_id && row.active)
+            .map(|row| row.id);
+        let row = ctx.db.country().insert(Country {
+            organization_code_key: key,
+            code: definition.code.to_string(),
+            organization_id,
+            name: definition.name.to_string(),
+            official_name: None,
+            iso3: definition.iso3.to_string(),
+            numcode: definition.numcode,
+            phone_code: definition.phone_code.to_string(),
+            currency_id,
+            language_codes: definition
+                .languages
+                .iter()
+                .map(|language| (*language).to_string())
+                .collect(),
+            is_active: true,
+            metadata: Some(r#"{"catalog":"onboarding-countries-v1"}"#.to_string()),
+        });
+        write_audit_log_v2(
+            ctx,
+            organization_id,
+            AuditLogParams {
+                company_id: None,
+                table_name: "country",
+                record_id: 0,
+                action: "CREATE",
+                old_values: None,
+                new_values: Some(
+                    serde_json::json!({"code": row.code, "catalog": "onboarding-countries-v1"})
+                        .to_string(),
+                ),
+                changed_fields: vec!["code".to_string(), "name".to_string()],
+                metadata: None,
+            },
+        );
+        inserted.push(row);
+    }
+    Ok(inserted)
+}
 
 fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
     let is_su = find_user_profile_for_identity(ctx, ctx.sender())
@@ -635,21 +708,28 @@ pub(crate) fn require_active_currency_for_organization(
 /// organization.  Bootstrap runs before the caller has an organization
 /// membership, so this internal path intentionally bypasses the superuser
 /// reducer guard while keeping ownership server-derived from `organization_id`.
+fn onboarding_currency_definition(code: &str) -> Option<(&'static str, &'static str, u8, f64)> {
+    match code {
+        "USD" => Some(("US Dollar", "$", 2, 0.01)),
+        "EUR" => Some(("Euro", "€", 2, 0.01)),
+        "GBP" => Some(("British Pound", "£", 2, 0.01)),
+        "CAD" => Some(("Canadian Dollar", "C$", 2, 0.01)),
+        "AUD" => Some(("Australian Dollar", "A$", 2, 0.01)),
+        "JPY" => Some(("Japanese Yen", "¥", 0, 1.0)),
+        "RWF" => Some(("Rwandan Franc", "FRw", 0, 1.0)),
+        _ => None,
+    }
+}
+
 pub(crate) fn seed_currency_for_organization(
     ctx: &ReducerContext,
     organization_id: u64,
     code: &str,
 ) -> Result<Currency, String> {
     let normalized = code.trim().to_uppercase();
-    let (name, symbol, decimal_places, rounding_factor) = match normalized.as_str() {
-        "USD" => ("US Dollar", "$", 2, 0.01),
-        "EUR" => ("Euro", "€", 2, 0.01),
-        "GBP" => ("British Pound", "£", 2, 0.01),
-        "CAD" => ("Canadian Dollar", "C$", 2, 0.01),
-        "AUD" => ("Australian Dollar", "A$", 2, 0.01),
-        "JPY" => ("Japanese Yen", "¥", 0, 1.0),
-        _ => return Err(format!("Unsupported onboarding currency '{normalized}'")),
-    };
+    let (name, symbol, decimal_places, rounding_factor) =
+        onboarding_currency_definition(&normalized)
+            .ok_or_else(|| format!("Unsupported onboarding currency '{normalized}'"))?;
     let organization_code_key = format!("{organization_id}:{normalized}");
     if let Some(existing) = ctx
         .db
@@ -677,6 +757,19 @@ pub(crate) fn seed_currency_for_organization(
         created_at: ctx.timestamp,
         metadata: Some("{\"seed\":\"bootstrap\"}".to_string()),
     }))
+}
+
+#[cfg(test)]
+mod onboarding_currency_tests {
+    use super::onboarding_currency_definition;
+
+    #[test]
+    fn rwandan_franc_is_a_zero_decimal_bootstrap_currency() {
+        assert_eq!(
+            onboarding_currency_definition("RWF"),
+            Some(("Rwandan Franc", "FRw", 0, 1.0))
+        );
+    }
 }
 
 /// Resolves a global `Currency` row by ISO 4217 code (case-insensitive).

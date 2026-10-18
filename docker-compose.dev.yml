@@ -25,17 +25,6 @@ services:
       retries: 20
       start_period: 10s
 
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). NoTls locally —
   # api-server/src/cold_tier/pg_pool.rs enforces PG_TLS_MODE=require in production.
   postgres:
@@ -124,6 +113,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w ai-gateway -w crates -w Cargo.toml -x 'run -p ai-gateway'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
@@ -133,6 +123,7 @@ services:
       PORT: 8080
       RUST_LOG: ${RUST_LOG:-ai_gateway=debug,tower_http=info}
       LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET in .env.docker}
+      AI_EXECUTION_ENVELOPE_KEY: ${AI_EXECUTION_ENVELOPE_KEY:-local-dev-trusted-envelope-key-32-bytes}
       QDRANT_URL: http://qdrant:6334
       QDRANT_ACTIVITY_REFS_COLLECTION: ${QDRANT_ACTIVITY_REFS_COLLECTION:-lumiere_erp_activity_refs_v1}
       STDB_HOST: http://spacetimedb:3000
@@ -180,6 +171,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
@@ -233,6 +225,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin owner-report-worker'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
@@ -272,6 +265,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin workflow-worker'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
@@ -311,6 +305,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w api-server -w crates -w Cargo.toml -x 'run -p api-server --bin projection-worker'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}
@@ -416,6 +411,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     command: cargo watch -w iot-gateway -w crates -w Cargo.toml -x 'run -p iot-gateway'
+    restart: unless-stopped
     environment:
       CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-1}
       CARGO_INCREMENTAL: ${CARGO_INCREMENTAL:-0}

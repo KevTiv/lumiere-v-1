@@ -17,6 +17,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "close_account_asset",
   "close_account_period",
   "close_fiscal_year",
+  "cleanup_abandoned_account_move_import",
   "complete_intercompany_transaction",
   "complete_tax_deadline",
   "compute_depreciation_board",
@@ -31,6 +32,7 @@ export const ACCOUNTING_BFF_REDUCERS = [
   "create_account_group",
   "create_account_journal",
   "create_account_move",
+  "create_manual_invoice",
   "create_account_period",
   "create_account_reconciliation_widget",
   "create_account_tax",
@@ -176,6 +178,7 @@ const ACCOUNTING_HINT_OVERRIDES: Partial<
   ],
   create_account_journal: ["account-journals"],
   create_account_move: ["account-moves", "account-move-lines"],
+  create_manual_invoice: ["account-moves", "account-move-lines"],
   create_account_tax: [
     "account-taxes",
     "tax-groups",

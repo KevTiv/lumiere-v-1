@@ -1,13 +1,13 @@
 //! Organization invitation creation and acceptance handlers.
 use super::cookies::set_stdb_session_cookies;
 use crate::auth_password::{
-    decrypt_token, encrypt_token, find_credential_by_email, find_invite_by_token_hash,
-    generate_secure_token, get_role_name_in_organization, now_micros, send_resend_email,
+    authenticate_invite_credential, encrypt_token, find_credential_by_email,
+    find_invite_by_token_hash, generate_secure_token, get_role_name_in_organization,
+    hash_native_password, normalized_auth_email, now_micros, send_resend_email,
+    validate_native_password,
 };
 use crate::cold_tier::pg_pool;
-use crate::commands::{
-    dispatch_internal_reducer, dispatch_session_reducer, InternalRouteAuthority,
-};
+use crate::commands::{dispatch_internal_reducer, InternalRouteAuthority};
 use crate::error::ApiError;
 use crate::platform_control::{self, PlatformId};
 use crate::session::{identity_json_for_reducer_call, normalize_identity_hex_for_sql};
@@ -39,6 +39,12 @@ pub(super) async fn invite(
     cookies: Cookies,
     Json(body): Json<InviteBody>,
 ) -> Result<impl IntoResponse, ApiError> {
+    if state.config.workos_client_id.is_some() {
+        return Err(ApiError::Gone(
+            "Invitations use the WorkOS membership flow".into(),
+        ));
+    }
+    let email = normalized_auth_email(&body.email)?;
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
@@ -50,18 +56,30 @@ pub(super) async fn invite(
     }
     let identity_hex = session.identity_hex.clone();
 
-    let hex = identity_hex
-        .trim()
-        .trim_start_matches("0x")
-        .trim_start_matches("0X");
     let context = TrustedOperationContext::for_resource_read(&state, &session)?;
     let client = context.client();
-
-    let sql = format!(
-        "SELECT role_id, organization_id, is_active FROM user_role_assignment WHERE identity = 0x{hex} AND organization_id = {} AND is_active = true",
-        body.organization_id
-    );
+    let sql = stdb_auth::select_user_role_assignments_for_identity_sql(&identity_hex, None)
+        .map_err(ApiError::Internal)?;
     let assignments = client.query_sql(&sql).await.map_err(ApiError::internal)?;
+    let assignments: Vec<_> = assignments
+        .into_iter()
+        .filter(|row| {
+            row.get("organizationId")
+                .or_else(|| row.get("organization_id"))
+                .and_then(json_u64)
+                == Some(body.organization_id)
+                && row
+                    .get("expiresAt")
+                    .or_else(|| row.get("expires_at"))
+                    .filter(|v| !v.is_null())
+                    .map(|v| {
+                        v.as_i64()
+                            .or_else(|| v.as_str()?.parse().ok())
+                            .is_some_and(|expiry| i128::from(expiry) > now_micros())
+                    })
+                    .unwrap_or(true)
+        })
+        .collect();
     if assignments.is_empty() {
         return Err(ApiError::Forbidden(
             "Forbidden: not a member of this organization".into(),
@@ -85,7 +103,7 @@ pub(super) async fn invite(
 
     // SpacetimeDB HTTP SQL does not support `IN (...)` — fetch org roles and filter in Rust.
     let roles_sql = format!(
-        "SELECT id, name FROM role WHERE organization_id = {}",
+        "SELECT id, name FROM role WHERE is_active = true AND organization_id = {}",
         body.organization_id
     );
     let all_roles = client
@@ -123,14 +141,15 @@ pub(super) async fn invite(
     let (token, token_hash) = generate_secure_token();
     let expires_at = now_micros() + (7_i128 * 24 * 60 * 60 * 1_000_000);
 
-    dispatch_session_reducer(
+    dispatch_internal_reducer(
         &state,
-        &session,
+        InternalRouteAuthority::InvitationCreation,
+        Some(body.organization_id),
         "create_user_invite",
         json!([
             body.organization_id,
             body.role_id,
-            body.email.trim(),
+            email.clone(),
             token_hash,
             identity_json_for_reducer_call(&identity_hex),
             expires_at.to_string()
@@ -156,7 +175,7 @@ pub(super) async fn invite(
     if let Some(ref api_key) = state.config.resend_api_key {
         let from = state.config.resend_from_email.clone();
         let app = state.config.app_url.clone();
-        let to = body.email.trim().to_string();
+        let to = email.clone();
         let link = format!("{app}/accept-invite?token={}", urlencoding::encode(&token));
         let text = format!(
             "Your colleague has invited you to join {org_name} on Lumiere ERP.\n\nAccept:\n{link}\n\nExpires in 7 days."
@@ -201,10 +220,10 @@ pub(super) async fn accept_invite(
         ));
     }
 
-    if body.password.len() < 8 {
-        return Err(ApiError::BadRequest(
-            "Password must be at least 8 characters".into(),
-        ));
+    validate_native_password(&body.password)?;
+    let email = normalized_auth_email(&body.email)?;
+    if body.token.len() != 43 {
+        return Err(ApiError::BadRequest("Invalid or expired invitation".into()));
     }
 
     let key = state
@@ -227,23 +246,22 @@ pub(super) async fn accept_invite(
     }
 
     let now_micros_i = now_micros() as i64;
-    if invite.expires_at < now_micros_i {
+    if invite.expires_at <= now_micros_i {
         return Err(ApiError::BadRequest("Invitation has expired".into()));
     }
 
-    if invite.email.to_lowercase() != body.email.trim().to_lowercase() {
+    if normalized_auth_email(&invite.email)? != email {
         return Err(ApiError::BadRequest(
             "Email does not match invitation".into(),
         ));
     }
 
-    let email = body.email.trim().to_lowercase();
     let role_name = get_role_name_in_organization(&state, invite.role_id, invite.organization_id)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Invite role not found".into()))?;
     let (member_identity, stdb_token, platform_user_id, new_credential) =
         if let Some(existing) = find_credential_by_email(&state, &email).await? {
-            let tok = decrypt_token(key, &existing.stdb_token_enc)?;
+            let tok = authenticate_invite_credential(&existing, body.password.clone(), key).await?;
             (
                 existing.identity_hex.clone(),
                 tok,
@@ -251,12 +269,11 @@ pub(super) async fn accept_invite(
                 None,
             )
         } else {
+            let password_hash = hash_native_password(body.password.clone()).await?;
             let (identity, token) = state
                 .stdb
                 .provision_identity()
                 .await
-                .map_err(ApiError::internal)?;
-            let password_hash = bcrypt::hash(body.password.as_str(), bcrypt::DEFAULT_COST)
                 .map_err(ApiError::internal)?;
             let token_enc = encrypt_token(key, &token)?;
             (
@@ -266,30 +283,6 @@ pub(super) async fn accept_invite(
                 Some((password_hash, token_enc)),
             )
         };
-
-    // Establish the validated organization membership before materializing the
-    // organization-owned credential/profile rows.
-    dispatch_internal_reducer(
-        &state,
-        InternalRouteAuthority::InvitationAcceptance,
-        Some(invite.organization_id),
-        "add_org_member",
-        json!([
-                identity_json_for_reducer_call(&member_identity),
-                invite.organization_id,
-                {
-                    "role_name": role_name,
-                    "company_id": Value::Null,
-                    "job_title": Value::Null,
-                    "department_id": Value::Null,
-                    "employee_id": Value::Null,
-                    "is_active": true,
-                    "is_default": true,
-                    "metadata": Value::Null,
-                }
-        ]),
-    )
-    .await?;
 
     if let Some((password_hash, token_enc)) = new_credential {
         let pool = pg_pool::shared_pool().ok_or_else(|| {
@@ -330,6 +323,41 @@ pub(super) async fn accept_invite(
         .map_err(ApiError::internal)?;
     }
 
+    // Claim before granting membership: a replay can never mutate access. If a
+    // later backend step fails the invite stays consumed and an owner must reissue.
+    dispatch_internal_reducer(
+        &state,
+        InternalRouteAuthority::InvitationAcceptance,
+        Some(invite.organization_id),
+        "mark_invite_accepted",
+        json!([invite.id]),
+    )
+    .await?;
+
+    // Establish the validated organization membership before materializing the
+    // organization-owned credential/profile rows.
+    dispatch_internal_reducer(
+        &state,
+        InternalRouteAuthority::InvitationAcceptance,
+        Some(invite.organization_id),
+        "add_org_member",
+        json!([
+                identity_json_for_reducer_call(&member_identity),
+                invite.organization_id,
+                {
+                    "role_name": role_name,
+                    "company_id": Value::Null,
+                    "job_title": Value::Null,
+                    "department_id": Value::Null,
+                    "employee_id": Value::Null,
+                    "is_active": true,
+                    "is_default": true,
+                    "metadata": Value::Null,
+                }
+        ]),
+    )
+    .await?;
+
     // The membership reducer derives organization ownership. Only after it
     // succeeds may this opaque platform binding be projected into ERP.
     dispatch_internal_reducer(
@@ -356,17 +384,12 @@ pub(super) async fn accept_invite(
     )
     .await?;
 
-    dispatch_internal_reducer(
-        &state,
-        InternalRouteAuthority::InvitationAcceptance,
-        Some(invite.organization_id),
-        "mark_invite_accepted",
-        json!([invite.id]),
-    )
-    .await?;
-
     let id_hex = normalize_identity_hex_for_sql(&member_identity);
     set_stdb_session_cookies(&state.config, &cookies, &stdb_token, &id_hex);
 
     Ok(Json(json!({ "redirectTo": "/overview" })))
+}
+
+fn json_u64(value: &Value) -> Option<u64> {
+    value.as_u64().or_else(|| value.as_str()?.parse().ok())
 }

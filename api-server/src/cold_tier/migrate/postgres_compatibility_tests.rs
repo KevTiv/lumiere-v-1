@@ -1,11 +1,12 @@
-use super::{
-    ensure_schema, migration_checksum, MIGRATIONS, MIGRATION_TABLE, MIGRATION_TABLE_DDL,
-};
+use super::{ensure_schema, migration_checksum, MIGRATIONS, MIGRATION_TABLE, MIGRATION_TABLE_DDL};
 use crate::cold_tier::{conventions, pg_codec, pg_pool, projection_worker};
 use anyhow::{ensure, Context, Result};
 use deadpool_postgres::Pool;
 use serde_json::json;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static DATABASE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 const NEXT_EXPAND_SQL: &str = r#"
 create table c4_next_release_probe (
@@ -69,14 +70,65 @@ async fn postgres_existing_durable_projection_adds_migration_11() -> Result<()> 
     Ok(())
 }
 
+#[tokio::test]
+async fn postgres_migration_13_adds_manufacturing_cost_projection_14() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!(
+            "skipping postgres_migration_13_adds_manufacturing_cost_projection_14 (set C4_TEST_PG=1 to run)"
+        );
+        return Ok(());
+    }
+
+    let base_config = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin_pool = admin_pool(&base_config)?;
+    create_database(&admin_pool, &database, &base_config.user).await?;
+
+    let mut test_config = base_config.clone();
+    test_config.database.clone_from(&database);
+    let test_pool = pg_pool::build_pool(&test_config)?;
+    let test_result = exercise_manufacturing_cost_projection_upgrade(&test_pool).await;
+    drop(test_pool);
+    let cleanup_result = drop_database(&admin_pool, &database).await;
+
+    test_result?;
+    cleanup_result?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn postgres_migration_14_adds_account_payment_reversal_identity_15() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!(
+            "skipping postgres_migration_14_adds_account_payment_reversal_identity_15 (set C4_TEST_PG=1 to run)"
+        );
+        return Ok(());
+    }
+
+    let base_config = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin_pool = admin_pool(&base_config)?;
+    create_database(&admin_pool, &database, &base_config.user).await?;
+
+    let mut test_config = base_config.clone();
+    test_config.database.clone_from(&database);
+    let test_pool = pg_pool::build_pool(&test_config)?;
+    let test_result = exercise_account_payment_reversal_identity_upgrade(&test_pool).await;
+    drop(test_pool);
+    let cleanup_result = drop_database(&admin_pool, &database).await;
+
+    test_result?;
+    cleanup_result?;
+    Ok(())
+}
+
 async fn exercise_durable_projection_upgrade(pool: &Pool) -> Result<()> {
     let migration_11_index = "cold_tier_service_identity_identity";
-    let frozen_migration_1 = include_str!(
-        "../../../../lumiere-codegen/pg-migration-ledger/0001_durable_projection.sql"
-    );
+    let frozen_migration_1 =
+        include_str!("../../../../lumiere-codegen/pg-migration-ledger/0001_durable_projection.sql");
     let prefix_length = MIGRATIONS
-        .len()
-        .checked_sub(1)
+        .iter()
+        .position(|migration| migration.version == 11)
         .context("migration 11 is missing from the catalog")?;
     ensure!(MIGRATIONS[0].sql == frozen_migration_1);
     ensure!(MIGRATIONS[prefix_length].version == 11);
@@ -92,11 +144,162 @@ async fn exercise_durable_projection_upgrade(pool: &Pool) -> Result<()> {
     ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
     ensure!(relation_exists(pool, migration_11_index).await?);
     ensure!(applied_checksum(pool, 1).await? == migration_1_checksum);
-    ensure!(
-        applied_checksum(pool, 11).await?
-            == migration_checksum(MIGRATIONS[prefix_length].sql)
-    );
+    ensure!(applied_checksum(pool, 11).await? == migration_checksum(MIGRATIONS[prefix_length].sql));
     Ok(())
+}
+
+async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<()> {
+    let migration_13_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.version == 13)
+        .context("migration 13 is missing from the catalog")?;
+    let migration_14_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.version == 14)
+        .context("migration 14 is missing from the catalog")?;
+    let frozen_migration_14 = include_str!(
+        "../../../../lumiere-codegen/pg-migration-ledger/0014_durable_projection_delta.sql"
+    );
+    ensure!(migration_14_index == migration_13_index + 1);
+    ensure!(MIGRATIONS[migration_14_index].name == "manufacturing_actual_cost_projection");
+    ensure!(MIGRATIONS[migration_14_index].sql == frozen_migration_14);
+    let prefix_length = migration_13_index + 1;
+    apply_migration_prefix(pool, prefix_length).await?;
+    ensure!(migration_count(pool).await? == prefix_length as i64);
+    let previous_history = applied_migration_history(pool).await?;
+    let previous_tables = public_table_names(pool).await?;
+    let expected_cost_tables = [
+        "mrp_production_cost",
+        "mrp_productivity_cost",
+        "mrp_valuation_config",
+        "mrp_workcenter_cost_rate",
+    ];
+    for table in expected_cost_tables {
+        ensure!(
+            !relation_exists(pool, table).await?,
+            "cost table {table} predates migration 14"
+        );
+    }
+
+    ensure_schema(pool).await?;
+
+    let current_history = applied_migration_history(pool).await?;
+    ensure!(current_history.len() == MIGRATIONS.len());
+    ensure!(
+        current_history[..prefix_length] == previous_history,
+        "manufacturing upgrade changed prior migration identity, checksum, or applied time"
+    );
+    ensure!(applied_checksum(pool, 14).await? == migration_checksum(frozen_migration_14));
+    let added_tables: Vec<_> = public_table_names(pool)
+        .await?
+        .into_iter()
+        .filter(|table| !previous_tables.contains(table))
+        .collect();
+    ensure!(
+        added_tables == expected_cost_tables,
+        "migration 13 upgrade produced unexpected new tables: {added_tables:?}"
+    );
+
+    // Startup replay must preserve both the released history and its application timestamps.
+    ensure_schema(pool).await?;
+    ensure!(applied_migration_history(pool).await? == current_history);
+    Ok(())
+}
+
+async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Result<()> {
+    let migration_15_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.version == 15)
+        .context("migration 15 is missing from the catalog")?;
+    let frozen_migration_15 = include_str!(
+        "../../../../lumiere-codegen/pg-migration-ledger/0015_durable_projection_delta.sql"
+    );
+    ensure!(
+        MIGRATIONS[migration_15_index].name == "account_payment_reversal_identity"
+    );
+    ensure!(MIGRATIONS[migration_15_index].sql == frozen_migration_15);
+
+    apply_migration_prefix(pool, migration_15_index).await?;
+    let client = pool.get().await?;
+    let column_before: bool = client
+        .query_one(
+            "select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'account_payment' and column_name = 'reversal_move_id')",
+            &[],
+        )
+        .await?
+        .get(0);
+    ensure!(!column_before, "reversal identity predates migration 15");
+    drop(client);
+
+    let previous_history = applied_migration_history(pool).await?;
+    ensure_schema(pool).await?;
+    ensure!(
+        applied_checksum(pool, 15).await? == migration_checksum(frozen_migration_15)
+    );
+
+    let client = pool.get().await?;
+    let column = client
+        .query_one(
+            "select is_nullable, column_default, data_type, numeric_precision, numeric_scale from information_schema.columns where table_schema = 'public' and table_name = 'account_payment' and column_name = 'reversal_move_id'",
+            &[],
+        )
+        .await?;
+    let nullable: String = column.get(0);
+    let default_value: Option<String> = column.get(1);
+    let data_type: String = column.get(2);
+    let precision: Option<i32> = column.get(3);
+    let scale: Option<i32> = column.get(4);
+    ensure!(nullable == "YES");
+    ensure!(default_value.is_none());
+    ensure!(data_type == "numeric");
+    ensure!(precision == Some(20));
+    ensure!(scale == Some(0));
+
+    let index = client
+        .query_one(
+            "select index_definition.indisunique, pg_get_expr(index_definition.indpred, index_definition.indrelid) from pg_catalog.pg_class index_relation join pg_catalog.pg_index index_definition on index_definition.indexrelid = index_relation.oid where index_relation.oid = to_regclass('account_payment_reversal_move_id')",
+            &[],
+        )
+        .await?;
+    let unique: bool = index.get(0);
+    let predicate: Option<String> = index.get(1);
+    ensure!(unique);
+    ensure!(predicate
+        .as_deref()
+        .is_some_and(|value| value.contains("reversal_move_id IS NOT NULL")));
+    drop(client);
+
+    ensure!(
+        applied_migration_history(pool).await?[..migration_15_index] == previous_history
+    );
+    ensure_schema(pool).await?;
+    ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
+    Ok(())
+}
+
+type AppliedMigrationHistory = (i64, String, i64, String, String, String);
+
+async fn applied_migration_history(pool: &Pool) -> Result<Vec<AppliedMigrationHistory>> {
+    let client = pool.get().await?;
+    Ok(client.query(
+        &format!("select version, name, change_set, phase, checksum, applied_at::text from {MIGRATION_TABLE} order by version"),
+        &[],
+    ).await?.into_iter().map(|row|
+        (row.get(0), row.get(1), row.get(2), row.get(3), row.get(4), row.get(5))
+    ).collect())
+}
+
+async fn public_table_names(pool: &Pool) -> Result<Vec<String>> {
+    let client = pool.get().await?;
+    Ok(client
+        .query(
+            "select tablename from pg_tables where schemaname = 'public' order by tablename",
+            &[],
+        )
+        .await?
+        .into_iter()
+        .map(|row| row.get(0))
+        .collect())
 }
 
 async fn apply_migration_prefix(pool: &Pool, prefix_length: usize) -> Result<()> {
@@ -289,11 +492,31 @@ fn column(name: &str, pg_type: &str, stdb_type: &str) -> pg_codec::ColumnCodec {
 }
 
 fn unique_database_name() -> Result<String> {
-    let micros = SystemTime::now()
+    let micros: u64 = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .context("read clock for C4 PostgreSQL database")?
-        .as_micros();
-    Ok(format!("lumiere_c4_{}_{}", std::process::id(), micros))
+        .as_micros()
+        .try_into()
+        .context("C4 PostgreSQL database clock exceeds u64 micros")?;
+    let sequence = DATABASE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    Ok(database_name(std::process::id(), micros, sequence))
+}
+
+fn database_name(process_id: u32, micros: u64, sequence: u64) -> String {
+    format!("lumiere_c4_{process_id}_{micros}_{sequence}")
+}
+
+#[test]
+fn database_names_distinguish_same_microsecond_and_fit_postgres_identifier() {
+    let first = database_name(u32::MAX, u64::MAX, 0);
+    let second = database_name(u32::MAX, u64::MAX, 1);
+    let longest = database_name(u32::MAX, u64::MAX, u64::MAX);
+
+    assert_ne!(first, second);
+    assert_eq!(longest.len(), 63);
+    assert!(longest
+        .bytes()
+        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'));
 }
 
 fn admin_pool(config: &pg_pool::PgConfig) -> Result<Pool> {

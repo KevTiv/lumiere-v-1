@@ -1,3 +1,4 @@
+import { bootstrapFixtureAccountSession } from './fixture-account'
 import { expect, request as playwrightRequest, test, type Browser, type Page } from "@playwright/test"
 
 import {
@@ -81,18 +82,7 @@ async function signupIdentityHex(email: string, password: string): Promise<strin
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100"
   const isolated = await playwrightRequest.newContext({ baseURL })
   try {
-    const signup = await isolated.post("/api/auth/signup", {
-      data: { email, password },
-    })
-    if (!signup.ok()) {
-      const body = await signup.text().catch(() => "")
-      throw new Error(`signup failed (${signup.status()}): ${body}`)
-    }
-    const state = await isolated.storageState()
-    const identityCookie = state.cookies.find((c) => c.name === "stdb_identity")
-    const raw = identityCookie?.value
-    if (!raw) throw new Error("signup did not set stdb_identity cookie")
-    return raw.replace(/^0x/i, "")
+    return await bootstrapFixtureAccountSession(isolated, email, password)
   } finally {
     await isolated.dispose()
   }
@@ -161,21 +151,57 @@ async function fetchJournalIdByCode(page: Page, code: string): Promise<number> {
   return id
 }
 
-async function fetchAccountIdByCode(page: Page, code: string): Promise<number> {
+async function createIsolatedPostingAccount(
+  page: Page,
+  companyId: number,
+  suffix: "debit" | "credit",
+): Promise<number> {
   const res = await page.request.get("/api/query/account-accounts")
   if (!res.ok()) throw new Error(`account-accounts query failed: ${res.status()}`)
-  const json = (await res.json()) as { data?: Array<{ id?: unknown; code?: string }> }
-  const row = (json.data ?? []).find((a) => String(a.code ?? "") === code)
-  const id = scalarQueryId(row?.id)
-  if (id == null) throw new Error(`account not found: ${code}`)
+  const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
+  const template = (json.data ?? []).find((account) => String(account.code ?? "") === "5000")
+  const userTypeId = scalarQueryId(template?.userTypeId ?? template?.user_type_id)
+  if (userTypeId == null) throw new Error("account template 5000 has no user type")
+
+  const code = `P${Date.now().toString(36).slice(-6)}${suffix === "debit" ? "D" : "C"}`.toUpperCase()
+  await callReducerBff(page, "create_account_account", [
+    orgId,
+    {
+      company_id: companyId,
+      code,
+      name: `Permission test ${suffix} account`,
+      user_type_id: userTypeId,
+      currency_id: null,
+      internal_type: { tag: "Expense" },
+      internal_group: { tag: "Expense" },
+      group_id: null,
+      reconcile: false,
+      tax_ids: [],
+      note: null,
+      opening_debit: 0,
+      opening_credit: 0,
+      allowed_journal_ids: [],
+      non_trade: false,
+      is_off_balance: false,
+      metadata: JSON.stringify({ test: "auth-permission-enforcement", suffix }),
+    },
+  ])
+
+  const created = await page.request.get("/api/query/account-accounts")
+  if (!created.ok()) throw new Error(`account-accounts query failed: ${created.status()}`)
+  const createdJson = (await created.json()) as { data?: Array<Record<string, unknown>> }
+  const id = scalarQueryId((createdJson.data ?? []).find((account) => account.code === code)?.id)
+  if (id == null) throw new Error(`isolated posting account not found: ${code}`)
   return id
 }
 
 async function adminCreatePostableDraftMiscMove(page: Page): Promise<number> {
   const companyId = await fetchDefaultCompanyId(page)
   const journalId = await fetchJournalIdByCode(page, "MISC")
-  const expenseAccountId = await fetchAccountIdByCode(page, "5000")
-  const bankAccountId = await fetchAccountIdByCode(page, "1200")
+  // Dedicated accounts keep this permission test independent from the P0
+  // account-deprecation test, which intentionally toggles a shared seeded row.
+  const expenseAccountId = await createIsolatedPostingAccount(page, companyId, "debit")
+  const bankAccountId = await createIsolatedPostingAccount(page, companyId, "credit")
   const moveRef = smokeName("perm-misc")
   const moveDate = stdbTimestampMicros(POSTABLE_MOVE_DATE)
   const moveMetadata = JSON.stringify({ test: "auth-permission-enforcement", ref: moveRef })

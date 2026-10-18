@@ -50,7 +50,7 @@ Slices marked `yes` pull that pin commit before continuing.
 | COV-23 | Membership role assign → revoke | `assign_role`, `revoke_role` | no | [status](./erp-cov23-role-assignment-status.md) |
 | COV-24 | Order → delivery → collection exception workspace | — | no | [status](./erp-cov24-distributor-workspace-status.md) |
 | COV-25 | Close one missing downstream record link per PR | — | no | [status](./erp-cov25-cross-module-links-status.md) |
-| COV-26 | One module quality pass per PR | — | no | [status](./erp-cov26-ux-accessibility-status.md) |
+| COV-26 | One module quality pass per PR | — | yes | [status](./erp-cov26-ux-accessibility-status.md) |
 | COV-27 | Seeded all-module launch manifest and ratchets | — | no | [status](./erp-cov27-full-stack-certification-status.md) |
 
 ## Placeholders

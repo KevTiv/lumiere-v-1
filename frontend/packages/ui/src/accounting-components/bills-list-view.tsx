@@ -34,18 +34,13 @@ import {
   Eye,
   Download,
   Trash2,
-  FileText,
-  DollarSign,
-  Clock,
-  AlertTriangle,
-  CheckCircle2,
   Filter,
   CreditCard,
-  Building,
   Calculator,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { StatCard, StatCardGrid } from "../components/stat-card"
+import { KpiStrip } from "../components/kpi-strip"
+import { toggleKpiKey } from "../lib/kpi-tiles"
 import { TablePager, usePagedRows } from "../components/table-pager"
 import { accountingListStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
@@ -56,6 +51,9 @@ import {
   stbEnumTag,
 } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
+import { EmptyStateCard } from "../components/empty-state-card"
+import { decideListEmptyState } from "../lib/list-empty-state"
+import { useRBAC } from "../lib/rbac-context"
 
 type BillStatus = "draft" | "pending" | "approved" | "partial" | "paid" | "overdue" | "cancelled"
 
@@ -113,6 +111,10 @@ export function BillsListView({
   const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<BillStatus | "all">("all")
+  // Set by the stat tiles above the list; "pending" groups pending, approved and partly paid bills.
+  const [tileFilter, setTileFilter] = useState<"paid" | "pending" | "overdue" | null>(null)
+  const { checkPermission } = useRBAC()
+  const canCreate = checkPermission("account_move", "create").allowed
 
   const filtered = bills
     .filter((bill) => {
@@ -121,11 +123,20 @@ export function BillsListView({
       const matchesSearch = name.includes(searchQuery.toLowerCase()) || partner.includes(searchQuery.toLowerCase())
       const status = getBillStatus(bill)
       const matchesStatus = statusFilter === "all" || status === statusFilter
-      return matchesSearch && matchesStatus
+      const matchesTile =
+        tileFilter == null ||
+        (tileFilter === "pending" ? ["pending", "approved", "partial"].includes(status) : status === tileFilter)
+      return matchesSearch && matchesStatus && matchesTile
     })
     // Newest first, matching EntityTable's default (auto-inc ids only increase).
     .sort((a, b) => Number(b.id) - Number(a.id))
-  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}`)
+  const pager = usePagedRows(filtered, `${searchQuery}|${statusFilter}|${tileFilter}`)
+  const emptyKind = decideListEmptyState({
+    totalRows: bills.length,
+    visibleRows: filtered.length,
+    search: searchQuery,
+    filters: { status: statusFilter === "all" ? undefined : statusFilter, tile: tileFilter ?? undefined },
+  })
 
   const stats = {
     total: bills.length,
@@ -139,14 +150,24 @@ export function BillsListView({
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <StatCardGrid className="lg:grid-cols-6">
-        <StatCard label={t("accounting.bills.totalBills")} value={stats.total} icon={FileText} tone="info" />
-        <StatCard label={t("accounting.states.paid")} value={stats.paid} icon={CheckCircle2} tone="success" />
-        <StatCard label={t("accounting.states.pending")} value={stats.pending} icon={Clock} tone="warning" />
-        <StatCard label={t("accounting.states.overdue")} value={stats.overdue} icon={AlertTriangle} tone="destructive" />
-        <StatCard label={t("accounting.bills.totalBilled")} value={formatCurrency(stats.totalAmount)} icon={Building} />
-        <StatCard label={t("accounting.bills.amountOwed")} value={formatCurrency(stats.totalDue)} icon={DollarSign} />
-      </StatCardGrid>
+      <KpiStrip
+        tiles={[
+          { key: "total", label: t("accounting.bills.totalBills"), value: stats.total, tone: "info", active: false },
+          ...(["paid", "pending", "overdue"] as const).map((key) => ({
+            key,
+            label: { paid: t("accounting.states.paid"), pending: t("accounting.states.pending"), overdue: t("accounting.states.overdue") }[key],
+            value: stats[key],
+            tone: ({ paid: "success", pending: "warning", overdue: "destructive" } as const)[key],
+            active: tileFilter === key,
+            onSelect: () => {
+              setTileFilter(toggleKpiKey(tileFilter, key) as typeof tileFilter)
+              setStatusFilter("all")
+            },
+          })),
+          { key: "billed", label: t("accounting.bills.totalBilled"), value: formatCurrency(stats.totalAmount), active: false },
+          { key: "owed", label: t("accounting.bills.amountOwed"), value: formatCurrency(stats.totalDue), active: false },
+        ]}
+      />
 
       {/* Table */}
       <Card>
@@ -160,7 +181,10 @@ export function BillsListView({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder={t("accounting.bills.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
             </div>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as BillStatus | "all")}>
+            <Select value={statusFilter} onValueChange={(v) => {
+              setStatusFilter(v as BillStatus | "all")
+              setTileFilter(null)
+            }}>
               <SelectTrigger className="w-[150px]">
                 <Filter className="h-4 w-4 mr-2" /><SelectValue placeholder={t("accounting.journalEntries.state")} />
               </SelectTrigger>
@@ -193,7 +217,41 @@ export function BillsListView({
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t("accounting.bills.noResults")}</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={8} className="p-0">
+                    {emptyKind === "first-time" ? (
+                      <EmptyStateCard
+                        compact
+                        data-testid="entity-empty-first-time"
+                        title={t("accounting.bills.emptyState.title", { defaultValue: "No vendor bills yet" })}
+                        description={t("accounting.bills.emptyState.description", { defaultValue: "Vendor bills record what you owe suppliers so payables and expenses stay accurate. Add the first one to start tracking it." })}
+                        primaryAction={
+                          canCreate && onCreateBill
+                            ? { label: t("accounting.actions.newBill"), onClick: onCreateBill }
+                            : undefined
+                        }
+                        readOnlyMessage={t("common.entityView.firstTime.readOnly", {
+                          defaultValue: "You have read-only access. Ask an administrator to add the first record.",
+                        })}
+                      />
+                    ) : (
+                      <EmptyStateCard
+                        compact
+                        data-testid="entity-empty-no-results"
+                        title={t("accounting.bills.noResults")}
+                        primaryAction={{
+                          label: t("common.entityView.noResults.clear", { defaultValue: "Clear filters" }),
+                          testId: "entity-empty-clear-filters",
+                          onClick: () => {
+                            setSearchQuery("")
+                            setStatusFilter("all")
+                            setTileFilter(null)
+                          },
+                        }}
+                      />
+                    )}
+                  </TableCell>
+                </TableRow>
               ) : pager.pageRows.map((bill) => {
                 const status = getBillStatus(bill)
                 const conf = statusConfig[status]

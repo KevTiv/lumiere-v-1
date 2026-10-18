@@ -451,6 +451,16 @@
       },
       "evidence": "spacetimedb/src/workflow/approvals.rs: body inserts or appends a new effect without a replay guard"
     },
+    "cleanup_abandoned_account_move_import": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/import_tracker.rs: reducer accepts only a successful provenance-bound parent job and treats an exact cleanup replay as success"
+    },
     "clone_workflow_version_to_draft": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -1821,6 +1831,16 @@
       },
       "evidence": "spacetimedb/src/data_ops/core_imports.rs: body inserts or appends a new effect without a replay guard"
     },
+    "import_csv_tracked": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/data_ops/import_tracker.rs: request_id and payload digest reuse the exact ImportJob receipt and reject changed-payload replay"
+    },
     "import_currency_csv": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -3041,6 +3061,16 @@
       },
       "evidence": "spacetimedb/src/ai/intelligence.rs: body writes or refreshes deterministic state and safely repeats the same input"
     },
+    "request_workflow_subject_snapshot": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/subject_snapshot.rs: requester-scoped natural key upserts the canonical snapshot and exact replay returns before a duplicate write"
+    },
     "reserve_ai_spend": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -3462,6 +3492,16 @@
       "evidence": "spacetimedb/tests/analytics/mod.rs: test reducer executes assertions; retry classification is not applicable"
     },
     "run_analytics_dashboard_company_scope_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/analytics/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_analytics_dashboard_widget_idempotency_test": {
       "semantic_kind": "test",
       "client_facing": false,
       "idempotency": "not_applicable",
@@ -4402,6 +4442,16 @@
       "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
     },
     "run_workflow_runtime_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/workflow/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_workflow_subject_snapshot_tests": {
       "semantic_kind": "test",
       "client_facing": false,
       "idempotency": "not_applicable",
@@ -5500,6 +5550,13 @@
       "idempotency": "not_applicable",
       "codec": { "id": "spacetimedb-sats-json", "version": 1 },
       "evidence": "spacetimedb/src/ai/spend_reads.rs: sender-scoped read-only view for the active ai_spend_reader service identity"
+    },
+    "helpdesk_related_record_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/helpdesk/related_records.rs: sender-scoped read-only view enforces ticket permission and organization, company, and target scope"
     }
   }
 }

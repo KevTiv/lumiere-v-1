@@ -55,6 +55,9 @@ pub async fn realtime_ws_upgrade(
     headers: HeaderMap,
     cookies: Cookies,
 ) -> Result<impl IntoResponse, ApiError> {
+    if state.config.workos_client_id.is_some() {
+        require_browser_origin(&headers, &state.config.app_url)?;
+    }
     let auth = headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok());
@@ -73,7 +76,72 @@ pub async fn realtime_ws_upgrade(
         &state.organization_placements,
     )?;
 
-    Ok(ws.on_upgrade(move |socket| socket::handle_realtime_socket(socket, state, context)))
+    let maximum_deadline = if state.config.workos_client_id.is_some() {
+        let token = auth
+            .and_then(|value| value.strip_prefix("Bearer "))
+            .or(cookie_tok.as_deref())
+            .ok_or(ApiError::Unauthorized)?;
+        Some(tokio::time::Instant::now() + verified_socket_lifetime(token)?)
+    } else {
+        None
+    };
+    Ok(ws.on_upgrade(move |socket| async move {
+        let handler = socket::handle_realtime_socket(socket, state, context);
+        if let Some(deadline) = maximum_deadline {
+            // Dropping the handler closes the socket and its invalidation receiver.
+            // Reconnection performs fresh provider revocation and membership checks.
+            let _ = tokio::time::timeout_at(deadline, handler).await;
+        } else {
+            handler.await;
+        }
+    }))
+}
+
+fn require_browser_origin(headers: &HeaderMap, app_url: &str) -> Result<(), ApiError> {
+    let configured = reqwest::Url::parse(app_url).map_err(|_| ApiError::Unauthorized)?;
+    if !matches!(configured.scheme(), "https" | "http")
+        || !configured.username().is_empty()
+        || configured.password().is_some()
+    {
+        return Err(ApiError::Unauthorized);
+    }
+    let expected = configured.origin().ascii_serialization();
+    if headers.get_all(axum::http::header::ORIGIN).iter().count() != 1 {
+        return Err(ApiError::Unauthorized);
+    }
+    let actual = headers
+        .get(axum::http::header::ORIGIN)
+        .and_then(|value| value.to_str().ok());
+    if actual != Some(expected.as_str()) {
+        return Err(ApiError::Forbidden(
+            "WebSocket origin is not permitted".into(),
+        ));
+    }
+    Ok(())
+}
+
+// Only call after resolve_api_session has verified the same provider token.
+// Untrusted claims can shorten this lease but cannot extend it beyond 60s.
+fn verified_socket_lifetime(token: &str) -> Result<std::time::Duration, ApiError> {
+    use base64::Engine;
+    let payload = token.split('.').nth(1).ok_or(ApiError::Unauthorized)?;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .map_err(|_| ApiError::Unauthorized)?;
+    let claims: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|_| ApiError::Unauthorized)?;
+    let expiry = claims
+        .get("exp")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or(ApiError::Unauthorized)?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(ApiError::internal)?;
+    let remaining = std::time::Duration::from_secs(expiry)
+        .checked_sub(now)
+        .filter(|remaining| !remaining.is_zero())
+        .ok_or(ApiError::Unauthorized)?;
+    Ok(remaining.min(std::time::Duration::from_secs(60)))
 }
 
 /// POST body subscribe (for clients that cannot send WS text first); returns upgrade URL hint — optional helper.
@@ -87,6 +155,52 @@ pub async fn realtime_info() -> Json<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn workos_websocket_requires_exact_frontend_origin() {
+        let mut headers = HeaderMap::new();
+        assert!(require_browser_origin(&headers, "https://alpha.example.test/app").is_err());
+        for origin in [
+            "null",
+            "https://evil.test",
+            "https://alpha.example.test.evil.test",
+            "http://alpha.example.test",
+            "https://alpha.example.test/path",
+        ] {
+            headers.insert("origin", origin.parse().unwrap());
+            assert!(require_browser_origin(&headers, "https://alpha.example.test/app").is_err());
+        }
+        headers.insert("origin", "https://alpha.example.test".parse().unwrap());
+        assert!(require_browser_origin(&headers, "https://alpha.example.test/app").is_ok());
+    }
+    #[test]
+    fn socket_lease_never_outlives_provider_jwt_or_sixty_seconds() {
+        use base64::Engine;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let token = |exp| {
+            format!(
+                "header.{}.signature",
+                base64::engine::general_purpose::URL_SAFE_NO_PAD
+                    .encode(json!({"exp":exp}).to_string())
+            )
+        };
+        assert!(verified_socket_lifetime(&token(now)).is_err());
+        assert!((1..=10).contains(
+            &verified_socket_lifetime(&token(now + 10))
+                .unwrap()
+                .as_secs()
+        ));
+        assert_eq!(
+            verified_socket_lifetime(&token(now + 600))
+                .unwrap()
+                .as_secs(),
+            60
+        );
+        assert!(verified_socket_lifetime("malformed").is_err());
+    }
 
     #[test]
     fn row_change_is_an_invalidation_without_row_payload() {

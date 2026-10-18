@@ -28,6 +28,7 @@ import {
 } from "@lumiere/stdb/live"
 import { FULL_CLIENT_SUBSCRIPTION_RESOURCES } from "@lumiere/stdb/erp-subscriptions"
 import { useStdbConnection } from "@lumiere/stdb"
+import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 import { webApi } from "@/lib/lumiere-web-http"
 import { PostHogPageView } from "@/lib/posthog-pageview"
 
@@ -44,11 +45,11 @@ function RBACBridge({
   organizationId?: number
 }) {
   const hasIdentity = Boolean(serverIdentity && serverIdentity !== "unknown")
-  const { data: rolesData = [] } = useStdbQuery("roles", 0, {
+  const { data: rolesData = [], isLoading: rolesLoading } = useStdbQuery("roles", 0, {
     enabled: hasIdentity,
   })
 
-  const { orgPolicyRules } = usePolicySnapshot(organizationId, serverIdentity)
+  const { orgPolicyRules, isLoading: policiesLoading } = usePolicySnapshot(organizationId, serverIdentity)
 
   const rbacRoles = useMemo<Role[]>(() => {
     return mapBackendRolesToRoles(rolesData as unknown as BackendRoleRow[])
@@ -70,6 +71,7 @@ function RBACBridge({
       initialUser={hasIdentity ? rbacUser : null}
       initialRoles={hasIdentity ? rbacRoles : undefined}
       initialPolicies={hasIdentity ? mergedPolicies : undefined}
+      permissionsReady={!hasIdentity || !(rolesLoading || policiesLoading)}
     >
       {children}
     </RBACProvider>
@@ -83,6 +85,7 @@ function LumiereRealtimeBridge({
   organizationId?: number
 }) {
   const queryClient = useQueryClient()
+  const workOsEnabled = useWorkOsAuthMode()
   const { activeCompanyId, activeCompanyReady, companyIds } = useErpSession()
   const resources = useMemo(() => FULL_CLIENT_SUBSCRIPTION_RESOURCES, [])
   useLumiereRealtime({
@@ -92,6 +95,11 @@ function LumiereRealtimeBridge({
     activeCompanyId: activeCompanyReady ? activeCompanyId : null,
     resources,
     enabled: organizationId != null && organizationId > 0,
+    sameOrigin: workOsEnabled,
+    beforeConnect: workOsEnabled ? async () => {
+      const response = await fetch('/api/auth/realtime-session', { method: 'POST', credentials: 'same-origin' })
+      if (!response.ok) throw new Error('Realtime session unavailable')
+    } : undefined,
   })
   return null
 }

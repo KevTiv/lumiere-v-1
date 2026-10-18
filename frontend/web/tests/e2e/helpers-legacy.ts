@@ -1,7 +1,7 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { expect, type Page } from "@playwright/test"
+import { expect, type Locator, type Page } from "@playwright/test"
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
 import { matchesOperationResponse } from "./operation-response"
@@ -729,6 +729,50 @@ export async function chooseSelectOptionByLabel(
         return await option.count()
       },
       { timeout: optionTimeoutMs },
+    )
+    .toBeGreaterThan(0)
+
+  await option.click()
+}
+
+/** Pick a shared Select option by its value (`SelectItem` mirrors it as `data-value`). */
+export async function chooseSelectOptionByTriggerValue(
+  page: Page,
+  trigger: Locator,
+  value: string | number | bigint,
+) {
+  const listbox = page.locator('[role="listbox"]:visible')
+  const option = listbox.locator(`[role="option"][data-value="${String(value)}"]`)
+
+  await expect
+    .poll(
+      async () => {
+        if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
+        const count = await option.count()
+        if (count === 0) await page.keyboard.press("Escape")
+        return count
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+
+  await option.click()
+}
+
+/** Pick the first real option of a shared Select located by its trigger. */
+export async function chooseFirstSelectOptionByTrigger(page: Page, trigger: Locator) {
+  const listbox = page.locator('[role="listbox"]:visible')
+  const option = listbox.getByRole("option", { disabled: false }).first()
+
+  await expect
+    .poll(
+      async () => {
+        if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
+        const count = await option.count()
+        if (count === 0) await page.keyboard.press("Escape")
+        return count
+      },
+      { timeout: 30_000 },
     )
     .toBeGreaterThan(0)
 
@@ -2885,7 +2929,7 @@ export async function waitForWorkflowVersionStatus(
 /** Seed a minimal publishable linear draft (start → end) via BFF reducers. */
 export async function seedPublishableWorkflowDraft(
   page: Page,
-  options?: { workflowKey?: string; model?: string; name?: string },
+  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string },
 ): Promise<{
   organizationId: number
   companyId: number
@@ -2950,7 +2994,9 @@ export async function seedPublishableWorkflowDraft(
       fromNodeKey: "start",
       toNodeKey: "end",
       sequence: 1,
-      signalKey: WORKFLOW_NONE,
+      signalKey: options?.signalKey
+        ? WORKFLOW_SOME(options.signalKey)
+        : WORKFLOW_NONE,
       condition: WORKFLOW_NONE,
       metadata: WORKFLOW_NONE,
     },
@@ -2991,14 +3037,16 @@ export async function seedPurchaseOrderApprovalWorkflow(
       kind: { tag: "HumanTask" },
       sequence: 2,
       action: WORKFLOW_NONE,
-      taskPolicy: { some: {
-        kind: { tag: "ApproveReject" },
-        assignment: { tag: "AnyCandidate" },
-        candidateRoleIds: [candidateRoleId],
-        candidateGroupIds: [],
-        candidateUnitIds: [],
-        requireCommentOnReject: true,
-      } },
+      taskPolicy: {
+        some: {
+          kind: { tag: "ApproveReject" },
+          assignment: { tag: "AnyCandidate" },
+          candidateRoleIds: [candidateRoleId],
+          candidateGroupIds: [],
+          candidateUnitIds: [],
+          requireCommentOnReject: true,
+        },
+      },
     },
     {
       nodeKey: "confirm",
@@ -3010,6 +3058,118 @@ export async function seedPurchaseOrderApprovalWorkflow(
         inputSchemaVersion: 1,
         input: [],
       } },
+      taskPolicy: WORKFLOW_NONE,
+    },
+  ]) {
+    await callReducerOwner("upsert_workflow_node", [
+      seeded.organizationId,
+      seeded.versionId,
+      revision,
+      {
+        ...node,
+        splitKind: { tag: "None" },
+        joinKind: { tag: "None" },
+        timerPolicy: WORKFLOW_NONE,
+        retryPolicy: WORKFLOW_NONE,
+        subflow: WORKFLOW_NONE,
+        metadata: WORKFLOW_NONE,
+      },
+    ])
+    revision += 1
+  }
+
+  for (const edge of [
+    {
+      edgeKey: "e_start_end",
+      fromNodeKey: "start",
+      toNodeKey: "approval",
+      sequence: 1,
+      signalKey: WORKFLOW_NONE,
+    },
+    {
+      edgeKey: "e_approval_confirm",
+      fromNodeKey: "approval",
+      toNodeKey: "confirm",
+      sequence: 2,
+      signalKey: { some: "approved" },
+    },
+    {
+      edgeKey: "e_approval_reject",
+      fromNodeKey: "approval",
+      toNodeKey: "end",
+      sequence: 3,
+      signalKey: { some: "rejected" },
+    },
+    {
+      edgeKey: "e_confirm_end",
+      fromNodeKey: "confirm",
+      toNodeKey: "end",
+      sequence: 4,
+      signalKey: WORKFLOW_NONE,
+    },
+  ]) {
+    await callReducerOwner("upsert_workflow_edge", [
+      seeded.organizationId,
+      seeded.versionId,
+      revision,
+      { ...edge, condition: WORKFLOW_NONE, metadata: WORKFLOW_NONE },
+    ])
+    revision += 1
+  }
+
+  await callReducerBff(page, "publish_workflow_version", [
+    seeded.organizationId,
+    seeded.versionId,
+    revision,
+  ])
+  await waitForWorkflowVersionStatus(page, seeded.versionId, "Published")
+  return {
+    organizationId: seeded.organizationId,
+    versionId: seeded.versionId,
+    revision,
+  }
+}
+
+/** Publish a company-scoped approval workflow for the guarded Sales confirm action. */
+export async function seedSaleOrderApprovalWorkflow(
+  page: Page,
+  options: { workflowKey: string; name: string },
+): Promise<{ organizationId: number; versionId: number; revision: number }> {
+  const seeded = await seedPublishableWorkflowDraft(page, {
+    ...options,
+    model: "sale_order",
+  })
+  const candidateRoleId = await fetchAdminRoleId(page)
+  let revision = seeded.draftRevision
+
+  for (const node of [
+    {
+      nodeKey: "approval",
+      name: "Approve sale order",
+      kind: { tag: "HumanTask" },
+      sequence: 2,
+      action: WORKFLOW_NONE,
+      taskPolicy: { some: {
+        kind: { tag: "ApproveReject" },
+        assignment: { tag: "AnyCandidate" },
+        candidateRoleIds: [candidateRoleId],
+        candidateGroupIds: [],
+        candidateUnitIds: [],
+        requireCommentOnReject: true,
+      } },
+    },
+    {
+      nodeKey: "confirm",
+      name: "Confirm sale order",
+      kind: { tag: "Action" },
+      sequence: 3,
+      action: {
+        some: {
+          actionKey: "confirm_sales_order",
+          inputSchemaVersion: 1,
+          input: [],
+        },
+      },
       taskPolicy: WORKFLOW_NONE,
     },
   ]) {

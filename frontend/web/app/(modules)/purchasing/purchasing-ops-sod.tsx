@@ -278,9 +278,18 @@ export function PurchasingOpsSod({
                 data-testid="purchasing-ops-reject-request"
                 disabled={
                   !pendingApprovalForSelected ||
+                  isApprovalRequester ||
                   approveRequest.isPending ||
                   rejectRequest.isPending ||
                   operatingCompanyId == null
+                }
+                title={
+                  isApprovalRequester
+                    ? t('purchasing.ops.cannotSelfApprove', {
+                        defaultValue:
+                          'Requester cannot approve their own request (SoD)',
+                      })
+                    : undefined
                 }
                 onClick={() => {
                   void (async () => {
@@ -308,6 +317,7 @@ export function PurchasingOpsSod({
                             type: 'textarea',
                             rows: 3,
                             required: true,
+                            // Persist a stable audit value; only the field chrome is localized.
                             defaultValue: 'Rejected',
                           },
                         ],

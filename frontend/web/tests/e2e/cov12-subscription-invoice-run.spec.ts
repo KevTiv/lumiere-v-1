@@ -164,7 +164,7 @@ async function openMountedSubscriptionHandoffs(page: Page, subscriptionId: numbe
     .toHaveAttribute("aria-selected", "true")
   await expect(sheet.locator("dd").filter({ hasText: "SUB-ACME-001" })).toHaveCount(1)
   await sheet.getByTestId("entity-record-sheet-tab-handoffs").click()
-  await expect(sheet.getByTestId("subscription-handoffs")).toBeVisible()
+  await expect(sheet.getByTestId("subscription-handoff-list")).toBeVisible()
   return sheet
 }
 

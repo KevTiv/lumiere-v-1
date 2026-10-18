@@ -5,7 +5,11 @@ import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query"
 import { isSubscriptionReady, useSubscriptionCache } from "@lumiere/stdb/live"
 
 import { coalesceQueryInitialData, fetchQueryList, rqBigIntKey, type QueryRows } from "./http"
-import { invalidateStdbQueryResources, realtimeQueryKeysForResource } from "./hooks/stdb"
+import {
+  invalidateStdbQueryResources,
+  isInvalidationOnlyResource,
+  realtimeQueryKeysForResource,
+} from "./hooks/stdb"
 import type { QueryRowFor, QueryRowResourceKey } from "@lumiere/stdb/query-row-map"
 
 /**
@@ -16,7 +20,7 @@ export function invalidateResourceQueries(
   organizationId: bigint | number,
   resources: readonly string[],
 ): void {
-  if (isSubscriptionReady()) return
+  if (isSubscriptionReady() && !resources.some(isInvalidationOnlyResource)) return
   invalidateStdbQueryResources(qc, organizationId, resources)
 }
 

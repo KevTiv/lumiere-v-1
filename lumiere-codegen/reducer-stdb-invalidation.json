@@ -19,6 +19,17 @@
     "account-moves",
     "account-move-lines"
   ],
+  "cleanup_abandoned_account_move_import": [
+    "import-jobs",
+    "account-moves",
+    "account-move-lines"
+  ],
+  "cancel_payment": [
+    "account-payments",
+    "account-moves",
+    "account-move-lines",
+    "sale-orders"
+  ],
   "create_account_account": [
     "account-accounts"
   ],
@@ -36,6 +47,14 @@
     "account-journals"
   ],
   "create_account_move": [
+    "account-moves",
+    "account-move-lines"
+  ],
+  "create_manual_account_invoice": [
+    "account-moves",
+    "account-move-lines"
+  ],
+  "create_manual_invoice": [
     "account-moves",
     "account-move-lines"
   ],

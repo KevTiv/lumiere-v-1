@@ -111,6 +111,7 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(feature = "dev-module")]
 fn require_dev_reducers_enabled() -> Result<(), String> {
     let enabled = option_env!("LUMIERE_ENABLE_DEV_REDUCERS")
         .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"));
@@ -127,6 +128,7 @@ fn require_dev_reducers_enabled() -> Result<(), String> {
 /// Do **not** rely on this for production security — anyone who can invoke reducers as this identity
 /// can escalate; use only with local `spacetime` or controlled deployments.
 #[spacetimedb::reducer]
+#[cfg(feature = "dev-module")]
 pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> {
     require_dev_reducers_enabled()?;
 
@@ -505,6 +507,58 @@ pub fn create_user_invite(
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
+    let email = normalize_invite_email(&email)?;
+    let now = ctx.timestamp.to_micros_since_unix_epoch();
+    let expiry = expires_at.to_micros_since_unix_epoch();
+    if expiry <= now || expiry - now > 7 * 24 * 60 * 60 * 1_000_000 {
+        return Err("Invite expiry must be within seven days".into());
+    }
+    if token_hash.len() != 64 || !token_hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("Invalid invite token hash".into());
+    }
+    use crate::core::permissions::role;
+    let target_role = ctx
+        .db
+        .role()
+        .id()
+        .find(role_id)
+        .ok_or("Invite role not found")?;
+    if target_role.organization_id != organization_id || !target_role.is_active {
+        return Err("Invite role is inactive or belongs to another organization".into());
+    }
+    require_invite_authority(ctx, organization_id, invited_by)?;
+    // Alpha quotas are enforced in the same transaction as insertion, including
+    // requests bypassing HTTP. The lifetime cap bounds churn and email abuse.
+    let mut total = 0;
+    let mut pending = 0;
+    for invite in ctx
+        .db
+        .user_invite()
+        .iter()
+        .filter(|invite| invite.organization_id == organization_id)
+    {
+        total += 1;
+        if invite.accepted_at.is_none() && invite.expires_at > ctx.timestamp {
+            pending += 1;
+            if invite.email.eq_ignore_ascii_case(&email) {
+                return Err("An active invitation already exists for this address".into());
+            }
+        }
+    }
+    if total >= 500 || pending >= 50 {
+        return Err("Alpha organization invitation limit reached; contact support".into());
+    }
+    if ctx
+        .db
+        .user_organization()
+        .iter()
+        .filter(|member| member.organization_id == organization_id && member.is_active)
+        .count()
+        >= 100
+    {
+        return Err("Alpha organization member limit reached; contact support".into());
+    }
+
     let row = ctx.db.user_invite().insert(UserInvite {
         id: 0,
         organization_id,
@@ -541,7 +595,7 @@ pub fn create_user_invite(
     Ok(())
 }
 
-/// Mark an invite as accepted (called after the invitee completes sign-up).
+/// Claim an invite before granting membership; failures require a new invite.
 /// Called by the server admin identity via HTTP reducer call.
 #[spacetimedb::reducer]
 pub fn mark_invite_accepted(ctx: &ReducerContext, invite_id: u64) -> Result<(), String> {
@@ -553,6 +607,32 @@ pub fn mark_invite_accepted(ctx: &ReducerContext, invite_id: u64) -> Result<(), 
         .id()
         .find(&invite_id)
         .ok_or("Invite not found")?;
+
+    if invite.accepted_at.is_some() || invite.expires_at <= ctx.timestamp {
+        return Err("Invite is used or expired".into());
+    }
+    use crate::core::permissions::role;
+    let target_role = ctx
+        .db
+        .role()
+        .id()
+        .find(invite.role_id)
+        .ok_or("Invite role not found")?;
+    if target_role.organization_id != invite.organization_id || !target_role.is_active {
+        return Err("Invite role is inactive or belongs to another organization".into());
+    }
+
+    require_invite_authority(ctx, invite.organization_id, invite.invited_by)?;
+    if ctx
+        .db
+        .user_organization()
+        .iter()
+        .filter(|member| member.organization_id == invite.organization_id && member.is_active)
+        .count()
+        >= 100
+    {
+        return Err("Alpha organization member limit reached; contact support".into());
+    }
 
     ctx.db.user_invite().id().update(UserInvite {
         accepted_at: Some(ctx.timestamp),
@@ -641,5 +721,61 @@ pub fn update_user_email(
         },
     );
 
+    Ok(())
+}
+
+fn normalize_invite_email(raw: &str) -> Result<String, String> {
+    let email = raw.trim().to_ascii_lowercase();
+    if email.len() > 254
+        || !email.is_ascii()
+        || email
+            .bytes()
+            .any(|b| b.is_ascii_whitespace() || b.is_ascii_control())
+        || email.split('@').count() != 2
+        || email.starts_with('@')
+        || email.ends_with('@')
+    {
+        return Err("Invalid invitation email".into());
+    }
+    Ok(email)
+}
+
+fn require_invite_authority(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    invited_by: Identity,
+) -> Result<(), String> {
+    use crate::core::permissions::{role, user_role_assignment};
+    if !ctx.db.user_organization().iter().any(|member| {
+        member.user_identity == invited_by
+            && member.organization_id == organization_id
+            && member.is_active
+    }) {
+        return Err("Inviter is not an active member".into());
+    }
+    let authorized = ctx.db.user_role_assignment().iter().any(|assignment| {
+        assignment.user_identity == invited_by
+            && assignment.organization_id == organization_id
+            && assignment.is_active
+            && assignment
+                .expires_at
+                .map_or(true, |expiry| expiry > ctx.timestamp)
+            && ctx
+                .db
+                .role()
+                .id()
+                .find(assignment.role_id)
+                .is_some_and(|role| {
+                    role.organization_id == organization_id
+                        && role.is_active
+                        && matches!(
+                            role.name.to_ascii_lowercase().as_str(),
+                            "owner" | "admin" | "administrator"
+                        )
+                })
+    });
+    if !authorized {
+        return Err("Inviter lacks active administrator authority".into());
+    }
     Ok(())
 }

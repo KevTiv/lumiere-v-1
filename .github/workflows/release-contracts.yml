@@ -17,7 +17,8 @@ name: Release contracts
 on:
   push:
     # main only receives pins through merged branches.
-    branches-ignore: [main]
+    # Draft backend prerequisites must be reviewed before publishing immutable tags.
+    branches-ignore: [main, "codex/draft-backend-*"]
     # Everything codegen reads to produce the contract IR.
     paths:
       - spacetimedb/**
@@ -26,6 +27,7 @@ on:
       - crates/stdb-auth/assets/resource_registry.json
       - .github/workflows/build-contracts-module.yml
       - .github/workflows/release-contracts.yml
+      - .github/actions/setup-contracts-ssh/action.yml
   workflow_dispatch:
     inputs:
       version:
@@ -100,8 +102,9 @@ jobs:
           manifest = json.loads(Path("release-compatibility-manifest.json").read_text(encoding="utf-8"))
           previous = manifest["lumiere_contracts"]["version"]
           cargo = Path("Cargo.toml").read_text(encoding="utf-8")
-          if f'tag = "v{previous}"' not in cargo:
-              raise SystemExit(f"Cargo.toml does not pin v{previous}, the release manifest version")
+          expected_path = 'path = "vendor/lumiere-contracts/crates/lumiere-contracts"'
+          if expected_path not in cargo:
+              raise SystemExit("Cargo.toml does not consume the verified vendored contracts path")
           pinned = parse(previous)
           if pinned is None:
               raise SystemExit(f"current pin {previous!r} is not x.y.z")
@@ -363,27 +366,57 @@ jobs:
         if: steps.changes.outputs.release == 'true'
         run: |
           REVISION="$(git -C "$RUNNER_TEMP/contracts-release/repo" rev-parse HEAD)"
-          sed -i "s/tag = \"v$PREVIOUS_VERSION\"/tag = \"v$VERSION\"/" Cargo.toml
-          sed -i "s/lumiere-contracts#v$PREVIOUS_VERSION&/lumiere-contracts#v$VERSION\&/" \
+          rm -f "vendor/lumiere-contracts-rust-$PREVIOUS_VERSION.tar.gz" \
+            "vendor/lumiere-contracts-rust-$PREVIOUS_VERSION.tar.gz.sha256" \
+            "vendor/lumiere-contracts-rust-$PREVIOUS_VERSION.sha256"
+          bash scripts/package-contracts-rust.sh \
+            "$RUNNER_TEMP/contracts-release/repo" "$VERSION" vendor
+          sed -i "s/lumiere-contracts-$PREVIOUS_VERSION\.tgz/lumiere-contracts-$VERSION.tgz/" \
             frontend/packages/presentation-core/package.json \
             frontend/packages/query-hooks/package.json \
             frontend/packages/stdb/package.json
-          # The old revision appears in specifiers, package keys and the git
-          # resolution; the resolved package entry also records the version.
-          sed -i "s/lumiere-contracts#v$PREVIOUS_VERSION&/lumiere-contracts#v$VERSION\&/; s/$PREVIOUS_REVISION/$REVISION/g" \
-            frontend/pnpm-lock.yaml
-          sed -i "/resolution: {commit: $REVISION, path: packages\/contracts/{n;s/^    version: $PREVIOUS_VERSION\$/    version: $VERSION/}" \
-            frontend/pnpm-lock.yaml
-          if grep -q "$PREVIOUS_REVISION" frontend/pnpm-lock.yaml; then echo "pnpm-lock.yaml still references $PREVIOUS_REVISION"; exit 1; fi
-          sed -i "s/v$PREVIOUS_VERSION/v$VERSION/g" api-server/src/presentation_dictionary.rs
-          cargo update -p lumiere-contracts
-          grep -q "tag=v$VERSION#$REVISION" Cargo.lock
-          # Migration SQL ships in lumiere-contracts, so the application catalog
-          # checksum moves with the pin; compute it with the runtime's own function.
-          export CATALOG_CHECKSUM="$(cargo run -q --locked -p api-server --example migration_catalog_checksum)"
-          case "$CATALOG_CHECKSUM" in sha256:*) ;; *) echo "bad catalog checksum: $CATALOG_CHECKSUM"; exit 1 ;; esac
-          CHECKOUT="$(bash scripts/resolve-pinned-contracts.sh)"
-          python3 - "$CHECKOUT" "$REVISION" <<'PY'
+          # Keep the application build self-contained. Railway must not need a
+          # private GitHub credential merely to install the released frontend
+          # contracts package.
+          PACK_DIR="$RUNNER_TEMP/contracts-release/package"
+          rm -rf "$PACK_DIR"
+          mkdir -p "$PACK_DIR" frontend/vendor
+          PACK_JSON="$(npm pack "$RUNNER_TEMP/contracts-release/repo/packages/contracts" \
+            --pack-destination "$PACK_DIR" --json)"
+          PACK_FILENAME="$(jq -r '.[0].filename // empty' <<<"$PACK_JSON")"
+          test "$PACK_FILENAME" = "lumiere-contracts-$VERSION.tgz"
+          test "$(tar -xOf "$PACK_DIR/$PACK_FILENAME" package/package.json | jq -r .name)" = "@lumiere/contracts"
+          test "$(tar -xOf "$PACK_DIR/$PACK_FILENAME" package/package.json | jq -r .version)" = "$VERSION"
+          rm -f frontend/vendor/lumiere-contracts-*.tgz
+          cp "$PACK_DIR/$PACK_FILENAME" "frontend/vendor/$PACK_FILENAME"
+          pnpm --dir frontend install --lockfile-only --no-frozen-lockfile
+          # pnpm 10 can retain the file: specifier and integrity while dropping
+          # the tarball locator, which makes the following frozen install fall
+          # back to the public registry for this private package.
+          python3 - "$VERSION" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          version = sys.argv[1]
+          tarball = f"file:vendor/lumiere-contracts-{version}.tgz"
+          path = Path("frontend/pnpm-lock.yaml")
+          contents = path.read_text(encoding="utf-8")
+          package = re.escape(f"'@lumiere/contracts@{tarball}':")
+          pattern = rf"({package}\n    resolution: \{{integrity: [^}}\n]+)(\}})"
+          contents, count = re.subn(pattern, rf"\1, tarball: {tarball}\2", contents, count=1)
+          if count != 1:
+              raise SystemExit("expected one vendored @lumiere/contracts lockfile package entry")
+          path.write_text(contents, encoding="utf-8")
+          PY
+          pnpm --dir frontend install --frozen-lockfile
+          if grep -q 'github.com/KevTiv/lumiere-contracts' frontend/pnpm-lock.yaml; then
+            echo "pnpm-lock.yaml still requires private GitHub access" >&2
+            exit 1
+          fi
+          sed -i "s/$PREVIOUS_VERSION/$VERSION/g; s/$PREVIOUS_REVISION/$REVISION/g" \
+            api-server/src/presentation_dictionary.rs
+          python3 - "$RUNNER_TEMP/contracts-release/repo" "$REVISION" <<'PY'
           import hashlib
           import json
           import os
@@ -403,11 +436,27 @@ jobs:
           })
           durable = manifest["durable_postgres"]
           durable["checksum"] = "sha256:" + hashlib.sha256((checkout / durable["sql_path"]).read_bytes()).hexdigest()
-          durable["application_catalog_checksum"] = os.environ["CATALOG_CHECKSUM"]
           manifest["lumiere_contracts"].update({"version": version, "tag": f"v{version}", "revision": revision})
           history = Path(manifest["operation_history"]["path"]).read_bytes()
           manifest["operation_history"]["checksum"] = "sha256:" + hashlib.sha256(history).hexdigest()
           manifest["minimum_client_contract"]["generated_contract_release"] = version
+          path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          PY
+          bash scripts/prepare-vendored-contracts-rust.sh
+          cargo update -p lumiere-contracts
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          # Migration SQL ships in lumiere-contracts, so the application catalog
+          # checksum moves with the pin; compute it with the runtime's own function.
+          export CATALOG_CHECKSUM="$(cargo run -q --locked -p api-server --example migration_catalog_checksum)"
+          case "$CATALOG_CHECKSUM" in sha256:*) ;; *) echo "bad catalog checksum: $CATALOG_CHECKSUM"; exit 1 ;; esac
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("release-compatibility-manifest.json")
+          manifest = json.loads(path.read_text(encoding="utf-8"))
+          manifest["durable_postgres"]["application_catalog_checksum"] = os.environ["CATALOG_CHECKSUM"]
           path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           PY
           python3 scripts/verify-release-manifest.py
@@ -420,10 +469,11 @@ jobs:
       - name: Commit the pin
         if: steps.changes.outputs.release == 'true'
         run: |
-          git add Cargo.toml Cargo.lock frontend/packages/presentation-core/package.json \
+          git add Cargo.lock frontend/packages/presentation-core/package.json \
             frontend/packages/query-hooks/package.json frontend/packages/stdb/package.json \
-            frontend/pnpm-lock.yaml api-server/src/presentation_dictionary.rs \
-            release-compatibility-manifest.json
+            frontend/pnpm-lock.yaml frontend/vendor \
+            api-server/src/presentation_dictionary.rs \
+            release-compatibility-manifest.json vendor
           git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
             commit -m "chore(contracts): publish and pin v$VERSION"
           # The tag is already published, so land the pin even if the branch

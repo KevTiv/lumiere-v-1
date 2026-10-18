@@ -412,17 +412,22 @@ pub fn add_user_to_organization(
         .find(&params.role_id)
         .ok_or("Role not found")?;
 
-    if role.organization_id != organization_id {
-        return Err("Role does not belong to this organization".to_string());
+    if role.organization_id != organization_id || !role.is_active {
+        return Err("Role is inactive or does not belong to this organization".to_string());
     }
 
-    let already_member = ctx.db.user_organization().iter().any(|uo| {
-        uo.user_identity == user_identity && uo.organization_id == organization_id && uo.is_active
-    });
-
+    let already_member = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&user_identity)
+        .any(|membership| membership.organization_id == organization_id && membership.is_active);
     if already_member {
-        return Err("User is already an active member of this organization".to_string());
+        // Retry of a completed invitation must not consume another seat or
+        // alter the existing member's role and company scope.
+        return Ok(());
     }
+    enforce_alpha_membership_capacity(ctx, organization_id, false, params.is_active)?;
 
     let row = ctx.db.user_organization().insert(UserOrganization {
         id: 0,
@@ -506,13 +511,18 @@ pub fn add_org_member(
         })
         .ok_or("Role not found in organization")?;
 
-    let already_member = ctx.db.user_organization().iter().any(|uo| {
-        uo.user_identity == user_identity && uo.organization_id == organization_id && uo.is_active
-    });
-
+    let already_member = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&user_identity)
+        .any(|membership| membership.organization_id == organization_id && membership.is_active);
     if already_member {
-        return Err("User is already an active member of this organization".to_string());
+        // Retry of a completed invitation must not consume another seat or
+        // alter the existing member's role and company scope.
+        return Ok(());
     }
+    enforce_alpha_membership_capacity(ctx, organization_id, false, params.is_active)?;
 
     let row = ctx.db.user_organization().insert(UserOrganization {
         id: 0,
@@ -717,6 +727,13 @@ pub fn update_user_organization_status(
         "write",
     )?;
 
+    enforce_alpha_membership_capacity(
+        ctx,
+        membership.organization_id,
+        membership.is_active,
+        is_active,
+    )?;
+
     ctx.db.user_organization().id().update(UserOrganization {
         is_active,
         is_default,
@@ -888,4 +905,83 @@ pub fn end_user_session(ctx: &ReducerContext, session_id: u64) -> Result<(), Str
     );
 
     Ok(())
+}
+
+const ALPHA_ACTIVE_MEMBERSHIP_LIMIT: usize = 100;
+
+/// The capacity check and insertion/reactivation run in the same reducer
+/// transaction, including generic membership calls and direct STDB access.
+fn enforce_alpha_membership_capacity(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    was_active: bool,
+    will_be_active: bool,
+) -> Result<(), String> {
+    if was_active || !will_be_active {
+        return Ok(());
+    }
+    let active_count = ctx
+        .db
+        .user_organization()
+        .user_org_by_org()
+        .filter(&organization_id)
+        .filter(|membership| membership.is_active)
+        .take(ALPHA_ACTIVE_MEMBERSHIP_LIMIT)
+        .count();
+    if membership_activation_allowed(active_count, was_active, will_be_active) {
+        Ok(())
+    } else {
+        Err("Alpha organization member limit reached; contact support".into())
+    }
+}
+
+fn membership_activation_allowed(
+    active_count: usize,
+    was_active: bool,
+    will_be_active: bool,
+) -> bool {
+    was_active || !will_be_active || active_count < ALPHA_ACTIVE_MEMBERSHIP_LIMIT
+}
+
+#[cfg(test)]
+mod alpha_membership_tests {
+    use super::{membership_activation_allowed, ALPHA_ACTIVE_MEMBERSHIP_LIMIT};
+
+    #[test]
+    fn new_or_reactivated_members_cannot_exceed_alpha_capacity() {
+        assert!(membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT - 1,
+            false,
+            true
+        ));
+        assert!(!membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT,
+            false,
+            true
+        ));
+        assert!(!membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT + 1,
+            false,
+            true
+        ));
+    }
+
+    #[test]
+    fn existing_members_and_deactivation_do_not_consume_capacity() {
+        assert!(membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT,
+            true,
+            true
+        ));
+        assert!(membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT,
+            true,
+            false
+        ));
+        assert!(membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT,
+            false,
+            false
+        ));
+    }
 }

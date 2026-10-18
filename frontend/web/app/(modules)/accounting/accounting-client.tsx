@@ -3,12 +3,15 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 import { useModuleTab } from "@/hooks/use-module-tab"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   RuntimeFormModal,
   EntityView,
   ListPivotSwitch,
@@ -81,20 +84,26 @@ import {
   percentChange,
   previousPeriodMs,
   timeRangeToMs,
+  AccountingSetupReadinessPanel,
+  evaluateAccountingSetupReadiness,
+  type AccountingReadinessAction,
+  type AccountingReadinessItem,
+  type AccountingSetupReadinessInput,
 } from "@lumiere/ui"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
-import type { BadgeVariant, EntityRecordSheetConfig, EntityRow, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { BadgeVariant, EntityAction, EntityRecordSheetConfig, FormField, EntityRow, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   accountingParamsToJson,
   analyticParamsToJson,
   toCreateAccountAccountParams,
-  toCreateAccountMoveFromInvoiceModal,
   toCreateAccountMoveParams,
   toCreateAccountJournalParams,
   toCreateCrossoveredBudgetLineParams,
   toCreateCreditNoteParams,
   toCreateAccountTaxParams,
+  toUpdateAccountTaxParams,
+  updateAccountTaxParamsForWire,
   toCreateCrossoveredBudgetParams,
   toCreateAnalyticAccountParams,
   toCreateAnalyticLineParams,
@@ -147,6 +156,34 @@ import {
 } from "@/lib/accounting-create-params"
 import type { ClearablePatch } from "@/lib/accounting-create-params"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
+import {
+  ACCOUNT_MOVE_BUNDLE_COLUMNS,
+  ACCOUNT_MOVE_IMPORT_BUNDLE,
+  accountMoveBundleMappings,
+  accountMoveBundleToken,
+  accountIsEligibleManualInvoiceTaxPosting,
+  accountMatchesManualInvoiceLineType,
+  accountMoveReference,
+  buildAccountMoveLineCsv,
+  buildBundleParentCsv,
+  buildMoveIdMapFromAccountMoves,
+  markAccountMoveBundleParentCsv,
+  markAccountMoveBundleLineCsv,
+  parseCsvText,
+  splitAccountMoveImportCsv,
+  type ColumnMappingMap,
+  type SplitAccountMoveImportResult,
+} from "@lumiere/erp-shared"
+import {
+  HISTORICAL_PAYMENT_REPLAY_IMPORT_COLUMNS,
+  OUTSTANDING_DOCUMENT_IMPORT_COLUMNS,
+  outstandingDocumentSplitArgs,
+  prepareOutstandingDocumentImport,
+  type OutstandingDocumentImportMode,
+} from "@lumiere/erp-shared/outstanding-document-import"
+import { createCsvImportRequest, type CsvImportReceipt } from "@lumiere/query-hooks/hooks/csv-import-request"
+import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
+import { useCleanupAbandonedAccountMoveImport } from "@lumiere/query-hooks/hooks/import-jobs"
 import { toAddAccountMoveLineParamsFromForm } from "./account-move-line-forms"
 import { accountMoveLineCanBeDeleted } from "./account-move-line-gates"
 import { stdbParamsToJson } from "@/lib/stdb-params-json"
@@ -166,10 +203,19 @@ import type {
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
 import { invoiceRecordHref } from "./invoice-record"
+import { historicalPaymentReplayIsCallable } from "./historical-payment-replay-capability"
+import {
+  buildHistoricalPaymentReplayBatches,
+  resolveHistoricalImportResume,
+  validateHistoricalPaymentReplayCapability,
+  validateHistoricalPaymentReplaySources,
+  type HistoricalImportResume,
+} from "./historical-payment-import"
 import { accountMovePivotSetup } from "@lumiere/ui/lib/accounting-pivot-configs"
 import { PaymentOperationsPanel } from "./payment-operations-panel"
 import { useAccountingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
+import { readImportFile } from "@/lib/import-spreadsheet-file"
 import {
   useAccountAccounts,
   useAccountMoves,
@@ -189,6 +235,8 @@ import {
   useAccountGroups,
   useCreateAccountAccount,
   useCreateAccountMove,
+  useCreateManualAccountInvoice,
+  readManualAccountInvoiceEffect,
   useCreateAccountTax,
   useCreateCrossoveredBudget,
   useUpdateCrossoveredBudget,
@@ -262,6 +310,8 @@ import {
   useCloseAccountPeriod,
   useDepreciationLines,
   useDeleteAccountAsset,
+  useCreateAccountAsset,
+  useUpdateAccountAsset,
   useConfirmAccountAsset,
   useCloseAccountAsset,
   useCreateDepreciationLine,
@@ -285,7 +335,27 @@ import {
   useRefreshTaxDeadlineStatuses,
   useScheduleTaxDeadlineUpdates,
   useTaxDeadlines,
+  useAccountTaxGroups,
+  useCreateAccountTaxGroup,
+  useUpdateAccountTaxGroup,
+  useTaxJurisdictions,
+  useCreateTaxJurisdiction,
+  useUpdateTaxJurisdiction,
+  useTaxSchedules,
+  useCreateTaxSchedule,
+  useUpdateTaxSchedule,
+  useCompleteTaxDeadline,
+  useWaiveTaxDeadline,
+  useDeleteTaxDeadline,
+  useCreateTaxDeadline,
+  useUpdateTaxDeadline,
+  useUpdateAccountTax,
+  useDeprecateAccountAccount,
+  useUpdateAccountAccount,
+  useCreateAccountBankStatement,
+  useUpdateAccountBankStatement,
   useAccountingCsvImportMutations,
+  useApplyHistoricalPaymentAllocations,
   useAccountPayments,
   useAccountPaymentTerms,
   useAccountPaymentTermLines,
@@ -328,7 +398,59 @@ import { useToast } from "@/hooks/use-toast"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { useWorkflowSurface } from "@/hooks/use-workflow-surface"
 import { useInvoiceToPaymentWorkflow } from "@lumiere/query-hooks/hooks/accounting/invoice-workflow"
-import { isPaymentRegistrable } from "@lumiere/erp-workflows"
+import { isPaymentRegistrable, variantTag } from "@lumiere/erp-workflows"
+import {
+  canCompleteTaxDeadline,
+  canDeleteTaxDeadline,
+  canEditTaxDeadline,
+  canWaiveTaxDeadline,
+  deadlineDateInput,
+  toTaxDeadlineCreateBody,
+  toTaxDeadlineUpdateBody,
+} from "./tax-deadline-actions"
+import {
+  canEditTaxGroup,
+  taxGroupAccountOptions,
+  taxGroupEditDefaults,
+  toTaxGroupCreateParams,
+  toTaxGroupUpdateParams,
+} from "./tax-group-actions"
+import {
+  taxJurisdictionEditDefaults,
+  toTaxJurisdictionCreateParams,
+  toTaxJurisdictionUpdateParams,
+} from "./tax-jurisdiction-actions"
+import {
+  canEditTaxSchedule,
+  scheduleJurisdictionOptions,
+  scheduleTaxOptions,
+  taxScheduleEditDefaults,
+  toTaxScheduleCreateParams,
+  toTaxScheduleUpdateParams,
+} from "./tax-schedule-actions"
+import { taxPickerField } from "./tax-picker-field"
+import { cellId, cellText, withNone } from "./tax-setup-wire"
+import {
+  ASSET_TYPES,
+  DEPRECIATION_METHODS,
+  assetAccountOptions,
+  assetCompanyId,
+  assetEditDefaults,
+  assetJournalOptions,
+  canEditAsset,
+  toAssetCreateParams,
+  toAssetUpdateParams,
+  type AssetFailure,
+} from "./asset-actions"
+import { accountIsDeprecated, deprecateAccountParams } from "./account-deprecation"
+import { ACCOUNT_INTERNAL_TYPES, accountEditDefaults, toAccountUpdateParams } from "./account-edit"
+import {
+  bankJournals,
+  canEditBankStatement,
+  statementDateInput,
+  toBankStatementCreateInput,
+  toBankStatementUpdateParams,
+} from "./bank-statement-actions"
 import { formText, useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
 import type {
   AccountAnalyticAccount,
@@ -336,6 +458,7 @@ import type {
   AccountMove,
   AccountPeriod,
   CrossoveredBudget,
+  CreateManualAccountInvoiceParams,
 } from "@lumiere/query-hooks/hooks/accounting"
 import {
   InvoiceListView,
@@ -355,16 +478,22 @@ import {
   type AccountAccount,
 } from "@lumiere/ui"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
-import { fetchQueryList } from "@lumiere/query-hooks/http"
 import {
-  customFieldEntriesFromMetadata,
-  findNewestRowByField,
-  persistCustomFieldsToEav,
-} from "@/lib/persist-record-custom-fields"
+  BankStatementImportLinesSection,
+  ConsolidationCompanyRatesSection,
+  TaxDeadlineRemindersSection,
+  taxDeadlinesTableConfig,
+  taxGroupsTableConfig,
+  taxJurisdictionsTableConfig,
+  taxSchedulesTableConfig,
+} from "./read-sections"
+import { apiFetch, fetchQueryList } from "@lumiere/query-hooks/http"
+import { persistCustomFieldsToEav } from "@/lib/persist-record-custom-fields"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
+import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import {
   downloadDocumentPdf,
   useDispatchQueuedMail,
@@ -382,6 +511,79 @@ import {
 import { Button } from "@lumiere/ui/components/button"
 import { cn } from "@lumiere/ui/lib/utils"
 import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
+
+function copyAsRecord<T extends object>(row: T): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(row))
+}
+
+function copyAsRecords<T extends object>(rows: readonly T[]): Record<string, unknown>[] {
+  return rows.map(copyAsRecord)
+}
+
+type ManualInvoiceAccountLookup = {
+  readonly id?: unknown
+  readonly code?: unknown
+  readonly name?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly deprecated?: unknown
+  readonly isOffBalance?: unknown
+  readonly internalType?: unknown
+  readonly internalGroup?: unknown
+  readonly allowedJournalIds?: unknown
+}
+
+type ManualInvoicePartnerLookup = {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly displayName?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly deletedAt?: unknown
+  readonly deleted_at?: unknown
+  readonly isCustomer?: unknown
+  readonly customerRank?: unknown
+  readonly isVendor?: unknown
+  readonly supplierRank?: unknown
+}
+
+type ManualInvoiceJournalLookup = {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly code?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly active?: unknown
+  readonly type?: unknown
+  readonly type_?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
+}
+
+type ManualInvoiceTaxGroupLookup = {
+  readonly id?: unknown
+  readonly taxPayableAccountId?: unknown
+  readonly tax_payable_account_id?: unknown
+  readonly taxReceivableAccountId?: unknown
+  readonly tax_receivable_account_id?: unknown
+}
+
+type ManualInvoiceTaxLookup = {
+  readonly id?: unknown
+  readonly name?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly active?: unknown
+  readonly typeTaxUse?: unknown
+  readonly type_tax_use?: unknown
+  readonly priceInclude?: unknown
+  readonly hasNegativeFactor?: unknown
+  readonly amount?: unknown
+  readonly amountType?: unknown
+  readonly amount_type?: unknown
+  readonly taxGroupId?: unknown
+  readonly tax_group_id?: unknown
+}
 
 function moveTypeTag(row: Record<string, unknown>): string {
   return enumTag(row.moveType ?? row.move_type)
@@ -534,27 +736,29 @@ function moveLineIdsFromRow(line: Record<string, unknown>): bigint[] {
   return raw.map((id) => BigInt(String(id)))
 }
 
-/** Resolve journal for `create_account_move` from modal payload or first loaded journal. */
-function journalIdFromInvoiceModalSave(
-  params: unknown,
-  journals: readonly { id?: unknown }[],
-): bigint | null {
-  const j = (params as { journalId?: unknown }).journalId
-  if (j != null) {
-    return typeof j === "bigint" ? j : BigInt(String(j))
-  }
-  const id = journals[0]?.id
-  return id != null ? BigInt(String(id)) : null
-}
-
 type AccountingCsvImportKind =
   | "account"
   | "accountMove"
+  | "outstandingDocuments"
+  | "historicalDocumentsForPaymentReplay"
   | "accountMoveLine"
   | "tax"
   | "budget"
   | "budgetLine"
   | "analytic"
+
+const HISTORICAL_PAYMENT_REPLAY_CALLABLE = historicalPaymentReplayIsCallable()
+
+function assertBundleImportSucceeded(
+  stage: string,
+  receipt: CsvImportReceipt,
+): void {
+  if (receipt.status === "success" && receipt.errorRows === 0) return
+  const firstError = receipt.errors[0]?.errorMessage
+  throw new Error(
+    `${stage} import job #${receipt.jobId} finished ${receipt.status} with ${receipt.errorRows} rejected row${receipt.errorRows === 1 ? "" : "s"}.${firstError ? ` ${firstError}` : " Review the import job before retrying."}`,
+  )
+}
 
 interface AccountingClientProps {
   initialBudgets?: CrossoveredBudget[]
@@ -599,16 +803,22 @@ function AccountingClientReady({
   organizationId,
   operatingCompanyId,
 }: AccountingClientReadyProps) {
+  const router = useRouter()
   useAccountingModuleSubscription()
   const { t } = useTranslation()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
-  const { askForm, formDialog } = useFormDialog()
-  const { currentUser } = useRBAC()
+  const { askForm, cancelForm, formDialog } = useFormDialog()
+  const { currentUser, checkPermission } = useRBAC()
   const runtimeRoleId = currentUser?.roles[0]
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   const accountingTabIds = useMemo(
-    () => moduleConfigBase.tabs.map((tab) => tab.id),
+    () => [
+      ...moduleConfigBase.tabs.map((tab) => tab.id),
+      "account-journals",
+      "move-lines",
+      "period-close",
+    ],
     [moduleConfigBase],
   )
   const { activeTab: accountingActiveTab, setActiveTab: setAccountingActiveTab } = useModuleTab(
@@ -617,31 +827,12 @@ function AccountingClientReady({
   )
   /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
   const { orgId } = orgBigInts(organizationId)
-  async function persistAccountMoveCustomFieldsAfterCreate(metadata: unknown, displayName: string) {
-    if (customFieldEntriesFromMetadata(metadata).length === 0) return
-    let row: Record<string, unknown> | undefined
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const rows = await fetchQueryList(
-        "/api/query/account-moves",
-        "Failed to fetch account moves",
-      )
-      row = findNewestRowByField(rows, "invoicePartnerDisplayName", displayName)
-      if (row?.id) break
-      await new Promise((r) => setTimeout(r, 250 * (attempt + 1)))
-    }
-    if (!row?.id) {
-      toast({
-        variant: "destructive",
-        title: t("common.error.title"),
-        description: "Invoice saved, but custom fields could not be linked yet. Retry from the record.",
-      })
-      return
-    }
+  async function persistAccountMoveCustomFieldsExact(metadata: unknown, recordId: string) {
     await persistCustomFieldsToEav({
       organizationId,
       companyId: operatingCompanyId,
       model: "account_move",
-      recordId: BigInt(String(row.id)),
+      recordId: BigInt(recordId),
       metadata,
     })
   }
@@ -657,6 +848,7 @@ function AccountingClientReady({
   // Create invoice / bill modals
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
   const [showCreateBill, setShowCreateBill] = useState(false)
+  const [readinessAction, setReadinessAction] = useState<AccountingReadinessAction | undefined>()
   const [creditNoteSource, setCreditNoteSource] = useState<AccountMove | null>(null)
   // Analytic row editors (click row on Analytic tabs)
   const [analyticAccountEdit, setAnalyticAccountEdit] = useState<Record<string, unknown> | null>(null)
@@ -691,79 +883,129 @@ function AccountingClientReady({
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
   const [glDrilldownAccount, setGlDrilldownAccount] = useState<AccountAccount | null>(null)
   // ── Data hooks ──────────────────────────────────────────────────────────────
-  const { data: accounts = [] } = useAccountAccounts(orgId, {
+  const accountsRead = moduleCollection(useAccountAccounts(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: allMoves = [], isLoading: movesLoading } = useAccountMoves(orgId, {
+  }))
+  const accounts = accountsRead.rows
+  const allMovesRead = moduleCollection(useAccountMoves(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: accountMoveLines = [] } = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
-  const { data: taxes = [] } = useAccountTaxes(orgId, { enabled: organizationId > 0 })
-  const { data: budgets = [] } = useCrossoveredBudgets(orgId, {
+  }))
+  const allMoves = allMovesRead.rows
+  const movesLoading = allMovesRead.state.status === "loading"
+  const accountMoveLinesRead = moduleCollection(useAccountMoveLines(orgId, { enabled: organizationId > 0 }))
+  const accountMoveLines = accountMoveLinesRead.rows
+  const taxesRead = moduleCollection(useAccountTaxes(orgId, { enabled: organizationId > 0 }))
+  const taxes = taxesRead.rows
+  const budgetsRead = moduleCollection(useCrossoveredBudgets(orgId, {
     enabled: organizationId > 0,
     initialData: initialBudgets,
-  })
-  const { data: budgetLines = [] } = useBudgetLines(orgId, { enabled: organizationId > 0 })
-  const { data: budgetPosts = [] } = useBudgetPosts(orgId, { enabled: organizationId > 0 })
-  const { data: taxDeadlines = [] } = useTaxDeadlines(orgId, { enabled: organizationId > 0 })
-  const { data: analytic = [] } = useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 })
-  const { data: analyticLines = [] } = useAccountAnalyticLines(orgId, { enabled: organizationId > 0 })
-  const { data: analyticDistribution = [] } = useAccountAnalyticDistributionModels(orgId, {
+  }))
+  const budgets = budgetsRead.rows
+  const budgetLinesRead = moduleCollection(useBudgetLines(orgId, { enabled: organizationId > 0 }))
+  const budgetLines = budgetLinesRead.rows
+  const budgetPostsRead = moduleCollection(useBudgetPosts(orgId, { enabled: organizationId > 0 }))
+  const budgetPosts = budgetPostsRead.rows
+  const taxDeadlinesRead = moduleCollection(useTaxDeadlines(orgId, { enabled: organizationId > 0 }))
+  const taxDeadlines = taxDeadlinesRead.rows
+  const taxGroupsRead = moduleCollection(useAccountTaxGroups(orgId, { enabled: organizationId > 0 }))
+  const taxGroups = taxGroupsRead.rows
+  const taxJurisdictionsRead = moduleCollection(useTaxJurisdictions(orgId, { enabled: organizationId > 0 }))
+  const taxJurisdictions = taxJurisdictionsRead.rows
+  const taxSchedulesRead = moduleCollection(useTaxSchedules(orgId, { enabled: organizationId > 0 }))
+  const taxSchedules = taxSchedulesRead.rows
+  const analyticRead = moduleCollection(useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 }))
+  const analytic = analyticRead.rows
+  const analyticLinesRead = moduleCollection(useAccountAnalyticLines(orgId, { enabled: organizationId > 0 }))
+  const analyticLines = analyticLinesRead.rows
+  const analyticDistributionRead = moduleCollection(useAccountAnalyticDistributionModels(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: bankStatements = [], isLoading: bankStatementsLoading } = useAccountBankStatements(orgId, { enabled: organizationId > 0 })
-  const { data: bankStatementLines = [] } = useAccountBankStatementLines(orgId, { enabled: organizationId > 0 })
-  const { data: bankMatchCandidates = [] } = useBankMatchCandidates(orgId, { enabled: organizationId > 0 })
-  const { data: reconciliationWidgets = [] } = useAccountReconciliationWidgets(orgId, {
+  }))
+  const analyticDistribution = analyticDistributionRead.rows
+  const bankStatementsRead = moduleCollection(useAccountBankStatements(orgId, { enabled: organizationId > 0 }))
+  const bankStatements = bankStatementsRead.rows
+  const bankStatementsLoading = bankStatementsRead.state.status === "loading"
+  const bankStatementLinesRead = moduleCollection(useAccountBankStatementLines(orgId, { enabled: organizationId > 0 }))
+  const bankStatementLines = bankStatementLinesRead.rows
+  const bankMatchCandidatesRead = moduleCollection(useBankMatchCandidates(orgId, { enabled: organizationId > 0 }))
+  const bankMatchCandidates = bankMatchCandidatesRead.rows
+  const reconciliationWidgetsRead = moduleCollection(useAccountReconciliationWidgets(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: fixedAssets = [] } = useAccountFixedAssets(orgId, { enabled: organizationId > 0 })
-  const { data: accountPayments = [], isLoading: paymentsLoading } = useAccountPayments(orgId, { enabled: organizationId > 0 })
-  const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId, { enabled: organizationId > 0 })
-  const { data: paymentTermLines = [] } = useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 })
-  const { data: depreciationLines = [] } = useDepreciationLines(orgId, { enabled: organizationId > 0 })
-  const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
-  const { data: currencies = [] } = useCurrencies()
-  const { data: intercompanyRules = [] } = useIntercompanyRules(orgId, { enabled: organizationId > 0 })
-  const { data: intercompanyTransactions = [] } = useIntercompanyTransactions(orgId, {
+  }))
+  const reconciliationWidgets = reconciliationWidgetsRead.rows
+  const fixedAssetsRead = moduleCollection(useAccountFixedAssets(orgId, { enabled: organizationId > 0 }))
+  const fixedAssets = fixedAssetsRead.rows
+  const accountPaymentsRead = moduleCollection(useAccountPayments(orgId, { enabled: organizationId > 0 }))
+  const accountPayments = accountPaymentsRead.rows
+  const paymentsLoading = accountPaymentsRead.state.status === "loading"
+  const paymentTermsRead = moduleCollection(useAccountPaymentTerms(orgId, { enabled: organizationId > 0 }))
+  const paymentTerms = paymentTermsRead.rows
+  const paymentTermLinesRead = moduleCollection(useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 }))
+  const paymentTermLines = paymentTermLinesRead.rows
+  const depreciationLinesRead = moduleCollection(useDepreciationLines(orgId, { enabled: organizationId > 0 }))
+  const depreciationLines = depreciationLinesRead.rows
+  const companiesRead = moduleCollection(useCompanies(organizationId, organizationId > 0))
+  const companies = companiesRead.rows
+  const currenciesRead = moduleCollection(useCurrencies())
+  const currencies = currenciesRead.rows
+  const intercompanyRulesRead = moduleCollection(useIntercompanyRules(orgId, { enabled: organizationId > 0 }))
+  const intercompanyRules = intercompanyRulesRead.rows
+  const intercompanyTransactionsRead = moduleCollection(useIntercompanyTransactions(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: saleOrders = [] } = useSaleOrders(orgId)
-  const { data: contacts = [] } = useContacts(orgId)
-  const { data: journals = [] } = useAccountJournals(orgId, { enabled: organizationId > 0 })
-  const { data: accountTypes = [] } = useAccountAccountTypes(orgId, { enabled: organizationId > 0 })
-  const { data: accountGroups = [] } = useAccountGroups(orgId, { enabled: organizationId > 0 })
-  const { data: consolidationAccounts = [] } = useConsolidationAccounts(orgId, {
+  }))
+  const intercompanyTransactions = intercompanyTransactionsRead.rows
+  const saleOrdersRead = moduleCollection(useSaleOrders(orgId))
+  const saleOrders = saleOrdersRead.rows
+  const contactsRead = moduleCollection(useContacts(orgId))
+  const contacts = contactsRead.rows
+  const productsRead = moduleCollection(useProducts(orgId))
+  const products = productsRead.rows
+  const journalsRead = moduleCollection(useAccountJournals(orgId, { enabled: organizationId > 0 }))
+  const journals = journalsRead.rows
+  const accountTypesRead = moduleCollection(useAccountAccountTypes(orgId, { enabled: organizationId > 0 }))
+  const accountTypes = accountTypesRead.rows
+  const accountGroupsRead = moduleCollection(useAccountGroups(orgId, { enabled: organizationId > 0 }))
+  const accountGroups = accountGroupsRead.rows
+  const consolidationAccountsRead = moduleCollection(useConsolidationAccounts(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: consolidationJournals = [] } = useConsolidationJournals(orgId, {
+  }))
+  const consolidationAccounts = consolidationAccountsRead.rows
+  const consolidationJournalsRead = moduleCollection(useConsolidationJournals(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: eliminationEntries = [] } = useConsolidationEliminationEntries(orgId, {
+  }))
+  const consolidationJournals = consolidationJournalsRead.rows
+  const eliminationEntriesRead = moduleCollection(useConsolidationEliminationEntries(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: fxRevaluationRuns = [] } = useFxRevaluationRuns(orgId, {
+  }))
+  const eliminationEntries = eliminationEntriesRead.rows
+  const fxRevaluationRunsRead = moduleCollection(useFxRevaluationRuns(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId, {
+  }))
+  const fxRevaluationRuns = fxRevaluationRunsRead.rows
+  const partnerCreditControlsRead = moduleCollection(usePartnerCreditControls(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: amortizationSchedules = [] } = useAmortizationSchedules(orgId, {
+  }))
+  const partnerCreditControls = partnerCreditControlsRead.rows
+  const amortizationSchedulesRead = moduleCollection(useAmortizationSchedules(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: amortizationLines = [] } = useAmortizationLines(orgId, {
+  }))
+  const amortizationSchedules = amortizationSchedulesRead.rows
+  const amortizationLinesRead = moduleCollection(useAmortizationLines(orgId, {
     enabled: organizationId > 0,
-  })
-  const { data: fiscalYearsRaw = [] } = useAccountFiscalYears(orgId, {
+  }))
+  const amortizationLines = amortizationLinesRead.rows
+  const fiscalYearsRawRead = moduleCollection(useAccountFiscalYears(orgId, {
     enabled: organizationId > 0,
     initialData: initialFiscalYears,
     staleTime: 0,
-  })
-  const { data: accountPeriodsRaw = [] } = useAccountPeriods(orgId, {
+  }))
+  const fiscalYearsRaw = fiscalYearsRawRead.rows
+  const accountPeriodsRawRead = moduleCollection(useAccountPeriods(orgId, {
     enabled: organizationId > 0,
     initialData: initialAccountPeriods,
-  })
-  const { data: financialReportsRaw = [] } = useFinancialReports(orgId)
+  }))
+  const accountPeriodsRaw = accountPeriodsRawRead.rows
+  const financialReportsRead = moduleCollection(useFinancialReports(orgId))
+  const financialReportsRaw = financialReportsRead.rows
 
   const createFiscalYear = useCreateFiscalYear(organizationId, operatingCompanyId)
   const updateFiscalYear = useUpdateFiscalYear(organizationId, operatingCompanyId)
@@ -935,16 +1177,311 @@ function AccountingClientReady({
     )
   }, [companies, currencySelectOptions, operatingCompanyId])
 
+  const manualInvoiceCurrencyId = useMemo(
+    () =>
+      companies.find((company) => company.id === operatingCompanyId)?.currencyId ?? 0n,
+    [companies, operatingCompanyId],
+  )
+
+  const manualInvoiceOptions = useMemo(() => {
+    const companyKey = String(operatingCompanyId)
+    const accountLabel = (row: ManualInvoiceAccountLookup) =>
+      `${String(row.code ?? "").trim() ? `${String(row.code)} — ` : ""}${String(row.name ?? row.id ?? "")}`
+    const allowedJournals = (row: ManualInvoiceAccountLookup) =>
+      Array.isArray(row.allowedJournalIds) ? row.allowedJournalIds.map(String) : []
+    const accountsFor = (kind: "invoice" | "bill", counterpart: boolean) =>
+      (accounts as ManualInvoiceAccountLookup[])
+        .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey)
+        .filter((row) => row.deprecated !== true && row.isOffBalance !== true)
+        .filter((row) => enumTag(counterpart ? row.internalType : row.internalGroup) === (
+          counterpart ? (kind === "invoice" ? "Receivable" : "Payable") : (kind === "invoice" ? "Income" : "Expense")
+        ))
+        .map((row) => ({ value: String(row.id), label: accountLabel(row), allowedJournalIds: allowedJournals(row) }))
+    const partnersFor = (kind: "invoice" | "bill") =>
+      (contacts as ManualInvoicePartnerLookup[])
+        .filter((row) => row.deletedAt == null && row.deleted_at == null)
+        .filter((row) => {
+          const rowCompany = row.companyId ?? row.company_id
+          return rowCompany == null || String(rowCompany) === companyKey
+        })
+        .filter((row) => kind === "invoice"
+          ? row.isCustomer === true || Number(row.customerRank ?? 0) > 0
+          : row.isVendor === true || Number(row.supplierRank ?? 0) > 0)
+        .map((row) => ({ value: String(row.id), label: String(row.displayName ?? row.name ?? row.id) }))
+    const journalsFor = (kind: "invoice" | "bill") =>
+      (journals as ManualInvoiceJournalLookup[])
+        .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey && row.active !== false)
+        .filter((row) => enumTag(row.type ?? row.type_) === (kind === "invoice" ? "Sale" : "Purchase"))
+        .map((row) => ({
+          value: String(row.id),
+          label: `${String(row.code ?? "").trim() ? `${String(row.code)} — ` : ""}${String(row.name ?? row.id)}`,
+          currencyId: String(row.currencyId ?? row.currency_id ?? defaultCurrencyId),
+        }))
+    const taxGroupById = new Map(
+      (taxGroups as ManualInvoiceTaxGroupLookup[]).map((row) => [String(row.id), row]),
+    )
+    const taxesFor = (kind: "invoice" | "bill") =>
+      (taxes as ManualInvoiceTaxLookup[])
+        .filter((row) => String(row.companyId ?? row.company_id ?? "") === companyKey && row.active !== false)
+        .filter((row) => [kind === "invoice" ? "Sale" : "Purchase", "None"].includes(enumTag(row.typeTaxUse ?? row.type_tax_use)))
+        .filter((row) => row.priceInclude !== true && row.hasNegativeFactor !== true && Number(row.amount ?? 0) >= 0)
+        .filter((row) => ["Percent", "Fixed", "Division"].includes(enumTag(row.amountType ?? row.amount_type)))
+        .filter((row) => {
+          const group = taxGroupById.get(String(row.taxGroupId ?? row.tax_group_id ?? ""))
+          return group != null && (kind === "invoice"
+            ? group.taxPayableAccountId ?? group.tax_payable_account_id
+            : group.taxReceivableAccountId ?? group.tax_receivable_account_id) != null
+        })
+        .map((row) => ({
+          value: String(row.id), label: String(row.name ?? row.id), amount: Number(row.amount ?? 0),
+          amountType: enumTag(row.amountType ?? row.amount_type) as "Percent" | "Fixed" | "Division",
+        }))
+    const productsFor = (kind: "invoice" | "bill") =>
+      (products as Record<string, unknown>[])
+        .filter((row) => row.active !== false && (kind === "invoice" ? row.saleOk === true : row.purchaseOk === true))
+        .map((row) => ({
+          value: String(row.id),
+          label: String(row.displayName ?? row.name ?? row.id),
+          description: String((kind === "invoice" ? row.descriptionSale : row.descriptionPurchase) ?? row.name ?? ""),
+          price: Number(kind === "invoice" ? row.listPrice ?? row.price ?? 0 : row.standardPrice ?? 0),
+          accountId: String((kind === "invoice" ? row.propertyAccountIncomeId : row.propertyAccountExpenseId) ?? "") || undefined,
+          taxIds: (Array.isArray(kind === "invoice" ? row.taxesId : row.supplierTaxesId)
+            ? (kind === "invoice" ? row.taxesId : row.supplierTaxesId) as unknown[] : []).map(String),
+        }))
+    return {
+      invoice: { journals: journalsFor("invoice"), partners: partnersFor("invoice"), counterpart: accountsFor("invoice", true), commercial: accountsFor("invoice", false), taxes: taxesFor("invoice"), products: productsFor("invoice") },
+      bill: { journals: journalsFor("bill"), partners: partnersFor("bill"), counterpart: accountsFor("bill", true), commercial: accountsFor("bill", false), taxes: taxesFor("bill"), products: productsFor("bill") },
+    }
+  }, [accounts, contacts, defaultCurrencyId, journals, operatingCompanyId, products, taxGroups, taxes])
+
   const companySelectOptions = useMemo(
     () => companyRowsToSelectOptions(companies as Record<string, unknown>[]),
     [companies],
   )
 
+  const invoicePartnerSelectOptions = useMemo(
+    () => contactRowsToAccountingPartnerSelectOptions(contacts),
+    [contacts],
+  )
+
+  const manualInvoiceAccountOptions = useMemo(() => {
+    const eligibleAccounts = accounts.filter(
+      (account) =>
+        account.companyId === operatingCompanyId &&
+        account.deprecated === false &&
+        (account.currencyId == null || account.currencyId === manualInvoiceCurrencyId),
+    )
+    const toOptions = (rows: typeof accounts) =>
+      rows.map((account) => ({
+        value: String(account.id),
+        label: `${account.code ? `${account.code} — ` : ""}${account.name ?? account.id}`,
+      }))
+    const lineOptions = (expectedType: "Income" | "Expense") =>
+      toOptions(
+        eligibleAccounts.filter((account) =>
+          accountMatchesManualInvoiceLineType(account, accountTypes, expectedType),
+        ),
+      )
+    const counterpartOptions = (expectedType: "Receivable" | "Payable") =>
+      toOptions(
+        eligibleAccounts.filter(
+          (account) => enumTag(account.internalType) === expectedType,
+        ),
+      )
+
+    return {
+      income: lineOptions("Income"),
+      expense: lineOptions("Expense"),
+      receivable: counterpartOptions("Receivable"),
+      payable: counterpartOptions("Payable"),
+    }
+  }, [accountTypes, accounts, manualInvoiceCurrencyId, operatingCompanyId])
+
+  const manualInvoiceJournalOptions = useMemo(() => {
+    const eligible = (journalType: "Sale" | "Purchase") =>
+      accountJournalRowsToSelectOptions(
+        journals.filter(
+          (journal) =>
+            journal.companyId === operatingCompanyId &&
+            journal.active === true &&
+            enumTag(journal.type) === journalType &&
+            (journal.currencyId == null || journal.currencyId === manualInvoiceCurrencyId),
+        ),
+      )
+    return { sales: eligible("Sale"), purchases: eligible("Purchase") }
+  }, [journals, manualInvoiceCurrencyId, operatingCompanyId])
+
+  const manualInvoiceTaxOptions = useMemo(() => {
+    const accountById = new Map(accounts.map((account) => [account.id, account]))
+    const groupById = new Map(taxGroups.map((group) => [group.id, group]))
+    const eligible = (taxUse: "Sale" | "Purchase") =>
+      taxes
+        .filter((tax) => {
+          const amount = Number(tax.amount)
+          if (
+            tax.companyId !== operatingCompanyId ||
+            tax.active !== true ||
+            tax.hasNegativeFactor === true ||
+            enumTag(tax.typeTaxUse) !== taxUse ||
+            enumTag(tax.amountType) !== "Percent" ||
+            !Number.isFinite(amount) ||
+            amount < 0 ||
+            amount > 100 ||
+            tax.taxGroupId == null
+          ) {
+            return false
+          }
+          const group = groupById.get(tax.taxGroupId)
+          if (group == null || group.companyId !== operatingCompanyId) return false
+          const postingAccountId =
+            taxUse === "Sale" ? group.taxPayableAccountId : group.taxReceivableAccountId
+          if (postingAccountId == null) return false
+          const postingAccount = accountById.get(postingAccountId)
+          if (
+            postingAccount == null ||
+            !accountIsEligibleManualInvoiceTaxPosting(
+              postingAccount,
+              operatingCompanyId,
+              manualInvoiceCurrencyId,
+            )
+          ) {
+            return false
+          }
+          return true
+        })
+        .map((tax) => ({
+          value: String(tax.id),
+          label: `${tax.name} (${Number(tax.amount)}%)`,
+          rate: Number(tax.amount),
+          priceIncluded: Boolean(tax.priceInclude),
+        }))
+    return { sales: eligible("Sale"), purchases: eligible("Purchase") }
+  }, [accounts, manualInvoiceCurrencyId, operatingCompanyId, taxGroups, taxes])
+
+  const accountingSetup = useMemo<AccountingSetupReadinessInput>(() => {
+    const company = companies.find(
+      (candidate) => String(candidate.id) === String(operatingCompanyId),
+    )
+    const companyFiscalYears = fiscalYearsRaw.filter((fiscalYear) => {
+      return String(fiscalYear.companyId) === String(operatingCompanyId)
+    })
+    const companyPeriods = accountPeriodsRaw.filter((period) => {
+      return String(period.companyId) === String(operatingCompanyId)
+    })
+    const activeCompanyTaxes = taxes.filter(
+      (tax) => tax.companyId === operatingCompanyId && tax.active === true,
+    )
+    const usableTaxCount =
+      manualInvoiceTaxOptions.sales.length + manualInvoiceTaxOptions.purchases.length
+
+    return {
+      companyConfigured: company != null,
+      baseCurrencyConfigured:
+        manualInvoiceCurrencyId > 0n &&
+        currencies.some((currency) => currency.id === manualInvoiceCurrencyId),
+      fiscalYearConfigured: companyFiscalYears.length > 0,
+      openPeriodAvailable: companyPeriods.some(
+        (period) => accountPeriodStateTag(copyAsRecord(period)) === "Open",
+      ),
+      salesJournalConfigured: manualInvoiceJournalOptions.sales.length > 0,
+      purchaseJournalConfigured: manualInvoiceJournalOptions.purchases.length > 0,
+      receivableAccountConfigured: manualInvoiceAccountOptions.receivable.length > 0,
+      payableAccountConfigured: manualInvoiceAccountOptions.payable.length > 0,
+      incomeAccountConfigured: manualInvoiceAccountOptions.income.length > 0,
+      expenseAccountConfigured: manualInvoiceAccountOptions.expense.length > 0,
+      taxConfiguration:
+        activeCompanyTaxes.length === 0
+          ? "missing"
+          : usableTaxCount < activeCompanyTaxes.length
+            ? "needs-review"
+            : "ready",
+    }
+  }, [
+    accountPeriodsRaw,
+    companies,
+    currencies,
+    fiscalYearsRaw,
+    manualInvoiceAccountOptions,
+    manualInvoiceCurrencyId,
+    manualInvoiceJournalOptions,
+    manualInvoiceTaxOptions,
+    operatingCompanyId,
+    taxes,
+  ])
+
+  const readinessByAction = useMemo(
+    () => ({
+      invoice: evaluateAccountingSetupReadiness(accountingSetup, "invoice"),
+      bill: evaluateAccountingSetupReadiness(accountingSetup, "bill"),
+      import: evaluateAccountingSetupReadiness(accountingSetup, "import"),
+    }),
+    [accountingSetup],
+  )
+
+  const requestAccountingAction = useCallback(
+    (action: AccountingReadinessAction, onReady: () => void) => {
+      const readiness = readinessByAction[action]
+      setReadinessAction(action)
+      if (readiness.isReady) {
+        onReady()
+        return
+      }
+      const first = readiness.blockingItems[0]
+      toast({
+        variant: "destructive",
+        title: `${first?.label ?? "Accounting setup"} is required`,
+        description:
+          first?.reason ?? "Complete the accounting setup requirements shown above first.",
+      })
+    },
+    [readinessByAction, toast],
+  )
+
+  const openInvoiceCreate = useCallback(
+    () => requestAccountingAction("invoice", () => setShowCreateInvoice(true)),
+    [requestAccountingAction],
+  )
+  const openBillCreate = useCallback(
+    () => requestAccountingAction("bill", () => setShowCreateBill(true)),
+    [requestAccountingAction],
+  )
+  const openAccountingMoveImport = useCallback(
+    () => requestAccountingAction("import", () => setCsvKind("accountMove")),
+    [requestAccountingAction],
+  )
+  const openAccountingMoveLineImport = useCallback(
+    () => requestAccountingAction("import", () => setCsvKind("accountMoveLine")),
+    [requestAccountingAction],
+  )
+  const openOutstandingDocumentImport = useCallback(
+    () => requestAccountingAction("import", () => setCsvKind("outstandingDocuments")),
+    [requestAccountingAction],
+  )
+  const openHistoricalDocumentPaymentReplayImport = useCallback(
+    () => requestAccountingAction("import", () => setCsvKind("historicalDocumentsForPaymentReplay")),
+    [requestAccountingAction],
+  )
+
+  const handleReadinessResolve = useCallback(
+    (item: AccountingReadinessItem) => {
+      if (item.id === "company" || item.id === "base-currency") {
+        window.location.assign("/settings")
+        return
+      }
+      if (item.id === "fiscal-year") setAccountingActiveTab("fiscal-years")
+      else if (item.id === "open-period") setAccountingActiveTab("account-periods")
+      else if (item.id === "sales-journal" || item.id === "purchase-journal") {
+        setAccountingActiveTab("account-journals")
+      } else if (item.id.endsWith("-account")) setAccountingActiveTab("accounts")
+      else setAccountingActiveTab("taxes")
+    },
+    [setAccountingActiveTab],
+  )
+
   const partnerSelectOptions = useMemo(() => {
-    const fromApi = contactRowsToAccountingPartnerSelectOptions(contacts)
-    if (fromApi.length > 0) return fromApi
+    if (invoicePartnerSelectOptions.length > 0) return invoicePartnerSelectOptions
     return [{ value: "", label: t("common.lookup.noPartners"), disabled: true }]
-  }, [contacts, t])
+  }, [invoicePartnerSelectOptions, t])
 
   const invoiceMoveSelectOptions = useMemo(() => {
     const invoiceMoves = (allMoves as Record<string, unknown>[]).filter((row) =>
@@ -1101,6 +1638,17 @@ function AccountingClientReady({
           },
         },
         {
+          id: "import-lines",
+          label: t("accounting.bankStatementImportLines.tab", { defaultValue: "Imported lines" }),
+          content: (record) => (
+            <BankStatementImportLinesSection
+              organizationId={orgId}
+              companyId={operatingCompanyId}
+              statementId={String(record.id ?? "")}
+            />
+          ),
+        },
+        {
           id: "reconcile",
           label: t("accounting.actions.reconcile"),
           content: (record) => (
@@ -1111,7 +1659,64 @@ function AccountingClientReady({
         },
       ],
     }
-  }, [t, bankStatementLines])
+  }, [t, bankStatementLines, orgId, operatingCompanyId])
+
+  const consolidationRateLabels = useMemo(() => {
+    const toMap = (opts: Array<{ value: string; label: string }>) =>
+      new Map(opts.filter((o) => o.value !== "").map((o) => [o.value, o.label] as const))
+    return {
+      company: toMap(companySelectOptions),
+      currency: toMap(currencySelectOptions),
+      period: new Map(
+        (accountPeriodsRaw as Record<string, unknown>[]).map(
+          (p) => [String(p.id ?? ""), String(p.name ?? "")] as const,
+        ),
+      ),
+    }
+  }, [companySelectOptions, currencySelectOptions, accountPeriodsRaw])
+
+  const taxDeadlineRows = useMemo(
+    () =>
+      (taxDeadlines as Record<string, unknown>[])
+        .filter((d) => d.deletedAt == null && d.deleted_at == null)
+        .map((d) => ({
+          ...d,
+          dueDate: d.dueDate ?? d.due_date,
+          statusLabel: taxDeadlineStatusStr(d),
+        })),
+    [taxDeadlines],
+  )
+
+  const taxDeadlineRecordSheet = useMemo(
+    (): EntityRecordSheetConfig => ({
+      titleKey: "title",
+      statusKey: "statusLabel",
+      detailConfig: {
+        mode: "detail",
+        sections: [
+          {
+            id: "header",
+            fields: [
+              { key: "title", label: t("accounting.taxDeadlines.columns.title", { defaultValue: "Deadline" }) },
+              { key: "dueDate", label: t("accounting.taxDeadlines.columns.dueDate", { defaultValue: "Due date" }), type: "date" },
+              { key: "statusLabel", label: t("accounting.taxDeadlines.columns.status", { defaultValue: "Status" }) },
+              { key: "description", label: t("accounting.taxDeadlines.columns.description", { defaultValue: "Description" }) },
+            ],
+          },
+        ],
+      },
+      customTabs: [
+        {
+          id: "reminders",
+          label: t("accounting.taxDeadlines.reminders.tab", { defaultValue: "Reminders" }),
+          content: (record) => (
+            <TaxDeadlineRemindersSection organizationId={orgId} deadlineId={String(record.id ?? "")} />
+          ),
+        },
+      ],
+    }),
+    [t, orgId],
+  )
 
   const accountMoveRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const moveStatus = {
@@ -1525,7 +2130,24 @@ function AccountingClientReady({
   const createAccountGroup = useCreateAccountGroup(organizationId)
   const updateAccountGroup = useUpdateAccountGroup(organizationId)
   const createMove = useCreateAccountMove(organizationId)
+  const createManualInvoice = useCreateManualAccountInvoice(organizationId)
   const createTax = useCreateAccountTax(organizationId)
+  const updateTax = useUpdateAccountTax(organizationId)
+  const deprecateAccount = useDeprecateAccountAccount(organizationId)
+  const updateAccount = useUpdateAccountAccount(organizationId)
+  const createBankStatement = useCreateAccountBankStatement(organizationId)
+  const updateBankStatement = useUpdateAccountBankStatement(organizationId)
+  const completeTaxDeadline = useCompleteTaxDeadline(organizationId)
+  const waiveTaxDeadline = useWaiveTaxDeadline(organizationId)
+  const deleteTaxDeadline = useDeleteTaxDeadline(organizationId)
+  const createTaxDeadline = useCreateTaxDeadline(organizationId)
+  const updateTaxDeadline = useUpdateTaxDeadline(organizationId)
+  const createTaxGroup = useCreateAccountTaxGroup(organizationId, operatingCompanyId)
+  const updateTaxGroup = useUpdateAccountTaxGroup(organizationId, operatingCompanyId)
+  const createTaxJurisdiction = useCreateTaxJurisdiction(organizationId)
+  const updateTaxJurisdiction = useUpdateTaxJurisdiction(organizationId)
+  const createTaxSchedule = useCreateTaxSchedule(organizationId, operatingCompanyId)
+  const updateTaxSchedule = useUpdateTaxSchedule(organizationId, operatingCompanyId)
   const createBudget = useCreateCrossoveredBudget(organizationId)
   const updateBudget = useUpdateCrossoveredBudget(organizationId)
   const createBudgetLine = useCreateBudgetLine(organizationId)
@@ -1538,7 +2160,7 @@ function AccountingClientReady({
   const updateBudgetLineActuals = useUpdateBudgetLineActuals(organizationId)
   const createBudgetPost = useCreateBudgetPost(organizationId)
   const updateBudgetPost = useUpdateBudgetPost(organizationId)
-  const postMove = usePostAccountMove(organizationId)
+  const postMove = usePostAccountMove(organizationId, operatingCompanyId)
   const createCreditNote = useCreateCreditNoteFromInvoice(organizationId)
   const mailTemplatesQuery = useMailTemplates(organizationId, organizationId > 0)
   const queueMailFromTemplate = useQueueMailFromTemplate(
@@ -1586,6 +2208,8 @@ function AccountingClientReady({
   const matchEliminationEntries = useMatchEliminationEntries(organizationId)
   const unmatchEliminationEntry = useUnmatchEliminationEntry(organizationId)
 
+  const createAccountAsset = useCreateAccountAsset(organizationId)
+  const updateAccountAsset = useUpdateAccountAsset(organizationId)
   const deleteAccountAsset = useDeleteAccountAsset(organizationId, operatingCompanyId)
   const confirmAccountAsset = useConfirmAccountAsset(organizationId, operatingCompanyId)
   const closeAccountAsset = useCloseAccountAsset(organizationId, operatingCompanyId)
@@ -1607,6 +2231,13 @@ function AccountingClientReady({
 
   const updateAccountMoveLine = useUpdateAccountMoveLine(organizationId, operatingCompanyId)
   const csvImports = useAccountingCsvImportMutations(organizationId, operatingCompanyId)
+  const trackedBundleImport = useTrackedCsvImport()
+  const cleanupAbandonedImport = useCleanupAbandonedAccountMoveImport(
+    orgId,
+    operatingCompanyId,
+  )
+  const applyHistoricalPaymentAllocations =
+    useApplyHistoricalPaymentAllocations(organizationId)
 
   const createAccountPayment = useCreateAccountPayment(organizationId)
   const cancelAccountPayment = useCancelAccountPayment(organizationId)
@@ -2023,6 +2654,737 @@ function AccountingClientReady({
     }
   }, [t, openFiscalYear, closeFiscalYear, deleteFiscalYear])
 
+  // ── Tax deadline + tax rate row actions ─────────────────────────────────────
+  /** Run a form-driven command; the reducer re-validates, so failures surface as an error toast. */
+  const runTaxCommand = useCallback(
+    async (title: string, work: () => Promise<unknown>): Promise<void> => {
+      try {
+        await work()
+        showWorkflowToast({
+          kind: "success",
+          title: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: title }),
+        })
+      } catch (error) {
+        showWorkflowToast({
+          kind: "error",
+          title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+    [t],
+  )
+
+  const taxDeadlinesEntityConfig = useMemo((): EntityViewConfig => {
+    const base = taxDeadlinesTableConfig(t)
+    const view = base.view as EntityTableConfig
+    const newLabel = t("accounting.taxDeadlines.actions.new", { defaultValue: "New deadline" })
+    const editLabel = t("accounting.taxDeadlines.actions.edit", { defaultValue: "Edit deadline" })
+    const completeLabel = t("accounting.taxDeadlines.actions.complete", { defaultValue: "Mark complete" })
+    const waiveLabel = t("accounting.taxDeadlines.actions.waive", { defaultValue: "Waive" })
+    const deleteLabel = t("accounting.taxDeadlines.actions.delete", { defaultValue: "Delete deadline" })
+    const invalidInput = (title: string) =>
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
+        description: t("accounting.taxDeadlines.actions.invalid", {
+          defaultValue: "Enter a title and a due date.",
+        }),
+      })
+    const idOf = (row: Record<string, unknown>) => BigInt(String(row.id))
+    const cancelLabel = t("common.cancel", { defaultValue: "Cancel" })
+
+    const promptNew = async () => {
+      const values = await askForm({
+        title: newLabel,
+        fields: [
+          { id: "title", name: "title", label: t("accounting.taxDeadlines.columns.title", { defaultValue: "Deadline" }), type: "text", required: true },
+          {
+            id: "deadlineType",
+            name: "deadlineType",
+            label: t("accounting.taxDeadlines.form.type", { defaultValue: "Type" }),
+            type: "select",
+            required: true,
+            defaultValue: "Filing",
+            width: "1/2",
+            options: ["Filing", "Payment", "Registration", "Report", "Renewal"].map((value) => ({
+              value,
+              label: t(`accounting.taxDeadlines.form.types.${value}`, { defaultValue: value }),
+            })),
+          },
+          { id: "dueDate", name: "dueDate", label: t("accounting.taxDeadlines.columns.dueDate", { defaultValue: "Due date" }), type: "date", required: true, width: "1/2" },
+          {
+            id: "companyId",
+            name: "companyId",
+            label: t("accounting.taxDeadlines.form.company", { defaultValue: "Company (optional)" }),
+            type: "select",
+            options: companySelectOptions,
+          },
+          { id: "description", name: "description", label: t("accounting.taxDeadlines.columns.description", { defaultValue: "Description" }), type: "textarea" },
+        ],
+      })
+      if (values == null) return
+      const body = toTaxDeadlineCreateBody(values)
+      if (body == null) return invalidInput(newLabel)
+      await runTaxCommand(newLabel, () => createTaxDeadline.mutateAsync(body))
+    }
+
+    const promptEdit = async (row: Record<string, unknown>) => {
+      const values = await askForm({
+        title: editLabel,
+        fields: [
+          { id: "title", name: "title", label: t("accounting.taxDeadlines.columns.title", { defaultValue: "Deadline" }), type: "text", required: true, defaultValue: String(row.title ?? "") },
+          { id: "dueDate", name: "dueDate", label: t("accounting.taxDeadlines.columns.dueDate", { defaultValue: "Due date" }), type: "date", defaultValue: deadlineDateInput(row.dueDate) },
+          { id: "description", name: "description", label: t("accounting.taxDeadlines.columns.description", { defaultValue: "Description" }), type: "textarea", defaultValue: String(row.description ?? "") },
+        ],
+      })
+      if (values == null) return
+      const body = toTaxDeadlineUpdateBody(values)
+      if (body == null) return invalidInput(editLabel)
+      await runTaxCommand(editLabel, () => updateTaxDeadline.mutateAsync({ deadlineId: idOf(row), params: body }))
+    }
+
+    const actions: EntityAction[] = [
+      {
+        id: "tax-deadline-new",
+        label: newLabel,
+        permission: { resource: "tax_deadline", action: "create" },
+        onClick: () => promptNew(),
+      },
+      {
+        id: "tax-deadline-complete",
+        label: completeLabel,
+        requiresSelection: true,
+        permission: { resource: "tax_deadline", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canCompleteTaxDeadline(r)),
+        successMessage: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: completeLabel }),
+        onClick: (rows) => completeTaxDeadline.mutateAsync(idOf(rows[0]!)),
+      },
+      {
+        id: "tax-deadline-edit",
+        label: editLabel,
+        requiresSelection: true,
+        permission: { resource: "tax_deadline", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canEditTaxDeadline(r)),
+        onClick: (rows) => promptEdit(rows[0]!),
+      },
+      {
+        id: "tax-deadline-waive",
+        label: waiveLabel,
+        requiresSelection: true,
+        permission: { resource: "tax_deadline", action: "admin" },
+        isApplicable: (rows) => rows.every((r) => canWaiveTaxDeadline(r)),
+        confirm: {
+          title: waiveLabel,
+          description: t("accounting.taxDeadlines.actions.waiveConfirm", {
+            defaultValue: "Mark this deadline as not applicable. It stops counting as open.",
+          }),
+          confirmLabel: waiveLabel,
+          cancelLabel,
+        },
+        successMessage: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: waiveLabel }),
+        onClick: (rows) => waiveTaxDeadline.mutateAsync(idOf(rows[0]!)),
+      },
+      {
+        id: "tax-deadline-delete",
+        label: deleteLabel,
+        variant: "destructive",
+        requiresSelection: true,
+        permission: { resource: "tax_deadline", action: "delete" },
+        isApplicable: (rows) => rows.every((r) => canDeleteTaxDeadline(r)),
+        confirm: {
+          title: deleteLabel,
+          description: t("accounting.taxDeadlines.actions.deleteConfirm", {
+            defaultValue: "Delete this tax deadline? It disappears from the list.",
+          }),
+          confirmLabel: t("common.delete", { defaultValue: "Delete" }),
+          cancelLabel,
+        },
+        successMessage: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: deleteLabel }),
+        onClick: (rows) => deleteTaxDeadline.mutateAsync(idOf(rows[0]!)),
+      },
+    ]
+    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
+  }, [
+    t,
+    askForm,
+    companySelectOptions,
+    runTaxCommand,
+    createTaxDeadline.mutateAsync,
+    updateTaxDeadline.mutateAsync,
+    completeTaxDeadline.mutateAsync,
+    waiveTaxDeadline.mutateAsync,
+    deleteTaxDeadline.mutateAsync,
+  ])
+
+  const taxGroupRows = useMemo(() => {
+    const accountLabel = new Map<string, string>()
+    for (const a of copyAsRecords(accounts)) {
+      const id = cellId(a.id)
+      if (id != null) accountLabel.set(id.toString(), `${cellText(a.code)} ${cellText(a.name)}`.trim())
+    }
+    const companyLabel = new Map(companySelectOptions.map((o) => [String(o.value), o.label] as const))
+    const labelOf = (map: Map<string, string>, v: unknown) => {
+      const id = cellId(v)
+      return id == null ? "" : (map.get(id.toString()) ?? id.toString())
+    }
+    return copyAsRecords(taxGroups).map((g) => ({
+      ...g,
+      sequence: Number(cellText(g.sequence)) || 0,
+      companyName: labelOf(companyLabel, g.companyId),
+      precedingSubtotalText: cellText(g.precedingSubtotal),
+      payableAccountName: labelOf(accountLabel, g.taxPayableAccountId),
+      receivableAccountName: labelOf(accountLabel, g.taxReceivableAccountId),
+      advanceAccountName: labelOf(accountLabel, g.advanceTaxPaymentAccountId),
+    }))
+  }, [taxGroups, accounts, companySelectOptions])
+
+  /** Tax groups table: "New tax group" and "Edit tax group" (the reducers re-validate accounts and company). */
+  const taxGroupsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = taxGroupsTableConfig(t)
+    const view = base.view as EntityTableConfig
+    const newLabel = t("accounting.taxGroups.actions.new", { defaultValue: "New tax group" })
+    const editLabel = t("accounting.taxGroups.actions.edit", { defaultValue: "Edit tax group" })
+    const noneLabel = t("accounting.taxGroups.form.none", { defaultValue: "None" })
+    const accountRows = copyAsRecords(accounts)
+    const fields = (current: ReturnType<typeof taxGroupEditDefaults> | null): FormField[] => [
+      { id: "name", name: "name", label: t("accounting.taxGroups.columns.name", { defaultValue: "Name" }), type: "text", required: true, defaultValue: current?.name ?? "", width: "2/3" },
+      { id: "sequence", name: "sequence", label: t("accounting.taxGroups.columns.sequence", { defaultValue: "Sequence" }), type: "number", required: true, min: 0, step: 1, defaultValue: current?.sequence ?? 10, width: "1/3" },
+      { id: "precedingSubtotal", name: "precedingSubtotal", label: t("accounting.taxGroups.columns.precedingSubtotal", { defaultValue: "Preceding subtotal" }), type: "text", defaultValue: current?.precedingSubtotal ?? "" },
+      { id: "taxPayableAccountId", name: "taxPayableAccountId", label: t("accounting.taxGroups.columns.payableAccount", { defaultValue: "Tax payable account" }), type: "select", defaultValue: current?.taxPayableAccountId ?? "", options: withNone(taxGroupAccountOptions(accountRows, "payable", operatingCompanyId), noneLabel) },
+      { id: "taxReceivableAccountId", name: "taxReceivableAccountId", label: t("accounting.taxGroups.columns.receivableAccount", { defaultValue: "Tax receivable account" }), type: "select", defaultValue: current?.taxReceivableAccountId ?? "", options: withNone(taxGroupAccountOptions(accountRows, "receivable", operatingCompanyId), noneLabel) },
+      { id: "advanceTaxPaymentAccountId", name: "advanceTaxPaymentAccountId", label: t("accounting.taxGroups.columns.advanceAccount", { defaultValue: "Advance tax payment account" }), type: "select", defaultValue: current?.advanceTaxPaymentAccountId ?? "", options: withNone(taxGroupAccountOptions(accountRows, "advance", operatingCompanyId), noneLabel) },
+    ]
+    const invalid = (title: string) =>
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
+        description: t("accounting.taxGroups.actions.invalid", { defaultValue: "Enter a name and a whole-number sequence." }),
+      })
+
+    const promptNew = async () => {
+      const values = await askForm({ title: newLabel, fields: fields(null) })
+      if (values == null) return
+      const params = toTaxGroupCreateParams(values)
+      if (params == null) return invalid(newLabel)
+      await runTaxCommand(newLabel, () => createTaxGroup.mutateAsync(params))
+    }
+    const promptEdit = async (row: Record<string, unknown>) => {
+      const values = await askForm({ title: editLabel, fields: fields(taxGroupEditDefaults(row)) })
+      if (values == null) return
+      const result = toTaxGroupUpdateParams(values, row)
+      if (!result.ok) {
+        if (result.reason === "invalid") return invalid(editLabel)
+        showWorkflowToast({ kind: "info", title: t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." }) })
+        return
+      }
+      await runTaxCommand(editLabel, () =>
+        updateTaxGroup.mutateAsync({ groupId: BigInt(String(row.id)), params: result.params }),
+      )
+    }
+
+    const actions: EntityAction[] = [
+      {
+        id: "tax-group-new",
+        label: newLabel,
+        permission: { resource: "account_tax_group", action: "create" },
+        onClick: () => promptNew(),
+      },
+      {
+        id: "tax-group-edit",
+        label: editLabel,
+        requiresSelection: true,
+        permission: { resource: "account_tax_group", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canEditTaxGroup(r, operatingCompanyId)),
+        onClick: (rows) => promptEdit(rows[0]!),
+      },
+    ]
+    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
+  }, [t, askForm, accounts, operatingCompanyId, runTaxCommand, createTaxGroup.mutateAsync, updateTaxGroup.mutateAsync])
+
+  const taxJurisdictionRows = useMemo(
+    () =>
+      copyAsRecords(taxJurisdictions).map((j) => {
+        const current = taxJurisdictionEditDefaults(j)
+        return {
+          ...j,
+          ...current,
+          activeLabel: current.isActive
+            ? t("accounting.taxJurisdictions.active", { defaultValue: "Active" })
+            : t("accounting.taxJurisdictions.inactive", { defaultValue: "Inactive" }),
+        }
+      }),
+    [taxJurisdictions, t],
+  )
+
+  /** Jurisdictions table: "New jurisdiction" and "Edit jurisdiction" (organization-level records). */
+  const taxJurisdictionsEntityConfig = useMemo((): EntityViewConfig => {
+    const base = taxJurisdictionsTableConfig(t)
+    const view = base.view as EntityTableConfig
+    const newLabel = t("accounting.taxJurisdictions.actions.new", { defaultValue: "New jurisdiction" })
+    const editLabel = t("accounting.taxJurisdictions.actions.edit", { defaultValue: "Edit jurisdiction" })
+    const fields = (current: ReturnType<typeof taxJurisdictionEditDefaults> | null): FormField[] => [
+      { id: "name", name: "name", label: t("accounting.taxJurisdictions.columns.name", { defaultValue: "Name" }), type: "text", required: true, defaultValue: current?.name ?? "", width: "2/3" },
+      { id: "code", name: "code", label: t("accounting.taxJurisdictions.columns.code", { defaultValue: "Code" }), type: "text", required: true, defaultValue: current?.code ?? "", width: "1/3" },
+      // The reducer cannot change the country of an existing jurisdiction, so it is only asked for on create.
+      ...(current == null
+        ? [{ id: "countryCode", name: "countryCode", label: t("accounting.taxJurisdictions.columns.countryCode", { defaultValue: "Country code" }), description: t("accounting.taxJurisdictions.form.countryHint", { defaultValue: "ISO country code, for example US." }), type: "text" as const, required: true, defaultValue: "", width: "1/3" as const }]
+        : []),
+      { id: "stateCode", name: "stateCode", label: t("accounting.taxJurisdictions.columns.stateCode", { defaultValue: "State" }), type: "text", defaultValue: current?.stateCode ?? "", width: "1/3" },
+      { id: "countyCode", name: "countyCode", label: t("accounting.taxJurisdictions.columns.countyCode", { defaultValue: "County" }), type: "text", defaultValue: current?.countyCode ?? "", width: "1/3" },
+      { id: "city", name: "city", label: t("accounting.taxJurisdictions.columns.city", { defaultValue: "City" }), type: "text", defaultValue: current?.city ?? "", width: "1/3" },
+      { id: "zipFrom", name: "zipFrom", label: t("accounting.taxJurisdictions.columns.zipFrom", { defaultValue: "Postal code from" }), type: "text", defaultValue: current?.zipFrom ?? "", width: "1/3" },
+      { id: "zipTo", name: "zipTo", label: t("accounting.taxJurisdictions.columns.zipTo", { defaultValue: "Postal code to" }), type: "text", defaultValue: current?.zipTo ?? "", width: "1/3" },
+      { id: "isActive", name: "isActive", label: t("accounting.taxJurisdictions.active", { defaultValue: "Active" }), type: "switch", defaultValue: current?.isActive ?? true, width: "1/3" },
+    ]
+    const invalid = (title: string) =>
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
+        description: t("accounting.taxJurisdictions.actions.invalid", { defaultValue: "Enter a name, a code and a country code." }),
+      })
+
+    const promptNew = async () => {
+      const values = await askForm({ title: newLabel, fields: fields(null) })
+      if (values == null) return
+      const params = toTaxJurisdictionCreateParams(values)
+      if (params == null) return invalid(newLabel)
+      await runTaxCommand(newLabel, () => createTaxJurisdiction.mutateAsync(params))
+    }
+    const promptEdit = async (row: Record<string, unknown>) => {
+      const values = await askForm({ title: editLabel, fields: fields(taxJurisdictionEditDefaults(row)) })
+      if (values == null) return
+      const result = toTaxJurisdictionUpdateParams(values, row)
+      if (!result.ok) {
+        if (result.reason === "invalid") return invalid(editLabel)
+        showWorkflowToast({ kind: "info", title: t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." }) })
+        return
+      }
+      await runTaxCommand(editLabel, () =>
+        updateTaxJurisdiction.mutateAsync({ jurisdictionId: BigInt(String(row.id)), params: result.params }),
+      )
+    }
+
+    const actions: EntityAction[] = [
+      {
+        id: "tax-jurisdiction-new",
+        label: newLabel,
+        permission: { resource: "tax_jurisdiction", action: "create" },
+        onClick: () => promptNew(),
+      },
+      {
+        id: "tax-jurisdiction-edit",
+        label: editLabel,
+        requiresSelection: true,
+        permission: { resource: "tax_jurisdiction", action: "write" },
+        onClick: (rows) => promptEdit(rows[0]!),
+      },
+    ]
+    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
+  }, [t, askForm, runTaxCommand, createTaxJurisdiction.mutateAsync, updateTaxJurisdiction.mutateAsync])
+
+  const taxScheduleRows = useMemo(() => {
+    const companyLabel = new Map(companySelectOptions.map((o) => [String(o.value), o.label] as const))
+    const jurisdictionLabel = new Map(
+      copyAsRecords(taxJurisdictions).map((j) => [cellId(j.id)?.toString() ?? "", cellText(j.name)] as const),
+    )
+    const taxLabel = new Map(
+      copyAsRecords(taxes).map((x) => [cellId(x.id)?.toString() ?? "", cellText(x.name)] as const),
+    )
+    return copyAsRecords(taxSchedules).map((s) => {
+      const current = taxScheduleEditDefaults(s)
+      const companyKey = cellId(s.companyId)?.toString() ?? ""
+      return {
+        ...s,
+        description: current.description,
+        companyName: companyLabel.get(companyKey) ?? companyKey,
+        jurisdictionName: jurisdictionLabel.get(current.jurisdictionId) ?? "",
+        taxNames: current.taxIds.map((id) => taxLabel.get(id) ?? id).join(", "),
+        effectiveFromDate: current.effectiveFrom,
+        effectiveToDate: current.effectiveTo,
+        activeLabel: current.isActive
+          ? t("accounting.taxSchedules.active", { defaultValue: "Active" })
+          : t("accounting.taxSchedules.inactive", { defaultValue: "Inactive" }),
+      }
+    })
+  }, [taxSchedules, taxJurisdictions, taxes, companySelectOptions, t])
+
+  /** Tax schedules table: "New schedule" and "Edit schedule" (taxes are picked from the company's active taxes). */
+  const taxSchedulesEntityConfig = useMemo((): EntityViewConfig => {
+    const base = taxSchedulesTableConfig(t)
+    const view = base.view as EntityTableConfig
+    const newLabel = t("accounting.taxSchedules.actions.new", { defaultValue: "New schedule" })
+    const editLabel = t("accounting.taxSchedules.actions.edit", { defaultValue: "Edit schedule" })
+    const noneLabel = t("accounting.taxSchedules.form.none", { defaultValue: "None" })
+    const inactiveSuffix = t("accounting.taxSchedules.form.inactive", { defaultValue: "(inactive)" })
+    const taxRows = copyAsRecords(taxes)
+    const jurisdictionRows = copyAsRecords(taxJurisdictions)
+    const fields = (current: ReturnType<typeof taxScheduleEditDefaults> | null): FormField[] => [
+      { id: "name", name: "name", label: t("accounting.taxSchedules.columns.name", { defaultValue: "Name" }), type: "text", required: true, defaultValue: current?.name ?? "" },
+      { id: "description", name: "description", label: t("accounting.taxSchedules.columns.description", { defaultValue: "Description" }), type: "textarea", defaultValue: current?.description ?? "" },
+      { id: "jurisdictionId", name: "jurisdictionId", label: t("accounting.taxSchedules.columns.jurisdiction", { defaultValue: "Jurisdiction" }), type: "select", defaultValue: current?.jurisdictionId ?? "", options: withNone(scheduleJurisdictionOptions(jurisdictionRows, current?.jurisdictionId ?? "", inactiveSuffix), noneLabel) },
+      taxPickerField({
+        id: "taxIds",
+        name: "taxIds",
+        label: t("accounting.taxSchedules.columns.taxes", { defaultValue: "Taxes" }),
+        options: scheduleTaxOptions(taxRows, operatingCompanyId, current?.taxIds ?? [], inactiveSuffix),
+        defaultValue: current?.taxIds ?? [],
+        emptyHint: t("accounting.taxSchedules.form.noActiveTaxes", { defaultValue: "There are no active taxes to choose from." }),
+      }),
+      { id: "effectiveFrom", name: "effectiveFrom", label: t("accounting.taxSchedules.columns.effectiveFrom", { defaultValue: "Effective from" }), type: "date", defaultValue: current?.effectiveFrom ?? "", width: "1/2" },
+      { id: "effectiveTo", name: "effectiveTo", label: t("accounting.taxSchedules.columns.effectiveTo", { defaultValue: "Effective to" }), type: "date", defaultValue: current?.effectiveTo ?? "", width: "1/2" },
+      { id: "isActive", name: "isActive", label: t("accounting.taxSchedules.active", { defaultValue: "Active" }), type: "switch", defaultValue: current?.isActive ?? true },
+    ]
+    const invalid = (title: string) =>
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: title }),
+        description: t("accounting.taxSchedules.actions.invalid", { defaultValue: "Enter a name and valid effective dates." }),
+      })
+
+    const promptNew = async () => {
+      const values = await askForm({ title: newLabel, fields: fields(null) })
+      if (values == null) return
+      const params = toTaxScheduleCreateParams(values)
+      if (params == null) return invalid(newLabel)
+      await runTaxCommand(newLabel, () => createTaxSchedule.mutateAsync(params))
+    }
+    const promptEdit = async (row: Record<string, unknown>) => {
+      const values = await askForm({ title: editLabel, fields: fields(taxScheduleEditDefaults(row)) })
+      if (values == null) return
+      const result = toTaxScheduleUpdateParams(values, row)
+      if (!result.ok) {
+        if (result.reason === "invalid") return invalid(editLabel)
+        showWorkflowToast({ kind: "info", title: t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." }) })
+        return
+      }
+      await runTaxCommand(editLabel, () =>
+        updateTaxSchedule.mutateAsync({ scheduleId: BigInt(String(row.id)), params: result.params }),
+      )
+    }
+
+    const actions: EntityAction[] = [
+      {
+        id: "tax-schedule-new",
+        label: newLabel,
+        permission: { resource: "tax_schedule", action: "create" },
+        onClick: () => promptNew(),
+      },
+      {
+        id: "tax-schedule-edit",
+        label: editLabel,
+        requiresSelection: true,
+        permission: { resource: "tax_schedule", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canEditTaxSchedule(r, operatingCompanyId)),
+        onClick: (rows) => promptEdit(rows[0]!),
+      },
+    ]
+    return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
+  }, [t, askForm, taxes, taxJurisdictions, operatingCompanyId, runTaxCommand, createTaxSchedule.mutateAsync, updateTaxSchedule.mutateAsync])
+
+  const editTaxAction = useMemo((): EntityAction => {
+    const label = t("accounting.taxes.actions.edit", { defaultValue: "Edit tax" })
+    return {
+      id: "tax-edit",
+      label,
+      requiresSelection: true,
+      permission: { resource: "account_tax", action: "write" },
+      onClick: async (rows) => {
+        const row = rows[0]
+        if (!row) return
+        const values = await askForm({
+          title: label,
+          fields: [
+            { id: "name", name: "name", label: t("accounting.forms.newTax.fields.name"), type: "text", required: true, defaultValue: String(row.name ?? "") },
+            { id: "amount", name: "amount", label: t("accounting.forms.newTax.fields.amount"), type: "number", required: true, min: 0, max: 100, defaultValue: Number(row.amount ?? 0), width: "1/2" },
+            {
+              id: "typeTaxUse",
+              name: "typeTaxUse",
+              label: t("accounting.forms.newTax.fields.taxType"),
+              type: "select",
+              required: true,
+              defaultValue: variantTag(row.typeTaxUse).toLowerCase() || "sale",
+              width: "1/2",
+              options: [
+                { value: "sale", label: t("accounting.forms.newTax.fields.options.sale") },
+                { value: "purchase", label: t("accounting.forms.newTax.fields.options.purchase") },
+                { value: "withholding", label: t("accounting.taxes.actions.withholding", { defaultValue: "Withholding" }) },
+                { value: "none", label: t("accounting.forms.newTax.fields.options.none") },
+              ],
+            },
+            { id: "priceInclude", name: "priceInclude", label: t("accounting.forms.newTax.fields.priceInclude"), type: "switch", defaultValue: Boolean(row.priceInclude), width: "1/2" },
+            { id: "active", name: "active", label: t("accounting.taxes.actions.active", { defaultValue: "Active" }), type: "switch", defaultValue: row.active !== false, width: "1/2" },
+            { id: "description", name: "description", label: t("accounting.forms.newTax.fields.description"), type: "textarea", defaultValue: String(row.description ?? "") },
+          ],
+        })
+        if (values == null) return
+        if (String(values.name ?? "").trim() === "") {
+          showWorkflowToast({
+            kind: "error",
+            title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+            description: t("accounting.taxes.actions.invalid", { defaultValue: "Enter a name and a rate." }),
+          })
+          return
+        }
+        await runTaxCommand(label, () =>
+          updateTax.mutateAsync({
+            companyId: operatingCompanyId,
+            taxId: BigInt(String(row.id)),
+            params: updateAccountTaxParamsForWire(toUpdateAccountTaxParams(values)),
+          }),
+        )
+      },
+    }
+  }, [t, askForm, runTaxCommand, updateTax.mutateAsync, operatingCompanyId])
+
+  /** Deprecate (after a confirmation) or reactivate a chart-of-accounts row; the reducer re-validates. */
+  const toggleAccountDeprecated = useCallback(
+    async (account: AccountAccount): Promise<void> => {
+      const row = copyAsRecord(account)
+      const params = deprecateAccountParams(row, operatingCompanyId)
+      const label = params?.deprecated === false
+        ? t("accounting.accounts.rowActions.reactivate", { defaultValue: "Reactivate account" })
+        : t("accounting.accounts.rowActions.deprecate", { defaultValue: "Deprecate account" })
+      const fail = (description: string) =>
+        showWorkflowToast({
+          kind: "error",
+          title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+          description,
+        })
+      if (params == null) {
+        fail(t("accounting.accounts.rowActions.noCompany", { defaultValue: "No company is available for this account." }))
+        return
+      }
+      if (
+        !accountIsDeprecated(row) &&
+        !(await confirmDialog({
+          title: label,
+          description: t("accounting.accounts.rowActions.deprecateConfirm", {
+            defaultValue: "Deprecated accounts are marked as retired. You can reactivate the account later.",
+          }),
+        }))
+      ) {
+        return
+      }
+      try {
+        await deprecateAccount.mutateAsync({ accountId: BigInt(String(account.id)), params })
+        showWorkflowToast({
+          kind: "success",
+          title: t("accounting.taxDeadlines.actions.done", { defaultValue: "{{action}} completed", action: label }),
+        })
+      } catch (error) {
+        fail(error instanceof Error ? error.message : String(error))
+      }
+    },
+    [t, operatingCompanyId, confirmDialog, deprecateAccount.mutateAsync],
+  )
+
+  /** Edit a chart-of-accounts row; only the fields the user changed are sent. */
+  const editAccount = useCallback(
+    async (account: AccountAccount): Promise<void> => {
+      const row = copyAsRecord(account)
+      const label = t("accounting.accounts.rowActions.edit", { defaultValue: "Edit account" })
+      const current = accountEditDefaults(row)
+      const values = await askForm({
+        title: label,
+        fields: [
+          { id: "code", name: "code", label: t("accounting.accounts.code"), type: "text", required: true, defaultValue: current.code, width: "1/3" },
+          { id: "name", name: "name", label: t("accounting.accounts.name"), type: "text", required: true, defaultValue: current.name, width: "2/3" },
+          {
+            id: "internalType",
+            name: "internalType",
+            label: t("accounting.accounts.edit.internalType", { defaultValue: "Account type" }),
+            type: "select",
+            defaultValue: current.internalType,
+            options: ACCOUNT_INTERNAL_TYPES.map((value) => ({
+              value,
+              label: t(`accounting.accounts.edit.internalTypes.${value}`, { defaultValue: value }),
+            })),
+          },
+          { id: "reconcile", name: "reconcile", label: t("accounting.accounts.edit.reconcile", { defaultValue: "Allow reconciliation" }), type: "switch", defaultValue: current.reconcile, width: "1/2" },
+          { id: "deprecated", name: "deprecated", label: t("accounting.accounts.edit.deprecated", { defaultValue: "Deprecated" }), type: "switch", defaultValue: current.deprecated, width: "1/2" },
+          { id: "note", name: "note", label: t("accounting.accounts.edit.note", { defaultValue: "Note" }), type: "textarea", defaultValue: current.note },
+        ],
+      })
+      if (values == null) return
+      const result = toAccountUpdateParams(values, row, operatingCompanyId)
+      if (!result.ok) {
+        showWorkflowToast({
+          kind: result.reason === "unchanged" ? "info" : "error",
+          title:
+            result.reason === "unchanged"
+              ? t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." })
+              : t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+          description:
+            result.reason === "noCompany"
+              ? t("accounting.accounts.rowActions.noCompany", { defaultValue: "No company is available for this account." })
+              : result.reason === "invalid"
+                ? t("accounting.accounts.edit.invalid", { defaultValue: "Enter a code and a name." })
+                : undefined,
+        })
+        return
+      }
+      await runTaxCommand(label, () =>
+        updateAccount.mutateAsync({ accountId: BigInt(String(account.id)), params: result.params }),
+      )
+    },
+    [t, askForm, runTaxCommand, updateAccount.mutateAsync, operatingCompanyId],
+  )
+
+  const promptNewBankStatement = useCallback(async (): Promise<void> => {
+    const label = t("accounting.bankStatements.actions.new", { defaultValue: "New statement" })
+    const bank = bankJournals(copyAsRecords(journals))
+    if (bank.length === 0) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+        description: t("accounting.bankStatements.actions.noBankJournal", {
+          defaultValue: "Create a bank journal first; statements are opened on bank journals.",
+        }),
+      })
+      return
+    }
+    const values = await askForm({
+      title: label,
+      fields: [
+        {
+          id: "journalId",
+          name: "journalId",
+          label: t("accounting.entities.bankStatements.columns.journalId"),
+          type: "select",
+          required: true,
+          searchable: true,
+          options: accountJournalRowsToSelectOptions(bank),
+        },
+        { id: "name", name: "name", label: t("accounting.entities.bankStatements.columns.name"), type: "text", width: "1/2" },
+        { id: "reference", name: "reference", label: t("accounting.bankStatements.actions.reference", { defaultValue: "Reference" }), type: "text", width: "1/2" },
+        { id: "date", name: "date", label: t("accounting.entities.bankStatements.columns.date"), type: "date", width: "1/2" },
+        { id: "balanceStart", name: "balanceStart", label: t("accounting.entities.bankStatements.columns.balanceStart"), type: "number", step: 0.01, defaultValue: 0, width: "1/2" },
+        {
+          id: "currencyId",
+          name: "currencyId",
+          label: t("accounting.bankStatements.actions.currency", { defaultValue: "Currency" }),
+          type: "select",
+          required: true,
+          defaultValue: defaultCurrencyId > 0n ? String(defaultCurrencyId) : "",
+          options: currencySelectOptions,
+        },
+      ],
+    })
+    if (values == null) return
+    const input = toBankStatementCreateInput(values, copyAsRecords(journals))
+    if (input == null) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+        description: t("accounting.bankStatements.actions.invalidNew", {
+          defaultValue: "Choose a bank journal and a currency, and enter a valid opening balance.",
+        }),
+      })
+      return
+    }
+    await runTaxCommand(label, () => createBankStatement.mutateAsync(input))
+  }, [t, askForm, journals, currencySelectOptions, defaultCurrencyId, runTaxCommand, createBankStatement.mutateAsync])
+
+  const promptEditBankStatement = useCallback(
+    async (statement: Record<string, unknown>): Promise<void> => {
+      const label = t("accounting.bankStatements.actions.edit", { defaultValue: "Edit statement" })
+      const values = await askForm({
+        title: label,
+        fields: [
+          { id: "name", name: "name", label: t("accounting.entities.bankStatements.columns.name"), type: "text", defaultValue: String(statement.name ?? ""), width: "1/2" },
+          { id: "reference", name: "reference", label: t("accounting.bankStatements.actions.reference", { defaultValue: "Reference" }), type: "text", defaultValue: String(statement.reference ?? ""), width: "1/2" },
+          { id: "date", name: "date", label: t("accounting.entities.bankStatements.columns.date"), type: "date", defaultValue: statementDateInput(statement.date), width: "1/3" },
+          { id: "balanceStart", name: "balanceStart", label: t("accounting.entities.bankStatements.columns.balanceStart"), type: "number", step: 0.01, defaultValue: Number(statement.balanceStart ?? 0), width: "1/3" },
+          { id: "balanceEndReal", name: "balanceEndReal", label: t("accounting.entities.bankStatements.columns.balanceEndReal"), type: "number", step: 0.01, defaultValue: Number(statement.balanceEndReal ?? 0), width: "1/3" },
+        ],
+      })
+      if (values == null) return
+      const result = toBankStatementUpdateParams(values, statement)
+      if (!result.ok) {
+        showWorkflowToast({
+          kind: result.reason === "unchanged" ? "info" : "error",
+          title:
+            result.reason === "unchanged"
+              ? t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." })
+              : t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: label }),
+          description:
+            result.reason === "invalid"
+              ? t("accounting.bankStatements.actions.invalidEdit", { defaultValue: "Enter valid balances and date." })
+              : undefined,
+        })
+        return
+      }
+      const companyId = optionalBigIntU64(statement.companyId ?? statement.company_id) ?? operatingCompanyId
+      await runTaxCommand(label, () =>
+        updateBankStatement.mutateAsync({
+          companyId,
+          statementId: BigInt(String(statement.id)),
+          params: result.params,
+        }),
+      )
+    },
+    [t, askForm, runTaxCommand, updateBankStatement.mutateAsync, operatingCompanyId],
+  )
+
+  /** The bank-statements table with its New / Edit actions, each shown only to users who may run it. */
+  const bankStatementsActionsConfig = useMemo((): EntityViewConfig => {
+    const view = bankStatementsEntityConfig.view as EntityTableConfig
+    const actions: EntityAction[] = [
+      {
+        id: "bank-statement-new",
+        label: t("accounting.bankStatements.actions.new", { defaultValue: "New statement" }),
+        permission: { resource: "account_bank_statement", action: "create" },
+        onClick: () => promptNewBankStatement(),
+      },
+      {
+        id: "bank-statement-edit",
+        label: t("accounting.bankStatements.actions.edit", { defaultValue: "Edit statement" }),
+        requiresSelection: true,
+        permission: { resource: "account_bank_statement", action: "write" },
+        isApplicable: (rows) => rows.every((r) => canEditBankStatement(r)),
+        onClick: (rows) => promptEditBankStatement(rows[0]!),
+      },
+    ]
+    return { ...bankStatementsEntityConfig, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
+  }, [t, bankStatementsEntityConfig, promptNewBankStatement, promptEditBankStatement])
+
+  /** The statement sheet plus an Edit tab (a posted statement is final, so it only explains that). */
+  const bankStatementRecordSheetWithEdit = useMemo(
+    (): EntityRecordSheetConfig => ({
+      ...bankStatementRecordSheet,
+      customTabs: [
+        ...(bankStatementRecordSheet.customTabs ?? []),
+        ...(checkPermission("account_bank_statement", "write").allowed
+          ? [
+              {
+                id: "edit",
+                label: t("accounting.bankStatements.actions.editTab", { defaultValue: "Edit" }),
+                content: (record: Record<string, unknown>) =>
+                  canEditBankStatement(record) ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      data-testid="bank-statement-edit"
+                      onClick={() => void promptEditBankStatement(record)}
+                    >
+                      {t("accounting.bankStatements.actions.edit", { defaultValue: "Edit statement" })}
+                    </Button>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {t("accounting.bankStatements.actions.postedLocked", {
+                        defaultValue: "A posted statement can no longer be edited.",
+                      })}
+                    </p>
+                  ),
+              },
+            ]
+          : []),
+      ],
+    }),
+    [t, bankStatementRecordSheet, checkPermission, promptEditBankStatement],
+  )
+
   const fiscalSetupFormConfig = useMemo((): FormConfig => {
     const year = new Date().getFullYear()
     return {
@@ -2133,11 +3495,198 @@ function AccountingClientReady({
   const fixedAssetsEntityConfig = useMemo((): EntityViewConfig => {
     const base = fixedAssetsTableConfig(t)
     const view = base.view as EntityTableConfig
+    const newAssetLabel = t("accounting.entities.fixedAssets.actions.new", { defaultValue: "New asset" })
+    const editAssetLabel = t("accounting.entities.fixedAssets.actions.edit", { defaultValue: "Edit asset" })
+    const staleSuffix = t("accounting.entities.fixedAssets.form.unavailable", { defaultValue: "(unavailable)" })
+    const noneLabel = t("accounting.entities.fixedAssets.form.none", { defaultValue: "None" })
+    const accountRows = copyAsRecords(accounts)
+    const journalRows = copyAsRecords(journals)
+    const assetFailureMessage = (reason: AssetFailure): string => {
+      switch (reason) {
+        case "code":
+        case "name":
+        case "assetType":
+        case "currency":
+          return t("accounting.entities.fixedAssets.form.invalidIdentity", { defaultValue: "Enter a code, a name, an asset type and a currency." })
+        case "originalValue":
+        case "salvageValue":
+          return t("accounting.entities.fixedAssets.form.invalidAmounts", { defaultValue: "The original value must be above zero and the salvage value from zero up to below the original value." })
+        case "method":
+        case "methodNumber":
+        case "methodPeriod":
+        case "progressFactor":
+          return t("accounting.entities.fixedAssets.form.invalidMethod", { defaultValue: "Choose a method, at least one depreciation of at least one month, and a degressive factor above 0 up to 100 for degressive methods." })
+        case "acquisitionDate":
+        case "firstDepreciationDate":
+          return t("accounting.entities.fixedAssets.form.invalidDates", { defaultValue: "Enter a valid acquisition date (and a valid first depreciation date, if any)." })
+        case "journal":
+        case "assetAccount":
+        case "depreciationAccount":
+        case "expenseAccount":
+          return t("accounting.entities.fixedAssets.form.invalidAccounts", { defaultValue: "Choose a general journal, asset and depreciation accounts from the Asset group and an expense account from the Expense group." })
+        default:
+          return t("accounting.entities.fixedAssets.form.invalidDisposal", { defaultValue: "Disposal accounts must be an income account for gains, an expense account for losses and an asset account for disposals." })
+      }
+    }
+    const assetFields = (
+      companyId: bigint,
+      current: ReturnType<typeof assetEditDefaults> | null,
+    ): FormField[] => {
+      const accountSelect = (
+        id: string,
+        label: string,
+        role: Parameters<typeof assetAccountOptions>[2],
+        value: string,
+        optional: boolean,
+      ): FormField => {
+        const options = assetAccountOptions(accountRows, companyId, role, value, staleSuffix)
+        return {
+          id,
+          name: id,
+          label,
+          type: "select",
+          required: !optional,
+          searchable: true,
+          defaultValue: value,
+          options: optional ? withNone(options, noneLabel) : options,
+          width: "1/2",
+        }
+      }
+      const f = (key: string, fallback: string) => t(`accounting.entities.fixedAssets.form.${key}`, { defaultValue: fallback })
+      const typeLabels: Record<string, string> = {
+        Purchase: f("typePurchase", "Purchase"),
+        Sale: f("typeSale", "Sale"),
+      }
+      const methodLabels: Record<string, string> = {
+        Linear: f("methodLinear", "Linear"),
+        Degressive: f("methodDegressive", "Degressive"),
+        DegressiveThenLinear: f("methodDegressiveThenLinear", "Degressive then linear"),
+      }
+      return [
+        ...(current == null
+          ? ([
+              { id: "code", name: "code", label: f("code", "Code"), type: "text", required: true, width: "1/2" },
+              { id: "name", name: "name", label: f("name", "Name"), type: "text", required: true, width: "1/2" },
+              {
+                id: "assetType",
+                name: "assetType",
+                label: f("assetType", "Asset type"),
+                type: "select",
+                required: true,
+                defaultValue: "Purchase",
+                options: ASSET_TYPES.map((value) => ({ value, label: typeLabels[value]! })),
+                width: "1/3",
+              },
+              {
+                id: "currencyId",
+                name: "currencyId",
+                label: f("currency", "Currency"),
+                type: "select",
+                required: true,
+                searchable: true,
+                defaultValue: defaultCurrencyId > 0n ? String(defaultCurrencyId) : "",
+                options: currencySelectOptions,
+                width: "1/3",
+              },
+              { id: "acquisitionDate", name: "acquisitionDate", label: f("acquisitionDate", "Acquisition date"), type: "date", required: true, width: "1/3" },
+            ] as FormField[])
+          : ([{ id: "name", name: "name", label: f("name", "Name"), type: "text", required: true, defaultValue: current.name }] as FormField[])),
+        { id: "originalValue", name: "originalValue", label: f("originalValue", "Original value"), type: "number", required: true, min: 0.01, step: 0.01, defaultValue: current?.originalValue, width: "1/2" },
+        { id: "salvageValue", name: "salvageValue", label: f("salvageValue", "Salvage value"), type: "number", min: 0, step: 0.01, defaultValue: current?.salvageValue ?? 0, width: "1/2" },
+        {
+          id: "method",
+          name: "method",
+          label: f("method", "Depreciation method"),
+          type: "select",
+          required: true,
+          defaultValue: current?.method ?? "Linear",
+          options: DEPRECIATION_METHODS.map((value) => ({ value, label: methodLabels[value]! })),
+          width: "1/2",
+        },
+        { id: "methodProgressFactor", name: "methodProgressFactor", label: f("progressFactor", "Degressive factor (%)"), type: "number", min: 0, max: 100, step: 0.01, defaultValue: current?.methodProgressFactor || 30, width: "1/2" },
+        { id: "methodNumber", name: "methodNumber", label: f("methodNumber", "Number of depreciations"), type: "number", required: true, min: 1, step: 1, defaultValue: current?.methodNumber ?? 5, width: "1/2" },
+        { id: "methodPeriod", name: "methodPeriod", label: f("methodPeriod", "Months between depreciations"), type: "number", required: true, min: 1, step: 1, defaultValue: current?.methodPeriod ?? 12, width: "1/2" },
+        { id: "firstDepreciationDate", name: "firstDepreciationDate", label: f("firstDepreciationDate", "First depreciation date"), type: "date", defaultValue: current?.firstDepreciationDate ?? "", width: "1/2" },
+        { id: "prorata", name: "prorata", label: f("prorata", "Prorata temporis"), type: "switch", defaultValue: current?.prorata ?? false, width: "1/2" },
+        {
+          id: "journalId",
+          name: "journalId",
+          label: f("journal", "Depreciation journal (general)"),
+          type: "select",
+          required: true,
+          searchable: true,
+          defaultValue: current?.journalId ?? "",
+          options: assetJournalOptions(journalRows, companyId, current?.journalId ?? "", staleSuffix),
+        },
+        accountSelect("accountAssetId", f("assetAccount", "Asset account"), "asset", current?.accountAssetId ?? "", false),
+        accountSelect("accountDepreciationId", f("depreciationAccount", "Accumulated depreciation account"), "depreciation", current?.accountDepreciationId ?? "", false),
+        accountSelect("accountDepreciationExpenseId", f("expenseAccount", "Depreciation expense account"), "expense", current?.accountDepreciationExpenseId ?? "", false),
+        accountSelect("gainAccountId", f("gainAccount", "Disposal gain account (optional)"), "gain", current?.gainAccountId ?? "", true),
+        accountSelect("lossAccountId", f("lossAccount", "Disposal loss account (optional)"), "loss", current?.lossAccountId ?? "", true),
+        accountSelect("accountDisposalId", f("disposalAccount", "Disposal account (optional)"), "disposal", current?.accountDisposalId ?? "", true),
+      ]
+    }
+    const promptNewAsset = async () => {
+      if (operatingCompanyId <= 0n) return
+      // One idempotency key per dialog: resubmitting this dialog replays instead of duplicating.
+      const idempotencyKey = `create-account-asset:${globalThis.crypto.randomUUID()}`
+      const values = await askForm({ title: newAssetLabel, fields: assetFields(operatingCompanyId, null) })
+      if (values == null) return
+      const result = toAssetCreateParams(values, { companyId: operatingCompanyId, accounts: accountRows, journals: journalRows }, idempotencyKey)
+      if (!result.ok) {
+        showWorkflowToast({
+          kind: "error",
+          title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: newAssetLabel }),
+          description: assetFailureMessage(result.reason),
+        })
+        return
+      }
+      await runTaxCommand(newAssetLabel, () =>
+        createAccountAsset.mutateAsync({ companyId: operatingCompanyId, params: result.params }),
+      )
+    }
+    const promptEditAsset = async (row: Record<string, unknown>) => {
+      const companyId = assetCompanyId(row, operatingCompanyId)
+      if (companyId == null || !canEditAsset(row)) return
+      const values = await askForm({ title: editAssetLabel, fields: assetFields(companyId, assetEditDefaults(row)) })
+      if (values == null) return
+      const result = toAssetUpdateParams(values, row, { companyId, accounts: accountRows, journals: journalRows })
+      if (!result.ok) {
+        showWorkflowToast(
+          result.reason === "unchanged"
+            ? { kind: "info", title: t("accounting.accounts.edit.unchanged", { defaultValue: "Nothing to change." }) }
+            : {
+                kind: "error",
+                title: t("accounting.taxDeadlines.actions.failed", { defaultValue: "{{action}} failed", action: editAssetLabel }),
+                description: assetFailureMessage(result.reason),
+              },
+        )
+        return
+      }
+      await runTaxCommand(editAssetLabel, () =>
+        updateAccountAsset.mutateAsync({ companyId, assetId: BigInt(String(row.id)), params: result.params }),
+      )
+    }
     return {
       ...base,
       view: {
         ...view,
         actions: [
+          {
+            id: "asset-new",
+            label: newAssetLabel,
+            permission: { resource: "account_asset", action: "create" },
+            onClick: () => promptNewAsset(),
+          },
+          {
+            id: "asset-edit",
+            label: editAssetLabel,
+            requiresSelection: true,
+            selection: "single",
+            permission: { resource: "account_asset", action: "write" },
+            isApplicable: (rows) => rows.length === 1 && canEditAsset(rows[0] as Record<string, unknown>),
+            onClick: (rows) => promptEditAsset(rows[0] as Record<string, unknown>),
+          },
           {
             id: "asset-activate",
             label: t("accounting.entities.fixedAssets.actions.activateSelected"),
@@ -2272,6 +3821,15 @@ function AccountingClientReady({
     }
   }, [
     t,
+    askForm,
+    accounts,
+    journals,
+    operatingCompanyId,
+    defaultCurrencyId,
+    currencySelectOptions,
+    runTaxCommand,
+    createAccountAsset.mutateAsync,
+    updateAccountAsset.mutateAsync,
     setAccountAssetActive,
     confirmAccountAsset,
     closeAccountAsset,
@@ -2862,7 +4420,7 @@ function AccountingClientReady({
   const liveSections = useMemo(() => {
     const ar = invoices.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
     const ap = bills.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
-    const cash = accounts
+    const bankOpeningBalances = accounts
       .filter((a) => a.isBankAccount)
       .reduce((s, a) => s + Number(a.openingBalance ?? 0), 0)
 
@@ -2887,8 +4445,8 @@ function AccountingClientReady({
       rows
         .filter((m) => moveStateStr(m as Record<string, unknown>) === "Posted")
         .reduce((s, m) => s + Number(m.amountTotal ?? 0), 0)
-    const currentRevenue = revenueOf(currentIssuedInvoices)
-    const previousRevenue = revenueOf(previousIssuedInvoices)
+    const currentPostedInvoiceTotal = revenueOf(currentIssuedInvoices)
+    const previousPostedInvoiceTotal = revenueOf(previousIssuedInvoices)
 
     const paymentRows = accountPayments as Record<string, unknown>[]
     const paymentsReceivedIn = (range: { startMs: number; endMs: number }) =>
@@ -2910,11 +4468,19 @@ function AccountingClientReady({
               stats: [
                 { label: t("accounting.dashboard.accountsReceivable"), value: `$${ar.toLocaleString()}`, icon: "TrendingUp" },
                 { label: t("accounting.dashboard.accountsPayable"), value: `$${ap.toLocaleString()}`, icon: "TrendingDown" },
-                { label: t("accounting.dashboard.cashBalance"), value: `$${cash.toLocaleString()}`, icon: "DollarSign" },
                 {
-                  label: t("accounting.dashboard.revenue"),
-                  value: `$${currentRevenue.toLocaleString()}`,
-                  change: percentChange(currentRevenue, previousRevenue),
+                  label: t("accounting.dashboard.bankOpeningBalances", {
+                    defaultValue: "Bank opening balances",
+                  }),
+                  value: `$${bankOpeningBalances.toLocaleString()}`,
+                  icon: "DollarSign",
+                },
+                {
+                  label: t("accounting.dashboard.postedInvoiceTotal", {
+                    defaultValue: "Posted invoice total",
+                  }),
+                  value: `$${currentPostedInvoiceTotal.toLocaleString()}`,
+                  change: percentChange(currentPostedInvoiceTotal, previousPostedInvoiceTotal),
                   icon: "BarChart2",
                 },
                 {
@@ -2938,8 +4504,8 @@ function AccountingClientReady({
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            create_invoice: () => setShowCreateInvoice(true),
-            create_bill: () => setShowCreateBill(true),
+            create_invoice: openInvoiceCreate,
+            create_bill: openBillCreate,
             journal_entry: () => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" }),
             create_tax: () => setQuickActionForm({ form: newTaxForm(t), action: "createTax" }),
             currency_rate: () =>
@@ -2955,9 +4521,14 @@ function AccountingClientReady({
           }
         }
         if (w.id === "acc-overdue") {
-          const overdueInvoices = invoices.filter((m) => Number(m.amountResidual ?? 0) > 0)
-          const totalAmount = overdueInvoices.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
           const nowMs = Date.now()
+          const overdueInvoices = invoices.filter((m) => {
+            if (moveStateStr(m as Record<string, unknown>) !== "Posted") return false
+            if (Number(m.amountResidual ?? 0) <= 0) return false
+            const dueMs = flexibleTimestampMs(m.invoiceDateDue)
+            return dueMs != null && dueMs < nowMs
+          })
+          const totalAmount = overdueInvoices.reduce((s, m) => s + Number(m.amountResidual ?? 0), 0)
           const oldestDays = overdueInvoices.reduce((max, m) => {
             if (!m.invoiceDateDue) return max
             const dueMs = flexibleTimestampMs(m.invoiceDateDue)
@@ -2983,7 +4554,13 @@ function AccountingClientReady({
             balance: Number(a.openingBalance ?? 0),
             type: String(a.internalGroup ?? "Asset"),
           }))
-          return { ...w, data: { accounts: accountRows } }
+          return {
+            ...w,
+            title: t("accounting.dashboard.keyAccountOpeningBalances", {
+              defaultValue: "Key account opening balances",
+            }),
+            data: { accounts: accountRows },
+          }
         }
         if (w.id === "accounting-ar-ap-aging") {
           const nowMs = Date.now()
@@ -3056,6 +4633,8 @@ function AccountingClientReady({
     t,
     journalEntryFormConfig,
     currencyRateFormConfig,
+    openInvoiceCreate,
+    openBillCreate,
   ])
 
   const chartStructurePanel = useMemo(
@@ -3104,11 +4683,245 @@ function AccountingClientReady({
   )
 
   // ── Form submit handler (entity tabs: taxes, budgets) ───────────────────────
+  const dataState = {
+    dashboard: mergeModuleStates([
+      accountsRead.state, allMovesRead.state, budgetsRead.state, taxDeadlinesRead.state, accountPaymentsRead.state,
+    ]),
+    accounts: mergeModuleStates([accountsRead.state, accountTypesRead.state, accountGroupsRead.state]),
+    "journal-entries": mergeModuleStates([
+      allMovesRead.state,
+      accountMoveLinesRead.state,
+      accountsRead.state,
+      saleOrdersRead.state,
+      journalsRead.state,
+    ]),
+    invoices: mergeModuleStates([
+      allMovesRead.state,
+      accountMoveLinesRead.state,
+      accountsRead.state,
+      saleOrdersRead.state,
+      journalsRead.state,
+    ]),
+    bills: mergeModuleStates([
+      allMovesRead.state,
+      accountMoveLinesRead.state,
+      accountsRead.state,
+      saleOrdersRead.state,
+      journalsRead.state,
+    ]),
+    taxes: taxesRead.state,
+    payments: mergeModuleStates([
+      accountPaymentsRead.state,
+      contactsRead.state,
+      journalsRead.state,
+      currenciesRead.state,
+      companiesRead.state,
+      allMovesRead.state,
+    ]),
+    "payment-operations": mergeModuleStates([
+      accountMoveLinesRead.state,
+      accountsRead.state,
+      contactsRead.state,
+      journalsRead.state,
+      currenciesRead.state,
+      companiesRead.state,
+    ]),
+    "tax-groups": taxGroupsRead.state,
+    "tax-jurisdictions": taxJurisdictionsRead.state,
+    "tax-schedules": taxSchedulesRead.state,
+    "tax-deadlines": taxDeadlinesRead.state,
+    "payment-terms": paymentTermsRead.state,
+    "payment-term-lines": mergeModuleStates([paymentTermLinesRead.state, paymentTermsRead.state]),
+    budgets: mergeModuleStates([budgetsRead.state, budgetLinesRead.state, budgetPostsRead.state]),
+    analytic: mergeModuleStates([analyticRead.state, currenciesRead.state, companiesRead.state]),
+    "analytic-lines": mergeModuleStates([
+      analyticLinesRead.state,
+      analyticRead.state,
+      currenciesRead.state,
+      companiesRead.state,
+    ]),
+    "analytic-distribution": mergeModuleStates([analyticDistributionRead.state, analyticRead.state]),
+    "bank-statements": mergeModuleStates([
+      bankStatementsRead.state,
+      bankStatementLinesRead.state,
+      bankMatchCandidatesRead.state,
+      contactsRead.state,
+      journalsRead.state,
+      currenciesRead.state,
+      companiesRead.state,
+    ]),
+    "reconciliation-widgets": mergeModuleStates([
+      reconciliationWidgetsRead.state,
+      accountsRead.state,
+      contactsRead.state,
+    ]),
+    "fixed-assets": mergeModuleStates([
+      fixedAssetsRead.state,
+      depreciationLinesRead.state,
+      accountsRead.state,
+      journalsRead.state,
+      currenciesRead.state,
+      companiesRead.state,
+      allMovesRead.state,
+    ]),
+    "fiscal-years": fiscalYearsRawRead.state,
+    "account-periods": accountPeriodsRawRead.state,
+    "fx-revaluation": mergeModuleStates([
+      fxRevaluationRunsRead.state,
+      currenciesRead.state,
+      journalsRead.state,
+      accountsRead.state,
+      accountPaymentsRead.state,
+      allMovesRead.state,
+    ]),
+    "credit-control": mergeModuleStates([
+      partnerCreditControlsRead.state,
+      contactsRead.state,
+      journalsRead.state,
+      accountsRead.state,
+      allMovesRead.state,
+    ]),
+    amortization: mergeModuleStates([
+      amortizationSchedulesRead.state,
+      amortizationLinesRead.state,
+      journalsRead.state,
+      accountsRead.state,
+      currenciesRead.state,
+    ]),
+    consolidation: mergeModuleStates([
+      consolidationAccountsRead.state,
+      consolidationJournalsRead.state,
+      eliminationEntriesRead.state,
+      companiesRead.state,
+      currenciesRead.state,
+      accountPeriodsRawRead.state,
+    ]),
+    "intercompany-rules": mergeModuleStates([
+      intercompanyRulesRead.state,
+      companiesRead.state,
+      journalsRead.state,
+      accountsRead.state,
+    ]),
+    "intercompany-transactions": mergeModuleStates([
+      intercompanyTransactionsRead.state,
+      companiesRead.state,
+      currenciesRead.state,
+      saleOrdersRead.state,
+      allMovesRead.state,
+    ]),
+    "account-journals": journalsRead.state,
+    "move-lines": mergeModuleStates([
+      accountMoveLinesRead.state,
+      accountsRead.state,
+      saleOrdersRead.state,
+      allMovesRead.state,
+    ]),
+    "period-close": mergeModuleStates([
+      fiscalYearsRawRead.state,
+      accountPeriodsRawRead.state,
+      allMovesRead.state,
+      bankStatementsRead.state,
+      bankStatementLinesRead.state,
+      financialReportsRead.state,
+    ]),
+  }
+  type AccountingTab = keyof typeof dataState
+  const isAccountingTab = (tab: string): tab is AccountingTab =>
+    Object.prototype.hasOwnProperty.call(dataState, tab)
+  const tabUsable = (tab: string | undefined) =>
+    tab == null || (isAccountingTab(tab) && canUseModuleData(dataState[tab]))
+  type AccountingDataAction =
+    | "createAccount"
+    | "createMove"
+    | "createTax"
+    | "createBudget"
+    | "createAnalyticAccount"
+    | "createAnalyticLine"
+    | "createAnalyticDistributionModel"
+    | "createReconciliationWidget"
+    | "createFiscalYear"
+    | "createAccountPeriod"
+    | "createAccountPayment"
+    | "createPaymentTerm"
+    | "createPaymentTermLine"
+    | "createAccountJournal"
+    | "addAccountMoveLine"
+    | "createCurrencyRate"
+    | "createDepreciationLine"
+    | "createIntercompanyRule"
+    | "createIntercompanyTransaction"
+  const actionTabs = {
+    createAccount: "accounts", createMove: "journal-entries", createTax: "taxes", createBudget: "budgets",
+    createAnalyticAccount: "analytic", createAnalyticLine: "analytic-lines",
+    createAnalyticDistributionModel: "analytic-distribution", createReconciliationWidget: "reconciliation-widgets",
+    createFiscalYear: "fiscal-years", createAccountPeriod: "account-periods", createAccountPayment: "payments",
+    createPaymentTerm: "payment-terms", createPaymentTermLine: "payment-term-lines",
+    createAccountJournal: "account-journals", addAccountMoveLine: "move-lines",
+    createCurrencyRate: "fx-revaluation",
+    createDepreciationLine: "fixed-assets", createIntercompanyRule: "intercompany-rules",
+    createIntercompanyTransaction: "intercompany-transactions",
+  } satisfies Record<AccountingDataAction, AccountingTab>
+  const isAccountingDataAction = (action: string): action is AccountingDataAction =>
+    Object.prototype.hasOwnProperty.call(actionTabs, action)
+  const actionUsable = (action: string) =>
+    !isAccountingDataAction(action) || tabUsable(actionTabs[action])
+  const csvTabs: Record<AccountingCsvImportKind, AccountingTab> = {
+    account: "accounts",
+    accountMove: "journal-entries",
+    outstandingDocuments: "journal-entries",
+    historicalDocumentsForPaymentReplay: "journal-entries",
+    accountMoveLine: "journal-entries",
+    tax: "taxes",
+    budget: "budgets",
+    budgetLine: "budgets",
+    analytic: "analytic",
+  }
+  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
+  // Record sheets, row editors and prompts are opened from the active tab's rows.
+  const activeTabUsable = tabUsable(accountingActiveTab)
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!csvUsable) setCsvKind(null)
+    if (!activeTabUsable) {
+      setSelectedInvoice(null)
+      setInvoiceSheetRecord(null)
+      setShowCreateInvoice(false)
+      setShowCreateBill(false)
+      setCreditNoteSource(null)
+      setAnalyticAccountEdit(null)
+      setAnalyticLineEdit(null)
+      setAnalyticDistEdit(null)
+      setBankStatementDetail(null)
+      setBankLineCreateOpen(false)
+      setBankLineEdit(null)
+      setBankLineMatchFocus(null)
+      setReconciliationWidgetEdit(null)
+      setFiscalYearEdit(null)
+      setFiscalSetupOpen(false)
+      setAccountPeriodEdit(null)
+      setRegisterPaymentForId(null)
+      setReconcilePaymentOpen(false)
+      setJournalEdit(null)
+      setPaymentTermLineEdit(null)
+      setSelectedFixedAsset(null)
+      setDepreciationLineCreateOpen(false)
+      setIntercompanyRuleEdit(null)
+      setIntercompanyTxCreateOpen(false)
+      setMoveLineEdit(null)
+      setChatterTarget(null)
+      setGlDrilldownAccount(null)
+      cancelForm()
+    }
+  }, [quickActionUsable, csvUsable, activeTabUsable, cancelForm])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!actionUsable(action)) return
     if (action === "createAccount") {
       const p = toCreateAccountAccountParams(formData, {
         companyId: operatingCompanyId,
@@ -3195,8 +5008,14 @@ function AccountingClientReady({
     }
   }
 
+  const canImportCsv = useCallback(
+    (kind: "account" | "accountMove" | "accountMoveLine" | "budget" | "budgetLine") =>
+      checkPermission(CSV_IMPORT_CONTRACTS[kind].resource, "create").allowed,
+    [checkPermission],
+  )
+
   const addCsvToolbar = useCallback(
-    (ec: EntityViewConfig, actions: Array<{ id: string; label: string; onClick: () => void }>): EntityViewConfig => {
+    (ec: EntityViewConfig, actions: EntityAction[]): EntityViewConfig => {
       if (ec.view.mode !== "table") return ec
       return {
         ...ec,
@@ -3210,18 +5029,280 @@ function AccountingClientReady({
     [],
   )
 
+  const submitAccountMoveBundle = useCallback(
+    async ({
+      headers,
+      split,
+      parentMapping,
+      lineMapping,
+      fileNamePrefix,
+      resume,
+    }: {
+      headers: string[]
+      split: SplitAccountMoveImportResult
+      parentMapping: ColumnMappingMap
+      lineMapping: ColumnMappingMap
+      fileNamePrefix: string
+      resume?: HistoricalImportResume
+    }) => {
+      const canonicalParentCsv = buildBundleParentCsv(
+        split.parentHeaders,
+        split.parentRows,
+        parentMapping,
+      )
+      const bundleToken = accountMoveBundleToken(canonicalParentCsv)
+      if (resume?.phase === "complete") {
+        return { bundleToken, moveIdByRef: resume.moveIdByReference }
+      }
+      const parentCsv = markAccountMoveBundleParentCsv(canonicalParentCsv)
+      let moveIdByRef =
+        resume?.phase === "lines_pending" ? resume.moveIdByReference : undefined
+      if (!moveIdByRef) {
+        const parentReceipt = await trackedBundleImport.mutateAsync(
+          createCsvImportRequest(
+            orgId,
+            "account_move",
+            parentCsv,
+            `${fileNamePrefix}-headers.csv`,
+            { companyId: operatingCompanyId },
+          ),
+        )
+        assertBundleImportSucceeded("Journal entry header", parentReceipt)
+
+        let importedMoves = await fetchQueryList<"account-moves">(
+          `/api/query/account-moves?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
+          "Failed to resolve imported journal entries",
+        )
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          const availableRefs = new Set(
+            importedMoves
+              .filter((move) => String(move.companyId) === String(operatingCompanyId))
+              .map((move) => accountMoveReference({ id: move.id, ref: move.ref }))
+              .filter(Boolean),
+          )
+          if (split.parentLinkValues.every((reference) => availableRefs.has(reference))) break
+          await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)))
+          importedMoves = await fetchQueryList<"account-moves">(
+            `/api/query/account-moves?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
+            "Failed to resolve imported journal entries",
+          )
+        }
+
+        const afterMoveLinks = importedMoves
+          .filter((move) => String(move.companyId) === String(operatingCompanyId))
+          .map((move) => ({ id: move.id, ref: move.ref }))
+        moveIdByRef = buildMoveIdMapFromAccountMoves(
+          afterMoveLinks,
+          split.parentLinkValues,
+        )
+      }
+      const lineCsv = markAccountMoveBundleLineCsv(
+        buildAccountMoveLineCsv(
+          headers,
+          split.lineRows,
+          lineMapping,
+          moveIdByRef,
+        ),
+        bundleToken,
+      )
+      const lineReceipt = await trackedBundleImport.mutateAsync(
+        createCsvImportRequest(
+          orgId,
+          "account_move_line",
+          lineCsv,
+          `${fileNamePrefix}-lines.csv`,
+          { companyId: operatingCompanyId },
+        ),
+      )
+      assertBundleImportSucceeded("Journal entry line", lineReceipt)
+      return { bundleToken, moveIdByRef }
+    },
+    [operatingCompanyId, orgId, trackedBundleImport],
+  )
+
+  const importAccountMoveBundle = useCallback(
+    async (text: string) => {
+      const parsed = parseCsvText(text)
+      const headers = parsed.headers.map((header) => header.trim().toLowerCase())
+      if (new Set(headers).size !== headers.length) {
+        throw new Error("The journal import contains duplicate column names.")
+      }
+
+      const { parentMapping, lineMapping } = accountMoveBundleMappings(headers)
+      const split = splitAccountMoveImportCsv({
+        headers,
+        rows: parsed.rows,
+        parentMapping,
+        lineMapping,
+        parentLinkSourceColumn: ACCOUNT_MOVE_IMPORT_BUNDLE.parentLinkField,
+      })
+      await submitAccountMoveBundle({
+        headers,
+        split,
+        parentMapping,
+        lineMapping,
+        fileNamePrefix: "journal-entry",
+      })
+    },
+    [submitAccountMoveBundle],
+  )
+
+  const importOutstandingDocuments = useCallback(
+    async (text: string, mode: OutstandingDocumentImportMode) => {
+      const parsed = parseCsvText(text)
+      const headers = parsed.headers.map((header) => header.trim().toLowerCase())
+      if (new Set(headers).size !== headers.length) {
+        throw new Error("The outstanding-document import contains duplicate column names.")
+      }
+      const supportedColumns: ReadonlySet<string> = new Set([
+        ...(mode === "reconstruct_original_total"
+          ? HISTORICAL_PAYMENT_REPLAY_IMPORT_COLUMNS.required
+          : OUTSTANDING_DOCUMENT_IMPORT_COLUMNS.required),
+        ...(mode === "reconstruct_original_total"
+          ? HISTORICAL_PAYMENT_REPLAY_IMPORT_COLUMNS.optional
+          : OUTSTANDING_DOCUMENT_IMPORT_COLUMNS.optional),
+      ])
+      const mapping = Object.fromEntries(
+        headers
+          .filter((header) => supportedColumns.has(header))
+          .map((header) => [header, header]),
+      )
+      const prepared = prepareOutstandingDocumentImport({
+        headers,
+        rows: parsed.rows,
+        mapping,
+        mode,
+        companyCurrencyId: manualInvoiceCurrencyId,
+        importBatchIdentity:
+          mode === "reconstruct_original_total"
+            ? accountMoveBundleToken(text)
+            : undefined,
+      })
+      let resume: HistoricalImportResume | undefined
+      if (mode === "reconstruct_original_total") {
+        const capabilityResponse = await apiFetch(
+          "/api/accounting/historical-payment-allocations/capability",
+        )
+        if (!capabilityResponse.ok) {
+          throw new Error(
+            `Historical payment replay capability check failed (${capabilityResponse.status})`,
+          )
+        }
+        validateHistoricalPaymentReplayCapability(await capabilityResponse.json())
+        validateHistoricalPaymentReplaySources({
+          groups: prepared.paymentReplayGroups,
+          paymentTransactions: await fetchQueryList<"payment-transactions">(
+            `/api/query/payment-transactions?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
+            "Failed to validate historical payment transactions",
+          ),
+          companyId: operatingCompanyId,
+        })
+      }
+      const split = splitAccountMoveImportCsv(outstandingDocumentSplitArgs(prepared))
+      if (mode === "reconstruct_original_total") {
+        const canonicalParentCsv = buildBundleParentCsv(
+          split.parentHeaders,
+          split.parentRows,
+          prepared.parentMapping,
+        )
+        const bundleToken = accountMoveBundleToken(canonicalParentCsv)
+        const [existingMoves, existingLines] = await Promise.all([
+          fetchQueryList<"account-moves">(
+            `/api/query/account-moves?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
+            "Failed to inspect existing historical documents",
+          ),
+          fetchQueryList<"account-move-lines">(
+            `/api/query/account-move-lines?companyId=${encodeURIComponent(String(operatingCompanyId))}`,
+            "Failed to inspect existing historical document lines",
+          ),
+        ])
+        resume = resolveHistoricalImportResume({
+          checks: prepared.documentResumeChecks,
+          existingMoves,
+          existingLines,
+          companyId: operatingCompanyId,
+          bundleToken,
+          markedParentCsv: markAccountMoveBundleParentCsv(canonicalParentCsv),
+          importBatchIdentity: prepared.importBatchIdentity,
+        })
+      }
+      const imported = await submitAccountMoveBundle({
+        headers: prepared.headers,
+        split,
+        parentMapping: prepared.parentMapping,
+        lineMapping: prepared.lineMapping,
+        fileNamePrefix:
+          mode === "reconstruct_original_total"
+            ? "historical-document-payment-replay"
+            : "outstanding-document",
+        resume,
+      })
+      if (mode === "reconstruct_original_total") {
+        const moveIds = [...new Set(imported.moveIdByRef.values())].sort((left, right) =>
+          BigInt(left) < BigInt(right) ? -1 : 1,
+        )
+        for (const moveId of moveIds) {
+          try {
+            await postMove.mutateAsync(moveId)
+          } catch (cause) {
+            const detail = cause instanceof Error ? cause.message : String(cause)
+            throw new Error(
+              `Original-total document ${moveId} was imported but could not be posted before payment replay. Complete any required approval, then retry this file. ${detail}`,
+            )
+          }
+        }
+        const batches = buildHistoricalPaymentReplayBatches({
+          groups: prepared.paymentReplayGroups,
+          moveIdByReference: imported.moveIdByRef,
+          companyId: operatingCompanyId,
+          bundleToken: imported.bundleToken,
+        })
+        for (const batch of batches) {
+          try {
+            await applyHistoricalPaymentAllocations.mutateAsync(batch)
+          } catch (cause) {
+            const detail = cause instanceof Error ? cause.message : String(cause)
+            throw new Error(
+              `Documents were imported and posted, but payment transaction ${batch.paymentTransactionId} could not be replayed. Correct the payment and retry this file; completed batches are idempotent. ${detail}`,
+            )
+          }
+        }
+      }
+    },
+    [
+      applyHistoricalPaymentAllocations,
+      manualInvoiceCurrencyId,
+      operatingCompanyId,
+      postMove,
+      submitAccountMoveBundle,
+    ],
+  )
+
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null
     const titleKey: Record<AccountingCsvImportKind, string> = {
       account: "accounting.csvImport.accountsTitle",
       accountMove: "accounting.csvImport.movesTitle",
+      outstandingDocuments: "accounting.csvImport.outstandingDocumentsTitle",
+      historicalDocumentsForPaymentReplay:
+        "accounting.csvImport.historicalDocumentsForPaymentReplayTitle",
       accountMoveLine: "accounting.csvImport.moveLinesTitle",
       tax: "accounting.csvImport.taxTitle",
       budget: "accounting.csvImport.budgetTitle",
       budgetLine: "accounting.csvImport.budgetLineTitle",
       analytic: "accounting.csvImport.analyticTitle",
     }
-    return csvImportForm(t, t(titleKey[csvKind]))
+    return csvImportForm(
+      t,
+      t(titleKey[csvKind]),
+      csvKind === "accountMove"
+        ? t("accounting.csvImport.movesBundleDescription")
+        : csvKind === "outstandingDocuments"
+          ? t("accounting.csvImport.outstandingDocumentsDescription")
+          : csvKind === "historicalDocumentsForPaymentReplay"
+            ? t("accounting.csvImport.historicalDocumentsForPaymentReplayDescription")
+            : undefined,
+    )
   }, [csvKind, t])
 
   // ── Config: inject rich custom content for invoices/bills/accounts/ledger ───
@@ -3255,16 +5336,13 @@ function AccountingClientReady({
                   <ListPivotSwitch
                     storageId="accounting-invoices-list"
                     t={t}
-                    rows={invoices as unknown as Record<string, unknown>[]}
+                    rows={copyAsRecords(invoices)}
                     {...accountMovePivotSetup(t)}
                   >
                   <InvoiceListView
                     invoices={invoices}
-                    onSelectInvoice={(invoice) =>
-                      // ACC-RI-018 rationale: safe because this sheet receives only InvoiceListView AccountMove rows.
-                      setInvoiceSheetRecord(invoice as unknown as Record<string, unknown>)
-                    }
-                    onCreateInvoice={() => setShowCreateInvoice(true)}
+                    onSelectInvoice={(invoice) => setInvoiceSheetRecord(copyAsRecord(invoice))}
+                    onCreateInvoice={openInvoiceCreate}
                     onRecalculateTotals={(inv) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint))
                     }
@@ -3282,16 +5360,13 @@ function AccountingClientReady({
                   <ListPivotSwitch
                     storageId="accounting-bills-list"
                     t={t}
-                    rows={bills as unknown as Record<string, unknown>[]}
+                    rows={copyAsRecords(bills)}
                     {...accountMovePivotSetup(t)}
                   >
                   <BillsListView
                     bills={bills}
-                    onCreateBill={() => setShowCreateBill(true)}
-                    onSelectBill={(bill) =>
-                      // ACC-RI-018 rationale: safe because this sheet receives only BillsListView AccountMove rows.
-                      setInvoiceSheetRecord(bill as unknown as Record<string, unknown>)
-                    }
+                    onCreateBill={openBillCreate}
+                    onSelectBill={(bill) => setInvoiceSheetRecord(copyAsRecord(bill))}
                     onRecalculateTotals={(bill) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint))
                     }
@@ -3309,8 +5384,12 @@ function AccountingClientReady({
                   <ChartOfAccountsView
                     accounts={accounts}
                     chartStructureContent={chartStructurePanel}
-                    onImportAccountsCsv={() => setCsvKind("account")}
+                    onImportAccountsCsv={canImportCsv("account") ? () => setCsvKind("account") : undefined}
                     onAccountClick={(account) => setGlDrilldownAccount(account)}
+                    onToggleDeprecated={
+                      checkPermission("account_account", "write").allowed ? toggleAccountDeprecated : undefined
+                    }
+                    onEdit={checkPermission("account_account", "write").allowed ? editAccount : undefined}
                     onCreate={accountTypes.length > 0 ? async (data) => {
                       const p = toCreateAccountAccountParams(data as Record<string, unknown>, {
                         companyId: operatingCompanyId,
@@ -3332,8 +5411,23 @@ function AccountingClientReady({
                 customContent: (
                   <GeneralLedgerView
                     moves={allMoves}
-                    onImportMovesCsv={() => setCsvKind("accountMove")}
-                    onImportMoveLinesCsv={() => setCsvKind("accountMoveLine")}
+                    onImportMovesCsv={canImportCsv("accountMove") ? openAccountingMoveImport : undefined}
+                    onImportOutstandingDocumentsCsv={
+                      canImportCsv("accountMove") && canImportCsv("accountMoveLine")
+                        ? openOutstandingDocumentImport
+                        : undefined
+                    }
+                    onImportHistoricalDocumentsForPaymentReplayCsv={
+                      HISTORICAL_PAYMENT_REPLAY_CALLABLE &&
+                      canImportCsv("accountMove") &&
+                      canImportCsv("accountMoveLine") &&
+                      checkPermission("account_move", "write").allowed &&
+                      checkPermission("payment_transaction", "read").allowed &&
+                      checkPermission("payment_reconciliation", "create").allowed
+                        ? openHistoricalDocumentPaymentReplayImport
+                        : undefined
+                    }
+                    onImportMoveLinesCsv={canImportCsv("accountMoveLine") ? openAccountingMoveLineImport : undefined}
                     onCreate={() => setQuickActionForm({ form: journalEntryFormConfig, action: "createMove" })}
                     onPostMove={(move) => postDraft(move)}
                     onCancelMove={(move) =>
@@ -3356,12 +5450,16 @@ function AccountingClientReady({
                 customContent: (
                   <div className="space-y-3">
                     <div className="flex justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => setCsvKind("budget")}>
-                        {t("accounting.csvImport.toolbarBudgets")}
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => setCsvKind("budgetLine")}>
-                        {t("accounting.csvImport.toolbarBudgetLines")}
-                      </Button>
+                      {canImportCsv("budget") ? (
+                        <Button type="button" variant="outline" onClick={() => setCsvKind("budget")}>
+                          {t("accounting.csvImport.toolbarBudgets")}
+                        </Button>
+                      ) : null}
+                      {canImportCsv("budgetLine") ? (
+                        <Button type="button" variant="outline" onClick={() => setCsvKind("budgetLine")}>
+                          {t("accounting.csvImport.toolbarBudgetLines")}
+                        </Button>
+                      ) : null}
                     </div>
                     <BudgetsWorkspace
                       budgets={budgets}
@@ -3436,6 +5534,7 @@ function AccountingClientReady({
                   {
                     id: "csv-tax",
                     label: t("accounting.csvImport.toolbarTaxRates"),
+                    permission: { resource: CSV_IMPORT_CONTRACTS.taxRate.resource, action: "create" },
                     onClick: () => setCsvKind("tax"),
                   },
                   {
@@ -3448,6 +5547,7 @@ function AccountingClientReady({
                     label: t("accounting.taxes.scheduleDeadlineUpdates"),
                     onClick: () => scheduleTaxDeadlineUpdates.mutateAsync(),
                   },
+                  editTaxAction,
                 ]),
               }
             }
@@ -3458,6 +5558,7 @@ function AccountingClientReady({
                   {
                     id: "csv-analytic",
                     label: t("accounting.csvImport.toolbarAnalytic"),
+                    permission: { resource: CSV_IMPORT_CONTRACTS.analyticAccount.resource, action: "create" },
                     onClick: () => setCsvKind("analytic"),
                   },
                 ]),
@@ -3587,11 +5688,27 @@ function AccountingClientReady({
                 ),
               }
             }
+            if (tab.id === "tax-schedules") {
+              return { ...tab, entityConfig: taxSchedulesEntityConfig }
+            }
+            if (tab.id === "tax-jurisdictions") {
+              return { ...tab, entityConfig: taxJurisdictionsEntityConfig }
+            }
+            if (tab.id === "tax-groups") {
+              return { ...tab, entityConfig: taxGroupsEntityConfig }
+            }
+            if (tab.id === "tax-deadlines") {
+              return {
+                ...tab,
+                entityConfig: taxDeadlinesEntityConfig,
+                recordSheet: taxDeadlineRecordSheet,
+              }
+            }
             if (tab.id === "bank-statements") {
               return {
                 ...tab,
-                entityConfig: bankStatementsEntityConfig,
-                recordSheet: bankStatementRecordSheet,
+                entityConfig: bankStatementsActionsConfig,
+                recordSheet: bankStatementRecordSheetWithEdit,
               }
             }
             if (tab.id === "reconciliation-widgets") {
@@ -3716,6 +5833,12 @@ function AccountingClientReady({
                     currencySelectOptions={currencySelectOptions}
                     consolidationJournalSelectOptions={consolidationJournalSelectOptions}
                     consolidationAccountSelectOptions={consolidationAccountSelectOptions}
+                    companyRatesSection={
+                      <ConsolidationCompanyRatesSection
+                        organizationId={orgId}
+                        labels={consolidationRateLabels}
+                      />
+                    }
                     onCreateConsolidationAccount={(params) =>
                       createConsolidationAccount.mutateAsync(params)
                     }
@@ -3777,6 +5900,7 @@ function AccountingClientReady({
                 fiscalYears={fiscalYearsRaw as Record<string, unknown>[]}
                 accountPeriods={accountPeriodsRaw as Record<string, unknown>[]}
                 moves={allMoves as Record<string, unknown>[]}
+                bankStatements={bankStatements as Record<string, unknown>[]}
                 bankStatementLines={bankStatementLines as Record<string, unknown>[]}
                 financialReports={financialReportsRaw as Record<string, unknown>[]}
                 onNavigateToTab={setAccountingActiveTab}
@@ -3802,7 +5926,9 @@ function AccountingClientReady({
       accounts,
       allMoves,
       bankStatements,
-      bankStatementsEntityConfig,
+      bankStatementsActionsConfig,
+      bankStatementRecordSheetWithEdit,
+      editAccount,
       createAccount.mutate,
       organizationId,
       budgets,
@@ -3859,6 +5985,14 @@ function AccountingClientReady({
       computeInvoiceTotals.mutateAsync,
       refreshTaxDeadlineStatuses.mutateAsync,
       scheduleTaxDeadlineUpdates.mutateAsync,
+      editTaxAction,
+      taxDeadlinesEntityConfig,
+      taxGroupsEntityConfig,
+      taxJurisdictionsEntityConfig,
+      taxSchedulesEntityConfig,
+      toggleAccountDeprecated,
+      checkPermission,
+      canImportCsv,
       postDraft,
       analyticLineFormConfig,
       newAnalyticAccountFormConfig,
@@ -3881,6 +6015,12 @@ function AccountingClientReady({
       matchEliminationEntries.mutateAsync,
       unmatchEliminationEntry.mutateAsync,
       addCsvToolbar,
+      openInvoiceCreate,
+      openBillCreate,
+      openAccountingMoveImport,
+      openAccountingMoveLineImport,
+      openOutstandingDocumentImport,
+      openHistoricalDocumentPaymentReplayImport,
       computeInvoiceTotals.isPending,
       operatingCompanyId,
       resolveConsolidationPeriodId,
@@ -3933,6 +6073,10 @@ function AccountingClientReady({
       "intercompany-transactions": intercompanyTransactions,
       payments: accountPayments,
       "bank-statements": bankStatements,
+      "tax-deadlines": taxDeadlineRows,
+      "tax-groups": taxGroupRows,
+      "tax-jurisdictions": taxJurisdictionRows,
+      "tax-schedules": taxScheduleRows,
       "payment-terms": paymentTerms,
       "payment-term-lines": paymentTermLinesDisplay,
       "account-journals": journals,
@@ -3948,6 +6092,10 @@ function AccountingClientReady({
       fixedAssets,
       accountPayments,
       bankStatements,
+      taxDeadlineRows,
+      taxGroupRows,
+      taxJurisdictionRows,
+      taxScheduleRows,
       paymentTerms,
       paymentTermLinesDisplay,
       journals,
@@ -3997,11 +6145,18 @@ function AccountingClientReady({
 
   return (
     <>
-      {formDialog}
+      {activeTabUsable && formDialog}
+      <AccountingSetupReadinessPanel
+        setup={accountingSetup}
+        action={readinessAction}
+        onResolve={handleReadinessResolve}
+        className="mb-4"
+      />
       <ModuleView
         config={config}
         data={data}
         dataLoading={dataLoading}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleEntityRowClick}
         activeTab={accountingActiveTab}
@@ -4149,14 +6304,79 @@ function AccountingClientReady({
         />
       ) : null}
 
-      {csvKind && csvFormConfig ? (
+      {csvKind && csvUsable && csvFormConfig ? (
         <CsvImportModal
+          fileReader={readImportFile}
+          trackedImport={
+            csvKind === "accountMove" ||
+            csvKind === "outstandingDocuments" ||
+            csvKind === "historicalDocumentsForPaymentReplay"
+              ? undefined
+              : { companyId: operatingCompanyId }
+          }
+          organizationId={orgId}
+          abandonedAccountingCleanup={
+            (csvKind === "accountMove" ||
+              csvKind === "outstandingDocuments" ||
+              csvKind === "historicalDocumentsForPaymentReplay") &&
+            operatingCompanyId > 0n &&
+            checkPermission("account_move", "delete").allowed
+              ? {
+                  companyId: operatingCompanyId,
+                  authorized: true,
+                  pendingJobId: cleanupAbandonedImport.isPending
+                    ? String(cleanupAbandonedImport.variables ?? "")
+                    : null,
+                  onCleanup: (parentJobId) =>
+                    cleanupAbandonedImport.mutateAsync(parentJobId),
+                }
+              : undefined
+          }
+          tableName={{
+            account: "account_account",
+            accountMove: "account_move_line",
+            outstandingDocuments: "account_move_line",
+            historicalDocumentsForPaymentReplay: "account_move_line",
+            accountMoveLine: "account_move_line",
+            tax: "account_tax",
+            budget: "crossovered_budget",
+            budgetLine: "crossovered_budget_lines",
+            analytic: "account_analytic_account",
+          }[csvKind]}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={
+            csvKind === "accountMove"
+              ? ACCOUNT_MOVE_BUNDLE_COLUMNS
+              : csvKind === "outstandingDocuments"
+                ? OUTSTANDING_DOCUMENT_IMPORT_COLUMNS
+                : csvKind === "historicalDocumentsForPaymentReplay"
+                  ? HISTORICAL_PAYMENT_REPLAY_IMPORT_COLUMNS
+                  : CSV_IMPORT_CONTRACTS[
+                      csvKind === "tax"
+                        ? "taxRate"
+                        : csvKind === "analytic"
+                          ? "analyticAccount"
+                          : csvKind
+                    ]
+          }
+          templateFileName={
+            csvKind === "accountMove"
+              ? "accounting-journal-entry-with-lines-template.csv"
+              : csvKind === "outstandingDocuments"
+                ? "accounting-outstanding-invoices-and-bills-template.csv"
+                : csvKind === "historicalDocumentsForPaymentReplay"
+                  ? "accounting-historical-invoices-and-bills-payment-replay-template.csv"
+                  : `accounting-${csvKind}-import-template.csv`
+          }
           onImport={async (text) => {
             if (csvKind === "account") await csvImports.importAccount.mutateAsync(text)
-            else if (csvKind === "accountMove") await csvImports.importAccountMove.mutateAsync(text)
+            else if (csvKind === "accountMove") await importAccountMoveBundle(text)
+            else if (csvKind === "outstandingDocuments")
+              await importOutstandingDocuments(text, "cutover_open_residual")
+            else if (csvKind === "historicalDocumentsForPaymentReplay")
+              await importOutstandingDocuments(text, "reconstruct_original_total")
             else if (csvKind === "accountMoveLine") await csvImports.importAccountMoveLine.mutateAsync(text)
             else if (csvKind === "tax") await csvImports.importTaxRate.mutateAsync(text)
             else if (csvKind === "budget") await csvImports.importBudget.mutateAsync(text)
@@ -4228,88 +6448,64 @@ function AccountingClientReady({
       {/* Create invoice */}
       <CreateInvoiceModal
         open={showCreateInvoice}
+        kind="invoice"
+        companyId={operatingCompanyId}
         onClose={() => setShowCreateInvoice(false)}
         organizationId={organizationId}
-        journalOptions={journalRowsAsSelectOptions}
-        onSave={async (params) => {
-          if (journals.length === 0) {
-            toast({
-              variant: "destructive",
-              title: t("accounting.forms.newInvoice.createTitle"),
-              description: t("accounting.forms.newInvoice.noJournalsHint"),
-            })
-            return
+        journalOptions={manualInvoiceOptions.invoice.journals}
+        partnerOptions={manualInvoiceOptions.invoice.partners}
+        counterpartAccountOptions={manualInvoiceOptions.invoice.counterpart}
+        lineAccountOptions={manualInvoiceOptions.invoice.commercial}
+        taxOptions={manualInvoiceOptions.invoice.taxes}
+        productOptions={manualInvoiceOptions.invoice.products}
+        paymentTermOptions={paymentTermSelectOptions.filter((option) => option.value !== "")}
+        onSave={async (params: CreateManualAccountInvoiceParams) => {
+          const outcome = await createManualInvoice.mutateAsync(params)
+          if (outcome.kind === "converged" || outcome.kind === "already-applied") {
+            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id)
           }
-          const jid = journalIdFromInvoiceModalSave(params, journals)
-          if (jid == null) {
-            toast({
-              variant: "destructive",
-              title: t("accounting.forms.newInvoice.createTitle"),
-              description: t("accounting.forms.newInvoice.fields.journalPlaceholder"),
-            })
-            return
-          }
-          const p = toCreateAccountMoveFromInvoiceModal(
-            params as Record<string, unknown>,
-            "OutInvoice",
-            jid,
-            "Customer Invoice",
-            operatingCompanyId,
-          )
-          await createMove.mutateAsync(p)
-          if (p.metadata && p.invoicePartnerDisplayName) {
-            await persistAccountMoveCustomFieldsAfterCreate(
-              p.metadata,
-              p.invoicePartnerDisplayName,
-            )
-          }
+          return outcome
         }}
+        onCheckStatus={async (params) => {
+          const ref = await readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)
+          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id)
+          return ref
+        }}
+        onResolved={(ref) => ref.href && router.push(ref.href)}
       />
 
       {/* Create bill (same form, different move type) */}
       <CreateInvoiceModal
         open={showCreateBill}
+        kind="bill"
+        companyId={operatingCompanyId}
         onClose={() => setShowCreateBill(false)}
         organizationId={organizationId}
-        journalOptions={journalRowsAsSelectOptions}
-        onSave={async (params) => {
-          if (journals.length === 0) {
-            toast({
-              variant: "destructive",
-              title: t("accounting.forms.newBill.createTitle"),
-              description: t("accounting.forms.newBill.noJournalsHint"),
-            })
-            return
+        journalOptions={manualInvoiceOptions.bill.journals}
+        partnerOptions={manualInvoiceOptions.bill.partners}
+        counterpartAccountOptions={manualInvoiceOptions.bill.counterpart}
+        lineAccountOptions={manualInvoiceOptions.bill.commercial}
+        taxOptions={manualInvoiceOptions.bill.taxes}
+        productOptions={manualInvoiceOptions.bill.products}
+        paymentTermOptions={paymentTermSelectOptions.filter((option) => option.value !== "")}
+        onSave={async (params: CreateManualAccountInvoiceParams) => {
+          const outcome = await createManualInvoice.mutateAsync(params)
+          if (outcome.kind === "converged" || outcome.kind === "already-applied") {
+            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id)
           }
-          const jid = journalIdFromInvoiceModalSave(params, journals)
-          if (jid == null) {
-            toast({
-              variant: "destructive",
-              title: t("accounting.forms.newBill.createTitle"),
-              description: t("accounting.forms.newBill.fields.journalPlaceholder"),
-            })
-            return
-          }
-          const p = toCreateAccountMoveFromInvoiceModal(
-            params as Record<string, unknown>,
-            "InInvoice",
-            jid,
-            "Vendor Bill",
-            operatingCompanyId,
-          )
-          await createMove.mutateAsync(p)
-          if (p.metadata && p.invoicePartnerDisplayName) {
-            await persistAccountMoveCustomFieldsAfterCreate(
-              p.metadata,
-              p.invoicePartnerDisplayName,
-            )
-          }
+          return outcome
         }}
+        onCheckStatus={async (params) => {
+          const ref = await readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)
+          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id)
+          return ref
+        }}
+        onResolved={(ref) => ref.href && router.push(ref.href)}
       />
 
       {/* Dashboard quick-action form modal */}
       <RuntimeFormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         staticConfig={quickActionForm?.form ?? journalEntryFormConfig}
         moduleId="accounting"

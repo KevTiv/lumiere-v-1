@@ -6,7 +6,7 @@ import { useTranslation } from "@lumiere/i18n"
 
 import { cn } from "@/lib/utils"
 import { useRBAC } from "@/lib/rbac-context"
-import { settingsSections } from "@/lib/rbac-defaults"
+import { isSettingsSectionAdmitted, settingsSections } from "@/lib/rbac-defaults"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -81,8 +81,10 @@ export function SettingsModule({ className }: SettingsModuleProps) {
 
   const [activeSection, setActiveSection] = useState<string | null>(null)
   const { checkPermission, isAdmin } = useRBAC()
-  const accessibleSections = settingsSections.filter((section) =>
-    checkPermission(section.requiredPermission, section.requiredAction).allowed
+  const accessibleSections = settingsSections.filter(
+    (section) =>
+      isSettingsSectionAdmitted(section.id, isAdmin()) &&
+      checkPermission(section.requiredPermission, section.requiredAction).allowed,
   )
 
   const renderSectionContent = () => {

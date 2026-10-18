@@ -50,6 +50,19 @@ client-side for bank statements only, so the payslip import now derives it serve
   timestamps, so the exact micros token is not derived client-side). The spec skips when `crm/new-lead`
   is already published in the target org.
 
+## Wave 2 closure evidence (2026-10-13)
+
+- Contact import now derives and persists the server-side SHA-256 identity, rejects an exact committed
+  replay, and preserves that domain-owned hash when the import assistant finalizes mapping metadata.
+  Native proof covers import → assistant finalize (including a forged hash attempt) → unchanged replay.
+- Browser proof covers upload/map/preview/commit and exact 422 replay with unchanged counts, plus a
+  malformed mapped row that is stopped at preview without dispatching the import. The form path still
+  proves the exact published version and stale/denied preservation.
+- Playwright discovery succeeds as part of the 14-test Wave-2 selection. Runtime execution remains
+  blocked on a seeded same-head stack; the Rust runner is unavailable in the current workspace.
+  COV-26 still needs import/form loading, error, keyboard/focus, viewport, and reconnect evidence;
+  COV-27 still needs the all-module seeded launch run and green ratchets.
+
 ## Prerequisites / decisions
 
 BASE-04 landed (accepted 2026-09-24).

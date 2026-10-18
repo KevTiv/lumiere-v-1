@@ -1,7 +1,10 @@
 "use client"
 
 
-import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import {
+  stdbBffCommandPost,
+  type StdbNamedOperationInput,
+} from "@lumiere/stdb/commands"
 import { decodeOperationDispatch } from "@lumiere/api-client"
 import type {
   AccountAccountTypeQueryRow,
@@ -13,8 +16,10 @@ import type {
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
 import { apiFetch, fetchQueryList } from "../../http"
+import { dispatchNamedOperation } from "../../operation-dispatch"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  manualAccountInvoiceParamsToJson,
   paymentParamsToJson,
   type ClearablePatch,
 } from "@lumiere/erp-shared/accounting-create-params"
@@ -74,12 +79,64 @@ import {
   requireResolvedOperationEffect,
   resolveUniqueRow,
   type CanonicalRecordRef,
+  type OperationEffectOutcome,
   type ResolvedOperationEffectOutcome,
 } from "../operation-effect"
 
 export interface PostedAccountMoveEffectRef extends CanonicalRecordRef {
   readonly resource: "account-moves"
   readonly state: "Posted"
+}
+
+export interface ManualAccountInvoiceEffectRef extends CanonicalRecordRef {
+  readonly resource: "account-moves"
+  readonly href: string
+}
+
+/** Legacy readback shape retained for in-flight alpha requests created before the released contract. */
+export interface DraftManualInvoiceEffectRef extends CanonicalRecordRef {
+  readonly resource: "account-moves"
+  readonly state: "Draft"
+  readonly requestId: string
+}
+
+export type CreateManualAccountInvoiceParams =
+  StdbNamedOperationInput<"create_manual_account_invoice">["params"]
+
+type ManualAccountInvoiceEffectPayload = {
+  readonly resource?: unknown
+  readonly id?: unknown
+  readonly href?: unknown
+}
+
+export function decodeManualAccountInvoiceEffect(value: unknown): ManualAccountInvoiceEffectRef | null {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) return null
+  const data = (value as { data?: unknown }).data
+  if (data == null) return null
+  if (typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Manual invoice result response is malformed")
+  }
+  const row = data as ManualAccountInvoiceEffectPayload
+  if (
+    row.resource !== "account-moves" ||
+    typeof row.id !== "string" ||
+    !/^[1-9][0-9]*$/.test(row.id) ||
+    row.href !== `/accounting/invoices/${row.id}`
+  ) {
+    throw new Error("Manual invoice result response is malformed")
+  }
+  return { resource: "account-moves", id: row.id, href: row.href }
+}
+
+export async function readManualAccountInvoiceEffect(
+  companyId: bigint,
+  idempotencyKey: string,
+): Promise<ManualAccountInvoiceEffectRef | null> {
+  const response = await apiFetch(
+    `/api/accounting/manual-invoice-results/${companyId.toString()}/${encodeURIComponent(idempotencyKey)}`,
+  )
+  if (!response.ok) throw new Error(await parseCallError(response))
+  return decodeManualAccountInvoiceEffect(await response.json())
 }
 
 function accountMoveStateTag(value: unknown): string {
@@ -102,6 +159,32 @@ export function resolvePostedAccountMoveEffect(
   const row = resolveUniqueRow(rows, (candidate) => parseStrictU64(candidate.id) === moveId)
   if (row == null || accountMoveStateTag(row.state) !== "posted") return null
   return { resource: "account-moves", id: moveId.toString(), state: "Posted" }
+}
+
+/** Resolve an alpha invoice draft correlated by its server-owned request ID. */
+export function resolveManualInvoiceDraftEffect(
+  rows: readonly AccountMoveQueryRow[],
+  companyId: bigint,
+  requestId: string,
+): DraftManualInvoiceEffectRef | null {
+  const row = resolveUniqueRow(rows, (candidate) => {
+    if (parseStrictU64(candidate.companyId) !== companyId) return false
+    if (accountMoveStateTag(candidate.state) !== "draft" || typeof candidate.metadata !== "string") return false
+    try {
+      const metadata: unknown = JSON.parse(candidate.metadata)
+      return metadata != null && typeof metadata === "object" &&
+        "manualInvoiceRequestId" in metadata && metadata.manualInvoiceRequestId === requestId
+    } catch {
+      return false
+    }
+  })
+  const moveId = row == null ? null : parseStrictU64(row.id)
+  return moveId == null ? null : {
+    resource: "account-moves",
+    id: moveId.toString(),
+    state: "Draft",
+    requestId,
+  }
 }
 
 export function useAccountMoves(
@@ -145,7 +228,41 @@ export function useCreateAccountMove(organizationId: number) {
   })
 }
 
-export function usePostAccountMove(organizationId: number) {
+export function useCreateManualAccountInvoice(organizationId: number) {
+  const qc = useQueryClient()
+  return useMutation<
+    OperationEffectOutcome<ManualAccountInvoiceEffectRef>,
+    Error,
+    CreateManualAccountInvoiceParams
+  >({
+    mutationFn: async (params) =>
+      executeOperationWithCanonicalReadback({
+        resolveEffect: () =>
+          readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey),
+        dispatch: () =>
+          dispatchNamedOperation(
+            "create_manual_account_invoice",
+            {
+              params: manualAccountInvoiceParamsToJson(params),
+            },
+            "Failed to create manual invoice",
+          ),
+        afterDispatch: () =>
+          invalidateStdbQueryResources(
+            qc,
+            organizationId,
+            stdbInvalidationFor("create_manual_account_invoice"),
+          ),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      }),
+  })
+}
+
+export function usePostAccountMove(
+  organizationId: number,
+  companyId?: bigint | number,
+) {
   const qc = useQueryClient()
   return useMutation<
     ResolvedOperationEffectOutcome<PostedAccountMoveEffectRef>,
@@ -155,14 +272,19 @@ export function usePostAccountMove(organizationId: number) {
     mutationFn: async (moveId: bigint | number | string) => {
       const canonicalMoveId = toScalarU64(moveId)
       const outcome = await executeOperationWithCanonicalReadback({
-        resolveEffect: async () =>
-          resolvePostedAccountMoveEffect(
-            await fetchQueryList(
-              "/api/query/account-moves",
-              "Failed to read posted account move",
-            ),
-            canonicalMoveId,
-          ),
+        resolveEffect: async () => {
+          const moves =
+            companyId != null && companyId > 0
+              ? await fetchQueryList(
+                  `/api/query/account-moves?companyId=${encodeURIComponent(String(companyId))}`,
+                  "Failed to read posted account move",
+                )
+              : await fetchQueryList(
+                  "/api/query/account-moves",
+                  "Failed to read posted account move",
+                )
+          return resolvePostedAccountMoveEffect(moves, canonicalMoveId)
+        },
         dispatch: async () => {
           const { urlPath, init } = stdbBffCommandPost("post_account_move", {
             moveId: canonicalMoveId,

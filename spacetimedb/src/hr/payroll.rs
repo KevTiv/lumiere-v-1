@@ -17,6 +17,7 @@ use crate::core::organization::{company, company_id_from_scope};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
 use crate::hr::contracts::hr_contract;
+use crate::hr::employees::hr_employee;
 use crate::types::{AccountMoveState, MoveType, PaymentState, PayslipState};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -499,6 +500,27 @@ pub fn create_salary_rule(
 
 // ── Reducers: Payslips ────────────────────────────────────────────────────────
 
+fn assert_not_self_approve_payslip(
+    ctx: &ReducerContext,
+    payslip: &HrPayslip,
+) -> Result<(), String> {
+    let employee = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&payslip.employee_id)
+        .ok_or("Payslip employee not found")?;
+    if employee.organization_id != payslip.organization_id
+        || employee.company_id != payslip.company_id
+    {
+        return Err("Payslip employee does not belong to this company".to_string());
+    }
+    if employee.user_id == Some(ctx.sender()) {
+        return Err("You cannot approve your own payslip".to_string());
+    }
+    Ok(())
+}
+
 #[reducer]
 pub fn create_payslip(
     ctx: &ReducerContext,
@@ -597,6 +619,7 @@ pub fn confirm_payslip(
     if payslip.company_id != company_id {
         return Err("Payslip does not belong to this company".to_string());
     }
+    assert_not_self_approve_payslip(ctx, &payslip)?;
     if payslip.state != PayslipState::Draft {
         return Err("Only draft payslips can be approved for export".to_string());
     }

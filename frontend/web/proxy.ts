@@ -1,15 +1,8 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-
-// Auth pages that don't require a session
-const AUTH_PATHS = [
-  '/sign-in',
-  '/sign-up',
-  '/forgot-password',
-  '/reset-password',
-  '/accept-invite',
-  '/auth/callback',
-]
+import { workOsRedirectUri } from './lib/workos-config'
+import { authkit, handleAuthkitHeaders } from '@workos-inc/authkit-nextjs'
+import { isWorkOsEnabled } from './lib/auth-mode'
+import { NextResponse, NextRequest } from 'next/server'
+import { requiresPrivatePageLogin } from './lib/private-release-policy'
 
 /**
  * Extracts Bearer token from Authorization header.
@@ -39,8 +32,24 @@ function isAuthenticated(request: NextRequest): boolean {
   return false
 }
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  if (isWorkOsEnabled()) {
+    // Preserve the custom pathname marker while AuthKit strips forged internal headers,
+    // verifies/refreshes the sealed browser session, and propagates its response cookies.
+    const headers = new Headers(request.headers)
+    headers.set('x-lumiere-pathname', pathname)
+    const forwarded = new NextRequest(request, { headers })
+    const result = await authkit(forwarded, { redirectUri: workOsRedirectUri() })
+    const privatePage = requiresPrivatePageLogin(pathname, process.env.NODE_ENV === 'production', Boolean(result.session.user))
+    const response = handleAuthkitHeaders(forwarded, result.headers, privatePage ? {
+      redirect: new URL(`/sign-in?callbackUrl=${encodeURIComponent(pathname)}`, workOsRedirectUri()),
+    } : {})
+    response.headers.set('Cache-Control', 'private, no-store')
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
+    return response
+  }
 
   // Allow all API routes - authentication is handled in route handlers
   // This supports both cookies (web) and Bearer tokens (Expo/mobile)
@@ -52,30 +61,26 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/public/') ||
+    pathname === '/robots.txt' ||
     pathname === '/favicon.ico'
   ) {
     return NextResponse.next()
   }
 
-  const _isLoggedIn = isAuthenticated(request)
-  const _isAuthPage = AUTH_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
+  const isLoggedIn = isAuthenticated(request)
 
-  // Redirect unauthenticated users to sign-in (excluding auth pages)
-  // Currently disabled - uncomment when ready to enforce auth
-  // if (!isLoggedIn && !isAuthPage) {
-  //   const url = request.nextUrl.clone()
-  //   url.pathname = '/sign-in'
-  //   if (pathname !== '/') {
-  //     url.searchParams.set('callbackUrl', pathname)
-  //   }
-  //   return NextResponse.redirect(url)
-  // }
-
-  // Redirect authenticated users away from auth pages
-  // Currently disabled - uncomment when ready to enforce auth
-  // if (isLoggedIn && isAuthPage && pathname !== '/onboarding') {
-  //   return NextResponse.redirect(new URL('/overview', request.url))
-  // }
+  // Cheap crawler guard, not an authorization boundary: API/session handlers
+  // still verify tokens. Do not render private ERP pages for anonymous traffic.
+  if (requiresPrivatePageLogin(pathname, process.env.NODE_ENV === 'production', isLoggedIn)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/sign-in'
+    url.search = ''
+    if (pathname !== '/') url.searchParams.set('callbackUrl', pathname)
+    const response = NextResponse.redirect(url)
+    response.headers.set('Cache-Control', 'private, no-store')
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive')
+    return response
+  }
 
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-lumiere-pathname', pathname)

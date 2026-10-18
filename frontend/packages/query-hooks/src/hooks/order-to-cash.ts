@@ -39,6 +39,8 @@ export interface OrderToCashProjection {
   readonly reference?: unknown
   readonly clientOrderRef?: unknown
   readonly client_order_ref?: unknown
+  readonly reconciledInvoiceIds?: unknown
+  readonly reconciled_invoice_ids?: unknown
 }
 
 interface TimestampProjection {
@@ -49,6 +51,8 @@ interface TimestampProjection {
 }
 
 export type PickingHandoff = { readonly id: bigint; readonly state: string; readonly name: string }
+export type ReturnHandoff = { readonly id: bigint; readonly state: string; readonly name: string }
+export type PaymentHandoff = { readonly id: bigint; readonly state: string; readonly name: string }
 export type InvoiceHandoff = {
   readonly id: bigint
   readonly state: string
@@ -60,6 +64,11 @@ export type InvoiceHandoff = {
 export type OrderHandoffs = {
   readonly pickings: readonly PickingHandoff[]
   readonly invoices: readonly InvoiceHandoff[]
+  /** Sales-only reverse relation; Purchasing handoff builders omit it. */
+  readonly returns?: readonly ReturnHandoff[]
+  /** Exact reverse relation through account_payment.reconciled_invoice_ids. */
+  readonly payments?: readonly PaymentHandoff[]
+  readonly paymentNotice?: "relation_unavailable" | "invariant_failure"
 }
 
 export type OrderToCashException =
@@ -134,6 +143,8 @@ export function orderHandoffs(
   scope: OrderToCashScope,
   pickings: readonly OrderToCashProjection[],
   moves: readonly OrderToCashProjection[],
+  returns: readonly OrderToCashProjection[] = [],
+  payments?: readonly OrderToCashProjection[],
 ): OrderHandoffs {
   const deliveries: PickingHandoff[] = []
   for (const picking of pickings) {
@@ -163,7 +174,53 @@ export function orderHandoffs(
       dueMicros: timestampMicros(move.invoiceDateDue ?? move.invoice_date_due),
     })
   }
-  return { pickings: byId(deliveries), invoices: byId(invoices) }
+  const linkedReturns: ReturnHandoff[] = []
+  for (const returned of returns) {
+    const id = parseStrictU64(returned.id)
+    if (id == null || !inScope(returned, scope)) continue
+    if (parseStrictU64(returned.saleOrderId ?? returned.sale_order_id) !== orderId) continue
+    const state = stateName(returned.state)
+    if (state === "cancel" || state === "cancelled") continue
+    linkedReturns.push({ id, state, name: String(returned.name ?? "") })
+  }
+  const linkedPayments: PaymentHandoff[] = []
+  let paymentNotice: OrderHandoffs["paymentNotice"]
+  if (payments != null) {
+    const invoiceIds = new Set(invoices.map((invoice) => invoice.id.toString()))
+    const seenPayments = new Set<string>()
+    for (const payment of payments) {
+      if (!inScope(payment, scope)) continue
+      const raw = payment.reconciledInvoiceIds ?? payment.reconciled_invoice_ids
+      if (!Array.isArray(raw)) {
+        paymentNotice = "relation_unavailable"
+        continue
+      }
+      const reconciled = raw.map(parseStrictU64)
+      if (!reconciled.every((id): id is bigint => id != null)) {
+        paymentNotice = "invariant_failure"
+        continue
+      }
+      if (new Set(reconciled.map(String)).size !== reconciled.length) {
+        paymentNotice = "invariant_failure"
+        continue
+      }
+      if (stateName(payment.state) !== "paid" || !reconciled.some((id) => invoiceIds.has(id.toString()))) continue
+      const id = parseStrictU64(payment.id)
+      if (id == null || id === 0n || seenPayments.has(id.toString())) {
+        paymentNotice = "invariant_failure"
+        continue
+      }
+      seenPayments.add(id.toString())
+      linkedPayments.push({ id, state: "paid", name: String(payment.name ?? "") })
+    }
+  }
+  return {
+    pickings: byId(deliveries),
+    invoices: byId(invoices),
+    returns: byId(linkedReturns),
+    payments: byId(linkedPayments),
+    paymentNotice,
+  }
 }
 
 function partnerOnHold(

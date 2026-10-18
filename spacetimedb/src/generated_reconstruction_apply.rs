@@ -458,63 +458,68 @@ pub(crate) fn generated_restore_order(table: &str) -> Option<u32> {
         "form_config_field" => Some(445),
         "form_role_config" => Some(446),
         "helpdesk_team_member" => Some(447),
-        "hr_expense_advance_application" => Some(448),
-        "hr_expense_allocation" => Some(449),
-        "hr_expense_policy_exception" => Some(450),
-        "hr_leave_allocation" => Some(451),
-        "hr_onboarding_template_item" => Some(452),
-        "import_job_error" => Some(453),
-        "import_job_record" => Some(454),
-        "mrp_bom_byproduct" => Some(455),
-        "mrp_bom_line" => Some(456),
-        "opportunity_line" => Some(457),
-        "pos_order_line" => Some(458),
-        "pos_payment" => Some(459),
-        "presentation_module_version" => Some(460),
-        "product_attribute_line" => Some(461),
-        "product_pricelist_item" => Some(462),
-        "project_rate_card_line" => Some(463),
-        "project_revenue_line" => Some(464),
-        "proposal_line_item" => Some(465),
-        "proposal_section" => Some(466),
-        "proposal_version" => Some(467),
-        "purchase_blanket_order_line" => Some(468),
-        "purchase_blanket_release" => Some(469),
-        "purchase_order_line" => Some(470),
-        "purchase_requisition_line" => Some(471),
-        "purchase_return_line" => Some(472),
-        "purchase_rfq_bid" => Some(473),
-        "purchase_rfq_line" => Some(474),
-        "return_order_creation" => Some(475),
-        "return_order_line" => Some(476),
-        "sale_commission_plan_split" => Some(477),
-        "sale_order_line" => Some(478),
-        "sale_order_option" => Some(479),
-        "segment_member" => Some(480),
-        "stock_inventory_line" => Some(481),
-        "stock_landed_cost_allocation" => Some(482),
-        "stock_landed_cost_application" => Some(483),
-        "stock_move_line" => Some(484),
-        "stock_picking" => Some(485),
-        "subscription_bundle_item" => Some(486),
-        "subscription_line" => Some(487),
-        "subscription_usage_event" => Some(488),
-        "tax_deadline_reminder" => Some(489),
-        "workflow_calendar_version" => Some(490),
-        "workflow_decision_event" => Some(491),
-        "workflow_human_task_candidate" => Some(492),
-        "workflow_human_task_event" => Some(493),
-        "workflow_simulation_step" => Some(494),
-        "workflow_version" => Some(495),
-        "ai_knowledge_review" => Some(496),
-        "ai_knowledge_skill_promotion" => Some(497),
-        "form_field_label" => Some(498),
-        "workflow_calendar_exception" => Some(499),
+        "helpdesk_ticket_related_record" => Some(448),
+        "hr_expense_advance_application" => Some(449),
+        "hr_expense_allocation" => Some(450),
+        "hr_expense_policy_exception" => Some(451),
+        "hr_leave_allocation" => Some(452),
+        "hr_onboarding_template_item" => Some(453),
+        "import_job_error" => Some(454),
+        "import_job_record" => Some(455),
+        "mrp_bom_byproduct" => Some(456),
+        "mrp_bom_line" => Some(457),
+        "mrp_production_cost" => Some(458),
+        "mrp_productivity_cost" => Some(459),
+        "mrp_valuation_config" => Some(460),
+        "mrp_workcenter_cost_rate" => Some(461),
+        "opportunity_line" => Some(462),
+        "pos_order_line" => Some(463),
+        "pos_payment" => Some(464),
+        "presentation_module_version" => Some(465),
+        "product_attribute_line" => Some(466),
+        "product_pricelist_item" => Some(467),
+        "project_rate_card_line" => Some(468),
+        "project_revenue_line" => Some(469),
+        "proposal_line_item" => Some(470),
+        "proposal_section" => Some(471),
+        "proposal_version" => Some(472),
+        "purchase_blanket_order_line" => Some(473),
+        "purchase_blanket_release" => Some(474),
+        "purchase_order_line" => Some(475),
+        "purchase_requisition_line" => Some(476),
+        "purchase_return_line" => Some(477),
+        "purchase_rfq_bid" => Some(478),
+        "purchase_rfq_line" => Some(479),
+        "return_order_creation" => Some(480),
+        "return_order_line" => Some(481),
+        "sale_commission_plan_split" => Some(482),
+        "sale_order_line" => Some(483),
+        "sale_order_option" => Some(484),
+        "segment_member" => Some(485),
+        "stock_inventory_line" => Some(486),
+        "stock_landed_cost_allocation" => Some(487),
+        "stock_landed_cost_application" => Some(488),
+        "stock_move_line" => Some(489),
+        "stock_picking" => Some(490),
+        "subscription_bundle_item" => Some(491),
+        "subscription_line" => Some(492),
+        "subscription_usage_event" => Some(493),
+        "tax_deadline_reminder" => Some(494),
+        "workflow_calendar_version" => Some(495),
+        "workflow_decision_event" => Some(496),
+        "workflow_human_task_candidate" => Some(497),
+        "workflow_human_task_event" => Some(498),
+        "workflow_simulation_step" => Some(499),
+        "workflow_version" => Some(500),
+        "ai_knowledge_review" => Some(501),
+        "ai_knowledge_skill_promotion" => Some(502),
+        "form_field_label" => Some(503),
+        "workflow_calendar_exception" => Some(504),
         _ => None,
     }
 }
 
-pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 499;
+pub(crate) const GENERATED_FINAL_RESTORE_ORDER: u32 = 504;
 
 pub(crate) fn apply_generated_reconstruction_row(
     ctx: &ReducerContext,
@@ -4187,6 +4192,12 @@ pub(crate) fn apply_generated_reconstruction_row(
         },
         "company_country_pack" => {
             use crate::core::country_pack::{company_country_pack as _, CompanyCountryPack};
+            let normalized_row_json =
+                crate::core::country_pack::normalize_country_pack_reconstruction_row_json(
+                    "company_country_pack",
+                    row_json,
+                )?;
+            let row_json = normalized_row_json.as_str();
             let spacetimedb_sats::serde::SerdeWrapper(row) =
                 serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CompanyCountryPack>>(row_json)
                     .map_err(|error| format!("invalid canonical row JSON for company_country_pack: {error}"))?;
@@ -5043,6 +5054,12 @@ pub(crate) fn apply_generated_reconstruction_row(
         },
         "country_pack_definition" => {
             use crate::core::country_pack::{country_pack_definition as _, CountryPackDefinition};
+            let normalized_row_json =
+                crate::core::country_pack::normalize_country_pack_reconstruction_row_json(
+                    "country_pack_definition",
+                    row_json,
+                )?;
+            let row_json = normalized_row_json.as_str();
             let spacetimedb_sats::serde::SerdeWrapper(row) =
                 serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CountryPackDefinition>>(row_json)
                     .map_err(|error| format!("invalid canonical row JSON for country_pack_definition: {error}"))?;
@@ -5071,6 +5088,12 @@ pub(crate) fn apply_generated_reconstruction_row(
         },
         "country_pack_tax_rule" => {
             use crate::core::country_pack::{country_pack_tax_rule as _, CountryPackTaxRule};
+            let normalized_row_json =
+                crate::core::country_pack::normalize_country_pack_reconstruction_row_json(
+                    "country_pack_tax_rule",
+                    row_json,
+                )?;
+            let row_json = normalized_row_json.as_str();
             let spacetimedb_sats::serde::SerdeWrapper(row) =
                 serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<CountryPackTaxRule>>(row_json)
                     .map_err(|error| format!("invalid canonical row JSON for country_pack_tax_rule: {error}"))?;
@@ -20833,6 +20856,34 @@ pub(crate) fn apply_generated_reconstruction_row(
                 }
             }
         },
+        "helpdesk_ticket_related_record" => {
+            use crate::helpdesk::related_records::{helpdesk_ticket_related_record as _, HelpdeskTicketRelatedRecord};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<HelpdeskTicketRelatedRecord>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for helpdesk_ticket_related_record: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.helpdesk_ticket_related_record();
+            if let Some(existing) = rows.ticket_id().find(&row.ticket_id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing helpdesk_ticket_related_record row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming helpdesk_ticket_related_record row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                rows.insert(row);
+                Ok(GeneratedApplyOutcome::Inserted)
+            }
+        },
         "hr_expense_advance_application" => {
             use crate::expenses::expense_wave_d::{hr_expense_advance_application as _, HrExpenseAdvanceApplication};
             let spacetimedb_sats::serde::SerdeWrapper(row) =
@@ -21245,6 +21296,118 @@ pub(crate) fn apply_generated_reconstruction_row(
                         ));
                     }
                 }
+            }
+        },
+        "mrp_production_cost" => {
+            use crate::manufacturing::costing::{mrp_production_cost as _, MrpProductionCost};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpProductionCost>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for mrp_production_cost: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.mrp_production_cost();
+            if let Some(existing) = rows.production_id().find(&row.production_id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing mrp_production_cost row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming mrp_production_cost row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                rows.insert(row);
+                Ok(GeneratedApplyOutcome::Inserted)
+            }
+        },
+        "mrp_productivity_cost" => {
+            use crate::manufacturing::costing::{mrp_productivity_cost as _, MrpProductivityCost};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpProductivityCost>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for mrp_productivity_cost: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.mrp_productivity_cost();
+            if let Some(existing) = rows.productivity_id().find(&row.productivity_id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing mrp_productivity_cost row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming mrp_productivity_cost row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                rows.insert(row);
+                Ok(GeneratedApplyOutcome::Inserted)
+            }
+        },
+        "mrp_valuation_config" => {
+            use crate::manufacturing::costing::{mrp_valuation_config as _, MrpValuationConfig};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpValuationConfig>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for mrp_valuation_config: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.mrp_valuation_config();
+            if let Some(existing) = rows.company_id().find(&row.company_id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing mrp_valuation_config row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming mrp_valuation_config row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                rows.insert(row);
+                Ok(GeneratedApplyOutcome::Inserted)
+            }
+        },
+        "mrp_workcenter_cost_rate" => {
+            use crate::manufacturing::costing::{mrp_workcenter_cost_rate as _, MrpWorkcenterCostRate};
+            let spacetimedb_sats::serde::SerdeWrapper(row) =
+                serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<MrpWorkcenterCostRate>>(row_json)
+                    .map_err(|error| format!("invalid canonical row JSON for mrp_workcenter_cost_rate: {error}"))?;
+            if row.organization_id != organization_id {
+                return Err("reconstruction row belongs to a different organization".to_string());
+            }
+            let rows = ctx.db.mrp_workcenter_cost_rate();
+            if let Some(existing) = rows.workcenter_id().find(&row.workcenter_id) {
+                let existing_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&existing),
+                )
+                .map_err(|error| format!("serialize existing mrp_workcenter_cost_rate row: {error}"))?;
+                let incoming_json = serde_json::to_value(
+                    spacetimedb_sats::serde::SerdeWrapper::from_ref(&row),
+                )
+                .map_err(|error| format!("serialize incoming mrp_workcenter_cost_rate row: {error}"))?;
+                if existing_json == incoming_json {
+                    Ok(GeneratedApplyOutcome::AlreadyPresent)
+                } else {
+                    Err("reconstruction primary-key conflict with different row data".to_string())
+                }
+            } else {
+                rows.insert(row);
+                Ok(GeneratedApplyOutcome::Inserted)
             }
         },
         "opportunity_line" => {

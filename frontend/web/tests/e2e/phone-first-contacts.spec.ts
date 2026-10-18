@@ -1,3 +1,4 @@
+import { bootstrapFixtureAccountSession } from './fixture-account'
 import { matchesOperationResponse } from "./operation-response"
 import {
   expect,
@@ -193,12 +194,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<Tenant>
   let context: BrowserContext | undefined
 
   try {
-    const signup = await api.post("/api/auth/signup", {
-      data: { email: `${suffix}@example.test`, password: E2E_PASSWORD },
-    })
-    if (!signup.ok()) {
-      throw new Error(`tenant signup failed (${signup.status()}): ${await signup.text()}`)
-    }
+    await bootstrapFixtureAccountSession(api, `${suffix}@example.test`, E2E_PASSWORD)
 
     const currencyResponse = await api.get("/api/bootstrap/currencies")
     if (!currencyResponse.ok()) {

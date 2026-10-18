@@ -28,6 +28,9 @@ class FingerprintTests(unittest.TestCase):
         (self.root / "scripts").mkdir()
         for file in ("Cargo.toml", "Cargo.lock", "Makefile", "scripts/build-fingerprint.py", "scripts/e2e-dx.sh"):
             (self.root / file).write_text(file)
+        prepare = self.root / "scripts/prepare-vendored-contracts-rust.sh"
+        prepare.write_text("#!/bin/sh\nexit 0\n")
+        prepare.chmod(0o755)
         (self.root / "frontend/package.json").write_text("{}")
         self.module = load_module()
 
@@ -85,6 +88,9 @@ class HelperTests(unittest.TestCase):
         (self.root / "scripts").mkdir()
         for file in ("Cargo.toml", "Cargo.lock", "Makefile", "scripts/build-fingerprint.py", "scripts/e2e-dx.sh"):
             (self.root / file).write_text(file)
+        prepare = self.root / "scripts/prepare-vendored-contracts-rust.sh"
+        prepare.write_text("#!/bin/sh\nexit 0\n")
+        prepare.chmod(0o755)
         (self.root / "frontend/package.json").write_text("{}")
         self.bin = self.root / "bin"
         self.bin.mkdir()
@@ -114,6 +120,24 @@ class HelperTests(unittest.TestCase):
             (self.root / "cargo.log").read_text(),
         )
         self.assertEqual(self.invoke("api-binary", env=self.env | {"CARGO_TARGET_DIR": "custom-target"}).stdout.strip(), str(self.root / "custom-target/debug/api-server"))
+
+    def test_prebuilt_mode_uses_artifact_binaries_and_frontend(self):
+        artifact_bin = self.root / ".ci/e2e-build/bin"
+        artifact_bin.mkdir(parents=True)
+        for name in ("api-server", "storage-migrate"):
+            binary = artifact_bin / name
+            binary.write_text("#!/bin/sh\nexit 0\n")
+            binary.chmod(0o755)
+        (self.root / "frontend/web/.next/BUILD_ID").write_text("artifact-build")
+        env = self.env | {"E2E_PREBUILT": "1"}
+        (self.root / "scripts/prepare-vendored-contracts-rust.sh").write_text("#!/bin/sh\nexit 99\n")
+
+        self.invoke("api-build", env=env)
+        self.assertEqual(self.invoke("api-binary", env=env).stdout.strip(), str(artifact_bin / "api-server"))
+        self.assertEqual(self.invoke("storage-migrate", env=env).returncode, 0)
+        result = self.invoke("frontend-build", env=env)
+        self.assertIn("prebuilt Next.js", result.stdout)
+        self.assertFalse((self.root / "count").exists())
 
     def test_frontend_reuse_identity_failure_and_ci(self):
         self.invoke("frontend-build")

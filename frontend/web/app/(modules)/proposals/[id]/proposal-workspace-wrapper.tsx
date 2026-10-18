@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { ProposalWorkspace, type ProposalWorkspaceHooks } from "@lumiere/ui"
+import { ProposalWorkspace, canConvertProposalToProject, useRBAC, type ProposalWorkspaceHooks } from "@lumiere/ui"
 import type { AIAnalysis } from "@lumiere/ui"
 import {
   useProposalSections,
@@ -11,6 +11,7 @@ import {
   useProposalPresence,
   useProposalComments,
   useUpsertProposalSection,
+  useResolveProposalSectionConflict,
   useDeleteProposalSection,
   useAddProposalSourceDoc,
   useDeleteProposalSourceDoc,
@@ -30,6 +31,13 @@ import {
   useApplyProposalTemplate,
   useUpsertProposalComplianceRequirement,
   useCreateProposalIntegrationIntent,
+  useRecordProposalBidDecision,
+  useConvertProposalToProject,
+  useProposalProcurementScores,
+  useUpsertProposalProcurementScore,
+  useReorderProposalLineItems,
+  useCreateProposalTemplate,
+  useProposals,
 } from "@lumiere/query-hooks/hooks/proposals"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import type { ProposalStatus } from "@lumiere/ui"
@@ -78,7 +86,8 @@ function createHttpHooks(
     useUpsertProposalSection: () => {
       const mutation = useUpsertProposalSection(organizationId, companyId)
       return {
-        mutate: (params) => mutation.mutate(params),
+        // Forward options so the workspace sees onSettled / onError (revision conflicts).
+        mutate: (params, options) => mutation.mutate(params, options),
         isPending: mutation.isPending,
       }
     },
@@ -200,6 +209,50 @@ function createHttpHooks(
       organizationId,
       companyId,
     ),
+    useRecordProposalBidDecision: () => {
+      const mutation = useRecordProposalBidDecision(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useProposalProcurementScores:
+      useProposalProcurementScores as unknown as ProposalWorkspaceHooks['useProposalProcurementScores'],
+    useCreateProposalTemplate: () => {
+      const mutation = useCreateProposalTemplate(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useReorderProposalLineItems: () => {
+      const mutation = useReorderProposalLineItems(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useResolveProposalSectionConflict: () => {
+      const mutation = useResolveProposalSectionConflict(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useUpsertProposalProcurementScore: () => {
+      const mutation = useUpsertProposalProcurementScore(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
+    useConvertProposalToProject: () => {
+      const mutation = useConvertProposalToProject(organizationId, companyId)
+      return {
+        mutateAsync: (params) => mutation.mutateAsync(params),
+        isPending: mutation.isPending,
+      }
+    },
   }
 }
 
@@ -213,6 +266,11 @@ export function ProposalWorkspaceWrapper({
   currentUserName,
   onAnalyze,
 }: ProposalWorkspaceWrapperProps) {
+  const { checkPermission } = useRBAC()
+  const { data: proposals = [] } = useProposals(organizationId)
+  const proposalRow = (proposals as unknown as Record<string, unknown>[]).find(
+    (row) => String(row.id) === proposalId,
+  )
   const httpHooks = useMemo(
     () => createHttpHooks(organizationId, companyId),
     [organizationId, companyId],
@@ -227,6 +285,16 @@ export function ProposalWorkspaceWrapper({
       currentUserId={currentUserId}
       currentUserName={currentUserName}
       onAnalyze={onAnalyze}
+      canRecordBidDecision={checkPermission("proposal", "write").allowed}
+      // The reducer also creates the project, so it needs project_project:create as well.
+      canConvertToProject={
+        checkPermission("proposal", "write").allowed && checkPermission("project_project", "create").allowed
+      }
+      canManageProcurementScores={checkPermission("proposal", "write").allowed}
+      canReorderLineItems={checkPermission("proposal", "write").allowed}
+      canSaveAsTemplate={checkPermission("proposal", "write").allowed}
+      canResolveSectionConflict={checkPermission("proposal", "write").allowed}
+      convertToProjectReady={canConvertProposalToProject(proposalRow)}
       hooks={httpHooks}
     />
   )

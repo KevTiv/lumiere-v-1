@@ -1,6 +1,7 @@
 "use client"
 import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import {
   inlineNumberAbove,
@@ -15,6 +16,7 @@ import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   newExpenseForm,
   newExpenseSheetForm,
   editExpenseForm,
@@ -70,11 +72,13 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useEmployees, type HrEmployee } from "@lumiere/query-hooks/hooks/hr"
 import {
+  newExpenseClientRequestId,
   newExpenseReceiptClientRequestId,
   parseAttachmentIds,
   toCreateExpenseParams,
   toCreateExpenseSheetParams,
 } from "@/lib/expenses-create-params"
+import { firstFileFromFormValue, uploadDocumentBlob } from "@/lib/document-blob-upload"
 import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,
@@ -182,8 +186,12 @@ function ExpensesClientLoaded({
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [timelineSheet, setTimelineSheet] = useState<Record<string, unknown> | null>(null)
 
-  const { data: expensesRaw = [] } = useExpenses(orgId, initialExpenses)
-  const { data: sheetsRaw = [] } = useExpenseSheets(orgId, initialSheets)
+  const expensesQuery = useExpenses(orgId, initialExpenses)
+  const sheetsQuery = useExpenseSheets(orgId, initialSheets)
+  const expensesState = moduleQueryState(expensesQuery)
+  const sheetsState = moduleQueryState(sheetsQuery)
+  const expensesRaw = canUseModuleData(expensesState) ? expensesQuery.data ?? [] : []
+  const sheetsRaw = canUseModuleData(sheetsState) ? sheetsQuery.data ?? [] : []
   const { data: sheetsToApprove = [] } = useExpenseSheetsToApprove(orgId)
   const { data: missingReceipts = [] } = useExpensesMissingReceipt(orgId)
   const { data: unmatchedCards = [] } = useExpenseCardStatementUnmatched(orgId)
@@ -222,26 +230,31 @@ function ExpensesClientLoaded({
         throw new Error("Employee is required to register a receipt")
       }
       const clientRequestId = newExpenseReceiptClientRequestId()
-      const storageKey =
-        formData.storageKey != null && String(formData.storageKey).trim() !== ""
-          ? String(formData.storageKey).trim()
-          : `local:${clientRequestId}`
+      const receiptFile = firstFileFromFormValue(formData.receiptFile)
+      const uploaded = receiptFile
+        ? await uploadDocumentBlob({ file: receiptFile, companyId: operatingCompanyId })
+        : null
+      const storageKey = uploaded?.objectKey ?? String(formData.storageKey ?? "").trim()
+      if (!storageKey) {
+        throw new Error("Choose a receipt file or provide an existing receipt storage key")
+      }
       const receiptId = await createExpenseReceipt.mutateAsync({
         employeeId,
         storageKey,
         clientRequestId,
-        fileName:
+        fileName: uploaded?.fileName ?? (
           formData.fileName != null && String(formData.fileName).trim() !== ""
             ? String(formData.fileName)
-            : undefined,
-        mimeType:
+            : undefined),
+        mimeType: uploaded?.mimetype ?? (
           formData.mimeType != null && String(formData.mimeType).trim() !== ""
             ? String(formData.mimeType)
-            : undefined,
+            : undefined),
+        contentHash: uploaded?.checksum,
       })
       return [receiptId]
     },
-    [createExpenseReceipt],
+    [createExpenseReceipt, operatingCompanyId],
   )
   const submitExpense = useSubmitExpense(orgId)
   const submitExpenseSheet = useSubmitExpenseSheet(orgId, operatingCompanyId)
@@ -419,6 +432,7 @@ function ExpensesClientLoaded({
                   {
                     id: "csv-expenses",
                     label: t("expenses.csvImport.toolbarExpenses"),
+                    permission: { resource: CSV_IMPORT_CONTRACTS.expense.resource, action: "create" },
                     onClick: () => setCsvKind("expense"),
                   },
                 ]),
@@ -460,6 +474,7 @@ function ExpensesClientLoaded({
                 {
                   id: "csv-sheets",
                   label: t("expenses.csvImport.toolbarSheets"),
+                  permission: { resource: CSV_IMPORT_CONTRACTS.expenseSheet.resource, action: "create" },
                   onClick: () => setCsvKind("sheet"),
                 },
                 {
@@ -620,7 +635,10 @@ function ExpensesClientLoaded({
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
       const attachmentIds = await resolveAttachmentIds(formData, empRaw)
       const params = toCreateExpenseParams(
-        formData,
+        {
+          ...formData,
+          clientRequestId: formData.clientRequestId ?? newExpenseClientRequestId(),
+        },
         {
           currencyId: pl.currencyId,
           pricelistId: plRaw,
@@ -837,6 +855,7 @@ function ExpensesClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={{ expenses: expensesState, "expense-sheets": sheetsState }}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
         isPending={isFormMutationPending}
@@ -856,9 +875,14 @@ function ExpensesClientLoaded({
 
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={csvKind === "expense" ? "hr_expense" : "hr_expense_sheet"}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={csvKind === "expense" ? CSV_IMPORT_CONTRACTS.expense : CSV_IMPORT_CONTRACTS.expenseSheet}
+          templateFileName={`${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             if (csvKind === "expense") await csvImports.importExpense.mutateAsync(text)

@@ -11,8 +11,13 @@ import {
   DialogTitle,
   Input,
   Label,
+  usePermission,
 } from "@lumiere/ui"
 import type { UseMutationResult } from "@tanstack/react-query"
+import type {
+  SignalWorkflowInput,
+  StartWorkflowInput,
+} from "@lumiere/query-hooks/hooks/workflows"
 import type {
   CancelWorkflowOutboxParams,
   CancelWorkflowParams,
@@ -23,6 +28,13 @@ import type {
   SimulateWorkflowParams,
 } from "@lumiere/stdb/types"
 import { instanceStateTag, versionStatusTag } from "@/lib/workflow-enum"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 function rowId(row: Record<string, unknown>): string {
   const v = row.id
@@ -34,6 +46,19 @@ function newKey(prefix: string): string {
     return `${prefix}-${crypto.randomUUID()}`
   }
   return `${prefix}-${Date.now()}`
+}
+
+function workflowRuntimeKey(): string {
+  return crypto.randomUUID()
+}
+
+function optionString(value: unknown): string | null {
+  if (typeof value === "string") return value.trim() || null
+  if (value && typeof value === "object" && "some" in value) {
+    const some = (value as { some?: unknown }).some
+    return typeof some === "string" ? some.trim() || null : null
+  }
+  return null
 }
 
 function num(row: Record<string, unknown>, ...keys: string[]): number {
@@ -72,6 +97,8 @@ export interface WorkflowMutationsBundle {
     { workflowVersionId: bigint | number | string; expectedDraftRevision: number },
     unknown
   >
+  startWorkflow: UseMutationResult<void, Error, StartWorkflowInput, unknown>
+  signalWorkflow: UseMutationResult<void, Error, SignalWorkflowInput, unknown>
   cancelWorkflow: UseMutationResult<unknown, Error, CancelWorkflowParams, unknown>
   simulateWorkflow: UseMutationResult<
     unknown,
@@ -101,6 +128,8 @@ export interface WorkflowsRowDialogProps {
   mutations: WorkflowMutationsBundle
   decisionEvents?: Record<string, unknown>[]
   activePlans?: Record<string, unknown>[]
+  workflowEdges?: Record<string, unknown>[]
+  operatingCompanyId?: number | null
 }
 
 export function WorkflowsRowDialog({
@@ -112,10 +141,17 @@ export function WorkflowsRowDialog({
   mutations,
   decisionEvents = [],
   activePlans = [],
+  workflowEdges = [],
+  operatingCompanyId,
 }: WorkflowsRowDialogProps) {
   const [migratePlanId, setMigratePlanId] = useState("")
   const [migrateReason, setMigrateReason] = useState("Operator cutover")
+  const [startSubjectId, setStartSubjectId] = useState("")
+  const [singletonTriggerKey, setSingletonTriggerKey] = useState("")
+  const [signalKey, setSignalKey] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const canStartWorkflow = usePermission("workflow_instance", "create")
+  const canSignalWorkflow = usePermission("workflow_instance", "write")
 
   if (!row || !tabId) {
     return (
@@ -127,6 +163,25 @@ export function WorkflowsRowDialog({
 
   const id = rowId(row)
   const companyId = num(row, "companyId", "company_id")
+  const workflowId = num(row, "workflowId", "workflow_id")
+  const workflowVersionId =
+    tabId === "versions" ? Number(id) : num(row, "workflowVersionId", "workflow_version_id")
+  const subjectModel = String(row.subjectModel ?? row.subject_model ?? row.model ?? "").trim()
+  const subjectId = num(row, "subjectId", "subject_id")
+  const isPublished =
+    versionStatusTag(row.status) === "Published" || row.statusTag === "Published"
+  const isActive = instanceStateTag(row.state) === "Active" || row.stateTag === "Active"
+  const signalKeys = Array.from(
+    new Set(
+      workflowEdges
+        .filter(
+          (edge) =>
+            num(edge, "workflowVersionId", "workflow_version_id") === workflowVersionId,
+        )
+        .map((edge) => optionString(edge.signalKey ?? edge.signal_key))
+        .filter((key): key is string => key !== null),
+    ),
+  ).sort()
   const instanceEvents = decisionEvents
     .filter((e) => String(e.instanceId ?? e.instance_id) === id)
     .slice(0, 12)
@@ -206,6 +261,63 @@ export function WorkflowsRowDialog({
                 <dt className="text-muted-foreground">Draft revision</dt>
                 <dd>{String(row.draftRevision ?? row.draft_revision ?? "—")}</dd>
               </dl>
+              {isPublished &&
+              canStartWorkflow.allowed &&
+              operatingCompanyId != null &&
+              workflowId > 0 &&
+              workflowVersionId > 0 &&
+              subjectModel ? (
+                <div className="space-y-3 rounded border p-3">
+                  <p className="font-medium">Start workflow</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="workflow-version-start-subject-id">
+                      Subject id ({subjectModel})
+                    </Label>
+                    <Input
+                      id="workflow-version-start-subject-id"
+                      inputMode="numeric"
+                      value={startSubjectId}
+                      onChange={(event) => setStartSubjectId(event.target.value)}
+                      data-testid="workflow-version-start-subject-id"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="workflow-version-start-singleton-key">
+                      Singleton trigger key (optional)
+                    </Label>
+                    <Input
+                      id="workflow-version-start-singleton-key"
+                      value={singletonTriggerKey}
+                      onChange={(event) => setSingletonTriggerKey(event.target.value)}
+                      data-testid="workflow-version-start-singleton-key"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    data-testid="workflow-version-start"
+                    disabled={
+                      !/^[1-9]\d*$/.test(startSubjectId.trim()) ||
+                      mutations.startWorkflow.isPending
+                    }
+                    onClick={() =>
+                      void run(() =>
+                        mutations.startWorkflow.mutateAsync({
+                          companyId: operatingCompanyId,
+                          workflowId,
+                          workflowVersionId,
+                          subjectModel,
+                          subjectId: startSubjectId.trim(),
+                          singletonTriggerKey,
+                          idempotencyKey: workflowRuntimeKey(),
+                          correlationId: workflowRuntimeKey(),
+                        }),
+                      )
+                    }
+                  >
+                    Start
+                  </Button>
+                </div>
+              ) : null}
               <div className="flex flex-wrap gap-2 pt-2">
                 {versionStatusTag(row.status) === "Draft" || row.statusTag === "Draft" ? (
                   <Button
@@ -311,27 +423,68 @@ export function WorkflowsRowDialog({
                 <dd>{String(row.revision ?? "—")}</dd>
               </dl>
 
-              {instanceStateTag(row.state) === "Active" || row.stateTag === "Active" ? (
+              {isActive && canSignalWorkflow.allowed && signalKeys.length > 0 ? (
+                <div className="space-y-3 rounded border p-3">
+                  <p className="font-medium">Signal instance</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="workflow-instance-signal-key">Signal</Label>
+                    <Select value={signalKey} onValueChange={setSignalKey}>
+                      <SelectTrigger id="workflow-instance-signal-key" data-testid="workflow-instance-signal-key">
+                        <SelectValue placeholder="Select signal…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {signalKeys.map((key) => (
+                          <SelectItem key={key} value={key}>
+                            {key}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    size="sm"
+                    data-testid="workflow-instance-signal"
+                    disabled={!signalKey || mutations.signalWorkflow.isPending}
+                    onClick={() =>
+                      void run(() =>
+                        mutations.signalWorkflow.mutateAsync({
+                          companyId,
+                          instanceId: id,
+                          workflowVersionId,
+                          subjectModel,
+                          subjectId,
+                          expectedRevision: num(row, "revision"),
+                          signalKey,
+                          idempotencyKey: workflowRuntimeKey(),
+                          correlationId: workflowRuntimeKey(),
+                        }),
+                      )
+                    }
+                  >
+                    Signal
+                  </Button>
+                </div>
+              ) : null}
+
+              {isActive ? (
                 <div className="space-y-3 rounded border p-3">
                   <p className="font-medium">Migrate instance</p>
                   <div className="space-y-2">
                     <Label htmlFor="mig-plan">Active plan id</Label>
-                    <select
-                      id="mig-plan"
-                      className="flex h-9 w-full rounded-md border bg-background px-3 text-sm"
-                      value={migratePlanId}
-                      onChange={(e) => setMigratePlanId(e.target.value)}
-                      data-testid="workflow-instance-migrate-plan"
-                    >
-                      <option value="">Select plan…</option>
-                      {activePlans.map((p) => (
-                        <option key={String(p.id)} value={String(p.id)}>
-                          #{String(p.id)} · wf {String(p.workflowId ?? p.workflow_id)} ·{" "}
-                          {String(p.sourceWorkflowVersionId ?? p.source_workflow_version_id)} →{" "}
-                          {String(p.targetWorkflowVersionId ?? p.target_workflow_version_id)}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={migratePlanId} onValueChange={setMigratePlanId}>
+                      <SelectTrigger id="mig-plan" data-testid="workflow-instance-migrate-plan">
+                        <SelectValue placeholder="Select plan…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activePlans.map((p) => (
+                          <SelectItem key={String(p.id)} value={String(p.id)}>
+                            #{String(p.id)} · wf {String(p.workflowId ?? p.workflow_id)} ·{" "}
+                            {String(p.sourceWorkflowVersionId ?? p.source_workflow_version_id)} →{" "}
+                            {String(p.targetWorkflowVersionId ?? p.target_workflow_version_id)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="mig-reason">Reason</Label>

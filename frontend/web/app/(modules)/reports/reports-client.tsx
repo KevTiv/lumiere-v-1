@@ -2,6 +2,7 @@
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -29,6 +30,7 @@ import {
   resolveStoredDashboard,
   storedDashboardExportGate,
   exportDashboardToPng,
+  reportExportSourceProvenance,
   timeRangeToMs,
   Button,
   Dialog,
@@ -128,9 +130,17 @@ import {
 } from "lucide-react"
 import { buildEntitySelection } from "@lumiere/query-hooks/ai-ui-context"
 import { useOpenErpAiChat } from "@/lib/erp-ai-context"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { PivotExplorer } from "./pivot-explorer"
 import { VatReportPanel } from "./vat-report-panel"
-import { QueryBuilder } from "./query-builder"
+import { StatementsPanel } from "./statements-panel"
+import { QueryBuilder, type QueryBuilderStatus } from "./query-builder"
 import { OwnerReportsPanel } from "./owner-reports-panel"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
@@ -170,6 +180,7 @@ function ReportsClientLoaded({
   organizationId,
 }: ReportsClientLoadedProps) {
   useReportsModuleSubscription()
+  const router = useRouter()
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => reportsModuleConfig(t), [t])
   /** BigInt organization id for React Query keys (matches `@lumiere/query-hooks` `organizationId` param). */
@@ -198,7 +209,12 @@ function ReportsClientLoaded({
   const [updateLayoutWidgetId, setUpdateLayoutWidgetId] = useState<string | null>(null)
   const [viewDashboardId, setViewDashboardId] = useState<string | null>(null)
   const [viewDashboardRange, setViewDashboardRange] = useState<"all" | "7d" | "30d" | "90d" | "ytd">("all")
+  const [queryBuilderStatus, setQueryBuilderStatus] = useState<QueryBuilderStatus | null>(null)
   const openErpAiChat = useOpenErpAiChat()
+  const handleStoredDashboardDrill = useCallback(
+    (target: { href: string }) => router.push(target.href),
+    [router],
+  )
 
   const { data: reportsRaw = [] } = useFinancialReports(orgId, initialReports)
   const { data: trialBalances = [] } = useTrialBalances(orgId, initialBalances)
@@ -284,6 +300,9 @@ function ReportsClientLoaded({
     dataSources: storedDashboardDataSources,
     sourceStates: storedDashboardSourceStates,
     isLoading: storedDashboardLoading,
+    isRefreshing: storedDashboardRefreshing,
+    issue: storedDashboardIssue,
+    retry: retryStoredDashboard,
   } = useStoredDashboardDataSources(orgId, viewDashboardModels)
 
   const viewDashboardTimeRange = useMemo(
@@ -303,9 +322,10 @@ function ReportsClientLoaded({
       {
         ...(viewDashboardTimeRange ?? {}),
         sourceStates: storedDashboardSourceStates,
+        onDrillTarget: handleStoredDashboardDrill,
       },
     )
-  }, [viewDashboard, dashboardWidgets, storedDashboardDataSources, storedDashboardSourceStates, viewDashboardTimeRange])
+  }, [viewDashboard, dashboardWidgets, storedDashboardDataSources, storedDashboardSourceStates, viewDashboardTimeRange, handleStoredDashboardDrill])
 
   const storedDashboardExport = useMemo(
     () => storedDashboardResolution
@@ -315,13 +335,30 @@ function ReportsClientLoaded({
   )
 
   const storedDashboardRef = useRef<HTMLDivElement>(null)
+  const storedDashboardProvenance = useMemo(() => {
+    if (!viewDashboard) return undefined
+    return reportExportSourceProvenance({
+      organizationId: orgId,
+      companyId: (viewDashboard.companyId ?? viewDashboard.company_id ?? operatingCompanyId ?? "") as string | number | bigint,
+      dashboardId: (viewDashboard.id ?? "") as string | number | bigint,
+      model: [...viewDashboardModels].sort().join(","),
+      domain: JSON.stringify(
+        (dashboardWidgets as unknown as Record<string, unknown>[])
+          .filter((widget) => ((viewDashboard.widgetIds ?? viewDashboard.widget_ids) as Array<string | number | bigint> | undefined)
+            ?.some((id) => String(id) === String(widget.id)))
+          .map((widget) => ({ id: String(widget.id ?? ""), domain: widget.domain ?? null })),
+      ),
+      ...(viewDashboardTimeRange ?? {}),
+    })
+  }, [dashboardWidgets, operatingCompanyId, orgId, viewDashboard, viewDashboardModels, viewDashboardTimeRange])
   const handleStoredDashboardExport = useCallback(async () => {
     if (!storedDashboardRef.current || !viewDashboard || !storedDashboardExport.allowed) return
     await exportDashboardToPng(
       storedDashboardRef.current,
       String(viewDashboard.name ?? "dashboard"),
+      storedDashboardProvenance,
     )
-  }, [viewDashboard, storedDashboardExport.allowed])
+  }, [viewDashboard, storedDashboardExport.allowed, storedDashboardProvenance])
 
   const addWidgetFormConfig = useMemo(
     () =>
@@ -908,6 +945,18 @@ function ReportsClientLoaded({
             ),
           }
         }
+        if (tab.id === "statements") {
+          return {
+            ...tab,
+            type: "custom" as const,
+            customContent: (
+              <StatementsPanel
+                organizationId={orgId}
+                financialReports={reports as Record<string, unknown>[]}
+              />
+            ),
+          }
+        }
         if (tab.id === "vat-report") {
           return {
             ...tab,
@@ -928,7 +977,10 @@ function ReportsClientLoaded({
             customContent: (
               <QueryBuilder
                 organizationId={orgId}
+                companyId={operatingCompanyId}
                 dashboards={dashboards as unknown as Record<string, unknown>[]}
+                status={queryBuilderStatus}
+                onStatusChange={setQueryBuilderStatus}
               />
             ),
           }
@@ -953,6 +1005,7 @@ function ReportsClientLoaded({
       reports,
       trialBalances,
       dashboards,
+      queryBuilderStatus,
       companies,
       operatingCompanyId,
       orgId,
@@ -994,7 +1047,10 @@ function ReportsClientLoaded({
       await createDashboard.mutateAsync(toCreateDashboardPayload(formData))
       setCreateDashboardOpen(false)
     } else if (action === "createDashboardWidget") {
-      await createDashboardWidget.mutateAsync(toCreateDashboardWidgetPayload(formData))
+      await createDashboardWidget.mutateAsync({
+        ...toCreateDashboardWidgetPayload(formData),
+        creationRequestId: globalThis.crypto.randomUUID(),
+      })
       setCreateWidgetOpen(false)
     }
   }
@@ -1129,6 +1185,9 @@ function ReportsClientLoaded({
       />
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={csvKind === "report_template" ? "report_template" : "analytics_metric"}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
@@ -1292,30 +1351,38 @@ function ReportsClientLoaded({
               </div>
               {viewDashboard ? (
                 <div className="flex shrink-0 items-center gap-2">
-                  <select
-                    aria-label={t("reports.actions.dashboardTimeRange")}
-                    className="h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  <Select
                     value={viewDashboardRange}
-                    onChange={(event) =>
-                      setViewDashboardRange(
-                        event.target.value as "all" | "7d" | "30d" | "90d" | "ytd",
-                      )
+                    onValueChange={(value) =>
+                      setViewDashboardRange(value as "all" | "7d" | "30d" | "90d" | "ytd")
                     }
-                    data-testid="stored-dashboard-time-range"
                   >
-                    <option value="all">All time</option>
-                    <option value="7d">Last 7 days</option>
-                    <option value="30d">Last 30 days</option>
-                    <option value="90d">Last 90 days</option>
-                    <option value="ytd">Year to date</option>
-                  </select>
+                    <SelectTrigger
+                      aria-label={t("reports.actions.dashboardTimeRange")}
+                      className="h-9 w-[150px]"
+                      data-testid="stored-dashboard-time-range"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All time</SelectItem>
+                      <SelectItem value="7d">Last 7 days</SelectItem>
+                      <SelectItem value="30d">Last 30 days</SelectItem>
+                      <SelectItem value="90d">Last 90 days</SelectItem>
+                      <SelectItem value="ytd">Year to date</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     className="gap-2"
                     onClick={() => void handleStoredDashboardExport()}
-                    disabled={storedDashboardLoading || !storedDashboardExport.allowed}
+                    disabled={
+                      storedDashboardLoading
+                      || storedDashboardRefreshing
+                      || !storedDashboardExport.allowed
+                    }
                     title={storedDashboardExport.reason}
                   >
                     <Download className="h-4 w-4" />
@@ -1326,15 +1393,64 @@ function ReportsClientLoaded({
             </div>
           </DialogHeader>
           {viewDashboard ? (
-            <StoredDashboardView
-              ref={storedDashboardRef}
-              dashboard={viewDashboard}
-              widgets={dashboardWidgets as unknown as Record<string, unknown>[]}
-              dataSources={storedDashboardDataSources}
-              sourceStates={storedDashboardSourceStates}
-              resolution={storedDashboardResolution ?? undefined}
-              timeRange={viewDashboardTimeRange}
-            />
+            storedDashboardLoading ? (
+              <p
+                role="status"
+                className="text-sm text-muted-foreground"
+                data-testid="stored-dashboard-loading"
+              >
+                {t("common.loading", "Loading…")}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {storedDashboardRefreshing ? (
+                  <p
+                    role="status"
+                    className="text-sm text-muted-foreground"
+                    data-testid="stored-dashboard-refreshing"
+                  >
+                    {t("reports.dashboards.sourceRefreshing")}
+                  </p>
+                ) : null}
+                {storedDashboardIssue ? (
+                  <div
+                    role="alert"
+                    className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm"
+                    data-testid={
+                      storedDashboardIssue.kind === "denied"
+                        ? "stored-dashboard-denied"
+                        : "stored-dashboard-error"
+                    }
+                  >
+                    <p>
+                      {storedDashboardIssue.kind === "denied"
+                        ? t("reports.dashboards.sourceDenied")
+                        : t("reports.dashboards.sourceError")}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void retryStoredDashboard()}
+                      data-testid="stored-dashboard-retry"
+                    >
+                      {t("reports.dashboards.retrySource")}
+                    </Button>
+                  </div>
+                ) : null}
+                <StoredDashboardView
+                  ref={storedDashboardRef}
+                  dashboard={viewDashboard}
+                  widgets={dashboardWidgets as unknown as Record<string, unknown>[]}
+                  dataSources={storedDashboardDataSources}
+                  sourceStates={storedDashboardSourceStates}
+                  resolution={storedDashboardResolution ?? undefined}
+                  timeRange={viewDashboardTimeRange}
+                  organizationId={orgId}
+                  onDrillTarget={handleStoredDashboardDrill}
+                />
+              </div>
+            )
           ) : null}
         </DialogContent>
       </Dialog>

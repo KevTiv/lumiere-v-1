@@ -75,6 +75,89 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(out.phone, { none: [] })
   })
 
+  it("preserves zero and negative scalar Option values", () => {
+    const validation = stdbParamsToJson(
+      { minLength: 0, min: -25.5, max: 0 },
+      "FieldValidation",
+    )
+    assert.deepEqual(validation.min_length, { some: 0 })
+    assert.deepEqual(validation.min, { some: -25.5 })
+    assert.deepEqual(validation.max, { some: 0 })
+    assert.deepEqual(validation.max_length, { none: [] })
+    const update = stdbParamsToJson(
+      { expectedRevenue: 0, probability: 0 },
+      "UpdateOpportunityParams",
+    )
+    assert.deepEqual(update.expected_revenue, { some: 0 })
+    assert.deepEqual(update.probability, { some: 0 })
+  })
+
+  it("distinguishes optional u64 counters from relation IDs", () => {
+    for (const durationMs of [0, 0n, 25n]) {
+      const out = stdbParamsToJson({ durationMs }, "AppendAiChatMessageParams")
+      assert.deepEqual(out.duration_ms, { some: Number(durationMs) })
+    }
+    for (const companyId of [0, 0n, -1, -1n]) {
+      const out = stdbParamsToJson({ companyId }, "CreateContactParams")
+      assert.deepEqual(out.company_id, { none: [] })
+    }
+  })
+
+  it("honors explicitly encoded presence for numeric values and relation IDs", () => {
+    assert.deepEqual(
+      stdbParamsToJson({ companyId: { some: 0n } }, "CreateContactParams").company_id,
+      { some: 0 },
+    )
+    const out = stdbParamsToJson(
+      { min: { some: -5 }, max: { some: 0 }, minLength: { none: [] } },
+      "FieldValidation",
+    )
+    assert.deepEqual(out.min, { some: -5 })
+    assert.deepEqual(out.max, { some: 0 })
+    assert.deepEqual(out.min_length, { none: [] })
+  })
+
+  it("serializes signed optional integers without losing zero or negative values", () => {
+    for (const value of [0n, -1n, -1_700_000_000_000_000n]) {
+      for (const expectedUpdatedAtMicros of [value, { some: value }]) {
+        const out = stdbParamsToJson({ expectedUpdatedAtMicros }, "PublishFormConfigurationParams")
+        assert.deepEqual(out.expected_updated_at_micros, { some: Number(value) })
+      }
+    }
+    assert.throws(
+      () => stdbParamsToJson({ expectedUpdatedAtMicros: -9_007_199_254_740_992n }, "PublishFormConfigurationParams"),
+      /exceeds Number.MAX_SAFE_INTEGER/,
+    )
+  })
+
+  it("preserves nested form validation bounds and false options", () => {
+    const out = encodeReducerCallArgs("publish_form_configuration", [7, {
+      fields: [{ validation: { required: false, minLength: 0, min: -5, max: 0 } }],
+      roleConfigs: [],
+    }])[1] as Record<string, unknown>
+    const field = (out.fields as Record<string, unknown>[])[0]
+    assert.deepEqual(field.validation, {
+      required: false,
+      min_length: { some: 0 },
+      max_length: { none: [] },
+      min: { some: -5 },
+      max: { some: 0 },
+      pattern: { none: [] },
+      message: { none: [] },
+    })
+    assert.deepEqual(
+      stdbParamsToJson({ active: false }, "UpdateAccountTaxParams").active,
+      { some: false },
+    )
+  })
+
+  it("does not send a row-only asset field in the create contract", () => {
+    const out = stdbParamsToJson({ name: "Machine" }, "CreateAccountAssetParams")
+    assert.equal("salvage_move_id" in out, false)
+    assert.deepEqual(out.depreciation_schedule, { none: [] })
+    assert.deepEqual(stdbParamsToJson({}, "AccountAsset").salvage_move_id, { none: [] })
+  })
+
   it("wraps an end-contact-role reason as an optional string", () => {
     const out = stdbParamsToJson(
       { reason: "test correction" },
@@ -96,6 +179,52 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.tag_ids, [])
     assert.deepEqual(params.phone, { none: [] })
     assert.deepEqual(params.stage_id, { none: [] })
+  })
+
+  it("encodeReducerCallArgs SATS-encodes CreateAccountAccountParams fixtures", () => {
+    const encoded = encodeReducerCallArgs("create_account_account", [
+      9,
+      {
+        company_id: 28,
+        code: "PTESTD",
+        name: "Permission test debit account",
+        user_type_id: 7,
+        currency_id: null,
+        internal_type: { tag: "Expense" },
+        internal_group: { tag: "Expense" },
+        group_id: null,
+        reconcile: false,
+        tax_ids: [],
+        note: null,
+        opening_debit: 0,
+        opening_credit: 0,
+        allowed_journal_ids: [],
+        non_trade: false,
+        is_off_balance: false,
+        metadata: JSON.stringify({ test: "auth-permission-enforcement" }),
+      },
+    ])
+
+    assert.equal(encoded[0], 9)
+    assert.deepEqual(encoded[1], {
+      company_id: { some: 28 },
+      code: "PTESTD",
+      name: "Permission test debit account",
+      user_type_id: 7,
+      currency_id: { none: [] },
+      internal_type: { some: { expense: [] } },
+      internal_group: { some: { expense: [] } },
+      group_id: { none: [] },
+      reconcile: false,
+      tax_ids: [],
+      note: { none: [] },
+      opening_debit: 0,
+      opening_credit: 0,
+      allowed_journal_ids: [],
+      non_trade: false,
+      is_off_balance: false,
+      metadata: { some: JSON.stringify({ test: "auth-permission-enforcement" }) },
+    })
   })
 
   it("encodeReducerCallArgs SATS-encodes convert_lead_to_customer params", () => {
@@ -559,6 +688,31 @@ describe("stdbParamsToJson", () => {
         ref: { none: [] },
         memo: { none: [] },
       },
+    )
+  })
+})
+
+describe("workflow subject snapshot reducer params", () => {
+  it("encodes the generated params struct with SATS snake_case fields", () => {
+    assert.deepEqual(
+      encodeReducerCallArgs("request_workflow_subject_snapshot", [
+        2n,
+        3n,
+        {
+          subjectModel: "sale_order",
+          subjectId: 5n,
+          workflowVersionId: 7n,
+        },
+      ]),
+      [
+        2n,
+        3n,
+        {
+          subject_model: "sale_order",
+          subject_id: 5,
+          workflow_version_id: 7,
+        },
+      ],
     )
   })
 })

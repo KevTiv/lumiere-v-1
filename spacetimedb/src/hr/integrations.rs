@@ -106,6 +106,39 @@ fn normalize_status(raw: &str) -> Result<&'static str, String> {
     }
 }
 
+fn is_statutory_provider_kind(kind: &str) -> bool {
+    matches!(kind, "stp" | "esocial" | "cpf" | "sars" | "bank")
+}
+
+fn require_canonical_provider_result(
+    intent: &HrIntegrationIntent,
+    status: &str,
+    params: &RecordHrIntegrationResultParams,
+) -> Result<(), String> {
+    let has_provider_reference = params
+        .external_ref
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_some()
+        || params
+            .result_ref
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_some();
+    if is_statutory_provider_kind(&intent.intent_kind)
+        && matches!(status, "sent" | "applied")
+        && !has_provider_reference
+    {
+        return Err(format!(
+            "{} provider result requires a non-empty external_ref or result_ref",
+            intent.intent_kind
+        ));
+    }
+    Ok(())
+}
+
 fn validate_payslip_link(
     ctx: &ReducerContext,
     organization_id: u64,
@@ -259,42 +292,10 @@ fn apply_intent_from_payload(
             }
             Ok((external_ref, payload_hash, None))
         }
-        "stp" | "esocial" | "cpf" | "sars" | "bank" => {
-            let result_ref = payload
-                .get("result_ref")
-                .or_else(|| payload.get("file_ref"))
-                .or_else(|| payload.get("submission_id"))
-                .and_then(|v| v.as_str())
-                .map(str::to_string)
-                .or_else(|| Some(format!("stub:{}:{}", intent.intent_kind, intent.id)));
-            let external_ref = payload
-                .get("external_ref")
-                .and_then(|v| v.as_str())
-                .map(str::to_string);
-            if let Some(export_id) = intent.export_intent_id {
-                let export_status = payload
-                    .get("export_status")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("sent");
-                apply_payroll_export_result_internal(
-                    ctx,
-                    intent.organization_id,
-                    intent.company_id,
-                    export_id,
-                    RecordPayrollExportResultParams {
-                        status: export_status.to_string(),
-                        external_ref: external_ref.clone(),
-                        payload_hash: payload
-                            .get("payload_hash")
-                            .and_then(|v| v.as_str())
-                            .map(str::to_string),
-                        last_error: None,
-                        metadata: intent.metadata.clone(),
-                    },
-                )?;
-            }
-            Ok((external_ref, None, result_ref))
-        }
+        "stp" | "esocial" | "cpf" | "sars" | "bank" => Err(format!(
+            "{} provider adapter is unavailable; a configured provider must record a canonical result",
+            intent.intent_kind
+        )),
         other => Err(format!("Unsupported intent_kind '{other}'")),
     }
 }
@@ -414,6 +415,7 @@ pub fn record_hr_integration_result(
     if intent.organization_id != organization_id || intent.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
+    require_canonical_provider_result(&intent, status, &params)?;
     if status == "applied" {
         apply_partner_engine_side_effects(ctx, &intent, &params)?;
     }
@@ -532,7 +534,26 @@ fn apply_hr_integration_intent_inner(
                     write_date: ctx.timestamp,
                     ..intent
                 });
-            Err(e)
+            write_audit_log_v2(
+                ctx,
+                organization_id,
+                AuditLogParams {
+                    company_id: Some(intent.company_id),
+                    table_name: "hr_integration_intent",
+                    record_id: intent_id,
+                    action: "UPDATE",
+                    old_values: None,
+                    new_values: Some(
+                        serde_json::json!({ "status": "failed", "last_error": e }).to_string(),
+                    ),
+                    changed_fields: vec!["status".to_string(), "last_error".to_string()],
+                    metadata: None,
+                },
+            );
+            // The processing attempt completed and the canonical row now records
+            // the unavailable provider outcome. Returning an error would roll
+            // the reducer transaction back and erase that recovery evidence.
+            Ok(())
         }
     }
 }

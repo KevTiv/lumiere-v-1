@@ -6,6 +6,8 @@ export * from "./components/input";
 export * from "./components/label";
 export * from "./components/theme-provider";
 export * from "./components/csv-import-modal";
+export * from "./lib/csv-import-preview";
+export * from "./lib/csv-import-columns";
 // form.tsx: exclude FormField (conflicts with lib/form-types FormField type)
 export { Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "./components/form";
 export * from "./components/toast";
@@ -80,6 +82,7 @@ export * from "./import-assistant/import-assistant-wizard";
 export * from "./import-assistant/import-mapping-table";
 export * from "./import-assistant/import-preview-grid";
 export * from "./import-assistant/import-job-status-panel";
+export * from "./import-assistant/abandoned-accounting-import-cleanup";
 export * from "./import-assistant/import-template-controls";
 export * from "./lib/hr-entity-configs";
 export * from "./lib/hr-form-configs";
@@ -120,12 +123,16 @@ export * from "./pages/notification-bell";
 export * from "./lib/notification-bell-model";
 export * from "./lib/dashboard-time-range";
 export * from "./components/trend-badge";
+export * from "./components/kpi-strip";
+export * from "./lib/kpi-tiles";
 export * from "./pages/dashboard-sidebar";
 export * from "./pages/dashboard-widget-renderer";
 export * from "./pages/stored-dashboard-view";
 export * from "./lib/dashboard-types";
 export * from "./lib/dashboard-config";
 export * from "./lib/dashboard-drill-down";
+export * from "./lib/stored-dashboard-drill-target";
+export * from "./lib/report-export-provenance";
 export * from "./lib/stored-dashboard-resolver";
 export * from "./lib/export-dashboard-png";
 export * from "./lib/export-csv";
@@ -223,6 +230,8 @@ export * from "./settings/field-permissions-editor";
 export * from "./settings/sso-settings";
 export * from "./settings/form-config-settings";
 export * from "./settings/user-custom-fields";
+export * from "./settings/country-pack-readiness";
+export * from "./settings/country-pack-readiness-panel";
 
 // Hooks
 export * from "./hooks/use-toast";
@@ -246,6 +255,8 @@ export * from "./accounting-components/consolidation-workspace";
 export * from "./accounting-components/fx-revaluation-panel";
 export * from "./accounting-components/partner-credit-control-panel";
 export * from "./accounting-components/amortization-panel";
+export * from "./accounting-components/accounting-setup-readiness";
+export * from "./accounting-components/accounting-setup-readiness-panel";
 
 // Calendar components
 export * from "./calendar-components/calendar-view";
@@ -262,6 +273,7 @@ export * from "./lib/map-pin-configs";
 
 // Proposal workspace
 export * from "./proposal-workspace/proposal-workspace";
+export * from "./proposal-workspace/project-conversion";
 export * from "./proposal-workspace/document-input-panel";
 export * from "./proposal-workspace/compliance-checklist";
 export * from "./proposal-workspace/version-history-bar";
@@ -289,6 +301,7 @@ export * from "./components/editable-number";
 export * from "./lib/sale-order-line-totals";
 export * from "./entity-views/sale-order-line-grid";
 export * from "./lib/entity-table-engine";
+export * from "./lib/entity-table-export";
 export * from "./lib/workflow-actions";
 export * from "./lib/workflow-toast";
 export * from "./lib/semantic-operation-outcome";

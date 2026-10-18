@@ -17,6 +17,7 @@ interface WebkitSpeechRecognitionResultEvent {
 }
 
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -106,7 +107,11 @@ const noteTypeIcons: Record<NoteType, React.ReactNode> = {
   decision: <GitBranch className="h-4 w-4" />,
 }
 
-function formatTimeAgo(dateString: string): string {
+function formatTimeAgo(
+  dateString: string,
+  t: ReturnType<typeof useTranslation>["t"],
+  locale: string,
+): string {
   const date = new Date(dateString)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
@@ -114,14 +119,15 @@ function formatTimeAgo(dateString: string): string {
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
-  if (diffMins < 1) return "Just now"
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return date.toLocaleDateString()
+  if (diffMins < 1) return t("ui.journal.time.justNow")
+  if (diffMins < 60) return t("ui.journal.time.minutesAgo", { count: diffMins })
+  if (diffHours < 24) return t("ui.journal.time.hoursAgo", { count: diffHours })
+  if (diffDays < 7) return t("ui.journal.time.daysAgo", { count: diffDays })
+  return date.toLocaleDateString(locale)
 }
 
 export function JournalPanel({ open, onClose }: JournalPanelProps) {
+  const { t, i18n } = useTranslation()
   const { currentUser } = useRBAC()
   const [notes, setNotes] = useState<WorkNote[]>(sampleWorkNotes)
   const [isComposing, setIsComposing] = useState(false)
@@ -154,6 +160,67 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
   // Get role-based config
   const userRoleId = currentUser?.roles[0] || "default"
   const config: WorkNotesConfig = workNotesConfigs[userRoleId] || defaultWorkNotesConfig
+  const noteTypeLabels: Record<NoteType, string> = {
+    observation: t("ui.journal.noteTypes.observation"),
+    "task-update": t("ui.journal.noteTypes.taskUpdate"),
+    blocker: t("ui.journal.noteTypes.blocker"),
+    idea: t("ui.journal.noteTypes.idea"),
+    "meeting-note": t("ui.journal.noteTypes.meetingNote"),
+    reminder: t("ui.journal.noteTypes.reminder"),
+    question: t("ui.journal.noteTypes.question"),
+    decision: t("ui.journal.noteTypes.decision"),
+  }
+  const notePriorityLabels: Record<NotePriority, string> = {
+    low: t("ui.journal.priorities.low"),
+    normal: t("ui.journal.priorities.normal"),
+    high: t("ui.journal.priorities.high"),
+    urgent: t("ui.journal.priorities.urgent"),
+  }
+  const noteStatusLabels: Record<NoteStatus, string> = {
+    active: t("ui.journal.statuses.active"),
+    resolved: t("ui.journal.statuses.resolved"),
+    archived: t("ui.journal.statuses.archived"),
+  }
+  const quickTemplateLabels: Record<string, string> = {
+    "admin-obs": t("ui.journal.quickTemplates.adminObservation.label"),
+    "admin-dec": t("ui.journal.quickTemplates.adminDecision.label"),
+    "admin-block": t("ui.journal.quickTemplates.adminBlocker.label"),
+    "mgr-meeting": t("ui.journal.quickTemplates.managerMeeting.label"),
+    "mgr-update": t("ui.journal.quickTemplates.managerUpdate.label"),
+    "mgr-decision": t("ui.journal.quickTemplates.managerDecision.label"),
+    "sales-obs": t("ui.journal.quickTemplates.salesObservation.label"),
+    "sales-update": t("ui.journal.quickTemplates.salesUpdate.label"),
+    "sales-remind": t("ui.journal.quickTemplates.salesReminder.label"),
+    "wh-obs": t("ui.journal.quickTemplates.warehouseObservation.label"),
+    "wh-block": t("ui.journal.quickTemplates.warehouseBlocker.label"),
+    "wh-update": t("ui.journal.quickTemplates.warehouseUpdate.label"),
+    "view-obs": t("ui.journal.quickTemplates.viewerObservation.label"),
+    "view-question": t("ui.journal.quickTemplates.viewerQuestion.label"),
+    "view-idea": t("ui.journal.quickTemplates.viewerIdea.label"),
+    "def-obs": t("ui.journal.quickTemplates.defaultObservation.label"),
+    "def-update": t("ui.journal.quickTemplates.defaultUpdate.label"),
+    "def-idea": t("ui.journal.quickTemplates.defaultIdea.label"),
+  }
+  const quickTemplatePlaceholders: Record<string, string> = {
+    "admin-obs": t("ui.journal.quickTemplates.adminObservation.placeholder"),
+    "admin-dec": t("ui.journal.quickTemplates.adminDecision.placeholder"),
+    "admin-block": t("ui.journal.quickTemplates.adminBlocker.placeholder"),
+    "mgr-meeting": t("ui.journal.quickTemplates.managerMeeting.placeholder"),
+    "mgr-update": t("ui.journal.quickTemplates.managerUpdate.placeholder"),
+    "mgr-decision": t("ui.journal.quickTemplates.managerDecision.placeholder"),
+    "sales-obs": t("ui.journal.quickTemplates.salesObservation.placeholder"),
+    "sales-update": t("ui.journal.quickTemplates.salesUpdate.placeholder"),
+    "sales-remind": t("ui.journal.quickTemplates.salesReminder.placeholder"),
+    "wh-obs": t("ui.journal.quickTemplates.warehouseObservation.placeholder"),
+    "wh-block": t("ui.journal.quickTemplates.warehouseBlocker.placeholder"),
+    "wh-update": t("ui.journal.quickTemplates.warehouseUpdate.placeholder"),
+    "view-obs": t("ui.journal.quickTemplates.viewerObservation.placeholder"),
+    "view-question": t("ui.journal.quickTemplates.viewerQuestion.placeholder"),
+    "view-idea": t("ui.journal.quickTemplates.viewerIdea.placeholder"),
+    "def-obs": t("ui.journal.quickTemplates.defaultObservation.placeholder"),
+    "def-update": t("ui.journal.quickTemplates.defaultUpdate.placeholder"),
+    "def-idea": t("ui.journal.quickTemplates.defaultIdea.placeholder"),
+  }
 
   // Filter notes
   const filteredNotes = notes.filter((note) => {
@@ -426,7 +493,8 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
         <div className="flex items-center gap-1.5">
           {/* Drag handle */}
           <button
-            title="Drag to move"
+            title={t("ui.journal.actions.dragToMove")}
+            aria-label={t("ui.journal.actions.dragToMove")}
             onMouseDown={handleDragStart}
             className={cn(
               "flex items-center justify-center h-7 w-7 rounded-md transition-colors shrink-0",
@@ -440,20 +508,20 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
             <StickyNote className="h-3 w-3 text-white" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold truncate">Work Notes</h2>
+            <h2 className="text-sm font-semibold truncate">{t("ui.journal.title")}</h2>
             {!isMinimized && (
-              <p className="text-[10px] text-muted-foreground truncate">Quick notes, observations & updates</p>
+              <p className="text-[10px] text-muted-foreground truncate">{t("ui.journal.subtitle")}</p>
             )}
           </div>
         </div>
         <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="icon" onClick={toggleMinimize} className="h-7 w-7" title="Minimize">
+          <Button variant="ghost" size="icon" onClick={toggleMinimize} className="h-7 w-7" title={t("ui.journal.actions.minimize")} aria-label={t("ui.journal.actions.minimize")}>
             <Minus className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={toggleMaximize} className="h-7 w-7" title={isMaximized ? "Restore" : "Maximize"}>
+          <Button variant="ghost" size="icon" onClick={toggleMaximize} className="h-7 w-7" title={isMaximized ? t("ui.journal.actions.restore") : t("ui.journal.actions.maximize")} aria-label={isMaximized ? t("ui.journal.actions.restore") : t("ui.journal.actions.maximize")}>
             {isMaximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7" title="Close">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7" title={t("common.close")} aria-label={t("common.close")}>
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -465,7 +533,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
           {/* Quick action bar */}
           <div className="px-4 py-3 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-medium text-muted-foreground">Quick add:</span>
+              <span className="text-xs font-medium text-muted-foreground">{t("ui.journal.quickAdd")}</span>
               <div className="flex flex-wrap gap-1.5">
                 {config.quickTemplates.map((template) => (
                   <button
@@ -478,7 +546,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                     )}
                   >
                     {noteTypeIcons[template.type]}
-                    <span>{template.label}</span>
+                    <span>{quickTemplateLabels[template.id] ?? template.label}</span>
                   </button>
                 ))}
                 <button
@@ -486,7 +554,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                   className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-colors"
                 >
                   <Plus className="h-3 w-3" />
-                  <span>Other</span>
+                  <span>{t("ui.journal.other")}</span>
                 </button>
               </div>
             </div>
@@ -498,7 +566,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search notes..."
+                  placeholder={t("ui.journal.searchPlaceholder")}
                   className="h-8 pl-8 text-xs"
                 />
               </div>
@@ -506,26 +574,26 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
                     <Filter className="h-3 w-3" />
-                    Filter
+                    {t("ui.journal.filter")}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Type</div>
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("ui.journal.type")}</div>
                   <DropdownMenuItem onClick={() => setFilterType("all")}>
                     <Circle className={cn("h-3 w-3 mr-2", filterType === "all" && "text-primary")} />
-                    All Types
+                    {t("ui.journal.allTypes")}
                   </DropdownMenuItem>
                   {Object.entries(noteTypeConfig).map(([type, config]) => (
                     <DropdownMenuItem key={type} onClick={() => setFilterType(type as NoteType)}>
                       <span className={cn("mr-2", config.color)}>{noteTypeIcons[type as NoteType]}</span>
-                      {config.label}
+                      {noteTypeLabels[type as NoteType]}
                     </DropdownMenuItem>
                   ))}
                   <DropdownMenuSeparator />
-                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Status</div>
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{t("ui.journal.status")}</div>
                   <DropdownMenuItem onClick={() => setFilterStatus("all")}>
                     <Circle className={cn("h-3 w-3 mr-2", filterStatus === "all" && "text-primary")} />
-                    All Status
+                    {t("ui.journal.allStatuses")}
                   </DropdownMenuItem>
                   {Object.entries(noteStatusConfig).map(([status, config]) => (
                     <DropdownMenuItem key={status} onClick={() => setFilterStatus(status as NoteStatus)}>
@@ -534,7 +602,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                           status === "resolved" ? <CheckCircle2 className="h-3 w-3" /> :
                             <Archive className="h-3 w-3" />}
                       </span>
-                      {config.label}
+                      {noteStatusLabels[status as NoteStatus]}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -568,7 +636,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                             : "border-border text-muted-foreground hover:border-primary/30"
                         )}
                       >
-                        {typeConfig.label}
+                        {noteTypeLabels[type as NoteType]}
                       </button>
                     ))}
                   </div>
@@ -579,7 +647,12 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                       ref={textareaRef}
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
-                      placeholder={config.quickTemplates.find(t => t.type === selectedType)?.placeholder || "Write your note..."}
+                      placeholder={(() => {
+                        const template = config.quickTemplates.find((template) => template.type === selectedType)
+                        return template
+                          ? (quickTemplatePlaceholders[template.id] ?? template.placeholder)
+                          : t("ui.journal.notePlaceholder")
+                      })()}
                       rows={3}
                       className="resize-none text-sm pr-10"
                       autoFocus
@@ -590,6 +663,8 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                         size="icon"
                         onClick={toggleRecording}
                         className="absolute right-2 bottom-2 h-7 w-7"
+                        title={isRecording ? t("ui.journal.actions.stopRecording") : t("ui.journal.actions.startRecording")}
+                        aria-label={isRecording ? t("ui.journal.actions.stopRecording") : t("ui.journal.actions.startRecording")}
                       >
                         {isRecording ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
                       </Button>
@@ -600,7 +675,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                   <div className="flex items-center gap-3 flex-wrap">
                     {/* Priority */}
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-muted-foreground">Priority:</span>
+                      <span className="text-[10px] text-muted-foreground">{t("ui.journal.priority")}</span>
                       {Object.entries(notePriorityConfig).map(([p, pConfig]) => (
                         <button
                           key={p}
@@ -610,7 +685,8 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                             pConfig.dotColor,
                             priority === p ? "ring-2 ring-offset-1 ring-primary" : "opacity-40 hover:opacity-70"
                           )}
-                          title={pConfig.label}
+                          title={notePriorityLabels[p as NotePriority]}
+                          aria-label={notePriorityLabels[p as NotePriority]}
                         />
                       ))}
                     </div>
@@ -639,7 +715,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                               handleAddTag(tagInput)
                             }
                           }}
-                          placeholder="add tag"
+                          placeholder={t("ui.journal.addTagPlaceholder")}
                           className="h-5 w-16 text-[10px] px-1.5 border-dashed"
                         />
                       </div>
@@ -668,7 +744,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                       <Input
                         value={linkedTaskId}
                         onChange={(e) => setLinkedTaskId(e.target.value)}
-                        placeholder="Link to task ID (optional)"
+                        placeholder={t("ui.journal.linkTaskPlaceholder")}
                         className="h-6 text-[10px] flex-1 max-w-48"
                       />
                     </div>
@@ -677,11 +753,11 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                   {/* Actions */}
                   <div className="flex items-center justify-end gap-2 pt-1">
                     <Button variant="ghost" size="sm" onClick={resetForm} className="h-7 text-xs">
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                     <Button size="sm" onClick={handleSubmit} disabled={!content.trim()} className="h-7 text-xs gap-1.5">
                       <Send className="h-3 w-3" />
-                      Save Note
+                      {t("ui.journal.actions.saveNote")}
                     </Button>
                   </div>
                 </div>
@@ -695,8 +771,8 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
               {filteredNotes.length === 0 ? (
                 <div className="text-center py-12">
                   <StickyNote className="h-10 w-10 mx-auto text-muted-foreground/30 mb-3" />
-                  <p className="text-sm text-muted-foreground">No notes yet</p>
-                  <p className="text-xs text-muted-foreground/70">Use the quick actions above to add your first note</p>
+                  <p className="text-sm text-muted-foreground">{t("ui.journal.empty.title")}</p>
+                  <p className="text-xs text-muted-foreground/70">{t("ui.journal.empty.description")}</p>
                 </div>
               ) : (
                 filteredNotes.map((note) => (
@@ -716,12 +792,12 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                            {noteTypeConfig[note.type].label}
+                            {noteTypeLabels[note.type]}
                           </Badge>
                           {note.priority !== "normal" && (
                             <span className={cn("flex items-center gap-1 text-[10px]", notePriorityConfig[note.priority].color)}>
                               <span className={cn("w-1.5 h-1.5 rounded-full", notePriorityConfig[note.priority].dotColor)} />
-                              {notePriorityConfig[note.priority].label}
+                              {notePriorityLabels[note.priority]}
                             </span>
                           )}
                           {note.linkedTaskId && (
@@ -732,7 +808,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                           )}
                           <span className="text-[10px] text-muted-foreground ml-auto flex items-center gap-1">
                             <Clock className="h-2.5 w-2.5" />
-                            {formatTimeAgo(note.createdAt)}
+                            {formatTimeAgo(note.createdAt, t, i18n.resolvedLanguage ?? i18n.language)}
                           </span>
                         </div>
                         <p className={cn(
@@ -754,26 +830,27 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
-                            <MoreHorizontal className="h-3.5 w-3.5" />
+                            <MoreHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span className="sr-only">{t("ui.journal.actions.noteMenu")}</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40">
                           {note.status === "active" && (
                             <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "resolved")}>
                               <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
-                              Mark Resolved
+                              {t("ui.journal.actions.markResolved")}
                             </DropdownMenuItem>
                           )}
                           {note.status === "resolved" && (
                             <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "active")}>
                               <Circle className="h-3.5 w-3.5 mr-2" />
-                              Reopen
+                              {t("ui.journal.actions.reopen")}
                             </DropdownMenuItem>
                           )}
                           {note.status !== "archived" && (
                             <DropdownMenuItem onClick={() => handleUpdateStatus(note.id, "archived")}>
                               <Archive className="h-3.5 w-3.5 mr-2" />
-                              Archive
+                              {t("ui.journal.actions.archive")}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
@@ -782,7 +859,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
                             className="text-destructive focus:text-destructive"
                           >
                             <Trash2 className="h-3.5 w-3.5 mr-2" />
-                            Delete
+                            {t("common.delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -795,8 +872,8 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
 
           {/* Footer stats */}
           <div className="px-4 py-2 border-t border-border bg-muted/30 flex items-center justify-between text-xs text-muted-foreground shrink-0">
-            <span>{filteredNotes.filter(n => n.status === "active").length} active notes</span>
-            <span>{notes.filter(n => n.status === "resolved").length} resolved today</span>
+            <span>{t("ui.journal.stats.activeNotes", { count: filteredNotes.filter(n => n.status === "active").length })}</span>
+            <span>{t("ui.journal.stats.resolvedToday", { count: notes.filter(n => n.status === "resolved").length })}</span>
           </div>
         </div>
       )}

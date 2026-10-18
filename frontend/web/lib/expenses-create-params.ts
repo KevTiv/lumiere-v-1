@@ -53,14 +53,14 @@ function parseU64IdList(raw: unknown): bigint[] {
   if (Array.isArray(raw)) {
     return raw
       .map((x) => optionalBigIntU64(x))
-      .filter((x): x is bigint => x !== undefined)
+      .filter((x): x is bigint => x !== undefined && x > 0n)
   }
   return String(raw)
     .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean)
     .map((s) => optionalBigIntU64(s))
-    .filter((x): x is bigint => x !== undefined)
+    .filter((x): x is bigint => x !== undefined && x > 0n)
 }
 
 /** Parse attachment ids from form; never invent stub id `1`. */
@@ -79,6 +79,14 @@ export function newExpenseReceiptClientRequestId(): string {
     return `rcpt-${crypto.randomUUID()}`
   }
   return `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** Stable command identity supplied to the reducer so a transport retry cannot duplicate a line. */
+export function newExpenseClientRequestId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `expense-${crypto.randomUUID()}`
+  }
+  return `expense-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 export function toCreateExpenseParams(

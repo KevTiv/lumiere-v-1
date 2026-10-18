@@ -1,5 +1,7 @@
 "use client";
 
+import { readPreference, writePreference } from "../lib/theme-storage";
+
 import {
   createContext,
   useCallback,
@@ -86,12 +88,14 @@ export function ThemeProvider({
   const resolvedTheme: "light" | "dark" = theme === "system" ? systemTheme : theme;
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem(storageKey) as Theme | null;
+    const storedTheme = readPreference(storageKey) as Theme | null;
     if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system") {
       setThemeState(storedTheme);
     }
-    setPaletteState(parsePalette(localStorage.getItem(paletteStorageKey)));
-    setShellState(parseShell(localStorage.getItem(shellStorageKey)));
+    const storedPalette = readPreference(paletteStorageKey);
+    if (storedPalette !== null) setPaletteState(parsePalette(storedPalette));
+    const storedShell = readPreference(shellStorageKey);
+    if (storedShell !== null) setShellState(parseShell(storedShell));
   }, [storageKey, paletteStorageKey, shellStorageKey]);
 
   useEffect(() => {
@@ -117,7 +121,7 @@ export function ThemeProvider({
 
   const setTheme = useCallback(
     (next: Theme) => {
-      localStorage.setItem(storageKey, next);
+      writePreference(storageKey, next);
       setThemeState(next);
     },
     [storageKey],
@@ -125,7 +129,7 @@ export function ThemeProvider({
 
   const setPalette = useCallback(
     (next: PaletteId) => {
-      localStorage.setItem(paletteStorageKey, next);
+      writePreference(paletteStorageKey, next);
       setPaletteState(next);
     },
     [paletteStorageKey],
@@ -133,7 +137,7 @@ export function ThemeProvider({
 
   const setShell = useCallback(
     (next: ShellId) => {
-      localStorage.setItem(shellStorageKey, next);
+      writePreference(shellStorageKey, next);
       setShellState(next);
     },
     [shellStorageKey],

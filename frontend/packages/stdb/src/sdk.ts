@@ -1,4 +1,5 @@
 import type { LumiereHttpFetch } from "@lumiere/api-client"
+import { httpResponseError } from "@lumiere/api-client/response-error"
 
 import {
   stdbBffCommandPost,
@@ -165,11 +166,7 @@ async function executeQuery<Row>(
 ): Promise<Row[]> {
   const response = await apiFetch(url)
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as {
-      error?: string
-      message?: string
-    }
-    throw new Error(payload.message ?? payload.error ?? errorMessage)
+    throw await httpResponseError(response, errorMessage)
   }
   return decode(await response.json())
 }

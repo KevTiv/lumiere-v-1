@@ -171,6 +171,12 @@
       "reviewed": true
     },
     {
+      "table": "workflow_subject_snapshot",
+      "module": "workflow",
+      "storage_class": "projection_only",
+      "reviewed": true
+    },
+    {
       "table": "presentation_module",
       "module": "presentation",
       "storage_class": "always_hot",
@@ -5281,7 +5287,9 @@
       "table": "document_retention_purge_job",
       "module": "documents",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
-      "authoritative_resources": [],
+      "authoritative_resources": [
+        "document-retention-purge-jobs"
+      ],
       "durability_class": "durable_operational_state",
       "organization_ownership": "direct",
       "organization_column": "organization_id",
@@ -6185,6 +6193,41 @@
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-semantic-safety-contract",
       "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "helpdesk_ticket_related_record",
+      "module": "helpdesk",
+      "rationale": "Canonical typed business-record relation; explicitly company-owned child of the organization-wide ticket. Targets are references, never aggregate storage parents.",
+      "authoritative_resources": [],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "helpdesk_ticket",
+          "child_column": "ticket_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "ticket_id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "follow_parent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
       "postgres_access_path": "organization_index"
@@ -8932,6 +8975,80 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "mrp_production_cost",
+      "module": "manufacturing",
+      "rationale": "Reviewed child aggregate: production_id references mrp_production.id.",
+      "authoritative_resources": [
+        "mrp-production-costs"
+      ],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "mrp_production",
+          "child_column": "production_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "production_id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/operations/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "mrp_productivity_cost",
+      "module": "manufacturing",
+      "rationale": "Reviewed child aggregate: productivity_id references mrp_workcenter_productivity.id.",
+      "authoritative_resources": [
+        "mrp-productivity-costs"
+      ],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "mrp_workcenter_productivity",
+          "child_column": "productivity_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "productivity_id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/operations/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "mrp_routing_workcenter",
       "module": "manufacturing",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
@@ -8965,6 +9082,43 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "mrp_valuation_config",
+      "module": "manufacturing",
+      "rationale": "Reviewed child aggregate: company_id references company.id.",
+      "authoritative_resources": [
+        "mrp-valuation-configs"
+      ],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "company",
+          "child_column": "company_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "company_id",
+        "version_strategy": "updated_at"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/operations/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "follow_parent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "mrp_workcenter",
       "module": "manufacturing",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
@@ -8993,6 +9147,43 @@
       "cooling_eligibility": "never",
       "cooling_eligibility_source": "reviewed:c5/operations/always-hot/missing-semantic-safety-contract",
       "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "mrp_workcenter_cost_rate",
+      "module": "manufacturing",
+      "rationale": "Reviewed child aggregate: workcenter_id references mrp_workcenter.id.",
+      "authoritative_resources": [
+        "mrp-workcenter-cost-rates"
+      ],
+      "durability_class": "durable_business_record",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "child",
+        "parent": {
+          "table": "mrp_workcenter",
+          "child_column": "workcenter_id",
+          "parent_column": "id"
+        }
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "workcenter_id",
+        "version_strategy": "updated_at"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/operations/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "follow_parent",
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
       "postgres_access_path": "organization_index"
@@ -16507,6 +16698,37 @@
       "hydration_policy": "not_applicable",
       "delete_behavior": "tombstone",
       "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "workflow_subject_snapshot",
+      "module": "workflow",
+      "rationale": "Requester-scoped derived snapshot rebuilt from an authoritative organization/company-owned workflow subject row.",
+      "authoritative_resources": [],
+      "durability_class": "derived_rebuildable",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "id",
+        "version_strategy": "none"
+      },
+      "projection_mode": "snapshot",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/requester-scoped-workflow-command-input",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "rebuild",
+      "postgres_access_path": "snapshot_key"
     },
     {
       "table": "workflow_timer",

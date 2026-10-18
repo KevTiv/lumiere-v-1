@@ -24,6 +24,7 @@ const schemaPath = path.join(
 const policyPath = path.join(repoRoot, "lumiere-codegen", "storage-policy-manifest.json");
 const resourceRegistryPath = path.join(repoRoot, "crates", "stdb-auth", "assets", "resource_registry.json");
 const checkOnly = process.argv.includes("--check");
+const EXPECTED_SCHEMA_TABLES = 510;
 
 // C0 no longer permits application-level platform-global tables. Former
 // exceptions must be organization-owned in schema source before policy
@@ -216,6 +217,10 @@ const PARENT_OVERRIDES = {
   import_job_record: ["import_job", "job_id", "id"],
   mrp_bom_byproduct: ["mrp_bom", "bom_id", "id"],
   mrp_bom_line: ["mrp_bom", "bom_id", "id"],
+  mrp_production_cost: ["mrp_production", "production_id", "id"],
+  mrp_productivity_cost: ["mrp_workcenter_productivity", "productivity_id", "id"],
+  mrp_valuation_config: ["company", "company_id", "id"],
+  mrp_workcenter_cost_rate: ["mrp_workcenter", "workcenter_id", "id"],
   opportunity_line: ["opportunity", "opportunity_id", "id"],
   pos_order_line: ["pos_order", "order_id", "id"],
   pos_payment: ["pos_order", "order_id", "id"],
@@ -368,6 +373,7 @@ function primaryKeyStrategy(table) {
   const { column_name: column, ty } = table.primary_key;
   if (ty === "Identity") return "identity";
   if (table.sql_name === "organization_commit_cursor") return "natural";
+  if (["mrp_production_cost", "mrp_productivity_cost", "mrp_valuation_config", "mrp_workcenter_cost_rate"].includes(table.sql_name)) return "natural";
   if (ty === "U64") return "auto_increment";
   if (column.endsWith("_key") || column === "code" || column === "token" || column === "scope_key") {
     return "natural";
@@ -590,8 +596,8 @@ function validateParentOverrides(tables) {
 }
 
 function validate(schema, policyDocument, resourceRegistry) {
-  if (!Array.isArray(schema.tables) || schema.tables.length !== 504) {
-    throw new Error(`expected schema manifest with 504 tables, found ${schema.tables?.length ?? "none"}`);
+  if (!Array.isArray(schema.tables) || schema.tables.length !== EXPECTED_SCHEMA_TABLES) {
+    throw new Error(`expected schema manifest with ${EXPECTED_SCHEMA_TABLES} tables, found ${schema.tables?.length ?? "none"}`);
   }
   if (policyDocument.version !== 1 || !Array.isArray(policyDocument.policies)) {
     throw new Error("storage policy source must have version 1 and a policies array");
@@ -603,9 +609,9 @@ function validate(schema, policyDocument, resourceRegistry) {
   const schemaNames = new Set(schema.tables.map((table) => table.sql_name));
   if (schemaNames.size !== schema.tables.length) throw new Error("schema manifest contains duplicate table names");
   if (schema.ownership_summary?.verified !== true
-      || schema.ownership_summary.erp_owned_count !== 504
+      || schema.ownership_summary.erp_owned_count !== EXPECTED_SCHEMA_TABLES
       || schema.ownership_summary.platform_global_count !== 0) {
-    throw new Error("schema manifest must carry verified C0 ownership totals (504 organization + 0 platform)");
+    throw new Error(`schema manifest must carry verified C0 ownership totals (${EXPECTED_SCHEMA_TABLES} organization + 0 platform)`);
   }
   const policyNames = new Set();
   const resources = new Map(Object.entries(resourceRegistry));
@@ -717,8 +723,8 @@ function validate(schema, policyDocument, resourceRegistry) {
 
   const platform = policyDocument.policies.filter((entry) => entry.organization_ownership === "platform_global");
   const organization = policyDocument.policies.filter((entry) => entry.organization_ownership === "direct");
-  if (platform.length !== PLATFORM_GLOBAL_TABLES.size || organization.length !== 504) {
-    throw new Error(`C0 ownership split must be 504 organization + 0 platform, got ${organization.length} + ${platform.length}`);
+  if (platform.length !== PLATFORM_GLOBAL_TABLES.size || organization.length !== EXPECTED_SCHEMA_TABLES) {
+    throw new Error(`C0 ownership split must be ${EXPECTED_SCHEMA_TABLES} organization + 0 platform, got ${organization.length} + ${platform.length}`);
   }
   const wrongPlatform = platform.filter((entry) => !PLATFORM_GLOBAL_TABLES.has(entry.table));
   if (wrongPlatform.length) throw new Error(`unapproved platform-global policy: ${wrongPlatform.map((entry) => entry.table).join(", ")}`);
@@ -795,9 +801,9 @@ if (checkOnly) {
   if (JSON.stringify(refreshed) !== JSON.stringify(policyDocument)) {
     throw new Error("storage policy source is not reproducible; run the bootstrap without --check");
   }
-  console.log(`C1 storage policy check passed: ${policyDocument.policies.length}/504 tables`);
+  console.log(`C1 storage policy check passed: ${policyDocument.policies.length}/${EXPECTED_SCHEMA_TABLES} tables`);
 } else {
   fs.writeFileSync(policyPath, `${JSON.stringify(policyDocument, null, 2)}\n`);
   console.log(`Wrote ${policyPath}`);
-  console.log(`C1 storage policy bootstrap passed: ${policyDocument.policies.length}/504 tables`);
+  console.log(`C1 storage policy bootstrap passed: ${policyDocument.policies.length}/${EXPECTED_SCHEMA_TABLES} tables`);
 }

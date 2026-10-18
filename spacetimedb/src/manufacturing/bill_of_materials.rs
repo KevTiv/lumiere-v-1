@@ -14,9 +14,10 @@ use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::manufacturing::manufacturing_orders::mrp_production;
 use crate::manufacturing::relations::{
-    require_bom_in_company, require_location_for_manufacturing, require_product_for_manufacturing,
+    require_active_workcenter_in_company, require_bom_in_company,
+    require_location_for_manufacturing, require_product_for_manufacturing,
     require_routing_workcenter_in_company, require_uom_compatible, require_uom_in_org,
-    require_warehouse_for_manufacturing, validate_positive_qty,
+    require_warehouse_for_manufacturing, validate_positive_duration, validate_positive_qty,
 };
 use crate::manufacturing::work_centers::mrp_workcenter;
 use crate::types::BomType;
@@ -750,6 +751,16 @@ pub fn create_bom_byproduct(
         changed_fields: vec!["bom_id".to_string(), "product_id".to_string()],
         metadata: None,
     });
+    let updated_bom = ctx.db.mrp_bom().id().find(&bom_id).ok_or("BOM not found after byproduct creation")?;
+    record_organization_commit(ctx, OrganizationCommitInput {
+        organization_id,
+        operation_id: "erp.create_bom_byproduct".to_string(),
+        correlation_id: format!("bom:{bom_id}:byproduct:{}", row.id),
+        changes: vec![
+            RowChange::upsert_stdb_row("mrp_bom", serde_json::json!({"id": bom_id}), &updated_bom)?,
+            RowChange::upsert_stdb_row("mrp_bom_byproduct", serde_json::json!({"id": row.id}), &row)?,
+        ],
+    })?;
     Ok(())
 }
 
@@ -773,6 +784,18 @@ pub fn update_bom(
 
     // Derive company from the BOM — never trust a parallel caller argument.
     let company_id = bom.company_id;
+
+    if !bom.operation_ids.is_empty()
+        && (params.product_qty.is_some() || params.routing_id.is_some())
+        && ctx
+            .db
+            .mrp_production()
+            .mrp_production_by_company()
+            .filter(&company_id)
+            .any(|mo| mo.bom_id == Some(bom_id))
+    {
+        return Err("BOM routing basis is locked by a manufacturing order".to_string());
+    }
 
     if let Some(qty) = params.product_qty {
         validate_positive_qty(qty, "product_qty")?;
@@ -1055,6 +1078,136 @@ pub fn create_routing_workcenter(
 // ============================================================================
 // REDUCERS: BOM COST & EXPLOSION
 // ============================================================================
+
+/// Load the BOM's operations in deterministic execution order. Dependencies must
+/// be members of this BOM and precede their dependent operation, so a cycle can
+/// never be accepted. Operation definitions are immutable after creation.
+pub(crate) fn ordered_bom_operations(
+    ctx: &ReducerContext,
+    bom: &MrpBom,
+    operation_ids: &[u64],
+) -> Result<Vec<MrpRoutingWorkcenter>, String> {
+    let mut operations = Vec::with_capacity(operation_ids.len());
+    let mut seen = std::collections::HashSet::new();
+    for &id in operation_ids {
+        if !seen.insert(id) {
+            return Err("BOM routing contains duplicate operations".to_string());
+        }
+        let operation = require_routing_workcenter_in_company(
+            ctx,
+            bom.organization_id,
+            bom.company_id,
+            id,
+            "BOM operation",
+        )?;
+        require_active_workcenter_in_company(
+            ctx,
+            bom.organization_id,
+            bom.company_id,
+            operation.workcenter_id,
+            "BOM operation workcenter",
+        )?;
+        let cycle = if operation.time_mode == "manual" {
+            operation.time_cycle_manual
+        } else {
+            operation.time_cycle
+        };
+        validate_positive_duration(cycle, "routing cycle duration")?;
+        operations.push(operation);
+    }
+    operations.sort_by_key(|operation| (operation.sequence, operation.id));
+    let mut predecessors = std::collections::HashSet::new();
+    for operation in &operations {
+        if operation
+            .blocked_by_operation_ids
+            .iter()
+            .any(|id| !predecessors.contains(id))
+        {
+            return Err("BOM operation dependencies must precede it in the same BOM".to_string());
+        }
+        predecessors.insert(operation.id);
+    }
+    Ok(operations)
+}
+
+/// Assign an ordered routing before any manufacturing order references the BOM.
+/// The server owns ordering; callers supply only operation identities.
+#[reducer]
+pub fn set_bom_operations(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    bom_id: u64,
+    operation_ids: Vec<u64>,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mrp_bom", "write")?;
+    let bom = require_bom_in_company(ctx, organization_id, company_id, bom_id, "BOM routing")?;
+    if ctx
+        .db
+        .mrp_production()
+        .mrp_production_by_company()
+        .filter(&company_id)
+        .any(|mo| mo.bom_id == Some(bom_id))
+    {
+        return Err("BOM routing is locked by a manufacturing order".to_string());
+    }
+    let operations = ordered_bom_operations(ctx, &bom, &operation_ids)?;
+    let operation_ids: Vec<_> = operations.iter().map(|operation| operation.id).collect();
+    if ctx
+        .db
+        .mrp_bom_line()
+        .mrp_bom_line_by_bom()
+        .filter(&bom_id)
+        .any(|line| {
+            line.operation_id
+                .is_some_and(|id| !operation_ids.contains(&id))
+        })
+    {
+        return Err("BOM routing must include every component operation".to_string());
+    }
+    let old_values = serde_json::json!({"operation_ids": bom.operation_ids}).to_string();
+    let new_values = serde_json::json!({"operation_ids": operation_ids}).to_string();
+    ctx.db.mrp_bom().id().update(MrpBom {
+        operation_ids,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..bom
+    });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mrp_bom",
+            record_id: bom_id,
+            action: "UPDATE",
+            old_values: Some(old_values),
+            new_values: Some(new_values),
+            changed_fields: vec!["operation_ids".to_string()],
+            metadata: None,
+        },
+    );
+    let bom = ctx
+        .db
+        .mrp_bom()
+        .id()
+        .find(&bom_id)
+        .ok_or("BOM missing after routing update")?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.set_bom_operations".to_string(),
+            correlation_id: format!("bom:{bom_id}"),
+            changes: vec![RowChange::upsert_stdb_row(
+                "mrp_bom",
+                serde_json::json!({"id": bom_id}),
+                &bom,
+            )?],
+        },
+    )?;
+    Ok(())
+}
 
 /// Compute and cache estimated BOM cost using component standard costs.
 ///

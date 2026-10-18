@@ -132,10 +132,38 @@ pub(super) fn validate_request(
         ));
     }
     parse_timezone(timezone)?;
+    let scenario = request.scenario.unwrap_or_default();
+    if !scenario.input_cost_change_pct.is_finite()
+        || !(-50.0..=500.0).contains(&scenario.input_cost_change_pct)
+    {
+        return Err(ApiError::BadRequest(
+            "scenario.inputCostChangePct must be between -50 and 500".into(),
+        ));
+    }
+    if !scenario.demand_change_pct.is_finite()
+        || !(-100.0..=500.0).contains(&scenario.demand_change_pct)
+    {
+        return Err(ApiError::BadRequest(
+            "scenario.demandChangePct must be between -100 and 500".into(),
+        ));
+    }
+    if !(0..=365).contains(&scenario.lead_time_change_days) {
+        return Err(ApiError::BadRequest(
+            "scenario.leadTimeChangeDays must be between 0 and 365".into(),
+        ));
+    }
+    if !scenario.target_margin_pct.is_finite()
+        || !(0.0..=95.0).contains(&scenario.target_margin_pct)
+    {
+        return Err(ApiError::BadRequest(
+            "scenario.targetMarginPct must be between 0 and 95".into(),
+        ));
+    }
 
     Ok(ValidatedPreviewRequest {
         company_id: request.company_id,
         date,
         timezone: timezone.to_string(),
+        scenario,
     })
 }

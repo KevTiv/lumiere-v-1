@@ -1,7 +1,10 @@
 import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
-import { resolvePostedAccountMoveEffect } from "./accounting/moves"
+import {
+  resolveManualInvoiceDraftEffect,
+  resolvePostedAccountMoveEffect,
+} from "./accounting/moves"
 import { AmbiguousOperationEffectError } from "./operation-effect"
 
 const postedMove = {
@@ -33,6 +36,57 @@ describe("resolvePostedAccountMoveEffect", () => {
   it("rejects duplicate exact posted rows", () => {
     assert.throws(
       () => resolvePostedAccountMoveEffect([postedMove, postedMove], 41n),
+      AmbiguousOperationEffectError,
+    )
+  })
+})
+
+describe("resolveManualInvoiceDraftEffect", () => {
+  const requestId = "create-manual-invoice:retry-safe"
+  const draft = {
+    id: "73",
+    companyId: "9",
+    state: { tag: "Draft" },
+    metadata: JSON.stringify({ manualInvoiceRequestId: requestId }),
+  } as never
+
+  it("returns the exact company-scoped draft correlated by the server", () => {
+    assert.deepEqual(resolveManualInvoiceDraftEffect([draft], 9n, requestId), {
+      resource: "account-moves",
+      id: "73",
+      state: "Draft",
+      requestId,
+    })
+  })
+
+  it("fails closed for company, state, request, malformed metadata, or duplicates", () => {
+    assert.equal(resolveManualInvoiceDraftEffect([draft], 10n, requestId), null)
+    assert.equal(resolveManualInvoiceDraftEffect([draft], 9n, "another-request"), null)
+    assert.equal(
+      resolveManualInvoiceDraftEffect(
+        [
+          {
+            id: "73",
+            companyId: "9",
+            state: { tag: "Posted" },
+            metadata: JSON.stringify({ manualInvoiceRequestId: requestId }),
+          } as never,
+        ],
+        9n,
+        requestId,
+      ),
+      null,
+    )
+    assert.equal(
+      resolveManualInvoiceDraftEffect(
+        [{ id: "73", companyId: "9", state: { tag: "Draft" }, metadata: "{" } as never],
+        9n,
+        requestId,
+      ),
+      null,
+    )
+    assert.throws(
+      () => resolveManualInvoiceDraftEffect([draft, draft], 9n, requestId),
       AmbiguousOperationEffectError,
     )
   })

@@ -6,7 +6,8 @@ use crate::accounting::fiscal_periods::{
 };
 use crate::accounting::journal_entries::{account_move, account_move_line, post_invoice};
 use crate::accounting::payments::{
-    account_payment, create_payment, post_payment, CreatePaymentParams,
+    account_payment, cancel_payment, create_payment, post_payment, register_payment_on_invoice,
+    unregister_payment_allocations, CreatePaymentParams,
 };
 use crate::core::organization::company;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -116,6 +117,132 @@ fn seed_closed_period(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<(), 
         return Err("period-close replay changed the canonical period".to_string());
     }
 
+    Ok(())
+}
+
+pub fn test_payment_allocation_unwind_blocked_in_closed_period(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let amount = 35.0;
+    let invoice_id = create_balanced_customer_invoice(ctx, &fixture, amount, true)?;
+    let (bank_journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+    let currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&fixture.company_id)
+        .ok_or("Fixture company not found")?
+        .currency_id;
+    create_payment(
+        ctx,
+        fixture.organization_id,
+        CreatePaymentParams {
+            idempotency_key: "closed-period-allocation-unwind".to_string(),
+            company_id: fixture.company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount,
+            currency_id,
+            date: Some(ctx.timestamp),
+            journal_id: bank_journal_id,
+            ref_: Some("Closed period unwind".to_string()),
+            memo: None,
+        },
+    )?;
+    let payment_id = ctx
+        .db
+        .account_payment()
+        .iter()
+        .find(|payment| payment.ref_.as_deref() == Some("Closed period unwind"))
+        .ok_or("closed-period payment missing")?
+        .id;
+    post_payment(ctx, fixture.organization_id, payment_id)?;
+    register_payment_on_invoice(
+        ctx,
+        fixture.organization_id,
+        payment_id,
+        vec![invoice_id],
+        false,
+    )?;
+    seed_closed_period(ctx, &fixture)?;
+
+    let before_payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("payment missing before closed-period unwind")?;
+    let before_invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("invoice missing before closed-period unwind")?;
+    let before_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|line| {
+            line.move_id == invoice_id || Some(line.move_id) == before_payment.move_id
+        })
+        .map(|line| {
+            (
+                line.id,
+                line.amount_residual,
+                line.matching_number.clone(),
+                line.write_date,
+            )
+        })
+        .collect();
+
+    match unregister_payment_allocations(ctx, fixture.organization_id, payment_id) {
+        Err(error) if error.contains("closed") => {}
+        Err(error) => return Err(format!("unexpected unwind period-lock error: {error}")),
+        Ok(()) => return Err("allocation unwind succeeded in a closed period".to_string()),
+    }
+    match cancel_payment(ctx, fixture.organization_id, payment_id) {
+        Err(error) if error.contains("closed") => {}
+        Err(error) => return Err(format!("unexpected cancel period-lock error: {error}")),
+        Ok(()) => return Err("reconciled cancellation succeeded in a closed period".to_string()),
+    }
+
+    let after_payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("payment missing after closed-period denial")?;
+    let after_invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("invoice missing after closed-period denial")?;
+    let after_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|line| before_lines.iter().any(|snapshot| snapshot.0 == line.id))
+        .map(|line| {
+            (
+                line.id,
+                line.amount_residual,
+                line.matching_number.clone(),
+                line.write_date,
+            )
+        })
+        .collect();
+    if after_payment.state != before_payment.state
+        || after_payment.reconciled_invoice_ids != before_payment.reconciled_invoice_ids
+        || after_invoice.amount_residual != before_invoice.amount_residual
+        || after_invoice.payment_state != before_invoice.payment_state
+        || after_lines != before_lines
+    {
+        return Err("closed-period denial changed payment allocation state".to_string());
+    }
     Ok(())
 }
 

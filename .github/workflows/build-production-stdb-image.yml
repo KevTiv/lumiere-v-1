@@ -1,0 +1,100 @@
+name: Build production SpacetimeDB publisher
+
+on:
+  push:
+    branches: [main, codex/railway-production-completion]
+    paths:
+      - spacetimedb/**
+      - crates/presentation-core/**
+      - scripts/railway-publish-spacetimedb.sh
+      - Dockerfile.spacetimedb-publisher-artifact
+      - .github/workflows/build-contracts-module.yml
+      - .github/workflows/build-production-stdb-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: production-stdb-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  module:
+    uses: ./.github/workflows/build-contracts-module.yml
+    with:
+      production: true
+      alpha_founder_identities: ${{ vars.LUMIERE_ALPHA_FOUNDER_IDENTITIES }}
+  publish:
+    needs: module
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: contracts-module
+          path: .ci
+      - uses: ./.github/actions/setup-spacetime-cli
+        with:
+          version: '2.8.2'
+      - name: Verify production module provisioning in an isolated database
+        shell: bash
+        run: |
+          set -euo pipefail
+          spacetime start --listen-addr 127.0.0.1:3000 > "$RUNNER_TEMP/stdb-provisioning.log" 2>&1 &
+          task_server_pid=$!
+          trap 'kill "$task_server_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..60}; do
+            if curl -fsS -X POST http://127.0.0.1:3000/v1/identity >/dev/null; then break; fi
+            sleep 1
+          done
+          spacetime publish lumiere-provisioning-test --bin-path .ci/contracts-module.wasm --server local -y --no-config
+          if spacetime call lumiere-provisioning-test dev_promote_caller_superuser --server local -y --no-config; then
+            echo 'Production module must reject dev privilege escalation' >&2
+            exit 1
+          fi
+          if spacetime call lumiere-provisioning-test test_bootstrap_new_tenant_records_complete_commit --server local -y --no-config; then
+            echo 'Production module must not expose test reducers' >&2
+            exit 1
+          fi
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image coordinates
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}-spacetimedb-publisher"
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+          echo "tag=$repository:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          if docker buildx imagetools inspect "$repository:$GITHUB_SHA" >/dev/null 2>&1; then
+            echo 'Refusing to overwrite immutable commit image' >&2
+            exit 1
+          fi
+      - uses: docker/build-push-action@v6
+        id: build
+        with:
+          context: .
+          file: Dockerfile.spacetimedb-publisher-artifact
+          push: true
+          tags: ${{ steps.image.outputs.tag }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=production-stdb-publisher
+          cache-to: type=gha,scope=production-stdb-publisher,mode=max
+          provenance: mode=max
+          sbom: true
+      - name: Verify public immutable deployment coordinate
+        env:
+          IMAGE: ${{ steps.image.outputs.repository }}@${{ steps.build.outputs.digest }}
+        run: |
+          task_docker_config="$(mktemp -d)"
+          DOCKER_CONFIG="$task_docker_config" docker manifest inspect "$IMAGE" >/dev/null
+          echo "spacetimedb-publisher: $IMAGE" >> "$GITHUB_STEP_SUMMARY"

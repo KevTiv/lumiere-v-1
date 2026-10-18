@@ -3,6 +3,7 @@ import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
 
 import { matchesOperationResponse } from "./operation-response"
 import { ORDER_SUMMARY, expectOrderSummary } from "./sales-order-fixtures"
+import { clickCanonicalHandoff, openCanonicalHandoffs } from "./cov25-link-navigation"
 
 import {
   chooseFirstEnabledOption,
@@ -52,6 +53,28 @@ import {
 
 const SEEDED_CUSTOMER_NAME = "Acme Corporation"
 type SaleOrderQueryRow = QueryRowFor<"sale-orders">
+type AccountPaymentQueryRow = QueryRowFor<"account-payments">
+
+/** Exact canonical registration relation produced by the visible Payments-tab action. */
+async function expectPaymentRegisteredOnInvoice(
+  page: Parameters<typeof gotoModule>[0],
+  paymentId: number,
+  invoiceId: number,
+): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get("/api/query/account-payments")
+        if (!response.ok()) return false
+        const payload = (await response.json()) as { data?: AccountPaymentQueryRow[] }
+        const payment = (payload.data ?? []).find((row) => Number(row.id) === paymentId)
+        if (!payment || !Array.isArray(payment.reconciledInvoiceIds)) return false
+        return payment.reconciledInvoiceIds.some((id) => Number(id) === invoiceId)
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true)
+}
 
 async function createDraftSaleOrder(page: Parameters<typeof gotoModule>[0], clientRef: string): Promise<number> {
   await gotoModule(page, "/sales", "sales")
@@ -417,6 +440,7 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       submitForm(page, "register-payment-invoices"),
     ])
     expect(registerRes.ok()).toBe(true)
+    await expectPaymentRegisteredOnInvoice(page, paymentId, moveId)
 
     // Payment applied: the order reads paid, and still does after a reload.
     await expectOrderSummary(page, orderId, {
@@ -424,6 +448,21 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
       absent: [ORDER_SUMMARY.payment.unpaid, ORDER_SUMMARY.payment.partial],
       reload: true,
     })
+    await expectPaymentRegisteredOnInvoice(page, paymentId, moveId)
+    const orderSource = { module: "sales", tab: "orders", id: orderId }
+    const handoffs = await openCanonicalHandoffs(page, orderSource)
+    const paymentLink = handoffs.getByTestId(`sale-order-handoff-payment-${paymentId}`)
+    await expect(paymentLink).toBeVisible()
+    await expect(paymentLink).toHaveAttribute(
+      "href",
+      `/accounting?tab=payments&filter=${encodeURIComponent(`id:${paymentId}`)}`,
+    )
+    await clickCanonicalHandoff(
+      page,
+      orderSource,
+      `sale-order-handoff-payment-${paymentId}`,
+      { module: "accounting", tab: "payments", id: paymentId },
+    )
     await expectNoAppError(page)
 
     // Step 13 — dashboard / report updates (live KPI widgets)

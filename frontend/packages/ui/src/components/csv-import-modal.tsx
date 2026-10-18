@@ -3,55 +3,265 @@
 import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import type { FormConfig } from "../lib/form-types"
-import { FormModal } from "../forms/form-modal"
+import {
+  analyzeCsv,
+  buildCsvTemplate,
+  canSubmitCsvImport,
+  type CsvImportAnalysis,
+  type CsvImportColumns,
+} from "../lib/csv-import-preview"
+import { showWorkflowToast } from "../lib/workflow-toast"
+import { createCsvImportRequest, supportsTrackedCsvImport, type CsvImportRequest, type TrackedCsvImportScope } from "@lumiere/query-hooks/hooks/csv-import-request"
+import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
+import { CsvImportResult } from "../import-assistant/csv-import-result"
+import { CsvImportHistory } from "../import-assistant/csv-import-history"
+import type { AbandonedAccountingImportCleanupProps } from "../import-assistant/abandoned-accounting-import-cleanup"
+import { Button } from "./button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog"
+import { Input } from "./input"
+import { Label } from "./label"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./table"
 
 export interface CsvImportModalProps {
   onClose: () => void
+  /** Supplies the dialog title, description and button labels. */
   config: FormConfig
   isPending?: boolean
   onImport: (csvText: string) => void | Promise<void>
+  /**
+   * The reducer's header contract. When set, the preview checks the file's header against it, blocks
+   * the import while a required column is missing, and offers a header-only template download.
+   */
+  columns?: CsvImportColumns
+  /** File name for the downloaded template; defaults to `import-template.csv`. */
+  templateFileName?: string
+  /** Scope import results to this organization and entity. */
+  organizationId?: bigint
+  tableName?: string
+  /** Use the dedicated tracked API. Legacy onImport remains supported when absent. */
+  trackedImport?: TrackedCsvImportScope
+  /** Optional controls for reviewing abandoned accounting parent-phase imports. */
+  abandonedAccountingCleanup?: Omit<AbandonedAccountingImportCleanupProps, "jobs">
+  /** Optional app-level reader that converts CSV or spreadsheet files to canonical CSV text. */
+  fileReader?: (file: File) => Promise<{ csvText: string }>
 }
 
-/** File-backed CSV import form with shared validation, read, and error handling. */
+function downloadTemplate(columns: CsvImportColumns, fileName: string) {
+  const blob = new Blob([buildCsvTemplate(columns)], { type: "text/csv;charset=utf-8" })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = fileName
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * File-backed CSV import: pick a .csv, preview its first rows and header check, confirm, then submit
+ * the raw text through `onImport`. The reducers skip bad rows and record them in the import job
+ * history instead of failing the call. Tracked imports show this exact submission; legacy
+ * callbacks open entity-scoped history without guessing which job belongs to the file.
+ */
 export function CsvImportModal({
   onClose,
   config,
   isPending = false,
   onImport,
+  columns,
+  templateFileName = "import-template.csv",
+  organizationId,
+  tableName,
+  trackedImport,
+  abandonedAccountingCleanup,
+  fileReader,
 }: CsvImportModalProps) {
   const { t } = useTranslation()
+  const [fileName, setFileName] = useState("")
+  const [csvText, setCsvText] = useState("")
+  const [analysis, setAnalysis] = useState<CsvImportAnalysis | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isReading, setIsReading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [request, setRequest] = useState<CsvImportRequest | null>(null)
+  const trackedMutation = useTrackedCsvImport()
+  const trackSubmission = trackedImport && tableName && supportsTrackedCsvImport(tableName)
 
-  const handleSubmit = async (data: Record<string, unknown>) => {
+  const handleFile = async (file: File | undefined) => {
     setError(null)
-    const files = data.csvFile as FileList | undefined
-    const file = files?.[0]
-    if (!file) {
-      setError(t("common.validation.required"))
-      return
-    }
-
-    setIsReading(true)
+    setAnalysis(null)
+    setCsvText("")
+    setFileName(file?.name ?? "")
+    if (!file) return
     try {
-      await onImport(await file.text())
-      onClose()
+      const text = fileReader ? (await fileReader(file)).csvText : await file.text()
+      setAnalysis(analyzeCsv(text, columns))
+      setCsvText(text)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
-    } finally {
-      setIsReading(false)
     }
   }
 
+  const handleSubmit = async () => {
+    if (!canSubmitCsvImport(analysis)) return
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      if (trackSubmission) {
+        if (!organizationId || !tableName) throw new Error("Tracked import requires organization and entity scope")
+        const next = request ?? createCsvImportRequest(organizationId, tableName, csvText, fileName, trackedImport)
+        setRequest(next)
+        setSubmitted(true)
+        await trackedMutation.mutateAsync(next)
+      } else await onImport(csvText)
+      showWorkflowToast({
+        kind: "info",
+        title: t("common.csvImportDialog.success", { defaultValue: "Import submitted" }),
+        description: t("common.csvImportDialog.successDescription", {
+          defaultValue: trackSubmission
+            ? "{{count}} rows from {{file}} were sent. This submission’s results appear below."
+            : "{{count}} rows from {{file}} were sent. Rows the server rejects are listed in the import job history.",
+          count: analysis?.rowCount ?? 0,
+          file: fileName,
+        }),
+      })
+      if (organizationId && organizationId > 0n) setSubmitted(true)
+      else onClose()
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause)
+      setError(message)
+      showWorkflowToast({
+        kind: "error",
+        title: t("common.csvImportDialog.failure", { defaultValue: "Import failed" }),
+        description: message,
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const busy = isPending || isSubmitting || trackedMutation.isPending
+
   return (
-    <FormModal
-      open
-      onOpenChange={(nextOpen) => !nextOpen && onClose()}
-      config={config}
-      isPending={isPending || isReading}
-      closeOnSubmit={false}
-      submitError={error}
-      onSubmit={handleSubmit}
-    />
+    <Dialog open onOpenChange={(next) => !next && !busy && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{config.title}</DialogTitle>
+          {config.description ? <DialogDescription>{config.description}</DialogDescription> : null}
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {request ? <CsvImportResult request={request} initialPending={isSubmitting} initialError={error} activeOrganizationId={organizationId} activeCompanyId={trackedImport?.companyId} onNewFile={() => {
+            setRequest(null); setSubmitted(false); setError(null); setAnalysis(null); setCsvText(""); setFileName("")
+          }} /> : organizationId && (submitted || abandonedAccountingCleanup) ? (
+            <CsvImportHistory
+              organizationId={organizationId}
+              tableName={tableName}
+              abandonedAccountingCleanup={abandonedAccountingCleanup}
+            />
+          ) : null}
+          {!submitted ? <>
+          {trackedImport && !trackSubmission ? <p className="text-sm text-muted-foreground">{t("common.csvImportDialog.manualResultNotice", { defaultValue: "This import uses manual history selection. Its results cannot yet be linked automatically to this file." })}</p> : null}
+          <div className="space-y-2">
+            <Label htmlFor="csv-import-file">
+              {fileReader
+                ? t("common.csvImportDialog.spreadsheetFileLabel", {
+                    defaultValue: "CSV or Excel file",
+                  })
+                : t("common.csvImportDialog.fileLabel", { defaultValue: "CSV file" })}
+            </Label>
+            <Input
+              id="csv-import-file"
+              type="file"
+              accept={
+                fileReader
+                  ? ".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  : ".csv,text/csv,text/plain"
+              }
+              disabled={busy}
+              onChange={(event) => void handleFile(event.target.files?.[0])}
+            />
+            {columns ? (
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto p-0"
+                onClick={() => downloadTemplate(columns, templateFileName)}
+              >
+                {t("common.csvImportDialog.downloadTemplate", { defaultValue: "Download template" })}
+              </Button>
+            ) : null}
+          </div>
+
+          {analysis ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {t("common.csvImportDialog.rowCount", {
+                  defaultValue: "{{count}} rows found",
+                  count: analysis.rowCount,
+                })}
+              </p>
+              {analysis.missingRequired.length > 0 ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {t("common.csvImportDialog.missingColumns", {
+                    defaultValue: "Missing required columns: {{columns}}",
+                    columns: analysis.missingRequired.join(", "),
+                  })}
+                </p>
+              ) : null}
+              {analysis.unknownColumns.length > 0 ? (
+                <p className="text-sm text-amber-600">
+                  {t("common.csvImportDialog.unknownColumns", {
+                    defaultValue: "These columns are not used and will be ignored: {{columns}}",
+                    columns: analysis.unknownColumns.join(", "),
+                  })}
+                </p>
+              ) : null}
+              {analysis.rowCount === 0 ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {t("common.csvImportDialog.noRows", { defaultValue: "The file has a header but no data rows." })}
+                </p>
+              ) : null}
+              <div className="max-h-56 overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {analysis.headers.map((header, index) => (
+                        <TableHead key={`${header}-${index}`}>{header}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analysis.previewRows.map((row, rowIndex) => (
+                      <TableRow key={rowIndex}>
+                        {analysis.headers.map((_, cellIndex) => (
+                          <TableCell key={cellIndex}>{row[cellIndex] ?? ""}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          ) : null}
+
+          </> : null}
+          {error && !request ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+            {submitted ? t("common.close", { defaultValue: "Close" }) : config.cancelLabel ?? t("common.cancel")}
+          </Button>
+          {!submitted ? <Button type="button" disabled={busy || !canSubmitCsvImport(analysis)} onClick={() => void handleSubmit()}>
+            {config.submitLabel ?? t("common.csvImportDialog.submit", { defaultValue: "Import" })}
+          </Button> : null}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

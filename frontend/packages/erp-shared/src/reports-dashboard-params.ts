@@ -8,6 +8,18 @@ import type {
   WidgetType,
 } from "@lumiere/stdb/types"
 
+const DASHBOARD_WIDGET_CREATION_KEY_PREFIX =
+  "lumiere.dashboard-widget.create/v1:"
+
+/** Stable request identity persisted on the canonical dashboard-widget row. */
+export function dashboardWidgetCreationMetadata(requestId: string): string {
+  const normalized = requestId.trim()
+  if (!normalized || normalized.length > 128 || normalized.includes(":")) {
+    throw new Error("Invalid dashboard widget creation request id")
+  }
+  return `${DASHBOARD_WIDGET_CREATION_KEY_PREFIX}${normalized}`
+}
+
 function parseCompanyId(v: unknown): number | null {
   if (v == null || String(v).trim() === "") return null
   const n = Number(v)
@@ -64,6 +76,7 @@ export function companyIdFromDashboardForm(formData: Record<string, unknown>): n
 export function toCreateDashboardWidgetParams(
   formData: Record<string, unknown>,
 ): CreateDashboardWidgetParams {
+  const creationRequestId = optionalString(formData.creationRequestId)
   return {
     name: String(formData.name ?? "").trim(),
     widgetType: toWidgetType(formData.widgetType),
@@ -83,11 +96,10 @@ export function toCreateDashboardWidgetParams(
     sortOrder: optionalString(formData.sortOrder),
     limit: optionalU32(formData.limit),
     refreshInterval: optionalU32(formData.refreshInterval),
-    configuration:
-      formData.config != null && String(formData.config).trim() !== ""
-        ? String(formData.config)
-        : undefined,
-    metadata: undefined,
+    configuration: optionalString(formData.configuration ?? formData.config),
+    metadata: creationRequestId
+      ? dashboardWidgetCreationMetadata(creationRequestId)
+      : undefined,
   }
 }
 

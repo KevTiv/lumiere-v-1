@@ -251,6 +251,16 @@
       },
       "evidence": "expenses/expense_wave_d.rs: reducer checks current state or duplicate before transition"
     },
+    "apply_historical_payment_allocations": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/historical_payment_migration.rs: batch idempotency receipt and deterministic per-document allocation keys reject conflicting replays before duplicate writes"
+    },
     "apply_index_linked_renewal": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -629,7 +639,7 @@
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "accounting/payments.rs: reducer checks current state or duplicate before transition"
+      "evidence": "accounting/payments.rs: reducer atomically unwinds owned allocations, writes one posted reversing move, stores its exact reversal_move_id on account_payment, then rejects replay"
     },
     "cancel_picking_batch": {
       "semantic_kind": "command",
@@ -1180,6 +1190,16 @@
         "version": 1
       },
       "evidence": "accounting/journal_entries.rs: receipt/key or deterministic update returns before duplicate writes"
+    },
+    "create_manual_invoice": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/journal_entries.rs: receipt/key returns the original balanced draft move before duplicate writes"
     },
     "create_account_period": {
       "semantic_kind": "command",
@@ -1740,6 +1760,16 @@
         "version": 1
       },
       "evidence": "sales/pos_config.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "create_manual_account_invoice": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/manual_invoices.rs: canonical accounting receipt returns before duplicate invoice and line writes"
     },
     "create_opportunity": {
       "semantic_kind": "command",
@@ -4650,6 +4680,16 @@
         "version": 1
       },
       "evidence": "accounting/bank_reconciliation.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "unregister_payment_allocations": {
+      "semantic_kind": "operator",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/payments.rs: internal allocation unwind validates payment-owned matching identity, rejects replay or rematched lines, and is invoked atomically by cancel_payment"
     },
     "update_account_account": {
       "semantic_kind": "command",

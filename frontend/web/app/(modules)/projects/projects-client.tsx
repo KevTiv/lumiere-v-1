@@ -1,6 +1,7 @@
 "use client"
-import { projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
+import { accountMoveHref, projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useMemo, useState, useCallback, useEffect } from "react"
@@ -10,6 +11,7 @@ import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   newProjectForm,
   newTaskForm,
   editProjectForm,
@@ -284,6 +286,45 @@ function timesheetStatus(row: Record<string, unknown>): string {
   return String(row.validationStatus ?? row.validation_status ?? "")
 }
 
+function withTimesheetLifecycleColumns(config: EntityViewConfig): EntityViewConfig {
+  if (config.view.mode !== "table") return config
+  const existing = new Set(config.view.columns.map((column) => column.key))
+  const columns = [...config.view.columns]
+  if (!existing.has("validationStatus")) {
+    columns.push({
+      key: "validationStatus",
+      label: "Validation",
+      type: "badge",
+      badgeVariants: {
+        draft: "secondary",
+        submitted: "info",
+        validated: "success",
+        rejected: "destructive",
+      },
+    })
+  }
+  if (!existing.has("timesheetInvoiceId")) {
+    columns.push({
+      key: "timesheetInvoiceId",
+      label: "Invoice",
+      render: (value, row) => {
+        const invoiceId = value ?? row.timesheet_invoice_id
+        if (invoiceId == null || String(invoiceId).trim() === "") return "—"
+        return (
+          <Link
+            href={accountMoveHref(String(invoiceId))}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+            onClick={(event) => event.stopPropagation()}
+          >
+            Invoice {String(invoiceId)}
+          </Link>
+        )
+      },
+    })
+  }
+  return { ...config, view: { ...config.view, columns } }
+}
+
 export function ProjectsClient(props: ProjectsClientProps) {
   if (!hasValidOrganizationId(props.organizationId)) {
     return <MissingOrganization />
@@ -308,9 +349,15 @@ function ProjectsClientLoaded({
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<ProjectsCsvImportKind | null>(null)
 
-  const { data: projects = [] } = useProjects(orgId, initialProjects)
-  const { data: tasks = [] } = useTasks(orgId, initialTasks)
-  const { data: timesheets = [] } = useTimesheets(orgId, initialTimesheets)
+  const projectsQuery = useProjects(orgId, initialProjects)
+  const tasksQuery = useTasks(orgId, initialTasks)
+  const timesheetsQuery = useTimesheets(orgId, initialTimesheets)
+  const projectsState = moduleQueryState(projectsQuery)
+  const tasksState = moduleQueryState(tasksQuery)
+  const timesheetsState = moduleQueryState(timesheetsQuery)
+  const projects = canUseModuleData(projectsState) ? projectsQuery.data ?? [] : []
+  const tasks = canUseModuleData(tasksState) ? tasksQuery.data ?? [] : []
+  const timesheets = canUseModuleData(timesheetsState) ? timesheetsQuery.data ?? [] : []
   const { data: timesheetsToValidate = [] } = useTimesheetsToValidate(orgId)
   const { data: timesheetsUnbilled = [] } = useTimesheetsUnbilled(orgId)
   const { data: rateCards = [] } = useProjectRateCards(orgId)
@@ -1018,10 +1065,20 @@ function ProjectsClientLoaded({
             const view = tab.entityConfig.view
             return {
               ...tab,
+              createForm: projectFormConfig,
               entityConfig: withInlineEdits({
                 ...tab.entityConfig,
                 view: {
                   ...view,
+                  actions: [
+                    ...(view.actions ?? []),
+                    {
+                      id: "csv-project",
+                      label: t("projects.toolbar.importProjectCsv"),
+                      permission: { resource: CSV_IMPORT_CONTRACTS.project.resource, action: "create" },
+                      onClick: () => setCsvKind("project"),
+                    },
+                  ],
                   columns: view.columns.map((column) =>
                     column.key === "name"
                       ? {
@@ -1085,6 +1142,7 @@ function ProjectsClientLoaded({
                 {
                   id: "csv-task",
                   label: t("projects.toolbar.importTaskCsv"),
+                  permission: { resource: "project_task", action: "create" },
                   onClick: () => setCsvKind("task"),
                 },
                 {
@@ -1124,10 +1182,12 @@ function ProjectsClientLoaded({
             return {
               ...tab,
               createForm: timesheetFormConfig,
-              entityConfig: addCsvToolbar(tab.entityConfig, [
+              createAction: "logTimesheet",
+              entityConfig: withTimesheetLifecycleColumns(addCsvToolbar(tab.entityConfig, [
                 {
                   id: "csv-timesheet",
                   label: t("projects.toolbar.importTimesheetCsv"),
+                  permission: { resource: CSV_IMPORT_CONTRACTS.timesheet.resource, action: "create" },
                   onClick: () => setCsvKind("timesheet"),
                 },
                 {
@@ -1188,7 +1248,7 @@ function ProjectsClientLoaded({
                     setLifecycleModal({ type: "billTimesheets", rows, form: billTimesheetsFormConfig })
                   },
                 },
-              ], { selectOnRowClick: true }),
+              ], { selectOnRowClick: true })),
             }
           }
           return tab
@@ -1362,6 +1422,7 @@ function ProjectsClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={{ projects: projectsState, tasks: tasksState, timesheets: timesheetsState }}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
         isPending={isFormMutationPending}
@@ -1442,13 +1503,22 @@ function ProjectsClientLoaded({
                 if (formData.invoiceDate == null || String(formData.invoiceDate).trim() === "") {
                   throw new Error("Invoice date is required")
                 }
-                await billTimesheets.mutateAsync({
+                const outcome = await billTimesheets.mutateAsync({
                   companyId: operatingCompanyId,
                   timesheetIds: ids,
                   journalId: formData.journalId as string | number,
                   incomeAccountId: formData.incomeAccountId as string | number,
                   partnerId: formData.partnerId as string | number,
                   invoiceDate: formData.invoiceDate as string | number | Date,
+                })
+                showWorkflowToast({
+                  kind: "success",
+                  title: "Timesheets billed",
+                  description: `Created accounting invoice ${outcome.ref.id}.`,
+                  action: {
+                    label: "Open invoice",
+                    onClick: () => window.location.assign(accountMoveHref(outcome.ref.id)),
+                  },
                 })
               } else if (lifecycleModal.type === "expenseRebill") {
                 // Surface expenses reducer create_expense_project_rebill (do not reimplement).
@@ -1639,9 +1709,14 @@ function ProjectsClientLoaded({
       ) : null}
       {csvKind && csvKind !== "task" && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={csvKind === "project" ? "project_project" : "project_timesheet"}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={csvKind === "project" ? CSV_IMPORT_CONTRACTS.project : CSV_IMPORT_CONTRACTS.timesheet}
+          templateFileName={`${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             if (csvKind === "project") await csvImports.importProject.mutateAsync(text)

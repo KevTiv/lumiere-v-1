@@ -8,6 +8,7 @@ import { Skeleton } from "../components/skeleton"
 import type { DashboardWidget, WidgetType } from "../lib/dashboard-types"
 import { exportChartToPng } from "../lib/export-dashboard-png"
 import { downloadCsv, widgetDataToCsv } from "../lib/export-csv"
+import type { ReportExportSourceProvenance } from "../lib/report-export-provenance"
 import { KPIWidget } from "./widgets/kpi-widget"
 import { AreaChartWidget } from "./widgets/area-chart-widget"
 import { LineChartWidget } from "./widgets/line-chart-widget"
@@ -33,6 +34,7 @@ interface WidgetRendererProps {
   testId?: string
   /** While the module's data loads, show a placeholder instead of zeros. */
   isLoading?: boolean
+  exportProvenance?: ReportExportSourceProvenance
 }
 
 /** A chart with no points, or only zero values, renders as an empty frame. */
@@ -61,7 +63,7 @@ const CHART_WIDGET_TYPES = new Set<WidgetType>([
   "funnel-chart",
 ])
 
-export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading = false }: WidgetRendererProps) {
+export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading = false, exportProvenance }: WidgetRendererProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const useCard = widget.useCard !== false
   const isChart = CHART_WIDGET_TYPES.has(widget.type)
@@ -84,6 +86,21 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
       )
     }
     switch (widget.type) {
+      case "diagnostic":
+        return (
+          <div
+            className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
+            role="alert"
+            data-testid="dashboard-widget-diagnostic"
+          >
+            <p>{widget.data.message}</p>
+            {widget.data.rejectedRows != null ? (
+              <p className="text-xs">
+                {widget.data.rejectedRows} source {widget.data.rejectedRows === 1 ? "row was" : "rows were"} rejected.
+              </p>
+            ) : null}
+          </div>
+        )
       case "kpi":
         return <KPIWidget data={widget.data} />
       case "area-chart":
@@ -131,11 +148,11 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
 
   const handleChartExport = async () => {
     if (!chartRef.current) return
-    await exportChartToPng(chartRef.current, widget.title || widget.id)
+    await exportChartToPng(chartRef.current, widget.title || widget.id, exportProvenance)
   }
 
   const handleCsvExport = () => {
-    const csv = widgetDataToCsv(widget)
+    const csv = widgetDataToCsv(widget, exportProvenance)
     if (csv !== null) downloadCsv(widget.title || widget.id, csv)
   }
 

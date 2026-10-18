@@ -1,6 +1,6 @@
 # COV-07f — exact finished-output scrap
 
-**Status:** IMPLEMENTED — runtime acceptance pending
+**Status:** REVIEW — bounded historical browser acceptance passed; full module acceptance open
 **Branch:** `codex/cov07f-finished-output-scrap`  
 **Stack base:** COV-07e / `codex/cov07e-manufacturing-quality-gate`
 
@@ -30,6 +30,21 @@ and preservation of the effect set after rejected calls.
   The client supplies a request UUID and resolves the exact stock move by the
   reducer-owned `MO/{mo}/SCRAP/{request}` reference; it never selects the newest
   move.
-- Warehouse persona and read-only browser proof remain runtime acceptance work.
-- Run native persisted tests and browser acceptance during stacked-PR integration.
-  The current workspace does not provide `cargo` or SpacetimeDB tooling.
+- The warehouse-persona UI scrap, exact request-bound move and quant deltas,
+  duplicate rejection and reader denial were exercised by
+  `cov07f-finished-output-scrap.spec.ts` in the Docker acceptance lane. Both
+  runs passed all 46 tests, including COV-07f/g; the second run proved durable
+  projection convergence. See
+  [`cov-runtime-docker-acceptance-2026-10-04.md`](../evidence/cov-runtime-docker-acceptance-2026-10-04.md).
+- The same evidence note's 2026-10-07 follow-up records two passing PostgreSQL
+  upgrade tests at contracts v0.3.86. It closes the released-migration checksum
+  blocker; it does not extend scrap browser coverage.
+- Historical setup creates the Done MO as a fixture. The direct resulting
+  record link remains open: the row-action submission discards the hook's exact
+  scrap reference. Tracked scrap, scrap during production and actual cost
+  valuation are separate completion-stack slices.
+- This historical pass does not certify the current PR #175 head or the new
+  completion stack. Repeat relevant persisted/browser/projection gates on the
+  final contract pin and immutable implementation head before promotion. The
+  module remains U2/review; see
+  [`erp-cov07-completion-stack-plan.md`](./erp-cov07-completion-stack-plan.md).

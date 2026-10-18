@@ -19,6 +19,7 @@ export type ReportKey =
   | "purchase_spend_v1"
   | "payment_fee_summary_v1"
   | "monthly_owner_report_v1"
+  | "margin_supply_outlook_v1"
 
 export const REPORT_KEYS: ReportKey[] = [
   "daily_business_summary_v1",
@@ -31,6 +32,7 @@ export const REPORT_KEYS: ReportKey[] = [
   "purchase_spend_v1",
   "payment_fee_summary_v1",
   "monthly_owner_report_v1",
+  "margin_supply_outlook_v1",
 ]
 
 export interface ReportCatalogEntry {
@@ -53,6 +55,14 @@ export interface ReportPreviewRequest {
   companyId: number
   date: string
   timezone: string
+  scenario?: MarginSupplyScenario
+}
+
+export interface MarginSupplyScenario {
+  inputCostChangePct: number
+  demandChangePct: number
+  leadTimeChangeDays: number
+  targetMarginPct: number
 }
 
 export interface ReportScope {
@@ -306,6 +316,56 @@ export interface PurchaseSpendReportV1 { quantityPurchased: number; totalSpend: 
 export interface PaymentFeeSummaryReportV1 { feeCount: number; fees: MoneyAmount; tax: MoneyAmount; total: MoneyAmount; lines: Array<{ providerAccount: string; bearer: string; amount: MoneyAmount; tax: MoneyAmount; total: MoneyAmount }> }
 export interface MonthlyOwnerReportV1 { sales: MoneyAmount; purchaseSpend: MoneyAmount; paymentFees: MoneyAmount; stockMovementValue: MoneyAmount; stockMovementCount: number }
 
+export type MarginSupplyWarningCode =
+  | "MISSING_COST_BASELINE"
+  | "MARGIN_BELOW_TARGET"
+  | "PROFIT_AT_RISK"
+  | "STOCKOUT_BEFORE_REPLENISHMENT"
+  | "STALE_INVENTORY_COUNT"
+
+export interface MarginSupplyLine {
+  productId: number
+  sku?: string
+  productName: string
+  quantitySold: number
+  availableQuantity: number
+  baselineRevenue: MoneyAmount
+  baselineCost: MoneyAmount
+  baselineGrossProfit: MoneyAmount
+  baselineMarginPct?: number
+  stressedRevenue: MoneyAmount
+  stressedCost: MoneyAmount
+  stressedGrossProfit: MoneyAmount
+  stressedMarginPct?: number
+  marginChangePoints?: number
+  profitAtRisk: MoneyAmount
+  targetUnitPrice?: MoneyAmount
+  effectiveLeadDays: number
+  daysOfCover?: number
+  projectedStockShortfall: number
+  severity: "ok" | "warning" | "critical"
+  warningCodes: MarginSupplyWarningCode[]
+}
+
+export interface MarginSupplyOutlookReportV1 {
+  scenario: MarginSupplyScenario
+  productCount: number
+  warningCount: number
+  criticalCount: number
+  baselineRevenue: MoneyAmount
+  baselineCost: MoneyAmount
+  baselineGrossProfit: MoneyAmount
+  baselineMarginPct?: number
+  stressedRevenue: MoneyAmount
+  stressedCost: MoneyAmount
+  stressedGrossProfit: MoneyAmount
+  stressedMarginPct?: number
+  profitAtRisk: MoneyAmount
+  projectedStockShortfall: number
+  recommendations: string[]
+  lines: MarginSupplyLine[]
+}
+
 // ── Ledger-backed owner reports V1 ──────────────────────────────────────────
 
 export interface CashAccountLine {
@@ -420,6 +480,7 @@ export type SalesByProductPreview = ReportEnvelope<SalesByProductReportV1> & { r
 export type PurchaseSpendPreview = ReportEnvelope<PurchaseSpendReportV1> & { reportKey: "purchase_spend_v1" }
 export type PaymentFeeSummaryPreview = ReportEnvelope<PaymentFeeSummaryReportV1> & { reportKey: "payment_fee_summary_v1" }
 export type MonthlyOwnerPreview = ReportEnvelope<MonthlyOwnerReportV1> & { reportKey: "monthly_owner_report_v1" }
+export type MarginSupplyOutlookPreview = ReportEnvelope<MarginSupplyOutlookReportV1> & { reportKey: "margin_supply_outlook_v1" }
 
 export type ReportPreview =
   | DailyBusinessSummaryPreview
@@ -432,6 +493,7 @@ export type ReportPreview =
   | PurchaseSpendPreview
   | PaymentFeeSummaryPreview
   | MonthlyOwnerPreview
+  | MarginSupplyOutlookPreview
 
 // ── Type guards ──────────────────────────────────────────────────────────────
 

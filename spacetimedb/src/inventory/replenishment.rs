@@ -12,14 +12,13 @@ use crate::crm::contacts::contact;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::{product, product_supplier_info};
 use crate::inventory::stock::{
-    create_stock_move, create_stock_picking, require_location_in_org, require_product_in_org,
-    require_warehouse_in_org_and_company, stock_picking, stock_quant, CreateStockMoveParams,
-    CreateStockPickingParams,
+    create_stock_move_system, create_stock_picking_system, require_location_in_org,
+    require_product_in_org, require_warehouse_in_org_and_company, stock_picking, stock_quant,
+    CreateStockMoveParams, CreateStockPickingParams,
 };
 use crate::inventory::warehouse::stock_route;
 use crate::purchasing::purchase_orders::{
-    add_purchase_order_line, create_purchase_order, purchase_order, AddPurchaseOrderLineParams,
-    CreatePurchaseOrderParams,
+    create_replenishment_purchase_demand, purchase_order, ReplenishmentPurchaseDemandParams,
 };
 use crate::types::PoState;
 use serde_json;
@@ -263,90 +262,30 @@ fn create_buy_demand(
         .find(&rule.product_id)
         .ok_or("Product not found for replenishment")?;
 
-    create_purchase_order(
+    let (order_id, _line_id) = create_replenishment_purchase_demand(
         ctx,
         organization_id,
-        CreatePurchaseOrderParams {
-            company_id: Some(company_id),
+        ReplenishmentPurchaseDemandParams {
+            company_id,
+            rule_id: rule.id,
             partner_id,
-            currency_id,
-            origin: Some(format!("REPLENISH-{}", rule.id)),
-            partner_ref: Some(format!("RPL-{}", rule.id)),
-            notes: Some(format!(
-                "Auto replenishment for product {} at location {}",
-                rule.product_id, rule.location_id
-            )),
-            date_planned: Some(
-                ctx.timestamp
-                    + std::time::Duration::from_secs((rule.lead_days.max(0) as u64) * 86400),
-            ),
-            payment_term_id: None,
-            fiscal_position_id: None,
-            incoterm_id: None,
-            incoterm_location: None,
-            user_id: None,
-            invoice_ids: vec![],
-            picking_ids: vec![],
-            message_follower_ids: vec![],
-            message_ids: vec![],
-            activity_ids: vec![],
-            is_quantity_copy: None,
-            metadata: Some(
-                serde_json::json!({
-                    "replenishment_rule_id": rule.id,
-                    "demand_type": "buy",
-                })
-                .to_string(),
-            ),
-        },
-    )?;
-
-    // Same open-only scope as the dedup check above: a prior done/cancelled PO
-    // sharing this partner_ref must not count against the one just created.
-    let mut matching_orders = ctx.db.purchase_order().iter().filter(|o| {
-        o.organization_id == organization_id
-            && o.company_id == company_id
-            && o.partner_ref == Some(format!("RPL-{}", rule.id))
-            && !matches!(o.state, PoState::Done | PoState::Cancelled)
-    });
-    let order = matching_orders
-        .next()
-        .ok_or("Draft PO missing after replenishment create")?;
-    if matching_orders.next().is_some() {
-        return Err(format!(
-            "Multiple purchase orders match replenishment rule {} — cannot identify the created draft",
-            rule.id
-        ));
-    }
-
-    add_purchase_order_line(
-        ctx,
-        organization_id,
-        order.id,
-        AddPurchaseOrderLineParams {
             product_id: rule.product_id,
-            quantity: order_qty,
             uom_id: rule.uom_id,
+            quantity: order_qty,
             price_unit: if price > 0.0 {
                 price
             } else {
                 product.standard_price
             },
-            discount: 0.0,
-            tax_ids: vec![],
-            name: Some(format!("Replenish {}", product.name)),
-            sequence: Some(10),
-            display_type: None,
-            product_variant_id: None,
-            account_analytic_id: None,
-            date_planned: order.date_planned,
-            propagate_cancel: Some(true),
-            lot_id: None,
-            metadata: Some(serde_json::json!({ "replenishment_rule_id": rule.id }).to_string()),
+            currency_id,
+            date_planned: Some(
+                ctx.timestamp
+                    + std::time::Duration::from_secs((rule.lead_days.max(0) as u64) * 86400),
+            ),
         },
     )?;
 
-    Ok(("buy".to_string(), order.id))
+    Ok(("buy".to_string(), order_id))
 }
 
 fn create_transfer_demand(
@@ -377,7 +316,7 @@ fn create_transfer_demand(
         .find(&rule.product_id)
         .ok_or("Product not found for replenishment transfer")?;
 
-    create_stock_picking(
+    let picking = create_stock_picking_system(
         ctx,
         organization_id,
         CreateStockPickingParams {
@@ -447,25 +386,7 @@ fn create_transfer_demand(
         },
     )?;
 
-    // Same open-only scope as the dedup check above: a prior done/cancelled
-    // picking sharing this name must not count against the one just created.
-    let mut matching_pickings = ctx.db.stock_picking().iter().filter(|p| {
-        p.organization_id == organization_id
-            && p.name == picking_name
-            && p.state != "done"
-            && p.state != "cancel"
-    });
-    let picking = matching_pickings
-        .next()
-        .ok_or("Internal transfer picking missing after replenishment create")?;
-    if matching_pickings.next().is_some() {
-        return Err(format!(
-            "Multiple internal transfer pickings match replenishment rule {} — cannot identify the created one",
-            rule.id
-        ));
-    }
-
-    create_stock_move(
+    create_stock_move_system(
         ctx,
         organization_id,
         CreateStockMoveParams {
@@ -848,6 +769,18 @@ fn rule_run_job_exists(ctx: &ReducerContext, rule_id: u64) -> bool {
         .is_some()
 }
 
+fn replacement_run_job_exists(
+    ctx: &ReducerContext,
+    rule_id: u64,
+    fired_scheduled_id: u64,
+) -> bool {
+    ctx.db
+        .replenishment_run_job()
+        .replenishment_run_job_by_rule()
+        .filter(&rule_id)
+        .any(|pending| pending.scheduled_id != fired_scheduled_id)
+}
+
 /// Opt an active rule into automatic recurring execution. Fails closed if the
 /// rule already has a pending scheduled run — call `cancel_replenishment_run`
 /// first rather than silently scheduling a duplicate.
@@ -987,6 +920,14 @@ pub fn run_scheduled_replenishment(
         job.rule_id,
         idempotency_key,
     )?;
+
+    // A lost-response retry of the same scheduled invocation replays the
+    // recorded demand result. Do not add another recurrence when the original
+    // invocation already inserted its replacement job. The currently firing
+    // scheduled row, when still visible, is ignored by exact id.
+    if replacement_run_job_exists(ctx, job.rule_id, job.scheduled_id) {
+        return Ok(());
+    }
 
     let updated_rule = ctx
         .db

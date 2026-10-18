@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import { useTranslation } from '@lumiere/i18n'
 import { useConfirmDialog } from '../hooks/use-confirm-dialog'
 import { cn } from '../lib/utils'
 import { Button } from '../components/button'
@@ -21,24 +22,13 @@ import {
 } from 'lucide-react'
 import { useWarehouse3DContext } from './warehouse-3d-context'
 import { CATEGORY_COLORS, type StockCategory } from './types'
-import { format } from 'date-fns'
 
 interface ItemDetailsPanelProps {
   className?: string
 }
 
-const categoryLabels: Record<StockCategory, string> = {
-  electronics: 'Electronics',
-  clothing: 'Clothing',
-  food: 'Food & Beverage',
-  furniture: 'Furniture',
-  tools: 'Tools',
-  packaging: 'Packaging',
-  'raw-materials': 'Raw Materials',
-  'finished-goods': 'Finished Goods',
-}
-
 export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
+  const { t, i18n } = useTranslation()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const [isEditing, setIsEditing] = useState(false)
   const [editQuantity, setEditQuantity] = useState('')
@@ -57,6 +47,16 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
   const item = items.find((i) => i.id === selectedItemId)
   const slot = item ? slots.find((s) => s.id === item.slotId) : null
   const zone = item ? zones.find((z) => z.id === item.zoneId) : null
+  const categoryLabels: Record<StockCategory, string> = {
+    electronics: t('ui.stock3d.categories.electronics'),
+    clothing: t('ui.stock3d.categories.clothing'),
+    food: t('ui.stock3d.categories.food'),
+    furniture: t('ui.stock3d.categories.furniture'),
+    tools: t('ui.stock3d.categories.tools'),
+    packaging: t('ui.stock3d.categories.packaging'),
+    'raw-materials': t('ui.stock3d.categories.rawMaterials'),
+    'finished-goods': t('ui.stock3d.categories.finishedGoods'),
+  }
 
   if (!item || !selectedItemId) return null
 
@@ -72,7 +72,7 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
   }
 
   const handleDelete = async () => {
-    if (await confirmDialog({ description: `Remove "${item.name}" from inventory?` })) {
+    if (await confirmDialog({ description: t('ui.stock3d.details.removeConfirmation', { name: item.name }) })) {
       onRemoveItem?.(item.id)
       setSelectedItem(null)
     }
@@ -109,7 +109,7 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
                 {isLowStock && (
                   <Badge variant="destructive" className="gap-1">
                     <AlertTriangle className="h-3 w-3" />
-                    Low Stock
+                    {t('ui.stock3d.lowStock')}
                   </Badge>
                 )}
               </div>
@@ -127,7 +127,12 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
               </div>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={() => setSelectedItem(null)}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSelectedItem(null)}
+            aria-label={t('ui.stock3d.details.close')}
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -138,7 +143,7 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Quantity */}
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Quantity</Label>
+            <Label className="text-xs text-muted-foreground">{t('ui.stock3d.details.quantity')}</Label>
             {isEditing ? (
               <div className="flex items-center gap-2">
                 <Input
@@ -150,6 +155,7 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
                   autoFocus
                 />
                 <Button size="sm" variant="ghost" className="h-8" onClick={handleSaveQuantity}>
+                  <span className="sr-only">{t('ui.stock3d.details.saveQuantity')}</span>
                   <Save className="h-4 w-4" />
                 </Button>
               </div>
@@ -169,6 +175,7 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
                     variant="ghost"
                     className="h-6 w-6 p-0"
                     onClick={handleStartEdit}
+                    aria-label={t('ui.stock3d.details.editQuantity')}
                   >
                     <Edit2 className="h-3 w-3" />
                   </Button>
@@ -177,40 +184,56 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
             )}
             {item.minStock !== undefined && (
               <p className="text-xs text-muted-foreground">
-                Min: {item.minStock} / Max: {item.maxStock}
+                {t('ui.stock3d.details.stockRange', {
+                  min: item.minStock,
+                  max: item.maxStock,
+                })}
               </p>
             )}
           </div>
 
           {/* Location */}
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Location</Label>
+            <Label className="text-xs text-muted-foreground">{t('ui.stock3d.details.location')}</Label>
             <div className="flex items-center gap-1.5">
               <MapPin className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">{zone?.name}</p>
             </div>
             {slot && (
               <p className="text-xs text-muted-foreground">
-                Row {slot.row + 1}, Col {slot.column + 1}, Level {slot.level + 1}
+                {t('ui.stock3d.locationCoordinates', {
+                  row: slot.row + 1,
+                  column: slot.column + 1,
+                  level: slot.level + 1,
+                })}
               </p>
             )}
           </div>
 
           {/* Last Updated */}
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Last Updated</Label>
+            <Label className="text-xs text-muted-foreground">{t('ui.stock3d.details.lastUpdated')}</Label>
             <div className="flex items-center gap-1.5">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-medium text-foreground">
-                {format(item.lastUpdated, 'MMM d, yyyy')}
+                {new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                }).format(item.lastUpdated)}
               </p>
             </div>
-            <p className="text-xs text-muted-foreground">{format(item.lastUpdated, 'h:mm a')}</p>
+            <p className="text-xs text-muted-foreground">
+              {new Intl.DateTimeFormat(i18n.resolvedLanguage ?? i18n.language, {
+                hour: 'numeric',
+                minute: '2-digit',
+              }).format(item.lastUpdated)}
+            </p>
           </div>
 
           {/* Actions */}
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Actions</Label>
+            <Label className="text-xs text-muted-foreground">{t('ui.stock3d.details.actions')}</Label>
             <div className="flex items-center gap-2">
               {onMoveItem && (
                 <Button
@@ -220,7 +243,7 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
                   onClick={() => onMoveItem(item.id, '')}
                 >
                   <ArrowRightLeft className="h-3.5 w-3.5" />
-                  Move
+                  {t('ui.stock3d.details.move')}
                 </Button>
               )}
               {onRemoveItem && (
@@ -231,7 +254,7 @@ export function ItemDetailsPanel({ className }: ItemDetailsPanelProps) {
                   onClick={handleDelete}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  Remove
+                  {t('common.remove')}
                 </Button>
               )}
             </div>

@@ -2,5 +2,7 @@
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    api_server::run_storage_migrations().await
+    api_server::run_storage_migrations().await?;
+    println!("PostgreSQL storage migrations applied and verified successfully");
+    Ok(())
 }

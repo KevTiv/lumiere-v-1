@@ -7,6 +7,7 @@ pub mod fx_revaluation_test;
 pub mod helpers;
 pub mod ic_consolidation_test;
 pub mod journal_entries_test;
+pub mod manual_invoices_test;
 pub mod option_vec_semantics_test;
 pub mod payment_management_test;
 pub mod payment_terms_test;
@@ -80,6 +81,8 @@ pub fn run_accounting_fixed_asset_ownership_test(ctx: &ReducerContext) -> Result
 pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), String> {
     journal_entries_test::test_post_customer_invoice_creates_move_lines(ctx)
         .map_err(|e| format!("post_customer_invoice: {e}"))?;
+    journal_entries_test::test_manual_invoice_is_atomic_balanced_and_idempotent(ctx)
+        .map_err(|e| format!("manual_invoice_atomic: {e}"))?;
     journal_entries_test::test_cross_tenant_move_mutations_fail_closed(ctx)
         .map_err(|e| format!("cross_tenant_move_mutations: {e}"))?;
     journal_entries_test::test_create_credit_note_rejects_cross_tenant_invoice(ctx)
@@ -87,13 +90,17 @@ pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), Stri
     journal_entries_test::test_add_account_move_line_rejects_invalid_and_cross_org_tax_id(ctx)
         .map_err(|e| format!("ACC-004 tax_id_validation: {e}"))?;
     journal_entries_test::test_reset_account_move_to_draft_only_from_cancelled(ctx)
-        .map_err(|e| format!("reset_account_move_to_draft: {e}"))
+        .map_err(|e| format!("reset_account_move_to_draft: {e}"))?;
+    manual_invoices_test::test_manual_invoice_is_atomic_balanced_and_idempotent(ctx)
+        .map_err(|e| format!("manual_account_invoice: {e}"))
 }
 
 #[spacetimedb::reducer]
 pub fn run_accounting_payment_reconcile_test(ctx: &ReducerContext) -> Result<(), String> {
     payments_test::test_payment_reconciles_invoice(ctx)
         .map_err(|e| format!("payment_reconciles_invoice: {e}"))?;
+    payments_test::test_reconciled_payment_unwind_and_cancel_exact_effect(ctx)
+        .map_err(|e| format!("payment_unwind_and_cancel: {e}"))?;
     payments_test::test_payment_create_rejects_invalid_relations(ctx)
         .map_err(|e| format!("payment_create_relations: {e}"))
 }
@@ -125,7 +132,9 @@ pub fn run_accounting_period_lock_test(ctx: &ReducerContext) -> Result<(), Strin
     period_lock_test::test_post_blocked_in_closed_period(ctx)
         .map_err(|e| format!("period_lock invoice: {e}"))?;
     period_lock_test::test_post_payment_blocked_in_closed_period(ctx)
-        .map_err(|e| format!("period_lock payment: {e}"))
+        .map_err(|e| format!("period_lock payment: {e}"))?;
+    period_lock_test::test_payment_allocation_unwind_blocked_in_closed_period(ctx)
+        .map_err(|e| format!("period_lock payment unwind: {e}"))
 }
 
 #[spacetimedb::reducer]

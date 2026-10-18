@@ -9,11 +9,17 @@ use crate::accounting::budgeting::{
     budget_post, crossovered_budget, crossovered_budget_lines, CrossoveredBudget,
     CrossoveredBudgetLines,
 };
-use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::chart_of_accounts::{
+    account_account, account_account_type, account_journal, AccountAccount,
+};
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::idempotency::{record_result, replayed_result};
-use crate::accounting::relations::{require_active_tax, require_explicit_company_id};
-use crate::accounting::tax_management::account_tax;
+use crate::accounting::money::validate_pilot_money_amount;
+use crate::accounting::relations::{
+    require_active_account, require_active_currency_id, require_active_journal, require_active_tax,
+    require_contact_in_scope, require_explicit_company_id,
+};
+use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
@@ -279,6 +285,36 @@ pub struct AddAccountMoveLineParams {
     pub expected_pay_date_currency_id: Option<u64>,
     pub expected_pay_date_amount: f64,
     pub expected_pay_date_residual: f64,
+    pub metadata: Option<String>,
+}
+
+/// One commercial line for an atomic manually entered customer invoice or vendor bill.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ManualInvoiceLineParams {
+    pub account_id: u64,
+    pub name: String,
+    pub quantity: f64,
+    pub price_unit: f64,
+    pub discount: f64,
+    pub tax_ids: Vec<u64>,
+}
+
+/// Create one complete draft invoice in a single transaction. The reducer derives all
+/// debits, credits, tax lines, totals, and residuals from these commercial inputs.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct CreateManualInvoiceParams {
+    pub idempotency_key: String,
+    pub company_id: u64,
+    pub journal_id: u64,
+    pub move_type: MoveType,
+    pub currency_id: u64,
+    pub partner_id: u64,
+    pub counterpart_account_id: u64,
+    pub date: Timestamp,
+    pub invoice_date: Timestamp,
+    pub invoice_date_due: Option<Timestamp>,
+    pub ref_: Option<String>,
+    pub lines: Vec<ManualInvoiceLineParams>,
     pub metadata: Option<String>,
 }
 
@@ -1416,6 +1452,739 @@ pub fn create_account_move(
     Ok(())
 }
 
+#[derive(Clone)]
+struct CalculatedManualInvoiceLine {
+    params: ManualInvoiceLineParams,
+    untaxed: f64,
+    total: f64,
+}
+
+#[derive(Clone)]
+struct CalculatedManualTaxLine {
+    tax_id: u64,
+    tax_group_id: u64,
+    account_id: u64,
+    amount: f64,
+    base_amount: f64,
+}
+
+fn manual_invoice_metadata(metadata: Option<&str>, request_id: &str) -> String {
+    let mut object = metadata
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|value| value.as_object().cloned())
+        .unwrap_or_default();
+    if object.is_empty() {
+        if let Some(raw) = metadata.filter(|raw| !raw.trim().is_empty()) {
+            object.insert(
+                "notes".to_string(),
+                serde_json::Value::String(raw.to_string()),
+            );
+        }
+    }
+    object.insert(
+        "manualInvoiceRequestId".to_string(),
+        serde_json::Value::String(request_id.to_string()),
+    );
+    serde_json::Value::Object(object).to_string()
+}
+
+fn round_manual_invoice_amount(amount: f64, rounding_factor: f64, decimal_places: u8) -> f64 {
+    if rounding_factor.is_finite() && rounding_factor > 0.0 {
+        return (amount / rounding_factor).round() * rounding_factor;
+    }
+    let scale = 10_f64.powi(i32::from(decimal_places.min(9)));
+    (amount * scale).round() / scale
+}
+
+fn update_manual_line_amounts(
+    ctx: &ReducerContext,
+    line: AccountMoveLine,
+    debit: f64,
+    credit: f64,
+    price_subtotal: f64,
+    price_total: f64,
+    tax_base_amount: f64,
+    residual: f64,
+) -> AccountMoveLine {
+    let balance = debit - credit;
+    ctx.db.account_move_line().id().update(AccountMoveLine {
+        price: price_subtotal,
+        price_subtotal,
+        price_total,
+        balance,
+        amount_currency: balance,
+        amount_residual: residual,
+        amount_residual_currency: residual,
+        debit,
+        credit,
+        debit_currency: debit,
+        credit_currency: credit,
+        tax_base_amount,
+        ..line
+    })
+}
+
+/// Atomically create a complete, balanced draft customer invoice or vendor bill.
+///
+/// The commercial form never supplies debits or credits. Accounts, taxes, currency,
+/// partner ownership, totals, and balancing are validated and derived here so a
+/// failed line cannot leave an orphan draft header behind.
+#[spacetimedb::reducer]
+pub fn create_manual_invoice(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateManualInvoiceParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "create")?;
+    check_permission(ctx, organization_id, "account_move_line", "create")?;
+    require_company_in_organization(ctx, organization_id, params.company_id)?;
+
+    let payload_fingerprint = format!("{params:?}");
+    if let Some(move_id) = replayed_result(
+        ctx,
+        organization_id,
+        params.company_id,
+        "create_manual_invoice",
+        &params.idempotency_key,
+        &payload_fingerprint,
+    )? {
+        let replayed = load_account_move_in_scope(ctx, organization_id, move_id)?;
+        if replayed.company_id != params.company_id {
+            return Err("manual invoice replay resolved outside the requested company".to_string());
+        }
+        return Ok(());
+    }
+
+    let (expected_journal_type, expected_counterpart_type, expected_line_type, expected_tax_use) =
+        match &params.move_type {
+            MoveType::OutInvoice => (
+                crate::types::JournalType::Sale,
+                crate::types::AccountTypeInternal::Receivable,
+                crate::types::AccountTypeInternal::Income,
+                TaxTypeUse::Sale,
+            ),
+            MoveType::InInvoice => (
+                crate::types::JournalType::Purchase,
+                crate::types::AccountTypeInternal::Payable,
+                crate::types::AccountTypeInternal::Expense,
+                TaxTypeUse::Purchase,
+            ),
+            _ => return Err("manual invoice move_type must be OutInvoice or InInvoice".to_string()),
+        };
+
+    if params.lines.is_empty() {
+        return Err("manual invoice requires at least one line".to_string());
+    }
+    if params.lines.len() > 200 {
+        return Err("manual invoice supports at most 200 lines".to_string());
+    }
+    if params.invoice_date_due.is_some_and(|due| {
+        due.to_micros_since_unix_epoch() < params.invoice_date.to_micros_since_unix_epoch()
+    }) {
+        return Err("invoice due date cannot be before invoice date".to_string());
+    }
+
+    ensure_accounting_period_open_for_date(ctx, params.company_id, params.date)?;
+    let currency = require_active_currency_id(ctx, params.currency_id, "invoice")?;
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&params.company_id)
+        .ok_or("Company not found")?;
+    let journal = require_active_journal(
+        ctx,
+        organization_id,
+        params.company_id,
+        params.journal_id,
+        "invoice",
+    )?;
+    if journal.type_ != expected_journal_type {
+        return Err("journal type does not match the manual invoice type".to_string());
+    }
+    let effective_currency_id = journal.currency_id.unwrap_or(company.currency_id);
+    if effective_currency_id != params.currency_id {
+        return Err(
+            "invoice currency does not match the selected journal/company currency".to_string(),
+        );
+    }
+    if params.currency_id != company.currency_id {
+        return Err(
+            "foreign-currency manual invoices require validated FX conversion support".to_string(),
+        );
+    }
+
+    let partner = require_contact_in_scope(
+        ctx,
+        organization_id,
+        params.company_id,
+        params.partner_id,
+        "invoice partner",
+    )?;
+    if params.move_type == MoveType::OutInvoice && !partner.is_customer {
+        return Err("customer invoice partner is not enabled as a customer".to_string());
+    }
+    if params.move_type == MoveType::InInvoice && !partner.is_vendor {
+        return Err("vendor bill partner is not enabled as a vendor".to_string());
+    }
+
+    let counterpart = require_active_account(
+        ctx,
+        organization_id,
+        params.company_id,
+        params.counterpart_account_id,
+        "invoice counterpart",
+    )?;
+    if counterpart.internal_type.as_ref() != Some(&expected_counterpart_type) {
+        return Err("counterpart account type does not match the manual invoice type".to_string());
+    }
+    if counterpart
+        .currency_id
+        .is_some_and(|currency_id| currency_id != params.currency_id)
+    {
+        return Err("counterpart account currency does not match invoice currency".to_string());
+    }
+
+    let mut calculated_lines = Vec::with_capacity(params.lines.len());
+    let mut calculated_tax_lines: Vec<CalculatedManualTaxLine> = Vec::new();
+    let mut amount_untaxed = 0.0;
+    let mut amount_tax = 0.0;
+    let mut amount_total = 0.0;
+
+    for (index, line) in params.lines.iter().enumerate() {
+        let label = format!("invoice line {}", index + 1);
+        if line.name.trim().is_empty() || line.name.trim().len() > 500 {
+            return Err(format!("{label} description must be 1 to 500 bytes"));
+        }
+        if !line.quantity.is_finite() || line.quantity <= 0.0 {
+            return Err(format!("{label} quantity must be a positive finite number"));
+        }
+        if !line.price_unit.is_finite() || line.price_unit < 0.0 {
+            return Err(format!(
+                "{label} unit price must be a non-negative finite number"
+            ));
+        }
+        if !line.discount.is_finite() || !(0.0..=100.0).contains(&line.discount) {
+            return Err(format!("{label} discount must be between 0 and 100"));
+        }
+        if line.tax_ids.len() > 1 {
+            return Err(format!(
+                "{label} supports one configured tax in the alpha invoice flow"
+            ));
+        }
+
+        let account = require_active_account(
+            ctx,
+            organization_id,
+            params.company_id,
+            line.account_id,
+            &label,
+        )?;
+        if !account_matches_manual_invoice_line_type(ctx, &account, &expected_line_type) {
+            return Err(format!(
+                "{label} account type does not match the invoice type"
+            ));
+        }
+        if account
+            .currency_id
+            .is_some_and(|currency_id| currency_id != params.currency_id)
+        {
+            return Err(format!(
+                "{label} account currency does not match invoice currency"
+            ));
+        }
+
+        let entered_amount_raw = line.quantity * line.price_unit * (1.0 - line.discount / 100.0);
+        validate_pilot_money_amount(&format!("{label} amount"), entered_amount_raw)?;
+        let entered_amount = round_manual_invoice_amount(
+            entered_amount_raw,
+            currency.rounding_factor,
+            currency.decimal_places,
+        );
+        if entered_amount <= 0.0 {
+            return Err(format!("{label} amount must be positive"));
+        }
+
+        let mut included_tax = 0.0;
+        let mut excluded_tax = 0.0;
+        let mut seen_tax_ids = std::collections::HashSet::with_capacity(line.tax_ids.len());
+        for tax_id in &line.tax_ids {
+            if !seen_tax_ids.insert(*tax_id) {
+                return Err(format!("{label} tax {tax_id} is duplicated"));
+            }
+            let tax = require_active_tax(ctx, organization_id, params.company_id, *tax_id, &label)?;
+            if tax.type_tax_use != expected_tax_use {
+                return Err(format!("{label} tax use does not match the invoice type"));
+            }
+            if tax.has_negative_factor
+                || !tax.amount.is_finite()
+                || !(0.0..=100.0).contains(&tax.amount)
+            {
+                return Err(format!(
+                    "{label} tax rate must be a non-negative percentage no greater than 100"
+                ));
+            }
+            if tax.amount_type != crate::types::TaxAmountType::Percent {
+                return Err(format!(
+                    "{label} tax must use the percentage amount type in the alpha invoice flow"
+                ));
+            }
+            let tax_group_id = tax
+                .tax_group_id
+                .ok_or_else(|| format!("{label} tax requires a tax group"))?;
+            let group = ctx
+                .db
+                .account_tax_group()
+                .id()
+                .find(&tax_group_id)
+                .ok_or_else(|| format!("{label} tax group not found"))?;
+            if group.organization_id != organization_id || group.company_id != params.company_id {
+                return Err(format!("{label} tax group does not belong to this company"));
+            }
+            let tax_account_id = match &params.move_type {
+                MoveType::OutInvoice => group.tax_payable_account_id,
+                MoveType::InInvoice => group.tax_receivable_account_id,
+                _ => None,
+            }
+            .ok_or_else(|| format!("{label} tax group has no posting account"))?;
+            let tax_account = require_active_account(
+                ctx,
+                organization_id,
+                params.company_id,
+                tax_account_id,
+                "tax posting",
+            )?;
+            if matches!(
+                tax_account.internal_type,
+                Some(crate::types::AccountTypeInternal::Receivable)
+                    | Some(crate::types::AccountTypeInternal::Payable)
+            ) {
+                return Err(format!(
+                    "{label} tax posting account cannot be a receivable or payable counterpart account"
+                ));
+            }
+            if tax_account
+                .currency_id
+                .is_some_and(|currency_id| currency_id != params.currency_id)
+            {
+                return Err(format!(
+                    "{label} tax posting account currency does not match invoice currency"
+                ));
+            }
+
+            let tax_amount = round_manual_invoice_amount(
+                calculate_tax(ctx, &[*tax_id], entered_amount_raw),
+                currency.rounding_factor,
+                currency.decimal_places,
+            );
+            validate_pilot_money_amount(&format!("{label} tax"), tax_amount)?;
+            let tax_base_amount = round_manual_invoice_amount(
+                if tax.price_include {
+                    entered_amount_raw - tax_amount
+                } else {
+                    entered_amount_raw
+                },
+                currency.rounding_factor,
+                currency.decimal_places,
+            );
+            if tax.price_include {
+                included_tax += tax_amount;
+            } else {
+                excluded_tax += tax_amount;
+            }
+            amount_tax += tax_amount;
+            if let Some(existing) = calculated_tax_lines.iter_mut().find(|item| {
+                item.tax_id == *tax_id
+                    && item.tax_group_id == tax_group_id
+                    && item.account_id == tax_account_id
+            }) {
+                existing.amount += tax_amount;
+                existing.base_amount += tax_base_amount;
+            } else {
+                calculated_tax_lines.push(CalculatedManualTaxLine {
+                    tax_id: *tax_id,
+                    tax_group_id,
+                    account_id: tax_account_id,
+                    amount: tax_amount,
+                    base_amount: tax_base_amount,
+                });
+            }
+        }
+
+        let untaxed = round_manual_invoice_amount(
+            entered_amount - included_tax,
+            currency.rounding_factor,
+            currency.decimal_places,
+        );
+        let total = round_manual_invoice_amount(
+            untaxed + included_tax + excluded_tax,
+            currency.rounding_factor,
+            currency.decimal_places,
+        );
+        validate_pilot_money_amount(&format!("{label} untaxed amount"), untaxed)?;
+        validate_pilot_money_amount(&format!("{label} total"), total)?;
+        amount_untaxed += untaxed;
+        amount_total += total;
+        calculated_lines.push(CalculatedManualInvoiceLine {
+            params: line.clone(),
+            untaxed,
+            total,
+        });
+    }
+    amount_untaxed = round_manual_invoice_amount(
+        amount_untaxed,
+        currency.rounding_factor,
+        currency.decimal_places,
+    );
+    amount_tax = round_manual_invoice_amount(
+        amount_tax,
+        currency.rounding_factor,
+        currency.decimal_places,
+    );
+    amount_total = round_manual_invoice_amount(
+        amount_total,
+        currency.rounding_factor,
+        currency.decimal_places,
+    );
+    for tax_line in &mut calculated_tax_lines {
+        tax_line.amount = round_manual_invoice_amount(
+            tax_line.amount,
+            currency.rounding_factor,
+            currency.decimal_places,
+        );
+        tax_line.base_amount = round_manual_invoice_amount(
+            tax_line.base_amount,
+            currency.rounding_factor,
+            currency.decimal_places,
+        );
+    }
+    validate_pilot_money_amount("invoice untaxed amount", amount_untaxed)?;
+    validate_pilot_money_amount("invoice tax amount", amount_tax)?;
+    validate_pilot_money_amount("invoice total", amount_total)?;
+
+    let metadata = manual_invoice_metadata(params.metadata.as_deref(), &params.idempotency_key);
+    let header_params = CreateAccountMoveParams {
+        idempotency_key: params.idempotency_key.clone(),
+        company_id: Some(params.company_id),
+        journal_id: params.journal_id,
+        move_type: params.move_type.clone(),
+        date: params.date,
+        name: String::new(),
+        ref_: params.ref_.clone(),
+        auto_post: false,
+        to_check: false,
+        is_storno: false,
+        partner_id: Some(params.partner_id),
+        partner_bank_id: None,
+        fiscal_position_id: None,
+        invoice_date: Some(params.invoice_date),
+        invoice_date_due: params.invoice_date_due,
+        invoice_payment_term_id: None,
+        payment_reference: None,
+        invoice_origin: None,
+        invoice_partner_display_name: Some(partner.display_name),
+        invoice_cash_rounding_id: None,
+        partner_shipping_id: None,
+        sale_order_id: None,
+        invoice_incoterm_id: None,
+        incoterm_location: None,
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        secure_sequence_number: None,
+        metadata: Some(metadata),
+    };
+    let header_fingerprint = format!("{header_params:?}");
+    create_account_move(ctx, organization_id, header_params.clone())?;
+    let move_id = replayed_result(
+        ctx,
+        organization_id,
+        params.company_id,
+        "create_account_move",
+        &header_params.idempotency_key,
+        &header_fingerprint,
+    )?
+    .ok_or("manual invoice header receipt was not persisted")?;
+    let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
+
+    let mut sequence = 1u32;
+    for calculated in calculated_lines {
+        let (debit, credit) = match &params.move_type {
+            MoveType::OutInvoice => (0.0, calculated.untaxed),
+            MoveType::InInvoice => (calculated.untaxed, 0.0),
+            _ => unreachable!(),
+        };
+        let line = insert_draft_account_move_line(
+            ctx,
+            &move_record,
+            AddAccountMoveLineParams {
+                account_id: calculated.params.account_id,
+                name: calculated.params.name,
+                debit,
+                credit,
+                sequence,
+                quantity: calculated.params.quantity,
+                price_unit: calculated.params.price_unit,
+                discount: calculated.params.discount,
+                tax_ids: calculated.params.tax_ids,
+                partner_id: Some(params.partner_id),
+                product_id: None,
+                product_uom_id: None,
+                product_category_id: None,
+                analytic_account_id: None,
+                analytic_tag_ids: vec![],
+                display_type: None,
+                is_downpayment: false,
+                exclude_from_invoice_tab: false,
+                blocked: false,
+                group_tax_id: None,
+                tax_line_id: None,
+                tax_group_id: None,
+                tax_repartition_line_id: None,
+                tax_audit: None,
+                reconcile_model_id: None,
+                payment_id: None,
+                statement_line_id: None,
+                matching_number: None,
+                matching_label: None,
+                expected_pay_date: params.invoice_date_due,
+                expected_pay_date_currency_id: Some(params.currency_id),
+                expected_pay_date_amount: calculated.total,
+                expected_pay_date_residual: calculated.total,
+                metadata: None,
+            },
+        )?;
+        update_manual_line_amounts(
+            ctx,
+            line,
+            debit,
+            credit,
+            calculated.untaxed,
+            calculated.total,
+            calculated.untaxed,
+            0.0,
+        );
+        sequence += 1;
+    }
+
+    for calculated in calculated_tax_lines {
+        let (debit, credit) = match &params.move_type {
+            MoveType::OutInvoice => (0.0, calculated.amount),
+            MoveType::InInvoice => (calculated.amount, 0.0),
+            _ => unreachable!(),
+        };
+        let line = insert_draft_account_move_line(
+            ctx,
+            &move_record,
+            AddAccountMoveLineParams {
+                account_id: calculated.account_id,
+                name: "Tax".to_string(),
+                debit,
+                credit,
+                sequence,
+                quantity: 1.0,
+                price_unit: calculated.amount,
+                discount: 0.0,
+                tax_ids: vec![],
+                partner_id: Some(params.partner_id),
+                product_id: None,
+                product_uom_id: None,
+                product_category_id: None,
+                analytic_account_id: None,
+                analytic_tag_ids: vec![],
+                display_type: None,
+                is_downpayment: false,
+                exclude_from_invoice_tab: true,
+                blocked: false,
+                group_tax_id: Some(calculated.tax_group_id),
+                tax_line_id: Some(calculated.tax_id),
+                tax_group_id: Some(calculated.tax_group_id),
+                tax_repartition_line_id: None,
+                tax_audit: None,
+                reconcile_model_id: None,
+                payment_id: None,
+                statement_line_id: None,
+                matching_number: None,
+                matching_label: None,
+                expected_pay_date: None,
+                expected_pay_date_currency_id: None,
+                expected_pay_date_amount: 0.0,
+                expected_pay_date_residual: 0.0,
+                metadata: None,
+            },
+        )?;
+        update_manual_line_amounts(
+            ctx,
+            line,
+            debit,
+            credit,
+            calculated.amount,
+            calculated.amount,
+            calculated.base_amount,
+            0.0,
+        );
+        sequence += 1;
+    }
+
+    let (counterpart_debit, counterpart_credit) = match &params.move_type {
+        MoveType::OutInvoice => (amount_total, 0.0),
+        MoveType::InInvoice => (0.0, amount_total),
+        _ => unreachable!(),
+    };
+    let counterpart_line = insert_draft_account_move_line(
+        ctx,
+        &move_record,
+        AddAccountMoveLineParams {
+            account_id: params.counterpart_account_id,
+            name: counterpart.name,
+            debit: counterpart_debit,
+            credit: counterpart_credit,
+            sequence,
+            quantity: 1.0,
+            price_unit: amount_total,
+            discount: 0.0,
+            tax_ids: vec![],
+            partner_id: Some(params.partner_id),
+            product_id: None,
+            product_uom_id: None,
+            product_category_id: None,
+            analytic_account_id: None,
+            analytic_tag_ids: vec![],
+            display_type: None,
+            is_downpayment: false,
+            exclude_from_invoice_tab: true,
+            blocked: false,
+            group_tax_id: None,
+            tax_line_id: None,
+            tax_group_id: None,
+            tax_repartition_line_id: None,
+            tax_audit: None,
+            reconcile_model_id: None,
+            payment_id: None,
+            statement_line_id: None,
+            matching_number: None,
+            matching_label: None,
+            expected_pay_date: params.invoice_date_due,
+            expected_pay_date_currency_id: Some(params.currency_id),
+            expected_pay_date_amount: amount_total,
+            expected_pay_date_residual: amount_total,
+            metadata: None,
+        },
+    )?;
+    let counterpart_balance = counterpart_debit - counterpart_credit;
+    update_manual_line_amounts(
+        ctx,
+        counterpart_line,
+        counterpart_debit,
+        counterpart_credit,
+        amount_total,
+        amount_total,
+        0.0,
+        counterpart_balance,
+    );
+
+    let persisted_lines = load_move_lines_in_scope(ctx, organization_id, &move_record)?;
+    let total_debit: f64 = persisted_lines.iter().map(|line| line.debit).sum();
+    let total_credit: f64 = persisted_lines.iter().map(|line| line.credit).sum();
+    if (total_debit - total_credit).abs() > 0.005 {
+        return Err("manual invoice lines are not balanced".to_string());
+    }
+    compute_invoice_totals_internal(ctx, organization_id, move_id)?;
+    let persisted_move = load_account_move_in_scope(ctx, organization_id, move_id)?;
+    if (persisted_move.amount_untaxed - amount_untaxed).abs() > 0.005
+        || (persisted_move.amount_tax - amount_tax).abs() > 0.005
+        || (persisted_move.amount_total - amount_total).abs() > 0.005
+        || (persisted_move.amount_residual - amount_total).abs() > 0.005
+    {
+        return Err("manual invoice persisted totals do not match derived totals".to_string());
+    }
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(params.company_id),
+            table_name: "account_move",
+            record_id: move_id,
+            action: "CREATE_MANUAL_INVOICE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "move_type": format!("{:?}", params.move_type),
+                    "line_count": persisted_lines.len(),
+                    "amount_untaxed": amount_untaxed,
+                    "amount_tax": amount_tax,
+                    "amount_total": amount_total,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec!["lines".to_string(), "amount_total".to_string()],
+            metadata: None,
+        },
+    );
+    record_result(
+        ctx,
+        organization_id,
+        params.company_id,
+        "create_manual_invoice",
+        params.idempotency_key,
+        payload_fingerprint,
+        "account_move",
+        move_id,
+    );
+
+    Ok(())
+}
+
+fn account_matches_manual_invoice_line_type(
+    ctx: &ReducerContext,
+    account: &AccountAccount,
+    expected_type: &crate::types::AccountTypeInternal,
+) -> bool {
+    use crate::types::{AccountInternalGroup, AccountTypeInternal};
+
+    // An explicit specialization is authoritative. In particular, receivable and
+    // payable accounts must never become invoice revenue/expense lines merely
+    // because broader classification metadata is inconsistent.
+    if let Some(actual_type) = account.internal_type.as_ref() {
+        return actual_type == expected_type;
+    }
+
+    let expected_group = match expected_type {
+        AccountTypeInternal::Income => AccountInternalGroup::Income,
+        AccountTypeInternal::Expense => AccountInternalGroup::Expense,
+        _ => return false,
+    };
+
+    if let Some(actual_group) = account.internal_group.as_ref() {
+        return actual_group == &expected_group;
+    }
+
+    // Older and manually-created charts may store the classification only on the
+    // referenced account type. Accept that canonical relation when the duplicated
+    // fields on the account are absent, while keeping the lookup tenant-scoped.
+    ctx.db
+        .account_account_type()
+        .id()
+        .find(&account.user_type_id)
+        .is_some_and(|account_type| {
+            account_type.organization_id == account.organization_id
+                && account_type
+                    .company_id
+                    .is_none_or(|company_id| company_id == account.company_id)
+                && !account_type.is_deprecated
+                && (account_type.internal_group == expected_group
+                    || account_type
+                        .type_
+                        .trim()
+                        .eq_ignore_ascii_case(match expected_type {
+                            AccountTypeInternal::Income => "income",
+                            AccountTypeInternal::Expense => "expense",
+                            _ => return false,
+                        }))
+        })
+}
+
 /// Insert a line on a draft move using caller-supplied [`AddAccountMoveLineParams`].
 pub(crate) fn insert_draft_account_move_line(
     ctx: &ReducerContext,
@@ -1781,9 +2550,15 @@ pub fn cancel_account_move(
 
     let move_record = load_account_move_in_scope(ctx, organization_id, move_id)?;
 
-    if move_record.state != AccountMoveState::Draft && move_record.state != AccountMoveState::Posted
-    {
-        return Err("Only draft or posted moves can be cancelled".to_string());
+    match move_record.state {
+        AccountMoveState::Draft => {}
+        AccountMoveState::Posted => {
+            return Err(
+                "Posted moves cannot be cancelled; create a credit note or reversal instead"
+                    .to_string(),
+            )
+        }
+        AccountMoveState::Cancelled => return Err("Only draft moves can be cancelled".to_string()),
     }
 
     let old_state = format!("{:?}", move_record.state);
@@ -1825,11 +2600,11 @@ pub fn cancel_account_move(
 
 /// Return a cancelled move to draft so its lines can be edited again.
 ///
-/// Only `Cancelled -> Draft` is supported. `Posted -> Draft` is refused because posting is
+/// Only `Cancelled -> Draft` is supported. Only draft moves can be cancelled; `Posted -> Draft`
+/// is refused because posting is
 /// not exactly invertible from the code: `post_invoice` inserts COGS lines, may accrue sale
 /// commissions and re-derives totals, and `post_account_move` pushes budget actuals and may
-/// issue a document number. Previously posted moves must be reversed with a credit note;
-/// cancelling does not undo those posting effects and must not make them repostable.
+/// issue a document number. Posted moves must be reversed with a credit note or reversal.
 /// The document number (`name` / `move_name`) is kept, so no number is ever re-issued; the
 /// payment/residual fields are untouched because cancel does not modify them.
 #[spacetimedb::reducer]
@@ -1847,14 +2622,16 @@ pub fn reset_account_move_to_draft(
         AccountMoveState::Draft => return Err("Move is already in draft state".to_string()),
         AccountMoveState::Posted => {
             return Err(
-                "Posted moves cannot be reset to draft; cancel the move first or issue a credit note"
+                "Posted moves cannot be reset to draft; issue a credit note or reversal"
                     .to_string(),
             )
         }
     }
 
     if move_record.posted_before {
-        return Err("Previously posted moves cannot be reset to draft; issue a credit note".to_string());
+        return Err(
+            "Previously posted moves cannot be reset to draft; issue a credit note".to_string(),
+        );
     }
 
     let company_id = move_record.company_id;

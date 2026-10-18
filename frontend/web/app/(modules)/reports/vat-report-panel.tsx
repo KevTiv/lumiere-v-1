@@ -20,6 +20,13 @@ import { Archive, FileDown, FileSpreadsheet, PlayCircle } from "lucide-react"
 import { reportStateTag } from "@/lib/reports-create-params"
 import { useToast } from "@/hooks/use-toast"
 import { currencyOptionsFromRows } from "@/lib/form-lookup"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type VatReportPanelProps = {
   organizationId: bigint
@@ -239,16 +246,16 @@ export function VatReportPanel({ organizationId, companyId, financialReports }: 
         </div>
         <div className="space-y-2">
           <Label htmlFor="vat-report-currency">Currency</Label>
-          <select
-            id="vat-report-currency"
-            value={currencyId}
-            onChange={(event) => setCurrencyId(event.target.value)}
-            className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm"
-          >
-            {currencyOptions.map((currency) => (
-              <option key={currency.value} value={currency.value}>{currency.label}</option>
-            ))}
-          </select>
+          <Select value={currencyId} onValueChange={setCurrencyId}>
+            <SelectTrigger id="vat-report-currency">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {currencyOptions.map((currency) => (
+                <SelectItem key={currency.value} value={currency.value}>{currency.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

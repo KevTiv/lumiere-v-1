@@ -15,6 +15,7 @@
     "./form-coercion": "./src/form-coercion.ts",
     "./create-params-helpers": "./src/create-params-helpers.ts",
     "./accounting-create-params": "./src/accounting-create-params.ts",
+    "./subscription-billing-periods": "./src/subscription-billing-periods.ts",
     "./ai-coverage-create-params": "./src/ai-coverage-create-params.ts",
     "./inventory-coverage-create-params": "./src/inventory-coverage-create-params.ts",
     "./messaging-create-params": "./src/messaging-create-params.ts",
@@ -50,6 +51,8 @@
     "./csv-import-safety": "./src/csv-import-safety.ts",
     "./csv-import-transform": "./src/csv-import-transform.ts",
     "./csv-import-bundles": "./src/csv-import-bundles.ts",
+    "./accounting-import-reconciliation": "./src/accounting-import-reconciliation.ts",
+    "./outstanding-document-import": "./src/outstanding-document-import.ts",
     "./csv-import-retry": "./src/csv-import-retry.ts",
     "./u64": "./src/u64.ts",
     "./contact-matching": "./src/contact-matching.ts",
@@ -58,7 +61,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/form-coercion.test.ts src/u64.test.ts src/accounting-create-params.test.ts src/manufacturing-create-params.test.ts src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts src/contact-matching.test.ts src/timestamp-values.test.ts src/row-values.test.ts src/record-links.test.ts"
+    "test": "node --import tsx --test src/form-coercion.test.ts src/u64.test.ts src/accounting-create-params.test.ts src/accounting-account-classification.test.ts src/accounting-import-reconciliation.test.ts src/outstanding-document-import.test.ts src/manufacturing-create-params.test.ts src/reports-dashboard-params.test.ts src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts src/contact-matching.test.ts src/timestamp-values.test.ts src/row-values.test.ts src/record-links.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",

@@ -14,6 +14,8 @@ const verifiedIdentity = (token: string) => (token === "approver" ? "b" : "a").r
 
 function resolver(options: {
   cookies?: Record<string, string>
+  workOs?: boolean
+  workOsToken?: string
   production?: boolean
   mock?: boolean
   rejectedToken?: string
@@ -24,6 +26,8 @@ function resolver(options: {
   const jar = options.cookies ?? {}
   const module = { exports: {} as { resolveApiSession: (req?: Request) => Promise<ApiSession | null> } }
   const dependencies: Record<string, unknown> = {
+    "@/lib/auth-mode": { isWorkOsEnabled: () => Boolean(options.workOs) },
+    "@workos-inc/authkit-nextjs": { withAuth: async () => ({ accessToken: options.workOsToken }) },
     "next/headers": {
       cookies: async () => ({
         get: (name: string) => name in jar ? { value: jar[name] } : undefined,
@@ -127,4 +131,18 @@ test("API unavailability or incomplete authoritative identity fails closed", asy
   assert.equal(await resolver({ unavailable: true }).resolve(request), null)
   assert.equal(await resolver({ response: { organizationId: 1, fieldAccess: {} } }).resolve(request), null)
   assert.equal(await resolver({ response: { identityHex: verifiedIdentity("reader"), organizationId: "1" } }).resolve(request), null)
+})
+
+
+test("WorkOS sessions use the provider token and ignore legacy cookies", async () => {
+  const { resolve, fieldTokens } = resolver({ workOs: true, workOsToken: 'provider', cookies: { stdb_token: 'owner' } })
+  const session = await resolve()
+  assert.equal(session?.stdbToken, 'provider')
+  assert.deepEqual(fieldTokens, ['Bearer provider'])
+})
+
+test("anonymous WorkOS callers cannot fall back to native cookies or development admin", async () => {
+  const { resolve, fieldTokens } = resolver({ workOs: true, cookies: { stdb_token: 'owner' } })
+  assert.equal(await resolve(), null)
+  assert.deepEqual(fieldTokens, [])
 })

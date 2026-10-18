@@ -1,4 +1,5 @@
 import type { DashboardWidget } from "./dashboard-types"
+import { reportExportProvenanceJson, type ReportExportSourceProvenance } from "./report-export-provenance"
 
 function escapeCsvCell(value: string | number): string {
   const str = String(value)
@@ -49,25 +50,30 @@ function seriesValuesToCsv(
  * Convert a dashboard widget's data into CSV.
  * Returns null for widget types without a tabular representation.
  */
-export function widgetDataToCsv(widget: DashboardWidget): string | null {
+export function widgetDataToCsv(widget: DashboardWidget, provenance?: ReportExportSourceProvenance): string | null {
+  let csv: string | null
   switch (widget.type) {
     case "area-chart":
     case "line-chart":
-      return seriesValuesToCsv(widget.data.xAxisKey, widget.data.series, widget.data.values)
+      csv = seriesValuesToCsv(widget.data.xAxisKey, widget.data.series, widget.data.values)
+      break
     case "bar-chart":
-      return seriesValuesToCsv(widget.data.categoryKey, widget.data.series, widget.data.values)
+      csv = seriesValuesToCsv(widget.data.categoryKey, widget.data.series, widget.data.values)
+      break
     case "donut-chart":
-      return rowsToCsv(
+      csv = rowsToCsv(
         ["name", "value"],
         widget.data.segments.map((s) => [s.name, s.value]),
       )
+      break
     case "funnel-chart":
-      return rowsToCsv(
+      csv = rowsToCsv(
         ["stage", "value"],
         widget.data.stages.map((s) => [s.name, s.value]),
       )
+      break
     case "table":
-      return rowsToCsv(
+      csv = rowsToCsv(
         widget.data.columns.map((c) => c.label),
         widget.data.rows.map((row) =>
           widget.data.columns.map((c) => {
@@ -76,7 +82,9 @@ export function widgetDataToCsv(widget: DashboardWidget): string | null {
           }),
         ),
       )
+      break
     default:
       return null
   }
+  return provenance ? `# lumiere-provenance:${reportExportProvenanceJson(provenance)}\r\n${csv}` : csv
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { KanbanColumn } from "../kanban/kanban-column"
 import { KanbanDraggableCard } from "../kanban/kanban-draggable-card"
 import { TaskCardContent } from "./task-card"
@@ -14,6 +15,7 @@ interface TaskColumnProps {
 
 /** Legacy column primitive — prefer {@link KanbanBoard} for new boards. Must be rendered inside `DndContext`. */
 export function TaskColumn({ column, tasks, onTaskClick, onAddTask }: TaskColumnProps) {
+  const { t } = useTranslation()
   return (
     <KanbanColumn
       column={{
@@ -25,8 +27,8 @@ export function TaskColumn({ column, tasks, onTaskClick, onAddTask }: TaskColumn
       itemCount={tasks.length}
       onAddItem={onAddTask}
       labels={{
-        emptyColumn: "Drop tasks here",
-        wipLimitReached: (limit) => `WIP limit reached (${limit})`,
+        emptyColumn: t("tasks.board.dropTasksHere"),
+        wipLimitReached: (limit) => t("tasks.board.wipLimitReached", { limit }),
       }}
     >
       {tasks.map((task) => (
