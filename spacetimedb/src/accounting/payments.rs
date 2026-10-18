@@ -42,6 +42,7 @@ use crate::workflow::approval_gate::{
     index(accessor = payment_by_partner, btree(columns = [partner_id])),
     index(accessor = payment_by_state, btree(columns = [state]))
 )]
+#[derive(Clone)]
 pub struct AccountPayment {
     #[primary_key]
     #[auto_inc]
@@ -667,6 +668,7 @@ pub fn post_payment_impl(
                 metadata: None,
             },
         );
+        super::bank_settlement_lifecycle::payment_posted(ctx, payment_id)?;
         return Ok(());
     }
 
@@ -776,6 +778,7 @@ pub fn post_payment_impl(
             metadata: None,
         },
     );
+    super::bank_settlement_lifecycle::payment_posted(ctx, payment_id)?;
     Ok(())
 }
 
@@ -783,6 +786,15 @@ fn reverse_posted_payment_move(
     ctx: &ReducerContext,
     payment: &AccountPayment,
     original_move_id: u64,
+) -> Result<u64, String> {
+    reverse_posted_payment_move_at(ctx, payment, original_move_id, ctx.timestamp)
+}
+
+pub(super) fn reverse_posted_payment_move_at(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+    original_move_id: u64,
+    date: Timestamp,
 ) -> Result<u64, String> {
     let original = ctx
         .db
@@ -811,13 +823,13 @@ fn reverse_posted_payment_move(
         return Err("Payment journal move is not balanced".to_string());
     }
 
-    ensure_accounting_period_open_for_date(ctx, payment.company_id, ctx.timestamp)?;
+    ensure_accounting_period_open_for_date(ctx, payment.company_id, date)?;
     let reversal = ctx.db.account_move().insert(AccountMove {
         id: 0,
         name: next_doc_number(ctx, payment.organization_id, "PAYREV"),
         ref_: Some(format!("Reversal of payment move {original_move_id}")),
         state: AccountMoveState::Draft,
-        date: ctx.timestamp,
+        date,
         invoice_origin: Some(format!("account-payment:{}", payment.id)),
         posted_before: false,
         create_uid: Some(ctx.sender()),

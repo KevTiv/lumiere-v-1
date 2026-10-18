@@ -198,6 +198,16 @@ pub fn request_guarded_action(
     })
 }
 
+/// Validate workflow discovery and selected routing without creating an instance/task.
+pub(crate) fn preflight_guarded_action_gate(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    snapshot: &GuardedActionSnapshot,
+) -> Result<(), String> {
+    discover_gate_plan(ctx, organization_id, company_id, snapshot).map(|_| ())
+}
+
 struct GatePlan {
     version: WorkflowVersion,
     task_node: Option<WorkflowNode>,

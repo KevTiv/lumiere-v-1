@@ -75,6 +75,7 @@ pub struct AccountBankStatement {
     index(accessor = statement_line_by_date, btree(columns = [date])),
     index(accessor = statement_line_by_reconcile, btree(columns = [is_reconciled]))
 )]
+#[derive(Clone)]
 pub struct AccountBankStatementLine {
     #[primary_key]
     #[auto_inc]
@@ -919,7 +920,11 @@ pub fn delete_account_bank_statement(
         .account_bank_statement_line()
         .statement_line_by_statement()
         .filter(&statement_id)
-        .any(|line| !line.payment_ids.is_empty() || line.is_reconciled)
+        .any(|line| {
+            !line.payment_ids.is_empty()
+                || line.is_reconciled
+                || super::bank_settlement_lifecycle::has_attempt_history(ctx, line.id)
+        })
     {
         return Err(
             "cannot delete a statement with settlement payments or reconciled lines".to_string(),
@@ -997,6 +1002,7 @@ pub fn create_account_bank_statement_line(
     }
     validate_pilot_money_amount("bank line amount", params.amount)?;
     validate_pilot_money_amount("bank line currency amount", params.amount_currency)?;
+    super::bank_settlement_lifecycle::validate_metadata_change(None, params.metadata.as_deref())?;
 
     let journal = ctx
         .db
@@ -1093,6 +1099,12 @@ pub fn update_account_bank_statement_line(
     }
     if statement.state == BankStatementState::Posted {
         return Err("cannot edit a posted statement line".to_string());
+    }
+    if let Some(metadata) = &params.metadata {
+        super::bank_settlement_lifecycle::validate_metadata_change(
+            line.metadata.as_deref(),
+            metadata.as_deref(),
+        )?;
     }
     if params.move_id.is_some()
         || params.is_reconciled.is_some()
@@ -1269,6 +1281,7 @@ pub fn delete_account_bank_statement_line(
     if statement.state == BankStatementState::Posted
         || !line.payment_ids.is_empty()
         || line.is_reconciled
+        || super::bank_settlement_lifecycle::has_attempt_history(ctx, line.id)
     {
         return Err(
             "cannot delete a posted, reconciled or settlement-linked bank line".to_string(),
@@ -1379,11 +1392,11 @@ pub fn post_account_bank_statement(
     Ok(())
 }
 
-struct BankSettlementSelection {
-    line_ids: Vec<u64>,
-    invoice_ids: Vec<u64>,
-    partner_id: u64,
-    account_id: u64,
+pub(super) struct BankSettlementSelection {
+    pub(super) line_ids: Vec<u64>,
+    pub(super) invoice_ids: Vec<u64>,
+    pub(super) partner_id: u64,
+    pub(super) account_id: u64,
 }
 
 /// Bank-linked payments remain part of an immutable settlement until a dedicated
@@ -1393,12 +1406,13 @@ pub(crate) fn require_payment_not_bank_linked(
     organization_id: u64,
     payment_id: u64,
 ) -> Result<(), String> {
-    if ctx
-        .db
-        .account_bank_statement_line()
-        .bank_statement_line_by_org()
-        .filter(&organization_id)
-        .any(|line| line.payment_ids.contains(&payment_id))
+    if super::bank_settlement_lifecycle::is_owned_payment(ctx, organization_id, payment_id)
+        || ctx
+            .db
+            .account_bank_statement_line()
+            .bank_statement_line_by_org()
+            .filter(&organization_id)
+            .any(|line| line.payment_ids.contains(&payment_id))
     {
         return Err(
             "bank-linked payments require a dedicated bank settlement reversal".to_string(),
@@ -1410,7 +1424,7 @@ pub(crate) fn require_payment_not_bank_linked(
 /// Validate the entire selection before creating a payment or requesting approval.
 /// Invoice registration settles all its open AR/AP rows, so partial row selection
 /// and mixed partners must be rejected rather than silently settling extra rows.
-fn bank_settlement_selection(
+pub(super) fn bank_settlement_selection(
     ctx: &ReducerContext,
     statement: &AccountBankStatement,
     line: &AccountBankStatementLine,
@@ -1621,6 +1635,7 @@ pub(super) fn bank_payment_clearing_account(
     ctx: &ReducerContext,
     payment: &AccountPayment,
 ) -> Result<Option<u64>, String> {
+    super::bank_settlement_lifecycle::validate_pending_snapshot(ctx, payment)?;
     let lines: Vec<_> = ctx
         .db
         .account_bank_statement_line()
@@ -1668,7 +1683,7 @@ pub(super) fn bank_payment_clearing_account(
         payment.organization_id,
         payment.company_id,
         "bank_statement_settlement",
-        &format!("bank-statement-line:{}", line.id),
+        &super::bank_settlement_lifecycle::receipt_key(ctx, line)?,
         &fingerprint,
     )?;
     if receipt != Some(payment.id) {
@@ -1735,7 +1750,8 @@ pub(super) fn validate_bank_settlement_registration(
         return Err("bank settlement registration scope is inconsistent".to_string());
     }
     // The receipt pins the canonical reviewed line IDs even while approval is pending.
-    let key = format!("bank-statement-line:{}", line.id);
+    super::bank_settlement_lifecycle::validate_pending_snapshot(ctx, &payment)?;
+    let key = super::bank_settlement_lifecycle::receipt_key(ctx, line)?;
     let receipt = ctx
         .db
         .accounting_operation_receipt()
@@ -1835,7 +1851,7 @@ pub fn reconcile_account_bank_statement_line(
     check_permission(ctx, organization_id, "account_move", "write")?;
     let mut selected_ids = params.move_ids.clone();
     selected_ids.sort_unstable();
-    let key = format!("bank-statement-line:{line_id}");
+    let key = super::bank_settlement_lifecycle::receipt_key(ctx, &line)?;
     let fingerprint = format!(
         "{}:{}:{}:{:?}:{:?}:{}:{:?}",
         statement.id,
@@ -1880,6 +1896,17 @@ pub fn reconcile_account_bank_statement_line(
             None
         },
     )?;
+    let mut prepared_attempt = if existing.is_none() {
+        Some(super::bank_settlement_lifecycle::prepare_attempt(
+            ctx,
+            &statement,
+            &line,
+            &selection.line_ids,
+            selection.partner_id,
+        )?)
+    } else {
+        None
+    };
     let inbound = line.amount > 0.0;
     let payment_type = if inbound {
         PaymentType::InBound
@@ -1945,6 +1972,16 @@ pub fn reconcile_account_bank_statement_line(
             "account_payment",
             payment_id,
         );
+        super::bank_settlement_lifecycle::insert_attempt(
+            ctx,
+            &statement,
+            &line,
+            payment_id,
+            selection.partner_id,
+            prepared_attempt
+                .take()
+                .ok_or("bank settlement snapshot was not prepared")?,
+        )?;
         payment_id
     };
     // This provenance survives a human approval, without marking the bank line matched.
@@ -1981,6 +2018,7 @@ pub fn reconcile_account_bank_statement_line(
         if payment.state == PaymentState::NotPaid {
             // The standard gate created an approval task. Returning success commits only
             // the draft and its approval request; canonical readback reports pending.
+            super::bank_settlement_lifecycle::pending_finished(ctx, payment_id)?;
             return Ok(());
         }
         if payment.state != PaymentState::Paid
@@ -2068,7 +2106,12 @@ pub fn reconcile_account_bank_statement_line(
             amount_residual: 0.0,
             write_uid: Some(ctx.sender()),
             write_date: Some(ctx.timestamp),
-            ..line
+            ..ctx
+                .db
+                .account_bank_statement_line()
+                .id()
+                .find(&line_id)
+                .ok_or("settled bank line missing")?
         });
 
     write_audit_log_v2(
@@ -2097,6 +2140,7 @@ pub fn reconcile_account_bank_statement_line(
         },
     );
 
+    super::bank_settlement_lifecycle::settlement_finished(ctx, payment_id)?;
     Ok(())
 }
 

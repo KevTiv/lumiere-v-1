@@ -562,6 +562,7 @@ pub(crate) fn claim_workflow_human_task_for_actor(
         None,
         actor,
     );
+    crate::accounting::bank_settlement_lifecycle::record_bank_task_claim(ctx, &updated)?;
     Ok(updated)
 }
 
@@ -688,6 +689,7 @@ pub(crate) fn decide_workflow_human_task_for_actor(
             &input_hash,
             comment.clone(),
         )? {
+            crate::accounting::bank_settlement_lifecycle::synchronize_bank_task(ctx, &partial)?;
             return Ok(partial);
         }
     }
@@ -793,6 +795,7 @@ pub(crate) fn decide_workflow_human_task_for_actor(
     if updated_instance.revision != expected_runtime_revision {
         return Err("workflow decision advanced an unexpected number of revisions".to_string());
     }
+    crate::accounting::bank_settlement_lifecycle::synchronize_bank_task(ctx, &updated)?;
     Ok(updated)
 }
 
@@ -905,6 +908,7 @@ pub(crate) fn invalidate_workflow_human_task_internal(
         None,
         actor,
     );
+    crate::accounting::bank_settlement_lifecycle::synchronize_bank_task(ctx, &updated)?;
     Ok(updated)
 }
 
@@ -976,6 +980,7 @@ pub(crate) fn add_workflow_human_task_comment_for_actor(
         None,
         actor,
     );
+    crate::accounting::bank_settlement_lifecycle::record_bank_task_comment(ctx, &updated)?;
     Ok(updated)
 }
 
