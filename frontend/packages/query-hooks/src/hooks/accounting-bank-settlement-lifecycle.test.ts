@@ -120,7 +120,7 @@ describe("bank settlement recovery command transport", () => {
   const intercept = (rows: BankSettlementCanonicalRows, firstStatus = 200, acknowledge = true) => {
     const calls: { url: string; body: string | undefined; method: string }[] = []
     let posts = 0
-    const collections: Record<string, readonly Record<string, unknown>[]> = { "bank-statement-lines": rows.lines, "bank-statements": rows.statements,
+    const collections: Record<string, BankSettlementCanonicalRows["lines"]> = { "bank-statement-lines": rows.lines, "bank-statements": rows.statements,
       "account-payments": rows.payments, "account-moves": rows.moves, "account-move-lines": rows.moveLines }
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input), method = init?.method ?? "GET"
