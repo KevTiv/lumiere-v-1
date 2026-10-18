@@ -402,6 +402,11 @@ pub fn session_read_resource(resource: &str) -> bool {
             | "states"
             | "uoms"
             | "uom-categories"
+            | "form-configs"
+            | "form-config-fields"
+            | "form-role-configs"
+            | "form-field-labels"
+            | "user-custom-fields"
     )
 }
 
