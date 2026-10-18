@@ -8,13 +8,19 @@
 /// | **SearchEmbedding** | Vector embeddings for semantic search |
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
+use crate::ai::evidence_source::{
+    ai_evidence_passage, ai_evidence_source_version, AiEvidencePassage, TEXT_PRESENT,
+};
 use crate::core::organization::{company_id_from_scope, require_company_in_organization};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
-use crate::core::queue::{enqueue_job_internal, queue_payload_hash, EnqueueJobParams};
+use crate::core::queue::{
+    complete_queue_job_inner, enqueue_job_internal, queue_job, require_queue_job_worker_authority,
+    CompleteQueueJobParams, EnqueueJobParams,
+};
 use crate::documents::documents::{document, document_version, Document};
-use crate::documents::pack_locale::{document_search_language_for_company, truncate_index_content};
+use crate::documents::pack_locale::document_search_language_for_company;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::{InsightSeverity, JobStatus};
+use crate::types::{InsightSeverity, JobStatus, QueueCompletionOutcome, QueueJobStatus};
 
 fn ensure_insight_in_org(organization_id: u64, insight_org_id: u64) -> Result<(), String> {
     if insight_org_id != organization_id {
@@ -35,6 +41,58 @@ fn ensure_embedding_in_org(organization_id: u64, embedding_org_id: u64) -> Resul
         return Err("Embedding does not belong to this organization".to_string());
     }
     Ok(())
+}
+
+fn require_current_passage(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    content_type: &str,
+    content_id: u64,
+    expected_fingerprint: &str,
+) -> Result<AiEvidencePassage, String> {
+    if content_type != "ai_evidence_passage" {
+        return Err("content_type must be ai_evidence_passage".to_string());
+    }
+    if expected_fingerprint.trim().is_empty() {
+        return Err("expected_fingerprint must not be empty".to_string());
+    }
+
+    let passage = ctx
+        .db
+        .ai_evidence_passage()
+        .id()
+        .find(&content_id)
+        .ok_or("evidence passage not found")?;
+    if passage.organization_id != organization_id || passage.company_id != company_id {
+        return Err("evidence passage does not belong to this tenant scope".to_string());
+    }
+    if passage.status != "current" || passage.text_state != TEXT_PRESENT {
+        return Err("evidence passage is not current and available".to_string());
+    }
+    if passage.content_hash != expected_fingerprint {
+        return Err("expected_fingerprint does not match the evidence passage".to_string());
+    }
+
+    let source_version_id = passage
+        .source_version_id
+        .ok_or("evidence passage has no canonical source version")?;
+    let source_version = ctx
+        .db
+        .ai_evidence_source_version()
+        .id()
+        .find(&source_version_id)
+        .ok_or("evidence passage source version not found")?;
+    if source_version.organization_id != organization_id
+        || source_version.company_id != company_id
+        || source_version.status != "current"
+    {
+        return Err(
+            "evidence passage source version is not current in this tenant scope".to_string(),
+        );
+    }
+
+    Ok(passage)
 }
 
 // ============================================================================
@@ -92,9 +150,8 @@ pub struct CompleteDocumentProcessingJobParams {
 pub struct UpsertSearchEmbeddingParams {
     pub content_type: String,
     pub content_id: u64,
-    pub text: String,
-    pub embedding: Vec<f32>,
-    pub embedding_hash: Option<String>,
+    pub expected_fingerprint: String,
+    pub index_generation: String,
     pub metadata: Option<String>,
 }
 
@@ -186,7 +243,7 @@ pub struct AiDocumentProcessingJob {
     pub metadata: Option<String>,
 }
 
-/// SearchEmbedding — Vector embedding for a piece of content (semantic search)
+/// SearchEmbedding — Derived semantic-index synchronization state.
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = search_embedding,
@@ -202,11 +259,12 @@ pub struct SearchEmbedding {
     pub id: u64,
 
     pub organization_id: u64, // AI-003: Tenant isolation
-    pub content_type: String, // product, contact, document, article, etc.
+    pub content_type: String,
     pub content_id: u64,
-    pub text: String,                   // Original text that was embedded
-    pub embedding: Vec<f32>,            // Vector embedding values (backup copy)
-    pub embedding_hash: Option<String>, // Hash of text for change detection
+    /// Hash of the canonical passage text that the external index must contain.
+    pub expected_fingerprint: String,
+    /// Provider/index generation identity used to make rebuilds explicit.
+    pub index_generation: String,
 
     // Qdrant sync tracking
     pub sync_status: String, // "pending" | "synced" | "failed" | "deleted"
@@ -615,11 +673,13 @@ pub fn approve_document_processing_job(
         return Err("Job must be completed before approval".to_string());
     }
 
-    // Promote approved OCR / extraction into the linked document search index (expenses/AP).
+    // Promote approved OCR / extraction into canonical evidence passages. The
+    // processing job keeps the full result only while it is awaiting review.
     let mut indexed_document_id = None;
+    let mut canonical_evidence = None;
     if let Some(doc_id) = job.document_id {
         if let Some(extracted) = job.extracted_data.as_ref() {
-            let content = truncate_index_content(extracted);
+            let content = extracted.trim().to_string();
             if !content.is_empty() {
                 if let Some(doc) = ctx.db.document().id().find(&doc_id) {
                     if doc.organization_id == organization_id && !doc.is_deleted {
@@ -683,7 +743,6 @@ pub fn approve_document_processing_job(
                             });
                         }
                         ctx.db.document().id().update(Document {
-                            index_content: Some(content.clone()),
                             index_language: language.or(doc.index_language.clone()),
                             metadata: meta,
                             write_uid: ctx.sender(),
@@ -693,18 +752,61 @@ pub fn approve_document_processing_job(
                         let company_id = doc
                             .company_id
                             .ok_or("governed document evidence requires company scope")?;
-                        crate::ai::evidence_source::ingest_document_blob_content(
-                            ctx,
-                            organization_id,
-                            company_id,
-                            doc_id,
-                            &doc.name,
-                            version.version_number,
-                            &version.url,
-                            version.checksum.as_deref(),
-                            &content,
-                            "inspected",
-                        )?;
+                        let (source_version_id, passage_count) =
+                            crate::ai::evidence_source::ingest_document_blob_content(
+                                ctx,
+                                organization_id,
+                                company_id,
+                                doc_id,
+                                &doc.name,
+                                version.version_number,
+                                &version.url,
+                                version.checksum.as_deref(),
+                                &content,
+                                "inspected",
+                            )?;
+                        let source_kind = "document".to_string();
+                        let source_key = format!("document:{doc_id}");
+                        let passages: Vec<_> = ctx
+                            .db
+                            .ai_evidence_passage()
+                            .ai_evidence_passage_by_source()
+                            .filter((&organization_id, &company_id, &source_kind, &source_key))
+                            .filter(|passage| passage.source_version_id == Some(source_version_id))
+                            .collect();
+                        for passage in passages {
+                            let params = UpsertSearchEmbeddingParams {
+                                content_type: "ai_evidence_passage".to_string(),
+                                content_id: passage.id,
+                                expected_fingerprint: passage.content_hash.clone(),
+                                index_generation: "semantic-index-v1".to_string(),
+                                metadata: Some(
+                                    serde_json::json!({
+                                        "sourceKind": &passage.source_kind,
+                                        "sourceKey": &passage.source_key,
+                                        "sourceVersion": &passage.source_version,
+                                        "passageKey": &passage.passage_key,
+                                    })
+                                    .to_string(),
+                                ),
+                            };
+                            upsert_search_embedding_inner(
+                                ctx,
+                                organization_id,
+                                company_id,
+                                params,
+                            )?;
+                            request_embedding_job_inner(
+                                ctx,
+                                organization_id,
+                                company_id,
+                                "ai_evidence_passage",
+                                passage.id,
+                                &passage.content_hash,
+                                "semantic-index-v1",
+                            )?;
+                        }
+                        canonical_evidence = Some((source_version_id, passage_count));
                         indexed_document_id = Some(doc_id);
                     }
                 }
@@ -713,13 +815,41 @@ pub fn approve_document_processing_job(
     }
 
     let job_company_id = job.company_id;
+    let extracted_data = if canonical_evidence.is_some() {
+        None
+    } else {
+        job.extracted_data.clone()
+    };
+    let job_metadata = canonical_evidence.map_or_else(
+        || job.metadata.clone(),
+        |(source_version_id, passage_count)| {
+            let mut metadata = job
+                .metadata
+                .as_deref()
+                .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+                .filter(serde_json::Value::is_object)
+                .unwrap_or_else(|| serde_json::json!({}));
+            if let Some(object) = metadata.as_object_mut() {
+                object.insert(
+                    "canonicalEvidence".to_string(),
+                    serde_json::json!({
+                        "sourceVersionId": source_version_id,
+                        "passageCount": passage_count,
+                    }),
+                );
+            }
+            Some(metadata.to_string())
+        },
+    );
     ctx.db
         .ai_document_processing_job()
         .id()
         .update(AiDocumentProcessingJob {
             is_approved: true,
+            extracted_data,
             reviewed_by: Some(ctx.sender()),
             reviewed_at: Some(ctx.timestamp),
+            metadata: job_metadata,
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
             ..job
@@ -789,6 +919,26 @@ pub fn upsert_search_embedding(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "search_embedding", "create")?;
     let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
+    upsert_search_embedding_inner(ctx, organization_id, operating_company_id, params)
+}
+
+fn upsert_search_embedding_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    operating_company_id: u64,
+    params: UpsertSearchEmbeddingParams,
+) -> Result<(), String> {
+    if params.index_generation.trim().is_empty() {
+        return Err("index_generation must not be empty".to_string());
+    }
+    require_current_passage(
+        ctx,
+        organization_id,
+        operating_company_id,
+        &params.content_type,
+        params.content_id,
+        &params.expected_fingerprint,
+    )?;
     let stored_company_id = Some(operating_company_id);
 
     // Check if an embedding already exists for this content
@@ -801,16 +951,25 @@ pub fn upsert_search_embedding(
 
     if let Some(existing) = existing {
         ensure_embedding_in_org(organization_id, existing.organization_id)?;
+        if existing.expected_fingerprint == params.expected_fingerprint
+            && existing.index_generation == params.index_generation
+            && existing.sync_status == "synced"
+        {
+            return Ok(());
+        }
         // Reset sync_status to "pending" so the gateway re-indexes the updated content
         ctx.db.search_embedding().id().update(SearchEmbedding {
-            text: params.text,
-            embedding: params.embedding,
-            embedding_hash: params.embedding_hash,
+            expected_fingerprint: params.expected_fingerprint,
+            index_generation: params.index_generation,
             sync_status: "pending".to_string(),
+            vector_db_id: None,
+            embedding_model: None,
+            embedding_dim: None,
             last_synced_at: None,
             sync_error: None,
             write_uid: ctx.sender(),
             write_date: ctx.timestamp,
+            metadata: params.metadata,
             ..existing
         });
         log::info!(
@@ -824,9 +983,8 @@ pub fn upsert_search_embedding(
             organization_id,
             content_type: params.content_type.clone(),
             content_id: params.content_id,
-            text: params.text,
-            embedding: params.embedding,
-            embedding_hash: params.embedding_hash,
+            expected_fingerprint: params.expected_fingerprint,
+            index_generation: params.index_generation,
             sync_status: "pending".to_string(),
             vector_db_id: None,
             embedding_model: None,
@@ -896,6 +1054,117 @@ pub fn mark_embedding_synced(
     Ok(())
 }
 
+/// Atomically finalize a successful external-index upsert and its leased job.
+#[reducer]
+pub fn finalize_embedding_job(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: Option<u64>,
+    embedding_id: u64,
+    model: String,
+    dim: u32,
+    job_id: u64,
+    params: CompleteQueueJobParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "search_embedding", "write")?;
+    let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
+    if params.outcome != QueueCompletionOutcome::Succeeded {
+        return Err("embedding finalization requires a successful job outcome".to_string());
+    }
+
+    let embedding = ctx
+        .db
+        .search_embedding()
+        .id()
+        .find(&embedding_id)
+        .ok_or("embedding not found")?;
+    ensure_embedding_in_org(organization_id, embedding.organization_id)?;
+    if embedding.company_id != Some(operating_company_id) {
+        return Err("company_id does not match embedding scope".to_string());
+    }
+    if params.response_fingerprint.as_deref() != Some(embedding.expected_fingerprint.as_str()) {
+        return Err("response_fingerprint does not match canonical passage".to_string());
+    }
+
+    let job = ctx
+        .db
+        .queue_job()
+        .id()
+        .find(&job_id)
+        .ok_or("embedding queue job not found")?;
+    if job.organization_id != organization_id
+        || job.company_id != Some(operating_company_id)
+        || job.queue_name != "embedding"
+        || job.job_type != "embed_content"
+    {
+        return Err("queue job does not match embedding scope".to_string());
+    }
+    require_queue_job_worker_authority(ctx, organization_id, &job.queue_name)?;
+
+    let expected_semantic_key = format!(
+        "embedding:{}:{}:{}:{}",
+        embedding.content_type,
+        embedding.content_id,
+        embedding.expected_fingerprint,
+        embedding.index_generation,
+    );
+    if job.status == QueueJobStatus::Completed && embedding.sync_status == "synced" {
+        let expected_vector_db_id = embedding_id.to_string();
+        if job.semantic_key != expected_semantic_key
+            || embedding.vector_db_id.as_deref() != Some(expected_vector_db_id.as_str())
+            || embedding.embedding_model.as_deref() != Some(model.as_str())
+            || embedding.embedding_dim != Some(dim)
+        {
+            return Err("completed embedding finalization replay does not match".to_string());
+        }
+        return complete_queue_job_inner(ctx, organization_id, job_id, params);
+    }
+    if job.status != QueueJobStatus::Leased || embedding.sync_status != "pending" {
+        return Err("embedding and queue job are not pending finalization".to_string());
+    }
+
+    let payload: serde_json::Value = serde_json::from_str(&job.payload)
+        .map_err(|error| format!("invalid embedding job payload: {error}"))?;
+    let payload_matches = payload.get("operation").and_then(serde_json::Value::as_str)
+        == Some("upsert")
+        && payload
+            .get("company_id")
+            .and_then(serde_json::Value::as_u64)
+            == Some(operating_company_id)
+        && payload
+            .get("content_type")
+            .and_then(serde_json::Value::as_str)
+            == Some(embedding.content_type.as_str())
+        && payload
+            .get("content_id")
+            .and_then(serde_json::Value::as_u64)
+            == Some(embedding.content_id)
+        && payload
+            .get("expected_fingerprint")
+            .and_then(serde_json::Value::as_str)
+            == Some(embedding.expected_fingerprint.as_str())
+        && payload
+            .get("index_generation")
+            .and_then(serde_json::Value::as_str)
+            == Some(embedding.index_generation.as_str())
+        && job.semantic_key == expected_semantic_key;
+    if !payload_matches {
+        return Err("leased queue job does not match embedding state".to_string());
+    }
+    ctx.db.search_embedding().id().update(SearchEmbedding {
+        sync_status: "synced".to_string(),
+        vector_db_id: Some(embedding_id.to_string()),
+        embedding_model: Some(model),
+        embedding_dim: Some(dim),
+        last_synced_at: Some(ctx.timestamp),
+        sync_error: None,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..embedding
+    });
+    complete_queue_job_inner(ctx, organization_id, job_id, params)
+}
+
 /// Soft-delete a search embedding (marks as "deleted" so the AI Gateway removes it from Qdrant).
 /// Preserves the row for audit trail.
 #[reducer]
@@ -942,10 +1211,8 @@ pub(crate) fn delete_search_embedding_inner(
     ensure_embedding_in_org(organization_id, existing.organization_id)?;
 
     let embedding_id = existing.id;
-    let fingerprint = existing
-        .embedding_hash
-        .clone()
-        .unwrap_or_else(|| "unfingerprinted".to_string());
+    let expected_fingerprint = existing.expected_fingerprint.clone();
+    let index_generation = existing.index_generation.clone();
     ctx.db.search_embedding().id().update(SearchEmbedding {
         sync_status: "deleted".to_string(),
         write_uid: ctx.sender(),
@@ -954,11 +1221,12 @@ pub(crate) fn delete_search_embedding_inner(
     });
 
     let payload = format!(
-        r#"{{"operation":"delete","company_id":{},"content_type":"{}","content_id":{},"text":"","fingerprint":{}}}"#,
+        r#"{{"operation":"delete","company_id":{},"content_type":{},"content_id":{},"expected_fingerprint":{},"index_generation":{}}}"#,
         operating_company_id,
-        content_type,
+        serde_json_escape(content_type),
         content_id,
-        serde_json_escape(&fingerprint),
+        serde_json_escape(&expected_fingerprint),
+        serde_json_escape(&index_generation),
     );
     enqueue_job_internal(
         ctx,
@@ -969,7 +1237,7 @@ pub(crate) fn delete_search_embedding_inner(
             job_type: "delete_embedding".to_string(),
             payload,
             semantic_key: format!(
-                "embedding-delete:{content_type}:{content_id}:{fingerprint}:{embedding_id}"
+                "embedding-delete:{content_type}:{content_id}:{expected_fingerprint}:{index_generation}:{embedding_id}"
             ),
             priority: 10,
             max_attempts: 3,
@@ -998,20 +1266,73 @@ pub fn request_embedding_job(
     company_id: Option<u64>,
     content_type: String,
     content_id: u64,
-    text: String,
+    expected_fingerprint: String,
+    index_generation: String,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "search_embedding", "create")?;
     let operating_company_id = company_id_from_scope(ctx, organization_id, company_id)?;
+    request_embedding_job_inner(
+        ctx,
+        organization_id,
+        operating_company_id,
+        &content_type,
+        content_id,
+        &expected_fingerprint,
+        &index_generation,
+    )
+}
 
-    let payload = format!(
-        r#"{{"company_id":{},"content_type":"{}","content_id":{},"text":{}}}"#,
+fn request_embedding_job_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    operating_company_id: u64,
+    content_type: &str,
+    content_id: u64,
+    expected_fingerprint: &str,
+    index_generation: &str,
+) -> Result<(), String> {
+    if index_generation.trim().is_empty() {
+        return Err("index_generation must not be empty".to_string());
+    }
+    require_current_passage(
+        ctx,
+        organization_id,
         operating_company_id,
         content_type,
         content_id,
-        serde_json_escape(&text)
+        expected_fingerprint,
+    )?;
+
+    let content_type_key = content_type.to_string();
+    let embedding = ctx
+        .db
+        .search_embedding()
+        .embedding_by_content()
+        .filter(&content_type_key)
+        .find(|row| row.content_id == content_id && row.company_id == Some(operating_company_id))
+        .ok_or("search embedding state must exist before the job is requested")?;
+    if embedding.organization_id != organization_id
+        || embedding.expected_fingerprint != expected_fingerprint
+        || embedding.index_generation != index_generation
+    {
+        return Err("search embedding state does not match the requested passage".to_string());
+    }
+    if embedding.sync_status == "synced" {
+        return Ok(());
+    }
+    if embedding.sync_status != "pending" {
+        return Err("search embedding state is not pending".to_string());
+    }
+
+    let payload = format!(
+        r#"{{"operation":"upsert","company_id":{},"content_type":{},"content_id":{},"expected_fingerprint":{},"index_generation":{}}}"#,
+        operating_company_id,
+        serde_json_escape(content_type),
+        content_id,
+        serde_json_escape(expected_fingerprint),
+        serde_json_escape(index_generation),
     );
 
-    let input_hash = queue_payload_hash(&payload)?;
     enqueue_job_internal(
         ctx,
         organization_id,
@@ -1020,7 +1341,9 @@ pub fn request_embedding_job(
             queue_name: "embedding".to_string(),
             job_type: "embed_content".to_string(),
             payload,
-            semantic_key: format!("embedding:{content_type}:{content_id}:{input_hash}"),
+            semantic_key: format!(
+                "embedding:{content_type}:{content_id}:{expected_fingerprint}:{index_generation}"
+            ),
             priority: 5,
             max_attempts: 3,
             available_at_micros: None,

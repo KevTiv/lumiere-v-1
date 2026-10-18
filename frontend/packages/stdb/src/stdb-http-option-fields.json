@@ -2305,7 +2305,6 @@
   "Document": [
     "description",
     "checksum",
-    "index_content",
     "access_token",
     "url",
     "res_model",
@@ -3435,7 +3434,6 @@
     "metadata"
   ],
   "SearchEmbedding": [
-    "embedding_hash",
     "vector_db_id",
     "embedding_model",
     "embedding_dim",
@@ -5001,7 +4999,6 @@
     "metadata"
   ],
   "UpsertSearchEmbeddingParams": [
-    "embedding_hash",
     "metadata"
   ],
   "UserCredential": [
