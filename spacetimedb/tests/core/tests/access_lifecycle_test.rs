@@ -4,8 +4,9 @@ use crate::core::auth::{
 };
 use crate::core::permissions::{
     assign_role, build_policy_snapshot_row, create_role, effective_roles, grant_permission, role,
-    update_role, AssignRoleParams, CreateRoleParams, GrantOrgPermissionParams, PermissionAction,
-    PermissionEffect, PermissionSubject, UpdateRoleParams,
+    update_role, user_role_assignment, AssignRoleParams, CreateRoleParams,
+    GrantOrgPermissionParams, PermissionAction, PermissionEffect, PermissionSubject,
+    UpdateRoleParams,
 };
 use crate::core::users::{
     add_user_to_organization, remove_user_from_organization, user_organization,

@@ -983,7 +983,7 @@ pub(crate) fn ensure_resource_fields_writable(
     ctx: &ReducerContext,
     organization_id: u64,
     user_identity: Identity,
-    role_id: u64,
+    _role_id: u64,
     _role_name: &str,
     is_superuser: bool,
     resource: &str,
