@@ -119,7 +119,7 @@ pub(super) async fn preview_margin_supply_outlook(
         caveats: vec![
             "This is a deterministic decision-support scenario. It does not change prices, pricelists, purchase orders, or replenishment rules.".into(),
             "Revenue and unit cost use confirmed/completed sales-order lines in the selected calendar month; cost is the sales-line purchase-price snapshot, not posted accounting COGS.".into(),
-            "Gross-margin totals exclude sales lines whose captured unit cost is zero; those products remain visible with a missing-cost warning.".into(),
+            "Gross-margin totals exclude products with any missing sales-line cost snapshot; those products remain visible with their complete demand and a missing-cost warning.".into(),
             "The cost shock is a manual blended assumption for upstream effects such as supplier, commodity, freight, or FX movement; it is not a live macroeconomic feed.".into(),
             "Demand is projected from the selected month's sold quantity over a 30-day planning horizon. Stock is the current company snapshot at generation time.".into(),
             "Products and lines in currencies other than the company currency, returns, service capacity, tax, overhead, financing, and net profit are excluded.".into(),

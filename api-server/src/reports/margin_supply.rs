@@ -119,7 +119,7 @@ pub fn margin_supply_outlook(
         entry.0 = entry.0.max(rule.product_min_qty.max(0.0));
         entry.1 = entry.1.max(rule.lead_days.max(0));
     }
-    let mut sales_by_product = BTreeMap::<u64, (f64, i64, i64)>::new();
+    let mut sales_by_product = BTreeMap::<u64, (f64, i64, i64, bool)>::new();
     for line in sales.into_iter().filter(|line| {
         line.currency_id == currency_id && line.display_type.is_none() && line.product_uom_qty > 0.0
     }) {
@@ -128,6 +128,7 @@ pub fn margin_supply_outlook(
         entry.0 += line.product_uom_qty;
         entry.1 += money_minor(line.price_subtotal);
         entry.2 += money_minor(line.purchase_price.max(0.0) * line.product_uom_qty);
+        entry.3 |= !line.purchase_price.is_finite() || line.purchase_price <= 0.0;
     }
 
     let demand_factor = 1.0 + scenario.demand_change_pct / 100.0;
@@ -135,10 +136,10 @@ pub fn margin_supply_outlook(
     let target_margin_ratio = scenario.target_margin_pct / 100.0;
     let mut lines = Vec::with_capacity(sales_by_product.len());
 
-    for (product_id, (quantity, revenue_minor, cost_minor)) in sales_by_product {
+    for (product_id, (quantity, revenue_minor, cost_minor, missing_cost)) in sales_by_product {
         let stressed_revenue_minor = scale_money(revenue_minor, demand_factor);
         let stressed_cost_minor = scale_money(cost_minor, demand_factor * cost_factor);
-        let has_cost_baseline = cost_minor > 0;
+        let has_cost_baseline = cost_minor > 0 && !missing_cost;
         let baseline_profit_minor = has_cost_baseline
             .then_some(revenue_minor - cost_minor)
             .unwrap_or(0);
@@ -185,7 +186,7 @@ pub fn margin_supply_outlook(
         };
 
         let mut warning_codes = Vec::new();
-        if cost_minor <= 0 {
+        if !has_cost_baseline {
             warning_codes.push("MISSING_COST_BASELINE");
         }
         if stressed_margin_pct.is_some_and(|margin| margin < scenario.target_margin_pct) {
@@ -255,20 +256,22 @@ pub fn margin_supply_outlook(
 
     let baseline_revenue_minor: i64 = lines
         .iter()
-        .filter(|line| line.baseline_cost.minor_units > 0)
+        .filter(|line| !line.warning_codes.contains(&"MISSING_COST_BASELINE"))
         .map(|line| line.baseline_revenue.minor_units)
         .sum();
     let baseline_cost_minor: i64 = lines
         .iter()
+        .filter(|line| !line.warning_codes.contains(&"MISSING_COST_BASELINE"))
         .map(|line| line.baseline_cost.minor_units)
         .sum();
     let stressed_revenue_minor: i64 = lines
         .iter()
-        .filter(|line| line.baseline_cost.minor_units > 0)
+        .filter(|line| !line.warning_codes.contains(&"MISSING_COST_BASELINE"))
         .map(|line| line.stressed_revenue.minor_units)
         .sum();
     let stressed_cost_minor: i64 = lines
         .iter()
+        .filter(|line| !line.warning_codes.contains(&"MISSING_COST_BASELINE"))
         .map(|line| line.stressed_cost.minor_units)
         .sum();
     let baseline_profit_minor = baseline_revenue_minor - baseline_cost_minor;
@@ -454,6 +457,78 @@ mod tests {
         assert_eq!(report.baseline_gross_profit.minor_units, 0);
         assert_eq!(report.baseline_margin_pct, None);
         assert!(report.lines[0]
+            .warning_codes
+            .contains(&"MISSING_COST_BASELINE"));
+    }
+
+    #[test]
+    fn excludes_mixed_cost_coverage_without_losing_product_demand() {
+        let sale = |product_id, quantity, revenue, cost| MarginSaleLineRow {
+            product_id,
+            product_template_id: None,
+            product_uom_qty: quantity,
+            price_subtotal: revenue,
+            purchase_price: cost,
+            currency_id: 7,
+            display_type: None,
+        };
+        let report = margin_supply_outlook(
+            vec![
+                sale(1, 2.0, 200.0, 60.0),
+                sale(1, 1.0, 100.0, 0.0),
+                sale(2, 1.0, 100.0, 50.0),
+            ],
+            vec![],
+            vec![],
+            vec![],
+            7,
+            scenario(),
+        );
+
+        let incomplete = report
+            .lines
+            .iter()
+            .find(|line| line.product_id == 1)
+            .unwrap();
+        assert_eq!(incomplete.quantity_sold, 3.0);
+        assert!(incomplete.projected_stock_shortfall > 0.0);
+        assert!(incomplete.warning_codes.contains(&"MISSING_COST_BASELINE"));
+        assert_eq!(incomplete.baseline_margin_pct, None);
+        assert_eq!(incomplete.stressed_margin_pct, None);
+        assert_eq!(incomplete.target_unit_price, None);
+        assert_eq!(incomplete.profit_at_risk.minor_units, 0);
+        assert_eq!(report.baseline_revenue.minor_units, 10_000);
+        assert_eq!(report.baseline_cost.minor_units, 5_000);
+        assert_eq!(report.baseline_gross_profit.minor_units, 5_000);
+        assert_eq!(report.stressed_revenue.minor_units, 11_000);
+        assert_eq!(report.stressed_cost.minor_units, 6_600);
+        assert_eq!(report.stressed_gross_profit.minor_units, 4_400);
+        assert_eq!(report.profit_at_risk.minor_units, 600);
+    }
+
+    #[test]
+    fn retains_known_costs_when_a_product_has_no_revenue() {
+        let report = margin_supply_outlook(
+            vec![MarginSaleLineRow {
+                product_id: 1,
+                product_template_id: None,
+                product_uom_qty: 1.0,
+                price_subtotal: 0.0,
+                purchase_price: 50.0,
+                currency_id: 7,
+                display_type: None,
+            }],
+            vec![],
+            vec![],
+            vec![],
+            7,
+            MarginSupplyScenario::default(),
+        );
+
+        assert_eq!(report.baseline_margin_pct, None);
+        assert_eq!(report.baseline_cost.minor_units, 5_000);
+        assert_eq!(report.baseline_gross_profit.minor_units, -5_000);
+        assert!(!report.lines[0]
             .warning_codes
             .contains(&"MISSING_COST_BASELINE"));
     }
