@@ -1648,13 +1648,14 @@ mod tests {
     fn resolve_http_sql_columns_exposes_helpdesk_lifecycle_without_customer_pii() {
         let cols =
             resolve_http_sql_columns("helpdesk-tickets", None).expect("helpdesk-tickets columns");
-        for field in ["state", "priority"] {
+        // The declared lifecycle projection includes the assignee ID for assignment readback.
+        for field in ["state", "priority", "user_id"] {
             assert!(
                 cols.iter().any(|column| column == field),
                 "expected {field} in helpdesk-tickets projection, got: {cols:?}"
             );
         }
-        for field in ["description", "partner_name", "partner_email", "user_id"] {
+        for field in ["description", "partner_name", "partner_email"] {
             assert!(
                 !cols.iter().any(|column| column == field),
                 "{field} must remain excluded from the default helpdesk projection: {cols:?}"
