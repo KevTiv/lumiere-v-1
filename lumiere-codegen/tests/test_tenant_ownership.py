@@ -56,15 +56,15 @@ def full_manifest(**overrides):
         }
     )
     tables = [manifest(name=name)["tables"][0] for name in protocol]
-    tables.extend(manifest(name=f"application_{index:03d}")["tables"][0] for index in range(509))
+    tables.extend(manifest(name=f"application_{index:03d}")["tables"][0] for index in range(510))
     result = {
         "version": 1,
         "tables": tables,
         "enum_types": [],
         "ownership_summary": {
             "verified": True,
-            "erp_owned_count": 514,
-            "application_relation_count": 509,
+            "erp_owned_count": 515,
+            "application_relation_count": 510,
             "protocol_relation_count": 5,
             "platform_global_count": 0,
             "platform_global_tables": [],
@@ -114,7 +114,7 @@ class TenantOwnershipTest(unittest.TestCase):
         self.assertIn("organization_id", result.stderr)
 
     def test_accepts_full_application_and_protocol_census(self):
-        result = self.run_checker(full_manifest(), expected_table_count=514)
+        result = self.run_checker(full_manifest(), expected_table_count=515)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_rejects_stale_452_11_summary(self):
@@ -127,7 +127,7 @@ class TenantOwnershipTest(unittest.TestCase):
                     "platform_global_tables": [],
                 }
             ),
-            expected_table_count=514,
+            expected_table_count=515,
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("erp_owned_count", result.stderr)
@@ -135,15 +135,15 @@ class TenantOwnershipTest(unittest.TestCase):
     def test_rejects_old_census_missing_four_application_relations(self):
         schema = full_manifest()
         schema["tables"] = schema["tables"][:-4]
-        schema["ownership_summary"]["erp_owned_count"] = 510
-        result = self.run_checker(schema, expected_table_count=514)
+        schema["ownership_summary"]["erp_owned_count"] = 511
+        result = self.run_checker(schema, expected_table_count=515)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("requires 514 schema tables, found 510", result.stderr)
+        self.assertIn("requires 515 schema tables, found 511", result.stderr)
 
     def test_rejects_missing_protocol_relation_in_full_census(self):
         schema = full_manifest()
         schema["tables"][0] = manifest(name="extra_application")["tables"][0]
-        result = self.run_checker(schema, expected_table_count=514)
+        result = self.run_checker(schema, expected_table_count=515)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("missing protocol relations", result.stderr)
 

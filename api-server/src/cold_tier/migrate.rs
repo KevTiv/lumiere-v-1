@@ -205,7 +205,7 @@ pub const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 18,
-        name: "bank_statement_settlement_lifecycle",
+        name: "durable_invite_acceptance_receipts",
         change_set: 10,
         phase: MigrationPhase::Expand,
         sql: include_str!(

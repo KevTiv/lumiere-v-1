@@ -23,7 +23,8 @@
     "organization_reconstruction_fence": "recreate",
     "project_earned_value_snapshot": "restore",
     "resource_capacity_snapshot": "restore",
-    "resource_utilisation_snapshot": "restore"
+    "resource_utilisation_snapshot": "restore",
+    "user_invite_acceptance": "restore"
   },
   "recreated_state": {
     "cold_tier_service_identity": "Register target-local platform service bindings through trusted operator workflows; never restore privileged identities from a source cell.",
