@@ -505,6 +505,9 @@ pub fn test_bank_statement_settlement_exact_effect(ctx: &ReducerContext) -> Resu
 /// A real published approval workflow must hold the payment in draft. Human
 /// approval posts it, and only an explicit continuation settles the bank line.
 pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::core::permissions::{
+        org_permission, OrgPermission, PermissionAction, PermissionEffect, PermissionSubject,
+    };
     use crate::core::users::UserOrganization;
     use crate::workflow::approvals::{
         decide_workflow_human_task_for_actor, workflow_human_task, DecideWorkflowHumanTaskParams,
@@ -747,7 +750,7 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
                 }),
                 task_policy: (key == "approve").then(|| WorkflowTaskPolicy {
                     kind: WorkflowHumanTaskKind::ApproveReject,
-                    assignment: WorkflowTaskAssignment::AllCandidates,
+                    assignment: WorkflowTaskAssignment::AnyCandidate,
                     candidate_role_ids: vec![role_id],
                     candidate_group_ids: vec![],
                     candidate_unit_ids: vec![],
@@ -845,23 +848,79 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
         .id()
         .find(&task.workflow_instance_id)
         .ok_or("payment approval instance missing")?;
-    decide_workflow_human_task_for_actor(
-        ctx,
-        org,
-        actor,
-        DecideWorkflowHumanTaskParams {
-            company_id,
-            task_id: task.id,
-            expected_task_revision: task.revision,
-            expected_instance_revision: instance.revision,
-            decision: WorkflowHumanTaskDecision::Approve,
-            acting_for: None,
-            comment: Some("approve exact bank amount".to_string()),
-            idempotency_key: format!("approve-bank-payment-{payment_id}"),
-            correlation_id: "bank-settlement-test".to_string(),
-            causation_id: None,
-        },
-    )?;
+    let approve = DecideWorkflowHumanTaskParams {
+        company_id,
+        task_id: task.id,
+        expected_task_revision: task.revision,
+        expected_instance_revision: instance.revision,
+        decision: WorkflowHumanTaskDecision::Approve,
+        acting_for: None,
+        comment: Some("approve exact bank amount".to_string()),
+        idempotency_key: format!("approve-bank-payment-{payment_id}"),
+        correlation_id: "bank-settlement-test".to_string(),
+        causation_id: None,
+    };
+    // The task actor is a separate authorized approver. Domain adapters use the
+    // real reducer sender, whose explicit financial capability must still yield
+    // to an accounting-module deny before ledger or approval evidence is written.
+    let financial_membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == org)
+        .ok_or("financial executor membership missing")?;
+    let financial_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&financial_membership.role_id)
+        .ok_or("financial executor role missing")?;
+    ctx.db.role().id().update(Role {
+        permissions: vec!["payment:post".to_string(), "account_move:write".to_string()],
+        ..financial_role.clone()
+    });
+    let financial_profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
+        .ok_or("financial executor profile missing")?;
+    let financial_profile_id = financial_profile.id;
+    let financial_was_superuser = financial_profile.is_superuser;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..financial_profile
+    });
+    let module_deny = ctx.db.org_permission().insert(OrgPermission {
+        id: 0,
+        organization_id: org,
+        subject: PermissionSubject::User(ctx.sender()),
+        role_id: None,
+        resource: "module:accounting".to_string(),
+        action: PermissionAction::All,
+        effect: PermissionEffect::Deny,
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+    });
+    let before_module_denial = super::bank_settlement_lifecycle_test::snapshot(ctx, org)?;
+    let module_denied = decide_workflow_human_task_for_actor(ctx, org, actor, approve.clone());
+    if !matches!(module_denied,Err(ref error) if error.contains("Permission denied: post on payment"))
+        || super::bank_settlement_lifecycle_test::snapshot(ctx, org)? != before_module_denial
+    {
+        return Err("accounting-module denial did not block the inner bank payment post before all financial, approval, receipt and durable writes".to_string());
+    }
+    ctx.db.org_permission().id().delete(&module_deny.id);
+    // The same reviewed request succeeds with explicit payment:post, while the
+    // reducer sender is still a normal user; account_payment CRUD is insufficient.
+    decide_workflow_human_task_for_actor(ctx, org, actor, approve)?;
+    ctx.db.role().id().update(financial_role);
+    let financial_profile = ctx
+        .db
+        .user_profile()
+        .id()
+        .find(&financial_profile_id)
+        .ok_or("financial executor profile missing after approval")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: financial_was_superuser,
+        ..financial_profile
+    });
     if ctx
         .db
         .account_payment()
