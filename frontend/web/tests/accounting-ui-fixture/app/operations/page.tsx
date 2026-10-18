@@ -19,6 +19,7 @@ import { invoiceEmailDocumentKey, invoiceEmailScope, type InvoiceEmailDocument }
 import type { AccountMove } from "../../../../../packages/ui/src/lib/accounting-types"
 import type { ModuleDataState } from "../../../../../packages/ui/src/lib/module-data-state"
 import { webApi } from "../../../../lib/lumiere-web-http"
+import { BankLifecycleFixture } from "./bank-lifecycle-fixture"
 const PaymentOperationsPanel = dynamic(() => import("../../../../app/(modules)/accounting/payment-operations-panel").then((module) => module.PaymentOperationsPanel), { ssr: false, loading: () => <p role="status">Loading actual payment operations…</p> })
 
 const NOW = new Date("2026-10-18T12:00:00Z")
@@ -78,6 +79,9 @@ function Operations() {
   const [imports, setImports] = useState(0)
   const [bankLocked, setBankLocked] = useState(false)
   const [paymentLocked, setPaymentLocked] = useState(false)
+  const [lifecycleLocked, setLifecycleLocked] = useState(false)
+  const [lifecycleScenario, setLifecycleScenario] = useState<"closed" | "posted">("closed")
+  const [actorKey, setActorKey] = useState("synthetic-accountant")
   const [bankDispatches, setBankDispatches] = useState(0)
   const [bankChecks, setBankChecks] = useState(0)
   const bankResolve = useRef<((outcome: ReconciliationOutcome) => void) | null>(null)
@@ -91,7 +95,8 @@ function Operations() {
     const control = new BroadcastChannel("synthetic-alpha-operations-controls")
     control.onmessage = (event) => {
       if (event.data === "11" || event.data === "22") switchCompany(event.data)
-      else if (["collections", "bills", "import", "bank", "payments"].includes(event.data)) setStage(event.data)
+      else if (event.data === "actor-1" || event.data === "actor-2") setActorKey(event.data === "actor-1" ? "synthetic-accountant" : "other-accountant")
+      else if (["collections", "bills", "import", "bank", "payments", "bank-lifecycle"].includes(event.data)) setStage(event.data)
     }
     return () => control.close()
   }, [setActiveCompanyId])
@@ -102,11 +107,12 @@ function Operations() {
     <h1 className="text-2xl font-semibold">Accounting operational reviews</h1>
     <div className="flex flex-wrap gap-2" aria-label="Synthetic operation controls">
       <Button onClick={() => switchCompany(companyId === "11" ? "22" : "11")}>Switch synthetic company</Button>
+      <Button disabled={lifecycleLocked} onClick={() => { setLifecycleScenario("posted"); setStage("bank-lifecycle") }}>Load posted bank lifecycle</Button>
       <Button onClick={() => setSourceStatus("error")}>Set source error</Button><Button onClick={() => setSourceStatus("denied")}>Set source denied</Button><Button onClick={() => setSourceStatus("ready")}>Restore source</Button>
       <Button onClick={() => bankResolve.current?.({ status: "unknown", message: "Synthetic response lost; check the original settlement." })}>Resolve pending bank as unknown</Button>
     </div>
     <output className="block break-words text-sm" data-testid="operations-state">Company {companyId}; selected {selected || "none"}; imports {imports}; bank dispatches {bankDispatches}; bank checks {bankChecks}; bank lock {String(bankLocked)}; payment lock {String(paymentLocked)}; queued {queued || "none"}</output>
-    <nav aria-label="Operational review workspaces" className="flex flex-wrap gap-2">{["collections", "bills", "import", "bank", "payments"].map((id) => <Button key={id} variant={stage === id ? "default" : "outline"} onClick={() => setStage(id)}>{id === "collections" ? "Collections" : id === "bills" ? "Bill intake" : id === "import" ? "Import source" : id === "bank" ? "Bank recovery" : "Payment allocation"}</Button>)}</nav>
+    <nav aria-label="Operational review workspaces" className="flex flex-wrap gap-2">{["collections", "bills", "import", "bank", "payments", "bank-lifecycle"].map((id) => <Button key={id} variant={stage === id ? "default" : "outline"} onClick={() => setStage(id)}>{id === "collections" ? "Collections" : id === "bills" ? "Bill intake" : id === "import" ? "Import source" : id === "bank" ? "Bank recovery" : id === "payments" ? "Payment allocation" : "Bank approval recovery"}</Button>)}</nav>
     {stage === "collections" ? <CollectionsWorkspace invoices={invoices} scope={{ organizationId: "7", companyId }} dataState={sourceState} currencyOptions={currencies} canReview now={NOW} onReviewReminder={(invoice) => {
       setSelected(String(invoice.id))
       setReminder({ organizationId: 7n, companyId: BigInt(companyId), moveId: BigInt(invoice.id), reference: invoice.name || "Invoice", partner: invoice.invoicePartnerDisplayName || "Customer", companyName: `Synthetic Company ${companyId}`, totalLabel: `Currency ${invoice.currencyId} ${invoice.amountResidual}`, pdfFilename: "synthetic-invoice.pdf", posted: true, revision: "synthetic-1" }); setReminderOpen(true)
@@ -116,7 +122,7 @@ function Operations() {
     {importOpen ? <CsvImportModal organizationId={7n} companyId={BigInt(companyId)} tableName="account_move_line" config={{ id: "synthetic-accounting-import", title: "Review accounting source import", submitLabel: "Import reviewed source", cancelLabel: "Close import review", sections: [] }} onClose={() => setImportOpen(false)} onImport={() => { setImports((count) => count + 1); setImportOpen(false) }} /> : null}
     {stage === "bank" || bankLocked ? <section className="space-y-3" aria-label="Retained bank recovery">
       {stage !== "bank" ? <p role="status">Original bank recovery remains mounted while its result is pending or unknown.</p> : null}
-      <ReconciliationWorkbench source={{ ...bankSource, companyId, state: sourceState }} canReconcile onOperationLockChange={setBankLocked} onConfirm={(request) => { bankRequest.current = request; setBankDispatches((count) => count + 1); return new Promise((resolve) => { bankResolve.current = resolve }) }} onCheckStatus={async (request) => {
+      <ReconciliationWorkbench actorKey="synthetic-accountant" source={{ ...bankSource, companyId, state: sourceState }} canReconcile onOperationLockChange={setBankLocked} onConfirm={(request) => { bankRequest.current = request; setBankDispatches((count) => count + 1); return new Promise((resolve) => { bankResolve.current = resolve }) }} onCheckStatus={async (request) => {
         if (JSON.stringify(request) !== JSON.stringify(bankRequest.current)) throw new Error("Original settlement request changed")
         setBankChecks((count) => count + 1); return companyId === request.companyId ? "confirmed" : "unconfirmed"
       }} />
@@ -124,6 +130,10 @@ function Operations() {
     {stage === "payments" || paymentLocked ? <section className="space-y-3" aria-label="Retained payment allocation">
       {stage !== "payments" ? <p role="status">Original payment allocation remains mounted while its result is pending or unknown.</p> : null}
       <PaymentOperationsPanel organizationId={7} companyId={BigInt(companyId)} defaultCurrencyId={1n} currencyOptions={currencies} journalOptions={[{ value: "5", label: "EUR bank" }]} glAccountOptions={[{ value: "401", label: "Receivables" }]} partnerOptions={[{ value: "601", label: "Canonical customer" }]} moveLines={openInvoiceLines} onRecoveryLockChange={setPaymentLocked} />
+    </section> : null}
+    {stage === "bank-lifecycle" || lifecycleLocked ? <section className="space-y-3" aria-label="Retained bank lifecycle recovery">
+      {stage !== "bank-lifecycle" ? <p role="status">Original bank approval recovery remains mounted while pending or awaiting approval.</p> : null}
+      <BankLifecycleFixture key={lifecycleScenario} scenario={lifecycleScenario} actorKey={actorKey} source={{ ...bankSource, companyId, state: sourceState }} onLockChange={setLifecycleLocked} />
     </section> : null}
     {reminder ? <InvoiceEmailReviewDialog open={reminderOpen} purpose="reminder" document={reminder} currentScopeKey={activeDocument ? invoiceEmailScope(activeDocument) : "other-company"} currentDocumentKey={activeDocument ? invoiceEmailDocumentKey(activeDocument) : null} templates={[{ id: 101n, organizationId: 7n, companyId: 11n, name: "Synthetic reminder base", model: "account_move", subject: "Invoice reminder", bodyHtml: "Please review your outstanding invoice.", isDefault: true, isActive: true, attachDocument: false }]} templateState={sourceState} canQueue canCheck onQueue={async (submission, mayDispatch) => { if (!mayDispatch()) return { status: "rejected", message: "Synthetic scope changed" }; setQueued(`${submission.document.moveId}:${submission.recipient}`); return { status: "queued", messageId: 701n, submission } }} onCheck={async (submission) => ({ status: "queued", messageId: 701n, submission })} onReviewPdf={async () => {}} onReloadTemplates={() => setSourceStatus("ready")} onClose={() => setReminderOpen(false)} /> : null}
   </main>

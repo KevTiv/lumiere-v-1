@@ -19,6 +19,8 @@ import {
 } from "@lumiere/erp-shared/accounting-create-params"
 import { stdbParamsToJson, encodeOptionalU64 } from "@lumiere/erp-shared/stdb-params-json"
 import { parseStrictU64, scalarToU64 as toScalarU64 } from "@lumiere/erp-shared/u64"
+import { hasBankSettlementAttempt, type BankSettlementRecoveryRequest } from "@lumiere/erp-shared/bank-settlement-lifecycle"
+import { resolveBankSettlementLifecycleEffect, type BankSettlementLifecycleEffect } from "./bank-settlement-effect"
 import type {
   AccountFiscalYear,
   AccountPeriod,
@@ -63,7 +65,7 @@ import {
 } from "../stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
-import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import { httpResponseError, responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 import { AmbiguousOperationEffectError, type CanonicalRecordRef } from "../operation-effect"
 
 export type BankStatementImportWorkspace = {
@@ -509,6 +511,13 @@ export function useReconcileAccountBankStatementLine(organizationId: number, com
         fetchQueryList("/api/query/account-moves", "Failed to read bank settlement journal entries"),
         fetchQueryList("/api/query/account-move-lines", "Failed to read bank settlement balances"),
       ])
+      const lifecycle = resolveBankSettlementLifecycleEffect({ lines, statements, payments, moves, moveLines }, {
+        organizationId: String(organizationId), companyId: String(companyId), lineId: String(args.lineId),
+      })
+      if (lifecycle) return lifecycle
+      if (lines.some((line) => parseStrictU64(line.id) === args.lineId && hasBankSettlementAttempt(line.metadata))) {
+        throw new Error("Bank settlement lifecycle and financial result did not read back exactly")
+      }
       const effect = resolveBankStatementSettlementEffect(lines, statements, { payments, moves, moveLines }, {
         organizationId: BigInt(organizationId),
         companyId,
@@ -518,6 +527,69 @@ export function useReconcileAccountBankStatementLine(organizationId: number, com
       })
       if (!effect) throw new Error("Bank settlement financial result did not read back exactly")
       return effect
+    },
+    onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
+  })
+}
+
+/** Read-only recovery uses explicit company filters and never submits an operation. */
+export async function readBankStatementSettlementLifecycle(
+  organizationId: string,
+  companyId: string,
+  lineId: string,
+  request?: BankSettlementRecoveryRequest,
+): Promise<BankSettlementLifecycleEffect | null> {
+  const suffix = `?companyId=${encodeURIComponent(companyId)}`
+  const [lines, statements, payments, moves, moveLines] = await Promise.all([
+    fetchQueryList(`/api/query/bank-statement-lines${suffix}`, "Could not check the original bank line"),
+    fetchQueryList(`/api/query/bank-statements${suffix}`, "Could not check the original statement"),
+    fetchQueryList(`/api/query/account-payments${suffix}`, "Could not check the original bank payment"),
+    fetchQueryList(`/api/query/account-moves${suffix}`, "Could not check the original journal entries"),
+    fetchQueryList(`/api/query/account-move-lines${suffix}`, "Could not check the original financial balances"),
+  ])
+  return resolveBankSettlementLifecycleEffect({ lines, statements, payments, moves, moveLines }, { organizationId, companyId, lineId, request })
+}
+
+export async function recoverBankStatementSettlement(
+  request: BankSettlementRecoveryRequest,
+  mayDispatch: () => boolean,
+): Promise<BankSettlementLifecycleEffect> {
+  if (!mayDispatch()) throw Object.assign(new Error("Return to the original user and company before recovering this settlement."), { status: 409 })
+  if ([request.organizationId, request.companyId, request.lineId, request.paymentId, ...request.moveLineIds].some((value) => {
+    const parsed = parseStrictU64(value)
+    return parsed == null || parsed <= 0n || parsed > BigInt(Number.MAX_SAFE_INTEGER)
+  })) throw Object.assign(new Error("This record identifier is not supported by the current command transport. No recovery was submitted."), { status: 400 })
+  const common = { paymentId: BigInt(request.paymentId), idempotencyKey: request.idempotencyKey, reason: request.reason }
+  const command = request.action === "abandon"
+    ? stdbBffCommandPost("abandon_bank_statement_settlement", {
+      companyId: BigInt(request.companyId), lineId: BigInt(request.lineId),
+      params: stdbParamsToJson(common, "AbandonBankStatementSettlementParams"),
+    })
+    : request.action === "resubmit"
+      ? stdbBffCommandPost("resubmit_bank_statement_settlement", {
+        companyId: BigInt(request.companyId), lineId: BigInt(request.lineId),
+        params: stdbParamsToJson({ ...common, moveIds: request.moveLineIds.map(BigInt) }, "ResubmitBankStatementSettlementParams"),
+      })
+      : stdbBffCommandPost("reverse_bank_statement_settlement", {
+        companyId: BigInt(request.companyId), lineId: BigInt(request.lineId),
+        params: stdbParamsToJson({ ...common, date: { microsSinceUnixEpoch: BigInt(request.dateMicros!) } }, "ReverseBankStatementSettlementParams"),
+      })
+  if (!mayDispatch()) throw Object.assign(new Error("The original settlement review is no longer active."), { status: 409 })
+  const response = await apiFetch(command.urlPath, command.init)
+  if (!response.ok) throw await httpResponseError(response, "The bank settlement recovery was not confirmed")
+  const effect = await readBankStatementSettlementLifecycle(request.organizationId, request.companyId, request.lineId, request)
+  if (!mayDispatch() || !effect) throw new Error("The original recovery result did not read back exactly. Keep this request and check its status.")
+  return effect
+}
+
+export function useRecoverBankStatementSettlement(organizationId: number, companyId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ request, mayDispatch }: { request: BankSettlementRecoveryRequest; mayDispatch: () => boolean }) => {
+      if (request.organizationId !== String(organizationId) || request.companyId !== String(companyId)) {
+        throw Object.assign(new Error("This recovery belongs to a different organization or company."), { status: 409 })
+      }
+      return recoverBankStatementSettlement(request, mayDispatch)
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
   })

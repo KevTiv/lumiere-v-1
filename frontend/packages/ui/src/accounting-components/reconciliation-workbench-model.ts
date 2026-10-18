@@ -11,6 +11,7 @@ export interface ReconciliationBankLineSource {
   date?: unknown; amount?: unknown; amountCurrency?: unknown; currencyId?: unknown
   journalCurrencyId?: unknown; foreignCurrencyId?: unknown; isReconciled?: unknown
   partnerId?: unknown; accountNumber?: unknown; transactionType?: unknown; moveIds?: readonly unknown[]
+  paymentIds?: readonly unknown[]; metadata?: unknown
 }
 export interface ReconciliationMoveLineSource extends ScopedRow {
   moveId?: unknown; accountId?: unknown; name?: unknown; ref?: unknown; ref_?: unknown
@@ -92,6 +93,28 @@ function uniqueRows<Row extends { id?: unknown }>(rows: readonly Row[]): Map<str
     if (result.has(id)) { result.delete(id); duplicate.add(id) } else result.set(id, row)
   }
   return result
+}
+
+/** Recovery context is independent of new-match eligibility and includes posted statements. */
+export function reconciliationLifecycleContext(source: ReconciliationSource): ReconciliationContext | null {
+  if (source.state.status !== "ready") return null
+  const organizationId = reconciliationId(source.organizationId), companyId = reconciliationId(source.companyId), currencyId = reconciliationId(source.companyCurrencyId)
+  const statement = source.statement, focusedId = reconciliationId(source.line?.id)
+  const line = focusedId ? uniqueRows(source.bankLines).get(focusedId) : undefined
+  if (!organizationId || !companyId || !currencyId || !statement || !line || !inScope(statement, organizationId, companyId)
+    || !["Open", "Posted"].includes(tag(statement.state))) return null
+  const statementId = reconciliationId(statement.id), lineId = reconciliationId(line.id), journalId = reconciliationId(statement.journalId)
+  const bankAmount = amount(line.amount), currency = uniqueRows(source.currencies).get(currencyId), decimalPlaces = amount(currency?.decimalPlaces)
+  if (!statementId || !lineId || !journalId || reconciliationId(line.organizationId) !== organizationId || reconciliationId(line.statementId) !== statementId
+    || reconciliationId(line.journalId) !== journalId || bankAmount == null || bankAmount === 0 || decimalPlaces == null
+    || !Number.isInteger(decimalPlaces) || decimalPlaces < 0 || decimalPlaces > 6 || amount(currency?.roundingFactor) !== 10 ** -decimalPlaces
+    || minorUnits(bankAmount, decimalPlaces) == null || reconciliationId(statement.currencyId) !== currencyId
+    || reconciliationId(line.journalCurrencyId) !== currencyId || !(line.currencyId === null || reconciliationId(line.currencyId) === currencyId)
+    || line.foreignCurrencyId !== null) return null
+  const code = text(currency?.code).trim().toUpperCase()
+  return { key: [organizationId, companyId, statementId, lineId].join(":"), organizationId, companyId, statementId, lineId,
+    statementLabel: text(statement.name) || text(statement.reference) || `Statement #${statementId}`, lineLabel: text(line.transactionType) || `Bank line #${lineId}`,
+    amount: bankAmount, currencyId, decimalPlaces, ...(/^[A-Z]{3}$/.test(code) ? { currencyCode: code } : {}) }
 }
 
 /**

@@ -6,10 +6,12 @@ import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
 import { useInvoicePersonalization } from "@lumiere/query-hooks/hooks/invoice-personalization"
 import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from "@lumiere/erp-shared/invoice-personalization"
 import { formatInvoiceMoney, resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
-import { ReconciliationWorkbench, type ReconciliationOutcome } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench"
+import { ReconciliationWorkbench, type ReconciliationOutcome, type ReconciliationStatusResult } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench"
 import type { ReconciliationRequest, ReconciliationSource } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench-model"
 import { bankLineFromQueryRow, canDispatchReviewedBankLink } from "./bank-link-review"
-import { resolveBankStatementSettlementEffect } from "@lumiere/query-hooks/hooks/accounting/bank-statements"
+import { resolveBankStatementSettlementEffect, useRecoverBankStatementSettlement } from "@lumiere/query-hooks/hooks/accounting/bank-statements"
+import { resolveBankSettlementLifecycleEffect } from "@lumiere/query-hooks/hooks/accounting/bank-settlement-effect"
+import { bankSettlementAttempt, bankSettlementRecoveryAllowed, bankSettlementRecoveryCorrelates, hasBankSettlementAttempt, type BankSettlementRecoveryAction, type BankSettlementRecoveryRequest } from "@lumiere/erp-shared/bank-settlement-lifecycle"
 import { CollectionsWorkspace } from "../../../../packages/ui/src/accounting-components/collections-workspace"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -2287,6 +2289,7 @@ function AccountingClientReady({
   const updateBankStatementLine = useUpdateAccountBankStatementLine(organizationId, operatingCompanyId)
   const deleteBankStatementLine = useDeleteAccountBankStatementLine(organizationId, operatingCompanyId)
   const reconcileBankLine = useReconcileAccountBankStatementLine(organizationId, operatingCompanyId)
+  const recoverBankSettlement = useRecoverBankStatementSettlement(organizationId, operatingCompanyId)
   const unreconcileBankLine = useUnreconciledAccountBankStatementLine(organizationId, operatingCompanyId)
   const createReconciliationWidget = useCreateAccountReconciliationWidget(organizationId, operatingCompanyId)
   const updateReconciliationWidget = useUpdateAccountReconciliationWidget(organizationId, operatingCompanyId)
@@ -4456,19 +4459,27 @@ function AccountingClientReady({
     bankLines: bankLinkLines, moves: allMoves, moveLines: accountMoveLines,
     accounts, currencies, suggestions: bankMatchCandidates, partners: contacts,
   }
-  const bankLinkAccess = useRef({ source: bankLinkSource, allowed: false })
+  const bankLinkAccess = useRef({ source: bankLinkSource, allowed: false, recovery: { abandon: false, resubmit: false, reverse: false }, actorKey: currentUser?.id ?? null })
   // Posting/reconciliation are exact backend payment actions beyond the UI CRUD vocabulary.
-  const canLinkBankRecords = companyAvailable && checkPermission("account_bank_statement_line", "write").allowed
+  const canCreateBankSettlement = companyAvailable && checkPermission("account_bank_statement_line", "write").allowed
     && checkPermission("payment", "create").allowed
     && checkPermission("payment", "post").allowed
     && checkPermission("payment", "reconcile").allowed
     && checkPermission("account_move", "write").allowed
-    && !postBankStatement.isPending && !deleteBankStatement.isPending && !deleteBankStatementLine.isPending
+  const bankMutationAvailable = !postBankStatement.isPending && !deleteBankStatement.isPending && !deleteBankStatementLine.isPending
     && !createBankStatementLine.isPending && !updateBankStatementLine.isPending && !unreconcileBankLine.isPending
-  bankLinkAccess.current = { source: bankLinkSource, allowed: canLinkBankRecords }
+  const canLinkBankRecords = canCreateBankSettlement && bankMutationAvailable
+    && !recoverBankSettlement.isPending
+  const bankRecoveryPermissions = {
+    abandon: companyAvailable && bankMutationAvailable && checkPermission("account_bank_statement_line", "write").allowed && checkPermission("payment", "cancel").allowed,
+    resubmit: canCreateBankSettlement && bankMutationAvailable,
+    reverse: companyAvailable && bankMutationAvailable && checkPermission("account_bank_statement_line", "write").allowed && checkPermission("payment", "reverse").allowed
+      && checkPermission("account_move", "write").allowed && checkPermission("account_bank_statement", "write").allowed,
+  }
+  bankLinkAccess.current = { source: bankLinkSource, allowed: canLinkBankRecords, recovery: bankRecoveryPermissions, actorKey: currentUser?.id ?? null }
   const confirmBankLink = async (request: ReconciliationRequest): Promise<ReconciliationOutcome> => {
     const current = bankLinkAccess.current
-    if (!canDispatchReviewedBankLink(current.source, request, current.allowed)) {
+    if (!current.actorKey || !canDispatchReviewedBankLink(current.source, request, current.allowed)) {
       return { status: "rejected", message: "The company, access or bank records changed. Review the current records before linking." }
     }
     if ([request.organizationId, request.companyId, request.lineId, ...request.moveLineIds].some((id) => BigInt(id) > BigInt(Number.MAX_SAFE_INTEGER))) {
@@ -4476,15 +4487,19 @@ function AccountingClientReady({
     }
     try {
       const effect = await reconcileBankLine.mutateAsync({ lineId: BigInt(request.lineId), params: bankReconcileParamsToJson(request.moveLineIds.map((id) => BigInt(id)), 0) })
+      if (!current.actorKey || bankLinkAccess.current.actorKey !== current.actorKey) return { status: "unknown", message: "The signed-in user changed. Return to the original user and check this action." }
+      if ("attempt" in effect) return { status: "lifecycle", attempt: effect.attempt }
       return effect.status === "awaiting_approval" ? { status: "awaiting_approval", paymentId: effect.paymentId } : { status: "confirmed" }
     } catch {
       // The existing command hook does not retain HTTP status; no error is safe to replay automatically.
       return { status: "unknown", message: "The original bank-line link could not be confirmed. Check its saved result; do not submit it again." }
     }
   }
-  const checkBankLink = async (request: ReconciliationRequest): Promise<"confirmed" | "unconfirmed" | { status: "awaiting_approval"; paymentId: string }> => {
+  const checkBankLink = async (request: ReconciliationRequest, recovery?: BankSettlementRecoveryRequest): Promise<ReconciliationStatusResult> => {
+    const actorKey = bankLinkAccess.current.actorKey
     const sameScope = () => String(bankLinkAccess.current.source.organizationId) === request.organizationId
       && String(bankLinkAccess.current.source.companyId) === request.companyId
+      && actorKey != null && bankLinkAccess.current.actorKey === actorKey
       && bankLinkAccess.current.source.state.status === "ready"
     if (!sameScope()) return "unconfirmed"
     const [lines, statements, payments, moves, moveLines] = await Promise.all([
@@ -4495,12 +4510,44 @@ function AccountingClientReady({
       fetchQueryList("/api/query/account-move-lines", "Could not check the original settlement balances"),
     ])
     if (!sameScope()) return "unconfirmed"
+    const lifecycle = resolveBankSettlementLifecycleEffect({ lines, statements, payments, moves, moveLines }, {
+      organizationId: request.organizationId, companyId: request.companyId, lineId: request.lineId, request: recovery,
+    })
+    const expectedMoveIds = recovery?.moveLineIds ?? request.moveLineIds
+    if (lifecycle && lifecycle.statementId === request.statementId && lifecycle.attempt.selectedMoveLineIds.length === expectedMoveIds.length
+      && lifecycle.attempt.selectedMoveLineIds.every((id) => expectedMoveIds.includes(id))) return { status: "lifecycle", attempt: lifecycle.attempt }
+    if (recovery || lines.some((line) => String(line.id) === request.lineId && hasBankSettlementAttempt(line.metadata))) return "unconfirmed"
     const effect = resolveBankStatementSettlementEffect(lines, statements, { payments, moves, moveLines }, {
       organizationId: BigInt(request.organizationId), companyId: BigInt(request.companyId),
       lineId: BigInt(request.lineId), moveIds: request.moveLineIds.map(BigInt), amountResidual: request.amountResidual,
     })
     return effect?.status === "awaiting_approval" ? { status: "awaiting_approval", paymentId: effect.paymentId }
       : effect?.status === "confirmed" ? "confirmed" : "unconfirmed"
+  }
+  const recoverReviewedBankSettlement = async (request: BankSettlementRecoveryRequest): Promise<ReconciliationOutcome> => {
+    const actorKey = bankLinkAccess.current.actorKey
+    const mayDispatch = () => {
+      const current = bankLinkAccess.current
+      if (!actorKey || current.actorKey !== actorKey || !current.recovery[request.action] || current.source.state.status !== "ready"
+        || String(current.source.organizationId) !== request.organizationId || String(current.source.companyId) !== request.companyId
+        || String(current.source.statement?.id) !== request.statementId || String(current.source.line?.id) !== request.lineId) return false
+      const attempt = bankSettlementAttempt(current.source.line?.metadata)
+      if (!attempt) return false
+      if (bankSettlementRecoveryCorrelates(attempt, request)) return true
+      return attempt.attemptId === request.attemptId && attempt.paymentId === request.paymentId && bankSettlementRecoveryAllowed(attempt, request.action)
+        && (request.action !== "resubmit" || canDispatchReviewedBankLink(current.source, { organizationId: request.organizationId, companyId: request.companyId,
+          statementId: request.statementId, lineId: request.lineId, moveLineIds: request.moveLineIds, amountResidual: 0 }, true))
+    }
+    if (!mayDispatch()) return { status: "rejected", message: "The original settlement, user, company or access changed. Check its current status before recovering it." }
+    try {
+      const effect = await recoverBankSettlement.mutateAsync({ request, mayDispatch })
+      return { status: "lifecycle", attempt: effect.attempt }
+    } catch (error) {
+      const status = error != null && typeof error === "object" && "status" in error ? error.status : undefined
+      return typeof status === "number" && status >= 400 && status < 500 && ![408, 429].includes(status)
+        ? { status: "rejected", message: error instanceof Error ? error.message : "The recovery request was rejected." }
+        : { status: "unknown", message: "The settlement recovery is unconfirmed. Keep the original request and check its saved result." }
+    }
   }
 
   // Each overview card owns its source state; an unavailable auxiliary read must
@@ -6981,9 +7028,12 @@ function AccountingClientReady({
             </fieldset>
           ) : null}
           <ReconciliationWorkbench
+            actorKey={currentUser?.id ?? null}
             source={bankLinkSource}
             canReconcile={canLinkBankRecords}
+            canRecover={(action: BankSettlementRecoveryAction) => bankRecoveryPermissions[action]}
             onConfirm={confirmBankLink}
+            onRecover={recoverReviewedBankSettlement}
             onCheckStatus={checkBankLink}
             onOperationLockChange={handleBankLinkLock}
           />
