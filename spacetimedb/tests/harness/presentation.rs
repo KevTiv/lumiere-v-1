@@ -509,7 +509,7 @@ pub fn test_presentation_module_rejects_inactive_cross_org_actor(
         Ok(()) => return Err("inactive cross-organization actor must be rejected".into()),
         Err(error) => error,
     };
-    if !error.contains("Not a member") {
+    if error != "Exactly one active organization membership is required" {
         return Err(format!("unexpected cross-org denial: {error}"));
     }
     if ctx.db.presentation_module().iter().count() != before {

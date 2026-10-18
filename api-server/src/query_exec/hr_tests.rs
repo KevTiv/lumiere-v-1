@@ -293,26 +293,6 @@ impl Drop for MockStdb {
 }
 
 async fn mock_stdb(replies: Vec<Reply>) -> MockStdb {
-    // An active company-bound membership must also pass the persisted role
-    // checks. No administrative role is granted by these hostile-scope fixtures.
-    let replies: Vec<_> = replies
-        .into_iter()
-        .flat_map(|reply| {
-            let has_membership = reply.body_contains == "FROM user_organization"
-                && reply.response[0]["rows"]
-                    .as_array()
-                    .is_some_and(|rows| !rows.is_empty());
-            let mut expanded = vec![reply];
-            if has_membership {
-                expanded.extend([
-                    sql_reply("SELECT role_id FROM user_organization", &[]),
-                    sql_reply("FROM user_role_assignment", &[]),
-                    sql_reply("FROM role", &[]),
-                ]);
-            }
-            expanded
-        })
-        .collect();
     async fn respond(
         State(replies): State<Replies>,
         uri: Uri,

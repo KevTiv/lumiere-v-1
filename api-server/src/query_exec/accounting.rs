@@ -535,23 +535,6 @@ mod tests {
     // Hostile rows deliberately bypass WHERE evaluation to exercise post-filters.
     async fn http_fixture(replies: Vec<(&'static str, Vec<Value>)>) -> HttpFixture {
         use axum::{routing::post, Json, Router};
-        // Company scope now resolves active persisted roles before accepting a
-        // company-bound membership. These fixtures deliberately have no admin grant.
-        let replies: Vec<_> = replies
-            .into_iter()
-            .flat_map(|reply| {
-                let has_membership = reply.0 == "user_organization" && !reply.1.is_empty();
-                let mut expanded = vec![reply];
-                if has_membership {
-                    expanded.extend([
-                        ("user_organization", vec![]),
-                        ("user_role_assignment", vec![]),
-                        ("role", vec![]),
-                    ]);
-                }
-                expanded
-            })
-            .collect();
         let queries = Arc::new(Mutex::new(Vec::new()));
         let recorded = queries.clone();
         let pending = Arc::new(Mutex::new(VecDeque::from(replies)));
@@ -664,7 +647,6 @@ mod tests {
         let queries = fixture.queries.lock().unwrap();
         assert_eq!(queries.len(), 5);
         assert_membership_query(&queries[0], &access);
-        let queries = &queries[3..];
         let columns = resolve_http_sql_columns("profit-loss-lines", Some(&access)).unwrap();
         assert!(queries[4].starts_with(&format!(
             "SELECT {} FROM profit_loss_line ",
@@ -775,7 +757,6 @@ mod tests {
             let queries = fixture.queries.lock().unwrap();
             assert_eq!(queries.len(), 6);
             assert_membership_query(&queries[0], &access);
-            let queries = &queries[3..];
             let columns = resolve_http_sql_columns(resource, Some(&access)).unwrap();
             assert!(queries[5].starts_with(&format!(
                 "SELECT {} FROM {child_table} ",

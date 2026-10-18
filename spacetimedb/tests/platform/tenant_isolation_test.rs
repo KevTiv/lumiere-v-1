@@ -349,7 +349,8 @@ pub fn test_adversarial_tenant_command_matrix(ctx: &ReducerContext) -> Result<()
             metadata: None,
         },
     );
-    if !matches!(&inactive_actor, Err(ref message) if message.contains("Not a member")) {
+    if !matches!(&inactive_actor, Err(message) if message == "Exactly one active organization membership is required")
+    {
         return Err(format!(
             "Expected inactive membership rejection, got: {inactive_actor:?}"
         ));
