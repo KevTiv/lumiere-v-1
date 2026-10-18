@@ -89,3 +89,8 @@ Real WorkOS callback, provider outage, invitation expiry/replay, linked legacy
 account, profile edits, role grant/revoke, suspension, logout, refresh and reconnect
 must still be exercised on an isolated operator-configured WorkOS stack before
 release. Local fixtures do not establish live provider acceptance.
+
+The ignored PostgreSQL lifecycle test runs against an isolated database with
+`WORKOS_TEST_DATABASE_URL=... cargo test -p api-server postgres_identity_and_profile_lifecycle_is_atomic --lib -- --ignored`.
+It covers concurrent provider callbacks, immutable explicit links, inactive-account
+rollback, profile/outbox transaction rollback, and verified-email synchronization.

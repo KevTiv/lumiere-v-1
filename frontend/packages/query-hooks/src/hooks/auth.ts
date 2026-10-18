@@ -15,7 +15,8 @@
  * Wraps REST API calls with React Query for the Auth module.
  * All hooks accept organizationId: bigint matching the stdb hooks interface.
  */
-import { stdbBffCommandPost } from "@lumiere/stdb/commands";
+import { stringifyReducerCommandBody } from "@lumiere/api-client"
+import { stdbBffCommandPost, type StdbBffCommandInput } from "@lumiere/stdb/commands";
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -489,6 +490,18 @@ export function useUserOrganizations(organizationId: bigint) {
   })
 }
 
+type SettingsMembershipProjection = {
+  id?: unknown
+  userIdentity?: unknown
+  user_identity?: unknown
+  roleId?: unknown
+  role_id?: unknown
+  isActive?: unknown
+  is_active?: unknown
+  jobTitle?: unknown
+  job_title?: unknown
+}
+
 export function useSettingsUsers(organizationId: bigint, search?: string) {
   const searchTerm = search?.trim() ?? ''
   return useQuery<SettingsUserRecord[]>({
@@ -500,7 +513,7 @@ export function useSettingsUsers(organizationId: bigint, search?: string) {
       const profiles = await collectSettingsRows((offset, limit) => fetchSettingsList(
         `/api/settings/users?limit=${limit}&offset=${offset}${searchQuery}`, 'Failed to fetch settings users',
       ))
-      const memberships = profiles.flatMap(row => row.membership && typeof row.membership === 'object' ? [row.membership as Record<string, unknown>] : [])
+      const memberships = profiles.flatMap(row => row.membership && typeof row.membership === 'object' ? [row.membership as SettingsMembershipProjection] : [])
       const assignments = profiles.flatMap(row => Array.isArray(row.roleAssignments) ? row.roleAssignments as QueryRows : [])
       return mapSettingsUsers(profiles, memberships, assignments)
     },
@@ -567,7 +580,7 @@ export function useSetMemberAccess(organizationId: bigint) {
     user: SettingsUserRecord; primaryRoleId: string; roleIds: string[]; isActive: boolean; jobTitle?: string
   }>({
     mutationFn: async ({ user, primaryRoleId, roleIds, isActive, jobTitle }) => {
-      const { urlPath, init } = stdbBffCommandPost('set_member_access', {
+      const input = {
         userIdentity: encodeIdentity(user.id),
         params: {
           primary_role_id: toScalarU64(primaryRoleId),
@@ -577,8 +590,11 @@ export function useSetMemberAccess(organizationId: bigint) {
           expected_is_active: user.status === 'active', is_active: isActive,
           job_title: jobTitle ?? null,
         },
+      } satisfies StdbBffCommandInput<'set_member_access'>
+      const response = await apiFetch('/api/operations/erp.set_member_access', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: stringifyReducerCommandBody(input),
       })
-      const response = await apiFetch(urlPath, init)
       if (!response.ok) throw await authResponseError(response, 'Failed to update member access')
     },
     onSuccess: () => invalidateAuthModule(qc, organizationId),

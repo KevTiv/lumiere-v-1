@@ -12,7 +12,6 @@ import {
   useSetMemberAccess,
   useUpdateOrgMemberDetails,
   useUpdateOrgMemberRole,
-  useUpdateUserOrganizationStatus,
   type SettingsUserRecord,
 } from "@lumiere/query-hooks/hooks/auth"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
@@ -89,7 +88,6 @@ export function UserManagement() {
   const updateOrgMemberDetails = useUpdateOrgMemberDetails(orgBigInt)
   const updateOrgMemberRole = useUpdateOrgMemberRole(orgBigInt)
   const removeUser = useRemoveUserFromOrganization(orgBigInt)
-  const updateOrgStatus = useUpdateUserOrganizationStatus(orgBigInt)
   const { checkPermission } = useRBAC()
   const [editingUser, setEditingUser] = useState<SettingsUserRecord | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -199,9 +197,8 @@ export function UserManagement() {
     }
     const nextActive = user.status !== "active"
     try {
-      await updateOrgStatus.mutateAsync({
-        userOrgId: user.userOrgId,
-        isActive: nextActive,
+      await setMemberAccess.mutateAsync({
+        user, primaryRoleId: user.primaryRoleId, roleIds: user.roles, isActive: nextActive,
       })
       await refetch()
     } catch (error) {

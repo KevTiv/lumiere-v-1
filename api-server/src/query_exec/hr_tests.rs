@@ -298,6 +298,25 @@ async fn mock_stdb(replies: Vec<Reply>) -> MockStdb {
         uri: Uri,
         body: String,
     ) -> (StatusCode, String) {
+        // Resolve the same current, non-owner company scope as a real session.
+        let authority_rows = if body.starts_with("SELECT role_id FROM user_organization") {
+            Some(vec![json!({"role_id": 9})])
+        } else if body.starts_with("SELECT role_id, expires_at FROM user_role_assignment") {
+            Some(vec![])
+        } else if body.starts_with("SELECT id, name, permissions, is_active FROM role") {
+            Some(vec![
+                json!({"id":9,"name":"hr-test","permissions":[],"is_active":true}),
+            ])
+        } else {
+            None
+        };
+        if let Some(rows) = authority_rows {
+            assert!(body.contains("organization_id = 3"));
+            if !body.contains(" FROM role ") {
+                assert!(body.contains(&format!("user_identity = 0x{}", actor())));
+            }
+            return (StatusCode::OK, sql_reply("", &rows).response.to_string());
+        }
         let reply = replies
             .lock()
             .await

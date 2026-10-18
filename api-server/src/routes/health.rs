@@ -365,14 +365,17 @@ mod tests {
     fn release_manifest_matches_runtime_contract_and_migrations() {
         let release = release_metadata().expect("valid release metadata");
         assert_eq!(release.contract_version, "ir-v2");
-        assert_eq!(release.migration_version, 10);
-        // The pin step rewrites the manifest and the workspace dependency tag together; the
-        // manifest must name the contracts release this binary actually compiles against.
-        let workspace = include_str!("../../../Cargo.toml");
-        assert!(
-            workspace.contains(&format!("tag = \"v{}\"", release.contract_release)),
-            "release manifest pins v{} but Cargo.toml compiles a different lumiere-contracts tag",
-            release.contract_release
+        assert_eq!(
+            release.migration_version,
+            crate::cold_tier::migrate::MIGRATIONS
+                .last()
+                .unwrap()
+                .version
+        );
+        // The application consumes a deterministic vendored release bundle.
+        assert_eq!(
+            release.contract_release,
+            include_str!("../../../vendor/lumiere-contracts/CONTRACT_VERSION").trim()
         );
     }
 
