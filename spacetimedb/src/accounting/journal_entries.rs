@@ -14,7 +14,7 @@ use crate::accounting::chart_of_accounts::{
 };
 use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::idempotency::{record_result, replayed_result};
-use crate::accounting::money::validate_pilot_money_amount;
+use crate::accounting::money::{pilot_money_minor_units, validate_pilot_money_amount};
 use crate::accounting::relations::{
     require_active_account, require_active_currency_id, require_active_journal, require_active_tax,
     require_contact_in_scope, require_explicit_company_id,
@@ -4865,6 +4865,30 @@ pub fn reconcile_payment_with_invoice(
     invoice_move_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "account_move", "write")?;
+    use crate::accounting::payments::account_payment;
+    for payment in ctx
+        .db
+        .account_payment()
+        .payment_by_org()
+        .filter(&organization_id)
+        .filter(|payment| payment.move_id == Some(payment_move_id))
+    {
+        crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
+            ctx,
+            organization_id,
+            payment.id,
+        )?;
+    }
+    reconcile_payment_with_invoice_impl(ctx, organization_id, payment_move_id, invoice_move_id)
+}
+
+pub(super) fn reconcile_payment_with_invoice_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment_move_id: u64,
+    invoice_move_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "write")?;
 
     let payment_move = ctx
         .db
@@ -4923,26 +4947,48 @@ pub fn reconcile_payment_with_invoice(
         return Err("Payment has no receivable/payable lines to reconcile".to_string());
     }
 
-    let invoice_amount: f64 = invoice_lines.iter().map(|l| l.amount_residual.abs()).sum();
-    let payment_amount: f64 = payment_lines.iter().map(|l| l.amount_residual.abs()).sum();
-
-    // A settled side cannot apply any value. Reject the stale command before
-    // rewriting matching metadata, move timestamps, sale totals, or audit rows.
-    if invoice_amount <= 0.01 {
+    let currency =
+        require_active_currency_id(ctx, invoice_move.currency_id, "invoice reconciliation")?;
+    if payment_move.currency_id != currency.id {
+        return Err("payment and invoice reconciliation currencies must match".to_string());
+    }
+    let scale = 10_f64.powi(i32::from(currency.decimal_places));
+    // Allocate in exact minor units. Previously a valid last cent was treated as
+    // already settled, and repeated f64 subtraction could leave a Partial dust balance.
+    let minor = |value: f64| pilot_money_minor_units(value, currency.decimal_places).map(i64::abs);
+    let sum_minor = |lines: &[AccountMoveLine]| -> Result<i64, String> {
+        lines.iter().try_fold(0_i64, |total, line| {
+            if line.organization_id != organization_id
+                || line.company_id != invoice_move.company_id
+                || line.currency_id != currency.id
+            {
+                return Err(
+                    "reconciliation lines do not match organization, company and currency"
+                        .to_string(),
+                );
+            }
+            total
+                .checked_add(minor(line.amount_residual)?)
+                .ok_or_else(|| "reconciliation residual overflow".to_string())
+        })
+    };
+    let invoice_amount = sum_minor(&invoice_lines)?;
+    let payment_amount = sum_minor(&payment_lines)?;
+    if invoice_amount == 0 {
         return Err("Invoice is already reconciled".to_string());
     }
-    if payment_amount <= 0.01 {
+    if payment_amount == 0 {
         return Err("Payment is already fully applied".to_string());
     }
 
     let mut remaining_payment = payment_amount;
 
     for line in &invoice_lines {
-        if remaining_payment <= 0.0 {
+        if remaining_payment == 0 {
             break;
         }
-        let apply = remaining_payment.min(line.amount_residual.abs());
-        let new_residual = (line.amount_residual.abs() - apply).max(0.0);
+        let apply = remaining_payment.min(minor(line.amount_residual)?);
+        let new_residual = (minor(line.amount_residual)? - apply) as f64 / scale;
         remaining_payment -= apply;
 
         // Preserve debit/credit sign on residual (AR usually debit-positive).
@@ -4965,13 +5011,13 @@ pub fn reconcile_payment_with_invoice(
 
     // A3: reduce payment residual by amount applied to this invoice only — never zero
     // the full payment when registering against the first of several invoices.
-    let applied_to_invoices = (payment_amount - remaining_payment.max(0.0)).max(0.0);
+    let applied_to_invoices = payment_amount - remaining_payment;
     let mut remaining_apply_on_payment = applied_to_invoices;
     for line in &payment_lines {
-        let current = line.amount_residual.abs();
+        let current = minor(line.amount_residual)?;
         let apply = remaining_apply_on_payment.min(current);
-        let new_residual = (current - apply).max(0.0);
-        remaining_apply_on_payment = (remaining_apply_on_payment - apply).max(0.0);
+        let new_residual = (current - apply) as f64 / scale;
+        remaining_apply_on_payment = remaining_apply_on_payment - apply;
         let signed_residual = if line.amount_residual < 0.0 {
             -new_residual
         } else {
@@ -4988,15 +5034,15 @@ pub fn reconcile_payment_with_invoice(
         });
     }
 
-    // Recompute invoice residual and payment_state
-    let remaining_invoice_residual: f64 = ctx
+    // Recompute from normalized line values at the currency's precision.
+    let current_invoice_lines: Vec<_> = ctx
         .db
         .account_move_line()
         .move_line_by_move()
         .filter(&invoice_move_id)
         .filter(|l| is_receivable_or_payable_line_type(l.account_internal_type.as_deref()))
-        .map(|l| l.amount_residual.abs())
-        .sum();
+        .collect();
+    let remaining_invoice_residual = sum_minor(&current_invoice_lines)? as f64 / scale;
 
     let new_payment_state = if remaining_invoice_residual == 0.0 {
         PaymentState::Paid
@@ -5007,7 +5053,7 @@ pub fn reconcile_payment_with_invoice(
     // Update SO amount_paid / amount_residual if this invoice links to a SO
     if let Some(so_id) = invoice_move.sale_order_id {
         if let Some(so) = ctx.db.sale_order().id().find(&so_id) {
-            let applied = payment_amount - remaining_payment.max(0.0);
+            let applied = (payment_amount - remaining_payment) as f64 / scale;
             ctx.db
                 .sale_order()
                 .id()
@@ -5033,19 +5079,22 @@ pub fn reconcile_payment_with_invoice(
         ..invoice_move
     });
 
-    // Keep payment move residual in sync with line residuals (partial multi-invoice).
+    // Keep payment move residual in sync with normalized line residuals.
     let remaining_payment_residual: f64 = ctx
         .db
         .account_move_line()
         .move_line_by_move()
         .filter(&payment_move_id)
         .filter(|l| is_receivable_or_payable_line_type(l.account_internal_type.as_deref()))
-        .map(|l| l.amount_residual.abs())
-        .sum();
+        .map(|line| minor(line.amount_residual))
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
+        .sum::<i64>() as f64
+        / scale;
     ctx.db.account_move().id().update(AccountMove {
         amount_residual: remaining_payment_residual,
         amount_residual_signed: remaining_payment_residual,
-        payment_state: if remaining_payment_residual <= 0.01 {
+        payment_state: if remaining_payment_residual == 0.0 {
             PaymentState::Paid
         } else {
             PaymentState::Partial

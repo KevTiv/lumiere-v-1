@@ -5,12 +5,25 @@
 /// Tables for managing bank statements and account reconciliation.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::accounting::chart_of_accounts::account_journal;
-use crate::accounting::idempotency::{record_result, replayed_result};
-use crate::accounting::journal_entries::{account_move_line, AccountMoveLine};
-use crate::accounting::money::validate_pilot_money_amount;
+use crate::accounting::chart_of_accounts::{account_account, account_journal};
+use crate::accounting::idempotency::{
+    accounting_operation_receipt, record_result, replayed_result,
+};
+use crate::accounting::journal_entries::{account_move, account_move_line, AccountMoveLine};
+use crate::accounting::money::{
+    pilot_money_minor_units as settlement_minor_units, validate_pilot_money_amount,
+};
+use crate::accounting::payments::{
+    account_payment, create_payment, post_payment, register_bank_settlement_on_invoices,
+    AccountPayment, CreatePaymentParams,
+};
+use crate::accounting::relations::{require_active_currency_id, require_active_journal};
+use crate::core::organization::{company, require_company_in_organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::types::BankStatementState;
+use crate::types::{
+    AccountMoveState, AccountTypeInternal, BankStatementState, JournalType, MoveType, PartnerType,
+    PaymentState, PaymentType,
+};
 
 // ── Tables ───────────────────────────────────────────────────────────────────
 
@@ -741,6 +754,27 @@ pub fn update_account_bank_statement(
         return Err("Record does not belong to this company".to_string());
     }
 
+    let settlement_lines: Vec<_> = ctx
+        .db
+        .account_bank_statement_line()
+        .statement_line_by_statement()
+        .filter(&statement_id)
+        .filter(|line| !line.payment_ids.is_empty())
+        .collect();
+    if !settlement_lines.is_empty()
+        && (params
+            .currency_id
+            .is_some_and(|id| id != statement.currency_id)
+            || params.state.as_ref().is_some_and(|state| {
+                *state != statement.state && settlement_lines.iter().any(|line| !line.is_reconciled)
+            }))
+    {
+        return Err(
+            "cannot change currency or close a statement with a pending settlement payment"
+                .to_string(),
+        );
+    }
+
     let old_name = statement.name.clone();
     let old_reference = statement.reference.clone();
     let old_balance_start = statement.balance_start;
@@ -880,6 +914,17 @@ pub fn delete_account_bank_statement(
     if statement.state == BankStatementState::Posted {
         return Err("Cannot delete a posted statement".to_string());
     }
+    if ctx
+        .db
+        .account_bank_statement_line()
+        .statement_line_by_statement()
+        .filter(&statement_id)
+        .any(|line| !line.payment_ids.is_empty() || line.is_reconciled)
+    {
+        return Err(
+            "cannot delete a statement with settlement payments or reconciled lines".to_string(),
+        );
+    }
 
     write_audit_log_v2(
         ctx,
@@ -940,6 +985,18 @@ pub fn create_account_bank_statement_line(
     if statement.company_id != company_id {
         return Err("Statement does not belong to this company".to_string());
     }
+    if params.is_reconciled
+        || params.move_id.is_some()
+        || !params.move_ids.is_empty()
+        || !params.payment_ids.is_empty()
+        || params.amount_residual != params.amount
+    {
+        return Err(
+            "new bank lines cannot supply settlement links or reconciled balances".to_string(),
+        );
+    }
+    validate_pilot_money_amount("bank line amount", params.amount)?;
+    validate_pilot_money_amount("bank line currency amount", params.amount_currency)?;
 
     let journal = ctx
         .db
@@ -1034,6 +1091,36 @@ pub fn update_account_bank_statement_line(
     if statement.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
+    if statement.state == BankStatementState::Posted {
+        return Err("cannot edit a posted statement line".to_string());
+    }
+    if params.move_id.is_some()
+        || params.is_reconciled.is_some()
+        || params.move_ids.is_some()
+        || params.payment_ids.is_some()
+        || params.amount_residual.is_some()
+    {
+        return Err(
+            "bank settlement links and residuals are managed by the settlement action".to_string(),
+        );
+    }
+    if (!line.payment_ids.is_empty() || line.is_reconciled)
+        && (params.date.is_some()
+            || params.amount.is_some()
+            || params.amount_currency.is_some()
+            || params.currency_id.is_some()
+            || params.foreign_currency_id.is_some()
+            || params.partner_id.is_some()
+            || params.move_id.is_some()
+            || params.is_reconciled.is_some()
+            || params.move_ids.is_some()
+            || params.payment_ids.is_some()
+            || params.amount_residual.is_some())
+    {
+        return Err(
+            "settlement payment provenance and financial fields cannot be edited".to_string(),
+        );
+    }
 
     let old_amount = line.amount;
     let old_partner_id = line.partner_id.clone();
@@ -1047,6 +1134,7 @@ pub fn update_account_bank_statement_line(
 
     let new_date = params.date.unwrap_or(line.date);
     let new_amount = params.amount.unwrap_or(line.amount);
+    validate_pilot_money_amount("bank line amount", new_amount)?;
     let new_amount_currency = params.amount_currency.unwrap_or(line.amount_currency);
     let new_currency_id = params
         .currency_id
@@ -1068,7 +1156,11 @@ pub fn update_account_bank_statement_line(
         .unwrap_or_else(|| line.transaction_type.clone());
     let new_move_ids = params.move_ids.unwrap_or(line.move_ids);
     let new_payment_ids = params.payment_ids.unwrap_or(line.payment_ids);
-    let new_amount_residual = params.amount_residual.unwrap_or(line.amount_residual);
+    let new_amount_residual = if params.amount.is_some() {
+        new_amount
+    } else {
+        line.amount_residual
+    };
     let new_auto_reconcile_ids = params.auto_reconcile_ids.unwrap_or(line.auto_reconcile_ids);
     let new_metadata = params.metadata.unwrap_or_else(|| line.metadata.clone());
 
@@ -1174,6 +1266,14 @@ pub fn delete_account_bank_statement_line(
     if statement.company_id != company_id {
         return Err("Record does not belong to this company".to_string());
     }
+    if statement.state == BankStatementState::Posted
+        || !line.payment_ids.is_empty()
+        || line.is_reconciled
+    {
+        return Err(
+            "cannot delete a posted, reconciled or settlement-linked bank line".to_string(),
+        );
+    }
 
     if statement.state == BankStatementState::Posted {
         return Err("Cannot delete lines from a posted statement".to_string());
@@ -1232,6 +1332,15 @@ pub fn post_account_bank_statement(
     if statement.state == BankStatementState::Posted {
         return Err("Statement is already posted".to_string());
     }
+    if ctx
+        .db
+        .account_bank_statement_line()
+        .statement_line_by_statement()
+        .filter(&statement_id)
+        .any(|line| !line.payment_ids.is_empty() && !line.is_reconciled)
+    {
+        return Err("complete pending bank settlements before posting the statement".to_string());
+    }
 
     if (statement.balance_end - statement.balance_end_real).abs() > 0.01 {
         return Err("Statement balance does not match".to_string());
@@ -1270,6 +1379,414 @@ pub fn post_account_bank_statement(
     Ok(())
 }
 
+struct BankSettlementSelection {
+    line_ids: Vec<u64>,
+    invoice_ids: Vec<u64>,
+    partner_id: u64,
+    account_id: u64,
+}
+
+/// Bank-linked payments remain part of an immutable settlement until a dedicated
+/// bank reversal can unwind both the statement and its financial effects.
+pub(crate) fn require_payment_not_bank_linked(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment_id: u64,
+) -> Result<(), String> {
+    if ctx
+        .db
+        .account_bank_statement_line()
+        .bank_statement_line_by_org()
+        .filter(&organization_id)
+        .any(|line| line.payment_ids.contains(&payment_id))
+    {
+        return Err(
+            "bank-linked payments require a dedicated bank settlement reversal".to_string(),
+        );
+    }
+    Ok(())
+}
+
+/// Validate the entire selection before creating a payment or requesting approval.
+/// Invoice registration settles all its open AR/AP rows, so partial row selection
+/// and mixed partners must be rejected rather than silently settling extra rows.
+fn bank_settlement_selection(
+    ctx: &ReducerContext,
+    statement: &AccountBankStatement,
+    line: &AccountBankStatementLine,
+    params: &ReconcileAccountBankStatementLineParams,
+    existing_payment: Option<&AccountPayment>,
+) -> Result<BankSettlementSelection, String> {
+    if params.amount_residual != 0.0 || params.move_ids.is_empty() {
+        return Err("bank settlement requires an exact full-amount selection".to_string());
+    }
+    require_company_in_organization(ctx, statement.organization_id, statement.company_id)?;
+    let company = ctx
+        .db
+        .company()
+        .id()
+        .find(&statement.company_id)
+        .ok_or("settlement company not found")?;
+    let currency = require_active_currency_id(ctx, company.currency_id, "bank settlement")?;
+    let journal = require_active_journal(
+        ctx,
+        statement.organization_id,
+        statement.company_id,
+        statement.journal_id,
+        "bank settlement",
+    )?;
+    if journal.type_ != JournalType::Bank
+        || statement.currency_id != company.currency_id
+        || line.journal_currency_id != company.currency_id
+        || line.currency_id.is_some_and(|id| id != company.currency_id)
+        || line.foreign_currency_id.is_some()
+        || journal
+            .currency_id
+            .is_some_and(|id| id != company.currency_id)
+        || currency.organization_id != statement.organization_id
+        || currency.rounding_factor != 10_f64.powi(-i32::from(currency.decimal_places))
+    {
+        return Err(
+            "bank settlement supports an active bank journal in company base currency only"
+                .to_string(),
+        );
+    }
+    let bank_minor = settlement_minor_units(line.amount, currency.decimal_places)?;
+    if bank_minor == 0 {
+        return Err("bank settlement amount must be nonzero".to_string());
+    }
+    let mut line_ids = params.move_ids.clone();
+    line_ids.sort_unstable();
+    line_ids.dedup();
+    if line_ids.len() != params.move_ids.len() {
+        return Err("Move line ids must be unique".to_string());
+    }
+    if !line.move_ids.is_empty() {
+        return Err("existing bank links require review before settlement".to_string());
+    }
+    for other in ctx
+        .db
+        .account_bank_statement_line()
+        .bank_statement_line_by_org()
+        .filter(&statement.organization_id)
+    {
+        if other.id != line.id
+            && (other.move_ids.iter().any(|id| line_ids.contains(id))
+                || existing_payment.is_some_and(|payment| other.payment_ids.contains(&payment.id)))
+        {
+            return Err("selected records are already linked to another bank line".to_string());
+        }
+    }
+    let expected_type = if bank_minor > 0 {
+        MoveType::OutInvoice
+    } else {
+        MoveType::InInvoice
+    };
+    let account_type = if bank_minor > 0 {
+        AccountTypeInternal::Receivable
+    } else {
+        AccountTypeInternal::Payable
+    };
+    let mut partner_id = line.partner_id;
+    let mut invoice_ids = Vec::new();
+    let mut selected_account_id = None;
+    let mut total_minor = 0_i64;
+    for id in &line_ids {
+        let target = ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(id)
+            .ok_or("selected move line not found")?;
+        let invoice = ctx
+            .db
+            .account_move()
+            .id()
+            .find(&target.move_id)
+            .ok_or("selected invoice not found")?;
+        let account = ctx
+            .db
+            .account_account()
+            .id()
+            .find(&target.account_id)
+            .ok_or("selected account not found")?;
+        if selected_account_id.is_some_and(|account_id| account_id != account.id) {
+            return Err("bank settlement requires one receivable or payable account".to_string());
+        }
+        selected_account_id = Some(account.id);
+        let target_partner = invoice
+            .partner_id
+            .ok_or("invoice partner is required for bank settlement")?;
+        if partner_id.is_some_and(|id| id != target_partner) {
+            return Err("bank settlement requires invoices for the same partner".to_string());
+        }
+        partner_id = Some(target_partner);
+        if target.organization_id != statement.organization_id
+            || target.company_id != statement.company_id
+            || invoice.organization_id != statement.organization_id
+            || invoice.company_id != statement.company_id
+            || invoice.state != AccountMoveState::Posted
+            || target.parent_state != AccountMoveState::Posted
+            || target.journal_id != invoice.journal_id
+            || invoice.move_type != expected_type
+            || invoice.currency_id != currency.id
+            || invoice.company_currency_id != currency.id
+            || target.currency_id != currency.id
+            || target.company_currency_id != currency.id
+            || target.partner_id != Some(target_partner)
+            || target.blocked
+            || account.organization_id != statement.organization_id
+            || account.company_id != statement.company_id
+            || account.deprecated
+            || !account.reconcile
+            || account.internal_type.as_ref() != Some(&account_type)
+        {
+            return Err("selection must contain posted, unblocked customer invoice receivables or supplier bill payables in bank scope".to_string());
+        }
+        let residual = settlement_minor_units(target.amount_residual, currency.decimal_places)?;
+        let balance = settlement_minor_units(target.balance, currency.decimal_places)?;
+        if balance.signum() != bank_minor.signum()
+            || settlement_minor_units(target.debit, currency.decimal_places)?
+                - settlement_minor_units(target.credit, currency.decimal_places)?
+                != balance
+        {
+            return Err("selected invoice line has an incompatible signed balance".to_string());
+        }
+        let selected_minor = if let Some(payment) = existing_payment {
+            let payment_move_id = payment
+                .move_id
+                .ok_or("posted payment has no journal entry")?;
+            if residual != 0
+                || target.matching_number.as_deref()
+                    != Some(format!("MATCH-{payment_move_id}-{}", invoice.id).as_str())
+                || !(payment.reconciled_invoice_ids.contains(&invoice.id)
+                    || payment.reconciled_bill_ids.contains(&invoice.id))
+            {
+                return Err(
+                    "existing payment does not own the selected settled invoice lines".to_string(),
+                );
+            }
+            balance
+        } else {
+            if residual == 0
+                || residual.signum() != bank_minor.signum()
+                || residual.abs() > balance.abs()
+            {
+                return Err(
+                    "selected invoice residual is stale or has the wrong direction".to_string(),
+                );
+            }
+            residual
+        };
+        total_minor = total_minor
+            .checked_add(selected_minor)
+            .ok_or("bank settlement total overflow")?;
+        if !invoice_ids.contains(&invoice.id) {
+            invoice_ids.push(invoice.id);
+        }
+    }
+    if total_minor != bank_minor {
+        return Err("selected invoice residuals must exactly equal the bank amount".to_string());
+    }
+    for invoice_id in &invoice_ids {
+        for target in ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(invoice_id)
+        {
+            if crate::accounting::journal_entries::is_receivable_or_payable_line_type(
+                target.account_internal_type.as_deref(),
+            ) && (existing_payment.is_some() || target.amount_residual != 0.0)
+                && !line_ids.contains(&target.id)
+            {
+                return Err(
+                    "select every outstanding receivable/payable line of each invoice".to_string(),
+                );
+            }
+        }
+    }
+    invoice_ids.sort_unstable();
+    Ok(BankSettlementSelection {
+        line_ids,
+        invoice_ids,
+        partner_id: partner_id.ok_or("bank settlement partner is required")?,
+        account_id: selected_account_id.ok_or("bank settlement clearing account is required")?,
+    })
+}
+
+/// Resolve the reviewed AR/AP account at posting time, including approval execution.
+/// A changed/paid invoice must invalidate the pending bank payment before posting.
+pub(super) fn bank_payment_clearing_account(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+) -> Result<Option<u64>, String> {
+    let lines: Vec<_> = ctx
+        .db
+        .account_bank_statement_line()
+        .bank_statement_line_by_org()
+        .filter(&payment.organization_id)
+        .filter(|line| line.payment_ids.contains(&payment.id))
+        .collect();
+    if lines.is_empty() {
+        return Ok(None);
+    }
+    if lines.len() != 1 {
+        return Err("bank settlement payment must own exactly one bank line".to_string());
+    }
+    let line = &lines[0];
+    let statement = ctx
+        .db
+        .account_bank_statement()
+        .id()
+        .find(&line.statement_id)
+        .ok_or("bank settlement statement missing")?;
+    if line.is_reconciled
+        || statement.state != BankStatementState::Open
+        || payment.company_id != statement.company_id
+    {
+        return Err("bank payment cannot post outside its open settlement".to_string());
+    }
+    let line_ids: Vec<u64> = payment
+        .memo
+        .as_deref()
+        .and_then(|memo| memo.strip_prefix("Reviewed bank settlement items "))
+        .and_then(|ids| serde_json::from_str(ids).ok())
+        .ok_or("reviewed bank payment items are unavailable")?;
+    let fingerprint = format!(
+        "{}:{}:{}:{:?}:{:?}:{}:{:?}",
+        statement.id,
+        line.journal_id,
+        line.amount.to_bits(),
+        line.date,
+        line.partner_id,
+        statement.currency_id,
+        line_ids
+    );
+    let receipt = replayed_result(
+        ctx,
+        payment.organization_id,
+        payment.company_id,
+        "bank_statement_settlement",
+        &format!("bank-statement-line:{}", line.id),
+        &fingerprint,
+    )?;
+    if receipt != Some(payment.id) {
+        return Err("bank payment has no immutable settlement receipt".to_string());
+    }
+    let selection = bank_settlement_selection(
+        ctx,
+        &statement,
+        line,
+        &ReconcileAccountBankStatementLineParams {
+            move_ids: line_ids,
+            amount_residual: 0.0,
+        },
+        None,
+    )?;
+    if selection.partner_id != payment.partner_id
+        || payment.amount != line.amount.abs()
+        || payment.currency_id != statement.currency_id
+        || payment.journal_id != statement.journal_id
+    {
+        return Err("bank payment does not match its reviewed settlement".to_string());
+    }
+    Ok(Some(selection.account_id))
+}
+
+/// Reconstruct and verify the immutable selection at the internal allocation boundary.
+pub(super) fn validate_bank_settlement_registration(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment_id: u64,
+    invoice_ids: &[u64],
+    is_bill: bool,
+) -> Result<(), String> {
+    let lines: Vec<_> = ctx
+        .db
+        .account_bank_statement_line()
+        .bank_statement_line_by_org()
+        .filter(&organization_id)
+        .filter(|line| line.payment_ids.contains(&payment_id))
+        .collect();
+    if lines.len() != 1 {
+        return Err("bank settlement payment must own exactly one bank line".to_string());
+    }
+    let line = &lines[0];
+    let statement = ctx
+        .db
+        .account_bank_statement()
+        .id()
+        .find(&line.statement_id)
+        .ok_or("bank settlement parent missing")?;
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("bank settlement payment missing")?;
+    if line.is_reconciled
+        || statement.state != BankStatementState::Open
+        || statement.organization_id != organization_id
+        || payment.organization_id != organization_id
+        || payment.company_id != statement.company_id
+        || is_bill != (line.amount < 0.0)
+    {
+        return Err("bank settlement registration scope is inconsistent".to_string());
+    }
+    // The receipt pins the canonical reviewed line IDs even while approval is pending.
+    let key = format!("bank-statement-line:{}", line.id);
+    let receipt = ctx
+        .db
+        .accounting_operation_receipt()
+        .accounting_operation_receipt_by_scope()
+        .filter((
+            &organization_id,
+            &statement.company_id,
+            &"bank_statement_settlement".to_string(),
+        ))
+        .find(|receipt| receipt.idempotency_key == key && receipt.result_id == payment_id)
+        .ok_or("immutable bank settlement receipt missing")?;
+    let line_ids: Vec<u64> = payment
+        .memo
+        .as_deref()
+        .and_then(|memo| memo.strip_prefix("Reviewed bank settlement items "))
+        .and_then(|ids| serde_json::from_str(ids).ok())
+        .ok_or("bank settlement reviewed items missing")?;
+    let fingerprint = format!(
+        "{}:{}:{}:{:?}:{:?}:{}:{:?}",
+        statement.id,
+        line.journal_id,
+        line.amount.to_bits(),
+        line.date,
+        line.partner_id,
+        statement.currency_id,
+        line_ids
+    );
+    if receipt.payload_fingerprint != fingerprint {
+        return Err("bank settlement selection no longer matches its receipt".to_string());
+    }
+    let selection = bank_settlement_selection(
+        ctx,
+        &statement,
+        line,
+        &ReconcileAccountBankStatementLineParams {
+            move_ids: line_ids,
+            amount_residual: 0.0,
+        },
+        None,
+    )?;
+    let mut canonical_invoice_ids = invoice_ids.to_vec();
+    canonical_invoice_ids.sort_unstable();
+    if selection.invoice_ids != canonical_invoice_ids {
+        return Err("bank payment can only settle its reviewed invoices".to_string());
+    }
+    Ok(())
+}
+
+/// Settle an exact bank amount through the normal payment posting approval gate.
+/// A pending approval persists a draft payment only; the bank line is matched
+/// only after payment posting and invoice reconciliation have both succeeded.
 #[spacetimedb::reducer]
 pub fn reconcile_account_bank_statement_line(
     ctx: &ReducerContext,
@@ -1311,36 +1828,228 @@ pub fn reconcile_account_bank_statement_line(
         return Err("Line is already reconciled".to_string());
     }
 
-    if params.move_ids.is_empty() {
-        return Err("At least one move line is required".to_string());
+    // Require every downstream capability before persisting even a draft or approval task.
+    check_permission(ctx, organization_id, "payment", "create")?;
+    check_permission(ctx, organization_id, "payment", "post")?;
+    check_permission(ctx, organization_id, "payment", "reconcile")?;
+    check_permission(ctx, organization_id, "account_move", "write")?;
+    let mut selected_ids = params.move_ids.clone();
+    selected_ids.sort_unstable();
+    let key = format!("bank-statement-line:{line_id}");
+    let fingerprint = format!(
+        "{}:{}:{}:{:?}:{:?}:{}:{:?}",
+        statement.id,
+        line.journal_id,
+        line.amount.to_bits(),
+        line.date,
+        line.partner_id,
+        statement.currency_id,
+        selected_ids
+    );
+    let own_payment_id = replayed_result(
+        ctx,
+        organization_id,
+        company_id,
+        "bank_statement_settlement",
+        &key,
+        &fingerprint,
+    )?;
+    if line.payment_ids.len() > 1 || own_payment_id.is_some_and(|id| line.payment_ids != vec![id]) {
+        return Err("bank settlement payment provenance is inconsistent".to_string());
     }
-    if !params.amount_residual.is_finite() || params.amount_residual < 0.0 {
-        return Err("Residual amount must be finite and non-negative".to_string());
+    let existing = line
+        .payment_ids
+        .first()
+        .map(|id| {
+            ctx.db
+                .account_payment()
+                .id()
+                .find(id)
+                .ok_or("bank settlement payment not found")
+        })
+        .transpose()?;
+    let previously_settled = own_payment_id.is_none() && existing.is_some();
+    let selection = bank_settlement_selection(
+        ctx,
+        &statement,
+        &line,
+        &params,
+        if previously_settled {
+            existing.as_ref()
+        } else {
+            None
+        },
+    )?;
+    let inbound = line.amount > 0.0;
+    let payment_type = if inbound {
+        PaymentType::InBound
+    } else {
+        PaymentType::OutBound
+    };
+    let partner_type = if inbound {
+        PartnerType::Customer
+    } else {
+        PartnerType::Supplier
+    };
+    let payment_id = if let Some(payment) = &existing {
+        if payment.organization_id != organization_id
+            || payment.company_id != company_id
+            || payment.journal_id != statement.journal_id
+            || payment.currency_id != statement.currency_id
+            || payment.partner_id != selection.partner_id
+            || payment.payment_type != payment_type
+            || payment.partner_type != partner_type
+            || payment.amount != line.amount.abs()
+            || payment.reversal_move_id.is_some()
+            || (previously_settled && payment.state != PaymentState::Paid)
+            || (!previously_settled && payment.date != line.date)
+        {
+            return Err("linked payment does not match bank settlement scope".to_string());
+        }
+        payment.id
+    } else {
+        let payment_params = CreatePaymentParams {
+            idempotency_key: key.clone(),
+            company_id,
+            payment_type,
+            partner_type,
+            partner_id: selection.partner_id,
+            amount: line.amount.abs(),
+            currency_id: statement.currency_id,
+            date: Some(line.date),
+            journal_id: statement.journal_id,
+            ref_: Some(format!("BANK-STATEMENT-{}-LINE-{line_id}", statement.id)),
+            memo: Some(format!(
+                "Reviewed bank settlement items {:?}",
+                selection.line_ids
+            )),
+        };
+        let payment_fingerprint = format!("{payment_params:?}");
+        create_payment(ctx, organization_id, payment_params)?;
+        let payment_id = replayed_result(
+            ctx,
+            organization_id,
+            company_id,
+            "create_payment",
+            &key,
+            &payment_fingerprint,
+        )?
+        .ok_or("bank settlement payment receipt missing")?;
+        record_result(
+            ctx,
+            organization_id,
+            company_id,
+            "bank_statement_settlement",
+            key,
+            fingerprint,
+            "account_payment",
+            payment_id,
+        );
+        payment_id
+    };
+    // This provenance survives a human approval, without marking the bank line matched.
+    ctx.db
+        .account_bank_statement_line()
+        .id()
+        .update(AccountBankStatementLine {
+            payment_ids: vec![payment_id],
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            ..ctx
+                .db
+                .account_bank_statement_line()
+                .id()
+                .find(&line_id)
+                .ok_or("bank line missing")?
+        });
+    if !previously_settled {
+        let payment = ctx
+            .db
+            .account_payment()
+            .id()
+            .find(&payment_id)
+            .ok_or("bank payment missing")?;
+        if payment.state == PaymentState::NotPaid {
+            post_payment(ctx, organization_id, payment_id)?;
+        }
+        let payment = ctx
+            .db
+            .account_payment()
+            .id()
+            .find(&payment_id)
+            .ok_or("bank payment missing after posting")?;
+        if payment.state == PaymentState::NotPaid {
+            // The standard gate created an approval task. Returning success commits only
+            // the draft and its approval request; canonical readback reports pending.
+            return Ok(());
+        }
+        if payment.state != PaymentState::Paid
+            || !payment.reconciled_invoice_ids.is_empty()
+            || !payment.reconciled_bill_ids.is_empty()
+        {
+            return Err(
+                "bank settlement payment is reversed or already allocated elsewhere".to_string(),
+            );
+        }
+        register_bank_settlement_on_invoices(
+            ctx,
+            organization_id,
+            payment_id,
+            selection.invoice_ids.clone(),
+            !inbound,
+        )?;
     }
-
-    let mut unique_move_ids = params.move_ids.clone();
-    unique_move_ids.sort_unstable();
-    unique_move_ids.dedup();
-    if unique_move_ids.len() != params.move_ids.len() {
-        return Err("Move line ids must be unique".to_string());
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("settled bank payment missing")?;
+    let payment_move_id = payment
+        .move_id
+        .ok_or("settled bank payment has no journal entry")?;
+    let payment_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&payment_move_id)
+        .ok_or("payment journal entry missing")?;
+    if payment_move.organization_id != organization_id
+        || payment_move.company_id != company_id
+        || payment_move.journal_id != statement.journal_id
+        || payment_move.state != AccountMoveState::Posted
+    {
+        return Err("bank payment journal entry does not match settlement scope".to_string());
     }
-
-    for move_id in &params.move_ids {
-        let move_line = ctx
+    let currency = require_active_currency_id(ctx, statement.currency_id, "bank settlement")?;
+    for id in &selection.line_ids {
+        let target = ctx
             .db
             .account_move_line()
             .id()
-            .find(move_id)
-            .ok_or(format!("Move line {} not found", move_id))?;
-        if move_line.organization_id != organization_id || move_line.company_id != company_id {
-            return Err(format!(
-                "Move line {} belongs to a different company",
-                move_id
-            ));
+            .find(id)
+            .ok_or("settled invoice line missing")?;
+        if settlement_minor_units(target.amount_residual, currency.decimal_places)? != 0 {
+            return Err(
+                "bank settlement did not clear every selected invoice residual".to_string(),
+            );
         }
     }
-
-    let is_reconciled = params.amount_residual.abs() < 0.01;
+    let clearing: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .filter(|row| {
+            crate::accounting::journal_entries::is_receivable_or_payable_line_type(
+                row.account_internal_type.as_deref(),
+            )
+        })
+        .collect();
+    if clearing.is_empty() || clearing.iter().any(|row| row.amount_residual != 0.0) {
+        return Err("bank settlement payment has an unapplied clearing residual".to_string());
+    }
+    let is_reconciled = true;
 
     let old_values = serde_json::json!({
         "is_reconciled": line.is_reconciled,
@@ -1353,8 +2062,10 @@ pub fn reconcile_account_bank_statement_line(
         .id()
         .update(AccountBankStatementLine {
             is_reconciled,
-            move_ids: params.move_ids.clone(),
-            amount_residual: params.amount_residual,
+            move_id: Some(payment_move_id),
+            payment_ids: vec![payment_id],
+            move_ids: selection.line_ids,
+            amount_residual: 0.0,
             write_uid: Some(ctx.sender()),
             write_date: Some(ctx.timestamp),
             ..line
@@ -1413,8 +2124,17 @@ pub fn unreconciled_account_bank_statement_line(
         .find(&line.statement_id)
         .ok_or("Parent statement not found")?;
 
-    if statement.company_id != company_id {
+    if statement.organization_id != organization_id
+        || line.organization_id != organization_id
+        || statement.company_id != company_id
+    {
         return Err("Record does not belong to this company".to_string());
+    }
+    if !line.payment_ids.is_empty() {
+        return Err(
+            "a settlement-linked bank line requires an accounting reversal, not unlinking"
+                .to_string(),
+        );
     }
 
     if !line.is_reconciled {

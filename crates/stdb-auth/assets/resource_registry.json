@@ -126,7 +126,10 @@
       "product_id",
       "quantity",
       "price_unit",
-      "company_id"
+      "company_id",
+      "payment_id",
+      "account_internal_type",
+      "matching_number"
     ],
     "mandatory": [
       "id",
@@ -220,7 +223,10 @@
       "currency_id",
       "partner_id",
       "reconciled_invoice_ids",
-      "reconciled_bill_ids"
+      "reconciled_bill_ids",
+      "payment_type",
+      "partner_type",
+      "date"
     ],
     "mandatory": [
       "id",
@@ -241,7 +247,8 @@
       "state",
       "fiscal_year_id",
       "is_adjustment",
-      "company_id"
+      "company_id",
+      "organization_id"
     ],
     "mandatory": [
       "id",
@@ -773,7 +780,9 @@
       "move_ids",
       "amount_residual",
       "transaction_type",
-      "account_number"
+      "account_number",
+      "payment_ids",
+      "move_id"
     ],
     "mandatory": [
       "id",
@@ -1850,7 +1859,14 @@
       "is_locked",
       "locked_by",
       "locked_at",
-      "locked_until"
+      "locked_until",
+      "url",
+      "checksum",
+      "file_size",
+      "mimetype",
+      "file_name",
+      "owner_id",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -2150,7 +2166,23 @@
     "default_restricted": [
       "name",
       "state",
-      "report_type"
+      "report_type",
+      "date_from",
+      "date_to",
+      "target_move",
+      "metadata",
+      "currency_id",
+      "result_currency_id",
+      "comparison_mode",
+      "hierarchy_level",
+      "show_zero_lines",
+      "show_hierarchy",
+      "show_percentage",
+      "show_debit_credit",
+      "filter_analytic_account_ids",
+      "filter_account_ids",
+      "filter_partner_ids",
+      "filter_journal_ids"
     ],
     "mandatory": [
       "id",
@@ -3954,7 +3986,9 @@
     "default_restricted": [
       "company_id",
       "reason",
-      "metadata"
+      "metadata",
+      "original_account_payment_id",
+      "correcting_account_payment_id"
     ],
     "mandatory": [
       "id",
@@ -3980,7 +4014,11 @@
       "evidence_document_ids",
       "created_by",
       "updated_by",
-      "metadata"
+      "metadata",
+      "currency_id",
+      "partner_id",
+      "source_entity",
+      "source_entity_id"
     ],
     "mandatory": [
       "id",

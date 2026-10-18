@@ -7,6 +7,7 @@
 /// The Vec<u64> fields on parent tables remain for backwards-compat but are not maintained.
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::MailMessageType;
 
@@ -361,8 +362,6 @@ pub fn mark_mail_message_delivered(
     message_id: u64,
     delivery_metadata: Option<String>,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "mail_message", "write")?;
-
     let message = ctx
         .db
         .mail_message()
@@ -374,6 +373,18 @@ pub fn mark_mail_message_delivered(
         return Err("mail message does not belong to this organization".to_string());
     }
 
+    if validate_reviewed_delivery_receipt(
+        message.metadata.as_deref(),
+        delivery_metadata.as_deref(),
+    )? {
+        crate::core::cold_tier_identity::require_active_service_identity(
+            ctx,
+            organization_id,
+            crate::core::cold_tier_identity::REVIEWED_MAIL_DISPATCHER_SERVICE,
+        )?;
+    } else {
+        check_permission(ctx, organization_id, "mail_message", "write")?;
+    }
     let metadata = Some(delivered_metadata(
         message.metadata.as_deref(),
         delivery_metadata.as_deref(),
@@ -383,10 +394,23 @@ pub fn mark_mail_message_delivered(
             .as_micros(),
     ));
 
-    ctx.db.mail_message().id().update(MailMessage {
+    let updated = ctx.db.mail_message().id().update(MailMessage {
         metadata,
         ..message
     });
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.mark_mail_message_delivered".into(),
+            correlation_id: format!("mail:{message_id}:provider-accepted"),
+            changes: vec![RowChange::upsert_stdb_row(
+                "mail_message",
+                serde_json::json!({"id":message_id}),
+                &updated,
+            )?],
+        },
+    )?;
 
     write_audit_log_v2(
         ctx,
@@ -404,6 +428,60 @@ pub fn mark_mail_message_delivered(
     );
 
     Ok(())
+}
+
+/// A reviewed invoice may only become sent after its exact durable provider claim.
+fn validate_reviewed_delivery_receipt(
+    existing: Option<&str>,
+    provided: Option<&str>,
+) -> Result<bool, String> {
+    let Some(metadata) = metadata_object(existing) else {
+        return Ok(false);
+    };
+    let Some(context) = metadata
+        .get("context_json")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return Ok(false);
+    };
+    let context: serde_json::Value = match serde_json::from_str(context) {
+        Ok(value) => value,
+        Err(_) if context.contains("invoiceReview") => {
+            return Err("reviewed delivery context is malformed".into())
+        }
+        Err(_) => return Ok(false),
+    };
+    if context.get("invoiceReview").is_none() {
+        return Ok(false);
+    }
+    let receipt =
+        metadata_object(provided).ok_or("reviewed delivery requires its exact provider receipt")?;
+    let review_id = context
+        .get("invoiceReview")
+        .and_then(|value| value.get("reviewId"))
+        .and_then(serde_json::Value::as_str)
+        .ok_or("reviewed delivery ID is unavailable")?;
+    if !matches!(
+        metadata.get("delivery").and_then(serde_json::Value::as_str),
+        Some("dispatching" | "sent")
+    ) || metadata
+        .get("dispatch_review_id")
+        .and_then(serde_json::Value::as_str)
+        != Some(review_id)
+        || receipt
+            .get("dispatch_review_id")
+            .and_then(serde_json::Value::as_str)
+            != Some(review_id)
+        || metadata
+            .get("dispatch_request_digest")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| value.len() == 64)
+            .is_none()
+        || receipt.get("dispatch_request_digest") != metadata.get("dispatch_request_digest")
+    {
+        return Err("reviewed delivery receipt does not match the claimed request".into());
+    }
+    Ok(true)
 }
 
 /// Preserve queue-review evidence across delivery, including legacy malformed metadata.

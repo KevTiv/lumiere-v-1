@@ -5,6 +5,8 @@ use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Times
 use crate::accounting::journal_entries::account_move;
 use crate::core::messaging::{mail_message, MailMessage};
 use crate::core::organization::require_company_in_organization;
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
+use crate::core::users::user_organization;
 use crate::documents::invoice_profile::{
     ensure_invoice_profile_update_allowed, validate_invoice_profile_metadata,
     INVOICE_PROFILE_REPORT_TYPE,
@@ -139,6 +141,11 @@ pub struct QueueMailFromTemplateParams {
 // Only the opt-in invoiceReview envelope strengthens the legacy queue contract.
 // These pure views keep the final comparison independent of serialization details.
 struct InvoiceMailReview {
+    review_id: String,
+    send_subject: String,
+    send_body: String,
+    attach_pdf: bool,
+    is_reminder: bool,
     organization_id: u64,
     company_id: u64,
     move_id: u64,
@@ -190,11 +197,11 @@ fn parse_invoice_mail_review(context: Option<&str>) -> Result<Option<InvoiceMail
     let review = review
         .as_object()
         .ok_or("invoice email review must be an object")?;
-    if review
+    let schema_version = review
         .get("schemaVersion")
         .and_then(serde_json::Value::as_u64)
-        != Some(1)
-    {
+        .unwrap_or(0);
+    if !matches!(schema_version, 1 | 2) {
         return Err("invoice email review schema is unsupported".into());
     }
     let text = |key: &str, limit: usize| -> Result<String, String> {
@@ -219,22 +226,51 @@ fn parse_invoice_mail_review(context: Option<&str>) -> Result<Option<InvoiceMail
         }
         Ok(parsed)
     };
-    if text("reviewId", 128)?.trim().is_empty() {
+    let review_id = text("reviewId", 128)?;
+    if review_id.trim().is_empty() || review_id.chars().any(char::is_control) {
         return Err("invoice email review ID is required".into());
     }
-    if review
+    let attach_pdf = review
         .get("pdfAttached")
         .and_then(serde_json::Value::as_bool)
-        != Some(false)
-    {
-        return Err("invoice email PDF attachments are not supported".into());
+        .ok_or("invoice email review attachment choice is unavailable")?;
+    if schema_version == 1 && attach_pdf {
+        return Err("invoice email PDF attachments require a version 2 review".into());
     }
     let attach_document = review
         .get("expectedAttachDocument")
         .and_then(serde_json::Value::as_bool)
         .ok_or("invoice email review attachment state is unavailable")?;
-    if attach_document {
-        return Err("invoice email PDF attachments are not supported".into());
+    if schema_version == 1 && attach_document {
+        return Err("invoice email PDF attachments require a version 2 review".into());
+    }
+    let subject = text("expectedSubject", 4096)?;
+    let body_html = text("expectedBodyHtml", 65_536)?;
+    let send_subject = if schema_version == 2 {
+        text("subject", 4096)?
+    } else {
+        subject.clone()
+    };
+    let send_body = if schema_version == 2 {
+        text("bodyText", 65_536)?
+    } else {
+        body_html.clone()
+    };
+    if send_subject.trim().is_empty()
+        || send_body.trim().is_empty()
+        || send_subject.chars().any(char::is_control)
+    {
+        return Err("invoice email requires a non-empty single-line subject and message".into());
+    }
+    let is_reminder = match review.get("purpose").and_then(serde_json::Value::as_str) {
+        None | Some("invoice") => false,
+        Some("reminder") => true,
+        _ => return Err("invoice email review purpose is invalid".into()),
+    };
+    let move_id = id("moveId")?;
+    let pdf_filename = text("pdfFilename", 128)?;
+    if pdf_filename != format!("account-move-{move_id}.pdf") {
+        return Err("invoice email PDF filename does not match the reviewed invoice".into());
     }
     let revision: Vec<serde_json::Value> =
         serde_json::from_str(&text("recordRevision", 65_536)?)
@@ -251,12 +287,17 @@ fn parse_invoice_mail_review(context: Option<&str>) -> Result<Option<InvoiceMail
         return Err("invoice email record revision is incomplete".into());
     }
     Ok(Some(InvoiceMailReview {
+        review_id,
+        send_subject,
+        send_body,
+        attach_pdf,
+        is_reminder,
         organization_id: id("organizationId")?,
         company_id: id("companyId")?,
         move_id: id("moveId")?,
         template_id: id("templateId")?,
-        subject: text("expectedSubject", 4096)?,
-        body_html: text("expectedBodyHtml", 65_536)?,
+        subject,
+        body_html,
         attach_document,
         revision,
     }))
@@ -294,7 +335,6 @@ fn validate_invoice_mail_review(
     if template.subject != review.subject
         || template.body_html != review.body_html
         || template.attach_document != review.attach_document
-        || template.attach_document
     {
         return Err(
             "invoice email template changed after review; review the current message".into(),
@@ -313,6 +353,31 @@ fn validate_invoice_mail_review(
         || revision[6].as_str() != record.metadata
     {
         return Err("invoice changed after email review; review the current document".into());
+    }
+    Ok(())
+}
+
+fn validate_reminder_target(
+    review: &InvoiceMailReview,
+    record: &crate::accounting::journal_entries::AccountMove,
+    now: Timestamp,
+) -> Result<(), String> {
+    if !review.is_reminder {
+        return Ok(());
+    }
+    let day = |timestamp: Timestamp| {
+        timestamp
+            .to_micros_since_unix_epoch()
+            .div_euclid(86_400_000_000)
+    };
+    if format!("{:?}", record.move_type) != "OutInvoice"
+        || !record.amount_residual.is_finite()
+        || record.amount_residual <= 0.0
+        || !record
+            .invoice_date_due
+            .is_some_and(|due| day(due) < day(now))
+    {
+        return Err("payment reminder requires a currently overdue customer invoice with an outstanding balance".into());
     }
     Ok(())
 }
@@ -604,9 +669,25 @@ pub fn queue_mail_from_template(
         return Err("recipient_email is required".to_string());
     }
 
-    if let Some(review) = parse_invoice_mail_review(params.context_json.as_deref())? {
+    let review = parse_invoice_mail_review(params.context_json.as_deref())?;
+    if let Some(review) = &review {
         check_permission(ctx, organization_id, "account_move", "read")?;
         require_company_in_organization(ctx, organization_id, company_id)?;
+        if !ctx
+            .db
+            .user_organization()
+            .user_org_by_user()
+            .filter(ctx.sender())
+            .any(|membership| {
+                membership.organization_id == organization_id
+                    && membership.is_active
+                    && membership.company_id.is_none_or(|id| id == company_id)
+            })
+        {
+            return Err(
+                "invoice email review requires active membership in the reviewed company".into(),
+            );
+        }
         let record = ctx
             .db
             .account_move()
@@ -644,15 +725,85 @@ pub fn queue_mail_from_template(
                 metadata: record.metadata.as_deref(),
             },
         )?;
+        validate_reminder_target(review, &record, ctx.timestamp)?;
     }
 
+    if review.is_some()
+        && (params.recipient_email.trim().len() > 254
+            || params.recipient_email.trim().split('@').count() != 2
+            || params.recipient_email.trim().chars().any(|value| {
+                value.is_whitespace() || value.is_control() || matches!(value, '<' | '>')
+            }))
+    {
+        return Err("invoice email requires one valid recipient address".into());
+    }
+    let send_subject = review
+        .as_ref()
+        .map(|review| review.send_subject.as_str())
+        .unwrap_or(&template.subject);
+    let send_body = review
+        .as_ref()
+        .map(|review| review.send_body.as_str())
+        .unwrap_or(&template.body_html);
+    let attach_pdf = review
+        .as_ref()
+        .map(|review| review.attach_pdf)
+        .unwrap_or(template.attach_document);
+    if let Some(review) = &review {
+        // The exact token is consumed atomically with insertion, including simultaneous callers.
+        for existing in ctx
+            .db
+            .mail_message()
+            .mail_message_by_org()
+            .filter(organization_id)
+        {
+            let Some(metadata) = existing
+                .metadata
+                .as_deref()
+                .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+            else {
+                continue;
+            };
+            let Some(context) = metadata
+                .get("context_json")
+                .and_then(serde_json::Value::as_str)
+            else {
+                continue;
+            };
+            // Unrelated legacy/malformed chatter must not poison this organization's outbox.
+            let Some(previous) = serde_json::from_str::<serde_json::Value>(context).ok() else {
+                continue;
+            };
+            if previous
+                .get("invoiceReview")
+                .and_then(|value| value.get("reviewId"))
+                .and_then(serde_json::Value::as_str)
+                == Some(review.review_id.as_str())
+            {
+                if existing.model == params.model
+                    && existing.res_id == params.res_id
+                    && metadata
+                        .get("context_json")
+                        .and_then(serde_json::Value::as_str)
+                        == params.context_json.as_deref()
+                    && metadata.get("to").and_then(serde_json::Value::as_str)
+                        == Some(params.recipient_email.trim())
+                {
+                    return Ok(());
+                }
+                return Err(
+                    "invoice email review token was already used for a different request".into(),
+                );
+            }
+        }
+    }
     let delivery_metadata = serde_json::json!({
         "delivery": "queued",
         "to": params.recipient_email.trim(),
-        "subject": template.subject,
-        "html": template.body_html,
+        "subject": send_subject,
+        "html": send_body,
         "mail_template_id": params.template_id,
-        "attach_document": template.attach_document,
+        "attach_document": attach_pdf,
         "context_json": params.context_json,
     })
     .to_string();
@@ -663,7 +814,7 @@ pub fn queue_mail_from_template(
         model: params.model.clone(),
         res_id: params.res_id,
         author_id: ctx.sender(),
-        body: template.body_html.clone(),
+        body: send_body.to_string(),
         message_type: MailMessageType::Email,
         subtype: Some("mail.template.send".to_string()),
         date: ctx.timestamp,
@@ -672,6 +823,19 @@ pub fn queue_mail_from_template(
         metadata: Some(delivery_metadata),
     });
 
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.queue_mail_from_template".into(),
+            correlation_id: format!("mail:{}:queue", msg.id),
+            changes: vec![RowChange::upsert_stdb_row(
+                "mail_message",
+                serde_json::json!({"id":msg.id}),
+                &msg,
+            )?],
+        },
+    )?;
     write_audit_log_v2(
         ctx,
         organization_id,
@@ -698,13 +862,187 @@ pub fn queue_mail_from_template(
     Ok(())
 }
 
+/// Claim one reviewed email before provider dispatch. A claimed or uncertain request cannot be replayed.
+/// Kept denied to generic operations; the dedicated API route supplies the request digest after rendering.
+#[reducer]
+pub fn claim_reviewed_mail_delivery(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    message_id: u64,
+    review_id: String,
+    request_digest: String,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "mail_message", "write")?;
+    check_permission(ctx, organization_id, "mail_template", "read")?;
+    check_permission(ctx, organization_id, "mail_template", "write")?;
+    check_permission(ctx, organization_id, "account_move", "read")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+    if !ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(ctx.sender())
+        .any(|membership| {
+            membership.organization_id == organization_id
+                && membership.is_active
+                && membership.company_id.is_none_or(|id| id == company_id)
+        })
+    {
+        return Err("reviewed dispatch requires active membership in the reviewed company".into());
+    }
+    let message = ctx
+        .db
+        .mail_message()
+        .id()
+        .find(message_id)
+        .ok_or("reviewed mail message not found")?;
+    if message.organization_id != organization_id || message.model != "account_move" {
+        return Err("reviewed mail message is outside the requested organization".into());
+    }
+    let mut metadata: serde_json::Value = serde_json::from_str(
+        message
+            .metadata
+            .as_deref()
+            .ok_or("mail metadata unavailable")?,
+    )
+    .map_err(|_| "mail metadata malformed")?;
+    let review = reviewed_delivery_claim(&metadata, &message.body, &review_id, &request_digest)?;
+    let template = ctx
+        .db
+        .mail_template()
+        .id()
+        .find(review.template_id)
+        .ok_or("reviewed mail template not found")?;
+    let record = ctx
+        .db
+        .account_move()
+        .id()
+        .find(message.res_id)
+        .ok_or("reviewed invoice not found")?;
+    validate_invoice_mail_review(
+        &review,
+        organization_id,
+        company_id,
+        &message.model,
+        message.res_id,
+        template.id,
+        &ReviewedMailTemplate {
+            organization_id: template.organization_id,
+            company_id: template.company_id,
+            model: &template.model,
+            active: template.is_active,
+            subject: &template.subject,
+            body_html: &template.body_html,
+            attach_document: template.attach_document,
+        },
+        &ReviewedMailRecord {
+            organization_id: record.organization_id,
+            company_id: record.company_id,
+            state: &format!("{:?}", record.state),
+            move_type: &format!("{:?}", record.move_type),
+            amount_total: record.amount_total,
+            currency_id: record.currency_id,
+            name: &record.name,
+            partner_display_name: record
+                .invoice_partner_display_name
+                .as_deref()
+                .unwrap_or_default(),
+            metadata: record.metadata.as_deref(),
+        },
+    )?;
+    validate_reminder_target(&review, &record, ctx.timestamp)?;
+    metadata["delivery"] = serde_json::json!("dispatching");
+    metadata["dispatch_review_id"] = serde_json::json!(review_id);
+    metadata["dispatch_request_digest"] = serde_json::json!(request_digest);
+    metadata["dispatch_claimed_at"] = serde_json::json!(ctx
+        .timestamp
+        .to_duration_since_unix_epoch()
+        .unwrap_or_default()
+        .as_micros());
+    let updated = ctx.db.mail_message().id().update(MailMessage {
+        metadata: Some(metadata.to_string()),
+        ..message
+    });
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.claim_reviewed_mail_delivery".into(),
+            correlation_id: format!("mail:{message_id}:claim:{}", review.review_id),
+            changes: vec![RowChange::upsert_stdb_row(
+                "mail_message",
+                serde_json::json!({"id": message_id}),
+                &updated,
+            )?],
+        },
+    )?;
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "mail_message",
+            record_id: message_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(r#"{"delivery":"dispatching"}"#.into()),
+            changed_fields: vec!["metadata".into()],
+            metadata: None,
+        },
+    );
+    Ok(())
+}
+
+fn reviewed_delivery_claim(
+    metadata: &serde_json::Value,
+    body: &str,
+    review_id: &str,
+    request_digest: &str,
+) -> Result<InvoiceMailReview, String> {
+    if metadata.get("delivery").and_then(serde_json::Value::as_str) != Some("queued") {
+        return Err("reviewed email is already claimed or sent; inspect the original request without retrying".into());
+    }
+    if request_digest.len() != 64
+        || !request_digest
+            .bytes()
+            .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value))
+    {
+        return Err("reviewed mail request digest is invalid".into());
+    }
+    let review = parse_invoice_mail_review(
+        metadata
+            .get("context_json")
+            .and_then(serde_json::Value::as_str),
+    )?
+    .ok_or("mail message has no invoice review")?;
+    if review.review_id != review_id
+        || metadata
+            .get("mail_template_id")
+            .and_then(serde_json::Value::as_u64)
+            != Some(review.template_id)
+        || metadata.get("subject").and_then(serde_json::Value::as_str)
+            != Some(review.send_subject.as_str())
+        || metadata.get("html").and_then(serde_json::Value::as_str)
+            != Some(review.send_body.as_str())
+        || metadata
+            .get("attach_document")
+            .and_then(serde_json::Value::as_bool)
+            != Some(review.attach_pdf)
+        || body != review.send_body
+    {
+        return Err("mail payload does not match the exact invoice review".into());
+    }
+    Ok(review)
+}
+
 #[cfg(test)]
 mod invoice_mail_review_tests {
     use super::*;
     use serde_json::json;
 
     fn context() -> serde_json::Value {
-        json!({ "invoiceReview": { "schemaVersion": 1, "reviewId": "review-unique", "organizationId": "1", "companyId": "2", "moveId": "3", "templateId": "4", "reference": "INV/3", "pdfFilename": "INV-3.pdf", "pdfAttached": false, "expectedSubject": "Reviewed subject", "expectedBodyHtml": "Reviewed body", "expectedAttachDocument": false, "recordRevision": "[\"Posted\",\"OutInvoice\",1,\"5\",\"INV/3\",\"Buyer\",null]" } })
+        json!({ "invoiceReview": { "schemaVersion": 1, "reviewId": "review-unique", "organizationId": "1", "companyId": "2", "moveId": "3", "templateId": "4", "reference": "INV/3", "pdfFilename": "account-move-3.pdf", "pdfAttached": false, "expectedSubject": "Reviewed subject", "expectedBodyHtml": "Reviewed body", "expectedAttachDocument": false, "recordRevision": "[\"Posted\",\"OutInvoice\",1,\"5\",\"INV/3\",\"Buyer\",null]" } })
     }
     fn review() -> InvoiceMailReview {
         parse_invoice_mail_review(Some(&context().to_string()))
@@ -895,5 +1233,51 @@ mod invoice_mail_review_tests {
         assert!(parse_invoice_mail_review(Some(&unrelated))
             .expect("untagged context has no new limit")
             .is_none());
+    }
+
+    #[test]
+    fn version_two_freezes_plain_text_and_attachment_intent_without_changing_template_evidence() {
+        let mut context = context();
+        context["invoiceReview"]["schemaVersion"] = json!(2);
+        context["invoiceReview"]["subject"] = json!("One-off reminder");
+        context["invoiceReview"]["bodyText"] = json!("Plain <script>text</script>");
+        context["invoiceReview"]["pdfAttached"] = json!(true);
+        let review = parse_invoice_mail_review(Some(&context.to_string()))
+            .expect("parse")
+            .expect("review");
+        assert_eq!(review.subject, "Reviewed subject");
+        assert_eq!(review.send_subject, "One-off reminder");
+        assert_eq!(review.send_body, "Plain <script>text</script>");
+        assert!(review.attach_pdf);
+        assert!(validate_invoice_mail_review(
+            &review,
+            1,
+            2,
+            "account_move",
+            3,
+            4,
+            &template(),
+            &record()
+        )
+        .is_ok());
+        let mut metadata = json!({"delivery":"queued", "subject":review.send_subject, "html":review.send_body,
+            "mail_template_id":4, "attach_document":true, "context_json":context.to_string()});
+        assert!(reviewed_delivery_claim(
+            &metadata,
+            "Plain <script>text</script>",
+            "review-unique",
+            &"a".repeat(64)
+        )
+        .is_ok());
+        metadata["delivery"] = json!("dispatching");
+        assert!(reviewed_delivery_claim(
+            &metadata,
+            "Plain <script>text</script>",
+            "review-unique",
+            &"a".repeat(64)
+        )
+        .is_err());
+        context["invoiceReview"]["subject"] = json!("Header\r\ninjection");
+        assert!(parse_invoice_mail_review(Some(&context.to_string())).is_err());
     }
 }

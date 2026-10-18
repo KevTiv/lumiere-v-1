@@ -411,6 +411,13 @@
       },
       "evidence": "spacetimedb/src/workflow/delivery.rs: body delegates through an explicit replay/idempotency receipt guard"
     },
+    "claim_reviewed_mail_delivery": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/documents/templates.rs: exact scoped invoice review and queued lifecycle guard atomically claim one provider request; repeats are rejected"
+    },
     "claim_ai_capability_execution": {
       "semantic_kind": "internal",
       "client_facing": false,

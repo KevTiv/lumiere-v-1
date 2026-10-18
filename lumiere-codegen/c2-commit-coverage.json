@@ -2,6 +2,27 @@
   "schema_version": 1,
   "reducers": [
     {
+      "source": "spacetimedb/src/documents/templates.rs",
+      "function": "queue_mail_from_template",
+      "operation": "queue_mail_from_template",
+      "operation_id": "erp.queue_mail_from_template",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/core/messaging.rs",
+      "function": "mark_mail_message_delivered",
+      "operation": "mark_mail_message_delivered",
+      "operation_id": "erp.mark_mail_message_delivered",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/documents/templates.rs",
+      "function": "claim_reviewed_mail_delivery",
+      "operation": "claim_reviewed_mail_delivery",
+      "operation_id": "erp.claim_reviewed_mail_delivery",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
       "source": "spacetimedb/src/accounting/journal_entries.rs",
       "function": "create_invoice_from_sale_order",
       "operation": "create_invoice_from_sale_order",

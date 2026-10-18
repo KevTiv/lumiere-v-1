@@ -100,6 +100,10 @@ pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), Stri
 
 #[spacetimedb::reducer]
 pub fn run_accounting_payment_reconcile_test(ctx: &ReducerContext) -> Result<(), String> {
+    payments_test::test_bank_statement_settlement_exact_effect(ctx)
+        .map_err(|e| format!("bank_statement_settlement_exact_effect: {e}"))?;
+    payments_test::test_bank_settlement_approval_and_last_cent(ctx)
+        .map_err(|e| format!("bank_settlement_approval_and_last_cent: {e}"))?;
     payments_test::test_payment_reconciles_invoice(ctx)
         .map_err(|e| format!("payment_reconciles_invoice: {e}"))?;
     payments_test::test_reconciled_payment_unwind_and_cancel_exact_effect(ctx)

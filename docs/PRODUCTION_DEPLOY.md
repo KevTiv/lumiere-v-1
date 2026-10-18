@@ -95,6 +95,11 @@ is performed by this patch.
 
 ## Shared immutable Rust runtime image
 
+Reviewed invoice email and collection reminders require a dedicated dispatcher
+identity and explicit per-message sending. Configure the provider, renderer, and
+service binding described in [Accounting email dispatch](./ACCOUNTING_EMAIL_DISPATCH.md)
+before enabling that workflow.
+
 `lumiere-contracts` is a versioned library dependency, not a Railway service.
 Do not deploy the contracts repository as an HTTP service or add a contracts
 service URL to application configuration. The generated types and metadata are
