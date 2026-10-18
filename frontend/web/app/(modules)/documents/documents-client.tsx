@@ -251,6 +251,14 @@ export function DocumentsClient(props: DocumentsClientProps) {
   return <DocumentsClientLoaded {...props} organizationId={props.organizationId} />
 }
 
+/** Form fields (or browser defaults) that describe an uploaded document. */
+interface DocumentUploadFields {
+  name?: string
+  folderId?: unknown
+  residencyRegion?: unknown
+  [field: string]: unknown
+}
+
 function DocumentsClientLoaded({
   initialDocuments,
   initialDeletedDocuments,
@@ -1162,7 +1170,7 @@ function DocumentsClientLoaded({
   )
 
   /** Stores the bytes, registers the document, then queues its evidence ingestion. */
-  const uploadAndRegisterDocument = async (file: File, formData: Record<string, unknown>) => {
+  const uploadAndRegisterDocument = async (file: File, formData: DocumentUploadFields) => {
     const folderId = optionalBigIntU64(formData.folderId)
     const folderResidency =
       folderId != null
