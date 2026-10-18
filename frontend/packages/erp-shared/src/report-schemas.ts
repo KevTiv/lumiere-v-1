@@ -58,11 +58,19 @@ export interface ReportPreviewRequest {
   scenario?: MarginSupplyScenario
 }
 
+export interface MarginSupplyScenarioProvenance {
+  source: "manual" | "controlled_csv"
+  fileName?: string
+  importedAt?: string
+  rowNumber?: number
+}
+
 export interface MarginSupplyScenario {
   inputCostChangePct: number
   demandChangePct: number
   leadTimeChangeDays: number
   targetMarginPct: number
+  provenance?: MarginSupplyScenarioProvenance
 }
 
 export interface ReportScope {
@@ -321,6 +329,8 @@ export type MarginSupplyWarningCode =
   | "MARGIN_BELOW_TARGET"
   | "PROFIT_AT_RISK"
   | "STOCKOUT_BEFORE_REPLENISHMENT"
+  | "REPLENISHMENT_THRESHOLD_BREACH"
+  | "MISSING_LEAD_TIME_BASELINE"
   | "STALE_INVENTORY_COUNT"
 
 export interface MarginSupplyLine {
@@ -347,6 +357,59 @@ export interface MarginSupplyLine {
   warningCodes: MarginSupplyWarningCode[]
 }
 
+export interface MarginSupplySuggestionEvidence {
+  metric: string
+  source: string
+  value: number
+  unit: string
+}
+
+export interface MarginSupplySuggestionProvenance {
+  calculationVersion: string
+  sourceTables: string[]
+  scenarioFingerprint: string
+  formula: string
+}
+
+interface MarginSupplySuggestionBase {
+  suggestionId: string
+  fingerprint: string
+  status: "review_required"
+  productId: number
+  sku: string | null
+  productName: string
+  confidence: "medium" | "low"
+  dataQuality: string[]
+  evidence: MarginSupplySuggestionEvidence[]
+  provenance: MarginSupplySuggestionProvenance
+}
+
+export interface MarginSupplyPriceSuggestion extends MarginSupplySuggestionBase {
+  kind: "price_change"
+  currentUnitPrice: MoneyAmount
+  suggestedUnitPrice: MoneyAmount
+  priceChange: MoneyAmount
+  priceChangePct: number
+  conditionalGrossProfitUplift: MoneyAmount
+  targetGrossMarginPct: number
+}
+
+export interface MarginSupplyReplenishmentSuggestion extends MarginSupplySuggestionBase {
+  kind: "replenishment_change"
+  currentAvailableQuantity: number
+  projectedShortfall: number
+  quantityUnavailable: true
+  suggestedQuantity: null
+  effectiveLeadDays: number
+  reorderPoint: number
+  stressedUnitCost: MoneyAmount | null
+  expectedWorkingCapitalRequirement: MoneyAmount | null
+}
+
+export type MarginSupplySuggestion =
+  | MarginSupplyPriceSuggestion
+  | MarginSupplyReplenishmentSuggestion
+
 export interface MarginSupplyOutlookReportV1 {
   scenario: MarginSupplyScenario
   productCount: number
@@ -363,6 +426,7 @@ export interface MarginSupplyOutlookReportV1 {
   profitAtRisk: MoneyAmount
   projectedStockShortfall: number
   recommendations: string[]
+  suggestions: MarginSupplySuggestion[]
   lines: MarginSupplyLine[]
 }
 
