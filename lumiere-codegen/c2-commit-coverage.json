@@ -421,6 +421,99 @@
           }
         }
       ]
+    },
+    {
+      "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+      "function": "record",
+      "operation_id_parameter": "operation",
+      "snapshot_type": "BankSettlementCommitSnapshot",
+      "method": "record",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ],
+      "change_helpers": [],
+      "callers": [
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "payment_posted",
+          "argument": "\"erp.post_payment\"",
+          "operations": {
+            "post_payment": "erp.post_payment"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "settlement_finished",
+          "argument": "\"erp.reconcile_account_bank_statement_line\"",
+          "operations": {
+            "reconcile_account_bank_statement_line": "erp.reconcile_account_bank_statement_line"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "pending_finished",
+          "argument": "\"erp.reconcile_account_bank_statement_line\"",
+          "operations": {
+            "reconcile_account_bank_statement_line": "erp.reconcile_account_bank_statement_line"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "abandon_bank_statement_settlement",
+          "argument": "\"erp.abandon_bank_statement_settlement\"",
+          "operations": {
+            "abandon_bank_statement_settlement": "erp.abandon_bank_statement_settlement"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "resubmit_bank_statement_settlement",
+          "argument": "\"erp.resubmit_bank_statement_settlement\"",
+          "operations": {
+            "resubmit_bank_statement_settlement": "erp.resubmit_bank_statement_settlement"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "reverse_bank_statement_settlement",
+          "argument": "\"erp.reverse_bank_statement_settlement\"",
+          "operations": {
+            "reverse_bank_statement_settlement": "erp.reverse_bank_statement_settlement"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "execute_bank_statement_settlement_reversal",
+          "argument": "\"erp.reverse_bank_statement_settlement\"",
+          "operations": {
+            "reverse_bank_statement_settlement": "erp.reverse_bank_statement_settlement"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "record_cancelled_bank_approval",
+          "argument": "\"erp.cancel_workflow\"",
+          "operations": {
+            "cancel_workflow": "erp.cancel_workflow"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "record_invalidated_bank_approval",
+          "argument": "\"erp.invalidate_workflow_human_task\"",
+          "operations": {
+            "invalidate_workflow_human_task": "erp.invalidate_workflow_human_task"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "record_decided_bank_approval",
+          "argument": "\"erp.decide_workflow_human_task\"",
+          "operations": {
+            "decide_workflow_human_task": "erp.decide_workflow_human_task"
+          }
+        }
+      ]
     }
   ]
 }

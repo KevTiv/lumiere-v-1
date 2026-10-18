@@ -25,6 +25,10 @@ const KNOWN_ACTIONS = new Set<Action>([
   "manage",
   "write",
   "admin",
+  "post",
+  "reconcile",
+  "reverse",
+  "cancel",
 ])
 
 function readBool(row: BackendRoleRow, camel: "isSystem" | "isActive"): boolean {

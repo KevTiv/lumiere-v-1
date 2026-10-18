@@ -2,6 +2,11 @@
   "version": 1,
   "reducers": [
     {
+      "name": "abandon_bank_statement_settlement",
+      "exposure": "session",
+      "reason": "reviewed bank settlement lifecycle action; exact expected payment, tenant/company and financial capability checks remain reducer-enforced"
+    },
+    {
       "name": "accept_sale_order_quotation",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3545,6 +3550,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "resubmit_bank_statement_settlement",
+      "exposure": "session",
+      "reason": "reviewed bank settlement lifecycle action; exact expected payment, tenant/company and financial capability checks remain reducer-enforced"
+    },
+    {
       "name": "resume_ai_run_checked",
       "exposure": "denied",
       "reason": "trusted lifecycle gateway only; continuation and capability authority are server-validated"
@@ -3568,6 +3578,11 @@
       "name": "retry_iot_action",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "reverse_bank_statement_settlement",
+      "exposure": "session",
+      "reason": "reviewed bank settlement lifecycle action; exact expected payment, tenant/company and financial capability checks remain reducer-enforced"
     },
     {
       "name": "reverse_payment_transaction",

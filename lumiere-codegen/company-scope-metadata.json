@@ -222,6 +222,45 @@
           "meaning": "legal entity owning the reviewed invoice and exactly claimed outbound message"
         }
       ]
+    },
+    {
+      "name": "abandon_bank_statement_settlement",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the bank statement, immutable settlement attempt and expected payment"
+        }
+      ]
+    },
+    {
+      "name": "resubmit_bank_statement_settlement",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the bank statement, immutable settlement attempt and expected payment"
+        }
+      ]
+    },
+    {
+      "name": "reverse_bank_statement_settlement",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the bank statement, immutable settlement attempt and expected payment"
+        }
+      ]
     }
   ]
 }

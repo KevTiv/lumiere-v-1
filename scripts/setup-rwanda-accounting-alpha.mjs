@@ -371,7 +371,7 @@ export async function runRwandaAccountingSetup(env = process.env, output = conso
       'account_account:read', 'account_account:create', 'account_account_type:read',
       'account_fiscal_year:read', 'account_period:read', 'financial_report:read',
       'account_move:*', 'account_move_line:*', 'account_payment:*', 'payment_transaction:*',
-      'payment:create', 'payment:post', 'payment:reconcile', 'payment_reversal:read',
+      'payment:create', 'payment:post', 'payment:reconcile', 'payment:cancel', 'payment:reverse', 'payment_reversal:read',
       'payment_reconciliation:*', 'account_journal:read', 'account_bank_statement:*',
       'account_bank_statement_line:*', 'import_job:*', 'report:read', 'audit_log:read',
       'mail_template:read', 'mail_template:write', 'mail_message:read', 'mail_message:write',

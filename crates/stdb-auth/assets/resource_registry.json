@@ -120,6 +120,7 @@
       "company_currency_id",
       "currency_id",
       "amount_residual",
+      "amount_residual_currency",
       "blocked",
       "account_id",
       "partner_id",
@@ -782,7 +783,8 @@
       "transaction_type",
       "account_number",
       "payment_ids",
-      "move_id"
+      "move_id",
+      "metadata"
     ],
     "mandatory": [
       "id",

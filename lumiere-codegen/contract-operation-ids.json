@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "operations": {
+    "abandon_bank_statement_settlement": "erp.abandon_bank_statement_settlement",
     "accept_ai_provider_attempt": "erp.accept_ai_provider_attempt",
     "accept_sale_order_quotation": "erp.accept_sale_order_quotation",
     "accrue_sale_commission": "erp.accrue_sale_commission",
@@ -888,12 +889,14 @@
     "restore_document": "erp.restore_document",
     "restore_product_category": "erp.restore_product_category",
     "restore_proposal_version": "erp.restore_proposal_version",
+    "resubmit_bank_statement_settlement": "erp.resubmit_bank_statement_settlement",
     "resume_ai_run_checked": "erp.resume_ai_run_checked",
     "resume_subscription": "erp.resume_subscription",
     "retire_workflow_version": "erp.retire_workflow_version",
     "retry_dead_letter_queue_job": "erp.retry_dead_letter_queue_job",
     "retry_intercompany_transaction": "erp.retry_intercompany_transaction",
     "retry_iot_action": "erp.retry_iot_action",
+    "reverse_bank_statement_settlement": "erp.reverse_bank_statement_settlement",
     "reverse_payment_transaction": "erp.reverse_payment_transaction",
     "reverse_sale_commission_settlement": "erp.reverse_sale_commission_settlement",
     "review_ai_artifact_component_links": "erp.review_ai_artifact_component_links",
