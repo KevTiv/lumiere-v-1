@@ -96,7 +96,7 @@ import { toUpdateAccountMoveLineParams, updateAccountMoveLineParamsToJson } from
 import { toCreateCreditNoteParams } from '@/lib/accounting-create-params';
 import { resolveDefaultCogsInventoryAccountIds } from '@/lib/accounting-post-draft';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
-import { useAccountingModuleSubscription } from '@/lib/module-subscription-hooks';
+import { useModuleSubscription } from '@lumiere/stdb/live';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { RecordDocumentAttachments } from '../../../../../components/record-document-attachments';
 import { toAddAccountMoveLineParamsFromForm } from '../../account-move-line-forms';
@@ -163,7 +163,7 @@ function InvoicePageLoaded({
   operatingCompanyId,
   companyAvailable,
 }: InvoicePageClientProps & { organizationId: number; operatingCompanyId: bigint; companyAvailable: boolean }) {
-  useAccountingModuleSubscription();
+  useModuleSubscription(['account-moves', 'account-move-lines', 'account-accounts', 'sale-orders', 'purchase-orders', 'purchase-order-lines', 'companies', 'currencies']);
   const { t } = useTranslation();
   const router = useRouter();
   const pathname = usePathname();
@@ -172,10 +172,10 @@ function InvoicePageLoaded({
   const { orgId } = orgBigInts(organizationId);
   const { checkPermission } = useRBAC();
   const queryClient = useQueryClient();
-  const [emailReview, setEmailReview] = useState<{ key: string; document: InvoiceEmailDocument } | null>(null);
+  const [emailReview, setEmailReview] = useState<{ key: string; document: InvoiceEmailDocument; purpose: 'invoice' | 'reminder' } | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
   const emailClient = useMemo(() => createInvoiceEmailQueueClient(), []);
-  const emailScopeRef = useRef({ scope: '', documentKey: null as string | null, canQueue: false, canCheck: false });
+  const emailScopeRef = useRef({ scope: '', documentKey: null as string | null, canQueue: false, canCheck: false, canDispatch: false });
   const autoReviewSeen = useRef('');
   const resetMove = useResetAccountMoveToDraft(orgId);
   const resetPendingGuard = useUnsavedChangesGuard(false, resetMove.isPending);
@@ -267,22 +267,23 @@ function InvoicePageLoaded({
   const canQueueEmail = hasQueueEmailPermission && emailRecordReady;
   const currentEmailScope = companyAvailable ? `${orgId}:${operatingCompanyId}:${moveId}` : 'no-active-company';
   const currentEmailDocumentKey = emailRecordReady && emailDocument ? invoiceEmailDocumentKey(emailDocument) : null;
-  emailScopeRef.current = { scope: currentEmailScope, documentKey: currentEmailDocumentKey, canQueue: canQueueEmail, canCheck: checkPermission('mail_message', 'read').allowed };
+  emailScopeRef.current = { scope: currentEmailScope, documentKey: currentEmailDocumentKey, canQueue: canQueueEmail, canCheck: checkPermission('mail_message', 'read').allowed, canDispatch: canQueueEmail && checkPermission('mail_message', 'write').allowed };
   const openEmailReview = () => {
     if (emailReview) { setEmailOpen(true); return; }
     if (!emailDocument) return;
-    setEmailReview((current) => current ?? { key: crypto.randomUUID(), document: { ...emailDocument } });
+    setEmailReview((current) => current ?? { key: crypto.randomUUID(), document: { ...emailDocument }, purpose: searchParams.get('reminder') === '1' ? 'reminder' : 'invoice' });
     setEmailOpen(true);
   };
   useEffect(() => {
-    if (searchParams.get('review') !== 'email' || !emailDocument || !canQueueEmail || autoReviewSeen.current === currentEmailScope) return;
+    if ((searchParams.get('review') !== 'email' && searchParams.get('reminder') !== '1') || !emailDocument || !canQueueEmail || autoReviewSeen.current === currentEmailScope) return;
     autoReviewSeen.current = currentEmailScope;
-    setEmailReview((current) => current ?? { key: crypto.randomUUID(), document: { ...emailDocument } });
+    setEmailReview((current) => current ?? { key: crypto.randomUUID(), document: { ...emailDocument }, purpose: searchParams.get('reminder') === '1' ? 'reminder' : 'invoice' });
     setEmailOpen(true);
   }, [searchParams, currentEmailScope, emailDocument, canQueueEmail]);
   const emailDialog = emailReview ? <InvoiceEmailReviewDialog
     key={emailReview.key}
     open={emailOpen}
+    purpose={emailReview.purpose}
     document={emailReview.document}
     currentScopeKey={currentEmailScope}
     currentDocumentKey={currentEmailDocumentKey}
@@ -298,13 +299,20 @@ function InvoicePageLoaded({
       return result;
     }}
     onCheck={(submission) => emailClient.check(submission, () => emailScopeRef.current.canCheck && emailScopeRef.current.scope === invoiceEmailScope(submission.document))}
+    onDispatch={checkPermission('mail_message', 'write').allowed ? async (submission, messageId, mayDispatch) => {
+      const result = await emailClient.dispatch(submission, messageId, () => mayDispatch() && emailScopeRef.current.canDispatch
+        && emailScopeRef.current.scope === invoiceEmailScope(submission.document)
+        && emailScopeRef.current.documentKey === invoiceEmailDocumentKey(submission.document));
+      void queryClient.invalidateQueries({ queryKey: ['mail-messages'] });
+      return result;
+    } : undefined}
     onReviewPdf={async (document) => {
       if (emailScopeRef.current.scope !== invoiceEmailScope(document) || emailScopeRef.current.documentKey !== invoiceEmailDocumentKey(document)) throw new Error('The active company or invoice changed. Return to the original review before opening its PDF.');
       await downloadInvoiceReviewPdf(document);
     }}
     onReloadTemplates={() => { void queryClient.invalidateQueries({ queryKey: ['invoice-email-review-templates', String(organizationId)] }); }}
     onRefreshDocument={canQueueEmail && emailDocument ? () => {
-      setEmailReview({ key: crypto.randomUUID(), document: { ...emailDocument } });
+      setEmailReview({ key: crypto.randomUUID(), document: { ...emailDocument }, purpose: searchParams.get('reminder') === '1' ? 'reminder' : 'invoice' });
       setEmailOpen(true);
     } : undefined}
     onClose={() => setEmailOpen(false)}

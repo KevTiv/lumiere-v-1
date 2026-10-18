@@ -6,9 +6,9 @@ export function reconciliationFixture(): ReconciliationSource {
   return {
     organizationId: 1n, companyId: 4n, companyCurrencyId: 7n, state: { status: "ready" },
     statement: { id: 2n, organizationId: 1n, companyId: 4n, journalId: 3n, currencyId: 7n, state: { tag: "Open" }, name: "January bank statement" }, line, bankLines: [line],
-    moves: [{ id: 20n, organizationId: 1n, companyId: 4n, name: "INV/2026/001", state: { tag: "Posted" }, invoicePartnerDisplayName: "Alpha customer" }, { id: 21n, organizationId: 1n, companyId: 4n, name: "INV/2026/002", state: { tag: "Posted" }, invoicePartnerDisplayName: "Beta customer" }],
-    accounts: [{ id: 30n, organizationId: 1n, companyId: 4n, code: "1100", name: "Receivable", reconcile: true, deprecated: false }],
-    moveLines: [{ id: 40n, organizationId: 1n, companyId: 4n, moveId: 20n, accountId: 30n, companyCurrencyId: 7n, currencyId: 7n, parentState: { tag: "Posted" }, name: "Consulting services", debit: 800, credit: 0, balance: 800, amountResidual: 600, blocked: false }, { id: 41n, organizationId: 1n, companyId: 4n, moveId: 21n, accountId: 30n, companyCurrencyId: 7n, currencyId: 7n, parentState: { tag: "Posted" }, name: "Support services", debit: 400, credit: 0, balance: 400, amountResidual: 400, blocked: false }],
+    moves: [{ id: 20n, organizationId: 1n, companyId: 4n, name: "INV/2026/001", state: { tag: "Posted" }, moveType: "OutInvoice", partnerId: 50n, invoicePartnerDisplayName: "Alpha customer" }, { id: 21n, organizationId: 1n, companyId: 4n, name: "INV/2026/002", state: { tag: "Posted" }, moveType: "OutInvoice", partnerId: 50n, invoicePartnerDisplayName: "Beta customer" }],
+    accounts: [{ id: 30n, organizationId: 1n, companyId: 4n, code: "1100", name: "Receivable", reconcile: true, deprecated: false, internalType: "Receivable" }],
+    moveLines: [{ id: 40n, organizationId: 1n, companyId: 4n, moveId: 20n, accountId: 30n, companyCurrencyId: 7n, currencyId: 7n, parentState: { tag: "Posted" }, name: "Consulting services", debit: 800, credit: 0, balance: 800, amountResidual: 600, blocked: false, partnerId: 50n }, { id: 41n, organizationId: 1n, companyId: 4n, moveId: 21n, accountId: 30n, companyCurrencyId: 7n, currencyId: 7n, parentState: { tag: "Posted" }, name: "Support services", debit: 400, credit: 0, balance: 400, amountResidual: 400, blocked: false, partnerId: 50n }],
     currencies: [{ id: 7n, code: "EUR", decimalPlaces: 2, roundingFactor: 0.01 }],
     suggestions: [{ entityId: 41n, organizationId: 1n, statementLineId: 10n }],
   }
@@ -84,6 +84,8 @@ describe("reconciliation review projection", () => {
   it("supports signed payable credits without pretending a missing amount is zero", () => {
     const source = reconciliationFixture()
     source.bankLines = [{ ...source.line!, amount: -1000 }]
+    source.moves = source.moves.map((row) => ({ ...row, moveType: "InInvoice" }))
+    source.accounts = source.accounts.map((row) => ({ ...row, internalType: "Payable" }))
     source.moveLines = source.moveLines.map((row) => ({ ...row, debit: 0, credit: row.debit, balance: -Number(row.balance), amountResidual: -Number(row.amountResidual) }))
     const projection = projectReconciliation(source)
     expect(reconciliationSelection(projection, ["40", "41"])).toMatchObject({ total: -1000, difference: 0, request: { amountResidual: 0 } })
@@ -108,5 +110,38 @@ describe("reconciliation review projection", () => {
   it("preserves exact u64 IDs and rejects lossy or invalid identifiers", () => {
     expect(reconciliationId("18446744073709551615")).toBe("18446744073709551615")
     for (const id of [Number.MAX_SAFE_INTEGER + 1, "18446744073709551616", "01", "0", "-1", "1.5", null]) expect(reconciliationId(id)).toBeNull()
+  })
+})
+
+describe("settlement selection boundaries", () => {
+  it("requires one partner and every open line of each selected invoice", () => {
+    const mixed = reconciliationFixture()
+    mixed.moves = mixed.moves.map((row, index) => ({ ...row, partnerId: BigInt(50 + index) }))
+    mixed.moveLines = mixed.moveLines.map((row, index) => ({ ...row, partnerId: BigInt(50 + index) }))
+    expect(reconciliationSelection(projectReconciliation(mixed), ["40", "41"]).request).toBeNull()
+    const split = reconciliationFixture()
+    split.moveLines = [...split.moveLines, { ...split.moveLines[0]!, id: 42n, balance: 100, debit: 100, amountResidual: 100 }]
+    expect(reconciliationSelection(projectReconciliation(split), ["40", "41"]).request).toBeNull()
+  })
+  it("preserves a last-cent residual after earlier binary subtraction", () => {
+    const source = reconciliationFixture()
+    source.bankLines = [{ ...source.line!, amount: 0.01 }]
+    source.moveLines = [{ ...source.moveLines[0]!, debit: 100, balance: 100, amountResidual: 100 - 99.99 }]
+    expect(reconciliationSelection(projectReconciliation(source), ["40"])).toMatchObject({ difference: 0, request: { amountResidual: 0 } })
+  })
+  it("excludes refunds, journal entries, missing partners and wrong account roles", () => {
+    for (const moveType of ["OutRefund", "InRefund", "Entry", "InInvoice", undefined]) {
+      const source = reconciliationFixture()
+      source.moves = source.moves.map((row) => ({ ...row, moveType }))
+      expect(projectReconciliation(source)).toMatchObject({ status: "ready", candidates: [] })
+    }
+    for (const patch of [{ partnerId: undefined }, { partnerId: 99n }]) {
+      const source = reconciliationFixture()
+      source.moveLines = source.moveLines.map((row) => ({ ...row, ...patch }))
+      expect(projectReconciliation(source)).toMatchObject({ status: "ready", candidates: [] })
+    }
+    const source = reconciliationFixture()
+    source.accounts = source.accounts.map((row) => ({ ...row, internalType: "Liquidity" }))
+    expect(projectReconciliation(source)).toMatchObject({ status: "ready", candidates: [] })
   })
 })

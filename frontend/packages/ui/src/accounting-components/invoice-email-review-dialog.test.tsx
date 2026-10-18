@@ -41,7 +41,7 @@ describe('invoice email review', () => {
     const input = props(); const { rerender } = render(<InvoiceEmailReviewDialog {...input} />); review();
     fireEvent.change(screen.getByTestId('invoice-email-recipient'), { target: { value: 'beta@example.test' } });
     expect((screen.getByTestId('invoice-email-queue') as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I reviewed this recipient/ }));
     rerender(<InvoiceEmailReviewDialog {...input} templates={[{ ...input.templates[0]!, bodyHtml: 'Updated body' }]} />);
     expect((screen.getByTestId('invoice-email-queue') as HTMLButtonElement).disabled).toBe(true);
   });
@@ -92,5 +92,58 @@ describe('invoice email review', () => {
     await screen.findByText('Email dispatch recorded');
     expect(screen.getByText(/Recipient delivery is not confirmed/)).toBeTruthy();
     expect(screen.queryByTestId('invoice-email-queue')).toBeNull();
+  });
+
+  it('queues the exact edited plain text and attachment choice only after renewed review', async () => {
+    const input = props(); render(<InvoiceEmailReviewDialog {...input} />);
+    review();
+    fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Reviewed reminder' } });
+    fireEvent.change(screen.getByTestId('invoice-email-body'), { target: { value: 'Please pay. <img src="https://example.test/">' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Attach the managed invoice PDF' }));
+    expect((screen.getByTestId('invoice-email-queue') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('checkbox', { name: /I reviewed this recipient/ }));
+    fireEvent.click(screen.getByTestId('invoice-email-queue'));
+    await screen.findByText('Email queue confirmed');
+    const submission = vi.mocked(input.onQueue).mock.calls[0]?.[0];
+    expect(submission?.content).toEqual({ subject: 'Reviewed reminder', bodyText: 'Please pay. <img src="https://example.test/">', attachPdf: true });
+    expect(submission?.template).toEqual(input.templates[0]);
+    expect(screen.getByTestId('invoice-email-body').querySelector('img')).toBeNull();
+  });
+
+  it('requires a separate send action and never offers replay after a claimed dispatch', async () => {
+    const onDispatch = vi.fn(async (submission: InvoiceEmailSubmission) => ({ status: 'dispatching' as const, submission, messageId: 10n }));
+    const input = props({ onDispatch }); render(<InvoiceEmailReviewDialog {...input} />);
+    review(); fireEvent.click(screen.getByTestId('invoice-email-queue'));
+    await screen.findByText('Email queue confirmed');
+    expect(onDispatch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId('invoice-email-dispatch'));
+    await screen.findByText('Dispatch status unconfirmed');
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('invoice-email-dispatch')).toBeNull();
+    expect(screen.queryByTestId('invoice-email-queue')).toBeNull();
+    expect(screen.getByTestId('invoice-email-check')).toBeTruthy();
+  });
+
+  it('starts reminders as editable literal suggestions and never queues them on open', () => {
+    const input = props({ purpose: 'reminder' }); render(<InvoiceEmailReviewDialog {...input} />);
+    expect(screen.getByText('Review payment reminder')).toBeTruthy();
+    expect((screen.getByLabelText('Subject') as HTMLInputElement).value).toBe('Payment reminder: INV/42');
+    expect((screen.getByTestId('invoice-email-body') as HTMLTextAreaElement).value).toContain('If you have already paid');
+    expect(input.onQueue).not.toHaveBeenCalled();
+    expect((screen.getByTestId('invoice-email-queue') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('lets the operator replace template placeholders with reviewed literal text', async () => {
+    const base = props();
+    const input = props({ templates: [{ ...base.templates[0]!, subject: 'Invoice {{name}}', bodyHtml: 'Hello {{buyer}}' }] });
+    render(<InvoiceEmailReviewDialog {...input} />);
+    fireEvent.change(screen.getByTestId('invoice-email-recipient'), { target: { value: 'alpha@example.test' } });
+    expect((screen.getByTestId('invoice-email-queue') as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Subject'), { target: { value: 'Invoice INV/42' } });
+    fireEvent.change(screen.getByTestId('invoice-email-body'), { target: { value: 'Hello Alpha' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /I reviewed this recipient/ }));
+    fireEvent.click(screen.getByTestId('invoice-email-queue'));
+    await screen.findByText('Email queue confirmed');
+    expect(vi.mocked(input.onQueue).mock.calls[0]?.[0].content?.bodyText).toBe('Hello Alpha');
   });
 });

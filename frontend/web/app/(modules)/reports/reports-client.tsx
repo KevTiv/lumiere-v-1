@@ -1,10 +1,11 @@
 "use client"
-import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { applyPeriodReportFormContext, periodReportContextState, periodReportFormDefaults, readPeriodReportContext, reportMatchesPeriodContext } from "@lumiere/ui/lib/period-report-context"
 import { ModuleInsights } from "../../../components/module-insights"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useMemo, useState, useRef, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState, useRef, useCallback } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -105,6 +106,7 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
+import { useAccountPeriods } from "@lumiere/query-hooks/hooks/accounting/fiscal-periods"
 import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources"
 import {
   companyRowsToSelectOptions,
@@ -137,6 +139,8 @@ import { VatReportPanel } from "./vat-report-panel"
 import { StatementsPanel } from "./statements-panel"
 import { QueryBuilder, type QueryBuilderStatus } from "./query-builder"
 import { OwnerReportsPanel } from "./owner-reports-panel"
+import { ReportPeriodNotice } from "./report-period-notice"
+import { useRBAC } from "@/lib/rbac-context"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
 
@@ -181,6 +185,10 @@ function ReportsClientLoaded({
   /** BigInt organization id for React Query keys (matches `@lumiere/query-hooks` `organizationId` param). */
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
+  const { currentUser, checkPermission, permissionsReady } = useRBAC()
+  const searchParams = useSearchParams()
+  const periodRequested = searchParams?.get("source") === "period-close"
+  const periodContext = useMemo(() => readPeriodReportContext(searchParams ?? new URLSearchParams()), [searchParams])
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [editTemplateOpen, setEditTemplateOpen] = useState(false)
@@ -190,6 +198,7 @@ function ReportsClientLoaded({
   const [recordRunOpen, setRecordRunOpen] = useState(false)
   const [recordRunScheduledId, setRecordRunScheduledId] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<"report_template" | "analytics_metric" | null>(null)
+  useEffect(() => { setSelectedReportId(null); setQuickActionForm(null) }, [orgId, operatingCompanyId, currentUser?.id, periodContext?.periodId, periodContext?.reportType, periodContext?.dateFrom, periodContext?.dateTo])
 
   // Dashboard modal states
   const [editReportOpen, setEditReportOpen] = useState(false)
@@ -213,7 +222,9 @@ function ReportsClientLoaded({
 
   const reportsQuery = useFinancialReports(orgId, initialReports)
   const { data: reportsRaw = [] } = reportsQuery
-  const { data: trialBalances = [] } = useTrialBalances(orgId, initialBalances)
+  const trialBalancesQuery = useTrialBalances(orgId, initialBalances)
+  const { data: trialBalances = [] } = trialBalancesQuery
+  const periodsQuery = useAccountPeriods(orgId, { enabled: periodRequested })
   const { data: reportTemplates = [] } = useReportTemplates(orgId, initialReportTemplates)
   const { data: scheduledReports = [] } = useScheduledReports(orgId, initialScheduledReports)
   const { data: analyticsMetrics = [] } = useAnalyticsMetrics(orgId, initialAnalyticsMetrics)
@@ -223,18 +234,24 @@ function ReportsClientLoaded({
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const currenciesQuery = useCurrencies()
   const { data: currencies = [] } = currenciesQuery
+  const periodState = periodReportContextState(periodContext, { organizationId: orgId, companyId: operatingCompanyId, periods: (periodsQuery.data ?? []) as Record<string, unknown>[], periodState: moduleQueryState(periodsQuery), reportState: moduleQueryState(reportsQuery) })
+  const validPeriodContext = periodRequested && periodState.status === "ready" ? periodContext : null
 
   const reports = useMemo(
     () =>
-      reportsRaw.map((r) => ({
+      reportsRaw.filter((report) => !periodRequested || Boolean(validPeriodContext && reportMatchesPeriodContext(report as Record<string, unknown>, validPeriodContext))).map((r) => ({
         ...r,
         state: reportStateTag((r as { state?: unknown }).state),
       })),
-    [reportsRaw],
+    [reportsRaw, periodRequested, validPeriodContext],
   )
 
   const createTrialBalanceEntry = useCreateTrialBalanceEntry(orgId, operatingCompanyId)
-  const createFinancialReportFlow = useCreateFinancialReportFlow(orgId, operatingCompanyId)
+  const reportActionScope = `${orgId}:${operatingCompanyId}:${currentUser?.id ?? ""}:${periodContext?.periodId ?? "all"}:${periodContext?.reportType ?? "all"}:${periodContext?.dateFrom ?? ""}:${periodContext?.dateTo ?? ""}`
+  const reportActionLive = useRef({ scope: reportActionScope, allowed: true })
+  useEffect(() => () => { reportActionLive.current.allowed = false }, [])
+  reportActionLive.current = { scope: reportActionScope, allowed: permissionsReady !== false && Boolean(currentUser?.id) && checkPermission("financial_report", "create").allowed && checkPermission("financial_report", "write").allowed && moduleQueryState(reportsQuery).status === "ready" && (!periodRequested || periodState.status === "ready") }
+  const createFinancialReportFlow = useCreateFinancialReportFlow(orgId, operatingCompanyId, { scopeKey: reportActionScope, mayDispatch: () => reportActionLive.current.scope === reportActionScope && reportActionLive.current.allowed })
   const generateFinancialReport = useGenerateFinancialReport(orgId, operatingCompanyId)
   const exportFinancialReport = useExportFinancialReport(orgId, operatingCompanyId)
   const archiveFinancialReport = useArchiveFinancialReport(orgId, operatingCompanyId)
@@ -400,11 +417,15 @@ function ReportsClientLoaded({
   )
 
   const financialReportFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(newFinancialReportForm(t), {
+    () => {
+      const form = mergeSelectOptionsForFields(newFinancialReportForm(t), {
         currencyId: currencySelectOptions,
-      }),
-    [t, currencySelectOptions],
+      })
+      if (!validPeriodContext) return form
+      const contextual = mergeFieldDefaultValues(form, periodReportFormDefaults(validPeriodContext))
+      return { ...contextual, sections: contextual.sections.map((section) => ({ ...section, fields: section.fields.map((field) => ["dateFrom", "dateTo", "reportType", "targetMove"].includes(field.name) ? { ...field, disabled: true } : field) })) }
+    },
+    [t, currencySelectOptions, validPeriodContext],
   )
 
   const reportTemplateFormConfig = useMemo(
@@ -462,9 +483,9 @@ function ReportsClientLoaded({
   )
 
   const filteredTrialBalances = useMemo(() => {
-    if (selectedReportId == null) return trialBalances
-    return trialBalances.filter((row) => String(row.reportId) === selectedReportId)
-  }, [trialBalances, selectedReportId])
+    const matchingReportIds = new Set(reports.map((report) => String(report.id)))
+    return trialBalances.filter((row) => (!periodRequested || matchingReportIds.has(String(row.reportId))) && (selectedReportId == null || String(row.reportId) === selectedReportId))
+  }, [trialBalances, selectedReportId, reports, periodRequested])
 
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null
@@ -898,7 +919,7 @@ function ReportsClientLoaded({
     () => ({
       ...moduleConfig,
       tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
-        if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig }
+        if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig, createForm: financialReportFormConfig }
         if (tab.id === "trial-balance") return { ...tab, entityConfig: trialBalanceEntityConfig, createForm: trialBalanceEntryFormConfig, createAction: "createTrialBalanceEntry", createLabel: t("reports.trialBalance.createEntryLabel") }
         if (tab.id === "report-templates") return { ...tab, entityConfig: reportTemplatesEntityConfig, createForm: reportTemplateFormConfig }
         if (tab.id === "analytics-metrics") return { ...tab, entityConfig: analyticsMetricsEntityConfig, createForm: analyticsMetricFormConfig }
@@ -960,9 +981,12 @@ function ReportsClientLoaded({
             type: "custom" as const,
             customContent: (
               <VatReportPanel
+                key={validPeriodContext ? `${validPeriodContext.organizationId}:${validPeriodContext.companyId}:${validPeriodContext.periodId}` : `vat:${orgId}:${operatingCompanyId}`}
                 organizationId={orgId}
                 companyId={operatingCompanyId}
                 financialReports={reports as Record<string, unknown>[]}
+                periodContext={validPeriodContext ?? undefined}
+                sourceState={moduleQueryState(reportsQuery)}
               />
             ),
           }
@@ -989,6 +1013,9 @@ function ReportsClientLoaded({
       liveSections,
       moduleConfig,
       financialReportsEntityConfig,
+      financialReportFormConfig,
+      validPeriodContext,
+      reportsQuery,
       trialBalanceEntityConfig,
       trialBalanceEntryFormConfig,
       reportTemplatesEntityConfig,
@@ -1031,7 +1058,8 @@ function ReportsClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createReport" || action === "generateReport") {
-      await createFinancialReportFlow.mutateAsync(toCreateFinancialReportPayload(formData))
+      if (periodRequested && (!validPeriodContext || validPeriodContext.reportType !== "trial-balance")) throw new Error("The selected period report context is not ready for trial balance generation")
+      await createFinancialReportFlow.mutateAsync(toCreateFinancialReportPayload(validPeriodContext ? applyPeriodReportFormContext(formData, validPeriodContext) : formData))
     } else if (action === "createReportTemplate") {
       await createReportTemplate.mutateAsync(toCreateReportTemplatePayload(formData))
     } else if (action === "createScheduledReport") {
@@ -1076,12 +1104,17 @@ function ReportsClientLoaded({
     importReportTemplateCsv.isPending ||
     importAnalyticsMetricCsv.isPending
 
+  if (periodRequested && periodState.status !== "ready") return <ReportPeriodNotice state={periodState} context={periodContext} />
+
   return (
     <>
+      {validPeriodContext ? <ReportPeriodNotice state={periodState} context={validPeriodContext} /> : null}
       <ModuleView
+        key={reportActionScope}
         config={config}
         dashboardContent={<ModuleInsights input={{ module: "reports", organizationId, companyId: operatingCompanyId ?? 0n, records: { rows: reportsRaw, state: moduleQueryState(reportsQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
+        dataState={{ reports: moduleQueryState(reportsQuery), "trial-balance": mergeModuleStates([moduleQueryState(reportsQuery), moduleQueryState(trialBalancesQuery)]), "vat-report": moduleQueryState(reportsQuery) }}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         onRowClick={(tabId, row) => {

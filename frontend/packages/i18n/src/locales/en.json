@@ -35,63 +35,112 @@
       "error": "This insight's source could not be loaded. Cached figures are hidden."
     },
     "states": {
-      "draft": "Draft", "sent": "Sent", "toapprove": "Awaiting approval",
-      "sale": "Confirmed", "done": "Completed", "cancelled": "Cancelled",
-      "open": "Open", "won": "Won", "lost": "Lost", "overdue": "Past deadline",
-      "purchase": "Confirmed", "late": "Late receipts", "submitted": "Submitted",
-      "approved": "Approved", "posted": "Posted", "refused": "Refused",
-      "generated": "Generated", "exported": "Exported", "archived": "Archived"
+      "draft": "Draft",
+      "sent": "Sent",
+      "toapprove": "Awaiting approval",
+      "sale": "Confirmed",
+      "done": "Completed",
+      "cancelled": "Cancelled",
+      "open": "Open",
+      "won": "Won",
+      "lost": "Lost",
+      "overdue": "Past deadline",
+      "purchase": "Confirmed",
+      "late": "Late receipts",
+      "submitted": "Submitted",
+      "approved": "Approved",
+      "posted": "Posted",
+      "refused": "Refused",
+      "generated": "Generated",
+      "exported": "Exported",
+      "archived": "Archived"
     },
     "workspaces": {
-      "ops": "Operations", "operations": "Operations", "deliveries": "Deliveries", "returns": "Returns",
-      "commission-plans": "Commission plans", "leads": "Leads", "activities": "Activities",
-      "contacts": "Contacts", "requisitions": "Purchase agreements", "vendors": "Vendors",
-      "lines": "Order lines", "inbox": "Receipt and card inbox", "expenses": "Expense lines",
-      "statements": "Financial statements", "trial-balance": "Trial balance",
-      "scheduled-reports": "Scheduled reports", "dashboards": "Saved dashboards"
+      "ops": "Operations",
+      "operations": "Operations",
+      "deliveries": "Deliveries",
+      "returns": "Returns",
+      "commission-plans": "Commission plans",
+      "leads": "Leads",
+      "activities": "Activities",
+      "contacts": "Contacts",
+      "requisitions": "Purchase agreements",
+      "vendors": "Vendors",
+      "lines": "Order lines",
+      "inbox": "Receipt and card inbox",
+      "expenses": "Expense lines",
+      "statements": "Financial statements",
+      "trial-balance": "Trial balance",
+      "scheduled-reports": "Scheduled reports",
+      "dashboards": "Saved dashboards"
     },
     "modules": {
       "sales": {
-        "title": "Sales overview", "description": "Understand order activity, then move the next customer decision forward.",
-        "currentValue": "Open quotation value", "currentCount": "Open quotations",
-        "periodValue": "Confirmed order value", "periodCount": "Confirmed orders placed",
-        "trend": "Confirmed order trends", "measure": "Order value", "distribution": "Orders by current state",
+        "title": "Sales overview",
+        "description": "Understand order activity, then move the next customer decision forward.",
+        "currentValue": "Open quotation value",
+        "currentCount": "Open quotations",
+        "periodValue": "Confirmed order value",
+        "periodCount": "Confirmed orders placed",
+        "trend": "Confirmed order trends",
+        "measure": "Order value",
+        "distribution": "Orders by current state",
         "trendHint": "Confirmed and completed order totals by order month, clipped to the selected period. Partial months are not extrapolated.",
         "basis": "Order totals include tax. Quotations are draft or sent orders. Confirmed order value is grouped by order date and current state, not a historical booking snapshot, recognized revenue, invoiced AR or cash received. Currencies are never combined.",
         "browse": "Browse orders in this currency"
       },
       "crm": {
-        "title": "CRM overview", "description": "See the opportunity pipeline and keep the next relationship action in view.",
-        "currentValue": "Open pipeline value", "currentCount": "Open opportunities",
-        "periodValue": "New opportunity value", "periodCount": "New opportunities",
-        "trend": "Opportunity creation trends", "measure": "Expected value", "distribution": "Opportunity outcomes",
+        "title": "CRM overview",
+        "description": "See the opportunity pipeline and keep the next relationship action in view.",
+        "currentValue": "Open pipeline value",
+        "currentCount": "Open opportunities",
+        "periodValue": "New opportunity value",
+        "periodCount": "New opportunities",
+        "trend": "Opportunity creation trends",
+        "measure": "Expected value",
+        "distribution": "Opportunity outcomes",
         "trendHint": "Expected value of opportunities created in the selected period that are currently open or won. Lost opportunities are excluded; partial months are not extrapolated.",
         "basis": "Pipeline is the current unweighted expected value, not committed sales or a historical pipeline snapshot. Only opportunities explicitly assigned to this company and currency are included. Organization-level unassigned opportunities are excluded. Currencies are never combined.",
         "browse": "Browse opportunities in this currency"
       },
       "purchasing": {
-        "title": "Purchasing overview", "description": "See purchasing commitments and focus on approvals and late receipts.",
-        "currentValue": "Open confirmed PO value", "currentCount": "Open confirmed POs",
-        "periodValue": "Confirmed PO value placed", "periodCount": "Confirmed POs placed",
-        "trend": "Purchase order trends", "measure": "PO value", "distribution": "Purchase orders by current state",
+        "title": "Purchasing overview",
+        "description": "See purchasing commitments and focus on approvals and late receipts.",
+        "currentValue": "Open confirmed PO value",
+        "currentCount": "Open confirmed POs",
+        "periodValue": "Confirmed PO value placed",
+        "periodCount": "Confirmed POs placed",
+        "trend": "Purchase order trends",
+        "measure": "PO value",
+        "distribution": "Purchase orders by current state",
         "trendHint": "Confirmed and completed PO totals by order month, clipped to the selected period. Partial months are not extrapolated.",
         "basis": "PO totals include tax. Open confirmed POs are currently in the Purchase state. These are current document commitments grouped by order date, not billed expenses, cash paid or historical commitments. Late receipt queues exclude fully received orders; no on-time delivery rate is inferred. Currencies are never combined.",
         "browse": "Browse POs in this currency"
       },
       "expenses": {
-        "title": "Expenses overview", "description": "Understand expense report activity and keep employee claims moving.",
-        "currentValue": "Submitted report value", "currentCount": "Submitted reports",
-        "periodValue": "Report value created", "periodCount": "Reports created",
-        "trend": "Expense report trends", "measure": "Report value", "distribution": "Expense reports by current state",
+        "title": "Expenses overview",
+        "description": "Understand expense report activity and keep employee claims moving.",
+        "currentValue": "Submitted report value",
+        "currentCount": "Submitted reports",
+        "periodValue": "Report value created",
+        "periodCount": "Reports created",
+        "trend": "Expense report trends",
+        "measure": "Report value",
+        "distribution": "Expense reports by current state",
         "trendHint": "Submitted, approved, posted and completed report totals by creation month. Draft and refused reports are excluded; partial months are not extrapolated.",
         "basis": "Figures use expense report headers only, not report headers plus expense lines. They describe current document states grouped by creation date, not approval-date history, ledger spend or reimbursement cash. Receipt/card review remains in the operations workspace. Currencies are never combined.",
         "browse": "Browse reports in this currency"
       },
       "reports": {
-        "title": "Reporting overview", "description": "See reporting activity and find drafts or prepared outputs to review.",
-        "currentValue": "Prepared outputs", "currentCount": "Drafts to review",
-        "periodValue": "Reports created", "periodCount": "Prepared reports created",
-        "trend": "Report creation trends", "measure": "Reports created", "distribution": "Reports by current state",
+        "title": "Reporting overview",
+        "description": "See reporting activity and find drafts or prepared outputs to review.",
+        "currentValue": "Prepared outputs",
+        "currentCount": "Drafts to review",
+        "periodValue": "Reports created",
+        "periodCount": "Prepared reports created",
+        "trend": "Report creation trends",
+        "measure": "Reports created",
+        "distribution": "Reports by current state",
         "trendHint": "Financial report header counts by creation month, not the reports' covered accounting periods. Partial months are not extrapolated.",
         "basis": "Prepared outputs are currently generated or exported reports. Counts span currencies within the selected company; no financial amounts, different report periods, snapshots or ledger lines are added together. Exported is a recorded state, not proof of recipient delivery. Statements, trial balances, schedules and saved dashboards retain their existing workspaces.",
         "browse": "Browse financial reports"
@@ -989,7 +1038,9 @@
       "draftEntries": "Draft Entries",
       "awaitingPosting": "Awaiting posting",
       "cashFlow": "Cash Flow Position",
-      "budgetVsActual": "Budget vs Actual"
+      "budgetVsActual": "Budget vs Actual",
+      "unallocatedPayments": "Payments with funds to allocate",
+      "unallocatedPaymentsHint": "Remaining funds on posted payments, including partially allocated payments"
     },
     "manualInvoice": {
       "invoiceTitle": "Invoice",
@@ -1134,7 +1185,9 @@
       "targetPeriod": {
         "label": "Accounting period",
         "placeholder": "Select a period to evaluate"
-      }
+      },
+      "exactPeriod": "Reviewing company {{company}} · {{from}} to {{to}}. Report evidence must cover these exact dates.",
+      "sourceLoading": "Loading the source records needed for this check."
     },
     "chartStructure": {
       "tabLabel": "Chart structure",
@@ -3095,7 +3148,9 @@
       "manualAmountResidual": "Amount residual",
       "reconcileManual": "Reconcile (manual)",
       "unreconcileLine": "Unreconcile",
-      "unreconcileConfirm": "Clear reconciliation for this line?"
+      "unreconcileConfirm": "Clear reconciliation for this line?",
+      "settlementLocked": "Settlement confirmed. Editing, unlinking and reversal are unavailable in this alpha.",
+      "settlementPending": "Payment awaiting approval or settlement completion. Use Focus line to continue."
     },
     "fiscalYears": {
       "title": "Fiscal Years",
@@ -3209,6 +3264,66 @@
       "price": "Unit price",
       "unavailable": "This bill line has no supported exact PO source. Refresh and review its lineage.",
       "description": "Review the supplier bill and correct its economic values. PO unit price: {{price}}; received quantity: {{received}}. Expense, payable, bill totals and PO billed quantities update together. Existing discounts are preserved. Linked percentage tax rows and currency amounts are recalculated using the bill-date exchange rate. Inconsistent tax or currency evidence must be reviewed; do not widen matching tolerances to clear a variance."
+    },
+    "importReview": {
+      "title": "Source control totals",
+      "scope": "These totals cover all {{rows}} source rows, before posting or payment allocation. Compare them with your source records.",
+      "references": "{{count}} distinct document or journal references",
+      "invalid": "Fix source exceptions before importing. Totals are incomplete while exceptions remain.",
+      "moreIssues": "{{count}} more exceptions in the source file.",
+      "currency": "Currency ID {{id}}",
+      "companyCurrency": "Currency unspecified; verify company default",
+      "confirm": "I checked these source totals and references.",
+      "scopeChanged": "The organization, company or import target changed. Select and review the source file again before importing.",
+      "fields": {
+        "source_total": "Source total",
+        "opening_residual": "Opening residual",
+        "opening_debit": "Opening debit",
+        "opening_credit": "Opening credit",
+        "opening_balance": "Opening balance",
+        "debit": "Debit",
+        "credit": "Credit",
+        "amount_untaxed": "Amount untaxed",
+        "amount_tax": "Amount tax",
+        "amount_total": "Amount total",
+        "planned_amount": "Planned amount"
+      }
+    },
+    "billIntake": {
+      "issues": {
+        "supplier": "Select supplier",
+        "reference": "Review supplier reference",
+        "invoiceDate": "Set invoice date",
+        "lines": "Add bill lines",
+        "lineValues": "Review line accounts and amounts",
+        "balance": "Balance journal lines",
+        "total": "Recalculate bill total"
+      },
+      "title": "Bill intake review",
+      "description": "Review draft bills, source references and journal lines before posting. Purchase order receipt and matching exceptions are available in Purchasing.",
+      "purchasing": "Review orders and receipts",
+      "scopeUnavailable": "Bill or journal line ownership is incomplete. Refresh the source records before reviewing intake.",
+      "count": "{{count}} draft bills to review",
+      "empty": "No draft bills in this company.",
+      "supplierUnavailable": "Supplier not available",
+      "lineCount": "{{count}} journal lines",
+      "reviewDetails": "Review source and posting details",
+      "openBill": "Review bill"
+    },
+    "paymentOperations": {
+      "returnToAllocationCompany": "Return to company #{{companyId}} to recover the original allocation."
+    },
+    "billDocuments": {
+      "title": "Supplier documents and receipts",
+      "scopeUnavailable": "Document links or ownership could not be verified. Refresh before attaching a file.",
+      "empty": "No supplier documents linked to this bill.",
+      "file": "Receipt or supplier document (PDF or image, up to 20 MB)",
+      "invalidFile": "Choose a non-empty PDF, PNG, JPEG or WebP file up to 20 MB.",
+      "uploading": "Attaching…",
+      "attach": "Attach to this bill",
+      "readOnly": "Document creation permission is required to attach files.",
+      "unknown": "Attachment submission is unverified. Refresh documents to check this attempt before uploading again.",
+      "refresh": "Refresh documents"
     }
   },
   "crm": {
@@ -13723,6 +13838,15 @@
       "report": "Report",
       "subtotal": "Total {{name}}",
       "viewJournalItems": "View journal items"
+    },
+    "periodContext": {
+      "title": "Period close report review",
+      "scope": "Company {{company}} · period {{period}} · {{from}} to {{to}}. Report results and new report dates use this exact period.",
+      "loading": "Checking period ownership and report sources…",
+      "denied": "You do not have access to the period or report sources needed for this review.",
+      "unavailable": "The period context or its source records could not be verified. Return to period close, select the active company and period, and retry.",
+      "returnToClose": "Return to period close",
+      "clear": "View all reports"
     }
   },
   "proposalWorkspace": {

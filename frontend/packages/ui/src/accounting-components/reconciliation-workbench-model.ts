@@ -15,12 +15,12 @@ export interface ReconciliationBankLineSource {
 export interface ReconciliationMoveLineSource extends ScopedRow {
   moveId?: unknown; accountId?: unknown; name?: unknown; ref?: unknown; ref_?: unknown
   parentState?: unknown; companyCurrencyId?: unknown; currencyId?: unknown
-  balance?: unknown; debit?: unknown; credit?: unknown; amountResidual?: unknown; blocked?: unknown
+  balance?: unknown; debit?: unknown; credit?: unknown; amountResidual?: unknown; blocked?: unknown; partnerId?: unknown
 }
 export interface ReconciliationMoveSource extends ScopedRow {
-  name?: unknown; ref?: unknown; state?: unknown; moveType?: unknown; invoicePartnerDisplayName?: unknown
+  name?: unknown; ref?: unknown; state?: unknown; moveType?: unknown; partnerId?: unknown; invoicePartnerDisplayName?: unknown
 }
-export interface ReconciliationAccountSource extends ScopedRow { name?: unknown; code?: unknown; reconcile?: unknown; deprecated?: unknown }
+export interface ReconciliationAccountSource extends ScopedRow { name?: unknown; code?: unknown; reconcile?: unknown; deprecated?: unknown; internalType?: unknown }
 export interface ReconciliationCurrencySource { id?: unknown; name?: unknown; code?: unknown; decimalPlaces?: unknown; roundingFactor?: unknown }
 export interface ReconciliationSuggestionSource { entityId?: unknown; statementLineId?: unknown; organizationId?: unknown }
 export interface ReconciliationPartnerSource extends ScopedRow { name?: unknown }
@@ -40,7 +40,7 @@ export interface ReconciliationSource {
   partners?: readonly ReconciliationPartnerSource[]
 }
 export interface ReconciliationCandidate {
-  id: string; moveId: string; documentLabel: string; description: string; partner: string
+  id: string; moveId: string; partnerId: string; accountId: string; documentLabel: string; description: string; partner: string
   accountLabel: string; amount: number; suggested: boolean; href: string
 }
 export interface ReconciliationContext {
@@ -74,7 +74,7 @@ function text(value: unknown): string { return typeof value === "string" ? value
 function minorUnits(value: number, decimalPlaces: number): number | null {
   const scaled = value * 10 ** decimalPlaces
   const integer = Math.round(scaled)
-  return Number.isSafeInteger(integer) && Math.abs(integer - scaled) <= Number.EPSILON * Math.max(1, Math.abs(scaled)) * 8 ? integer : null
+  return Number.isSafeInteger(integer) && Math.abs(integer - scaled) <= 0.000001 ? integer : null
 }
 function tag(value: unknown): string {
   if (typeof value === "string") return value
@@ -95,9 +95,8 @@ function uniqueRows<Row extends { id?: unknown }>(rows: readonly Row[]): Map<str
 }
 
 /**
- * Conservative review only, not a matching engine. The reducer records bank-line
- * links; it does not settle invoices or calculate FX, write-offs or ledger entries.
- * Canonical signed residuals are used only when every amount is in base currency.
+ * Exact invoice/bill settlement review. Canonical signed residuals are used only
+ * when every amount is in base currency; payment posting uses its approval gate.
  */
 export function projectReconciliation(source: ReconciliationSource): ReconciliationProjection {
   if (source.state.status !== "ready") return { status: "unavailable", state: source.state }
@@ -147,13 +146,18 @@ export function projectReconciliation(source: ReconciliationSource): Reconciliat
     const accountId = reconciliationId(row.accountId)
     const move = moveId ? moves.get(moveId) : undefined
     const account = accountId ? accounts.get(accountId) : undefined
-    if (!moveId || !move || !inScope(move, organizationId, companyId) || tag(move.state) !== "Posted" || !account || !inScope(account, organizationId, companyId) || account.reconcile !== true || account.deprecated !== false) continue
+    const partnerId = reconciliationId(move?.partnerId)
+    if (!moveId || !move || !inScope(move, organizationId, companyId) || tag(move.state) !== "Posted" || !account || !inScope(account, organizationId, companyId) || account.reconcile !== true || account.deprecated !== false
+      || tag(move.moveType) !== (bankAmount > 0 ? "OutInvoice" : "InInvoice")
+      || tag(account.internalType).toLowerCase() !== (bankAmount > 0 ? "receivable" : "payable")
+      || !partnerId || reconciliationId(row.partnerId) !== partnerId
+      || (line.partnerId != null && reconciliationId(line.partnerId) !== partnerId)) continue
     const balance = amount(row.balance), debit = amount(row.debit), credit = amount(row.credit), residual = amount(row.amountResidual)
     if (balance === null || debit === null || credit === null || residual === null || debit < 0 || credit < 0 || residual === 0 || Math.sign(residual) !== Math.sign(bankAmount) || Math.sign(residual) !== Math.sign(balance)) continue
     const balanceMinor = minorUnits(balance, decimalPlaces), debitMinor = minorUnits(debit, decimalPlaces), creditMinor = minorUnits(credit, decimalPlaces), residualMinor = minorUnits(residual, decimalPlaces)
     if (balanceMinor === null || debitMinor === null || creditMinor === null || residualMinor === null || debitMinor - creditMinor !== balanceMinor || Math.abs(residualMinor) > Math.abs(balanceMinor)) continue
     const documentLabel = text(move.name).trim() || `Journal entry #${moveId}`
-    candidates.push({ id, moveId, documentLabel, description: text(row.name) || text(row.ref) || text(row.ref_) || text(move.ref) || "Journal item", partner: text(move.invoicePartnerDisplayName), accountLabel: [text(account.code), text(account.name)].filter(Boolean).join(" · ") || `Account #${accountId}`, amount: residual, suggested: suggestions.has(id), href: `/accounting/invoices/${encodeURIComponent(moveId)}` })
+    candidates.push({ id, moveId, partnerId, accountId, documentLabel, description: text(row.name) || text(row.ref) || text(row.ref_) || text(move.ref) || "Journal item", partner: text(move.invoicePartnerDisplayName), accountLabel: [text(account.code), text(account.name)].filter(Boolean).join(" · ") || `Account #${accountId}`, amount: residual, suggested: suggestions.has(id), href: `/accounting/invoices/${encodeURIComponent(moveId)}` })
   }
   candidates.sort((a, b) => Number(b.suggested) - Number(a.suggested) || a.documentLabel.localeCompare(b.documentLabel) || a.id.localeCompare(b.id))
   const code = text(currency?.code).trim().toUpperCase()
@@ -168,6 +172,9 @@ export function reconciliationSelection(projection: ReconciliationProjection, se
   if (projection.status !== "ready") return { selected: [] as ReconciliationCandidate[], total: null, difference: null, request: null }
   const selected = projection.candidates.filter((row) => selectedIds.includes(row.id))
   const valid = selected.length > 0 && selected.length === selectedIds.length && new Set(selectedIds).size === selectedIds.length
+    && new Set(selected.map((row) => row.partnerId)).size === 1
+    && new Set(selected.map((row) => row.accountId)).size === 1
+    && projection.candidates.every((row) => !selected.some((chosen) => chosen.moveId === row.moveId) || selectedIds.includes(row.id))
   const scale = 10 ** projection.context.decimalPlaces
   const totalMinor = selected.reduce((sum, row) => sum + minorUnits(row.amount, projection.context.decimalPlaces)!, 0)
   const differenceMinor = minorUnits(projection.context.amount, projection.context.decimalPlaces)! - totalMinor

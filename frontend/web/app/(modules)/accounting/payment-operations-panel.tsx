@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeftRightIcon, Building2Icon, CircleDollarSignIcon, FileUpIcon, PlusIcon, ReceiptTextIcon, RotateCcwIcon, SendIcon, Trash2Icon } from "lucide-react"
 
 import { useTranslation } from "@lumiere/i18n"
@@ -22,8 +22,8 @@ import {
   useCreatePaymentFee,
   useCreatePaymentTransaction,
   usePaymentAccounts,
+  usePaymentAllocationBalances,
   usePaymentFees,
-  usePaymentReconciliations,
   usePaymentReversals,
   usePaymentTransactions,
   usePostPaymentTransaction,
@@ -35,6 +35,7 @@ import {
 import type { PartnerType, PaymentDirection, PaymentFeeBearer, PaymentProviderCode } from "@lumiere/stdb/types"
 import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import { paymentMinorUnitsText, paymentMoneyMinor } from "@lumiere/erp-shared/payment-allocation-projection"
 import {
   statementImportIdempotencyKey,
   statementImportRows,
@@ -45,6 +46,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { HISTORICAL_ACCOUNTING_IMPORT_SOURCE } from "./historical-payment-import"
+import { allocationFailureIsDefinitive, preparePaymentAllocationAttempt, type PaymentAllocationAttempt } from "./payment-allocation-attempt"
 
 type Row = Record<string, unknown>
 
@@ -94,6 +96,8 @@ export interface PaymentOperationsPanelProps {
   glAccountOptions: Array<{ value: string; label: string }>
   partnerOptions: Array<{ value: string; label: string }>
   moveLines: Row[]
+  scopeAvailable?: boolean
+  onRecoveryLockChange?: (locked: boolean) => void
 }
 
 export function PaymentOperationsPanel({
@@ -105,12 +109,14 @@ export function PaymentOperationsPanel({
   glAccountOptions,
   partnerOptions,
   moveLines,
+  scopeAvailable = true,
+  onRecoveryLockChange,
 }: PaymentOperationsPanelProps) {
   const { t } = useTranslation()
   const organization = BigInt(organizationId)
   const { data: accounts = [], isLoading: accountsLoading } = usePaymentAccounts(organization)
   const { data: transactions = [], isLoading: transactionsLoading } = usePaymentTransactions(organization)
-  const { data: reconciliations = [] } = usePaymentReconciliations(organization)
+  const allocationBalances = usePaymentAllocationBalances(organization, companyId)
   const { data: reversals = [] } = usePaymentReversals(organization)
   const { data: fees = [] } = usePaymentFees(organization)
   const { data: statementImportWorkspace = { imports: [], lines: [] }, isLoading: statementImportsLoading } = useBankStatementImports(organization, companyId)
@@ -133,10 +139,15 @@ export function PaymentOperationsPanel({
   const [voidingTransaction, setVoidingTransaction] = useState<Row | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const allocationAttemptRef = useRef<PaymentAllocationAttempt | null>(null)
+  const [unresolvedAllocation, setUnresolvedAllocation] = useState<PaymentAllocationAttempt | null>(null)
+  const inScope = (row: Row) => asId(row.organizationId ?? row.organization_id) === organization && asId(row.companyId ?? row.company_id) === companyId
+  const companyTransactions = (transactions as Row[]).filter(inScope)
+  const balancesByTransaction = new Map(allocationBalances.rows.filter((balance) => balance.transactionId).map((balance) => [balance.transactionId!, balance]))
 
   const activeAccounts = useMemo(
-    () => (accounts as Row[]).filter((account) => optionValue(account.archivedAt) == null && account.active !== false),
-    [accounts],
+    () => (accounts as Row[]).filter((account) => asId(account.organizationId) === organization && asId(account.companyId) === companyId && optionValue(account.archivedAt) == null && account.active !== false),
+    [accounts, organization, companyId],
   )
   const accountOptions = useMemo(
     () => activeAccounts.map((account) => ({
@@ -154,38 +165,33 @@ export function PaymentOperationsPanel({
       .filter((line) => {
         if (allocatingTransaction == null) return false
         const accountType = enumName(line.accountInternalType).toLowerCase()
-        return asId(line.companyId) === companyId
+        return asId(line.organizationId) === organization
+          && asId(line.companyId) === companyId
+          && enumName(line.parentState).toLowerCase() === "posted"
           && asId(line.partnerId) === asId(allocatingTransaction.partnerId)
           && asId(line.currencyId) === asId(allocatingTransaction.currencyId)
           && (accountType === "receivable" || accountType === "payable")
-          && numberValue(line.amountResidual ?? line.amountResidualCurrency) > 0
+          && Math.abs(numberValue(line.amountResidual ?? line.amountResidualCurrency)) > 0
       })
       .map((line) => ({
         value: String(line.id ?? ""),
         label: `${String(line.name ?? line.moveName ?? `Line ${line.id}`)} · ${numberValue(line.amountResidual ?? line.amountResidualCurrency).toLocaleString()}`,
       })),
-    [allocatingTransaction, companyId, moveLines],
+    [allocatingTransaction, companyId, organization, moveLines],
   )
-  const reconciliationsByTransaction = useMemo(() => {
-    const map = new Map<string, Row[]>()
-    for (const reconciliation of reconciliations as Row[]) {
-      const key = String(reconciliation.paymentTransactionId ?? "")
-      map.set(key, [...(map.get(key) ?? []), reconciliation])
-    }
-    return map
-  }, [reconciliations])
   const reversedTransactionIds = useMemo(
-    () => new Set((reversals as Row[]).map((reversal) => String(reversal.originalTransactionId ?? ""))),
-    [reversals],
+    () => new Set((reversals as Row[]).filter((row) => asId(row.organizationId) === organization && asId(row.companyId) === companyId).map((reversal) => String(reversal.originalTransactionId ?? ""))),
+    [reversals, organization, companyId],
   )
   const feesByTransaction = useMemo(() => {
     const map = new Map<string, Row[]>()
     for (const fee of fees as Row[]) {
+      if (asId(fee.organizationId) !== organization || asId(fee.companyId) !== companyId) continue
       const key = String(fee.paymentTransactionId ?? "")
       map.set(key, [...(map.get(key) ?? []), fee])
     }
     return map
-  }, [fees])
+  }, [fees, organization, companyId])
   const statementImports = statementImportWorkspace.imports as Row[]
   const statementImportLines = statementImportWorkspace.lines as Row[]
 
@@ -231,6 +237,7 @@ export function PaymentOperationsPanel({
   const saveAccount = async (data: Row) => {
     try {
       setFormError(null)
+      if (!scopeAvailable) throw new Error("Select a company before creating a payment account.")
       const currencyId = asId(data.currencyId)
       const accountJournalId = asId(data.accountJournalId)
       const providerCode = stringValue(data.providerCode) || "Other"
@@ -261,6 +268,7 @@ export function PaymentOperationsPanel({
   const saveTransaction = async (data: Row) => {
     try {
       setFormError(null)
+      if (!scopeAvailable) throw new Error("Select a company before recording a payment.")
       const paymentAccountId = asId(data.paymentAccountId)
       const partnerId = asId(data.partnerId)
       const currencyId = asId(data.currencyId)
@@ -300,15 +308,22 @@ export function PaymentOperationsPanel({
   const saveAllocation = async (data: Row) => {
     const transaction = allocatingTransaction
     const transactionId = transaction == null ? null : rowId(transaction)
+    const previousOutcomeUnknown = allocationAttemptRef.current != null
     try {
       setFormError(null)
+      if (!scopeAvailable) throw new Error("Select the original company before allocating this payment.")
       const allocatedMoveLineId = asId(data.allocatedMoveLineId)
       const writeOffAmount = numberValue(data.writeOffAmount)
       const writeOffAccountId = asId(data.writeOffAccountId)
       if (transaction == null || transactionId == null || allocatedMoveLineId == null) throw new Error("Choose the invoice or bill line to allocate")
       if (writeOffAmount > 0 && writeOffAccountId == null) throw new Error("Choose a write-off account")
-      await allocateTransaction.mutateAsync({
-        idempotencyKey: `allocate-payment:${globalThis.crypto.randomUUID()}`,
+      if (!inScope(transaction)) throw new Error("The payment belongs to another organization or company.")
+      const balance = balancesByTransaction.get(String(transactionId))
+      const amountMinor = balance ? paymentMoneyMinor(data.allocatedAmount, balance.decimalPlaces) : null
+      if (!allocationAttemptRef.current && (allocationBalances.state.status !== "ready" || !balance || amountMinor == null || amountMinor <= 0n || amountMinor > balance.remainingMinor)) {
+        throw new Error("Enter a positive allocation within the payment's available balance. Refresh unavailable payment balances before continuing.")
+      }
+      const attempt = preparePaymentAllocationAttempt(allocationAttemptRef.current, organization, {
         companyId,
         paymentTransactionId: transactionId,
         allocatedMoveLineId,
@@ -317,12 +332,36 @@ export function PaymentOperationsPanel({
         writeOffAmount,
         writeOffAccountId: writeOffAccountId ?? undefined,
         metadata: undefined,
-      })
+      }, () => `allocate-payment:${globalThis.crypto.randomUUID()}`)
+      allocationAttemptRef.current = attempt
+      setUnresolvedAllocation(attempt)
+      await allocateTransaction.mutateAsync(attempt.params)
+      allocationAttemptRef.current = null
+      setUnresolvedAllocation(null)
       setAllocatingTransaction(null)
     } catch (cause) {
+      if (allocationFailureIsDefinitive(cause, previousOutcomeUnknown)) {
+        allocationAttemptRef.current = null
+        setUnresolvedAllocation(null)
+      }
       const message = cause instanceof Error ? cause.message : "Unable to allocate the payment"
       setFormError(message)
       throw cause
+    }
+  }
+
+  const retryAllocation = async () => {
+    const attempt = allocationAttemptRef.current
+    if (!attempt || !scopeAvailable || attempt.organizationId !== organization || attempt.params.companyId !== companyId) return
+    try {
+      setActionError(null)
+      await allocateTransaction.mutateAsync(attempt.params)
+      allocationAttemptRef.current = null
+      setUnresolvedAllocation(null)
+      setAllocatingTransaction(null)
+    } catch (cause) {
+      // A rejected retry cannot establish the earlier command's outcome.
+      setActionError(cause instanceof Error ? cause.message : "The allocation response remains unresolved.")
     }
   }
 
@@ -330,6 +369,7 @@ export function PaymentOperationsPanel({
     const transactionId = reversingTransaction && rowId(reversingTransaction)
     try {
       setFormError(null)
+      if (!scopeAvailable) throw new Error("Select the original company before reversing this payment.")
       if (transactionId == null) throw new Error("The selected transaction has no ID")
       await reverseTransaction.mutateAsync({
         transactionId,
@@ -348,6 +388,7 @@ export function PaymentOperationsPanel({
     const transactionId = transaction == null ? null : rowId(transaction)
     try {
       setFormError(null)
+      if (!scopeAvailable) throw new Error("Select the original company before adding a fee.")
       if (transaction == null || transactionId == null) throw new Error("The selected transaction has no ID")
       const amount = numberValue(data.amount)
       const taxAmount = numberValue(data.taxAmount)
@@ -380,6 +421,7 @@ export function PaymentOperationsPanel({
     if (transactionId == null) return
     try {
       setActionError(null)
+      if (!scopeAvailable) throw new Error("Select the original company before voiding this payment.")
       await voidTransaction.mutateAsync(transactionId)
       setVoidingTransaction(null)
     } catch (cause) {
@@ -390,6 +432,7 @@ export function PaymentOperationsPanel({
   const saveStatementImport = async (data: Row) => {
     try {
       setFormError(null)
+      if (!scopeAvailable) throw new Error("Select a company before importing a statement.")
       const journalId = asId(data.journalId)
       const currencyId = asId(data.currencyId)
       const uploadedFiles = data.csvFile
@@ -426,6 +469,7 @@ export function PaymentOperationsPanel({
     if (importId == null) return
     try {
       setActionError(null)
+      if (!scopeAvailable) throw new Error("Select the original company before approving the statement import.")
       await approveStatementImport.mutateAsync(importId)
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Unable to approve the statement import")
@@ -437,17 +481,24 @@ export function PaymentOperationsPanel({
     if (transactionId == null) return
     try {
       setActionError(null)
+      if (!scopeAvailable) throw new Error("Select the original company before posting this payment.")
       await postTransaction.mutateAsync(transactionId)
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Unable to post the payment")
     }
   }
 
-  const mutationBusy = createAccount.isPending || createTransaction.isPending || postTransaction.isPending || allocateTransaction.isPending || reverseTransaction.isPending || createFee.isPending || voidTransaction.isPending || stageStatementImport.isPending || approveStatementImport.isPending
+  const mutationPending = createAccount.isPending || createTransaction.isPending || postTransaction.isPending || allocateTransaction.isPending || reverseTransaction.isPending || createFee.isPending || voidTransaction.isPending || stageStatementImport.isPending || approveStatementImport.isPending
+  const mutationBusy = mutationPending || !scopeAvailable
+  const recoveryLocked = mutationPending || unresolvedAllocation != null
+  const allocationScopeMatches = unresolvedAllocation == null
+    || (unresolvedAllocation.organizationId === organization && unresolvedAllocation.params.companyId === companyId)
+  useEffect(() => { onRecoveryLockChange?.(recoveryLocked) }, [onRecoveryLockChange, recoveryLocked])
 
   return (
     <div className="space-y-4">
       {actionError ? <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{actionError}</p> : null}
+      {unresolvedAllocation && !allocateTransaction.isPending ? <div role="alert" className="space-y-2 rounded-md border border-amber-500/40 p-3 text-sm"><p>The allocation response is unresolved. Retry the original allocation with the same values to recover its result.</p>{!allocationScopeMatches ? <p>{t("accounting.paymentOperations.returnToAllocationCompany", { defaultValue: "Return to company #{{companyId}} to recover the original allocation.", companyId: String(unresolvedAllocation.params.companyId) })}</p> : null}<Button size="sm" variant="outline" disabled={!scopeAvailable || mutationPending || !allocationScopeMatches} onClick={() => void retryAllocation()}>Retry original allocation</Button></div> : null}
       <Card>
         <CardHeader>
           <div>
@@ -502,15 +553,31 @@ export function PaymentOperationsPanel({
           <CardAction><Button size="sm" disabled={activeAccounts.length === 0} onClick={() => { setFormError(null); setTransactionDialogOpen(true) }}><PlusIcon data-icon="inline-start" />Record payment</Button></CardAction>
         </CardHeader>
         <CardContent className="space-y-3">
-          {(transactions as Row[]).length > 0 ? (transactions as Row[]).map((transaction) => {
+          {allocationBalances.state.status !== "ready" ? <div role="status" className="rounded-md border border-dashed p-3 text-sm text-muted-foreground"><p>{allocationBalances.state.status === "loading" ? "Loading payment allocation balances…" : allocationBalances.state.status === "denied" ? "Access to payment allocation balances is restricted." : "Complete payment allocation balances are unavailable. Allocation is paused until the ledger sources can be verified."}</p>{"onRetry" in allocationBalances.state && allocationBalances.state.onRetry ? <Button size="sm" variant="outline" className="mt-2" disabled={!scopeAvailable} onClick={allocationBalances.state.onRetry}>Retry balances</Button> : null}</div> : null}
+          {companyTransactions.length > 0 ? companyTransactions.map((transaction) => {
             const id = rowId(transaction)
             const status = enumName(transaction.status)
-            const allocations = reconciliationsByTransaction.get(String(transaction.id)) ?? []
+            const balance = balancesByTransaction.get(String(transaction.id))
             const transactionFees = feesByTransaction.get(String(transaction.id)) ?? []
             const account = accountById.get(String(transaction.paymentAccountId))
-            const canReverse = status === "Posted" && !reversedTransactionIds.has(String(transaction.id))
+            const correction = stringValue(optionValue(transaction.sourceEntity)) === "reversal"
+            const canReverse = status === "Posted" && !correction && !reversedTransactionIds.has(String(transaction.id))
             return <div key={String(transaction.id)} className="rounded-lg border p-3">
-              <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="font-medium">{String(optionValue(transaction.externalReference) ?? `Payment ${transaction.id}`)}</p><Badge variant={statusVariant(status)}>{status || "Draft"}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{String(account?.name ?? "Payment account")} · {enumName(transaction.direction)} · {numberValue(transaction.settlementAmount).toLocaleString()}</p><p className="mt-1 select-all font-mono text-xs text-muted-foreground" data-testid={`payment-transaction-id-${String(transaction.id)}`}>Internal transaction ID: {String(transaction.id)}</p>{stringValue(optionValue(transaction.sourceEntity)) === HISTORICAL_ACCOUNTING_IMPORT_SOURCE ? <p className="mt-1 select-all font-mono text-xs text-muted-foreground">Migration batch reference: {String(optionValue(transaction.sourceEntityId) ?? "missing")}</p> : null}{allocations.length > 0 ? <p className="mt-1 text-xs text-muted-foreground">{allocations.length} allocation{allocations.length === 1 ? "" : "s"} · {allocations.reduce((sum, allocation) => sum + numberValue(allocation.allocatedAmount), 0).toLocaleString()} matched</p> : null}{transactionFees.length > 0 ? <p className="mt-1 text-xs text-muted-foreground">{transactionFees.length} fee{transactionFees.length === 1 ? "" : "s"} · {transactionFees.reduce((sum, fee) => sum + numberValue(fee.amount) + numberValue(fee.taxAmount), 0).toLocaleString()}</p> : null}</div><div className="flex flex-wrap gap-2">{status === "Draft" ? <><Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => { setFormError(null); setFeeTransaction(transaction) }}><ReceiptTextIcon data-icon="inline-start" />Add fee</Button><Button size="sm" variant="outline" disabled={mutationBusy || id == null} onClick={() => void post(transaction)}><SendIcon data-icon="inline-start" />Post</Button><Button size="sm" variant="outline" disabled={mutationBusy || id == null} onClick={() => setVoidingTransaction(transaction)}><Trash2Icon data-icon="inline-start" />Void</Button></> : null}{status === "Posted" ? <Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => { setFormError(null); setAllocatingTransaction(transaction) }}><ArrowLeftRightIcon data-icon="inline-start" />Allocate</Button> : null}{canReverse ? <Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => { setFormError(null); setReversingTransaction(transaction) }}><RotateCcwIcon data-icon="inline-start" />Reverse</Button> : null}</div></div>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2"><p className="font-medium">{String(optionValue(transaction.externalReference) ?? `Payment ${transaction.id}`)}</p><Badge variant={statusVariant(status)}>{status || "Draft"}</Badge></div>
+                  <p className="mt-1 text-sm text-muted-foreground">{String(account?.name ?? "Payment account")} · {enumName(transaction.direction)} · {balance ? paymentMinorUnitsText(balance.amountMinor, balance.decimalPlaces) : String(transaction.settlementAmount ?? "Amount unavailable")}</p>
+                  <p className="mt-1 select-all font-mono text-xs text-muted-foreground" data-testid={`payment-transaction-id-${String(transaction.id)}`}>Internal transaction ID: {String(transaction.id)}</p>
+                  {stringValue(optionValue(transaction.sourceEntity)) === HISTORICAL_ACCOUNTING_IMPORT_SOURCE ? <p className="mt-1 select-all font-mono text-xs text-muted-foreground">Migration batch reference: {String(optionValue(transaction.sourceEntityId) ?? "missing")}</p> : null}
+                  {balance ? <p className="mt-1 text-xs text-muted-foreground" data-testid={`payment-allocation-balance-${String(transaction.id)}`}>{paymentMinorUnitsText(balance.allocatedMinor, balance.decimalPlaces)} allocated · {paymentMinorUnitsText(balance.remainingMinor, balance.decimalPlaces)} remaining · {currencyOptions.find((currency) => currency.value === balance.currencyId)?.label ?? `Currency #${balance.currencyId}`}</p> : null}
+                  {transactionFees.length > 0 ? <p className="mt-1 text-xs text-muted-foreground">{transactionFees.length} fee{transactionFees.length === 1 ? "" : "s"} · {transactionFees.reduce((sum, fee) => sum + numberValue(fee.amount) + numberValue(fee.taxAmount), 0).toLocaleString()}</p> : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {status === "Draft" ? <><Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => { setFormError(null); setFeeTransaction(transaction) }}><ReceiptTextIcon data-icon="inline-start" />Add fee</Button><Button size="sm" variant="outline" disabled={mutationBusy || id == null} onClick={() => void post(transaction)}><SendIcon data-icon="inline-start" />Post</Button><Button size="sm" variant="outline" disabled={mutationBusy || id == null} onClick={() => setVoidingTransaction(transaction)}><Trash2Icon data-icon="inline-start" />Void</Button></> : null}
+                  {status === "Posted" && !correction ? <Button size="sm" variant="outline" disabled={mutationBusy || unresolvedAllocation != null || allocationBalances.state.status !== "ready" || !balance || balance.remainingMinor <= 0n} onClick={() => { setFormError(null); setAllocatingTransaction(transaction) }}><ArrowLeftRightIcon data-icon="inline-start" />Allocate</Button> : null}
+                  {canReverse ? <Button size="sm" variant="outline" disabled={mutationBusy || unresolvedAllocation != null} onClick={() => { setFormError(null); setReversingTransaction(transaction) }}><RotateCcwIcon data-icon="inline-start" />Reverse</Button> : null}
+                </div>
+              </div>
             </div>
           }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><CircleDollarSignIcon /></EmptyMedia><EmptyTitle>{transactionsLoading ? "Loading transactions" : "No payment transactions"}</EmptyTitle><EmptyDescription>Record a provider event, post it, and allocate it to an open invoice or bill.</EmptyDescription></EmptyHeader></Empty>}
         </CardContent>

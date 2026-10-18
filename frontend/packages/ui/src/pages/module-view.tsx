@@ -58,6 +58,8 @@ interface ModuleViewProps {
   /** Controlled tab (use with `onActiveTabChange`, e.g. dashboard quick action → vendors tab) */
   activeTab?: string
   onActiveTabChange?: (tab: string) => void
+  /** Opt in to retaining an open create form and its source workspace across tab changes. */
+  onOpenFormChange?: (tab: string | null) => void
   /** Runtime kanban columns + move handlers keyed by entity tab id */
   entityBoardContext?: Record<string, EntityBoardRuntimeContext>
   /** Per-tab loading flags keyed by tab id — forwarded to EntityTable as skeleton rows. */
@@ -93,6 +95,7 @@ export function ModuleView({
   onRowClick,
   activeTab: activeTabProp,
   onActiveTabChange,
+  onOpenFormChange,
   isPending,
   entityBoardContext,
   dataLoading,
@@ -142,6 +145,7 @@ export function ModuleView({
     overview: t("modules.workspaces.overview"), more: t("modules.workspaces.more"),
   })
   const [openForm, setOpenForm] = useState<string | null>(null)
+  useEffect(() => { onOpenFormChange?.(openForm) }, [openForm, onOpenFormChange])
   const [kpiSelection, setKpiSelection] = useState<Record<string, string | null>>({})
   const [selectedRecord, setSelectedRecord] = useState<Record<string, unknown> | null>(null)
   const dashboardGridRef = useRef<HTMLDivElement>(null)
@@ -212,6 +216,7 @@ export function ModuleView({
           <TabsContent
             key={tab.id}
             value={tab.id}
+            keepMounted={onOpenFormChange != null && openForm === tab.id}
             className="mt-6"
             aria-busy={dataState?.[tab.id]?.status === "loading"}
             data-testid={`module-panel-${config.id}-${tab.id}`}

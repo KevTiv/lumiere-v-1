@@ -5,7 +5,7 @@ import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
 import type { QueueMailFromTemplateParams } from '@lumiere/stdb/types';
 import { createStdbSdk } from '@lumiere/stdb/sdk';
 import {
-  invoiceEmailContext, invoiceEmailRecordRevision, invoiceEmailRecipientProblem, invoiceEmailTemplateProblem, invoiceEmailTemplates,
+  invoiceEmailContent, invoiceEmailContentProblem, invoiceEmailContext, invoiceEmailRecordRevision, invoiceEmailRecipientProblem, invoiceEmailTemplateProblem, invoiceEmailTemplates,
   parseInvoiceEmailMessages, parseInvoiceEmailTemplates, resolveInvoiceEmailQueue, sameInvoiceEmailTemplate,
   type InvoiceEmailDocument, type InvoiceEmailQueueOutcome, type InvoiceEmailSubmission,
 } from '../../../../../../packages/ui/src/accounting-components/invoice-email-review';
@@ -52,6 +52,7 @@ export function createInvoiceEmailQueueClient(fetcher: Fetcher = apiFetch) {
     return fetcher(input, init);
   });
   const dispatched = new Set<string>();
+  const dispatchAttempts = new Set<string>();
   const unknown = (submission: InvoiceEmailSubmission, message: string): InvoiceEmailQueueOutcome => ({ status: 'unknown', submission, message });
   const readMessages = async (submission: InvoiceEmailSubmission) => {
     const response = await fetcher('/api/query/mail-messages');
@@ -63,6 +64,7 @@ export function createInvoiceEmailQueueClient(fetcher: Fetcher = apiFetch) {
     try {
       const confirmed = resolveInvoiceEmailQueue(await readMessages(submission), submission);
       if (!mayRead()) return unknown(submission, 'The active scope changed while checking the original request. No new email was queued.');
+      if (confirmed?.status === 'queued' && dispatchAttempts.has(submission.reviewId)) return unknown(submission, 'This dispatch was already attempted. Its acceptance is not confirmed; inspect the original request without sending another copy.');
       return confirmed === undefined ? unknown(submission, 'The exact queued message is not confirmed. It may have queued or been processed; do not queue it again. Check the original request or ask an administrator to inspect the outbox.')
         : { ...confirmed, submission };
     } catch (error) {
@@ -72,7 +74,8 @@ export function createInvoiceEmailQueueClient(fetcher: Fetcher = apiFetch) {
 
   const queue = async (submission: InvoiceEmailSubmission, mayDispatch = () => true): Promise<InvoiceEmailQueueOutcome> => {
     if (dispatched.has(submission.reviewId)) return check(submission, mayDispatch);
-    const problem = invoiceEmailRecipientProblem(submission.recipient) || invoiceEmailTemplateProblem(submission.template);
+    const reviewedContent = invoiceEmailContent(submission);
+    const problem = invoiceEmailRecipientProblem(submission.recipient) || invoiceEmailTemplateProblem({ ...submission.template, subject: reviewedContent.subject, bodyHtml: reviewedContent.bodyText }) || invoiceEmailContentProblem(reviewedContent) || (!submission.content && submission.template.attachDocument ? 'Review this invoice again to approve its PDF attachment.' : null);
     if (problem || !submission.document.posted) return { status: 'rejected', message: problem || 'Post the customer invoice before queueing its email.' };
     if (new TextEncoder().encode(submission.document.revision).length > 65_536 || new TextEncoder().encode(invoiceEmailContext(submission)).length > 131_072) {
       return { status: 'rejected', message: 'This document or email exceeds the supported review size. No email was queued.' };
@@ -108,7 +111,30 @@ export function createInvoiceEmailQueueClient(fetcher: Fetcher = apiFetch) {
     }
     return check(submission, mayDispatch);
   };
-  return { queue, check };
+  const dispatch = async (submission: InvoiceEmailSubmission, messageId: bigint, mayDispatch = () => true): Promise<InvoiceEmailQueueOutcome> => {
+    if (!mayDispatch()) return unknown(submission, 'Return to the original readable invoice and company before dispatching this reviewed request.');
+    if (dispatchAttempts.has(submission.reviewId)) {
+      const result = await check(submission, mayDispatch);
+      return result.status === 'queued' ? unknown(submission, 'This dispatch was already attempted. Inspect the original request without sending another copy.') : result;
+    }
+    try {
+      const current = resolveInvoiceEmailQueue(await readMessages(submission), submission);
+      if (!current || current.messageId !== messageId) return unknown(submission, 'The exact queued message could not be confirmed. No dispatch was attempted.');
+      // A resumed outbox review has already consumed its queue token too.
+      dispatched.add(submission.reviewId);
+      if (current.status !== 'queued') return { ...current, submission };
+      if (!mayDispatch()) return unknown(submission, 'The active invoice, company or access changed. No dispatch was attempted.');
+    } catch { return unknown(submission, 'The original queue request is unreadable. No dispatch was attempted.'); }
+    // A second caller may finish the same read concurrently; claim locally before POST.
+    if (dispatchAttempts.has(submission.reviewId)) return unknown(submission, 'This dispatch is already being checked. No second request was sent.');
+    dispatchAttempts.add(submission.reviewId);
+    try {
+      await fetcher(`/api/mail/messages/${messageId}/dispatch`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reviewId: submission.reviewId }), signal: AbortSignal.timeout(120_000) });
+    } catch { /* A durable claim or provider acceptance may have succeeded: reconcile without retry. */ }
+    const result = await check(submission, mayDispatch);
+    return result.status === 'queued' ? unknown(submission, 'Dispatch was not confirmed. Inspect this original request; do not send another copy.') : result;
+  };
+  return { queue, check, dispatch };
 }
 
 export async function downloadInvoiceReviewPdf(document: InvoiceEmailDocument, fetcher: Fetcher = apiFetch): Promise<void> {

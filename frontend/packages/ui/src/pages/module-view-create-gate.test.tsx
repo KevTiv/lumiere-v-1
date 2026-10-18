@@ -234,3 +234,34 @@ describe("ModuleView dialogs follow collection availability", () => {
     expect(screen.queryByTestId("create-form")).toBeNull()
   })
 })
+
+
+describe("ModuleView opt-in create form retention", () => {
+  const twoTabs: ModuleConfig = { ...config, tabs: [...config.tabs, { id: "other", label: "Other", type: "custom", customContent: "Other workspace" }] }
+  const view = (activeTab: string, onOpenFormChange?: (tab: string | null) => void, state?: ModuleDataState) => (
+    <RBACProvider initialUser={user} initialRoles={[role([rule("sale_order", "create")])]} initialPolicies={[]}>
+      <ModuleView config={twoTabs} activeTab={activeTab} onOpenFormChange={onOpenFormChange} dataState={state ? { orders: state } : undefined} />
+    </RBACProvider>
+  )
+  it("retains the original form and reports its workspace after navigating, then clears it on source denial", async () => {
+    const onOpen = vi.fn()
+    const { rerender } = render(view("orders", onOpen))
+    fireEvent.click(screen.getByTestId("module-create-sales-orders"))
+    expect(screen.getByTestId("create-form")).toBeTruthy()
+    expect(onOpen).toHaveBeenLastCalledWith("orders")
+    rerender(view("other", onOpen))
+    expect(screen.getByTestId("create-form")).toBeTruthy()
+    expect(screen.getByText("Other workspace")).toBeTruthy()
+    expect(onOpen).toHaveBeenLastCalledWith("orders")
+    rerender(view("other", onOpen, { status: "denied" }))
+    await waitFor(() => expect(screen.queryByTestId("create-form")).toBeNull())
+    expect(onOpen).toHaveBeenLastCalledWith(null)
+  })
+  it("preserves the existing unmount behavior without the opt-in callback", () => {
+    const { rerender } = render(view("orders"))
+    fireEvent.click(screen.getByTestId("module-create-sales-orders"))
+    expect(screen.getByTestId("create-form")).toBeTruthy()
+    rerender(view("other"))
+    expect(screen.queryByTestId("create-form")).toBeNull()
+  })
+})

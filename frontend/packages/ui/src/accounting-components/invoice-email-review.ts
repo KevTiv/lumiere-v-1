@@ -19,13 +19,17 @@ export interface InvoiceEmailDocument {
 
 export interface InvoiceEmailSubmission {
   reviewId: string;
+  purpose?: 'invoice' | 'reminder';
   document: InvoiceEmailDocument;
   template: InvoiceEmailTemplate;
   recipient: string;
+  /** Exact plain text approved for this one send; original template remains revision evidence. */
+  content?: { subject: string; bodyText: string; attachPdf: boolean };
 }
 
 export type InvoiceEmailQueueOutcome =
   | { status: 'queued'; submission: InvoiceEmailSubmission; messageId: MailMessage['id'] }
+  | { status: 'dispatching'; submission: InvoiceEmailSubmission; messageId: MailMessage['id'] }
   | { status: 'dispatched'; submission: InvoiceEmailSubmission; messageId: MailMessage['id'] }
   | { status: 'unknown'; submission: InvoiceEmailSubmission; message: string }
   | { status: 'rejected'; message: string };
@@ -128,7 +132,6 @@ export function defaultInvoiceEmailTemplate(rows: readonly InvoiceEmailTemplate[
 
 export function invoiceEmailTemplateProblem(template: InvoiceEmailTemplate): string | null {
   if (new TextEncoder().encode(template.subject).length > 4096 || new TextEncoder().encode(template.bodyHtml).length > 65_536) return 'This template exceeds the supported email review size. Shorten its subject or body before queueing.';
-  if (template.attachDocument) return 'This template requests an attachment, but invoice PDF attachments are not supported by the current email transport. Choose a message-only template.';
   if (!template.subject.trim() || !template.bodyHtml.trim()) return 'The template needs a subject and message body before it can be queued.';
   if (/\{\{|\$\{|\{%|\bt-(?:esc|out|field)\s*=/.test(`${template.subject}\n${template.bodyHtml}`)) return 'This template contains placeholders. They are not expanded by the current email transport. Choose a template with complete literal text.';
   return null;
@@ -144,36 +147,51 @@ export function invoiceEmailRecipientProblem(recipient: string): string | null {
   return recipient.length > 254 || !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(recipient.trim()) ? 'Enter one valid recipient email address.' : null;
 }
 
-/** This review token is correlation evidence, not a backend idempotency guarantee. */
+export function invoiceEmailContent(submission: InvoiceEmailSubmission) {
+  return submission.content ?? { subject: submission.template.subject, bodyText: submission.template.bodyHtml, attachPdf: false };
+}
+
+export function invoiceEmailContentProblem(content: { subject: string; bodyText: string }): string | null {
+  if (!content.subject.trim() || !content.bodyText.trim()) return 'Enter a subject and message before queueing.';
+  if (/[\r\n\x00-\x1f\x7f]/.test(content.subject)) return 'The email subject must be a single line.';
+  if (new TextEncoder().encode(content.subject).length > 4096 || new TextEncoder().encode(content.bodyText).length > 65_536) return 'The reviewed subject or message is too long.';
+  return null;
+}
+
+/** Original template, exact approved text and immutable invoice revision travel together. */
 export function invoiceEmailContext(submission: InvoiceEmailSubmission): string {
   return JSON.stringify({ invoiceReview: {
-    schemaVersion: 1, reviewId: submission.reviewId,
+    schemaVersion: submission.content ? 2 : 1, reviewId: submission.reviewId,
+    ...(submission.purpose ? { purpose: submission.purpose } : {}),
     organizationId: String(submission.document.organizationId), companyId: String(submission.document.companyId),
     moveId: String(submission.document.moveId), templateId: String(submission.template.id),
-    reference: submission.document.reference, pdfFilename: submission.document.pdfFilename, pdfAttached: false,
+    reference: submission.document.reference, pdfFilename: submission.document.pdfFilename, pdfAttached: submission.content?.attachPdf ?? false,
+    ...(submission.content ? { subject: submission.content.subject, bodyText: submission.content.bodyText } : {}),
     expectedSubject: submission.template.subject, expectedBodyHtml: submission.template.bodyHtml,
     expectedAttachDocument: submission.template.attachDocument, recordRevision: submission.document.revision,
   } });
 }
 
-export function resolveInvoiceEmailQueue(rows: readonly InvoiceEmailMessage[], submission: InvoiceEmailSubmission): { messageId: MailMessage['id']; status: 'queued' | 'dispatched' } | undefined {
+export function resolveInvoiceEmailQueue(rows: readonly InvoiceEmailMessage[], submission: InvoiceEmailSubmission): { messageId: MailMessage['id']; status: 'queued' | 'dispatching' | 'dispatched' } | undefined {
   const context = invoiceEmailContext(submission);
+  const content = invoiceEmailContent(submission);
   const matches = rows.filter((row) => {
     if (row.organizationId !== submission.document.organizationId || row.model !== 'account_move' || row.resId !== submission.document.moveId
-      || row.body !== submission.template.bodyHtml || typeof row.metadata !== 'string') return false;
+      || row.body !== content.bodyText || typeof row.metadata !== 'string') return false;
     let metadata: unknown;
     try { metadata = JSON.parse(row.metadata); } catch { return false; }
     if (!object(metadata)) return false;
-    return own(metadata, 'delivery') && (metadata.delivery === 'queued' || metadata.delivery === 'sent')
+    return own(metadata, 'delivery') && (metadata.delivery === 'queued' || metadata.delivery === 'dispatching' || metadata.delivery === 'sent')
       && own(metadata, 'context_json') && metadata.context_json === context
       && own(metadata, 'mail_template_id') && String(metadata.mail_template_id) === String(submission.template.id)
       && own(metadata, 'to') && metadata.to === submission.recipient.trim()
-      && own(metadata, 'subject') && metadata.subject === submission.template.subject
-      && own(metadata, 'html') && metadata.html === submission.template.bodyHtml;
+      && own(metadata, 'subject') && metadata.subject === content.subject
+      && own(metadata, 'html') && metadata.html === content.bodyText
+      && (!submission.content || own(metadata, 'attach_document') && metadata.attach_document === content.attachPdf);
   });
   if (matches.length > 1) throw new Error('More than one message matches this review. Do not queue it again.');
   const match = matches[0];
   if (!match?.metadata) return undefined;
   const metadata: unknown = JSON.parse(match.metadata);
-  return { messageId: match.id, status: object(metadata) && own(metadata, 'delivery') && metadata.delivery === 'sent' ? 'dispatched' : 'queued' };
+  return { messageId: match.id, status: object(metadata) && own(metadata, 'delivery') && metadata.delivery === 'sent' ? 'dispatched' : object(metadata) && own(metadata, 'delivery') && metadata.delivery === 'dispatching' ? 'dispatching' : 'queued' };
 }

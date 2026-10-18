@@ -17,6 +17,13 @@ describe("RBAC action vocabulary", () => {
     expect(actionsMatch("*", "admin")).toBe(true)
   })
 
+  it.each(["post", "reconcile", "reverse"] as const)("keeps the backend %s permission distinct from write", (action) => {
+    expect(parsePermissionString(`payment:${action}`)).toEqual({ resource: "payment", action })
+    expect(actionsMatch("write", action)).toBe(false)
+    expect(actionsMatch(action, action)).toBe(true)
+    expect(actionsMatch("*", action)).toBe(true)
+  })
+
   it("preserves manage coverage for non-admin UI actions", () => {
     expect(actionsMatch("manage", "read")).toBe(true)
     expect(actionsMatch("manage", "update")).toBe(true)

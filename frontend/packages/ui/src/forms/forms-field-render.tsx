@@ -162,6 +162,7 @@ export function FormFieldRenderer({
             disabled={field.disabled}
           >
             <SelectTrigger
+              id={field.id}
               data-testid={`form-field-${field.name}`}
               className={cn(
                 "w-full",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  defaultInvoiceEmailTemplate, invoiceEmailContext, invoiceEmailTemplateProblem, invoiceEmailTemplates,
+  defaultInvoiceEmailTemplate, invoiceEmailContentProblem, invoiceEmailContext, invoiceEmailTemplateProblem, invoiceEmailTemplates,
   parseInvoiceEmailMessages, parseInvoiceEmailTemplates, resolveInvoiceEmailQueue,
   type InvoiceEmailDocument, type InvoiceEmailMessage, type InvoiceEmailSubmission, type InvoiceEmailTemplate,
 } from './invoice-email-review';
@@ -27,8 +27,8 @@ describe('invoice email review projections', () => {
     expect(() => parseInvoiceEmailTemplates({ data: [{ ...raw, is_active: null }] })).toThrow(/active/);
   });
 
-  it('blocks unsupported attachment and placeholder templates instead of promising absent capabilities', () => {
-    expect(invoiceEmailTemplateProblem({ ...template, attachDocument: true })).toMatch(/attachments are not supported/);
+  it('accepts managed attachment templates while rejecting unexpanded placeholders', () => {
+    expect(invoiceEmailTemplateProblem({ ...template, attachDocument: true })).toBeNull();
     expect(invoiceEmailTemplateProblem({ ...template, subject: 'Invoice {{object.name}}' })).toMatch(/not expanded/);
     expect(invoiceEmailTemplateProblem({ ...template, bodyHtml: '${invoice.reference}' })).toMatch(/not expanded/);
     expect(invoiceEmailTemplateProblem(template)).toBeNull();
@@ -63,5 +63,21 @@ describe('invoice email review projections', () => {
     expect(context.invoiceReview.expectedAttachDocument).toBe(false);
     expect(context.invoiceReview.pdfAttached).toBe(false);
     expect(context.invoiceReview.recordRevision).toBe(document.revision);
+  });
+
+  it('binds edited content and attachment choice to v2, retaining claimed dispatches for recovery', () => {
+    const edited = { ...submission, content: { subject: 'Approved reminder', bodyText: '<script>Plain text</script>', attachPdf: true } };
+    const context = invoiceEmailContext(edited);
+    const envelope = JSON.parse(context).invoiceReview;
+    expect(envelope.schemaVersion).toBe(2);
+    expect(envelope.expectedSubject).toBe(template.subject);
+    expect(envelope.subject).toBe('Approved reminder');
+    expect(envelope.pdfAttached).toBe(true);
+    const queued = { ...message(), body: edited.content.bodyText, metadata: JSON.stringify({ delivery: 'dispatching', context_json: context,
+      mail_template_id: 9, to: edited.recipient, subject: edited.content.subject, html: edited.content.bodyText, attach_document: true }) };
+    expect(resolveInvoiceEmailQueue([queued], edited)).toEqual({ messageId: 10n, status: 'dispatching' });
+    expect(resolveInvoiceEmailQueue([queued], { ...edited, content: { ...edited.content, attachPdf: false } })).toBeUndefined();
+    expect(invoiceEmailContentProblem({ subject: 'Header\r\ninjection', bodyText: 'Body' })).toMatch(/single line/);
+    expect(invoiceEmailContentProblem({ subject: 'Subject', bodyText: '' })).toMatch(/Enter/);
   });
 });

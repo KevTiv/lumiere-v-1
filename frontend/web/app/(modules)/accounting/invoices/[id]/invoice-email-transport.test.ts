@@ -107,3 +107,56 @@ test('large canonical IDs are rejected before write if the existing serializer c
   if (outcome.status === 'rejected') assert.match(outcome.message, /cannot represent this request exactly/);
   assert.equal(posts, 0);
 });
+
+test('per-send text and PDF intent use the existing exact reviewed queue envelope', async () => {
+  const edited = { ...submission, content: { subject: 'Reviewed reminder', bodyText: 'Please pay invoice INV/42.', attachPdf: true } };
+  const command = invoiceEmailQueueRequest(edited);
+  const body = JSON.parse(String(command.init.body));
+  const review = JSON.parse(body.params.context_json.some).invoiceReview;
+  assert.equal(review.schemaVersion, 2);
+  assert.equal(review.expectedSubject, submission.template.subject);
+  assert.equal(review.subject, edited.content.subject);
+  assert.equal(review.bodyText, edited.content.bodyText);
+  assert.equal(review.pdfAttached, true);
+});
+
+test('explicit dispatch binds exact queued message and never repeats a lost claimed response', async () => {
+  let delivery = 'queued'; let posts = 0;
+  const client = createInvoiceEmailQueueClient(async (path, init) => {
+    if (path === '/api/query/mail-messages') return json({ data: [message(delivery)] });
+    assert.equal(path, '/api/mail/messages/11/dispatch');
+    assert.equal(init?.method, 'POST');
+    assert.deepEqual(JSON.parse(String(init?.body)), { reviewId: submission.reviewId });
+    posts += 1; delivery = 'dispatching'; throw new TypeError('response lost after durable claim');
+  });
+  assert.equal((await client.dispatch(submission, 11n)).status, 'dispatching');
+  assert.equal((await client.dispatch(submission, 11n)).status, 'dispatching');
+  assert.equal((await client.queue(submission)).status, 'dispatching');
+  assert.equal(posts, 1);
+});
+
+test('concurrent dispatch preflights produce one POST and never target another queue row', async () => {
+  let posts = 0;
+  let delivery = 'queued';
+  const client = createInvoiceEmailQueueClient(async (path) => {
+    if (path === '/api/query/mail-messages') return json({ data: [message(delivery)] });
+    posts += 1; delivery = 'sent'; return json({ status: 'dispatched' });
+  });
+  assert.equal((await client.dispatch(submission, 999n)).status, 'unknown');
+  assert.equal(posts, 0);
+  await Promise.all([client.dispatch(submission, 11n), client.dispatch(submission, 11n)]);
+  assert.equal(posts, 1);
+});
+
+test('dispatch scope loss and denied readback never trigger provider work or a queue replay', async () => {
+  let posts = 0; let active = true;
+  const client = createInvoiceEmailQueueClient(async (_path, init) => {
+    if (init?.method === 'POST') posts += 1;
+    active = false;
+    return json({ data: [message()] });
+  });
+  assert.equal((await client.dispatch(submission, 11n, () => active)).status, 'unknown');
+  assert.equal(posts, 0);
+  const denied = createInvoiceEmailQueueClient(async () => json({ error: 'Denied' }, 403));
+  assert.equal((await denied.dispatch(submission, 11n)).status, 'unknown');
+});

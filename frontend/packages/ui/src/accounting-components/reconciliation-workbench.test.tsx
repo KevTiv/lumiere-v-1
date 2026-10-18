@@ -11,11 +11,11 @@ function fixture(): ReconciliationSource {
   return {
     organizationId: 1n, companyId: 4n, companyCurrencyId: 7n, state: { status: "ready" },
     statement: { id: 2n, organizationId: 1n, companyId: 4n, journalId: 3n, currencyId: 7n, state: "Open", name: "January statement" }, line, bankLines: [line],
-    moves: [{ id: 20n, organizationId: 1n, companyId: 4n, name: "INV/001", state: "Posted", invoicePartnerDisplayName: "Alpha customer" }, { id: 21n, organizationId: 1n, companyId: 4n, name: "INV/002", state: "Posted", invoicePartnerDisplayName: "Beta customer" }],
-    accounts: [{ id: 30n, organizationId: 1n, companyId: 4n, name: "Receivable", code: "1100", reconcile: true, deprecated: false }],
+    moves: [{ id: 20n, organizationId: 1n, companyId: 4n, name: "INV/001", state: "Posted", moveType: "OutInvoice", partnerId: 50n, invoicePartnerDisplayName: "Alpha customer" }, { id: 21n, organizationId: 1n, companyId: 4n, name: "INV/002", state: "Posted", moveType: "OutInvoice", partnerId: 50n, invoicePartnerDisplayName: "Beta customer" }],
+    accounts: [{ id: 30n, organizationId: 1n, companyId: 4n, name: "Receivable", code: "1100", reconcile: true, deprecated: false, internalType: "Receivable" }],
     moveLines: [
-      { id: 40n, organizationId: 1n, companyId: 4n, moveId: 20n, accountId: 30n, companyCurrencyId: 7n, currencyId: 7n, parentState: "Posted", name: "Consulting", debit: 600, credit: 0, balance: 600, amountResidual: 600, blocked: false },
-      { id: 41n, organizationId: 1n, companyId: 4n, moveId: 21n, accountId: 30n, companyCurrencyId: 7n, currencyId: 7n, parentState: "Posted", name: "Support", debit: 400, credit: 0, balance: 400, amountResidual: 400, blocked: false },
+      { id: 40n, organizationId: 1n, companyId: 4n, moveId: 20n, accountId: 30n, companyCurrencyId: 7n, currencyId: 7n, parentState: "Posted", name: "Consulting", debit: 600, credit: 0, balance: 600, amountResidual: 600, blocked: false, partnerId: 50n },
+      { id: 41n, organizationId: 1n, companyId: 4n, moveId: 21n, accountId: 30n, companyCurrencyId: 7n, currencyId: 7n, parentState: "Posted", name: "Support", debit: 400, credit: 0, balance: 400, amountResidual: 400, blocked: false, partnerId: 50n },
     ], currencies: [{ id: 7n, code: "EUR", decimalPlaces: 2, roundingFactor: 0.01 }],
   }
 }
@@ -37,10 +37,10 @@ describe("bank matching desk", () => {
     expect(within(review).getByText("Difference").nextElementSibling?.textContent).toContain("0.00")
     fireEvent.click(screen.getByRole("checkbox", { name: reviewLabel }))
     fireEvent.click(confirm)
-    await screen.findByText("Bank-line link confirmed")
+    await screen.findByText("Bank settlement confirmed")
     expect(onConfirm).toHaveBeenCalledOnce()
     expect(onConfirm.mock.calls[0]![0]).toEqual({ organizationId: "1", companyId: "4", statementId: "2", lineId: "10", moveLineIds: ["40", "41"], amountResidual: 0 })
-    expect(screen.getByText(/Invoice and payment balances have not been settled/)).toBeTruthy()
+    expect(screen.getByText(/posted payment and selected invoice balances are settled/)).toBeTruthy()
   })
   it("searches readable document, partner, account and item labels without losing selections", () => {
     render(<ReconciliationWorkbench source={fixture()} canReconcile onConfirm={vi.fn()} />)
@@ -97,7 +97,7 @@ describe("bank matching desk", () => {
     fireEvent.click(screen.getByText("Check original action"))
     await screen.findByText(/Nothing has been resubmitted/)
     fireEvent.click(screen.getByText("Check original action"))
-    await screen.findByText("Bank-line link confirmed")
+    await screen.findByText("Bank settlement confirmed")
     expect(onCheckStatus.mock.calls.every(([request]) => request === captured)).toBe(true)
     expect(onConfirm).toHaveBeenCalledOnce()
     expect(onOperationLockChange).toHaveBeenLastCalledWith(false)
@@ -151,4 +151,23 @@ describe("bank matching desk", () => {
     expect(screen.queryByTestId("reconciliation-confirm")).toBeNull()
     expect(props.onConfirm).not.toHaveBeenCalled()
   })
+  it("preserves approval waiting distinctly and completes only after explicit continuation", async () => {
+    const onConfirm = vi.fn().mockResolvedValueOnce({ status: "awaiting_approval", paymentId: "88" }).mockResolvedValueOnce({ status: "confirmed" })
+    const onCheckStatus = vi.fn().mockResolvedValue({ status: "awaiting_approval", paymentId: "88" })
+    render(<ReconciliationWorkbench source={fixture()} canReconcile onConfirm={onConfirm} onCheckStatus={onCheckStatus} />)
+    selectExactMatch()
+    fireEvent.click(screen.getByRole("checkbox", { name: reviewLabel }))
+    fireEvent.click(screen.getByTestId("reconciliation-confirm"))
+    await screen.findByText("Payment awaiting approval or settlement completion")
+    expect(screen.queryByText("Bank settlement confirmed")).toBeNull()
+    expect(screen.getByRole("link", { name: "Review approval for payment #88" }).getAttribute("href")).toBe("/approvals?model=account_payment&resId=88")
+    fireEvent.click(screen.getByText("Check payment status"))
+    await screen.findByText("Payment awaiting approval or settlement completion")
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByText("Complete approved settlement"))
+    await screen.findByText("Bank settlement confirmed")
+    expect(onConfirm).toHaveBeenCalledTimes(2)
+    expect(onConfirm.mock.calls[1]![0]).toBe(onConfirm.mock.calls[0]![0])
+  })
+
 })

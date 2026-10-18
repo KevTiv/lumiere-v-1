@@ -207,9 +207,23 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
       amountResidual: 0,
     })
     const acceptedEffect = await fetchBankLine(page, lineId)
-    // Bank-line linkage is not invoice settlement: the invoice stays unpaid.
+    // Confirmation now proves actual invoice and payment settlement.
     const invoiceAfter = (await queryRows(page, "account-moves")).find((row) => scalarQueryId(row.id) === moveId)
-    expect(Number(invoiceAfter?.amountResidual ?? invoiceAfter?.amount_residual)).toBe(25)
+    expect(Number(invoiceAfter?.amountResidual ?? invoiceAfter?.amount_residual)).toBe(0)
+    const settledLine = (await queryRows(page, "bank-statement-lines")).find((row) => scalarQueryId(row.id) === lineId)
+    const paymentIds = settledLine?.paymentIds ?? settledLine?.payment_ids
+    expect(Array.isArray(paymentIds) ? paymentIds.length : 0).toBe(1)
+    const paymentId = scalarQueryId((paymentIds as unknown[])[0])
+    const paymentAfter = (await queryRows(page, "account-payments")).find((row) => scalarQueryId(row.id) === paymentId)
+    expect(Number(paymentAfter?.amount)).toBe(25)
+    const paymentMoveId = scalarQueryId(paymentAfter?.moveId ?? paymentAfter?.move_id)
+    expect(paymentMoveId).not.toBeNull()
+    const clearing = (await queryRows(page, "account-move-lines")).filter((row) =>
+      scalarQueryId(row.moveId ?? row.move_id) === paymentMoveId
+      && ["receivable", "payable"].includes(String(row.accountInternalType ?? row.account_internal_type).toLowerCase()),
+    )
+    expect(clearing).toHaveLength(1)
+    expect(Number(clearing[0]?.amountResidual ?? clearing[0]?.amount_residual)).toBe(0)
 
     const stale = await replayOperationAs(page, accepted.request())
     expect(stale.status()).toBe(422)

@@ -7,6 +7,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { Badge } from "@lumiere/ui/components/badge"
 import { Button } from "@lumiere/ui/components/button"
 import { workspaceStyles } from "@lumiere/ui/lib/workspace-styles"
+import { paymentMinorUnitsText } from "@lumiere/erp-shared/payment-allocation-projection"
 import { invoiceRecordHref } from "./invoice-record"
 import { AccountantInsights } from "./accountant-insights"
 import {
@@ -38,7 +39,7 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
     { key: "draft-invoices", label: tr("draftInvoices", "Draft customer invoices"), hint: tr("draftInvoicesHint", "Review details before posting"), icon: <FileText />, tab: "invoices" },
     { key: "draft-bills", label: tr("draftBills", "Draft vendor bills"), hint: tr("draftBillsHint", "Check supplier details and line items"), icon: <ReceiptText />, tab: "bills" },
     { key: "bank-lines", label: tr("bankLines", "Unreconciled bank lines"), hint: tr("bankLinesHint", "Match statement activity to your records"), icon: <Landmark />, tab: "bank-statements" },
-    { key: "unlinked-payments", label: tr("unlinkedPayments", "Payments without invoice links"), hint: tr("unlinkedPaymentsHint", "Posted payments with no linked invoices or bills"), icon: <ArrowDownLeft />, tab: "payments" },
+    { key: "unlinked-payments", label: tr("unallocatedPayments", "Payments with funds to allocate"), hint: tr("unallocatedPaymentsHint", "Remaining funds on posted payments, including partially allocated payments"), icon: <ArrowDownLeft />, tab: "payments" },
     { key: "deadlines", label: tr("deadlines", "Tax deadlines"), hint: tr("deadlinesHint", "Due in the next 30 days or overdue, including organization deadlines"), icon: <CalendarClock />, tab: "tax-deadlines" },
     { key: "periods", label: tr("periods", "Open accounting periods"), hint: tr("periodsHint", "Select a period in the close checklist to check readiness"), icon: <CheckCheck />, tab: "period-close" },
   ]
@@ -84,6 +85,11 @@ export function AccountantOverview({ data, companyName, onNavigate, onCreateInvo
     return total.currencyLabel
   }
   function recordAmount(row: OverviewRow, residual = false): string {
+    if (row.allocationBalance) {
+      const balance = row.allocationBalance
+      const currency = data.currencies.rows.find((candidate) => String(candidate.id) === balance.currencyId)
+      return `${paymentMinorUnitsText(balance.remainingMinor, balance.decimalPlaces)} ${String(currency?.code ?? currency?.name ?? `${tr("currency", "Currency")} #${balance.currencyId}`)}`
+    }
     const totals = overviewMoneyTotals([row], data.currencies, residual ? overviewResidual : (record) => overviewNumber(record.amountTotal ?? record.amount_total ?? record.amount))
     return totals.map((total) => `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(total.amount)} ${currencyLabel(total)}`).join(" · ")
   }

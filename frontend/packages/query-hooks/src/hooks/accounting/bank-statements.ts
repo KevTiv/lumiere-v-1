@@ -83,6 +83,13 @@ export interface BankReconciliationLineProjection {
   readonly move_ids?: unknown
   readonly amountResidual?: unknown
   readonly amount_residual?: unknown
+  readonly paymentIds?: unknown
+  readonly payment_ids?: unknown
+  readonly amount?: unknown
+  readonly journalId?: unknown
+  readonly journal_id?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
 }
 
 export interface BankReconciliationStatementProjection {
@@ -92,6 +99,10 @@ export interface BankReconciliationStatementProjection {
   readonly companyId?: unknown
   readonly company_id?: unknown
   readonly state?: unknown
+  readonly journalId?: unknown
+  readonly journal_id?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
 }
 
 export interface BankReconciliationEffectRef extends CanonicalRecordRef {
@@ -100,6 +111,100 @@ export interface BankReconciliationEffectRef extends CanonicalRecordRef {
   readonly companyId: string
   readonly moveLineIds: readonly string[]
   readonly isReconciled: boolean
+}
+
+export type BankSettlementEffect = (BankReconciliationEffectRef & { status: "confirmed"; paymentId: string })
+  | { status: "awaiting_approval"; paymentId: string; resource: "account-payments"; id: string }
+export interface BankSettlementFinancialReadback {
+  payments: readonly Record<string, unknown>[]
+  moves: readonly Record<string, unknown>[]
+  moveLines: readonly Record<string, unknown>[]
+}
+
+/** A matched flag alone is never proof of invoice or ledger settlement. */
+export function resolveBankStatementSettlementEffect(
+  lines: readonly BankReconciliationLineProjection[], statements: readonly BankReconciliationStatementProjection[],
+  financial: BankSettlementFinancialReadback,
+  args: { organizationId: bigint; companyId: bigint; lineId: bigint; moveIds: readonly bigint[]; amountResidual: number },
+): BankSettlementEffect | null {
+  const field = (row: object, camel: string, snake: string) => {
+    const values = row as Record<string, unknown>
+    return values[camel] ?? values[snake]
+  }
+  const exact = <T extends { readonly id?: unknown }>(rows: readonly T[], id: bigint | null | undefined): T | undefined => {
+    if (id == null) return undefined
+    const found = rows.filter((row) => parseStrictU64(row.id) === id)
+    return found.length === 1 ? found[0] : undefined
+  }
+  const numeric = (value: unknown): number | null => {
+    if ((typeof value !== "number" && typeof value !== "string") || String(value).trim() === "") return null
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  const scoped = (row: object) => parseStrictU64(field(row, "organizationId", "organization_id")) === args.organizationId
+    && parseStrictU64(field(row, "companyId", "company_id")) === args.companyId
+  const line = exact(lines, args.lineId)
+  if (!line || parseStrictU64(field(line, "organizationId", "organization_id")) !== args.organizationId) return null
+  const statement = exact(statements, parseStrictU64(field(line, "statementId", "statement_id")))
+  const paymentIds = exactIdList(field(line, "paymentIds", "payment_ids"))
+  if (!statement || !scoped(statement) || enumTag(statement.state) !== "open" || paymentIds?.length !== 1) return null
+  const paymentId = paymentIds[0]!
+  const payment = exact(financial.payments, paymentId)
+  const journalId = parseStrictU64(field(statement, "journalId", "journal_id"))
+  const currencyId = parseStrictU64(field(statement, "currencyId", "currency_id"))
+  const bankAmount = numeric(line.amount)
+  const partnerId = payment && parseStrictU64(field(payment, "partnerId", "partner_id"))
+  if (!payment || !scoped(payment) || !partnerId || !journalId || !currencyId || bankAmount == null || bankAmount === 0
+    || parseStrictU64(field(line, "journalId", "journal_id")) !== journalId
+    || parseStrictU64(field(payment, "journalId", "journal_id")) !== journalId
+    || parseStrictU64(field(payment, "currencyId", "currency_id")) !== currencyId
+    || numeric(payment.amount) !== Math.abs(bankAmount)
+    || enumTag(field(payment, "paymentType", "payment_type")) !== (bankAmount > 0 ? "inbound" : "outbound")
+    || enumTag(field(payment, "partnerType", "partner_type")) !== (bankAmount > 0 ? "customer" : "supplier")
+    || parseStrictU64(field(payment, "reversalMoveId", "reversal_move_id")) != null) return null
+  const targets = args.moveIds.map((id) => exact(financial.moveLines, id))
+  if (!targets.length || new Set(args.moveIds.map(String)).size !== targets.length || targets.some((row) => !row)) return null
+  const invoices = targets.map((target) => exact(financial.moves, parseStrictU64(field(target!, "moveId", "move_id"))))
+  if (targets.some((target, index) => {
+    const invoice = invoices[index]
+    return !target || !invoice || !scoped(target) || !scoped(invoice)
+      || enumTag(invoice.state) !== "posted" || enumTag(field(target, "parentState", "parent_state")) !== "posted"
+      || enumTag(field(invoice, "moveType", "move_type")) !== (bankAmount > 0 ? "outinvoice" : "ininvoice")
+      || parseStrictU64(field(invoice, "partnerId", "partner_id")) !== partnerId
+      || parseStrictU64(field(target, "partnerId", "partner_id")) !== partnerId
+      || parseStrictU64(field(target, "currencyId", "currency_id")) !== currencyId
+      || parseStrictU64(field(invoice, "currencyId", "currency_id")) !== currencyId
+      || String(field(target, "accountInternalType", "account_internal_type")).toLowerCase() !== (bankAmount > 0 ? "receivable" : "payable")
+  })) return null
+  if (enumTag(payment.state) === "notpaid" || (enumTag(payment.state) === "paid" && field(line, "isReconciled", "is_reconciled") === false)) {
+    const linked = exactIdList(field(line, "moveIds", "move_ids"))
+    const residuals = targets.map((target) => numeric(field(target!, "amountResidual", "amount_residual")))
+    if (boolValue(field(line, "isReconciled", "is_reconciled")) || !linked || linked.length !== 0
+      || (enumTag(payment.state) === "notpaid" && parseStrictU64(field(payment, "moveId", "move_id")) != null)
+      || residuals.some((value) => value == null || Math.sign(value) !== Math.sign(bankAmount))
+      || Math.abs(residuals.reduce<number>((sum, value) => sum + value!, 0) - bankAmount) > 0.000001) return null
+    if (enumTag(payment.state) === "paid") {
+      const posted = exact(financial.moves, parseStrictU64(field(payment, "moveId", "move_id")))
+      if (!posted || !scoped(posted) || enumTag(posted.state) !== "posted"
+        || parseStrictU64(field(posted, "journalId", "journal_id")) !== journalId
+        || parseStrictU64(field(posted, "currencyId", "currency_id")) !== currencyId) return null
+    }
+    return { status: "awaiting_approval", paymentId: String(paymentId), resource: "account-payments", id: String(paymentId) }
+  }
+  const effect = resolveBankStatementReconciliationEffect(lines, statements, args)
+  const paymentMoveId = parseStrictU64(field(payment, "moveId", "move_id"))
+  const paymentMove = exact(financial.moves, paymentMoveId)
+  if (!effect || enumTag(payment.state) !== "paid" || !paymentMoveId || !paymentMove || !scoped(paymentMove)
+    || enumTag(paymentMove.state) !== "posted" || parseStrictU64(field(paymentMove, "journalId", "journal_id")) !== journalId
+    || parseStrictU64(field(paymentMove, "currencyId", "currency_id")) !== currencyId
+    || targets.some((target, index) => numeric(field(target!, "amountResidual", "amount_residual")) !== 0
+      || numeric(field(invoices[index]!, "amountResidual", "amount_residual")) !== 0
+      || enumTag(field(invoices[index]!, "paymentState", "payment_state")) !== "paid"
+      || field(target!, "matchingNumber", "matching_number") !== `MATCH-${paymentMoveId}-${String(invoices[index]!.id)}`)) return null
+  const clearing = financial.moveLines.filter((row) => parseStrictU64(field(row, "moveId", "move_id")) === paymentMoveId
+    && ["receivable", "payable"].includes(String(field(row, "accountInternalType", "account_internal_type")).toLowerCase()))
+  if (!clearing.length || clearing.some((row) => !scoped(row) || numeric(field(row, "amountResidual", "amount_residual")) !== 0)) return null
+  return { ...effect, status: "confirmed", paymentId: String(paymentId) }
 }
 
 function enumTag(value: unknown): string {
@@ -397,18 +502,21 @@ export function useReconcileAccountBankStatementLine(organizationId: number, com
       })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
-      const [lines, statements] = await Promise.all([
+      const [lines, statements, payments, moves, moveLines] = await Promise.all([
         fetchQueryList("/api/query/bank-statement-lines", "Failed to read reconciled bank line"),
         fetchQueryList("/api/query/bank-statements", "Failed to read parent bank statement"),
+        fetchQueryList("/api/query/account-payments", "Failed to read bank settlement payment"),
+        fetchQueryList("/api/query/account-moves", "Failed to read bank settlement journal entries"),
+        fetchQueryList("/api/query/account-move-lines", "Failed to read bank settlement balances"),
       ])
-      const effect = resolveBankStatementReconciliationEffect(lines, statements, {
+      const effect = resolveBankStatementSettlementEffect(lines, statements, { payments, moves, moveLines }, {
         organizationId: BigInt(organizationId),
         companyId,
         lineId: args.lineId,
         moveIds,
         amountResidual,
       })
-      if (!effect) throw new Error("Bank reconciliation result did not read back exactly")
+      if (!effect) throw new Error("Bank settlement financial result did not read back exactly")
       return effect
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
@@ -484,4 +592,6 @@ export function invalidateBankStatementQueries(qc: ReturnType<typeof useQueryCli
   void qc.invalidateQueries({ queryKey: ["stdb", "bank-match-candidates", k] })
   void qc.invalidateQueries({ queryKey: ["stdb", "account-reconciliation-widgets", k] })
   void qc.invalidateQueries({ queryKey: ["bank-statement-imports", String(k)] })
+  invalidateStdbQueryResources(qc, organizationId, ["account-payments", "account-moves", "account-move-lines", "workflow-human-tasks", "sale-orders"])
+  void qc.invalidateQueries({ queryKey: ["workflow-human-tasks-inbox"] })
 }
