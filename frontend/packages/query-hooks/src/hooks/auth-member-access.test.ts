@@ -13,7 +13,12 @@ function memberMutation() {
     "@lumiere/stdb/commands": { stdbBffCommandPost },
     "@lumiere/stdb/browser-http": {},
     "@tanstack/react-query": { useQueryClient: () => ({}), useMutation: (options: unknown) => options },
-    "../http": {},
+    "../http": {
+      apiFetch: async (url: string, init: RequestInit) => {
+        calls.push({ url, body: JSON.parse(String(init.body)) })
+        return new Response('{"ok":true}')
+      },
+    },
     "../operation-dispatch": {
       dispatchNamedOperation: async (...[name, input]: Parameters<typeof stdbBffCommandPost>) => {
         const { urlPath, init } = stdbBffCommandPost(name, input)
@@ -29,7 +34,12 @@ function memberMutation() {
   const compiled = ts.transpileModule(readFileSync(new URL("./auth.ts", import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText
-  const module = { exports: {} as { useSetMemberAccess(org: bigint): { mutationFn(input: unknown): Promise<void> } } }
+  type Mutation = { mutationFn(input: unknown): Promise<void> }
+  const module = { exports: {} as {
+    useSetMemberAccess(org: bigint): Mutation
+    useCreateRole(org: bigint): Mutation
+    useUpdateRole(org: bigint): Mutation
+  } }
   runInNewContext(compiled, {
     module, exports: module.exports,
     require: (name: string) => {
@@ -37,7 +47,7 @@ function memberMutation() {
       return dependencies[name]
     },
   })
-  return { calls, mutation: module.exports.useSetMemberAccess(1n) }
+  return { calls, mutation: module.exports.useSetMemberAccess(1n), hooks: module.exports }
 }
 
 test("member access saves encode optional job titles and preserve the optimistic access snapshot", async () => {
@@ -63,4 +73,15 @@ test("member access cannot save a row without its server revision", async () => 
   const { calls, mutation } = memberMutation()
   await assert.rejects(mutation.mutationFn({ user: {}, primaryRoleId: "7", roleIds: ["7"], isActive: true }), /Reload users/)
   assert.equal(calls.length, 0)
+})
+
+test("role creation and permission edits send the distinct required and optional list contracts", async () => {
+  const { calls, hooks } = memberMutation()
+  await hooks.useCreateRole(1n).mutationFn({ name: "Operators", permissions: ["contact:read"] })
+  await hooks.useUpdateRole(1n).mutationFn({ roleId: "7", params: { permissions: ["contact:write"] } })
+  await hooks.useUpdateRole(1n).mutationFn({ roleId: "7", params: { permissions: [] } })
+  assert.deepEqual(calls.map(c => c.url), ["/api/operations/erp.create_role", "/api/operations/erp.update_role", "/api/operations/erp.update_role"])
+  assert.deepEqual(calls.map(c => (c.body.params as Record<string, unknown>).permissions), [
+    ["contact:read"], { some: ["contact:write"] }, { some: [] },
+  ])
 })
