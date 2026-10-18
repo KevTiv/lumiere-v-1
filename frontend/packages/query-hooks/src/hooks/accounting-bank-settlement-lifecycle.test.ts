@@ -33,11 +33,12 @@ function reversedFixture() {
   const attempt = { ...f.attempt, status: "reversed", reversalMoveId: "80", recoveryAction: "reverse", recoveryKey: "recovery-1", reversalDateMicros: "1792281600000000", reversalReason: "Wrong bank receipt" }
   const rows = openTargets(f.rows)
   const reversal = { id: "80", ...f.common, journalId: "5", state: "Posted", date: { microsSinceUnixEpoch: "1792281600000000" }, metadata: { reverses_payment_move_id: "60", account_payment_id: "50" } }
-  return { ...f, attempt, rows: { ...rows,
+  const reversedRows: BankSettlementCanonicalRows = { ...rows,
     lines: [{ ...rows.lines[0], isReconciled: false, amountResidual: 100, moveIds: [], paymentIds: [], metadata: { bankSettlement: attempt } }],
     payments: [{ ...rows.payments[0], state: "Reversed", reversalMoveId: "80" }], moves: [...rows.moves, reversal],
     moveLines: [...rows.moveLines, ...rows.moveLines.filter((row) => row.moveId === "60").map((row, index) => ({ ...row, id: String(100 + index), moveId: "80", debit: row.credit, credit: row.debit }))],
-  } satisfies BankSettlementCanonicalRows }
+  }
+  return { ...f, attempt, rows: reversedRows }
 }
 describe("canonical bank settlement lifecycle effect", () => {
   it("requires complete financial facts before confirming a settled hint", () => {
