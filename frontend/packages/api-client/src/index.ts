@@ -11,6 +11,11 @@ export {
   type QueryRows,
 } from "./query-list"
 export {
+  queryResourceFailure,
+  queryResourceRows,
+  type QueryResourceState,
+} from "./query-resource-state"
+export {
   OperationRequestError,
   decodeOperationDispatch,
   type OperationDispatchReceipt,

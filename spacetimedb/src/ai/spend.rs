@@ -247,7 +247,7 @@ pub fn configure_ai_spend(
         return Err("agent is outside the requested tenant or company".into());
     }
     if !agent.is_active
-        || agent.provider != params.provider
+        || !provider_eq(&agent.provider, &params.provider)
         || !model_allowed(&agent.allowed_models, &params.model)
     {
         return Err("provider or model is not allowed for agent".into());
@@ -387,7 +387,7 @@ pub fn reserve_ai_spend(
         .find(&params.agent_id)
         .ok_or_else(|| "agent not found".to_string())?;
     if !agent.is_active
-        || agent.provider != params.provider
+        || !provider_eq(&agent.provider, &params.provider)
         || !model_allowed(&agent.allowed_models, &params.model)
     {
         return Err("provider or model is not allowed for agent".into());
@@ -406,7 +406,7 @@ pub fn reserve_ai_spend(
         .ok_or_else(|| "price snapshot not found".to_string())?;
     if snapshot.organization_id != organization_id
         || snapshot.agent_id != params.agent_id
-        || snapshot.provider != params.provider
+        || !provider_eq(&snapshot.provider, &params.provider)
         || snapshot.model != params.model
         || snapshot.currency != params.currency
     {
@@ -419,7 +419,7 @@ pub fn reserve_ai_spend(
         .filter(&params.agent_id)
         .filter(|row| {
             row.organization_id == organization_id
-                && row.provider == params.provider
+                && provider_eq(&row.provider, &params.provider)
                 && row.model == params.model
                 && row.currency == params.currency
         })
@@ -608,7 +608,7 @@ pub fn accept_ai_provider_attempt(
         || reservation.company_id != params.company_id
         || reservation.agent_id != params.agent_id
         || reservation.run_id != params.run_id
-        || reservation.provider != params.provider
+        || !provider_eq(&reservation.provider, &params.provider)
         || reservation.model != params.model
     {
         return Err("attempt does not match an open reservation".into());
@@ -844,7 +844,7 @@ fn attempt_matches(row: &AiProviderAttempt, params: &AcceptAiProviderAttemptPara
         && row.run_id == params.run_id
         && row.reservation_id == params.reservation_id
         && row.request_key == params.request_key
-        && row.provider == params.provider
+        && provider_eq(&row.provider, &params.provider)
         && row.model == params.model
 }
 
@@ -962,6 +962,9 @@ fn current_period(timestamp: Timestamp) -> Result<String, String> {
 fn model_allowed(allowed: &[String], model: &str) -> bool {
     !allowed.is_empty() && allowed.iter().any(|candidate| candidate == model)
 }
+fn provider_eq(left: &str, right: &str) -> bool {
+    left.eq_ignore_ascii_case(right)
+}
 fn allowance_cost(snapshot: &AiPriceSnapshot, input: u32, output: u32) -> Result<u64, String> {
     usage_cost(snapshot, input, output)
 }
@@ -983,7 +986,7 @@ fn reservation_matches(row: &AiSpendReservation, params: &ReserveAiSpendParams) 
         && row.agent_id == params.agent_id
         && row.run_id == params.run_id
         && row.request_key == params.request_key
-        && row.provider == params.provider
+        && provider_eq(&row.provider, &params.provider)
         && row.model == params.model
         && row.billing_period == params.billing_period
         && row.currency == params.currency

@@ -133,7 +133,7 @@ impl CandidateScope {
         // Unit = department_id on active org membership.
         let mut unit_ids = HashSet::new();
         let uo_sql = format!(
-            "SELECT department_id, organization_id, company_id, is_active FROM user_organization WHERE user_id = {id_lit}"
+            "SELECT department_id, organization_id, company_id, is_active FROM user_organization WHERE user_identity = {id_lit}"
         );
         if let Ok(rows) = owner.query_sql(&uo_sql).await {
             for r in rows {

@@ -4,13 +4,14 @@ use spacetimedb::{ReducerContext, Table};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, add_account_move_line, cancel_account_move,
     compute_invoice_totals, create_credit_note_from_invoice, post_invoice,
+    reset_account_move_to_draft,
     AddAccountMoveLineParams, CreateCreditNoteParams,
 };
 use crate::accounting::tax_management::{account_tax, create_account_tax, CreateAccountTaxParams};
 use crate::test_harness::{chart_keys, ensure_test_superuser, OrgFixture};
 use crate::types::{AccountMoveState, PaymentState, TaxAmountType, TaxTypeUse};
 
-use super::helpers::create_balanced_customer_invoice;
+use super::helpers::{create_balanced_customer_invoice, create_balanced_customer_invoice_on_account};
 
 pub fn test_post_customer_invoice_creates_move_lines(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
@@ -438,5 +439,81 @@ pub fn test_add_account_move_line_rejects_invalid_and_cross_org_tax_id(
         return Err("valid same-organization tax_id line was not persisted".to_string());
     }
 
+    Ok(())
+}
+
+pub fn test_reset_account_move_to_draft_only_from_cancelled(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+
+    let move_id = create_balanced_customer_invoice(ctx, &fixture, 100.0, false)?;
+
+    if reset_account_move_to_draft(ctx, org_id, move_id).is_ok() {
+        return Err("reset of an already-draft move succeeded".to_string());
+    }
+
+    cancel_account_move(ctx, org_id, move_id)?;
+    reset_account_move_to_draft(ctx, org_id, move_id)?;
+
+    let reset = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_id)
+        .ok_or("move missing after reset")?;
+    if reset.state != AccountMoveState::Draft {
+        return Err(format!("Expected Draft after reset, got {:?}", reset.state));
+    }
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .collect();
+    if lines.is_empty() || lines.iter().any(|l| l.parent_state != AccountMoveState::Draft) {
+        return Err("move lines were not returned to Draft".to_string());
+    }
+
+    // `create_balanced_customer_invoice` keys the move by its reference label, so a second call
+    // with the default label returns the first move again; a distinct label gives a distinct move.
+    let ar_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("Harness missing AR account")?;
+    let posted_id = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        50.0,
+        ar_id,
+        "Harness posted invoice",
+        true,
+    )?;
+    if posted_id == move_id {
+        return Err("the posted invoice reused the first move".to_string());
+    }
+    match reset_account_move_to_draft(ctx, org_id, posted_id) {
+        Err(error) if error.contains("Posted") => {}
+        Err(error) => return Err(format!("unexpected posted reset error: {error}")),
+        Ok(()) => return Err("reset of a posted move succeeded".to_string()),
+    }
+
+    let other = OrgFixture::seed_minimal(ctx)?;
+    cancel_account_move(ctx, org_id, posted_id)?;
+    match reset_account_move_to_draft(ctx, org_id, posted_id) {
+        Err(error) if error.contains("Previously posted") => {}
+        Err(error) => return Err(format!("unexpected previously-posted reset error: {error}")),
+        Ok(()) => return Err("reset of a posted-then-cancelled move succeeded".to_string()),
+    }
+    let cancelled = ctx.db.account_move().id().find(&posted_id).ok_or("posted move missing")?;
+    if cancelled.state != AccountMoveState::Cancelled || !cancelled.posted_before {
+        return Err("rejected reset changed the previously-posted move".to_string());
+    }
+    cancel_account_move(ctx, org_id, move_id)?;
+    match reset_account_move_to_draft(ctx, other.organization_id, move_id) {
+        Err(error) if error.contains("organization") => {}
+        Err(error) => return Err(format!("unexpected cross-tenant reset error: {error}")),
+        Ok(()) => return Err("cross-tenant reset succeeded".to_string()),
+    }
     Ok(())
 }

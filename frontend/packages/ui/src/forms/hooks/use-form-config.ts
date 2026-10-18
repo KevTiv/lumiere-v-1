@@ -382,7 +382,13 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
   useEffect(() => {
     dispatch({ type: "SET_LOADING", payload: true })
 
-    function loadDefaultConfig() {
+    /**
+     * `absentIsError` is false only after a successful query proved the
+     * organization has no row: a form with neither a row nor a registry
+     * default then resolves to no runtime overlay (callers keep their static
+     * config) instead of a dependency failure.
+     */
+    function loadDefaultConfig(absentIsError = true) {
       const defaultConfig = getDefaultFormConfig(moduleId, formId)
       if (defaultConfig) {
         const mockConfig: FormConfig = {
@@ -453,8 +459,13 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
             customFields: [],
           },
         })
-      } else {
+      } else if (absentIsError) {
         dispatch({ type: "SET_ERROR", payload: `No form configuration found for ${moduleId}:${formId}` })
+      } else {
+        dispatch({
+          type: "SET_DATA",
+          payload: { config: null, fields: [], roleConfigs: [], customFields: [] },
+        })
       }
     }
 
@@ -485,7 +496,7 @@ export function useFormConfiguration(options: UseFormConfigurationOptions): {
         )
 
         if (configs.length === 0) {
-          if (useDefaultIfMissing) loadDefaultConfig()
+          if (useDefaultIfMissing) loadDefaultConfig(false)
           else dispatch({ type: "SET_ERROR", payload: `No form configuration found for ${moduleId}:${formId}` })
           return
         }

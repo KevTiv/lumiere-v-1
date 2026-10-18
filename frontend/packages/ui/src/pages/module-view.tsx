@@ -9,14 +9,16 @@ import {
 } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
+import { Plus } from "lucide-react"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DashboardGrid } from "./dashboard-grid"
 import { DashboardHeader, type TimeRangeValue } from "./dashboard-header"
 import { EntityView } from "../entity-views/entity-view"
 import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
 import { FormModal } from "../forms/form-modal"
 import { RuntimeFormModal } from "../forms/runtime-form-modal"
-import type { ModuleConfig } from "../lib/module-types"
+import { buildModuleTabRow, type ModuleConfig } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import { isEntitySurfaceVisible } from "../lib/entity-view-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
@@ -91,14 +93,38 @@ export function ModuleView({
   const defaultCompanyId = companyIds?.[0]
   const useRuntimeCreate = runtimeForms != null && runtimeForms.organizationId > 0
   const defaultTab = config.defaultTab ?? config.tabs[0]?.id ?? ""
-  const [internalTab, setInternalTab] = useState(defaultTab)
+  // Uncontrolled modules keep the active tab in `?tab=` so every tab is linkable.
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const rawRouteTab = searchParams?.get("tab") ?? null
+  const routeTab =
+    rawRouteTab && config.tabs.some((tab) => tab.id === rawRouteTab) ? rawRouteTab : null
+  const [internalTab, setInternalTab] = useState(routeTab ?? defaultTab)
+  useEffect(() => {
+    if (activeTabProp === undefined && routeTab) setInternalTab(routeTab)
+  }, [activeTabProp, routeTab])
   const [isHydrated, setIsHydrated] = useState(false)
   const activeTab = activeTabProp ?? internalTab
   const prevActiveTabRef = useRef<string | null>(null)
   const setActiveTab = (v: string) => {
     onActiveTabChange?.(v)
-    if (activeTabProp === undefined) setInternalTab(v)
+    if (activeTabProp !== undefined) return
+    setInternalTab(v)
+    const params = new URLSearchParams(searchParams?.toString() ?? "")
+    // Record filters belong to the tab they were opened on.
+    params.delete("filter")
+    if (v === defaultTab) params.delete("tab")
+    else params.set("tab", v)
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
   }
+  const tabListRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    // Deep links can land on a tab far along the scrollable tab row.
+    const trigger = tabListRef.current?.querySelector<HTMLElement>('[data-active], [aria-selected="true"]')
+    trigger?.scrollIntoView({ block: "nearest", inline: "nearest" })
+  }, [activeTab])
   const [openForm, setOpenForm] = useState<string | null>(null)
   const [selectedRecord, setSelectedRecord] = useState<Record<string, unknown> | null>(null)
   const dashboardGridRef = useRef<HTMLDivElement>(null)
@@ -132,53 +158,80 @@ export function ModuleView({
     >
       <DashboardHeader
         title={config.title}
-        description={config.description}
+        description={
+          activeTabConfig?.description ??
+          (activeTabConfig?.type === "dashboard" || activeTabConfig == null ? config.description : undefined)
+        }
         timeRange={showDashboardTimeRange ? dashboardTimeRange : undefined}
         onTimeRangeChange={showDashboardTimeRange ? onDashboardTimeRangeChange : undefined}
         onExport={showDashboardExport ? () => void handleDashboardExport() : undefined}
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className={"flex-col flex"}>
-        <TabsList variant="default" className="w-full flex flex-wrap justify-start max-w-fit gap-2">
-          {config.tabs.map((tab, i) => (
-            <TabsTrigger
-              tabIndex={i}
-              key={tab.id}
-              value={tab.id}
-              data-testid={`module-tab-${config.id}-${tab.id}`}
-            >
-              {tab.label}
-            </TabsTrigger>
-          ))}
+        <div
+          ref={tabListRef}
+          className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]"
+          data-testid={`module-tabs-${config.id}`}
+        >
+        <TabsList
+          variant="line"
+          className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto"
+        >
+          {buildModuleTabRow(config.tabs, config.tabGroups).map((item, i) =>
+            item.kind === "group" ? (
+              <span
+                key={`group-${item.label}`}
+                aria-hidden
+                className="ml-3 mr-1 shrink-0 border-l border-border pl-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80"
+              >
+                {item.label}
+              </span>
+            ) : (
+              <TabsTrigger
+                tabIndex={i}
+                key={item.tab.id}
+                // Natural width with an underline on the active tab; the
+                // default pseudo-underline is clipped by the scroll container.
+                className="-mb-px flex-none rounded-none border-0 border-b-2 border-transparent px-2.5 pb-2.5 pt-1.5 after:hidden data-active:border-foreground data-active:text-foreground"
+                value={item.tab.id}
+                data-testid={`module-tab-${config.id}-${item.tab.id}`}
+              >
+                {item.tab.label}
+              </TabsTrigger>
+            ),
+          )}
         </TabsList>
+        </div>
 
         {config.tabs.map((tab) => (
           <TabsContent key={tab.id} value={tab.id} className="mt-6">
             {tab.type === "dashboard" && tab.sections && (
-              <DashboardGrid ref={dashboardGridRef} sections={tab.sections} />
+              <DashboardGrid
+                ref={dashboardGridRef}
+                sections={tab.sections}
+                // Dashboard figures derive from the module's collections.
+                isLoading={Object.values(dataLoading ?? {}).some(Boolean)}
+              />
             )}
 
             {tab.type === "custom" && tab.customContent}
 
             {tab.type === "entity" && tab.entityConfig && (
               <div className="space-y-3">
-                <div className="flex justify-end">
-                  {tab.createForm &&
-                    isEntitySurfaceVisible(
-                      { permission: tab.createPermission },
-                      checkPermission,
-                    ) && (
-                    <Button
-                      size="lg"
-                      onClick={() => setOpenForm(tab.id)}
-                      data-testid={`module-create-${config.id}-${tab.id}`}
-                    >
-                      {tab.createLabel ?? "New"}
-                    </Button>
-                  )}
-                </div>
-
                 <EntityView
+                  useCard={false}
+                  headerAction={
+                    tab.createForm &&
+                    isEntitySurfaceVisible({ permission: tab.createPermission }, checkPermission) ? (
+                      <Button
+                        onClick={() => setOpenForm(tab.id)}
+                        data-testid={`module-create-${config.id}-${tab.id}`}
+                      >
+                        <Plus className="h-4 w-4" />
+                        {tab.createLabel ?? "New"}
+                      </Button>
+                    ) : undefined
+                  }
                   config={tab.entityConfig}
                   data={data[tab.id] ?? []}
                   isLoading={dataLoading?.[tab.id]}

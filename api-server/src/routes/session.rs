@@ -28,7 +28,11 @@ async fn field_access_get(
         .await?
         .ok_or(ApiError::Unauthorized)?;
 
-    Ok(Json(json!({ "fieldAccess": session.field_access })))
+    Ok(Json(json!({
+        "identityHex": session.identity_hex,
+        "organizationId": session.organization_id,
+        "fieldAccess": session.field_access,
+    })))
 }
 
 pub fn router() -> axum::Router<Arc<AppState>> {

@@ -31,6 +31,23 @@ interface DashboardSidebarProps {
   navBadges?: Record<string, number>
   /** When set, shows a sidebar control that calls this handler (typically clears session + redirects). */
   onSignOut?: () => void | Promise<void>
+  /** Signed-in user's profile; the RBAC user carries roles only. */
+  userProfile?: { name?: string | null; firstName?: string | null; lastName?: string | null; email?: string | null }
+}
+
+/** Best available human label: full name, then first/last, then email. */
+export function sidebarUserLabel(profile: DashboardSidebarProps["userProfile"]): string {
+  const name = profile?.name?.trim()
+  if (name) return name
+  const parts = [profile?.firstName, profile?.lastName].map((part) => part?.trim()).filter(Boolean)
+  if (parts.length > 0) return parts.join(" ")
+  return profile?.email?.trim() ?? ""
+}
+
+function sidebarUserInitials(label: string): string {
+  const base = label.includes("@") ? label.split("@")[0] : label
+  const words = base.split(/[\s._-]+/).filter(Boolean)
+  return words.slice(0, 2).map((word) => word[0]!.toUpperCase()).join("")
 }
 
 export function DashboardSidebar({
@@ -41,6 +58,7 @@ export function DashboardSidebar({
   firstOrgProfile = false,
   navBadges,
   onSignOut,
+  userProfile,
 }: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const { checkPermission, currentUser, roles, isAdmin } = useRBAC()
@@ -48,6 +66,7 @@ export function DashboardSidebar({
   const router = useRouter()
   const { t } = useTranslation()
   const isCollapsed = forceCollapsed || collapsed
+  const userLabel = sidebarUserLabel(userProfile) || currentUser?.name?.trim() || ""
 
   const userIsAdmin = isAdmin()
   const navGroups = useMemo(
@@ -229,12 +248,12 @@ export function DashboardSidebar({
       <div className="space-y-3 border-t border-sidebar-border p-3">
         <div className={cn("flex items-center gap-3", isCollapsed && "justify-center")} data-testid="sidebar-user">
           <div className="flex h-8 w-8 items-center justify-center rounded-full border border-sidebar-border bg-sidebar-accent text-sm font-medium text-sidebar-foreground">
-            {currentUser?.name.split(" ").map(n => n[0]).join("") || "?"}
+            {sidebarUserInitials(userLabel) || "?"}
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {currentUser?.name || "Guest"}
+                {userLabel || t("nav.signedIn")}
               </p>
               <p className="text-xs text-muted-foreground truncate">{getUserRoleName()}</p>
             </div>

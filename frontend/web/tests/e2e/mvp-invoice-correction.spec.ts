@@ -7,7 +7,7 @@ import {
   expectFormModalVisible,
   fetchAccountSelectLabelByInternalType,
   fetchDraftCreditNoteMoveIdForInvoice,
-  fetchDraftInvoiceMoveIdByPartner,
+  fetchDraftInvoiceMoveIdForSaleOrder,
   fetchFulfillmentPickingIdBySaleOrderId,
   fetchLeadIdByName,
   fetchOpportunityIdByName,
@@ -32,6 +32,7 @@ import {
   waitForSaleOrderDraftInQuery,
   waitForSaleOrderLineExists,
   waitForSaleOrderLineQtyDelivered,
+  openCreateInvoiceFromOrder,
 } from "./helpers"
 
 /**
@@ -171,9 +172,7 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
     const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
     await gotoModule(page, "/sales", "sales")
     await page.getByTestId("module-tab-sales-orders").click()
-    await selectEntityRowById(page, orderId)
-    await waitForEntityActionEnabled(page, "entity-action-create-invoice")
-    await page.getByTestId("entity-action-create-invoice").click()
+    await openCreateInvoiceFromOrder(page, orderId)
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
@@ -186,8 +185,8 @@ test.describe("MVP invoice correction", { tag: "@p0" }, () => {
       submitForm(page, "create-invoice-from-sale-order"),
     ])
 
-    await fetchDraftInvoiceMoveIdByPartner(page, leadName)
-    const invoiceMoveId = await postDraftInvoiceViaUi(page, leadName)
+    const draftInvoiceMoveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
+    const invoiceMoveId = await postDraftInvoiceViaUi(page, draftInvoiceMoveId)
     expect(invoiceMoveId).toBeGreaterThan(0)
 
     await gotoModule(page, "/accounting", "accounting")

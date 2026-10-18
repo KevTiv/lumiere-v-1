@@ -33,6 +33,8 @@ export const HR_WORKSPACE_RESOURCE_KEYS = [
   "hr-skills",
   "hr-employee-skills",
   "hr-statutory-ids",
+  "hr-leave-allocations",
+  "hr-offboarding-checklists",
   "attendance",
   "compensation-events",
   "work-schedules",

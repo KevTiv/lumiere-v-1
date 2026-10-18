@@ -16,19 +16,23 @@ fn load_dotenv_files() {
     }
     let _ = dotenvy::dotenv();
     let server_local = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(".env.local");
-    let _ = dotenvy::from_path_override(&server_local);
-    let _ = dotenvy::from_filename_override(".env.local");
+    let _ = dotenvy::from_path(&server_local);
+    let _ = dotenvy::from_filename(".env.local");
 }
 
-pub(crate) async fn serve() -> anyhow::Result<()> {
-    load_dotenv_files();
-    tracing_subscriber::registry()
+pub(crate) fn init_tracing() {
+    let _ = tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| "api_server=debug,tower_http=info".parse().unwrap()),
         )
         .with(tracing_subscriber::fmt::layer())
-        .init();
+        .try_init();
+}
+
+pub(crate) async fn serve() -> anyhow::Result<()> {
+    load_dotenv_files();
+    init_tracing();
 
     let config = Config::from_env()?;
 

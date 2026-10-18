@@ -8,6 +8,7 @@ use crate::{
         enforce_chargeable_limits, ensure_allowed_action, ensure_model_allowed, resolve_agent,
         AgentLimitViolation,
     },
+    ai_spend::{self, input_request_key, RequestKind, SpendReader},
     error::{AppError, AppResult},
     harness::snapshot::{
         fetch_authorized_live_snapshots, filter_entity_refs_by_allowed_types, ActorCredentials,
@@ -21,7 +22,7 @@ use crate::{
             admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
             PublicationIdentity,
         },
-        skill_loader::{complete_run, create_generation_surface_run},
+        skill_loader::{complete_run, create_generation_surface_run, GovernedRunRef},
         spend_admission::StdbSpendLedger,
         text_answer_gate::{TextAnswerProvenance, TextAnswerVerification, TextEvidence},
     },
@@ -74,6 +75,8 @@ pub struct ActionDraftRequest {
 
 #[derive(Debug, Serialize, Clone)]
 pub struct ActionDraft {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub draft_id: Option<u64>,
     pub reducer_name: String,
     pub params_json: Value,
     pub confidence: f32,
@@ -93,6 +96,13 @@ pub struct ActionDraftResponse {
     pub drafts: Vec<ActionDraft>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub grounding_snapshots: Option<Vec<LiveSnapshot>>,
+}
+
+struct GeneratedDraftBatch {
+    drafts: Vec<ActionDraft>,
+    run: GovernedRunRef,
+    step_count: u32,
+    total_tokens: u32,
 }
 
 #[derive(Debug)]
@@ -298,6 +308,7 @@ fn parse_llm_drafts(
             });
 
         drafts.push(ActionDraft {
+            draft_id: None,
             reducer_name: entry.reducer_name.to_string(),
             params_json: Value::Object(params),
             confidence,
@@ -325,7 +336,7 @@ async fn draft_actions_llm(
     state: &AppState,
     req: &ActionDraftRequest,
     grounding_snapshots: Option<&[LiveSnapshot]>,
-) -> Result<Vec<ActionDraft>, DraftActionsError> {
+) -> Result<GeneratedDraftBatch, DraftActionsError> {
     let org_id = req
         .org_id
         .filter(|id| *id > 0)
@@ -333,7 +344,9 @@ async fn draft_actions_llm(
     let entries =
         allowed_catalog_entries(&req.allowed_reducers).map_err(DraftActionsError::other)?;
     if entries.is_empty() {
-        return Ok(Vec::new());
+        return Err(DraftActionsError::other(
+            "no action-draft reducers are available",
+        ));
     }
 
     let agent = resolve_agent(
@@ -475,22 +488,12 @@ async fn draft_actions_llm(
             return Err(DraftActionsError::other(error));
         }
     };
-    complete_run(
-        state.stdb.as_ref(),
-        org_id,
-        req.company_id,
-        run.run_id,
-        "completed",
-        Some(format!("generated {} action drafts", drafts.len())),
-        None,
-        None,
-        program.trace.len() as u32,
+    Ok(GeneratedDraftBatch {
+        drafts,
+        run,
+        step_count: program.trace.len() as u32,
         total_tokens,
-        None,
-    )
-    .await
-    .map_err(|e| DraftActionsError::other(e.to_string()))?;
-    Ok(drafts)
+    })
 }
 
 fn non_empty(value: &str) -> bool {
@@ -752,6 +755,7 @@ fn draft_actions_stub(req: &ActionDraftRequest) -> Result<Vec<ActionDraft>, Stri
     };
 
     Ok(vec![ActionDraft {
+        draft_id: None,
         reducer_name: entry.reducer_name.to_string(),
         params_json: Value::Object(params),
         confidence,
@@ -773,6 +777,113 @@ fn draft_actions_stub(req: &ActionDraftRequest) -> Result<Vec<ActionDraft>, Stri
     }])
 }
 
+fn draft_request_input(draft: &ActionDraft, index: usize) -> Value {
+    json!({
+        "surface": "action_draft_generation",
+        "index": index,
+        "reducer_name": draft.reducer_name,
+        "params_json": draft.params_json,
+        "summary": draft.summary,
+        "confidence": draft.confidence,
+        "elevated": draft.elevated,
+        "warnings": draft.warnings,
+    })
+}
+
+async fn persist_generated_drafts(
+    state: &AppState,
+    req: &ActionDraftRequest,
+    run_id: u64,
+    drafts: &mut [ActionDraft],
+) -> Result<(), String> {
+    let organization_id = req
+        .org_id
+        .filter(|id| *id > 0)
+        .ok_or_else(|| "org_id is required for draft persistence".to_string())?;
+    let reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or_else(|| "spend_read_stdb is required for exact draft readback".to_string())?;
+    let reader = SpendReader::new(reader);
+
+    for (index, draft) in drafts.iter_mut().enumerate() {
+        let request_input = draft_request_input(draft, index);
+        let request_key = input_request_key(RequestKind::Draft, run_id, &request_input)
+            .map_err(|error| format!("build stable draft request key: {error}"))?;
+        let metadata = serde_json::to_string(&json!({
+            "run_id": run_id,
+            "request_key": request_key,
+            "surface": "action_draft_generation",
+            "explanation_verification": draft.explanation_verification,
+            "explanation_provenance": draft.explanation_provenance,
+        }))
+        .map_err(|error| format!("serialize action draft metadata: {error}"))?;
+        let params = json!({
+            "reducer_name": draft.reducer_name,
+            "params_json": serde_json::to_string(&draft.params_json)
+                .map_err(|error| format!("serialize action draft params: {error}"))?,
+            "summary": draft.summary,
+            "confidence": draft.confidence,
+            "elevated": draft.elevated,
+            "warnings_json": if draft.warnings.is_empty() {
+                None
+            } else {
+                Some(serde_json::to_string(&draft.warnings)
+                    .map_err(|error| format!("serialize action draft warnings: {error}"))?)
+            },
+            "source_query": Some(req.query.clone()),
+            "ui_context_json": req.ui_context.as_ref().map(|context| {
+                serde_json::to_string(context).unwrap_or_else(|_| "{}".to_string())
+            }),
+            "expires_at": Value::Null,
+            "metadata": Some(metadata),
+        });
+        ai_spend::create_run_action_draft(
+            state.stdb.as_ref(),
+            organization_id,
+            req.company_id,
+            run_id,
+            &request_key,
+            params,
+        )
+        .await
+        .map_err(|error| format!("persist run-correlated action draft: {error}"))?;
+        let request = reader
+            .draft_request(organization_id, req.company_id, run_id, &request_key)
+            .await
+            .map_err(|error| format!("read exact action draft effect: {error}"))?
+            .ok_or_else(|| {
+                format!("run-correlated action draft is not visible for {request_key}")
+            })?;
+        draft.draft_id = Some(request.draft_id);
+    }
+    Ok(())
+}
+
+async fn fail_generated_run(
+    state: &AppState,
+    req: &ActionDraftRequest,
+    batch: &GeneratedDraftBatch,
+    reason: String,
+) {
+    if let Some(organization_id) = req.org_id.filter(|id| *id > 0) {
+        let _ = complete_run(
+            state.stdb.as_ref(),
+            organization_id,
+            req.company_id,
+            batch.run.run_id,
+            "failed",
+            None,
+            None,
+            None,
+            batch.step_count,
+            batch.total_tokens,
+            Some(reason),
+        )
+        .await;
+    }
+}
+
 pub async fn post_draft(
     State(state): State<AppState>,
     Json(req): Json<ActionDraftRequest>,
@@ -788,18 +899,23 @@ pub async fn post_draft(
 
     let grounding_snapshots = fetch_grounding_snapshots(&state, &req).await?;
 
-    let mut drafts = match draft_actions_llm(&state, &req, grounding_snapshots.as_deref()).await {
-        Ok(llm_drafts) if !llm_drafts.is_empty() => llm_drafts,
-        Ok(_) => draft_actions_stub(&req).map_err(AppError::BadRequest)?,
+    let mut batch = match draft_actions_llm(&state, &req, grounding_snapshots.as_deref()).await {
+        Ok(batch) if !batch.drafts.is_empty() => batch,
+        Ok(mut batch) => {
+            batch.drafts = draft_actions_stub(&req).map_err(AppError::BadRequest)?;
+            batch
+        }
         Err(DraftActionsError::Limit(violation)) => return Err(violation.into_app_error()),
         Err(DraftActionsError::Other(err)) => {
-            tracing::warn!(error = %err, "LLM action draft generation failed; using keyword stub");
-            draft_actions_stub(&req).map_err(AppError::BadRequest)?
+            return Err(AppError::Internal(format!(
+                "action draft generation failed before stable persistence: {err}"
+            )));
         }
     };
+    let drafts = &mut batch.drafts;
 
     if let Some(ref snapshots) = grounding_snapshots {
-        enrich_drafts_with_grounding(&mut drafts, snapshots);
+        enrich_drafts_with_grounding(drafts, snapshots);
     }
 
     // Gate the prose before it can cross the BFF and be persisted by the
@@ -826,16 +942,21 @@ pub async fn post_draft(
     for (index, draft) in drafts.iter_mut().enumerate() {
         let structured =
             GeneratedOutputDraft::single_claim(draft.summary.clone(), support_refs.clone());
-        let mut gated = admit_structured_output(
+        let mut gated = match admit_structured_output(
             req.org_id.unwrap_or_default(),
             req.company_id,
             &structured,
             &evidence,
         )
         .await
-        .map_err(|error| {
-            AppError::Internal(format!("action-draft explanation gate failed: {error}"))
-        })?;
+        {
+            Ok(gated) => gated,
+            Err(error) => {
+                let reason = format!("action-draft explanation gate failed: {error}");
+                fail_generated_run(&state, &req, &batch, reason.clone()).await;
+                return Err(AppError::Internal(reason));
+            }
+        };
         persist_or_withhold_generated_output(
             &mut gated,
             state.stdb.as_ref(),
@@ -859,15 +980,43 @@ pub async fn post_draft(
         }
     }
 
+    if let Err(error) =
+        persist_generated_drafts(&state, &req, batch.run.run_id, &mut batch.drafts).await
+    {
+        fail_generated_run(&state, &req, &batch, error.clone()).await;
+        return Err(AppError::Internal(error));
+    }
+
+    let organization_id = req.org_id.unwrap_or_default();
+    if let Err(error) = complete_run(
+        state.stdb.as_ref(),
+        organization_id,
+        req.company_id,
+        batch.run.run_id,
+        "completed",
+        Some(format!("generated {} action drafts", batch.drafts.len())),
+        None,
+        None,
+        batch.step_count,
+        batch.total_tokens,
+        None,
+    )
+    .await
+    {
+        return Err(AppError::Internal(format!(
+            "complete action-draft generation run: {error}"
+        )));
+    }
+
     tracing::info!(
         company_id = req.company_id,
-        draft_count = drafts.len(),
+        draft_count = batch.drafts.len(),
         grounding_snapshot_count = grounding_snapshots.as_ref().map_or(0, Vec::len),
         "Generated advisory action drafts"
     );
 
     Ok(Json(ActionDraftResponse {
-        drafts,
+        drafts: batch.drafts,
         grounding_snapshots,
     }))
 }
@@ -956,5 +1105,35 @@ mod tests {
         .expect("drafts");
         assert_eq!(drafts.len(), 1);
         assert_eq!(drafts[0].params_json["name"], json!("Call vendor"));
+    }
+
+    #[test]
+    fn generated_draft_request_identity_is_stable_and_effect_specific() {
+        let req = ActionDraftRequest {
+            org_id: Some(1),
+            company_id: 42,
+            query: "create task".to_string(),
+            ui_context: None,
+            allowed_reducers: vec!["create_task".to_string()],
+            allowed_entity_types: Vec::new(),
+            agent_id: None,
+            team_member_id: None,
+            stdb_token: "token".into(),
+            identity_hex: "actor".into(),
+        };
+        let mut drafts = draft_actions_stub(&req).expect("drafts");
+        let draft = drafts.first_mut().expect("draft");
+        let first = draft_request_input(draft, 0);
+        let replay = draft_request_input(draft, 0);
+        let concurrent = draft_request_input(draft, 1);
+
+        assert_eq!(
+            input_request_key(RequestKind::Draft, 77, &first).expect("first key"),
+            input_request_key(RequestKind::Draft, 77, &replay).expect("replay key")
+        );
+        assert_ne!(
+            input_request_key(RequestKind::Draft, 77, &first).expect("first key"),
+            input_request_key(RequestKind::Draft, 77, &concurrent).expect("concurrent key")
+        );
     }
 }

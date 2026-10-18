@@ -50,6 +50,7 @@ import {
 import type { AccountAccount } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
 import { toast } from "sonner"
+import { TablePager, usePagedRows } from "../components/table-pager"
 
 type DisplayGroup = AccountTypeGroup
 
@@ -114,6 +115,17 @@ function accountOpeningBalance(account: AccountAccount): number {
     : 0
 }
 
+/**
+ * Debit-normal groups (assets, expenses) carry positive balances and
+ * credit-normal groups (liabilities, equity, income) negative ones. Only a
+ * balance on the wrong side is worth highlighting.
+ */
+function isAbnormalBalance(group: DisplayGroup, balance: number): boolean {
+  if (group === "asset" || group === "expense") return balance < 0
+  if (group === "liability" || group === "equity" || group === "income") return balance > 0
+  return false
+}
+
 type TFunction = ReturnType<typeof useTranslation>["t"]
 
 interface AccountsTableProps {
@@ -123,8 +135,10 @@ interface AccountsTableProps {
 }
 
 function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
+  const accountsPager = usePagedRows(accounts)
   return (
-    <Table>
+    <>
+      <Table>
       <TableHeader>
         <TableRow>
           <TableHead className="w-20">{t("accounting.accounts.code")}</TableHead>
@@ -138,7 +152,7 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
       <TableBody>
         {accounts.length === 0 ? (
           <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">{t("accounting.accounts.noResults")}</TableCell></TableRow>
-        ) : accounts.map((account) => {
+        ) : accountsPager.pageRows.map((account) => {
           const group = getDisplayGroup(account)
           const conf = groupConfig[group]
           return (
@@ -160,7 +174,7 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
                   {conf.icon}{t(conf.labelKey as any)}
                 </Badge>
               </TableCell>
-              <TableCell className={cn("font-medium", accountOpeningBalance(account) < 0 ? "text-destructive" : "")}>
+              <TableCell className={cn("font-medium tabular-nums", isAbnormalBalance(group, accountOpeningBalance(account)) && "text-destructive")}>
                 {formatCurrency(accountOpeningBalance(account))}
               </TableCell>
               <TableCell>
@@ -177,7 +191,9 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
           )
         })}
       </TableBody>
-    </Table>
+      </Table>
+      <TablePager {...accountsPager} />
+    </>
   )
 }
 

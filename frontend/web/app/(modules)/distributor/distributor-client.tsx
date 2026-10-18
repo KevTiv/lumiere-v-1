@@ -2,6 +2,8 @@
 
 import { useMemo, type ReactNode } from "react"
 import Link from "next/link"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import { DashboardHeader } from "@lumiere/ui"
 import { BoxesIcon, CircleDollarSignIcon, PackageIcon, ReceiptTextIcon, StoreIcon } from "lucide-react"
 
 import { useErpSession } from "@lumiere/erp-session"
@@ -18,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { OrderHandoffLinks, orderHref } from "../../../components/order-handoff-links"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
 
 type Row = Record<string, unknown>
 
@@ -89,13 +92,24 @@ export function DistributorClient() {
       ).filter((row) => row.exceptions.length > 0),
     [canReadOrders, companyId, holds, moves, orders, organization, pickings],
   )
+  const exceptionsPager = usePagedRows(exceptionRows)
   const partnerNames = useMemo(
     () => new Map((contacts as Row[]).map((contact) => [String(contact.id), String(contact.name ?? contact.displayName ?? contact.display_name ?? "")])),
     [contacts],
   )
 
   if (!organizationId) return <MissingOrganization />
-  const toggle = () => void setPack.mutate({ companyId, organizationId, packKey: "distributor_wholesaler", enabled: !enabled })
+  const toggle = async () => {
+    try {
+      await setPack.mutateAsync({ companyId, organizationId, packKey: "distributor_wholesaler", enabled: !enabled })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: enabled ? "Disable pack failed" : "Enable pack failed",
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
 
   return (
     <main
@@ -103,6 +117,10 @@ export function DistributorClient() {
       data-testid="module-view-distributor"
       data-hydrated={packs.isSuccess ? "true" : "false"}
     >
+      <DashboardHeader
+        title="Distributor"
+        description="Cash, credit, order-to-cash and stock control for distribution companies"
+      />
       <Card>
         <CardHeader>
           <div>
@@ -130,7 +148,7 @@ export function DistributorClient() {
             : <table className="w-full text-sm" data-testid="distributor-o2c-table">
               <thead><tr className="text-left text-muted-foreground"><th className="pb-2">Order</th><th className="pb-2">Customer</th><th className="pb-2">Stage</th><th className="pb-2">Exceptions</th><th className="pb-2">Deliveries &amp; invoices</th><th className="pb-2 text-right">Open balance</th></tr></thead>
               <tbody>
-                {exceptionRows.map((row) => <tr key={String(row.orderId)} className="border-t align-top" data-testid={`distributor-o2c-row-${row.orderId}`}>
+                {exceptionsPager.pageRows.map((row) => <tr key={String(row.orderId)} className="border-t align-top" data-testid={`distributor-o2c-row-${row.orderId}`}>
                   <td className="py-2"><Link className="underline underline-offset-2" href={orderHref(row.orderId)} data-testid={`distributor-o2c-order-${row.orderId}`}>{row.reference || `Order #${row.orderId}`}</Link></td>
                   <td className="py-2">{row.partnerId == null ? "—" : partnerNames.get(String(row.partnerId)) || `Partner ${row.partnerId}`}</td>
                   <td className="py-2" data-testid={`distributor-o2c-stage-${row.orderId}`}>{STAGE_LABELS[row.stage]}</td>
@@ -140,6 +158,7 @@ export function DistributorClient() {
                 </tr>)}
               </tbody>
             </table>}
+            <TablePager {...exceptionsPager} />
         </CardContent>
       </Card> : null}
     </main>

@@ -168,8 +168,14 @@ def operation_shape(
         "generator_version",
     ):
         shape.pop(field, None)
-    application = _object(shape.get("application"), "operation application")
-    shape["application"] = _without_operation_identity(application)
+    application = shape.get("application")
+    if application is None:
+        if shape.get("source_kind") == "reducer":
+            fail("reducer operation application must be an object")
+    else:
+        shape["application"] = _without_operation_identity(
+            _object(application, "operation application")
+        )
     schema = _object(shape.get("schema"), "operation schema")
     shape["schema"] = _without_operation_identity(schema)
     if type_names is not None:

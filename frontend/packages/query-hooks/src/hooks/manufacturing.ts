@@ -9,7 +9,7 @@ import { scalarToU64, type ScalarId } from '@lumiere/erp-shared/u64'
 import { apiFetch, fetchQueryList, rqBigIntKey } from "../http"
 import { dispatchNamedOperation } from '../operation-dispatch'
 import { withCompanyScope } from "@lumiere/erp-shared/org-scoped"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { encodeOptionalString, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { useConfirmManufacturingOrder } from "./manufacturing-order-confirmation"
 import { useConsumeMoMaterials, useStartManufacturingOrder } from "./manufacturing-material-consumption"
 import { useFinishManufacturingOrder, useProduceManufacturingOrder } from "./manufacturing-production-close"
@@ -545,7 +545,11 @@ export function useCreateBomByproduct(
             'create_bom_byproduct',
             {
               bomId,
-              params: stdbParamsToJson(params, 'CreateBomByproductParams'),
+              // SATS struct options are required on the wire even when absent.
+              params: stdbParamsToJson(
+                { ...params, metadata: encodeOptionalString(params.metadata) },
+                'CreateBomByproductParams',
+              ),
             },
             'Failed to create BOM byproduct',
           );

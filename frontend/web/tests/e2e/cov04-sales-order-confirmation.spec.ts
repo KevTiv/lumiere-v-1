@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
-import { activeTabEntityTable, fetchDefaultCompanyId, signIn, smokeName } from "./helpers"
+import { activeTabEntityTable, fetchDefaultCompanyId, gotoModule, signIn, smokeName } from "./helpers"
 import {
   addLaptopLine,
   confirmOrderViaUi,
@@ -59,6 +59,9 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
 
     try {
       await signIn(salesPage, "fixture.sales@example.test", PERSONA_PASSWORD)
+      // confirmOrderViaUi opens the exact-order URL directly; the unfiltered
+      // Orders list must precede it in history for the Back assertion below.
+      await gotoModule(salesPage, "/sales?tab=orders", "sales")
       await confirmOrderViaUi(salesPage, orderId)
       await expectCanonicalOrderFocus(salesPage, orderId)
 
