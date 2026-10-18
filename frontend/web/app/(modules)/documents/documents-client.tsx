@@ -3,6 +3,7 @@ import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -108,6 +109,9 @@ import {
   toSetDocumentRetentionParams,
 } from "@/lib/documents-create-params"
 import { documentRecordHref, formatFileSize } from "./document-record"
+import { documentNameFromFile, toBrowserFiles, toBrowserFolders } from "./file-browser-rows"
+import { FileBrowser } from "@lumiere/ui"
+import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { documentFolderCanBeDeleted } from "./document-folder-gates"
 import {
   canDeleteKnowledgeCategory,
@@ -273,6 +277,8 @@ function DocumentsClientLoaded({
   const [ackModalRows, setAckModalRows] = useState<Record<string, unknown>[] | null>(null)
   const [ackSubmitError, setAckSubmitError] = useState<string | null>(null)
   const openErpAiChat = useOpenErpAiChat()
+  const router = useRouter()
+  const identityLabels = useIdentityLabelMap(orgId)
 
   const { data: documents = [] } = useDocuments(orgId, initialDocuments)
   const { data: deletedDocuments = [] } = useDeletedDocuments(
@@ -1155,6 +1161,47 @@ function DocumentsClientLoaded({
     ],
   )
 
+  /** Stores the bytes, registers the document, then queues its evidence ingestion. */
+  const uploadAndRegisterDocument = async (file: File, formData: Record<string, unknown>) => {
+    const folderId = optionalBigIntU64(formData.folderId)
+    const folderResidency =
+      folderId != null
+        ? folders.find((f) => String(f.id) === String(folderId))?.residencyRegion
+        : undefined
+    const residency =
+      (typeof formData.residencyRegion === "string" && formData.residencyRegion.trim()) ||
+      (typeof folderResidency === "string" ? folderResidency : undefined) ||
+      undefined
+    const uploaded = await uploadDocumentBlob({
+      file,
+      companyId: operatingCompanyId,
+      residency: residency ? String(residency) : undefined,
+    })
+    const params = toCreateDocumentParams({
+      ...formData,
+      fileName: uploaded.fileName,
+      fileSize: uploaded.fileSize,
+      mimetype: uploaded.mimetype,
+      url: uploaded.url,
+      checksum: uploaded.checksum,
+      residencyRegion: formData.residencyRegion ?? residency,
+    })
+    if (!params) {
+      throw new Error("Document registration params incomplete after upload")
+    }
+    await createDocument.mutateAsync(params)
+    await ingestDocumentEvidence.mutateAsync({
+      companyId: operatingCompanyId,
+      objectKey: uploaded.objectKey,
+    })
+  }
+
+  const browserFiles = useMemo(
+    () => toBrowserFiles(documents, identityLabels),
+    [documents, identityLabels],
+  )
+  const browserFolders = useMemo(() => toBrowserFolders(folders, browserFiles), [folders, browserFiles])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
@@ -1165,37 +1212,7 @@ function DocumentsClientLoaded({
       if (!file) {
         throw new Error(t("documents.forms.newDocument.fields.fileHint"))
       }
-      const folderId = optionalBigIntU64(formData.folderId)
-      const folderResidency =
-        folderId != null
-          ? folders.find((f) => String(f.id) === String(folderId))?.residencyRegion
-          : undefined
-      const residency =
-        (typeof formData.residencyRegion === "string" && formData.residencyRegion.trim()) ||
-        (typeof folderResidency === "string" ? folderResidency : undefined) ||
-        undefined
-      const uploaded = await uploadDocumentBlob({
-        file,
-        companyId: operatingCompanyId,
-        residency: residency ? String(residency) : undefined,
-      })
-      const params = toCreateDocumentParams({
-        ...formData,
-        fileName: uploaded.fileName,
-        fileSize: uploaded.fileSize,
-        mimetype: uploaded.mimetype,
-        url: uploaded.url,
-        checksum: uploaded.checksum,
-        residencyRegion: formData.residencyRegion ?? residency,
-      })
-      if (!params) {
-        throw new Error("Document registration params incomplete after upload")
-      }
-      await createDocument.mutateAsync(params)
-      await ingestDocumentEvidence.mutateAsync({
-        companyId: operatingCompanyId,
-        objectKey: uploaded.objectKey,
-      })
+      await uploadAndRegisterDocument(file, formData)
     } else if (action === "createArticle") {
       const params = toCreateKnowledgeArticleParams(formData, operatingCompanyId)
       if (!params) return
@@ -1275,7 +1292,43 @@ function DocumentsClientLoaded({
       {formDialog}
       {confirmDialogNode}
       <ModuleView
-        config={config}
+        config={{
+          ...config,
+          tabs: config.tabs.map((tab) =>
+            tab.id === "documents" && tab.type === "entity"
+              ? {
+                  ...tab,
+                  entityAltView: {
+                    label: t("documents.browser.viewFiles"),
+                    tableLabel: t("documents.browser.viewTable"),
+                    content: (
+                      <FileBrowser
+                        folders={browserFolders}
+                        files={browserFiles}
+                        storageKey="lumiere:documents-browser-layout"
+                        onOpenFile={(id) => router.push(`/documents/${id}`)}
+                        onCreateFolder={() =>
+                          setQuickActionForm({ form: documentFolderFormConfig, action: "createDocumentFolder" })
+                        }
+                        onUpload={async (picked, folderId) => {
+                          for (const file of picked) {
+                            await uploadAndRegisterDocument(file, {
+                              name: documentNameFromFile(file.name),
+                              folderId: folderId ?? undefined,
+                            })
+                          }
+                          showWorkflowToast({
+                            kind: "success",
+                            title: t("common.actionCompleted", { action: t("documents.browser.upload") }),
+                          })
+                        }}
+                      />
+                    ),
+                  },
+                }
+              : tab,
+          ),
+        }}
         data={data}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}

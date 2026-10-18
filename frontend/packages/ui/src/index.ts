@@ -29,6 +29,7 @@ export * from "./lib/kanban-board-types";
 export * from "./kanban/kanban-board";
 export * from "./kanban/kanban-column";
 export * from "./kanban/kanban-draggable-card";
+export * from "./kanban/kanban-card";
 export * from "./lib/entity-configs";
 
 // Modular forms
@@ -89,6 +90,7 @@ export * from "./lib/hr-form-configs";
 export * from "./lib/documents-entity-configs";
 export * from "./lib/documents-form-configs";
 export * from "./documents/record-attachments-panel";
+export * from "./documents/file-browser";
 export * from "./lib/calendar-types";
 export * from "./lib/calendar-entity-configs";
 export * from "./lib/calendar-form-configs";

@@ -68,6 +68,19 @@ export interface ModuleTab {
   recordSheet?: EntityRecordSheetConfig
   /** For type='custom': arbitrary content rendered inside the tab panel */
   customContent?: ReactNode
+  /**
+   * For type='entity': another presentation of the tab's records (e.g. a file browser), shown
+   * by default with a toggle back to the table. Route filters always open the table.
+   */
+  entityAltView?: ModuleTabAltView
+}
+
+export interface ModuleTabAltView {
+  /** Toggle label of the alternate view. */
+  label: string
+  /** Toggle label of the table. */
+  tableLabel: string
+  content: ReactNode
 }
 
 export interface ModuleConfig {

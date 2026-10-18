@@ -9189,6 +9189,31 @@
       "retentionPurgeConfirm": "Schedule the purge to run in {{seconds}} seconds? Purged documents cannot be restored.",
       "retentionPurgeHint": "Permanently deletes recycle-bin documents whose retention period has ended, after the delay.",
       "retentionPurgeScheduled": "Retention purge scheduled in {{seconds}} seconds"
+    },
+    "browser": {
+      "allFiles": "All files",
+      "folders": "Folders",
+      "noFolders": "No folders yet. Create one to organise your files.",
+      "search": "Search files…",
+      "newFolder": "New folder",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "fileCount": "{{count}} files",
+      "fileCount_one": "{{count}} file",
+      "updated": "Updated {{date}}",
+      "layout": "File layout",
+      "grid": "Grid view",
+      "list": "List view",
+      "empty": "No files here yet",
+      "noMatches": "No files match your search",
+      "dropHint": "Drop files here or use Upload.",
+      "name": "Name",
+      "size": "Size",
+      "modifiedBy": "Modified by",
+      "modified": "Modified",
+      "viewFiles": "Files",
+      "viewTable": "Table",
+      "uploadFailed": "Upload failed"
     }
   },
   "helpdesk": {
@@ -11740,7 +11765,9 @@
       "boardView": "Board view",
       "dropTasksHere": "Drop tasks here",
       "listView": "List view",
-      "wipLimitReached": "WIP limit reached ({{limit}})"
+      "wipLimitReached": "WIP limit reached ({{limit}})",
+      "tableView": "Table",
+      "moveFailed": "Could not move the task"
     },
     "actions": {
       "addComment": "Add comment",
@@ -11753,7 +11780,10 @@
       "unassigned": "Unassigned"
     },
     "card": {
-      "storyPoints": "{{count}} SP"
+      "storyPoints": "{{count}} SP",
+      "comments": "{{count}} comments",
+      "attachments": "{{count}} attachments",
+      "progress": "Progress"
     },
     "create": {
       "descriptionPlaceholder": "Enter task description",
