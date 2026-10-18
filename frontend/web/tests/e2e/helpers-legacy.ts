@@ -413,8 +413,19 @@ export async function openTabAndCancelCreate(
   await expectNoAppError(page)
 }
 
-export async function fillField(page: Page, name: string, value: string) {
-  const field = page.getByTestId(`form-field-${name}`)
+export async function fillField(scope: Page | Locator, name: string, value: string) {
+  const field = scope.getByTestId(`form-field-${name}`)
+  // Textarea retains its test id on the native form bridge. User input belongs
+  // in the visible editor inside that same panel, including within a dialog.
+  if (
+    await field.getAttribute("data-slot") === "textarea" &&
+    await field.getAttribute("aria-hidden") === "true"
+  ) {
+    const editor = field.locator("..").locator('[data-slot="rich-text-editor"]')
+    await editor.click()
+    await editor.fill(value)
+    return
+  }
   await field.click()
   await field.fill(value)
 }
