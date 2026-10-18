@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { LumiereApiProvider } from "@lumiere/api-client"
 import { I18nProvider } from "@lumiere/i18n"
 import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
@@ -17,6 +18,7 @@ import { InvoiceEmailReviewDialog } from "../../../../../packages/ui/src/account
 import { invoiceEmailDocumentKey, invoiceEmailScope, type InvoiceEmailDocument } from "../../../../../packages/ui/src/accounting-components/invoice-email-review"
 import type { AccountMove } from "../../../../../packages/ui/src/lib/accounting-types"
 import type { ModuleDataState } from "../../../../../packages/ui/src/lib/module-data-state"
+import { webApi } from "../../../../lib/lumiere-web-http"
 const PaymentOperationsPanel = dynamic(() => import("../../../../app/(modules)/accounting/payment-operations-panel").then((module) => module.PaymentOperationsPanel), { ssr: false, loading: () => <p role="status">Loading actual payment operations…</p> })
 
 const NOW = new Date("2026-10-18T12:00:00Z")
@@ -44,7 +46,7 @@ const bankSource: ReconciliationSource = {
   currencies: [{ id: "1", code: "EUR", name: "Euro", decimalPlaces: 2, roundingFactor: 0.01 }],
   accounts: [{ ...scope, id: "401", code: "1200", name: "Receivables", internalType: "receivable", reconcile: true, deprecated: false }],
   moves: [{ ...scope, id: "91", name: "INV/BANK/91", partnerId: "601", moveType: "OutInvoice", state: "Posted", invoicePartnerDisplayName: "Canonical customer" }],
-  moveLines: [{ ...scope, id: "501", moveId: "91", accountId: "401", partnerId: "601", accountInternalType: "receivable", parentState: "Posted", name: "Open customer invoice", companyCurrencyId: "1", currencyId: "1", balance: 100, debit: 100, credit: 0, amountResidual: 100, blocked: false }],
+  moveLines: [{ ...scope, id: "501", moveId: "91", accountId: "401", partnerId: "601", parentState: "Posted", name: "Open customer invoice", companyCurrencyId: "1", currencyId: "1", balance: 100, debit: 100, credit: 0, amountResidual: 100, blocked: false }],
 }
 const paymentRows: Record<string, Record<string, unknown>[]> = {
   "payment-accounts": [{ ...scope, id: "1", name: "Synthetic EUR bank", active: true, currencyId: "1", providerCode: "Bank", accountJournalId: "5" }],
@@ -54,7 +56,7 @@ const paymentRows: Record<string, Record<string, unknown>[]> = {
   "account-move-lines": [{ ...scope, id: "201", moveId: "101", paymentId: "1", partnerId: "601", parentState: "Posted", accountInternalType: "receivable", companyCurrencyId: "1", currencyId: "1", balance: -100, amountResidual: 60 }],
   "payment-reconciliations": [], "payment-reversals": [], "payment-fees": [],
 }
-const openInvoiceLines = [{ ...scope, id: "501", moveId: "91", partnerId: "601", currencyId: "1", accountInternalType: "receivable", name: "Customer invoice INV/BANK/91", amountResidual: 100 }]
+const openInvoiceLines = [{ ...scope, id: "501", moveId: "91", partnerId: "601", currencyId: "1", accountInternalType: "receivable", parentState: "Posted", name: "Customer invoice INV/BANK/91", amountResidual: 100 }]
 function queryClient() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } })
   for (const company of [11, 22]) {
@@ -128,5 +130,5 @@ function Operations() {
 }
 export default function OperationsFixture() {
   const [client] = useState(queryClient)
-  return <QueryClientProvider client={client}><I18nProvider language="en"><RBACProvider useDefaultFixtures><ErpSessionProvider value={{ identity: null, connected: false, organizationId: 7, companyIds: [11, 22] }}><ThemeProvider defaultTheme="light"><Operations /></ThemeProvider></ErpSessionProvider></RBACProvider></I18nProvider></QueryClientProvider>
+  return <LumiereApiProvider client={webApi}><QueryClientProvider client={client}><I18nProvider language="en"><RBACProvider useDefaultFixtures><ErpSessionProvider value={{ identity: null, connected: false, organizationId: 7, companyIds: [11, 22] }}><ThemeProvider defaultTheme="light"><Operations /></ThemeProvider></ErpSessionProvider></RBACProvider></I18nProvider></QueryClientProvider></LumiereApiProvider>
 }

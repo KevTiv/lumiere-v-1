@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test"
+import { stdbBffCallUrl } from "../../packages/stdb/src/commands/stdb-http"
 
 const unexpectedWrites = new WeakMap<Page, string[]>()
 async function noOverflow(page: Page) {
@@ -17,11 +18,15 @@ for (const width of [390, 1440]) {
   test.describe(`${width}px operational gaps with actual components`, () => {
     test.use({ viewport: { width, height: width < 768 ? 844 : 1000 }, hasTouch: width < 768 })
     test.beforeAll(async ({ request }) => {
-      test.setTimeout(120_000)
-      const response = await request.get("/operations", { timeout: 120_000 })
+      test.setTimeout(600_000)
+      const response = await request.get("/operations", { timeout: 600_000 })
       expect(response.ok()).toBe(true)
     })
-    test.beforeEach(async ({ page }) => {
+    test.beforeEach(async ({ page }, testInfo) => {
+      const interactionBudget = testInfo.timeout
+      const startupStartedAt = Date.now()
+      // Route/chunk startup is separate from the unchanged interaction budget.
+      testInfo.setTimeout(600_000)
       // Every API request ends at this test boundary. No request reaches an ERP server.
       const writes: string[] = []
       unexpectedWrites.set(page, writes)
@@ -33,6 +38,7 @@ for (const width of [390, 1440]) {
       await expect(page.getByTestId("operations-disclosure")).toHaveAttribute("data-hydrated", "true")
       await page.evaluate(async () => { await document.fonts.ready })
       await expect(page.locator("body")).toHaveCSS("font-family", /Geist/)
+      testInfo.setTimeout(Date.now() - startupStartedAt + interactionBudget)
     })
 
     test.afterEach(async ({ page }) => {
@@ -160,7 +166,7 @@ for (const width of [390, 1440]) {
     test("actual payment allocation retains its pending request and exact retry after a lost synthetic response", async ({ page }, testInfo) => {
       const requests: unknown[] = []
       let pendingRoute: Route | undefined
-      await page.route("**/api/operations/allocate_payment_transaction", async (route) => {
+      await page.route(`**${stdbBffCallUrl("allocate_payment_transaction")}`, async (route) => {
         requests.push(route.request().postDataJSON())
         if (requests.length === 1) pendingRoute = route
         else await route.fulfill({ status: 200, contentType: "application/json", body: "{}" })
@@ -176,10 +182,16 @@ for (const width of [390, 1440]) {
       await expect.poll(() => requests.length).toBe(1)
       await expect(page.getByTestId("operations-state")).toContainText("payment lock true")
       await control(page, "collections")
-      await expect(page.getByRole("region", { name: "Retained payment allocation" })).toBeVisible()
+      // The open modal hides siblings from accessible-name queries; verify its
+      // original parent remains rendered and the reviewed dialog remains intact.
+      await expect(page.locator('section[aria-label="Retained payment allocation"]')).toBeVisible()
+      await expect(dialog).toBeVisible()
+      await expect(dialog.getByRole("spinbutton", { name: /Allocation amount/ })).toHaveValue("20")
       await pendingRoute!.fulfill({ status: 504, contentType: "application/json", body: JSON.stringify({ error: "Synthetic allocation response lost" }) })
       await expect(dialog).toContainText("Synthetic allocation response lost")
       await dialog.getByRole("button", { name: "Cancel", exact: true }).click()
+      await page.getByRole("alertdialog", { name: "Discard changes?", exact: true }).getByRole("button", { name: "Discard", exact: true }).click()
+      await expect(dialog).toHaveCount(0)
       const retained = page.getByRole("region", { name: "Retained payment allocation" })
       await expect(retained).toContainText("allocation response is unresolved")
       await expect(page.getByTestId("operations-state")).toContainText("payment lock true")
