@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use spacetimedb::{ReducerContext, Table, Timestamp};
+use spacetimedb::{ReducerContext, Timestamp};
 
 use super::bank_reconciliation::{account_bank_statement, account_bank_statement_line};
 use super::bank_settlement_lifecycle::{
