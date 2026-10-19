@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import { fetchContactIdByName, fetchDefaultCompanyId, gotoModule, scalarQueryId, selectEntityRowById, signIn } from "./helpers"
+import { fetchContactIdByName, fetchCurrencyIdByCode, fetchDefaultCompanyId, gotoModule, selectEntityRowById, signIn } from "./helpers"
 import { command, create, id, location, password, product, rows, value } from "./cov-scheduler-manufacturing-fixtures"
 import { createProductSupplierInfoFixture, createStockQuantFixture, fetchQuantsAtProductLocation } from "./inventory-quant-fixtures"
 import { fetchPickingMoveStates, fetchPickingState, runPickingActionViaInventoryUi } from "./inventory-picking-fixtures"
@@ -128,11 +128,9 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
       const buyItem = await product(page)
       const buyDestination = await location(page, companyId)
       const vendorId = await fetchContactIdByName(page, "Globex Corp")
-      const currenciesResponse = await page.request.get("/api/bootstrap/currencies")
-      expect(currenciesResponse.ok()).toBe(true)
-      const currencies = await currenciesResponse.json() as { data?: Array<Record<string, unknown>> }
-      const currencyId = scalarQueryId(currencies.data?.[0]?.id)
-      if (currencyId == null) throw new Error("No currency in seed data")
+      // Same currency as the product fixture and the company, not whichever
+      // currency the bootstrap list happens to return first.
+      const currencyId = await fetchCurrencyIdByCode(page, "USD")
       await createProductSupplierInfoFixture(page, id(buyItem), vendorId, currencyId, 1, 12)
       const buyRule = await create(page, "replenishment-rules", "create_replenishment_rule", {
         companyId,

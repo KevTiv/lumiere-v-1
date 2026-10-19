@@ -134,7 +134,10 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
       // The candidate-scoped inbox does not expose an admin-only task to its
       // requester. The Sales client must keep the outcome unknown rather than
       // infer a task by order state, name, or time.
-      expect(await exactActiveApprovalTaskIds(requester, orderId)).toEqual([])
+      // Fail closed means denied outright or an empty inbox, never the admin task.
+      const requesterInbox = await requester.request.get("/api/query/workflow-human-tasks-inbox")
+      expect([200, 403]).toContain(requesterInbox.status())
+      if (requesterInbox.ok()) expect(await exactActiveApprovalTaskIds(requester, orderId)).toEqual([])
       expect(await fetchOrderPickings(page, orderId)).toEqual([])
 
       await gotoApprovals(page)

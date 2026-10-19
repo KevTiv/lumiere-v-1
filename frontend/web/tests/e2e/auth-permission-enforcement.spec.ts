@@ -656,9 +656,11 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
         secondaryPaymentId = await adminCreateDraftPayment(page)
         return [orgId, secondaryPaymentId]
       },
-      assertSuccess: async (limitedPage, args) => {
+      // The actor holds post only, not account_payment read; the administrator
+      // observes the posted payment.
+      assertSuccess: async (_limitedPage, args) => {
         const paymentId = Number(args[1])
-        await waitForPaymentPosted(limitedPage, paymentId)
+        await waitForPaymentPosted(page, paymentId)
       },
     })
   })
