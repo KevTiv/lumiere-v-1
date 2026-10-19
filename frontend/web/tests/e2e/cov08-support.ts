@@ -96,6 +96,7 @@ export async function createAndPostPayment(page: Page, moveId: number) {
   await fillField(page, "date", new Date().toISOString().slice(0, 10))
   const reference = smokeName("cov08-pay")
   await fillField(page, "ref", reference)
+  await expect(page.getByTestId("form-submit-new-account-payment")).toBeEnabled({ timeout: 15_000 })
   const [createResponse] = await Promise.all([
     page.waitForResponse((r) => matchesOperationResponse(r, "create_payment") && r.ok(), { timeout: 30_000 }),
     submitForm(page, "new-account-payment"),
