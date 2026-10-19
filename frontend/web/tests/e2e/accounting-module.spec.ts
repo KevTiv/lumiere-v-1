@@ -166,11 +166,15 @@ test.describe("Accounting module e2e", () => {
   test("renders accounting shell and each tab without errors", { tag: "@p0" }, async ({ page }) => {
     // Exercise every preserved deep link; each is a full navigation with fresh scoped reads.
     test.setTimeout(240_000)
-    await gotoModule(page, "/accounting", "accounting")
-    await expect(page.getByRole("navigation", { name: "Accounting workspaces" }).getByRole("link")).toHaveCount(7)
-    await expect(page.getByRole("button", { name: "Advanced / Configuration" })).toBeVisible()
+    await test.step("Open Accounting and validate workspace navigation", async () => {
+      await gotoModule(page, "/accounting", "accounting")
+      await expect(page.getByRole("navigation", { name: "Accounting workspaces" }).getByRole("link")).toHaveCount(7)
+      await expect(page.getByRole("button", { name: "Advanced / Configuration" })).toBeVisible()
+    }, { timeout: 30_000 })
     for (const tabId of ACCOUNTING_TAB_IDS) {
-      await assertAccountingTabRenders(page, tabId)
+      await test.step(`Accounting workspace: ${tabId}`, async () => {
+        await assertAccountingTabRenders(page, tabId)
+      }, { timeout: 30_000 })
     }
   })
 
