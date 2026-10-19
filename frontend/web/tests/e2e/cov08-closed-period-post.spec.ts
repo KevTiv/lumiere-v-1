@@ -9,6 +9,7 @@ import {
   fetchSessionOrganizationId,
   fillField,
   gotoModule,
+  openAccountingTab,
   scalarQueryId,
   smokeName,
   submitForm,
@@ -102,7 +103,7 @@ test.describe("COV-08 closed accounting period", { tag: ["@p0", "@cov08"] }, () 
       [bankAccountId, "Bank", "40", "0"],
       [arAccountId, "Receivable", "0", "40"],
     ] as const) {
-      await page.getByTestId("module-tab-accounting-move-lines").click()
+      await openAccountingTab(page, "move-lines")
       await page.getByTestId("module-create-accounting-move-lines").click()
       await expect(page.getByTestId("form-modal-add-account-move-line")).toBeVisible()
       await chooseSelectOptionByValue(page, "moveId", entryId)
@@ -118,7 +119,7 @@ test.describe("COV-08 closed accounting period", { tag: ["@p0", "@cov08"] }, () 
     }
 
     // Operator: close the period.
-    await page.getByTestId("module-tab-accounting-account-periods").click()
+    await openAccountingTab(page, "account-periods")
     const periodRow = page.getByTestId(`entity-row-${periodId}`)
     await expect(periodRow).toContainText(periodName)
     await periodRow.click()
