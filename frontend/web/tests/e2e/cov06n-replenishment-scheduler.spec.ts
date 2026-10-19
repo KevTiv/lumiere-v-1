@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import { fetchContactIdByName, fetchCurrencyIdByCode, fetchDefaultCompanyId, gotoModule, selectEntityRowById, signIn } from "./helpers"
+import { fetchContactIdByName, fetchDefaultCompanyId, gotoModule, scalarQueryId, selectEntityRowById, signIn } from "./helpers"
 import { command, create, id, location, password, product, rows, value } from "./cov-scheduler-manufacturing-fixtures"
 import { createProductSupplierInfoFixture, createStockQuantFixture, fetchQuantsAtProductLocation } from "./inventory-quant-fixtures"
 import { fetchPickingMoveStates, fetchPickingState, runPickingActionViaInventoryUi } from "./inventory-picking-fixtures"
@@ -128,9 +128,11 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
       const buyItem = await product(page)
       const buyDestination = await location(page, companyId)
       const vendorId = await fetchContactIdByName(page, "Globex Corp")
-      // Same currency as the product fixture and the company, not whichever
-      // currency the bootstrap list happens to return first.
-      const currencyId = await fetchCurrencyIdByCode(page, "USD")
+      const currenciesResponse = await page.request.get("/api/bootstrap/currencies")
+      expect(currenciesResponse.ok()).toBe(true)
+      const currencies = await currenciesResponse.json() as { data?: Array<Record<string, unknown>> }
+      const currencyId = scalarQueryId(currencies.data?.[0]?.id)
+      if (currencyId == null) throw new Error("No currency in seed data")
       await createProductSupplierInfoFixture(page, id(buyItem), vendorId, currencyId, 1, 12)
       const buyRule = await create(page, "replenishment-rules", "create_replenishment_rule", {
         companyId,
@@ -154,10 +156,17 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
       await warehousePage.getByTestId("entity-action-schedule-replenishment-run").click()
       await expect.poll(async () => (await buyJobs()).length, { timeout: 30_000 }).toBe(1)
       const buyScheduledId = id((await buyJobs())[0]!, "scheduledId", "scheduled_id")
-      await expect.poll(async () => {
-        const current = (await rows(page, "replenishment-rules")).find(row => id(row) === buyRuleId)
-        return value(current ?? {}, "lastRun", "last_run") ?? null
-      }, { timeout: 75_000 }).not.toBeNull()
+      try {
+        await expect.poll(async () => {
+          const current = (await rows(page, "replenishment-rules")).find(row => id(row) === buyRuleId)
+          return value(current ?? {}, "lastRun", "last_run") ?? null
+        }, { timeout: 75_000 }).not.toBeNull()
+      } catch (error) {
+        // The scheduled run never stamped last_run, so it failed. Replay the same
+        // rule synchronously once to surface the reducer's rejection reason.
+        const probe = await command(page, "execute_replenishment_rule", { companyId, ruleId: buyRuleId, idempotencyKey: `diag-${buyRuleId}` })
+        throw new Error(`scheduled buy run did not execute; direct execute -> ${probe.status()} ${await probe.text()}`, { cause: error })
+      }
       await expect.poll(async () => {
         const pending = await buyJobs()
         return pending.length === 1
