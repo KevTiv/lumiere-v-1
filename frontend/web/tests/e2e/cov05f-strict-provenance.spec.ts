@@ -190,12 +190,13 @@ test.describe(
         await signIn(accounting, "fixture.finance@example.test", PASSWORD)
         await accounting.goto(`/accounting?tab=journal-entries&filter=id:${exactBillId}`)
         await expectBillFocus(accounting, exactBillId)
+        const accountRead = await accounting.request.get("/api/query/account-accounts")
+        expect(accountRead.ok(), "Finance must read the posting accounts").toBe(true)
         await activeTabEntityTable(accounting).getByTestId(`entity-row-${exactBillId}`).click()
-        // The initial record sheet also has a discussion "Post" action.
-        // Enter the invoice workflow, rather than submitting a chatter post.
-        await accounting.getByTestId("entity-record-sheet-tab-actions").click()
-        await accounting.getByTestId("accounting-invoice-record-actions").click()
-        const post = accounting.getByTestId("invoice-detail-post-draft")
+        // GeneralLedgerView owns the journal-entry dialog, not EntityRecordSheet.
+        const entryDialog = accounting.getByRole("dialog", { name: /^Entry:/ })
+        await expect(entryDialog).toBeVisible()
+        const post = entryDialog.getByTestId("general-ledger-post-move")
         await expect(post).toBeEnabled()
         const responsePromise = accounting.waitForResponse(
           (response) => matchesOperationResponse(response, "post_invoice"),
