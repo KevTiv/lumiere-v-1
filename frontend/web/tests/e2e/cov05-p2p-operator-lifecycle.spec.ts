@@ -27,6 +27,7 @@ import {
   fetchVendorPartnerIdByName,
   fillField,
   gotoModule,
+  openAccountingTab,
   postDraftBillViaUi,
   scalarQueryString,
   selectEntityRowById,
@@ -200,7 +201,7 @@ test.describe("COV-05 purchasing operator lifecycle (PO through bill and payment
 
     const { amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await openAccountingTab(page, "payments")
     await page.getByTestId("module-create-accounting-payments").click()
     await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
     await chooseSelectOptionByValue(page, "paymentType", "OutBound")
@@ -253,7 +254,7 @@ test.describe("COV-05 purchasing operator lifecycle (PO through bill and payment
 
     await reloadSettled(page)
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await openAccountingTab(page, "payments")
     await expect(page.getByTestId(`entity-row-${paymentId}`)).toContainText(VENDOR_NAME)
     await waitForSettledBill(page, moveId)
     expect(
