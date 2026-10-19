@@ -213,6 +213,7 @@ test.describe("COV-05 purchasing operator lifecycle (PO through bill and payment
     await fillField(page, "date", new Date().toISOString().slice(0, 10))
     const paymentReference = smokeName("mvp-p2p-payment")
     await fillField(page, "ref", paymentReference)
+    await expect(page.getByTestId("form-submit-new-account-payment")).toBeEnabled({ timeout: 15_000 })
     const [createPaymentResponse] = await Promise.all([
       page.waitForResponse(
         (res) => matchesOperationResponse(res, "create_payment") && res.ok(),
