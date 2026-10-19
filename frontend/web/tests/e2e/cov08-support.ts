@@ -11,6 +11,7 @@ import {
   fetchPaymentIdByExactReference,
   fillField,
   gotoModule,
+  openAccountingTab,
   postDraftInvoiceViaUi,
   scalarQueryId,
   scalarQueryString,
@@ -83,7 +84,7 @@ export async function createAndPostPayment(page: Page, moveId: number) {
   expect(partnerName).not.toBe("")
 
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-payments").click()
+  await openAccountingTab(page, "payments")
   await page.getByTestId("module-create-accounting-payments").click()
   await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
   await chooseSelectOptionByValue(page, "paymentType", "InBound")
