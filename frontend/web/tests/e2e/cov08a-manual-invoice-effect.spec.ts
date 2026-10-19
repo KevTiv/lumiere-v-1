@@ -62,8 +62,12 @@ test.describe(
         })
       }, browserRequestUuid)
 
-      await page.getByTestId("quick-action-create_invoice").click()
-      await expect(page.getByTestId("create-invoice-modal")).toBeVisible()
+      // Setup readiness is evaluated from several reads; a click before they have
+      // loaded shows the blocking toast instead of the modal, so retry the click.
+      await expect(async () => {
+        await page.getByTestId("quick-action-create_invoice").click()
+        await expect(page.getByTestId("create-invoice-modal")).toBeVisible({ timeout: 5_000 })
+      }).toPass({ timeout: 60_000 })
       await fillManualInvoice(page, description)
 
       const dispatchPromise = page.waitForResponse(
