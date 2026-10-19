@@ -612,12 +612,14 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
         secondaryPickingId = await adminPrepareAssignedPicking(page)
         return [orgId, secondaryPickingId, { company_id: companyId }]
       },
-      assertSuccess: async (limitedPage, args) => {
+      // The grant is Write-only, so the limited actor still cannot read pickings;
+      // the administrator observes the validated effect.
+      assertSuccess: async (_limitedPage, args) => {
         const pickingId = Number(args[1])
         await expect
           .poll(
             async () => {
-              const res = await limitedPage.request.get("/api/query/stock-pickings")
+              const res = await page.request.get("/api/query/stock-pickings")
               if (!res.ok()) return ""
               const json = (await res.json()) as {
                 data?: Array<{ id?: unknown; state?: unknown }>

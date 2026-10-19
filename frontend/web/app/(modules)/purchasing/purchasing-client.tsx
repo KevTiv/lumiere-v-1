@@ -209,6 +209,7 @@ import {
   toCreatePartnerBankParams,
   toUpdatePartnerBankParams,
 } from "@/lib/purchasing-partner-bank-params"
+import { runtimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 /** Forms that render their own failure inline instead of a toast. */
 const INLINE_ERROR_TRANSITIONS: ReadonlySet<string> = new Set(["purchasing.order.create-bill"])
@@ -460,7 +461,7 @@ function PurchasingClientLoaded({
   const { t } = useTranslation()
   const { identity } = useErpSession()
   const { currentUser } = useRBAC()
-  const runtimeRoleId = currentUser?.roles[0]
+  const runtimeRoleId = runtimeFormRoleId(currentUser)
   const { orgId } = orgBigInts(organizationId)
   const { askForm, formDialog } = useFormDialog()
 

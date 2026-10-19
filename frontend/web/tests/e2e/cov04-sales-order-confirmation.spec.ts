@@ -6,6 +6,7 @@ import {
   activeTabEntityTable,
   callReducerBff,
   fetchDefaultCompanyId,
+  fetchSessionOrganizationId,
   gotoApprovals,
   gotoModule,
   scalarQueryId,
@@ -52,6 +53,38 @@ async function exactActiveApprovalTaskIds(page: Page, orderId: number): Promise<
   })
 }
 
+function statusTag(status: unknown): string {
+  if (typeof status === "string") return status
+  if (status && typeof status === "object" && "tag" in status) return String((status as { tag?: unknown }).tag ?? "")
+  return status && typeof status === "object" ? (Object.keys(status)[0] ?? "") : ""
+}
+
+/**
+ * Guarded-action discovery admits exactly one published workflow per action, so
+ * the seeded `seed.sales-approval` (gated on the unreachable ToApprove state)
+ * must be retired before this test publishes its own sale-order approval.
+ */
+async function retireSeedSalesApproval(page: Page, organizationId: number) {
+  const workflows = await page.request.get("/api/query/workflows")
+  expect(workflows.ok()).toBe(true)
+  const seedIds = new Set(
+    (((await workflows.json()) as { data?: Array<Record<string, unknown>> }).data ?? [])
+      .filter((row) => (row.workflowKey ?? row.workflow_key) === "seed.sales-approval")
+      .map((row) => scalarQueryId(row.id)),
+  )
+  if (seedIds.size === 0) return
+  const versions = await page.request.get("/api/query/workflow-versions")
+  expect(versions.ok()).toBe(true)
+  for (const row of ((await versions.json()) as { data?: Array<Record<string, unknown>> }).data ?? []) {
+    if (!seedIds.has(scalarQueryId(row.workflowId ?? row.workflow_id)) || statusTag(row.status) !== "Published") continue
+    await callReducerBff(page, "retire_workflow_version", [
+      organizationId,
+      scalarQueryId(row.id),
+      scalarQueryId(row.draftRevision ?? row.draft_revision),
+    ])
+  }
+}
+
 function isCanonicalOrderUrl(url: URL, orderId: number): boolean {
   return (
     url.pathname === "/sales" &&
@@ -78,6 +111,7 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
   }) => {
     test.setTimeout(300_000)
     await signIn(page, "test@email.com", PERSONA_PASSWORD)
+    await retireSeedSalesApproval(page, await fetchSessionOrganizationId(page))
     const workflow = await seedSaleOrderApprovalWorkflow(page, {
       workflowKey: smokeName("cov04_sales_approval").toLowerCase().replace(/-/g, "_"),
       name: smokeName("COV04 sales approval"),
