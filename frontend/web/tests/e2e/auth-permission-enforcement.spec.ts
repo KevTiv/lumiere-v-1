@@ -17,6 +17,7 @@ import {
   grantPermissionViaSettings,
   revokePermissionViaSettings,
   scalarQueryId,
+  scalarQueryString,
   signIn,
   smokeName,
   waitForMovePosted,
@@ -613,16 +614,21 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
       },
       assertSuccess: async (limitedPage, args) => {
         const pickingId = Number(args[1])
+        // Write permission is not read permission: prove the limited actor
+        // cannot inspect pickings, then use the admin's authorized readback to
+        // certify the exact mutation effect.
+        const deniedRead = await limitedPage.request.get("/api/query/stock-pickings")
+        expect(deniedRead.status()).toBe(403)
         await expect
           .poll(
             async () => {
-              const res = await limitedPage.request.get("/api/query/stock-pickings")
-              if (!res.ok()) return ""
+              const res = await page.request.get("/api/query/stock-pickings")
+              expect(res.ok(), `admin stock-pickings read: ${res.status()}`).toBe(true)
               const json = (await res.json()) as {
                 data?: Array<{ id?: unknown; state?: unknown }>
               }
               const row = (json.data ?? []).find((p) => scalarQueryId(p.id) === pickingId)
-              return String(row?.state ?? "").toLowerCase()
+              return scalarQueryString(row?.state).toLowerCase()
             },
             { timeout: 30_000 },
           )
