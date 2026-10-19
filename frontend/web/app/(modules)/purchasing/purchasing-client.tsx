@@ -1,4 +1,5 @@
 "use client"
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleInsights } from "../../../components/module-insights"
@@ -396,7 +397,7 @@ function PurchasingClientLoaded({
   const { t } = useTranslation()
   const { identity } = useErpSession()
   const { currentUser } = useRBAC()
-  const runtimeRoleId = currentUser?.roles[0]
+  const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const { orgId } = orgBigInts(organizationId)
   const { askForm, formDialog } = useFormDialog()
 
