@@ -8,6 +8,7 @@ import {
   scalarQueryId,
   smokeName,
 } from "./helpers"
+import { provisionActor, withActor } from "./pretenant-support"
 
 const none = { none: [] as [] }
 const some = <T,>(value: T) => ({ some: value })
@@ -43,7 +44,8 @@ function rowCompanyId(row: QueryRow): number | null {
 }
 
 test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
-  test("isolates same-organization companies and strips sensitive payload fields", async ({ page }) => {
+  test("isolates same-organization companies and strips sensitive payload fields", async ({ browser, page }) => {
+    test.setTimeout(180_000)
     const organizationId = await fetchSessionOrganizationId(page)
     const defaultCompanyId = await fetchDefaultCompanyId(page)
     const companies = await queryRows(page, "companies", defaultCompanyId)
@@ -97,22 +99,30 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
     ])
     await callReducerBff(page, "generate_hub_pairing_token", [organizationId, defaultCompanyId])
 
-    // Creating a sibling company does not silently expand the signed-in
-    // principal's company scope. Exercise the trusted BFF boundary instead of
-    // using that principal to manufacture a cross-company fixture.
-    const forgedBranchWrite = await callReducerBffResult(page, "register_iot_hub", [
-      organizationId,
-      branchCompanyId,
-      {
-        name: branchSerial,
-        serial: branchSerial,
-        ip_address: some("192.0.2.11"),
-        firmware_version: some("1.0.0"),
-        metadata: none,
-      },
+    // The wildcard administrator is authorized across its organization's
+    // companies, so the denials are proven with a member bound to the default
+    // company that holds IoT grants. Creating a sibling company does not
+    // expand that member's scope at the trusted BFF boundary.
+    const iotResources = ["iot_action", "iot_alert", "iot_device", "iot_hub", "iot_pairing_token", "iot_telemetry", "iot_threshold"]
+    const companyBound = await provisionActor(page, "iot-company-bound", [
+      "iot_hub:create",
+      ...iotResources.map((resource) => `${resource}:read`),
     ])
-    expect(forgedBranchWrite.status).toBe(403)
-    expect(forgedBranchWrite.error ?? "").toMatch(/company scope mismatch/i)
+    await withActor(browser, companyBound, async (actor) => {
+      const forgedBranchWrite = await callReducerBffResult(actor, "register_iot_hub", [
+        organizationId,
+        branchCompanyId,
+        {
+          name: branchSerial,
+          serial: branchSerial,
+          ip_address: some("192.0.2.11"),
+          firmware_version: some("1.0.0"),
+          metadata: none,
+        },
+      ])
+      expect(forgedBranchWrite.status).toBe(403)
+      expect(forgedBranchWrite.error ?? "").toMatch(/company scope mismatch/i)
+    })
 
     const defaultHub = await waitForRow(
       page,
@@ -192,17 +202,19 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
     expect(telemetry).not.toHaveProperty("rawValue")
     expect(telemetry).not.toHaveProperty("raw_value")
 
-    for (const resource of [
-      "iot-actions",
-      "iot-alerts",
-      "iot-devices",
-      "iot-hubs",
-      "iot-pairing-tokens",
-      "iot-telemetry",
-      "iot-thresholds",
-    ]) {
-      const response = await page.request.get(`/api/query/${resource}?companyId=${branchCompanyId}`)
-      expect(response.status(), resource).toBe(403)
-    }
+    await withActor(browser, companyBound, async (actor) => {
+      for (const resource of [
+        "iot-actions",
+        "iot-alerts",
+        "iot-devices",
+        "iot-hubs",
+        "iot-pairing-tokens",
+        "iot-telemetry",
+        "iot-thresholds",
+      ]) {
+        const response = await actor.request.get(`/api/query/${resource}?companyId=${branchCompanyId}`)
+        expect(response.status(), resource).toBe(403)
+      }
+    })
   })
 })

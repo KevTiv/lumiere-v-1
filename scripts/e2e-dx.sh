@@ -65,6 +65,14 @@ frontend_build() {
   (cd "$ROOT/frontend/web" && pnpm exec next build)
   build_id="$(cat "$ROOT/frontend/web/.next/BUILD_ID")"
   [ -n "$build_id" ] || { echo "[e2e] Build completed without BUILD_ID" >&2; exit 1; }
+  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+    local compiler_cache="$ROOT/frontend/web/.next/cache/turbopack"
+    if [ ! -d "$compiler_cache" ] ||
+        [ -z "$(find "$compiler_cache" -type f -size +0c -print -quit)" ]; then
+      echo "[e2e] Build completed without a nonempty Turbopack compiler cache." >&2
+      exit 1
+    fi
+  fi
   printf '%s:%s\n' "$current" "$build_id" > "$stamp"
 }
 

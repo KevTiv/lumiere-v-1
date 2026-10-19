@@ -268,6 +268,23 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
             .collect(),
     );
     m.insert(
+        "mrp-production-costs".to_string(),
+        [
+            "raw_move_ids",
+            "output_move_ids",
+            "productivity_cost_ids",
+            "account_move_line_ids",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect(),
+    );
+    // Scheduler readback: last_run stamps execution, metadata links the demand.
+    m.insert(
+        "replenishment-rules".to_string(),
+        ["metadata"].into_iter().map(String::from).collect(),
+    );
+    m.insert(
         "mrp-workorders".to_string(),
         ["time_ids"].into_iter().map(String::from).collect(),
     );

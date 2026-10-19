@@ -18,18 +18,11 @@ import {
   submitForm,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
+import { stockedComponentSource } from "./cov-scheduler-manufacturing-fixtures"
 
 const PERSONA_PASSWORD =
   process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
 
-type ProductRow = {
-  id?: unknown
-  uomId?: unknown
-  uom_id?: unknown
-  tracking?: unknown
-  type?: unknown
-  type_?: unknown
-}
 
 type BomRow = {
   id?: unknown
@@ -70,31 +63,6 @@ async function queryRows<T>(page: Page, resource: string): Promise<T[]> {
   return ((await response.json()) as { data?: T[] }).data ?? []
 }
 
-async function fetchUntrackedProduct(page: Page): Promise<{
-  id: number
-  uomId: number
-}> {
-  const products = await queryRows<ProductRow>(page, "products")
-  const product = products.find((row) => {
-    const id = scalarQueryId(row.id)
-    const uomId = scalarQueryId(row.uomId ?? row.uom_id)
-    const tracking = stateTag(row.tracking).toLowerCase()
-    const type = String(row.type ?? row.type_ ?? "").toLowerCase()
-    return (
-      id != null &&
-      uomId != null &&
-      tracking !== "lot" &&
-      tracking !== "serial" &&
-      type !== "service"
-    )
-  })
-  const id = scalarQueryId(product?.id)
-  const uomId = scalarQueryId(product?.uomId ?? product?.uom_id)
-  if (id == null || uomId == null) {
-    throw new Error("no untracked storable product in seed data")
-  }
-  return { id, uomId }
-}
 
 async function fetchFirstStockPicking(page: Page): Promise<{
   pickingTypeId: number
@@ -393,8 +361,9 @@ test.describe(
       await signIn(page)
       const companyId = await fetchDefaultCompanyId(page)
       const warehouseId = await fetchFirstWarehouseId(page)
-      const product = await fetchUntrackedProduct(page)
-      const picking = await fetchFirstStockPicking(page)
+      const source = await stockedComponentSource(page, companyId, 3)
+      const product = { id: source.productId, uomId: source.uomId }
+      const picking = { ...(await fetchFirstStockPicking(page)), locationSrcId: source.locationId }
       const bomId = await createSetupBom(
         page,
         companyId,
