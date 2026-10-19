@@ -155,20 +155,11 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
       await selectEntityRowById(warehousePage, buyRuleId)
       await warehousePage.getByTestId("entity-action-schedule-replenishment-run").click()
       await expect.poll(async () => (await buyJobs()).length, { timeout: 30_000 }).toBe(1)
-      const scheduledBuyJob = (await buyJobs())[0]!
-      const buyScheduledId = id(scheduledBuyJob, "scheduledId", "scheduled_id")
-      try {
-        await expect.poll(async () => {
-          const current = (await rows(page, "replenishment-rules")).find(row => id(row) === buyRuleId)
-          return value(current ?? {}, "lastRun", "last_run") ?? null
-        }, { timeout: 75_000 }).not.toBeNull()
-      } catch (error) {
-        // The scheduled run never stamped last_run, so it failed. Replay the same
-        // rule synchronously once to surface the reducer's rejection reason.
-        const jobsAtFailure = (await buyJobs()).map(row => ({ scheduledId: id(row, "scheduledId", "scheduled_id"), scheduledAt: value(row, "scheduledAt", "scheduled_at") }))
-        const probe = await command(page, "execute_replenishment_rule", { companyId, ruleId: buyRuleId, idempotencyKey: `diag-${buyRuleId}` })
-        throw new Error(`scheduled buy run did not execute (job ${buyScheduledId} due ${JSON.stringify(value(scheduledBuyJob, "scheduledAt", "scheduled_at"))}; now ${Date.now() * 1000}; jobs at failure ${JSON.stringify(jobsAtFailure)}); direct execute -> ${probe.status()} ${await probe.text()}`, { cause: error })
-      }
+      const buyScheduledId = id((await buyJobs())[0]!, "scheduledId", "scheduled_id")
+      await expect.poll(async () => {
+        const current = (await rows(page, "replenishment-rules")).find(row => id(row) === buyRuleId)
+        return value(current ?? {}, "lastRun", "last_run") ?? null
+      }, { timeout: 75_000 }).not.toBeNull()
       await expect.poll(async () => {
         const pending = await buyJobs()
         return pending.length === 1
