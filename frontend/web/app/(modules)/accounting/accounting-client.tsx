@@ -1,4 +1,5 @@
 "use client"
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { AccountantOverview } from "./accountant-overview"
 import { BillDocumentIntake } from "./bill-document-intake"
@@ -816,7 +817,7 @@ function AccountingClientReady({
   const [promptWorkspace, setPromptWorkspace] = useState<string | null>(null)
   const [moduleFormWorkspace, setModuleFormWorkspace] = useState<string | null>(null)
   const { currentUser, checkPermission } = useRBAC()
-  const runtimeRoleId = currentUser?.roles[0]
+  const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   const accountingTabIds = useMemo(
     () => [
