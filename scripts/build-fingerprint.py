@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Content fingerprints for local reuse; never prints source or secret values."""
+"""Content fingerprints for build reuse; never prints source or secret values."""
 import argparse
 import hashlib
 import os
@@ -28,6 +28,16 @@ def fingerprint(root: Path, kind: str, environ: dict, tool_version: str = "") ->
                   *root.glob("vendor/lumiere-contracts-rust-*.sha256"),
                   *root.glob("frontend/web/.env*"))
         prefixes = ("CARGO_", "RUST", "STDB_", "LUMIERE_", "PG_", "WORKOS_", "E2E_BUILD_")
+    elif kind == "stdb-wasm":
+        # This is a compiled module, independent of browser tests and API code.
+        # Include all local crates (including the embedded resource registry),
+        # module fixtures, external policy data, and the CI build recipe.
+        inputs = (*RUST, "scripts/build-fingerprint.py", "spacetimedb", "crates",
+                  "lumiere-codegen/storage-policy-manifest.json",
+                  "spacetime.json", "spacetime.local.json",
+                  ".github/workflows/e2e-smoke.yml",
+                  ".github/actions/setup-spacetime-cli/action.yml")
+        prefixes = ("CARGO_", "RUST", "SPACETIME_", "LUMIERE_", "WASM_", "BINARYEN_")
     elif kind == "stdb":
         inputs = (*COMMON, "spacetimedb", *root.glob("scripts/e2e*"),
                   "frontend/web/scripts", "frontend/web/package.json", "frontend/pnpm-lock.yaml")
@@ -54,10 +64,15 @@ def fingerprint(root: Path, kind: str, environ: dict, tool_version: str = "") ->
         digest.update(value)
 
     add(f"lumiere-build-v1:{kind}:{tool_version}".encode())
+    def input_name(path: Path) -> str:
+        # Identical checkouts must share CI fingerprints regardless of location.
+        # Existing local API builds may intentionally use external staging.
+        return str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
+
     for name in sorted(missing):
-        add(f"missing:{name}".encode())
+        add(f"missing:{input_name(Path(name))}".encode())
     for path in sorted(files):
-        add(os.fsencode(path))
+        add(os.fsencode(input_name(path)))
         add(path.read_bytes())
     for key, value in sorted(environ.items()):
         if key.startswith(prefixes) or key in {"NODE_ENV", "DEV_MOCK_ORG_ID", "CORS_ORIGINS"}:
@@ -68,9 +83,13 @@ def fingerprint(root: Path, kind: str, environ: dict, tool_version: str = "") ->
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("kind", choices=("api", "frontend", "stdb"))
+    parser.add_argument("kind", choices=("api", "frontend", "stdb", "stdb-wasm"))
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
-    command = ["node", "--version"] if args.kind == "frontend" else ["rustc", "--version"]
-    version = subprocess.check_output(command, text=True).strip()
+    if args.kind == "stdb-wasm":
+        commands = (["rustc", "--version", "--verbose"], ["cargo", "--version"],
+                    ["spacetime", "--version"], ["wasm-opt", "--version"])
+    else:
+        commands = (["node", "--version"] if args.kind == "frontend" else ["rustc", "--version"],)
+    version = "\n".join(subprocess.check_output(command, text=True).strip() for command in commands)
     print(fingerprint(args.root.resolve(), args.kind, dict(os.environ), version))

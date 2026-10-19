@@ -13,6 +13,7 @@ RUN apt-get update \
 # layer; a changed release manifest, archive, checksum, or preparer invalidates it.
 COPY release-compatibility-manifest.json ./
 COPY scripts/prepare-vendored-contracts-rust.sh ./scripts/prepare-vendored-contracts-rust.sh
+COPY scripts/sync-directory.py ./scripts/sync-directory.py
 COPY vendor ./vendor
 RUN scripts/prepare-vendored-contracts-rust.sh
 

@@ -2,6 +2,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -77,6 +78,58 @@ class FingerprintTests(unittest.TestCase):
         env = os.environ | {"PATH": f"{ROOT / 'scripts'}:{os.environ['PATH']}", "API_SECRET": "secret-value"}
         result = subprocess.run(["python3", str(FINGERPRINT), "frontend", "--root", str(self.root)], env=env, text=True, capture_output=True, check=True)
         self.assertNotIn("secret-value", result.stdout + result.stderr)
+
+    def test_wasm_reuses_identical_inputs_across_commits_and_checkout_paths(self):
+        source = self.root / "spacetimedb/src/lib.rs"
+        source.write_text("module source")
+        env = {"LUMIERE_ENABLE_DEV_REDUCERS": "1", "GITHUB_SHA": "old"}
+        baseline = self.fp("stdb-wasm", env)
+        for name in ("frontend/web/app.tsx", "frontend/web/tests/e2e/fixture.spec.ts",
+                     "api-server/lib.rs", "spacetimedb/target/release/output.wasm"):
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("unrelated edit or generated output")
+        os.utime(source, (1, 1))
+        self.assertEqual(baseline, self.fp("stdb-wasm", env | {"GITHUB_SHA": "new"}))
+        with tempfile.TemporaryDirectory() as other:
+            checkout = Path(other) / "checkout"
+            shutil.copytree(self.root, checkout)
+            self.assertEqual(baseline, self.module.fingerprint(checkout, "stdb-wasm", env, "tool"))
+
+    def test_wasm_source_fixtures_policies_configuration_and_removals_invalidate(self):
+        inputs = (
+            "spacetimedb/src/lib.rs", "spacetimedb/tests/fixture_test.rs",
+            "spacetimedb/assets/pack.json", "spacetimedb/Cargo.lock",
+            "spacetimedb/Cargo.toml", "spacetimedb/.cargo/config.toml",
+            "crates/policy-core/src/lib.rs", "crates/presentation-core/Cargo.toml",
+            "crates/stdb-auth/assets/resource_registry.json",
+            "lumiere-codegen/storage-policy-manifest.json", "Cargo.toml", "Cargo.lock",
+            ".cargo/config.toml", "rust-toolchain.toml", "spacetime.json",
+            ".github/workflows/e2e-smoke.yml", ".github/actions/setup-spacetime-cli/action.yml",
+        )
+        for name in inputs:
+            with self.subTest(input=name):
+                path = self.root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("before")
+                original = self.fp("stdb-wasm")
+                path.write_text("after")
+                changed = self.fp("stdb-wasm")
+                self.assertNotEqual(original, changed)
+                path.unlink()
+                self.assertNotEqual(changed, self.fp("stdb-wasm"))
+
+    def test_wasm_compiler_versions_flags_and_admission_policy_invalidate(self):
+        baseline = self.fp("stdb-wasm")
+        for key in ("LUMIERE_ENABLE_DEV_REDUCERS", "LUMIERE_ALPHA_FOUNDER_IDENTITIES",
+                    "LUMIERE_RECONSTRUCTION_BOOTSTRAP_IDENTITY", "RUSTFLAGS",
+                    "CARGO_PROFILE_RELEASE_LTO", "SPACETIME_CLI_VERSION",
+                    "BINARYEN_VERSION", "WASM_TOOLS_VERSION"):
+            with self.subTest(environment=key):
+                self.assertNotEqual(baseline, self.fp("stdb-wasm", {key: "changed"}))
+        self.assertNotEqual(
+            baseline, self.module.fingerprint(self.root, "stdb-wasm", {}, "different compiler/CLI"),
+        )
 
 
 class HelperTests(unittest.TestCase):
