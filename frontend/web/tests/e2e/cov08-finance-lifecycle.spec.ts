@@ -163,6 +163,7 @@ test.describe("COV-08 invoice to payment to reconciliation", { tag: ["@p0", "@co
     await fillField(page, "date", isoDate(0))
     const paymentRef = smokeName("cov08-payment")
     await fillField(page, "ref", paymentRef)
+    await expect(page.getByTestId("form-submit-new-account-payment")).toBeEnabled({ timeout: 15_000 })
     const [created] = await Promise.all([
       page.waitForResponse((res) => matchesOperationResponse(res, "create_payment") && res.ok(), { timeout: 30_000 }),
       submitForm(page, "new-account-payment"),
@@ -241,6 +242,7 @@ test.describe("COV-08 invoice to payment to reconciliation", { tag: ["@p0", "@co
     await fillField(page, "date", isoDate(0))
     const paymentRef = smokeName("cov08-reversal")
     await fillField(page, "ref", paymentRef)
+    await expect(page.getByTestId("form-submit-new-account-payment")).toBeEnabled({ timeout: 15_000 })
     await submitForm(page, "new-account-payment")
     const paymentId = await fetchPaymentIdByExactReference(page, partnerId, paymentRef, { state: "NotPaid" })
     await selectEntityRowById(page, paymentId)
