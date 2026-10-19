@@ -151,7 +151,11 @@ The October 2026 follow-up adds reuse below that archive boundary:
   or stale files. Archive provenance and IR validations still run each time.
 - The builder verifies its archive in a temporary directory with
   `scripts/e2e-ci-artifact.sh verify-archive`. This preserves `.next/cache` for
-  the existing post-job cache save. Shards still install the archive normally.
+  the existing post-job cache save. GitHub Actions also explicitly enables
+  production filesystem caching in the pinned Next 16.1 release, which writes
+  `.next/cache/turbopack`. The frontend build helper rejects missing or empty
+  compiler-cache output before recording a successful build. Shards still
+  install the archive normally and do not require compiler caches.
 - A new PR commit or branch push cancels the entire superseded E2E run,
   including older shards. Explicit manual runs have independent concurrency
   groups. Suite selection, worker counts, and required gates are unchanged.
@@ -166,6 +170,13 @@ took 17m08s, including 10m09s compiling the WASM module and another 28s optimizi
 it. This is the reuse opportunity, not a measured saving from this patch. The
 first run for a new fingerprint still compiles; compare a subsequent cache hit
 and confirm the restored Rust metadata and saved Next cache in the job logs.
+
+A local production-cache check on October 19 used the real frontend build helper
+with `CI=true`, `GITHUB_ACTIONS=true`, Node 22.23.3, pnpm 10.31.0, Next 16.1.6,
+and four available CPU cores. Two consecutive successful builds took 64.44s
+cold and 10.09s warm; Next reported compilation phases of 48s and 2.6s. The
+compiler cache occupied approximately 680 MiB. These timings exclude GitHub
+cache transfer and artifact packaging, so measure the full CI job separately.
 
 Focused regression checks:
 

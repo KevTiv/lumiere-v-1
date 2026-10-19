@@ -85,6 +85,7 @@ class FingerprintTests(unittest.TestCase):
         env = {"LUMIERE_ENABLE_DEV_REDUCERS": "1", "GITHUB_SHA": "old"}
         baseline = self.fp("stdb-wasm", env)
         for name in ("frontend/web/app.tsx", "frontend/web/tests/e2e/fixture.spec.ts",
+                     "frontend/web/next.config.mjs", "scripts/e2e-dx.sh",
                      "api-server/lib.rs", "spacetimedb/target/release/output.wasm"):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -150,9 +151,18 @@ class HelperTests(unittest.TestCase):
         self.write_exe("cargo", '#!/bin/sh\nif [ "$1" = metadata ]; then d="${CARGO_TARGET_DIR:-target}"; case "$d" in /*) ;; *) d="$PWD/$d";; esac; printf \'{"target_directory":"%s"}\n\' "$d"; else printf "%s\\n" "$*" >> "$MOCK_LOG"; fi\n')
         self.write_exe("rustc", "#!/bin/sh\necho rustc-test\n")
         self.write_exe("node", "#!/bin/sh\necho node-test\n")
-        self.write_exe("pnpm", '#!/bin/sh\nif [ "$1" = exec ] && [ "$2" = next ]; then n=$(cat "$MOCK_COUNT" 2>/dev/null || echo 0); n=$((n+1)); echo "$n" > "$MOCK_COUNT"; echo "build-$n" > .next/BUILD_ID; else exit 2; fi\n')
+        self.write_exe("pnpm", '''#!/bin/sh
+if [ "$1" != exec ] || [ "$2" != next ]; then exit 2; fi
+n=$(cat "$MOCK_COUNT" 2>/dev/null || echo 0)
+n=$((n+1))
+echo "$n" > "$MOCK_COUNT"
+echo "build-$n" > .next/BUILD_ID
+mkdir -p .next/cache/turbopack
+echo "compiler-cache" > .next/cache/turbopack/chunk
+''')
         self.env = os.environ | {"PATH": f"{self.bin}:{os.environ['PATH']}", "E2E_DX_ROOT": str(self.root), "MOCK_LOG": str(self.root / "cargo.log"), "MOCK_COUNT": str(self.root / "count")}
         self.env.pop("CI", None)
+        self.env.pop("GITHUB_ACTIONS", None)
         self.env.pop("E2E_FORCE_REBUILD", None)
 
     def tearDown(self):
@@ -182,7 +192,7 @@ class HelperTests(unittest.TestCase):
             binary.write_text("#!/bin/sh\nexit 0\n")
             binary.chmod(0o755)
         (self.root / "frontend/web/.next/BUILD_ID").write_text("artifact-build")
-        env = self.env | {"E2E_PREBUILT": "1"}
+        env = self.env | {"E2E_PREBUILT": "1", "CI": "true", "GITHUB_ACTIONS": "true"}
         (self.root / "scripts/prepare-vendored-contracts-rust.sh").write_text("#!/bin/sh\nexit 99\n")
 
         self.invoke("api-build", env=env)
@@ -191,6 +201,32 @@ class HelperTests(unittest.TestCase):
         result = self.invoke("frontend-build", env=env)
         self.assertIn("prebuilt Next.js", result.stdout)
         self.assertFalse((self.root / "count").exists())
+
+    def test_github_actions_build_preserves_compiler_cache_and_writes_stamp(self):
+        self.invoke("frontend-build", env=self.env | {"CI": "true", "GITHUB_ACTIONS": "true"})
+
+        cache = self.root / "frontend/web/.next/cache/turbopack/chunk"
+        self.assertEqual(cache.read_text().strip(), "compiler-cache")
+        self.assertTrue((self.root / ".tmp/e2e/frontend.hash").is_file())
+
+    def test_github_actions_build_without_compiler_cache_rejects_reuse(self):
+        self.write_exe("pnpm", '#!/bin/sh\necho "build-without-cache" > .next/BUILD_ID\n')
+        cache = self.root / "frontend/web/.next/cache/turbopack"
+        stamp = self.root / ".tmp/e2e/frontend.hash"
+        stamp.parent.mkdir(parents=True)
+        for state in ("missing", "empty directory", "empty file"):
+            with self.subTest(cache=state):
+                if state != "missing":
+                    cache.mkdir(parents=True, exist_ok=True)
+                if state == "empty file":
+                    (cache / "chunk").touch()
+                stamp.write_text("previous-build")
+
+                with self.assertRaises(subprocess.CalledProcessError) as error:
+                    self.invoke("frontend-build", env=self.env | {"CI": "true", "GITHUB_ACTIONS": "true"})
+
+                self.assertIn("without a nonempty Turbopack compiler cache", error.exception.stderr)
+                self.assertFalse(stamp.exists())
 
     def test_frontend_reuse_identity_failure_and_ci(self):
         self.invoke("frontend-build")
