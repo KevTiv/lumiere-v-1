@@ -29,6 +29,12 @@ on:
     # Weekly Monday 08:00 UTC
     - cron: "0 8 * * 1"
 
+# Cancel superseded PR/push runs before their replacement finishes building.
+# Explicit diagnostic runs remain independent of branch updates and each other.
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'latest' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+
 env:
   STDB_MODULE: lumiere-v1-j1uo0
   STDB_HOST: http://127.0.0.1:3000
@@ -150,9 +156,17 @@ jobs:
     if: needs.scope.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    concurrency:
-      group: e2e-build-${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
+    # Fingerprints and compilation must see the same build-time configuration.
+    env:
+      NEXT_PUBLIC_DEV_ADMIN: 'false'
+      LUMIERE_API_SERVER_URL: http://127.0.0.1:8082
+      STDB_SERVER_TOKEN: e2e-build-placeholder
+      STDB_CREDENTIAL_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+      STDB_MODULE: lumiere-v1-local-e2e
+      NEXT_PUBLIC_STDB_MODULE: lumiere-v1-local-e2e
+      STDB_HOST: http://127.0.0.1:3000
+      NEXT_PUBLIC_STDB_HOST: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_GATEWAY_URL: ''
     steps:
       - uses: actions/checkout@v4
 
@@ -167,6 +181,10 @@ jobs:
         if: steps.e2e-build-cache.outputs.cache-hit != 'true'
         with:
           targets: wasm32-unknown-unknown
+
+      # cargo metadata must see the complete workspace when the cache is keyed.
+      - uses: ./.github/actions/prepare-contracts
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
 
       - uses: Swatinem/rust-cache@v2
         if: steps.e2e-build-cache.outputs.cache-hit != 'true'
@@ -229,8 +247,40 @@ jobs:
           "$HOME/.local/bin/wasm-tools" --version
           "$HOME/.local/bin/wasm-opt" --version
 
-      - uses: ./.github/actions/prepare-contracts
+      - name: Fingerprint E2E module inputs
         if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        id: e2e-wasm-inputs
+        env:
+          LUMIERE_ENABLE_DEV_REDUCERS: '1'
+        run: |
+          set -euo pipefail
+          fingerprint="$(python3 scripts/build-fingerprint.py stdb-wasm)"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Restore compiled E2E module
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        id: e2e-wasm-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm
+          key: e2e-wasm-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.e2e-wasm-inputs.outputs.fingerprint }}
+
+      - name: Compile E2E module
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-wasm-cache.outputs.cache-hit != 'true'
+        run: LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime build --module-path ./spacetimedb
+
+      - name: Validate compiled E2E module
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        run: wasm-tools validate spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm
+
+      # Save a validated module even if a subsequent API/frontend build fails.
+      # There are no fallback keys: reuse requires every module input to match.
+      - name: Save compiled E2E module
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-wasm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm
+          key: ${{ steps.e2e-wasm-cache.outputs.cache-primary-key }}
 
       - uses: ./.github/actions/setup-frontend
         if: steps.e2e-build-cache.outputs.cache-hit != 'true'
@@ -246,6 +296,54 @@ jobs:
           cargo fetch --locked
           make contracts-staging-from-pinned
 
+      - name: Fingerprint E2E API inputs
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        id: e2e-api-inputs
+        run: |
+          set -euo pipefail
+          fingerprint="$(python3 scripts/build-fingerprint.py api-ci)"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Restore compiled E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        id: e2e-api-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci/e2e-api
+          key: e2e-api-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.e2e-api-inputs.outputs.fingerprint }}
+
+      - name: Compile and validate E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-api-cache.outputs.cache-hit != 'true'
+        env:
+          EXPECTED_API_FINGERPRINT: ${{ steps.e2e-api-inputs.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          # A changed Cargo output layout must not leave stale restored binaries
+          # available to package. The E2E archive uses this native output layout.
+          rm -f target/debug/api-server target/debug/storage-migrate
+          scripts/e2e-dx.sh api-build
+          fingerprint="$(python3 scripts/build-fingerprint.py api-ci)"
+          if [ "$fingerprint" != "$EXPECTED_API_FINGERPRINT" ]; then
+            echo 'API build inputs changed during compilation; refusing to cache outputs.' >&2
+            exit 1
+          fi
+          python3 scripts/e2e-api-cache.py stage "$EXPECTED_API_FINGERPRINT"
+
+      - name: Install verified E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-api-cache.outputs.cache-hit == 'true'
+        env:
+          EXPECTED_API_FINGERPRINT: ${{ steps.e2e-api-inputs.outputs.fingerprint }}
+        run: python3 scripts/e2e-api-cache.py install "$EXPECTED_API_FINGERPRINT"
+
+      # Preserve successful API builds even if a later frontend build fails.
+      # Exact input keys and an inert checksum manifest guard native-binary reuse.
+      - name: Save compiled E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-api-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci/e2e-api
+          key: ${{ steps.e2e-api-cache.outputs.cache-primary-key }}
+
       - name: Cache Next.js intermediate output
         if: steps.e2e-build-cache.outputs.cache-hit != 'true'
         uses: actions/cache@v4
@@ -260,26 +358,13 @@ jobs:
 
       - name: Build exact-commit E2E artifacts
         if: steps.e2e-build-cache.outputs.cache-hit != 'true'
-        env:
-          NEXT_PUBLIC_DEV_ADMIN: 'false'
-          LUMIERE_API_SERVER_URL: http://127.0.0.1:8082
-          STDB_SERVER_TOKEN: e2e-build-placeholder
-          STDB_CREDENTIAL_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
-          STDB_MODULE: lumiere-v1-local-e2e
-          NEXT_PUBLIC_STDB_MODULE: lumiere-v1-local-e2e
-          STDB_HOST: http://127.0.0.1:3000
-          NEXT_PUBLIC_STDB_HOST: http://127.0.0.1:3000
-          NEXT_PUBLIC_API_GATEWAY_URL: ''
         run: |
           set -euo pipefail
-          LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime build --module-path ./spacetimedb
-          wasm-tools validate spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm
-          scripts/e2e-dx.sh api-build
           scripts/e2e-dx.sh frontend-build
           scripts/e2e-ci-artifact.sh pack "$GITHUB_SHA"
 
       - name: Verify exact-commit E2E archive
-        run: scripts/e2e-ci-artifact.sh install "$GITHUB_SHA"
+        run: scripts/e2e-ci-artifact.sh verify-archive "$GITHUB_SHA"
 
       - name: Upload exact-commit E2E artifacts
         uses: actions/upload-artifact@v4
@@ -311,9 +396,6 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
-    concurrency:
-      group: e2e-smoke-${{ github.workflow }}-${{ github.ref }}-${{ matrix.config.suite }}-${{ matrix.config.slot || '1' }}
-      cancel-in-progress: true
     strategy:
       fail-fast: false
       matrix:
