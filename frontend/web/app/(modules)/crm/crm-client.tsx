@@ -1,4 +1,5 @@
 "use client"
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleInsights, type InsightPeriodRange } from "../../../components/module-insights"
@@ -352,7 +353,7 @@ function CrmClientLoaded({
   const { t } = useTranslation()
   const router = useRouter()
   const { currentUser } = useRBAC()
-  const runtimeRoleId = currentUser?.roles[0]
+  const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const { orgId } = orgBigInts(organizationId)
   const ownerLabelMap = useIdentityLabelMap(organizationId)
 
