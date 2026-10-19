@@ -29,6 +29,7 @@ import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 import { webApi } from "@/lib/lumiere-web-http"
 import { PostHogPageView } from "@/lib/posthog-pageview"
 import { apiFetch } from "@/lib/api-fetch"
+import { EFFECTIVE_ACCESS_ROLE_ID } from "@lumiere/ui/lib/runtime-form-role"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
 function RBACBridge({
@@ -62,11 +63,11 @@ function RBACBridge({
   })
   const access = accessQuery.isError ? undefined : accessQuery.data
   const rbacRoles = useMemo<Role[]>(() => access ? mapBackendRolesToRoles([{
-    id: '__effective_access__', name: 'Effective permissions', isActive: true,
+    id: EFFECTIVE_ACCESS_ROLE_ID, name: 'Effective permissions', isActive: true,
     permissions: [...access.rolePermissions],
   }]) : [], [access])
   const rbacUser = useMemo<User | null>(() => access && serverIdentity ? {
-    id: serverIdentity, email: '', name: '', roles: ['__effective_access__', ...(access.roleIds ?? [access.roleId]).map(String)],
+    id: serverIdentity, email: '', name: '', roles: [EFFECTIVE_ACCESS_ROLE_ID, ...(access.roleIds ?? [access.roleId]).map(String)],
     status: 'active', department: '', isSuperuser: access.isSuperuser,
     lastLogin: '', createdAt: '', updatedAt: '',
   } : null, [access, serverIdentity])

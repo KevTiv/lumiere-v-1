@@ -233,6 +233,7 @@ import {
 } from '@/lib/form-lookup';
 import { enumTag } from '@/lib/accounting-post-draft';
 import { saleOrderLineCanBeDeleted } from './sale-order-line-gates';
+import { runtimeFormRoleId } from '@lumiere/ui/lib/runtime-form-role';
 
 function saleOrderState(row: Record<string, unknown>): string {
   const v = row.state;
@@ -368,7 +369,7 @@ function SalesClientLoaded({
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useRBAC();
-  const runtimeRoleId = currentUser?.roles[0];
+  const runtimeRoleId = runtimeFormRoleId(currentUser);
   const { orgId } = orgBigInts(organizationId)
   const { askForm, formDialog } = useFormDialog();
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
