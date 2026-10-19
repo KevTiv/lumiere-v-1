@@ -156,6 +156,17 @@ jobs:
     if: needs.scope.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # Fingerprints and compilation must see the same build-time configuration.
+    env:
+      NEXT_PUBLIC_DEV_ADMIN: 'false'
+      LUMIERE_API_SERVER_URL: http://127.0.0.1:8082
+      STDB_SERVER_TOKEN: e2e-build-placeholder
+      STDB_CREDENTIAL_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+      STDB_MODULE: lumiere-v1-local-e2e
+      NEXT_PUBLIC_STDB_MODULE: lumiere-v1-local-e2e
+      STDB_HOST: http://127.0.0.1:3000
+      NEXT_PUBLIC_STDB_HOST: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_GATEWAY_URL: ''
     steps:
       - uses: actions/checkout@v4
 
@@ -285,6 +296,54 @@ jobs:
           cargo fetch --locked
           make contracts-staging-from-pinned
 
+      - name: Fingerprint E2E API inputs
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        id: e2e-api-inputs
+        run: |
+          set -euo pipefail
+          fingerprint="$(python3 scripts/build-fingerprint.py api-ci)"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Restore compiled E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        id: e2e-api-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci/e2e-api
+          key: e2e-api-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.e2e-api-inputs.outputs.fingerprint }}
+
+      - name: Compile and validate E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-api-cache.outputs.cache-hit != 'true'
+        env:
+          EXPECTED_API_FINGERPRINT: ${{ steps.e2e-api-inputs.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          # A changed Cargo output layout must not leave stale restored binaries
+          # available to package. The E2E archive uses this native output layout.
+          rm -f target/debug/api-server target/debug/storage-migrate
+          scripts/e2e-dx.sh api-build
+          fingerprint="$(python3 scripts/build-fingerprint.py api-ci)"
+          if [ "$fingerprint" != "$EXPECTED_API_FINGERPRINT" ]; then
+            echo 'API build inputs changed during compilation; refusing to cache outputs.' >&2
+            exit 1
+          fi
+          python3 scripts/e2e-api-cache.py stage "$EXPECTED_API_FINGERPRINT"
+
+      - name: Install verified E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-api-cache.outputs.cache-hit == 'true'
+        env:
+          EXPECTED_API_FINGERPRINT: ${{ steps.e2e-api-inputs.outputs.fingerprint }}
+        run: python3 scripts/e2e-api-cache.py install "$EXPECTED_API_FINGERPRINT"
+
+      # Preserve successful API builds even if a later frontend build fails.
+      # Exact input keys and an inert checksum manifest guard native-binary reuse.
+      - name: Save compiled E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-api-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci/e2e-api
+          key: ${{ steps.e2e-api-cache.outputs.cache-primary-key }}
+
       - name: Cache Next.js intermediate output
         if: steps.e2e-build-cache.outputs.cache-hit != 'true'
         uses: actions/cache@v4
@@ -299,19 +358,8 @@ jobs:
 
       - name: Build exact-commit E2E artifacts
         if: steps.e2e-build-cache.outputs.cache-hit != 'true'
-        env:
-          NEXT_PUBLIC_DEV_ADMIN: 'false'
-          LUMIERE_API_SERVER_URL: http://127.0.0.1:8082
-          STDB_SERVER_TOKEN: e2e-build-placeholder
-          STDB_CREDENTIAL_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
-          STDB_MODULE: lumiere-v1-local-e2e
-          NEXT_PUBLIC_STDB_MODULE: lumiere-v1-local-e2e
-          STDB_HOST: http://127.0.0.1:3000
-          NEXT_PUBLIC_STDB_HOST: http://127.0.0.1:3000
-          NEXT_PUBLIC_API_GATEWAY_URL: ''
         run: |
           set -euo pipefail
-          scripts/e2e-dx.sh api-build
           scripts/e2e-dx.sh frontend-build
           scripts/e2e-ci-artifact.sh pack "$GITHUB_SHA"
 

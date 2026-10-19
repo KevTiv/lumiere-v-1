@@ -145,6 +145,21 @@ The October 2026 follow-up adds reuse below that archive boundary:
   Frontend, browser-test, and API edits alone do not invalidate that module.
   Both restored and newly built modules pass `wasm-tools validate`; there are
   no fallback restore keys. The release profile is unchanged.
+- The native `api-server` and `storage-migrate` executables have a separate
+  exact-input cache. `scripts/build-fingerprint.py api-ci` includes the actual
+  local Cargo packages, verified contracts and staging, embedded policy and
+  migration files, build configuration and recipe, compiler/linker versions,
+  and hosted runner image identity. Frontend and browser-test edits alone do
+  not invalidate these executables. Both binaries must match an inert JSON
+  manifest's fingerprint and checksums and pass native ELF/executable checks
+  before a restored bundle replaces either output. The helper never invokes
+  the server or migration executable for validation. This CI cache deliberately
+  requires the existing native `target/debug` layout.
+  On a miss, the workflow removes the two old executables, builds both, verifies
+  that the input fingerprint is still unchanged, and stages the complete
+  bundle before saving it. Successful API builds are saved before the frontend
+  build, even when a later step fails. The final shared archive still contains
+  the current commit's identity and full file checksums.
 - Verified contracts are prepared before Rust cache metadata is collected.
   Repeated vendor preparation and `make contracts-staging-from-pinned` preserve
   unchanged contents and modification times while repairing changed, missing,
@@ -165,11 +180,14 @@ The form-configuration helper also waits for the actual
 Publication/query failures surface directly instead of becoming swallowed
 timeouts and refresh loops.
 
-The observed [E2E build job 118052656886](https://github.com/KevTiv/lumiere-v-1/actions/runs/39250424678/job/118052656886)
-took 17m08s, including 10m09s compiling the WASM module and another 28s optimizing
-it. This is the reuse opportunity, not a measured saving from this patch. The
-first run for a new fingerprint still compiles; compare a subsequent cache hit
-and confirm the restored Rust metadata and saved Next cache in the job logs.
+The first PR run's [E2E builder](https://github.com/KevTiv/lumiere-v-1/actions/runs/39259934323/job/118084757463)
+took 16m24s. The [subsequent builder](https://github.com/KevTiv/lumiere-v-1/actions/runs/39273733081/job/118132599785)
+took 7m08s after restoring the compiled WASM module, validating it, and skipping
+module compilation. That builder also successfully saved the Next compiler
+cache. It still spent 3m21s compiling API binaries, which motivates the separate
+API cache. The API cache's first fill and later hit need separate CI measurements;
+editing the workflow or fingerprint recipe also invalidates the WASM key once.
+These are builder timings, not end-to-end browser-suite timings.
 
 A local production-cache check on October 19 used the real frontend build helper
 with `CI=true`, `GITHUB_ACTIONS=true`, Node 22.23.3, pnpm 10.31.0, Next 16.1.6,
@@ -187,8 +205,16 @@ cd frontend/web
 node --import tsx --test tests/e2e/operation-response.test.ts
 ```
 
-Production Docker dependency layers, E2E shard balance, and further API build
-reuse need separate measurements. Full service startup and authenticated
+The production Rust Docker builder now copies only the required contract
+preparation helpers, rather than the entire scripts directory and Makefile.
+The dispatcher is copied directly into the final runtime stage. Unrelated CI
+script edits therefore do not invalidate the expensive release compilation
+layer. The first build with the changed Docker recipe may still compile; real
+Rust source changes still invalidate the combined dependency/application layer.
+The existing runtime-image contract gate checks these input boundaries.
+
+Production Docker dependency layers, E2E shard balance, and API cache transfer
+cost still need separate measurements. Full service startup and authenticated
 browser execution remain CI checks.
 
 ## Earlier measurement and remaining work
