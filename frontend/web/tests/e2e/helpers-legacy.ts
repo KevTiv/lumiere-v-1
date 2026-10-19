@@ -2046,6 +2046,7 @@ export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise
   await openAccountingTab(page, "invoices")
   await selectCustomTableRowById(page, moveId)
   await openInvoiceDetailModalFromRecordSheet(page)
+  await expect(page.getByTestId("invoice-detail-post-draft")).toBeEnabled({ timeout: 15_000 })
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
@@ -2070,7 +2071,7 @@ async function openDraftVendorBillModal(page: Page, billId: number): Promise<voi
   await openAccountingTab(page, "bills")
   await selectCustomTableRowById(page, billId)
   await openInvoiceDetailModalFromRecordSheet(page)
-  await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByTestId("invoice-detail-post-draft")).toBeEnabled({ timeout: 15_000 })
 }
 
 /** Open vendor bill detail and post draft via accounting bills tab. */
