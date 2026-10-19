@@ -73,15 +73,19 @@ export async function reloadSettled(page: Page) {
   await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
 }
 
+async function expectHydratedModule(page: Page, moduleId: string) {
+  const moduleView = page.getByTestId(`module-view-${moduleId}`)
+  // Next.js may briefly render streamed and client shells together.
+  await expect(moduleView).toHaveCount(1, { timeout: 30_000 })
+  await expect(moduleView).toBeVisible()
+  await expect(moduleView).toHaveAttribute("data-hydrated", "true")
+}
+
 export async function gotoModule(page: Page, route: string, moduleId?: string) {
   await page.goto(route)
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
   await expectAuthenticatedShell(page)
-  if (moduleId) {
-    const moduleView = page.getByTestId(`module-view-${moduleId}`)
-    await expect(moduleView).toBeVisible()
-    await expect(moduleView).toHaveAttribute("data-hydrated", "true")
-  }
+  if (moduleId) await expectHydratedModule(page, moduleId)
 }
 
 /** Select a module tab and wait until its panel is the active interaction surface. */
@@ -98,7 +102,7 @@ export async function selectModuleTab(page: Page, moduleId: string, tabId: strin
     }
     if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
     await page.goto(target.toString())
-    await expect(page.getByTestId(`module-view-${moduleId}`)).toHaveAttribute("data-hydrated", "true")
+    await expectHydratedModule(page, moduleId)
   }
   await expect(tab).toHaveAttribute("aria-selected", "true")
   // Nested charts and unrelated workspaces can have their own active panels.
