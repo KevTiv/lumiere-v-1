@@ -10,6 +10,7 @@ import {
   fetchPaymentIdByExactReference,
   fillField,
   gotoModule,
+  openAccountingTab,
   isoDate,
   postDraftInvoiceViaUi,
   scalarQueryId,
@@ -152,7 +153,7 @@ test.describe("COV-08 invoice to payment to reconciliation", { tag: ["@p0", "@co
 
     const { partnerId, amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, invoiceId)
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await openAccountingTab(page, "payments")
     await page.getByTestId("module-create-accounting-payments").click()
     await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
     await chooseSelectOptionByValue(page, "partnerId", partnerId)
@@ -231,7 +232,7 @@ test.describe("COV-08 invoice to payment to reconciliation", { tag: ["@p0", "@co
     const { partnerId, amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, invoiceId)
 
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await openAccountingTab(page, "payments")
     await page.getByTestId("module-create-accounting-payments").click()
     await chooseSelectOptionByValue(page, "partnerId", partnerId)
     await fillField(page, "amount", String(amountTotal))
