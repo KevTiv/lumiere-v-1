@@ -1,4 +1,5 @@
 'use client';
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 import { useMemo, useState } from 'react';
 import { useTranslation } from '@lumiere/i18n';
@@ -145,7 +146,7 @@ export function CreateBillFromPurchaseOrderDialog({
       moduleId="purchasing"
       formId="create-bill-from-purchase-order"
       organizationId={organizationId}
-      roleId={currentUser?.roles[0]}
+      roleId={resolveRuntimeFormRoleId(currentUser?.roles)}
       preferStdbVisibility
       foldCustomFieldsIntoMetadata={false}
       closeOnSubmit={false}
@@ -354,7 +355,7 @@ export function PurchaseOrderFormDialog({
       staticConfig={config}
       moduleId="purchasing"
       organizationId={organizationId}
-      roleId={currentUser?.roles[0]}
+      roleId={resolveRuntimeFormRoleId(currentUser?.roles)}
       preferStdbVisibility
       closeOnSubmit={false}
       submitError={error}
