@@ -982,9 +982,9 @@ async fn read_exact_outcome(
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/import/{entity}", post(import_entity_post))
+        .route("/import/:entity", post(import_entity_post))
         .route(
-            "/import/{entity}/requests/{request_id}",
+            "/import/:entity/requests/:request_id",
             get(import_request_get),
         )
 }

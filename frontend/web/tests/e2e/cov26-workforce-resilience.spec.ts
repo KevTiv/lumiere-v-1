@@ -119,17 +119,17 @@ test.describe("COV-26 workforce module resilience", { tag: ["@cov09", "@cov10", 
       const canonicalId = scalarQueryId(beforeRows[0]?.id)
       if (canonicalId == null) throw new Error(`${module.resource} requires one seeded canonical row`)
 
-      await gotoModule(page, module.href, module.moduleId)
+      await gotoModule(page, `${module.href}&filter=id:${canonicalId}`, module.moduleId)
+      await expect(page.getByTestId(`entity-row-${canonicalId}`)).toBeVisible()
       await context.setOffline(true)
       await page.waitForTimeout(500)
       await context.setOffline(false)
 
-      const refetch = page.waitForResponse(
-        (response) => response.url().includes(`/api/query/${module.resource}`) && response.ok(),
-        { timeout: 30_000 },
-      )
+      // SSR prefetch and subscriptions can satisfy the reloaded view without
+      // another browser query. Check the live read and exact displayed row.
       await page.reload({ waitUntil: "domcontentloaded" })
-      const response = await refetch
+      const response = await page.request.get(`/api/query/${module.resource}`)
+      expect(response.ok()).toBe(true)
       const rows = ((await response.json()) as { data?: Array<{ id?: unknown }> }).data ?? []
       expect(rows.map((row) => scalarQueryId(row.id))).toContain(canonicalId)
       await page.getByTestId(`module-tab-${module.moduleId}-${module.tabId}`).click()

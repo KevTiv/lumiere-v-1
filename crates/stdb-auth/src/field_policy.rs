@@ -211,6 +211,13 @@ static GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashSet<String>> = Lazy::new(|| {
 static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy::new(|| {
     let mut m = HashMap::new();
     m.insert(
+        "tasks".to_string(),
+        ["user_ids", "message_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
+    m.insert(
         "account-moves".to_string(),
         ["metadata"].into_iter().map(String::from).collect(),
     );
@@ -1680,6 +1687,70 @@ mod tests {
             assert!(cols.iter().any(|column| column == "organization_id"));
             assert!(cols.iter().any(|column| column == "name"));
         }
+    }
+
+    #[test]
+    fn task_board_http_projection_retains_workspace_fields() {
+        let access = field_access(&["project_task:read"]);
+        let cols = resolve_http_sql_columns("tasks", Some(&access)).expect("task board columns");
+        for field in [
+            "state",
+            "priority",
+            "is_closed",
+            "date_deadline",
+            "progress",
+            "planned_hours",
+            "effective_hours",
+            "user_ids",
+            "message_ids",
+        ] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "missing task board field {field}: {cols:?}"
+            );
+        }
+        for field in [
+            "description",
+            "metadata",
+            "activity_ids",
+            "message_follower_ids",
+        ] {
+            assert!(
+                !cols.iter().any(|column| column == field),
+                "unrelated field {field} must remain excluded"
+            );
+        }
+    }
+
+    #[test]
+    fn task_board_http_relations_respect_selective_field_permissions() {
+        let mut access = field_access(&["project_task:read"]);
+        access.field_permissions.push(FieldPermissionLike {
+            id: Some(1),
+            organization_id: Some(7),
+            role_id: Some(9),
+            resource: "tasks".to_string(),
+            action: "read".to_string(),
+            allowed_fields: vec!["name".to_string()],
+            subject_user_hex: None,
+            subject_role_id: Some(9),
+        });
+        let cols =
+            resolve_http_sql_columns("tasks", Some(&access)).expect("restricted task columns");
+        for field in ["user_ids", "message_ids", "priority", "date_deadline"] {
+            assert!(
+                !cols.iter().any(|column| column == field),
+                "field restriction must omit {field}"
+            );
+        }
+        let candidates = [
+            "user_ids",
+            "message_ids",
+            "activity_ids",
+            "message_follower_ids",
+        ]
+        .map(String::from);
+        assert!(filter_http_sql_unsafe_columns(&candidates, Some("projects")).is_empty());
     }
 
     #[test]

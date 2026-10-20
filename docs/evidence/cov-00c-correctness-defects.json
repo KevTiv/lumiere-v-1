@@ -314,6 +314,7 @@
       "frontend/web/tests/e2e/purchasing-module.spec.ts",
       "frontend/web/tests/e2e/sales-invoice-flow.spec.ts",
       "frontend/web/tests/e2e/sales-mutations.spec.ts",
+      "frontend/web/tests/e2e/tasks-board-drag.spec.ts",
       "frontend/web/tests/e2e/vertical-distributor.spec.ts",
       "frontend/web/tests/e2e/workflows-gate-ui.spec.ts"
     ],

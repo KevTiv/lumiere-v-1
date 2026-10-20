@@ -31,19 +31,28 @@ export function KanbanColumn({
   const atWipLimit = column.limit != null && itemCount >= column.limit
 
   return (
-    <div className="flex flex-col w-72 shrink-0">
+    <div
+      className="flex w-[17rem] shrink-0 flex-col sm:w-72"
+      data-testid={`kanban-column-${column.id}`}
+    >
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2 min-w-0">
           {column.colorClass ? (
             <div className={cn("w-2.5 h-2.5 rounded-full shrink-0", column.colorClass)} />
           ) : null}
           <h3 className="text-sm font-semibold text-foreground truncate">{column.title}</h3>
-          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
+          <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
             {itemCount}
           </span>
         </div>
         {onAddItem ? (
-          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={onAddItem}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 shrink-0"
+            onClick={onAddItem}
+            aria-label={`Add to ${column.title}`}
+          >
             <Plus className="h-4 w-4" />
           </Button>
         ) : null}
@@ -52,7 +61,7 @@ export function KanbanColumn({
       <div
         ref={setNodeRef}
         className={cn(
-          "flex-1 p-2 rounded-lg bg-muted/30 border-2 border-dashed border-transparent transition-colors space-y-2",
+          "flex-1 space-y-2 rounded-xl border-2 border-dashed border-transparent bg-muted/40 p-2 transition-colors",
           minHeight,
           isOver && "border-primary/50 bg-primary/5",
         )}

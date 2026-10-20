@@ -214,8 +214,64 @@ mod tests {
                 demand_change_pct: 0.0,
                 lead_time_change_days: 0,
                 target_margin_pct: 25.0,
+                provenance: None,
             }),
         });
+        assert!(invalid.is_err());
+    }
+
+    #[test]
+    fn preview_request_preserves_valid_controlled_csv_provenance() {
+        use crate::reports::common::{
+            MarginSupplyScenario, MarginSupplyScenarioProvenance, MarginSupplyScenarioSource,
+        };
+
+        let request = validate_request(ReportPreviewRequest {
+            company_id: 1,
+            date: "2026-07-10".into(),
+            timezone: "UTC".into(),
+            scenario: Some(MarginSupplyScenario {
+                input_cost_change_pct: 12.0,
+                demand_change_pct: -5.0,
+                lead_time_change_days: 2,
+                target_margin_pct: 30.0,
+                provenance: Some(MarginSupplyScenarioProvenance {
+                    source: MarginSupplyScenarioSource::ControlledCsv,
+                    file_name: Some("october-shock.csv".into()),
+                    imported_at: Some("2026-10-18T12:00:00Z".into()),
+                    row_number: Some(2),
+                }),
+            }),
+        })
+        .expect("valid controlled CSV scenario");
+
+        assert_eq!(
+            request.scenario.provenance.expect("provenance").file_name,
+            Some("october-shock.csv".into())
+        );
+    }
+
+    #[test]
+    fn preview_request_rejects_csv_fields_on_manual_provenance() {
+        use crate::reports::common::{
+            MarginSupplyScenario, MarginSupplyScenarioProvenance, MarginSupplyScenarioSource,
+        };
+
+        let invalid = validate_request(ReportPreviewRequest {
+            company_id: 1,
+            date: "2026-07-10".into(),
+            timezone: "UTC".into(),
+            scenario: Some(MarginSupplyScenario {
+                provenance: Some(MarginSupplyScenarioProvenance {
+                    source: MarginSupplyScenarioSource::Manual,
+                    file_name: Some("should-not-be-accepted.csv".into()),
+                    imported_at: None,
+                    row_number: None,
+                }),
+                ..MarginSupplyScenario::default()
+            }),
+        });
+
         assert!(invalid.is_err());
     }
 }
