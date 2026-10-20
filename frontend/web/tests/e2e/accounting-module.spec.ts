@@ -324,7 +324,8 @@ test.describe("Accounting module e2e", () => {
     await page.getByTestId("quick-action-create_bill").click()
     const billModal = page.getByTestId("create-invoice-modal")
     await expect(billModal).toBeVisible()
-    await expect(billModal.getByRole("heading", { name: /bill/i })).toBeVisible()
+    await expect(billModal.getByRole("heading", { name: "Create Vendor Bill", exact: true })).toBeVisible()
+    await expect(billModal.getByRole("heading", { name: "Vendor bill", exact: true })).toBeVisible()
     await billModal.getByRole("button", { name: /^cancel$/i }).click()
     await expect(billModal).toBeHidden()
 
