@@ -36,8 +36,7 @@ export async function signIn(
     .catch(() => false)
 
   if (!emailVisible) {
-    await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
-    await expectNoAppError(page)
+    await expectAuthenticatedShell(page)
     return
   }
 
@@ -46,15 +45,24 @@ export async function signIn(
   await page.getByRole("button", { name: /sign in/i }).click()
 
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
-  await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
-  await expectNoAppError(page)
+  await expectAuthenticatedShell(page)
 }
 
 export async function expectAuthenticatedShell(page: Page) {
-  await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
-  await expect(page.getByTestId("sidebar-user")).toBeVisible()
-  await expect(page.getByTestId("sidebar-sign-out")).toBeVisible()
+  const sidebar = page.getByTestId("dashboard-sidebar").filter({ visible: true })
+  await expect(sidebar).toHaveCount(1)
+  await expect(sidebar).toBeVisible()
+  await expect(sidebar.getByTestId("sidebar-user")).toBeVisible()
+  await expect(sidebar.getByTestId("sidebar-sign-out")).toBeVisible()
   await expectNoAppError(page)
+}
+
+async function currentModuleView(page: Page, moduleId: string): Promise<Locator> {
+  const moduleView = page.getByTestId(`module-view-${moduleId}`).filter({ visible: true })
+  await expect(moduleView).toHaveCount(1)
+  await expect(moduleView).toBeVisible()
+  await expect(moduleView).toHaveAttribute("data-hydrated", "true")
+  return moduleView
 }
 
 export async function gotoModule(page: Page, route: string, moduleId?: string) {
@@ -62,20 +70,29 @@ export async function gotoModule(page: Page, route: string, moduleId?: string) {
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
   await expectAuthenticatedShell(page)
   if (moduleId) {
-    const moduleView = page.getByTestId(`module-view-${moduleId}`)
-    await expect(moduleView).toBeVisible()
-    await expect(moduleView).toHaveAttribute("data-hydrated", "true")
+    await currentModuleView(page, moduleId)
   }
 }
 
 /** Select a module tab and wait until its panel is the active interaction surface. */
 export async function selectModuleTab(page: Page, moduleId: string, tabId: string) {
-  const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
+  const moduleView = await currentModuleView(page, moduleId)
+  const tab = moduleView.getByTestId(`module-tab-${moduleId}-${tabId}`)
+  if (!(await tab.isVisible())) {
+    const areaTrigger = moduleView.getByTestId(`module-area-${moduleId}`)
+    if (await areaTrigger.count()) {
+      const rawAreas = await areaTrigger.getAttribute("data-tab-areas")
+      const areas: unknown = rawAreas ? JSON.parse(rawAreas) : null
+      const area = areas != null && typeof areas === "object" && !Array.isArray(areas)
+        && tabId in areas ? (areas as { [tabId: string]: unknown })[tabId] : undefined
+      if (typeof area === "string") await chooseSelectOptionByTriggerValue(page, areaTrigger, area)
+    }
+  }
   await tab.click()
   await expect(tab).toHaveAttribute("aria-selected", "true")
   // Base UI may regenerate the tab/tabpanel ids during the state transition.
   // The selected tab and the single visible panel are the stable behavior.
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
+  await expect(moduleView.locator('[role="tabpanel"]:visible')).toHaveCount(1)
 }
 
 /** Open an entity tab’s create modal and wait for the form dialog. */
@@ -88,14 +105,14 @@ export async function openEntityCreate(
 ) {
   await gotoModule(page, route, moduleId)
   await selectModuleTab(page, moduleId, tabId)
-  const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
+  const createBtn = (await currentModuleView(page, moduleId)).getByTestId(`module-create-${moduleId}-${tabId}`)
   await createBtn.scrollIntoViewIfNeeded()
   await createBtn.click()
   await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible()
 }
 
 export async function openAccountingTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-accounting-${tabId}`).click()
+  await selectModuleTab(page, "accounting", tabId)
 }
 
 /** Click each module tab in order, assert no app error, optionally run per-tab checks. */
@@ -372,6 +389,10 @@ export async function openTabAndCancelCreate(
   formId: string,
 ) {
   const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
+  if (!(await tab.isVisible())) {
+    const area = await tab.getAttribute("data-navigation-group")
+    if (area) await chooseSelectOptionByTriggerValue(page, page.getByTestId(`module-area-${moduleId}`), area)
+  }
   await tab.click()
   await expect(tab).toHaveAttribute("aria-selected", "true")
   // The tab switch also updates ?tab=, which can re-render the panel; click
@@ -1878,7 +1899,7 @@ export async function postDraftCreditNoteMove(page: Page, creditNoteId: number):
 /** @deprecated Use {@link postDraftCreditNoteMove} — credit notes are not listed on journal entries. */
 export async function postDraftCreditNoteViaGl(page: Page, partnerName: string): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-invoices").click()
+  await selectModuleTab(page, "accounting", "invoices")
   const rows = activeTabCustomTableRows(page).filter({ hasText: partnerName })
   await expect(rows.first()).toBeVisible({ timeout: 30_000 })
 
@@ -1999,7 +2020,7 @@ export async function openInvoiceDetailModalFromRecordSheet(page: Page): Promise
 /** Open invoice detail and post draft via accounting invoices tab. */
 export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise<number> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-invoices").click()
+  await selectModuleTab(page, "accounting", "invoices")
   await selectCustomTableRowById(page, moveId)
   await openInvoiceDetailModalFromRecordSheet(page)
 
@@ -2018,12 +2039,12 @@ export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise
 /** Open one exact draft vendor bill in the accounting Bills tab. */
 async function openDraftVendorBillModal(page: Page, billId: number): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-bills").click()
+  await selectModuleTab(page, "accounting", "bills")
   // The bill projection is available through the API before the accounting
   // list's query cache necessarily sees it. Rebuild the page once after the
   // tab is active so all procure-to-pay row-visibility flows use fresh data.
   await page.reload({ waitUntil: "domcontentloaded" })
-  await page.getByTestId("module-tab-accounting-bills").click()
+  await selectModuleTab(page, "accounting", "bills")
   await selectCustomTableRowById(page, billId)
   await openInvoiceDetailModalFromRecordSheet(page)
   await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible({ timeout: 15_000 })
@@ -2618,7 +2639,7 @@ export async function expectMailMessageForRecord(
 
 export async function openFiscalSetupWizard(page: Page) {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-fiscal-years").click()
+  await selectModuleTab(page, "accounting", "fiscal-years")
   await page.getByTestId("entity-action-fy-setup-wizard").click()
   await expect(page.getByTestId("form-modal-fiscal-setup-wizard")).toBeVisible()
 }

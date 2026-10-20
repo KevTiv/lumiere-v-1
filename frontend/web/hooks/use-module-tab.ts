@@ -27,6 +27,8 @@ export function useModuleTab(defaultTab: string, validTabs: string[]) {
   const setActiveTab = useCallback(
     (tab: string) => {
       const params = new URLSearchParams(searchParams.toString())
+      // A record filter belongs to its owning tab. Preserve it only on same-tab refocus.
+      if (tab !== activeTab) params.delete('filter')
       if (tab === defaultTab) {
         params.delete('tab')
       } else {
@@ -35,7 +37,7 @@ export function useModuleTab(defaultTab: string, validTabs: string[]) {
       const qs = params.toString()
       router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false })
     },
-    [searchParams, router, pathname, defaultTab],
+    [searchParams, router, pathname, defaultTab, activeTab],
   )
 
   return { activeTab, setActiveTab }

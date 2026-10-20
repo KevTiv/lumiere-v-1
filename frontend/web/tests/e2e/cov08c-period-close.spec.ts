@@ -8,6 +8,7 @@ import {
   scalarQueryId,
   signIn,
   smokeName,
+  selectModuleTab,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 
@@ -82,7 +83,7 @@ test.describe("COV-08c exact period close", { tag: ["@p0", "@cov08", "@cov08c"] 
     await callReducerOwner("open_account_period", [organizationId, companyId, periodId])
 
     await gotoModule(page, "accounting")
-    await page.getByTestId("module-tab-accounting-account-periods").click()
+    await selectModuleTab(page, "accounting", "account-periods")
     const periodRow = page.getByTestId(`entity-row-${periodId}`)
     await expect(periodRow).toContainText(periodName)
     // Clicking an open period selects it and opens its edit form; dismiss the

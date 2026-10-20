@@ -1,6 +1,7 @@
 "use client"
 
 
+import { dispatchNamedOperation } from "../../operation-dispatch"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stringifyReducerCommandBody } from "@lumiere/api-client"
 import type {
@@ -211,9 +212,7 @@ export function useAllocatePaymentTransaction(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, AllocatePaymentParams>({
     mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost("allocate_payment_transaction", { params: stdbParamsToJson(params, "AllocatePaymentParams") })
-      const response = await apiFetch(urlPath, init)
-      if (!response.ok) throw new Error(await parseCallError(response))
+      await dispatchNamedOperation("allocate_payment_transaction", { params: stdbParamsToJson(params, "AllocatePaymentParams") }, "Unable to allocate the payment")
     },
     onSuccess: () => invalidateOperationalPaymentQueries(qc, organizationId),
   })

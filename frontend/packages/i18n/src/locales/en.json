@@ -255,6 +255,10 @@
       "successDescription": "{{count}} rows from {{file}} were sent. Rows the server rejects are listed in the import job history.",
       "unknownColumns": "These columns are not used and will be ignored: {{columns}}",
       "viewJob": "View import job"
+    },
+    "moduleNavigation": {
+      "overview": "Overview",
+      "area": "Task area"
     }
   },
   "navigation": {
@@ -881,6 +885,28 @@
       "targetPeriod": {
         "label": "Accounting period",
         "placeholder": "Select a period to evaluate"
+      },
+      "review": {
+        "failed": "The close result could not be confirmed. Refresh the period before you try again.",
+        "company": "Company",
+        "period": "Selected period",
+        "state": "Saved period state",
+        "drafts": "Confirmed draft journal entries",
+        "bankLines": "Confirmed unreconciled bank lines",
+        "title": "Review this period",
+        "advisory": "This checklist is a review aid. The server validates the close action; it does not post drafts or reconcile bank lines for you.",
+        "dataUnavailable": "Period review data is incomplete or unavailable. Counts and close readiness cannot be confirmed.",
+        "open": "Review close consequences",
+        "unverified": "Unverified records: {{count}}. Their scope, identity, or saved state cannot be verified. They are not counted as selected-period records.",
+        "record": "Exact record",
+        "date": "Date (UTC)",
+        "amount": "Saved amount",
+        "statement": "Statement",
+        "consequence": "Closing this period prevents new journal posting for dates in its range. It does not post drafts, reconcile bank lines, or generate reports.",
+        "outstanding": "This period has outstanding records listed in the checklist. Review them before you close.",
+        "unknown": "Some record scope or source data cannot be verified. The checklist cannot confirm that this period is ready to close.",
+        "cancel": "Return to checklist",
+        "close": "Close selected period"
       }
     },
     "chartStructure": {
@@ -1789,7 +1815,11 @@
           "typeSale": "Sale",
           "unavailable": "(unavailable)",
           "showDisposalAccounts": "Show disposal account settings (optional)",
-          "showDisposalAccountsHint": "Use these accounts when the asset is disposed. Hiding these fields keeps your selections."
+          "showDisposalAccountsHint": "Use these accounts when the asset is disposed. Hiding these fields keeps your selections.",
+          "loadingSetup": "Loading asset setup…",
+          "unavailableSetup": "Asset setup unavailable",
+          "waitForLookups": "Wait for accounts, journals, and currencies to finish loading, then open the form.",
+          "refreshLookups": "Refresh the unavailable accounts, journals, or currencies before opening the asset form."
         }
       },
       "depreciationSchedule": {
@@ -3002,6 +3032,94 @@
       "unsavedPreview": "Unsaved preview",
       "untaxed": "Untaxed amount",
       "vendor": "Vendor"
+    },
+    "assetSchedule": {
+      "generateFailed": "The saved schedule could not be confirmed. Refresh before you try again.",
+      "title": "Saved depreciation schedule",
+      "savedOnly": "Dates, amounts, and balances below come from the saved schedule. Generating a schedule does not post journal entries.",
+      "loading": "Loading saved schedule…",
+      "unavailable": "The complete company-scoped schedule cannot be verified. Refresh the data before generating or reviewing a schedule.",
+      "refresh": "Refresh schedule",
+      "notGenerated": "No saved depreciation lines exist for this asset. A schedule is available after the asset is confirmed and generated.",
+      "generate": "Generate saved schedule",
+      "currency": "Amounts in {{currency}}",
+      "assetCurrency": "Amounts are in the asset's saved currency. The currency label is unavailable.",
+      "incomplete": "Some saved values are unavailable and appear as —. They have not been estimated.",
+      "sequence": "Installment",
+      "date": "Date (UTC)",
+      "amount": "Depreciation amount",
+      "depreciated": "Depreciated to date",
+      "remaining": "Remaining depreciable value",
+      "awaitingRefresh": "Schedule generation is confirmed. Refresh the saved lines to display the schedule.",
+      "refreshFailed": "Saved schedule lines could not be refreshed. Try again."
+    },
+    "workflowTools": {
+      "confirmed": "Confirmed server record #{{id}}. Review the saved result before continuing.",
+      "ambiguous": "More than one result matches this request. Do not submit again. Resolve the duplicate records first.",
+      "conflict": "The saved result does not match the submitted request. Do not submit again. Review the server records.",
+      "accepted": "The request was accepted. The saved result is not confirmed yet. Check its status before another submission.",
+      "unknown": "The request result is unknown. Check its status before another submission.",
+      "checkStatus": "Check request status",
+      "importReview": "Statement review",
+      "submitted": "Submitted request",
+      "localOnly": "Local review · not staged",
+      "company": "Company #{{id}}",
+      "requestKey": "Request key: {{key}}",
+      "rowCounts": "{{total}} rows · {{valid}} pass local checks · {{invalid}} need review",
+      "balance": "Balance review",
+      "amount": "Amount",
+      "opening": "Opening balance",
+      "movements": "Movement from locally valid rows",
+      "closing": "Estimated closing balance",
+      "envelope": "The opening balance, movement, or closing balance exceeds the supported money range. Correct the setup or file before staging.",
+      "incompleteBalance": "The estimated balance excludes rows with local errors. Staging keeps invalid rows for server review; it does not approve them.",
+      "row": "Row",
+      "date": "Date",
+      "reference": "Reference / description",
+      "validation": "Local check",
+      "invalidDate": "Missing or invalid date",
+      "invalidAmount": "Missing or invalid amount",
+      "zeroAmount": "Amount must not be zero",
+      "rowEnvelope": "Amount exceeds the supported money range",
+      "valid": "Ready for server validation",
+      "reviewFirst": "Choose a CSV file and statement setup, then select Review CSV. No rows are sent to the server during this review.",
+      "allocationReview": "Allocation review",
+      "unsavedAllocation": "Unsaved allocation",
+      "postedPayment": "Posted payment · company #{{id}}",
+      "unavailableAllocation": "The authorized payment or open-item data is unavailable. Refresh the data before allocating. Missing balances are not treated as zero.",
+      "noOpenItems": "No readable posted invoice or bill items match this payment's partner, currency, and required account type.",
+      "paymentAvailable": "Payment available before allocation",
+      "itemOutstanding": "Selected item outstanding",
+      "applied": "Applied from this payment",
+      "writeOff": "Separate write-off",
+      "paymentAfter": "Estimated payment left unapplied",
+      "itemAfter": "Estimated item balance after allocation",
+      "overAllocation": "The entered amounts exceed a displayed balance. Review the amounts before submitting.",
+      "allocationAdvisory": "These are read-only estimates from authorized records. The server validates current eligibility, amounts, and rounding. Unapplied payment credit is not a write-off.",
+      "enableWriteOff": "Add a separate write-off",
+      "positiveWriteOff": "Enter a positive write-off amount, or turn off the write-off.",
+      "stageReviewed": "Stage reviewed rows",
+      "invalidAllocation": "Choose a current open item and enter a positive allocation amount.",
+      "invalidWriteOff": "Enter a positive write-off and choose an allowed write-off account, or turn off the write-off.",
+      "allocationFailed": "Unable to allocate the payment",
+      "reviewFailed": "Unable to review the CSV",
+      "reviewAgain": "Review the current file and setup before staging.",
+      "importKeyConflict": "An import with this file identity has different saved data. Review the saved import before continuing.",
+      "stageFailed": "Unable to stage the statement import",
+      "importCsv": "Import CSV",
+      "reviewCsv": "Review CSV",
+      "importSetup": "Choose a CSV file, journal, currency, and finite opening balance.",
+      "importEmpty": "Upload a bank CSV to review its rows and balances before staging."
+    },
+    "readiness": {
+      "hideDetails": "Hide setup details",
+      "reviewDetails": "Review setup ({{count}} required)"
+    },
+    "navigation": {
+      "receivables": "Receivables",
+      "payables": "Payables",
+      "cashBank": "Cash & Bank",
+      "assets": "Assets"
     }
   },
   "crm": {
@@ -10237,11 +10355,11 @@
       "financeFailed": "Expense report action failed"
     },
     "capture": {
-      "title": "Mobile capture (delayed sync)",
-      "description": "Queues locally with client_request_id, then flushes via durable delayed_sync intents when online.",
+      "title": "Receipt capture",
+      "description": "Capture an expense with a receipt preview and track its upload and sync status.",
       "submit": "Queue & sync expense",
-      "flushQueue": "Flush outbox",
-      "validation": "Employee, pricelist, and description are required.",
+      "flushQueue": "Sync ready captures",
+      "validation": "Select an employee and pricelist. Enter a description, a valid date, and the amount or required rate details.",
       "queuedOffline": "Queued locally — flush when online (idempotent client_request_id).",
       "queuedSynced": "Captured and synced.",
       "receiptStub": "Register receipt evidence on capture",
@@ -10249,7 +10367,36 @@
       "receiptNotePlaceholder": "Optional note stored on the expense line",
       "retry": "Retry",
       "discard": "Discard",
-      "conflictHelp": "Sync conflict — retry or discard this outbox item."
+      "conflictHelp": "Sync conflict — retry or discard this outbox item.",
+      "attachments": {
+        "storageUnavailable": "Local queue storage is unavailable. No capture can be saved on this device.",
+        "confirmed": "Expense {{id}} is confirmed in the saved records.",
+        "outcomeUnknown": "The expense result is not confirmed. Check its status; no automatic resend will occur.",
+        "failed": "Capture failed",
+        "fileRequired": "Choose a non-empty image or PDF receipt, or clear the receipt checkbox.",
+        "queued": "Capture queued on this device.",
+        "queueFailed": "The capture could not be saved in the local queue.",
+        "originalFile": "Select the original receipt file with the same name, size, type, and modified date.",
+        "persistenceLimit": "Capture details and completed upload checkpoints are saved on this device. Unuploaded file bytes stay in this capture panel only. After leaving this panel or reloading, reattach the original file before syncing.",
+        "fileHint": "Attach an image or PDF. A note alone is not a receipt.",
+        "awaiting": "Awaiting confirmation",
+        "queuedLabel": "Queued",
+        "attached": "Receipt attached",
+        "uploading": "Uploading receipt",
+        "receiptFailed": "Receipt failed",
+        "receiptQueued": "Receipt queued",
+        "legacy": "This older capture cannot be resumed safely. Discard it and capture it again.",
+        "companyMismatch": "Switch to the company saved with this capture before syncing.",
+        "reattach": "Reattach the original receipt",
+        "checkStatus": "Check status",
+        "attachedPreview": "Receipt attachment is confirmed. This preview uses the local file.",
+        "localPreview": "Local preview. This file is not attached to a saved expense yet.",
+        "imageAlt": "Selected receipt",
+        "pdfLabel": "Selected receipt PDF",
+        "pdfFallback": "PDF selected. Your browser cannot display its preview.",
+        "rejected": "The server rejected this capture. Retry after the cause is corrected, or discard it and capture corrected values.",
+        "retryRejected": "Retry rejected capture"
+      }
     },
     "tabs": {
       "inbox": "Inbox"
@@ -13622,6 +13769,39 @@
       "structureOnly": "Layout preview only. Financial amounts are calculated by the report service after generation.",
       "unsaved": "Unsaved",
       "widgetScope": "Read-only preview of the selected company. The saved widget is added to a dashboard separately."
+    },
+    "layout": {
+      "bindingLimit": "This editor saves layout markup. Your report integration supplies live data. Example values appear only in the preview.",
+      "hideSource": "Hide markup",
+      "showSource": "Edit markup",
+      "useSections": "Build with sections",
+      "addHeading": "Add heading",
+      "addText": "Add text",
+      "addTable": "Add document table",
+      "markup": "Template markup",
+      "moveUp": "Move section {{number}} up",
+      "up": "Up",
+      "moveDown": "Move section {{number}} down",
+      "down": "Down",
+      "removeSection": "Remove section {{number}}",
+      "columnsHint": "Choose the labels and order for the document columns. Example rows are not saved.",
+      "column": "Column {{number}}",
+      "removeColumn": "Remove column {{number}}",
+      "addColumn": "Add column",
+      "sectionText": "Section text",
+      "replaceTitle": "Replace existing markup?",
+      "replaceDescription": "Section editing starts a new layout. The existing markup is replaced only in this draft. Cancel the form to keep the saved template.",
+      "replace": "Start section layout",
+      "previewHint": "Layout preview with example values. Scripts and external content are not loaded.",
+      "previewTitle": "Report template layout preview",
+      "save": "Save template layout",
+      "kind": {
+        "heading": "Heading",
+        "paragraph": "Text",
+        "table": "Document table"
+      },
+      "existingOrientation": "Existing orientation: {{value}}",
+      "saved": "Template layout saved"
     }
   },
   "proposalWorkspace": {

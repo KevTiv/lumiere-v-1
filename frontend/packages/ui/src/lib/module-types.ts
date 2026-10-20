@@ -1,6 +1,11 @@
 import type { ReactNode } from "react"
 import type { DashboardSection } from "./dashboard-types"
-import type { EntityDetailConfig, EntitySurfacePermission, EntityViewConfig, BadgeVariant } from "./entity-view-types"
+import type {
+  EntityDetailConfig,
+  EntitySurfacePermission,
+  EntityViewConfig,
+  BadgeVariant,
+} from "./entity-view-types"
 import type { FormConfig } from "./form-types"
 import type { KanbanColumnDef, KanbanMoveHandler } from "./kanban-board-types"
 
@@ -94,6 +99,8 @@ export interface ModuleConfig {
    * those before the first grouped tab lead the row, the rest trail it.
    */
   tabGroups?: ModuleTabGroup[]
+  /** Show one task area's tabs at a time; direct tab links select their owning area. */
+  tabNavigation?: "areas"
 }
 
 export interface ModuleTabGroup {
@@ -101,9 +108,7 @@ export interface ModuleTabGroup {
   tabIds: readonly string[]
 }
 
-export type ModuleTabRowItem =
-  | { kind: "group"; label: string }
-  | { kind: "tab"; tab: ModuleTab }
+export type ModuleTabRowItem = { kind: "group"; label: string } | { kind: "tab"; tab: ModuleTab }
 
 /** Tab row in display order, with a group label before each group's tabs. */
 export function buildModuleTabRow(
@@ -114,8 +119,12 @@ export function buildModuleTabRow(
   const groupOf = new Map<string, number>()
   groups.forEach((group, index) => group.tabIds.forEach((id) => groupOf.set(id, index)))
   const firstGrouped = tabs.findIndex((tab) => groupOf.has(tab.id))
-  const leading = tabs.filter((tab, index) => !groupOf.has(tab.id) && (firstGrouped < 0 || index < firstGrouped))
-  const trailing = tabs.filter((tab, index) => !groupOf.has(tab.id) && firstGrouped >= 0 && index > firstGrouped)
+  const leading = tabs.filter(
+    (tab, index) => !groupOf.has(tab.id) && (firstGrouped < 0 || index < firstGrouped),
+  )
+  const trailing = tabs.filter(
+    (tab, index) => !groupOf.has(tab.id) && firstGrouped >= 0 && index > firstGrouped,
+  )
   const row: ModuleTabRowItem[] = leading.map((tab) => ({ kind: "tab", tab }))
   groups.forEach((group, index) => {
     const members = tabs.filter((tab) => groupOf.get(tab.id) === index)
@@ -125,4 +134,32 @@ export function buildModuleTabRow(
   })
   trailing.forEach((tab) => row.push({ kind: "tab", tab }))
   return row
+}
+
+export interface ModuleNavigationArea {
+  id: string
+  label: string
+  tabIds: string[]
+}
+
+/** Areas only organize existing tabs. They do not grant access or create destinations. */
+export function buildModuleNavigationAreas(
+  tabs: readonly ModuleTab[],
+  groups: readonly ModuleTabGroup[] | undefined,
+  overviewLabel: string,
+): ModuleNavigationArea[] {
+  const assigned = new Set<string>()
+  const areas: ModuleNavigationArea[] = []
+  for (const group of groups ?? []) {
+    const members = tabs
+      .filter((tab) => group.tabIds.includes(tab.id) && !assigned.has(tab.id))
+      .map((tab) => tab.id)
+    if (!members.length) continue
+    members.forEach((id) => assigned.add(id))
+    areas.push({ id: members[0]!, label: group.label, tabIds: members })
+  }
+  const remaining = tabs.filter((tab) => !assigned.has(tab.id)).map((tab) => tab.id)
+  return remaining.length
+    ? [{ id: remaining[0]!, label: overviewLabel, tabIds: remaining }, ...areas]
+    : areas
 }

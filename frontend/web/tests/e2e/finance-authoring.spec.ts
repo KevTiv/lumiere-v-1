@@ -250,8 +250,24 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
 
   test("shows asset factors only for degressive methods and preserves collapsed disposal selections", async ({ page }) => {
     const writes = observeOperationWrites(page)
+    let releaseAccounts!: () => void
+    const accountsAllowed = new Promise<void>((resolve) => { releaseAccounts = resolve })
+    await page.route("**/api/query/account-accounts**", async (route) => {
+      await accountsAllowed
+      await route.continue()
+    })
     await gotoModule(page, "/accounting?tab=fixed-assets", "accounting")
-    await page.getByTestId("entity-action-asset-new").click()
+    const createAsset = page.getByTestId("entity-action-asset-new")
+    try {
+      await expect(createAsset).toHaveText("Loading asset setup…")
+      await createAsset.click()
+      await expect(page.getByTestId("form-modal-form-dialog")).toHaveCount(0)
+      await expect(page.getByText("Wait for accounts, journals, and currencies to finish loading, then open the form.", { exact: true })).toBeVisible()
+    } finally {
+      releaseAccounts()
+    }
+    await expect(createAsset).toHaveText("New asset")
+    await createAsset.click()
     const modal = page.getByTestId("form-modal-form-dialog")
     await expect(modal).toBeVisible()
     const method = modal.getByTestId("form-field-method")

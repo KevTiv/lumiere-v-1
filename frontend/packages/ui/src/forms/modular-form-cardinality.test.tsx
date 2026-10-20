@@ -53,10 +53,12 @@ describe("ModularForm array fields", () => {
     fireEvent.submit(button.closest("form")!)
     expect(submit).not.toHaveBeenCalled()
   })
-  it("resets to multiple defaults", () => {
-    render(<ModularForm config={config(["north", "south"])} />)
+  it("resets to multiple defaults and notifies the review owner", () => {
+    const onValuesChange = vi.fn()
+    render(<ModularForm config={config(["north", "south"])} onValuesChange={onValuesChange} />)
     select("north")
     fireEvent.click(screen.getByRole("button", { name: "common.reset" }))
+    expect(onValuesChange).toHaveBeenLastCalledWith({ "custom:regions": ["north", "south"] })
     const input = screen.getByRole("listbox") as HTMLSelectElement
     expect(Array.from(input.selectedOptions, (option) => option.value)).toEqual(["north", "south"])
   })

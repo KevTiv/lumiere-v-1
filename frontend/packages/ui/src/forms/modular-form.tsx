@@ -337,7 +337,9 @@ export function ModularForm({
   }
 
   const handleReset = () => {
-    setValues(getInitialValues())
+    const initial = getInitialValues()
+    setValues(initial)
+    onValuesChange?.(initial)
     setErrors({})
   }
 

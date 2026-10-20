@@ -200,7 +200,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     const { amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await selectModuleTab(page, "accounting", "payments")
     await page.getByTestId("module-create-accounting-payments").click()
     await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
     await chooseSelectOptionByValue(page, "paymentType", "OutBound")
@@ -253,7 +253,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     await page.reload({ waitUntil: "domcontentloaded" })
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await selectModuleTab(page, "accounting", "payments")
     await expect(page.getByTestId(`entity-row-${paymentId}`)).toContainText(VENDOR_NAME)
     await waitForSettledBill(page, moveId)
     expect(

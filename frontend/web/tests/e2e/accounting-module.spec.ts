@@ -14,6 +14,7 @@ import {
   openEntityCreate,
   smokeName,
   submitForm,
+  selectModuleTab,
 } from "./helpers"
 
 const ACCOUNTING_TAB_IDS = [
@@ -55,8 +56,7 @@ type AccountingTabId = (typeof ACCOUNTING_TAB_IDS)[number]
 
 async function openAndAssertAccountingTab(page: Page, tabId: AccountingTabId) {
   const tab = page.getByTestId(`module-tab-accounting-${tabId}`)
-  await tab.scrollIntoViewIfNeeded()
-  await tab.click()
+  await selectModuleTab(page, "accounting", tabId)
 
   await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe(
     tabId === "dashboard" ? null : tabId,

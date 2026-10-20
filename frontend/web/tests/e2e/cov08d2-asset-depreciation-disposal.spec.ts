@@ -8,6 +8,7 @@ import {
   scalarQueryId,
   signIn,
   smokeName,
+  selectModuleTab,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 
@@ -130,7 +131,7 @@ async function clickAssetAction(
   reducer: string,
 ) {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-fixed-assets").click()
+  await selectModuleTab(page, "accounting", "fixed-assets")
   const assetRow = page.getByTestId(`entity-row-${assetId}`)
   await expect(assetRow).toBeVisible({ timeout: 30_000 })
   await assetRow.click()

@@ -49,6 +49,7 @@ import {
   expectFormModalVisible,
   fetchSaleOrderSelectLabel,
   openCreateInvoiceFromOrder,
+  selectModuleTab,
 } from "./helpers"
 
 const SEEDED_CUSTOMER_NAME = "Acme Corporation"
@@ -383,17 +384,17 @@ test.describe("MVP lead-to-cash workflow", { tag: "@p0" }, () => {
     })
 
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-invoices").click()
+    await selectModuleTab(page, "accounting", "invoices")
     await expectSeededText(page, leadName, "/api/query/account-moves")
     await page.reload({ waitUntil: "domcontentloaded" })
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-invoices").click()
+    await selectModuleTab(page, "accounting", "invoices")
     await expectSeededText(page, leadName, "/api/query/account-moves")
 
     // Step 11 — create payment → post → register on invoice (UI)
     const { partnerId, amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
 
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await selectModuleTab(page, "accounting", "payments")
     await page.getByTestId("module-create-accounting-payments").click()
     await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
     await chooseSelectOptionByValue(page, "partnerId", partnerId)

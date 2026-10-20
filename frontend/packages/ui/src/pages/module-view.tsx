@@ -12,6 +12,9 @@ import {
 } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/select"
+import { Label } from "../components/label"
+import { useTranslation } from "@lumiere/i18n"
 import { LayoutGrid, Plus, Table as TableIcon } from "lucide-react"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -21,7 +24,7 @@ import { EntityView } from "../entity-views/entity-view"
 import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
 import { FormModal } from "../forms/form-modal"
 import { RuntimeFormModal } from "../forms/runtime-form-modal"
-import { buildModuleTabRow, type ModuleConfig, type ModuleTab } from "../lib/module-types"
+import { buildModuleNavigationAreas, buildModuleTabRow, type ModuleConfig, type ModuleTab } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import type { EntitySurfacePermission } from "../lib/entity-view-types"
 import type { FormConfig, FormValues } from "../lib/form-types"
@@ -131,6 +134,12 @@ export function ModuleView({
   }, [activeTabProp, routeTab])
   const [isHydrated, setIsHydrated] = useState(false)
   const activeTab = activeTabProp ?? internalTab
+  const { t } = useTranslation()
+  const navigationAreas = config.tabNavigation === "areas"
+    ? buildModuleNavigationAreas(config.tabs, config.tabGroups, t("common.moduleNavigation.overview", { defaultValue: "Overview" })) : []
+  const currentArea = navigationAreas.find((area) => area.tabIds.includes(activeTab)) ?? navigationAreas[0]
+  const tabAreas = Object.fromEntries(navigationAreas.flatMap((area) => area.tabIds.map((tabId) => [tabId, area.id])))
+  const visibleTabs = currentArea ? config.tabs.filter((tab) => currentArea.tabIds.includes(tab.id)) : config.tabs
   const prevActiveTabRef = useRef<string | null>(null)
   const setActiveTab = (v: string) => {
     onActiveTabChange?.(v)
@@ -235,6 +244,16 @@ export function ModuleView({
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className={"flex-col flex"}>
+        {currentArea ? <div className="flex flex-wrap items-center gap-3" data-testid={`module-navigation-${config.id}`}>
+          <Label htmlFor={`module-area-${config.id}`}>{t("common.moduleNavigation.area", { defaultValue: "Task area" })}</Label>
+          <Select value={currentArea.id} onValueChange={(id) => {
+            const area = navigationAreas.find((candidate) => candidate.id === id)
+            if (area?.tabIds[0]) setActiveTab(area.tabIds[0])
+          }}>
+            <SelectTrigger id={`module-area-${config.id}`} data-testid={`module-area-${config.id}`} data-tab-areas={JSON.stringify(tabAreas)} className="w-full sm:w-64"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectGroup>{navigationAreas.map((area) => <SelectItem key={area.id} value={area.id}>{area.label}</SelectItem>)}</SelectGroup></SelectContent>
+          </Select>
+        </div> : null}
         <div
           ref={tabListRef}
           className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]"
@@ -244,8 +263,8 @@ export function ModuleView({
           variant="line"
           className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto"
         >
-          {buildModuleTabRow(config.tabs, config.tabGroups).map((item) =>
-            item.kind === "group" ? (
+          {buildModuleTabRow(visibleTabs, config.tabGroups).map((item) =>
+            item.kind === "group" ? (currentArea ? null : (
               <span
                 key={`group-${item.label}`}
                 aria-hidden
@@ -253,12 +272,13 @@ export function ModuleView({
               >
                 {item.label}
               </span>
-            ) : (
+            )) : (
               <TabsTrigger
                 key={item.tab.id}
                 // Natural width with an underline on the active tab; the
                 // default pseudo-underline is clipped by the scroll container.
                 className="-mb-px flex-none rounded-none border-0 border-b-2 border-transparent px-2.5 pb-2.5 pt-1.5 after:hidden data-active:border-foreground data-active:text-foreground"
+                data-navigation-group={navigationAreas.find((area) => area.tabIds.includes(item.tab.id))?.id}
                 value={item.tab.id}
                 data-testid={`module-tab-${config.id}-${item.tab.id}`}
               >
