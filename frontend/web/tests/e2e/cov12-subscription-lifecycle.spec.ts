@@ -3,6 +3,7 @@ import { expect, test, type Page, type Request } from "@playwright/test"
 import {
   addLaptopLine,
   createDraftSaleOrder,
+  confirmOrderViaUi,
 } from "./sales-order-fixtures"
 import {
   fetchAccountSelectLabelByInternalType,
@@ -10,8 +11,6 @@ import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   fetchSaleOrderSelectLabel,
-  waitForEntityActionEnabled,
-  waitForSaleOrderConfirmed,
   fillField,
   gotoModule,
   isoDate,
@@ -101,8 +100,8 @@ async function openSubscriptionAction(
   subscriptionId: number,
   actionId: string,
 ) {
-  await gotoModule(page, "/subscriptions", "subscriptions")
-  await selectModuleTab(page, "subscriptions", "subscriptions")
+  // Exact focus keeps the newly created subscription visible after pagination fills.
+  await gotoModule(page, `/subscriptions?tab=subscriptions&filter=id:${subscriptionId}`, "subscriptions")
   await selectEntityRowById(page, subscriptionId)
   const action = page.getByTestId(`entity-action-${actionId}`)
   await expect(action).toBeEnabled()
@@ -122,12 +121,7 @@ async function labelByCode(page: Page, resource: string, code: string) {
 async function provisionBilledSubscription(page: Page, label: string) {
   const saleOrderId = await createDraftSaleOrder(page, smokeName(`${label}-so`))
   await addLaptopLine(page, saleOrderId, "1")
-  await gotoModule(page, "/sales", "sales")
-  await page.getByTestId("module-tab-sales-orders").click()
-  await selectEntityRowById(page, saleOrderId)
-  await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
-  await page.getByTestId("entity-action-confirm-orders").click()
-  await waitForSaleOrderConfirmed(page, saleOrderId)
+  await confirmOrderViaUi(page, saleOrderId)
   const saleOrderLabel = await fetchSaleOrderSelectLabel(page, saleOrderId)
 
   const incomeLabel = await fetchAccountSelectLabelByInternalType(page, "income")
@@ -233,12 +227,7 @@ test.describe(
         smokeName("cov12-so"),
       )
       await addLaptopLine(page, saleOrderId, "1")
-      await gotoModule(page, "/sales", "sales")
-      await page.getByTestId("module-tab-sales-orders").click()
-      await selectEntityRowById(page, saleOrderId)
-      await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
-      await page.getByTestId("entity-action-confirm-orders").click()
-      await waitForSaleOrderConfirmed(page, saleOrderId)
+      await confirmOrderViaUi(page, saleOrderId)
       const saleOrderLabel = await fetchSaleOrderSelectLabel(page, saleOrderId)
 
       await gotoModule(page, "/subscriptions", "subscriptions")
