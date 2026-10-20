@@ -200,12 +200,10 @@ pub const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 17,
-        name: "purchasing_keyed_operations",
+        name: "platform_identity_lifecycle",
         change_set: 9,
         phase: MigrationPhase::Expand,
-        sql: include_str!(
-            "../../../lumiere-codegen/pg-migration-ledger/0017_durable_projection_delta.sql"
-        ),
+        sql: platform_control::PLATFORM_IDENTITY_LIFECYCLE_DDL,
     },
     Migration {
         version: 18,
@@ -218,19 +216,12 @@ pub const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 19,
-        name: "bank_statement_settlement_lifecycle",
+        name: "financial_alpha_operations",
         change_set: 11,
         phase: MigrationPhase::Expand,
         sql: include_str!(
             "../../../lumiere-codegen/pg-migration-ledger/0019_durable_projection_delta.sql"
         ),
-    },
-    Migration {
-        version: 20,
-        name: "platform_identity_lifecycle",
-        change_set: 12,
-        phase: MigrationPhase::Expand,
-        sql: platform_control::PLATFORM_IDENTITY_LIFECYCLE_DDL,
     },
 ];
 
