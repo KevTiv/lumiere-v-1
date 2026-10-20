@@ -423,6 +423,7 @@ export function stdbParamsToJson(
 
 /** Last-argument struct names retained for explicit compatibility fixtures. */
 const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & string>> = {
+  update_role: "UpdateRoleParams",
   add_account_move_line: "AddAccountMoveLineParams",
   create_company: "CreateCompanyParams",
   create_ai_insight: "CreateAiInsightParams",

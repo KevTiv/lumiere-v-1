@@ -205,7 +205,9 @@ test.describe(
       await page.getByTestId("module-create-expenses-expenses").click()
       await fillField(page, "name", expenseName)
       await fillField(page, "totalAmount", "73.17")
-      await fillField(page, "date", isoDate(0))
+      // A failed attempt leaves real rows behind. Keep a retry's business date
+      // distinct so duplicate detection does not mask the original failure.
+      await fillField(page, "date", isoDate(-test.info().retry))
       await chooseFirstEnabledOption(page, "pricelistId")
       await chooseFirstEnabledOption(page, "employeeId")
       await page.getByTestId("form-field-receiptFile").setInputFiles({
@@ -382,6 +384,7 @@ test.describe(
             },
           ])
         }
+        expect(await sheetSnapshot(financePage, sheetId)).toMatchObject({ state: "Submitted" })
         const approveAction = await openSheetAction(
           financePage,
           sheetId,
