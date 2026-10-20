@@ -1,5 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
+import type { FormModalProps } from "../forms/form-modal"
+import type { RuntimeFormModalProps } from "../forms/runtime-form-modal"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { ModuleConfig } from "../lib/module-types"
 import type { PolicyRule, Role, User } from "../lib/rbac-types"
@@ -28,8 +30,16 @@ vi.mock("../entity-views/entity-view", () => ({
   EntityView: ({ headerAction, isLoading }: { headerAction?: ReactNode; isLoading?: boolean }) => <div data-testid="entity-view" data-loading={String(isLoading)}>{headerAction}</div>,
 }))
 vi.mock("../entity-views/entity-record-sheet", () => ({ EntityRecordSheet: () => null }))
-vi.mock("../forms/form-modal", () => ({ FormModal: ({ open }: { open: boolean }) => (open ? <div data-testid="create-form" /> : null) }))
-vi.mock("../forms/runtime-form-modal", () => ({ RuntimeFormModal: () => null }))
+vi.mock("../forms/form-modal", () => ({
+  FormModal: ({ open, renderPreview }: FormModalProps) => open
+    ? <div data-testid="create-form">{renderPreview?.({ name: "Draft order" })}</div>
+    : null,
+}))
+vi.mock("../forms/runtime-form-modal", () => ({
+  RuntimeFormModal: ({ open, renderPreview }: RuntimeFormModalProps) => open
+    ? <div data-testid="create-form">{renderPreview?.({ name: "Draft order" })}</div>
+    : null,
+}))
 vi.mock("./dashboard-grid", () => ({ DashboardGrid: () => <div data-testid="legacy-dashboard-grid" /> }))
 vi.mock("./dashboard-header", () => ({ DashboardHeader: ({ timeRange, onExport }: { timeRange?: string; onExport?: () => void }) => <div data-testid="dashboard-header-contract" data-time-range={timeRange ?? "none"} data-has-export={String(Boolean(onExport))} /> }))
 vi.mock("../lib/export-dashboard-png", () => ({ exportDashboardToPng: vi.fn() }))
@@ -218,6 +228,22 @@ describe("ModuleView collection states", () => {
 })
 
 describe("ModuleView dialogs follow collection availability", () => {
+  it.each([false, true])("forwards the tab preview to the create dialog (runtime=%s)", (runtime) => {
+    const preview = vi.fn((_tabId, values) => <output>{String(values.name)}</output>)
+    render(
+      <RBACProvider initialUser={user} initialRoles={[role([rule("sale_order", "create")])]} initialPolicies={[]}>
+        <ModuleView
+          config={config}
+          runtimeForms={runtime ? { organizationId: 1 } : undefined}
+          renderCreatePreview={preview}
+        />
+      </RBACProvider>,
+    )
+    fireEvent.click(screen.getByTestId("module-create-sales-orders"))
+    expect(screen.getByText("Draft order")).toBeTruthy()
+    expect(preview).toHaveBeenCalledWith("orders", { name: "Draft order" }, config.tabs[0]!.createForm)
+  })
+
   it("closes an open create form when the collection becomes denied and keeps it closed on recovery", () => {
     const view = (state: ModuleDataState) => (
       <RBACProvider initialUser={user} initialRoles={[role([rule("sale_order", "create")])]} initialPolicies={[]}>

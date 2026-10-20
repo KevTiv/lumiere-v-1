@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../components/dialog"
-import type { AiFormAssistConfig, FormConfig } from "../lib/form-types"
+import type { AiFormAssistConfig, FormConfig, FormPreviewRenderer } from "../lib/form-types"
 import { showSemanticOperationOutcome } from "../lib/semantic-operation-outcome"
 import { cn } from "../lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
@@ -68,6 +68,8 @@ export interface FormModalProps {
   aiAssist?: AiFormAssistConfig
   /** Forwarded to {@link ModularForm} — e.g. swap dependent select options when a field changes. */
   onValuesChange?: (values: Record<string, unknown>) => void
+  /** Local authoring preview. Receives the same values that validation and submit use. */
+  renderPreview?: FormPreviewRenderer
 }
 
 export function FormModal({
@@ -85,6 +87,7 @@ export function FormModal({
   submissionDisabled,
   aiAssist,
   onValuesChange,
+  renderPreview,
 }: FormModalProps) {
   const { t } = useTranslation()
   const [dirty, setDirty] = React.useState(false)
@@ -176,6 +179,7 @@ export function FormModal({
           maxW,
           workspaceStyles.surface,
           "flex max-h-[86dvh] flex-col gap-0 overflow-hidden p-0",
+          "sm:has-[[data-form-preview]]:max-w-[min(1200px,calc(100vw-2rem))]",
           className
         )}
       >
@@ -217,6 +221,7 @@ export function FormModal({
             submissionDisabled={submissionDisabled}
             aiAssist={aiAssist}
             onValuesChange={onValuesChange}
+            renderPreview={renderPreview}
             onDirtyChange={setDirty}
           />
         </div>
