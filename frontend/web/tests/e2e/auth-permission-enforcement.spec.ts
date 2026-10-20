@@ -614,7 +614,7 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
       },
       // The grant is Write-only, so the limited actor still cannot read pickings;
       // the administrator observes the validated effect.
-      assertSuccess: async (_limitedPage, args) => {
+      assertSuccess: async (limitedPage, args) => {
         const pickingId = Number(args[1])
         // Write permission is not read permission: prove the limited actor
         // cannot inspect pickings, then use the admin's authorized readback to
