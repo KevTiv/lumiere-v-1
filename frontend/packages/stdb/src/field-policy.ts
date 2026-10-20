@@ -290,6 +290,7 @@ const HTTP_SQL_EXCLUDED_COLUMNS: Record<string, Set<string>> = {
 
 /** Per-resource columns selected even when globally excluded (e.g. metadata for credit-note linkage). */
 const HTTP_SQL_INCLUDED_COLUMNS: Record<string, Set<string>> = {
+  'purchase-requisitions': new Set(['purchase_ids']),
   'account-moves': new Set(['metadata']),
   'mail-messages': new Set(['metadata']),
 }
