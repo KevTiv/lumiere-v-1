@@ -11,6 +11,20 @@ import {
 } from "./stdb-params-json"
 
 describe("stdbParamsToJson", () => {
+  it("encodes complete update_role compatibility params for revocation and clearing", () => {
+    for (const permissions of [["organization:read"], []]) {
+      assert.deepEqual(encodeReducerCallArgs("update_role", [7, {
+        permissions: { some: permissions },
+      }]), [7, {
+        permissions: { some: permissions },
+        name: { none: [] },
+        description: { none: [] },
+        is_active: { none: [] },
+        metadata: { none: [] },
+      }])
+    }
+  })
+
   it("preserves optional permission-list presence, including an explicit clear", () => {
     for (const permissions of [["contact:read"], []]) {
       assert.deepEqual(stdbParamsToJson({ permissions }, "UpdateRoleParams").permissions, { some: permissions })
