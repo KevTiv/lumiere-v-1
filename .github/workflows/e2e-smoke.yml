@@ -479,6 +479,12 @@ jobs:
       - name: Install and verify exact-commit E2E artifacts
         run: scripts/e2e-ci-artifact.sh install "$GITHUB_SHA"
 
+      - name: Verify API outage control prerequisites
+        run: |
+          set -euo pipefail
+          pnpm --dir frontend/web exec node --import tsx tests/e2e/api-outage.unit.ts
+          sudo -n iptables --version
+
       - name: Run make e2e-smoke
         env:
           E2E_SUITE: ${{ matrix.config.suite }}
@@ -502,8 +508,6 @@ jobs:
           PG_TLS_MODE: disable
         run: |
           set -euo pipefail
-          pnpm --dir frontend/web exec node --import tsx tests/e2e/api-outage.unit.ts
-          sudo -n iptables --version
           # Makefile defaults to a macOS dev PATH; use the runner PATH in CI.
           export E2E_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.cargo/bin:${HOME}/.local/bin:${PNPM_HOME}"
           echo "E2E_SUITE=${E2E_SUITE} E2E_CLEAR_DB=${E2E_CLEAR_DB} E2E_SHARD=${E2E_SHARD} E2E_SPEC_FILES=${E2E_SPEC_FILES}"
