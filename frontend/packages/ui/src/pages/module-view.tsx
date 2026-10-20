@@ -12,7 +12,7 @@ import {
 } from "@lumiere/query-hooks/erp-ai-selection-context"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
-import { Plus } from "lucide-react"
+import { LayoutGrid, Plus, Table as TableIcon } from "lucide-react"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { DashboardGrid } from "./dashboard-grid"
@@ -21,7 +21,7 @@ import { EntityView } from "../entity-views/entity-view"
 import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
 import { FormModal } from "../forms/form-modal"
 import { RuntimeFormModal } from "../forms/runtime-form-modal"
-import { buildModuleTabRow, type ModuleConfig } from "../lib/module-types"
+import { buildModuleTabRow, type ModuleConfig, type ModuleTab } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import type { EntitySurfacePermission } from "../lib/entity-view-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
@@ -136,6 +136,33 @@ export function ModuleView({
     const query = params.toString()
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
   }
+  // Tabs with an alternate view open on it; the table choice is remembered per tab.
+  const [altViewChoice, setAltViewChoice] = useState<Readonly<Partial<Record<string, "alt" | "table">>>>({})
+  useEffect(() => {
+    const restored: Partial<Record<string, "alt" | "table">> = {}
+    for (const tab of config.tabs) {
+      if (!tab.entityAltView) continue
+      try {
+        const stored = window.localStorage.getItem(`lumiere:module-alt-view:${config.id}:${tab.id}`)
+        if (stored === "alt" || stored === "table") restored[tab.id] = stored
+      } catch {
+        /* storage unavailable */
+      }
+    }
+    setAltViewChoice(restored)
+  }, [config.id]) // tabs are read once per module
+  const chooseAltView = (tabId: string, choice: "alt" | "table") => {
+    setAltViewChoice((prev) => ({ ...prev, [tabId]: choice }))
+    try {
+      window.localStorage.setItem(`lumiere:module-alt-view:${config.id}:${tabId}`, choice)
+    } catch {
+      /* not remembered */
+    }
+  }
+  const showAltView = (tab: ModuleTab) =>
+    tab.entityAltView != null &&
+    altViewChoice[tab.id] !== "table" &&
+    !(activeTab === tab.id && Object.keys(urlFilters ?? {}).length > 0)
   const tabListRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     // Deep links can land on a tab far along the scrollable tab row.
@@ -255,7 +282,38 @@ export function ModuleView({
 
             {tab.type === "custom" && tab.customContent}
 
-            {tab.type === "entity" && tab.entityConfig && (
+            {tab.type === "entity" && tab.entityConfig && tab.entityAltView && (
+              <div
+                className="flex w-fit items-center rounded-lg border border-border p-1"
+                role="group"
+                aria-label={`${tab.entityAltView.label} / ${tab.entityAltView.tableLabel}`}
+              >
+                {([
+                  ["alt", tab.entityAltView.label, LayoutGrid],
+                  ["table", tab.entityAltView.tableLabel, TableIcon],
+                ] as const).map(([choice, label, Icon]) => {
+                  const pressed = (showAltView(tab) ? "alt" : "table") === choice
+                  return (
+                    <Button
+                      key={choice}
+                      variant={pressed ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 gap-1.5 px-2"
+                      aria-pressed={pressed}
+                      onClick={() => chooseAltView(tab.id, choice)}
+                      data-testid={`module-view-${choice}-${tab.id}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </Button>
+                  )
+                })}
+              </div>
+            )}
+
+            {tab.type === "entity" && tab.entityConfig && showAltView(tab) && tab.entityAltView?.content}
+
+            {tab.type === "entity" && tab.entityConfig && !showAltView(tab) && (
               <div className="space-y-3">
                 {kpiStrips?.[tab.id] ? (
                   <KpiStrip

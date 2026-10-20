@@ -6572,7 +6572,16 @@
     "default_restricted": [
       "name",
       "project_id",
-      "company_id"
+      "company_id",
+      "state",
+      "priority",
+      "is_closed",
+      "date_deadline",
+      "progress",
+      "planned_hours",
+      "effective_hours",
+      "user_ids",
+      "message_ids"
     ],
     "mandatory": [
       "id",
