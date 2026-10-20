@@ -57,7 +57,9 @@
       "state",
       "acquisition_date",
       "original_value",
-      "company_id"
+      "company_id",
+      "organization_id",
+      "depreciation_board_ids"
     ],
     "mandatory": [
       "id",
@@ -117,7 +119,10 @@
       "balance",
       "account_id",
       "partner_id",
-      "company_id"
+      "company_id",
+      "amount_residual",
+      "currency_id",
+      "journal_id"
     ],
     "mandatory": [
       "id",
@@ -230,7 +235,8 @@
       "state",
       "fiscal_year_id",
       "is_adjustment",
-      "company_id"
+      "company_id",
+      "organization_id"
     ],
     "mandatory": [
       "id",
@@ -2071,7 +2077,27 @@
       "name",
       "employee_id",
       "state",
-      "company_id"
+      "company_id",
+      "client_request_id",
+      "attachment_ids",
+      "has_receipt",
+      "currency_id",
+      "date",
+      "unit_amount",
+      "quantity",
+      "description",
+      "tax_ids",
+      "product_id",
+      "account_id",
+      "analytic_account_id",
+      "project_id",
+      "line_kind",
+      "mileage_distance",
+      "mileage_rate_id",
+      "per_diem_days",
+      "per_diem_rate_id",
+      "payment_mode",
+      "merchant_key"
     ],
     "mandatory": [
       "id",
@@ -3851,7 +3877,9 @@
       "write_off_amount",
       "write_off_account_id",
       "write_off_move_id",
-      "metadata"
+      "metadata",
+      "currency_id",
+      "reversed_reconciliation_id"
     ],
     "mandatory": [
       "id",
@@ -3895,7 +3923,11 @@
       "evidence_document_ids",
       "created_by",
       "updated_by",
-      "metadata"
+      "metadata",
+      "partner_id",
+      "partner_type",
+      "currency_id",
+      "payment_account_id"
     ],
     "mandatory": [
       "id",
@@ -5435,7 +5467,12 @@
       "name",
       "model",
       "report_type",
-      "is_active"
+      "is_active",
+      "company_id",
+      "orientation",
+      "paper_format",
+      "template_content",
+      "write_date"
     ],
     "mandatory": [
       "id",

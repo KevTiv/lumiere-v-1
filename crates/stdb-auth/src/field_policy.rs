@@ -222,6 +222,20 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         ["metadata"].into_iter().map(String::from).collect(),
     );
     m.insert(
+        "account-assets".to_string(),
+        ["depreciation_board_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
+    m.insert(
+        "expenses".to_string(),
+        ["attachment_ids", "tax_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
+    m.insert(
         "account-payments".to_string(),
         ["reconciled_invoice_ids", "reconciled_bill_ids"]
             .into_iter()
@@ -1609,6 +1623,37 @@ mod tests {
             cols.iter().any(|column| column == "backorder_id"),
             "expected backorder_id in stock-pickings projection, got: {cols:?}"
         );
+    }
+
+    #[test]
+    fn finance_tool_http_projections_keep_only_selected_owner_relations() {
+        for (resource, fields) in [
+            ("account-assets", &["depreciation_board_ids"][..]),
+            ("expenses", &["attachment_ids", "tax_ids"][..]),
+        ] {
+            let columns = resolve_http_sql_columns(resource, None).expect("finance projection");
+            for field in fields {
+                assert!(columns.iter().any(|column| column == field));
+            }
+            let mut access = field_access(&[&format!("{resource}:read")]);
+            access.field_permissions.push(FieldPermissionLike {
+                id: Some(1),
+                organization_id: Some(7),
+                role_id: Some(9),
+                resource: resource.to_string(),
+                action: "read".to_string(),
+                allowed_fields: vec!["name".to_string()],
+                subject_user_hex: None,
+                subject_role_id: Some(9),
+            });
+            let selected = resolve_http_sql_columns(resource, Some(&access))
+                .expect("selected finance projection");
+            for field in fields {
+                assert!(!selected.iter().any(|column| column == field));
+            }
+            let unrelated = ["message_ids", "activity_ids"].map(String::from);
+            assert!(filter_http_sql_unsafe_columns(&unrelated, Some(resource)).is_empty());
+        }
     }
 
     #[test]

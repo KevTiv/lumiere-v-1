@@ -56,6 +56,26 @@ describe("stdbParamsToJson", () => {
     ])
   })
 
+  it("encodes statement import row decimal amounts, timestamps, zero and missing values as SATS Options", () => {
+    const timestamp = { microsSinceUnixEpoch: 1_791_244_800_000_000n }
+    const params = stdbParamsToJson({
+      fileName: "bank.csv", idempotencyKey: "bank-reviewed-key", openingBalance: 10,
+      rows: [
+        { rowNumber: 2, date: timestamp, amount: 125.5, reference: "TX-1", description: "Transfer" },
+        { rowNumber: 3, amount: 0 },
+        { rowNumber: 4 },
+      ],
+    }, "StageBankStatementImportParams")
+    assert.deepEqual(params.rows, [
+      { row_number: 2, date: { some: { __timestamp_micros_since_unix_epoch__: 1_791_244_800_000_000 } }, amount: { some: 125.5 }, reference: { some: "TX-1" }, description: { some: "Transfer" } },
+      { row_number: 3, amount: { some: 0 }, date: { none: [] }, reference: { none: [] }, description: { none: [] } },
+      { row_number: 4, date: { none: [] }, amount: { none: [] }, reference: { none: [] }, description: { none: [] } },
+    ])
+    assert.deepEqual(params.file_name, { some: "bank.csv" })
+    assert.equal(params.opening_balance, 10)
+    assert.deepEqual(stdbParamsToJson(params, "StageBankStatementImportParams"), params)
+  })
+
   it("fills every Option field of nested purchase requisition lines", () => {
     const params = stdbParamsToJson(
       {

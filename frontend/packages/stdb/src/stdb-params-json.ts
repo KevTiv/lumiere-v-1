@@ -45,6 +45,9 @@ const NESTED_ARRAY_STRUCTS: Partial<
   CreateBomParams: {
     lines: "BomLineInput",
   },
+  StageBankStatementImportParams: {
+    rows: "StageBankStatementImportLineParams",
+  },
 }
 
 /** Nested object fields that need struct-scoped Option encoding via `stdbParamsToJson`. */
