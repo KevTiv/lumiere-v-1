@@ -45,3 +45,12 @@ test("does not match a different operation", () => {
     false,
   )
 })
+
+
+test("matches an exact immutable member access operation", () => {
+  for (const prefix of ["/api", "/v1"]) {
+    assert.equal(matchesOperationResponse(response(`${prefix}/operations/erp.set_member_access`), "erp.set_member_access"), true)
+    assert.equal(matchesOperationResponse(response(`${prefix}/operations/erp.set_member_access/extra`), "erp.set_member_access"), false)
+    assert.equal(matchesOperationResponse(response(`${prefix}/operations/erp.assign_role`), "erp.set_member_access"), false)
+  }
+})

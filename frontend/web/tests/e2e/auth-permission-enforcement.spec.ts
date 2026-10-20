@@ -579,8 +579,9 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
 
     await withLimitedUserSession(browser, async (limitedPage) => {
       await callReducerBff(limitedPage, "post_account_move", args)
-      await waitForMovePosted(limitedPage, moveId)
     })
+    // A write grant does not grant read access. Observe the effect as admin.
+    await waitForMovePosted(page, moveId)
 
     permissionId = await fetchOrgPermissionId(page, "account_move", {
       roleId: limitedRoleId,
@@ -611,12 +612,14 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
         secondaryPickingId = await adminPrepareAssignedPicking(page)
         return [orgId, secondaryPickingId, { company_id: companyId }]
       },
-      assertSuccess: async (limitedPage, args) => {
+      // The grant is Write-only, so the limited actor still cannot read pickings;
+      // the administrator observes the validated effect.
+      assertSuccess: async (_limitedPage, args) => {
         const pickingId = Number(args[1])
         await expect
           .poll(
             async () => {
-              const res = await limitedPage.request.get("/api/query/stock-pickings")
+              const res = await page.request.get("/api/query/stock-pickings")
               if (!res.ok()) return ""
               const json = (await res.json()) as {
                 data?: Array<{ id?: unknown; state?: unknown }>
@@ -653,9 +656,11 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
         secondaryPaymentId = await adminCreateDraftPayment(page)
         return [orgId, secondaryPaymentId]
       },
-      assertSuccess: async (limitedPage, args) => {
+      // The actor holds post only, not account_payment read; the administrator
+      // observes the posted payment.
+      assertSuccess: async (_limitedPage, args) => {
         const paymentId = Number(args[1])
-        await waitForPaymentPosted(limitedPage, paymentId)
+        await waitForPaymentPosted(page, paymentId)
       },
     })
   })

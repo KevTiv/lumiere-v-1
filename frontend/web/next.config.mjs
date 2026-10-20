@@ -37,6 +37,10 @@ const nextConfig = {
   // Keep workspace packages imported by the web app inside the standalone
   // server bundle. The release workflow copies this traced tree verbatim.
   outputFileTracingRoot: path.resolve(__dirname, '../..'),
+  experimental: {
+    // Next 16.1 requires opt-in to write the compiler cache restored by Actions.
+    turbopackFileSystemCacheForBuild: process.env.GITHUB_ACTIONS === 'true',
+  },
   skipTrailingSlashRedirect: true,
   async headers() {
     return [{

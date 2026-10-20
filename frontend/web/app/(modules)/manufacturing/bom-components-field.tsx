@@ -2,6 +2,13 @@
 
 import { useTranslation } from "@lumiere/i18n"
 import type { CustomField } from "@lumiere/ui/lib/form-types"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export type BomComponentOption = { id: string; label: string; uomId: string }
 export type BomComponentValue = { productId: string; productQty: string; productUomId: string; sequence: number }
@@ -23,18 +30,17 @@ export function createBomComponentsField(products: readonly BomComponentOption[]
           <div key={index} className="flex flex-wrap items-end gap-3">
             <label className="flex flex-col gap-1">
               {t("manufacturing.forms.newBom.components.product")}
-              <select
-                data-testid={`bom-component-product-${index}`}
-                className="rounded-md border bg-background p-2"
-                value={line.productId}
-                onChange={(event) => {
-                  const matches = products.filter((product) => product.id === event.target.value)
-                  update(index, { productId: event.target.value, productUomId: matches.length === 1 ? matches[0]!.uomId : "" })
-                }}
-              >
-                <option value="">{t("manufacturing.forms.newBom.components.selectProduct")}</option>
-                {products.map((product) => <option key={product.id} value={product.id}>{product.label}</option>)}
-              </select>
+              <Select value={line.productId} onValueChange={(value) => {
+                  const matches = products.filter((product) => product.id === value)
+                  update(index, { productId: value, productUomId: matches.length === 1 ? matches[0]!.uomId : "" })
+                }}>
+                <SelectTrigger data-testid={`bom-component-product-${index}`}>
+                  <SelectValue placeholder={t("manufacturing.forms.newBom.components.selectProduct")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {products.map((product) => <SelectItem key={product.id} value={product.id}>{product.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </label>
             <label className="flex flex-col gap-1">
               {t("manufacturing.forms.newBom.components.quantity")}

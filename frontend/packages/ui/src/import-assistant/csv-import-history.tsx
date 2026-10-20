@@ -11,6 +11,13 @@ import {
   AbandonedAccountingImportCleanup,
   type AbandonedAccountingImportCleanupProps,
 } from "./abandoned-accounting-import-cleanup"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/select"
 
 export function CsvImportHistory({
   organizationId,
@@ -65,13 +72,16 @@ export function CsvImportHistory({
       {job && errorsQuery.isLoading ? <p>{t("common.csvImportDialog.loadingErrors", { defaultValue: "Loading row errors…" })}</p> : null}
       {jobs.length > 0 ? <div className="space-y-2">
         <Label htmlFor="csv-import-history-job">{t("common.csvImportDialog.selectJob", { defaultValue: "Import job" })}</Label>
-        <select id="csv-import-history-job" className="w-full rounded-md border bg-background p-2" value={selectedId ?? ""}
-          onChange={(event) => setSelectedId(event.target.value || null)}>
-          <option value="">{t("common.csvImportDialog.selectJobPrompt", { defaultValue: "Select a job to review" })}</option>
-          {jobs.map((row) => <option key={String(row.id)} value={String(row.id)}>
-            #{String(row.id)} · {String(row.tableName ?? row.table_name)} · {String(row.status ?? "pending")}
-          </option>)}
-        </select>
+        <Select value={selectedId ?? ""} onValueChange={(value) => setSelectedId(value || null)}>
+          <SelectTrigger id="csv-import-history-job">
+            <SelectValue placeholder={t("common.csvImportDialog.selectJobPrompt", { defaultValue: "Select a job to review" })} />
+          </SelectTrigger>
+          <SelectContent>
+            {jobs.map((row) => <SelectItem key={String(row.id)} value={String(row.id)}>
+              #{String(row.id)} · {String(row.tableName ?? row.table_name)} · {String(row.status ?? "pending")}
+            </SelectItem>)}
+          </SelectContent>
+        </Select>
       </div> : null}
       {job ? <ImportJobStatusPanel job={job} errors={errorsQuery.isError ? [] : (errorsQuery.data ?? []) as unknown as ImportJobErrorRow[]} /> : null}
     </div>

@@ -13,13 +13,15 @@ function returnToFromForm(formData: FormData, fallback: string): string {
 }
 
 export async function redirectToWorkOsSignIn(formData: FormData) {
-  const returnTo = returnToFromForm(formData, POST_AUTH_PATHS.overview)
+  const next = returnToFromForm(formData, POST_AUTH_PATHS.overview)
+  const returnTo = `/auth/complete?next=${encodeURIComponent(next)}`
   const url = await getSignInUrl({ returnTo, redirectUri: workOsRedirectUri() })
   redirect(url)
 }
 
 export async function redirectToWorkOsSignUp(formData: FormData) {
-  const returnTo = returnToFromForm(formData, POST_AUTH_PATHS.onboarding)
+  const next = returnToFromForm(formData, POST_AUTH_PATHS.onboarding)
+  const returnTo = `/auth/complete?next=${encodeURIComponent(next)}`
   const url = await getSignUpUrl({ returnTo, redirectUri: workOsRedirectUri() })
   redirect(url)
 }
@@ -33,9 +35,9 @@ export async function redirectToWorkOsSignInForPasswordReset(formData: FormData)
   redirect(url)
 }
 
-/** Legacy local invite links never grant membership in hosted mode. Admission is operator-owned. */
+/** Return to the token-free invite page. The invitation is held in an HTTP-only cookie. */
 export async function redirectToWorkOsForInvite(_formData: FormData) {
   if (!isWorkOsEnabled()) throw new Error('Hosted authentication is disabled')
-  const url = await getSignInUrl({ returnTo: POST_AUTH_PATHS.overview, redirectUri: workOsRedirectUri() })
+  const url = await getSignInUrl({ returnTo: '/accept-invite', redirectUri: workOsRedirectUri() })
   redirect(url)
 }

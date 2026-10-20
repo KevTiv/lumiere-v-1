@@ -18,6 +18,13 @@ import {
 import { useTranslation } from "@lumiere/i18n"
 import { accountPeriodStateTag } from "@lumiere/erp-shared/accounting-create-params"
 import { kpiDate } from "@/lib/kpi-tiles"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/select"
 
 type StepStatus = "done" | "pending" | "blocked"
 
@@ -412,24 +419,20 @@ export function PeriodCloseChecklist({
         <label className="mt-4 block max-w-sm text-sm font-medium" htmlFor="period-close-target">
           {t("accounting.periodClose.targetPeriod.label", { defaultValue: "Accounting period" })}
         </label>
-        <select
-          id="period-close-target"
-          data-testid="period-close-target"
-          className="mt-1 h-9 w-full max-w-sm rounded-md border border-input bg-background px-3 text-sm"
-          value={targetPeriodId}
-          onChange={(event) => setTargetPeriodId(event.target.value)}
-        >
-          <option value="">
-            {t("accounting.periodClose.targetPeriod.placeholder", {
+        <Select value={targetPeriodId} onValueChange={setTargetPeriodId}>
+          <SelectTrigger id="period-close-target" data-testid="period-close-target" className="w-full max-w-sm">
+            <SelectValue placeholder={t("accounting.periodClose.targetPeriod.placeholder", {
               defaultValue: "Select a period to evaluate",
-            })}
-          </option>
-          {companyPeriods.map((period) => (
-            <option key={String(period.id)} value={String(period.id)}>
-              {String(period.name ?? period.code ?? period.id)}
-            </option>
-          ))}
-        </select>
+            })} />
+          </SelectTrigger>
+          <SelectContent>
+            {companyPeriods.map((period) => (
+              <SelectItem key={String(period.id)} value={String(period.id)}>
+                {String(period.name ?? period.code ?? period.id)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid gap-4">

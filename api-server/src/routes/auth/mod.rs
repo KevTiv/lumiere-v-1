@@ -10,7 +10,7 @@ use crate::state::AppState;
 mod cookies;
 mod invitations;
 mod password;
-mod profile;
+pub(crate) mod profile;
 mod recovery;
 mod service_bridge;
 
@@ -18,13 +18,14 @@ use self::invitations::{accept_invite, invite};
 use self::password::{signin, signout, signup};
 use self::profile::{profile_get, profile_update};
 use self::recovery::{forgot_password, reset_password};
-use self::service_bridge::{bootstrap_credential, workos_bridge};
+use self::service_bridge::{bootstrap_credential, workos_bridge, workos_status};
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/auth/signin", post(signin))
         .route("/auth/signup", post(signup))
         .route("/auth/workos/bridge", post(workos_bridge))
+        .route("/auth/workos/status", get(workos_status))
         .route(
             "/auth/internal/bootstrap-credential",
             post(bootstrap_credential),

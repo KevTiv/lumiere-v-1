@@ -55,7 +55,7 @@ async function roleAssignments(page: Page, organizationId: number, roleId: numbe
     .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
 }
 
-async function toggleRoleInSettings(page: Page, roleId: number, reducer: string): Promise<Response> {
+async function toggleRoleInSettings(page: Page, roleId: number): Promise<Response> {
   await gotoModule(page, "/settings")
   await page.getByTestId("settings-section-users").click()
   // The users list is capped (limit=100) and other specs add users; search on
@@ -75,7 +75,7 @@ async function toggleRoleInSettings(page: Page, roleId: number, reducer: string)
   await expect(checkbox).toBeVisible()
   await checkbox.click()
   const [accepted] = await Promise.all([
-    page.waitForResponse((response) => matchesOperationResponse(response, reducer), { timeout: 30_000 }),
+    page.waitForResponse((response) => matchesOperationResponse(response, "erp.set_member_access"), { timeout: 30_000 }),
     page.getByTestId("settings-user-save").click(),
   ])
   expect(accepted.ok()).toBe(true)
@@ -88,7 +88,9 @@ async function targetCanOpenProfileSettings(browser: Browser) {
     const targetPage = await context.newPage()
     await signIn(targetPage, TARGET_EMAIL, PERSONA_PASSWORD)
     await gotoModule(targetPage, "/settings")
-    return await targetPage.getByTestId("settings-section-profile").isVisible({ timeout: 10_000 })
+    return await targetPage.getByTestId("settings-section-profile")
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true, () => false)
   } finally {
     await context.close()
   }
@@ -134,7 +136,7 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     expect(await roleAssignments(page, organizationId, roleId)).toEqual([])
 
     // Assign through Settings → Users → Edit → role checkbox → Save.
-    const assigned = await toggleRoleInSettings(page, roleId, "assign_role")
+    const assigned = await toggleRoleInSettings(page, roleId)
     await expect.poll(() => roleAssignments(page, organizationId, roleId), { timeout: 30_000 }).toHaveLength(1)
     const [active] = await roleAssignments(page, organizationId, roleId)
     expect(active).toMatchObject({ identity: targetIdentity, isActive: true })
@@ -143,22 +145,24 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
       .poll(() => targetCanOpenProfileSettings(browser), { timeout: 45_000 })
       .toBe(true)
 
-    const staleAssign = await replay(page, assigned.request())
-    expect(staleAssign.status()).toBe(422)
+    const retriedAssign = await replay(page, assigned.request())
+    expect(retriedAssign.status()).toBe(200)
     expect(await roleAssignments(page, organizationId, roleId)).toEqual([active])
 
     // Revoke through the same dialog by clearing the checkbox.
-    const revoked = await toggleRoleInSettings(page, roleId, "revoke_role")
+    const revoked = await toggleRoleInSettings(page, roleId)
     const effect = [{ id: assignmentId, identity: targetIdentity, isActive: false }]
     await expect.poll(() => roleAssignments(page, organizationId, roleId), { timeout: 30_000 }).toEqual(effect)
     await expect
       .poll(() => targetCanOpenProfileSettings(browser), { timeout: 45_000 })
       .toBe(false)
 
-    // Before COV-23 a replayed revoke re-audited and rebuilt the policy
-    // snapshot; the reducer now rejects an already-revoked assignment.
-    const staleRevoke = await replay(page, revoked.request())
-    expect(staleRevoke.status()).toBe(422)
+    // Exact retries acknowledge the committed state; an older assignment must
+    // never restore access after a later revocation.
+    const retriedRevoke = await replay(page, revoked.request())
+    expect(retriedRevoke.status()).toBe(200)
+    const staleAssign = await replay(page, assigned.request())
+    expect(staleAssign.status()).toBe(422)
     expect(await roleAssignments(page, organizationId, roleId)).toEqual(effect)
 
     const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })

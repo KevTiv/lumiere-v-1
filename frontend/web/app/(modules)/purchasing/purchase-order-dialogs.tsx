@@ -55,6 +55,7 @@ import {
   toReceiveLineInput,
   toUpdatePurchaseOrderHeaderArgs,
 } from './purchase-order-forms';
+import { runtimeFormRoleId } from '@lumiere/ui/lib/runtime-form-role';
 
 type PurchasingWorkflow = ReturnType<typeof usePurchasingWorkflow>;
 type Row = Record<string, unknown>;
@@ -141,7 +142,7 @@ export function CreateBillFromPurchaseOrderDialog({
       moduleId="purchasing"
       formId="create-bill-from-purchase-order"
       organizationId={organizationId}
-      roleId={currentUser?.roles[0]}
+      roleId={runtimeFormRoleId(currentUser)}
       preferStdbVisibility
       foldCustomFieldsIntoMetadata={false}
       closeOnSubmit={false}
@@ -350,7 +351,7 @@ export function PurchaseOrderFormDialog({
       staticConfig={config}
       moduleId="purchasing"
       organizationId={organizationId}
-      roleId={currentUser?.roles[0]}
+      roleId={runtimeFormRoleId(currentUser)}
       preferStdbVisibility
       closeOnSubmit={false}
       submitError={error}

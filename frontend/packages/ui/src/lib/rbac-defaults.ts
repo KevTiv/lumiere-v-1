@@ -51,17 +51,6 @@ function readTimestamp(
   return new Date().toISOString()
 }
 
-function readMetadataPermissions(row: BackendRoleRow): string[] {
-  if (!row.metadata?.trim()) return []
-  try {
-    const metadata = JSON.parse(row.metadata) as { uiPermissions?: unknown }
-    if (!Array.isArray(metadata.uiPermissions)) return []
-    return metadata.uiPermissions.map((entry) => String(entry))
-  } catch {
-    return []
-  }
-}
-
 /** Parse backend permission strings such as `*:*`, `module:inventory:read`, `admin:roles:update`. */
 export function parsePermissionString(
   permission: string,
@@ -225,10 +214,17 @@ export function mapBackendRoleToRole(row: BackendRoleRow, index = 0): Role | nul
   if (id === undefined || id === null || id === "") return null
 
   const roleId = String(id)
-  const permissions = Array.isArray(row.permissions) && row.permissions.length > 0
+  const permissions = Array.isArray(row.permissions)
     ? row.permissions
-    : readMetadataPermissions(row)
+    : []
   const isActive = readBool(row, "isActive")
+  let color = ROLE_COLORS[index % ROLE_COLORS.length]
+  if (row.metadata) {
+    try {
+      const saved = JSON.parse(row.metadata) as { color?: unknown }
+      if (ROLE_COLORS.includes(saved.color as typeof color)) color = saved.color as typeof color
+    } catch { /* Invalid display metadata does not affect access. */ }
+  }
 
   return {
     id: roleId,
@@ -236,7 +232,7 @@ export function mapBackendRoleToRole(row: BackendRoleRow, index = 0): Role | nul
     description: String(row.description ?? ""),
     isSystem: readBool(row, "isSystem"),
     isActive,
-    color: ROLE_COLORS[index % ROLE_COLORS.length],
+    color,
     permissions: isActive ? permissionStringsToPolicyRules(roleId, permissions) : [],
     createdAt: readTimestamp(row, "createdAt"),
     updatedAt: readTimestamp(row, "updatedAt"),
@@ -287,12 +283,14 @@ export function buildRbacUserFromServer(
 
 /** Whether a stored rule action satisfies a requested UI action. */
 export function actionsMatch(ruleAction: Action | "*", requested: Action): boolean {
+  if (String(ruleAction) === 'view') return String(requested) === 'read' || String(requested) === 'view'
+  if (ruleAction === 'read' && String(requested) === 'view') return true
   if (ruleAction === "*") return true
   if (ruleAction === requested) return true
   // `admin` is a server-enforced capability. A broad UI `manage` policy must
   // not silently grant it; only an exact or wildcard rule can do that.
   if (ruleAction === "manage" && requested !== "admin") return true
-  if (ruleAction === "write" && (requested === "update" || requested === "create")) {
+  if (ruleAction === "write" && requested === "update") {
     return true
   }
   if (ruleAction === "update" && requested === "write") return true
@@ -302,7 +300,12 @@ export function actionsMatch(ruleAction: Action | "*", requested: Action): boole
 /** Whether a stored rule resource satisfies a requested UI resource. */
 export function resourcesMatch(ruleResource: Resource | "*", requested: Resource): boolean {
   if (ruleResource === "*") return true
-  return ruleResource === requested
+  const canonical = (resource: string) => ({
+    'admin:users': 'user_organization', 'admin:roles': 'role',
+    'admin:permissions': 'org_permission', 'admin:audit-log': 'audit_log',
+    'admin:organization': 'organization',
+  }[resource] ?? resource).replace(/-/g, '_')
+  return canonical(ruleResource) === canonical(requested)
 }
 
 // ── Default fixtures (dev / storybook) ───────────────────────────────────────

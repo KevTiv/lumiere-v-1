@@ -192,3 +192,37 @@ export async function quantQuantity(page: Page, companyId: number, productId: nu
   if (matches.length > 1) throw new Error("Ambiguous exact fixture quant")
   return matches.length === 0 ? 0 : Number(matches[0]!.quantity)
 }
+/**
+ * Material consumption costs exactly one plain quant (no lot, package or owner)
+ * of the component at the MO source location, so product, internal location and
+ * available stock must be chosen together rather than from an arbitrary picking.
+ */
+export async function stockedComponentSource(page: Page, companyId: number, requiredQty: number): Promise<{ productId: number; uomId: number; locationId: number }> {
+  const [quants, locations, products] = await Promise.all([rows(page, "stock-quants"), rows(page, "stock-locations"), rows(page, "products")])
+  const internal = new Set(locations.filter(row => tag(value(row, "usage", "usage")).toLowerCase() === "internal").map(row => id(row)))
+  const uomByProduct = new Map(products.flatMap(row => {
+    const tracking = tag(value(row, "tracking", "tracking")).toLowerCase()
+    const type = String(value(row, "type", "type_") ?? "").toLowerCase()
+    const uomId = scalarQueryId(value(row, "uomId", "uom_id"))
+    return uomId != null && tracking !== "lot" && tracking !== "serial" && type !== "service" ? [[id(row), uomId] as const] : []
+  }))
+  const plain = quants.filter(row =>
+    scalarQueryId(value(row, "companyId", "company_id")) === companyId &&
+    value(row, "lotId", "lot_id") == null && value(row, "packageId", "package_id") == null && value(row, "ownerId", "owner_id") == null)
+  const identities = new Map<string, Row[]>()
+  for (const row of plain) {
+    const key = `${id(row, "productId", "product_id")}:${id(row, "locationId", "location_id")}`
+    identities.set(key, [...(identities.get(key) ?? []), row])
+  }
+  for (const matches of identities.values()) {
+    const quant = matches[0]!
+    const productId = id(quant, "productId", "product_id")
+    const locationId = id(quant, "locationId", "location_id")
+    const uomId = uomByProduct.get(productId)
+    if (matches.length !== 1 || uomId == null || !internal.has(locationId)) continue
+    if (Number(quant.quantity) >= requiredQty && Number(value(quant, "availableQuantity", "available_quantity")) >= requiredQty) {
+      return { productId, uomId, locationId }
+    }
+  }
+  throw new Error(`No untracked product with one plain internal quant holding ${requiredQty} units`)
+}

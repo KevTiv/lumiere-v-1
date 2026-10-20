@@ -11,6 +11,17 @@ import {
 } from "./stdb-params-json"
 
 describe("stdbParamsToJson", () => {
+  it("preserves optional permission-list presence, including an explicit clear", () => {
+    for (const permissions of [["contact:read"], []]) {
+      assert.deepEqual(stdbParamsToJson({ permissions }, "UpdateRoleParams").permissions, { some: permissions })
+      assert.deepEqual(stdbParamsToJson({ permissions }, "CreateRoleParams").permissions, permissions)
+      assert.deepEqual(stdbParamsToJson({ permissions: { some: permissions } }, "UpdateRoleParams").permissions, { some: permissions })
+    }
+    assert.deepEqual(stdbParamsToJson({}, "UpdateRoleParams").permissions, { none: [] })
+    assert.deepEqual(stdbParamsToJson({ permissions: null }, "UpdateRoleParams").permissions, { none: [] })
+    assert.deepEqual(stdbParamsToJson({ roleIds: [1n, 2n] }), { role_ids: [1, 2] })
+  })
+
   it("fills every Option field of nested BOM lines", () => {
     const params = stdbParamsToJson(
       {
@@ -28,6 +39,18 @@ describe("stdbParamsToJson", () => {
         child_bom_id: { none: [] },
         metadata: { none: [] },
       },
+    ])
+  })
+
+  it("fills every Option field of nested purchase requisition lines", () => {
+    const params = stdbParamsToJson(
+      {
+        lines: [{ productId: 7n, productUom: 1n, productUomQty: 2, name: "Bolts", sequence: 10 }],
+      },
+      "CreatePurchaseRequisitionParams",
+    )
+    assert.deepEqual(params.lines, [
+      { product_id: 7, product_uom: 1, product_uom_qty: 2, name: { some: "Bolts" }, sequence: { some: 10 } },
     ])
   })
 

@@ -1,7 +1,7 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { expect, type Page } from "@playwright/test"
+import { expect, type Locator, type Page } from "@playwright/test"
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
 import { matchesOperationResponse } from "./operation-response"
@@ -729,6 +729,50 @@ export async function chooseSelectOptionByLabel(
         return await option.count()
       },
       { timeout: optionTimeoutMs },
+    )
+    .toBeGreaterThan(0)
+
+  await option.click()
+}
+
+/** Pick a shared Select option by its value (`SelectItem` mirrors it as `data-value`). */
+export async function chooseSelectOptionByTriggerValue(
+  page: Page,
+  trigger: Locator,
+  value: string | number | bigint,
+) {
+  const listbox = page.locator('[role="listbox"]:visible')
+  const option = listbox.locator(`[role="option"][data-value="${String(value)}"]`)
+
+  await expect
+    .poll(
+      async () => {
+        if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
+        const count = await option.count()
+        if (count === 0) await page.keyboard.press("Escape")
+        return count
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+
+  await option.click()
+}
+
+/** Pick the first real option of a shared Select located by its trigger. */
+export async function chooseFirstSelectOptionByTrigger(page: Page, trigger: Locator) {
+  const listbox = page.locator('[role="listbox"]:visible')
+  const option = listbox.getByRole("option", { disabled: false }).first()
+
+  await expect
+    .poll(
+      async () => {
+        if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
+        const count = await option.count()
+        if (count === 0) await page.keyboard.press("Escape")
+        return count
+      },
+      { timeout: 30_000 },
     )
     .toBeGreaterThan(0)
 
@@ -2355,7 +2399,7 @@ export async function openFormConfigLeadForm(page: Page) {
 export async function fetchCrmNewLeadFormConfigId(page: Page): Promise<number | null> {
   const orgId = await fetchSessionOrganizationId(page)
   const res = await page.request.get(`/api/query/form-configs?organizationId=${orgId}`)
-  if (!res.ok()) return null
+  if (!res.ok()) throw new Error(`form configs query failed: ${res.status()}`)
   const json = (await res.json()) as { data?: Record<string, unknown>[] }
   const row = (json.data ?? []).find(
     (r) =>
@@ -2369,32 +2413,24 @@ export async function fetchCrmNewLeadFormConfigId(page: Page): Promise<number | 
 export async function ensureFormConfigDbFromRegistry(page: Page) {
   await openFormConfigLeadForm(page)
   const addField = page.getByTestId("form-config-add-field")
-  if (await addField.isEnabled({ timeout: 5_000 }).catch(() => false)) return
-
   const existingId = await fetchCrmNewLeadFormConfigId(page)
-  const pushBtn = page.getByTestId("form-config-push-registry")
-  if (existingId == null && (await pushBtn.isEnabled({ timeout: 10_000 }).catch(() => false))) {
-    await Promise.all([
+  if (existingId == null) {
+    const pushBtn = page.getByTestId("form-config-push-registry")
+    await expect(pushBtn).toBeEnabled({ timeout: 10_000 })
+    const [published] = await Promise.all([
       page.waitForResponse(
-        (r) =>
-          matchesOperationResponse(r, "create_form_configuration") ||
-          matchesOperationResponse(r, "add_form_field"),
-        { timeout: 90_000 },
+        (response) => matchesOperationResponse(response, "publish_form_configuration"),
+        { timeout: 30_000 },
       ),
       pushBtn.click(),
-    ]).catch(() => {})
+    ])
+    expect(published.ok(), `form publication failed: ${published.status()}`).toBe(true)
+    await expect
+      .poll(() => fetchCrmNewLeadFormConfigId(page), { timeout: 30_000 })
+      .not.toBeNull()
   }
 
-  await expect
-    .poll(
-      async () => {
-        await page.getByRole("button", { name: /refresh/i }).click().catch(() => {})
-        await page.waitForTimeout(300)
-        return addField.isEnabled()
-      },
-      { timeout: 60_000 },
-    )
-    .toBeTruthy()
+  await expect(addField).toBeEnabled({ timeout: 30_000 })
 }
 
 export async function addCustomFormFieldViaSettings(

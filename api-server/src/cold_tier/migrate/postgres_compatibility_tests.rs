@@ -195,8 +195,12 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
         .into_iter()
         .filter(|table| !previous_tables.contains(table))
         .collect();
+    let mut expected_added_tables = expected_cost_tables.to_vec();
+    // The full upgrade also applies the later, forward-only invitation receipt migration.
+    expected_added_tables.push("user_invite_acceptance");
+    expected_added_tables.sort_unstable();
     ensure!(
-        added_tables == expected_cost_tables,
+        added_tables == expected_added_tables,
         "migration 13 upgrade produced unexpected new tables: {added_tables:?}"
     );
 
@@ -214,9 +218,7 @@ async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Resu
     let frozen_migration_15 = include_str!(
         "../../../../lumiere-codegen/pg-migration-ledger/0015_durable_projection_delta.sql"
     );
-    ensure!(
-        MIGRATIONS[migration_15_index].name == "account_payment_reversal_identity"
-    );
+    ensure!(MIGRATIONS[migration_15_index].name == "account_payment_reversal_identity");
     ensure!(MIGRATIONS[migration_15_index].sql == frozen_migration_15);
 
     apply_migration_prefix(pool, migration_15_index).await?;
@@ -233,9 +235,7 @@ async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Resu
 
     let previous_history = applied_migration_history(pool).await?;
     ensure_schema(pool).await?;
-    ensure!(
-        applied_checksum(pool, 15).await? == migration_checksum(frozen_migration_15)
-    );
+    ensure!(applied_checksum(pool, 15).await? == migration_checksum(frozen_migration_15));
 
     let client = pool.get().await?;
     let column = client
@@ -269,9 +269,7 @@ async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Resu
         .is_some_and(|value| value.contains("reversal_move_id IS NOT NULL")));
     drop(client);
 
-    ensure!(
-        applied_migration_history(pool).await?[..migration_15_index] == previous_history
-    );
+    ensure!(applied_migration_history(pool).await?[..migration_15_index] == previous_history);
     ensure_schema(pool).await?;
     ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
     Ok(())
