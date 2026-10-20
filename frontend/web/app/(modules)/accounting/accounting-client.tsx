@@ -1,6 +1,7 @@
 "use client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { AccountantOverview } from "./accountant-overview"
+import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -1375,8 +1376,7 @@ function AccountingClientReady({
     return {
       companyConfigured: company != null,
       baseCurrencyConfigured:
-        manualInvoiceCurrencyId > 0n &&
-        currencies.some((currency) => currency.id === manualInvoiceCurrencyId),
+        currencyCatalogContainsId(currencies, manualInvoiceCurrencyId),
       fiscalYearConfigured: companyFiscalYears.length > 0,
       openPeriodAvailable: companyPeriods.some(
         (period) => accountPeriodStateTag(copyAsRecord(period)) === "Open",
@@ -4417,8 +4417,9 @@ function AccountingClientReady({
   // Each overview card owns its source state; an unavailable auxiliary read must
   // never become a zero balance or hide the other independently available queues.
   const manualInvoiceReadState = mergeModuleStates([
-    accountsRead.state, journalsRead.state, contactsRead.state, taxesRead.state,
+    accountsRead.state, accountTypesRead.state, journalsRead.state, contactsRead.state, taxesRead.state,
     productsRead.state, paymentTermsRead.state, currenciesRead.state, companiesRead.state, taxGroupsRead.state,
+    fiscalYearsRawRead.state, accountPeriodsRawRead.state,
   ])
   const accountantOverview = (
     <AccountantOverview

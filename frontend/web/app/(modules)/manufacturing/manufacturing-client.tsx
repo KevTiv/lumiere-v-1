@@ -436,6 +436,7 @@ function ManufacturingClientLoaded({
             const view = tab.entityConfig.view
             return {
               ...tab,
+              createForm: moFormConfig,
               entityConfig: manufacturingOrdersWithBoard(t, {
                 ...tab.entityConfig,
                 view: {

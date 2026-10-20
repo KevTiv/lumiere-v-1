@@ -175,6 +175,13 @@ test.describe(
         "utf8",
       )
       const receiptHash = createHash("sha256").update(receiptBytes).digest("hex")
+      // Repeated runs share a seed employee/date. Keep the positive fixture
+      // distinct under the amount/day/merchant duplicate detector too.
+      const existingAmounts = (await rows(page, "expenses")).map(
+        (row) => Number(row.totalAmount ?? row.total_amount),
+      )
+      let expenseAmount = 73.17
+      while (existingAmounts.some((amount) => Math.abs(amount - expenseAmount) < 0.02)) expenseAmount += 1
 
       // Create the report through the operator form so lookup and company scope
       // are exercised before the lifecycle actions begin.
@@ -204,7 +211,7 @@ test.describe(
       await page.getByTestId("module-tab-expenses-expenses").click()
       await page.getByTestId("module-create-expenses-expenses").click()
       await fillField(page, "name", expenseName)
-      await fillField(page, "totalAmount", "73.17")
+      await fillField(page, "totalAmount", expenseAmount.toFixed(2))
       await fillField(page, "date", isoDate(0))
       await chooseFirstEnabledOption(page, "pricelistId")
       await chooseFirstEnabledOption(page, "employeeId")
@@ -232,12 +239,12 @@ test.describe(
       expect(blobCompleted.ok()).toBe(true)
       expect(receiptRegistered.ok(), await receiptRegistered.text()).toBe(true)
       expect(expenseCreated.ok(), await expenseCreated.text()).toBe(true)
-      const expenseId = scalarQueryId(
-        (await rows(page, "expenses")).find(
-          (row) => row.name === expenseName,
-        )?.id,
+      const expense = (await rows(page, "expenses")).find(
+        (row) => row.name === expenseName,
       )
+      const expenseId = scalarQueryId(expense?.id)
       if (expenseId == null) throw new Error("created expense line not found")
+      expect(Number(expense?.totalAmount ?? expense?.total_amount)).toBe(Number(expenseAmount.toFixed(2)))
       const receipt = (await rows(page, "expense-receipts")).find(
         (row) => String(row.fileName ?? row.file_name ?? "") === receiptFileName,
       )
@@ -289,7 +296,7 @@ test.describe(
         ),
         submitAction.click(),
       ])
-      expect(submitted.ok()).toBe(true)
+      expect(submitted.ok(), await submitted.text()).toBe(true)
       await expect
         .poll(() => sheetSnapshot(page, sheetId))
         .toMatchObject({ state: "Submitted" })

@@ -87,6 +87,7 @@ spacetimedb-sats = "=2.8.2"
 
 [dev-dependencies]
 base64.workspace = true
+openssl = "=0.10.76"
 tokio.workspace = true
 tower.workspace = true
 

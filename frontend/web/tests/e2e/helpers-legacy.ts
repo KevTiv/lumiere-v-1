@@ -77,9 +77,10 @@ export async function selectModuleTab(page: Page, moduleId: string, tabId: strin
   const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
   await tab.click()
   await expect(tab).toHaveAttribute("aria-selected", "true")
-  // Base UI may regenerate the tab/tabpanel ids during the state transition.
-  // The selected tab and the single visible panel are the stable behavior.
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
+  // Nested charts and unrelated workspaces can have their own active panels.
+  // Assert the module's exact panel, not every tabpanel in the document.
+  await expect(page.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)).toHaveCount(1)
+  await expect(page.getByTestId(`module-panel-${moduleId}-${tabId}`)).toBeVisible()
 }
 
 /** Open an entity tab’s create modal and wait for the form dialog. */
@@ -109,7 +110,8 @@ export async function openAccountingTab(page: Page, tabId: string) {
   await expect(moduleView).toBeVisible()
   await expect(moduleView).toHaveAttribute("data-hydrated", "true")
   await expect(page.getByTestId(`module-tab-accounting-${tabId}`)).toHaveAttribute("aria-selected", "true")
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
+  await expect(page.locator('[data-testid^="module-panel-accounting-"]:visible')).toHaveCount(1)
+  await expect(page.getByTestId(`module-panel-accounting-${tabId}`)).toBeVisible()
   await expectNoAppError(page)
 }
 
@@ -761,7 +763,7 @@ export async function submitForm(page: Page, formId: string) {
     await expect(modal).toBeHidden({ timeout: 15_000 })
   } catch {
     const fieldErrors = await modal.locator(".text-destructive, [role='alert']").allTextContents()
-    const toastErrors = await page.getByRole("status").allTextContents().catch(() => [] as string[])
+    const toastErrors = await page.locator('[role="status"], [data-sonner-toast]').allTextContents().catch(() => [] as string[])
     const detail = [...fieldErrors, ...toastErrors].filter(Boolean).join("; ")
     throw new Error(
       `Form "${formId}" did not close after submit${detail ? `: ${detail}` : ""}`,
@@ -1980,12 +1982,12 @@ export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => matchesOperationResponse(res, "post_invoice") && res.ok(),
+      (res) => matchesOperationResponse(res, "post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
   ])
-  expect(postRes.ok()).toBe(true)
+  await expectReducerHttpResponseOk("post_invoice", postRes)
   await waitForMovePosted(page, moveId)
   return moveId
 }
@@ -2904,7 +2906,7 @@ export async function waitForWorkflowVersionStatus(
 /** Seed a minimal publishable linear draft (start → end) via BFF reducers. */
 export async function seedPublishableWorkflowDraft(
   page: Page,
-  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string },
+  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string; companyId?: number },
 ): Promise<{
   organizationId: number
   companyId: number
@@ -2914,7 +2916,7 @@ export async function seedPublishableWorkflowDraft(
   draftRevision: number
 }> {
   const organizationId = await fetchSessionOrganizationId(page)
-  const companyId = await fetchDefaultCompanyId(page)
+  const companyId = options?.companyId ?? await fetchDefaultCompanyId(page)
   const workflowKey = (options?.workflowKey ?? smokeName("wf")).toLowerCase().replace(/-/g, "_")
   const model = options?.model ?? "e2e.subject"
   const name = options?.name ?? `E2E ${workflowKey}`
@@ -3108,7 +3110,7 @@ export async function seedPurchaseOrderApprovalWorkflow(
 /** Publish a company-scoped approval workflow for the guarded Sales confirm action. */
 export async function seedSaleOrderApprovalWorkflow(
   page: Page,
-  options: { workflowKey: string; name: string },
+  options: { workflowKey: string; name: string; companyId?: number },
 ): Promise<{ organizationId: number; versionId: number; revision: number }> {
   const seeded = await seedPublishableWorkflowDraft(page, {
     ...options,
