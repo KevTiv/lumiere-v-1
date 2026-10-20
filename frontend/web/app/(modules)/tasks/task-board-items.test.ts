@@ -27,6 +27,7 @@ test('a task row becomes a board item with names, counts and its column', () => 
   );
   assert.equal(item.id, '3');
   assert.equal(item.columnId, 'Approved');
+  assert.equal(item.priority, '2');
   assert.equal(item.projectName, 'Website');
   assert.deepEqual(item.assignees.map((p) => p.name), ['Ada Lovelace', 'ffff0000…']);
   assert.equal(item.dueAt, 1_700_000_000_000);

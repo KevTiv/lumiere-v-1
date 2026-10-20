@@ -16,7 +16,7 @@ import {
 const some = <T>(value: T) => ({ some: value })
 const none = { none: [] as [] }
 
-type QueryRow = { id?: number | string; name?: string; state?: { tag?: string } | string }
+type QueryRow = { id?: number | string; name?: string; state?: { tag?: string } | string; priority?: string }
 
 async function queryRows(page: Page, path: string): Promise<QueryRow[]> {
   const res = await page.request.get(path)
@@ -148,7 +148,10 @@ async function createTask(page: Page, organizationId: number, companyId: number,
       metadata: none,
     },
   ])
-  return Number((await waitForRow(page, "/api/query/tasks", name)).id)
+  const row = await waitForRow(page, "/api/query/tasks", name)
+  expect(row.priority, "task readback retains the saved priority").toBe("2")
+  expect(stateTag(row), "task readback retains the saved state").toBe("InProgress")
+  return Number(row.id)
 }
 
 /** dnd-kit's pointer sensor starts after 8px of movement, so the drag moves in steps. */
