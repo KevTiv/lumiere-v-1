@@ -3,7 +3,6 @@ import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleInsights } from "../../../components/module-insights"
-import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import {
   inlineNumberAbove,
