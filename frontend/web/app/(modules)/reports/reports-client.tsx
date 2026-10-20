@@ -1443,8 +1443,8 @@ function ReportsClientLoaded({
         }}
       >
         <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-start justify-between gap-4">
+          <DialogHeader className="pr-10">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 space-y-1">
                 <DialogTitle>{String(viewDashboard?.name ?? t("reports.dashboards.title"))}</DialogTitle>
                 {viewDashboard?.description ? (
@@ -1452,7 +1452,7 @@ function ReportsClientLoaded({
                 ) : null}
               </div>
               {viewDashboard ? (
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Select
                     value={viewDashboardRange}
                     onValueChange={(value) =>
@@ -1479,6 +1479,7 @@ function ReportsClientLoaded({
                     variant="outline"
                     size="sm"
                     className="gap-2"
+                    data-testid="stored-dashboard-export"
                     onClick={() => void handleStoredDashboardExport()}
                     disabled={
                       storedDashboardLoading

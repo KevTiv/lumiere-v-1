@@ -11,16 +11,13 @@ import {
   scalarQueryId,
   selectEntityRowById,
   selectModuleTab,
-  signIn,
   waitForBffQueryMinRows,
   smokeName,
   submitForm,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 import { readApiOutageControl } from "./api-outage"
-
-const PERSONA_PASSWORD =
-  process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
+import { provisionActor, withActor } from "./pretenant-support"
 
 type Row = Record<string, unknown>
 
@@ -238,7 +235,7 @@ test.describe(
 
       const downloads: Download[] = []
       page.on("download", (download) => downloads.push(download))
-      await page.getByRole("button", { name: /export/i }).first().click()
+      await page.getByTestId("stored-dashboard-export").click()
       await expect.poll(() => downloads.length, { timeout: 45_000 }).toBe(2)
       const named = new Map<string, string>()
       for (const download of downloads) {
@@ -291,30 +288,44 @@ test.describe(
         }, { timeout: 30_000 })
         .toEqual({ path: "/sales", tab: "orders", filter: "state" })
 
-      // --- live denial: the lead source answers 403 for a persona without CRM
-      // read, so the dashboard shows a denied alert and cannot be exported. ---
-      const financeContext = await page.context().browser()!.newContext({
-        storageState: { cookies: [], origins: [] },
-      })
-      const financePage = await financeContext.newPage()
-      try {
-        await signIn(
-          financePage,
-          "fixture.finance@example.test",
-          PERSONA_PASSWORD,
-        )
-        const denied = await financePage.request.get("/api/query/leads")
+      // --- live denial: dashboard and sales reads are admitted, but the lead
+      // source answers 403, so the dashboard cannot be exported. -------------
+      const reportViewer = await provisionActor(page, "cov20-report-viewer", [
+        "report:read",
+        "dashboard:read",
+        "dashboard_widget:read",
+        "sale_order:read",
+      ], companyId)
+      await withActor(page.context().browser()!, reportViewer, async (viewer) => {
+        expect(
+          (await rows(viewer, "dashboards")).some(
+            (row) => scalarQueryId(row.id) === dashboardId,
+          ),
+          "report viewer can read the dashboard under test",
+        ).toBe(true)
+        const visibleWidgetIds = (await rows(viewer, "dashboard-widgets"))
+          .map((row) => scalarQueryId(row.id))
+        expect(visibleWidgetIds).toEqual(expect.arrayContaining([widgetId, leadWidgetId]))
+        await rows(viewer, "sale-orders")
+        const denied = await viewer.request.get("/api/query/leads")
         expect(denied.status()).toBe(403)
-        await openDashboardView(financePage, dashboardId)
-        const alert = financePage.getByTestId("stored-dashboard-denied")
+        const deniedPayload = await denied.json() as { error?: string }
+        const deniedSourceMessage = deniedPayload.error ?? "Query leads failed"
+        const [sourceRead] = await Promise.all([
+          viewer.waitForResponse((response) =>
+            response.request().method() === "GET"
+            && new URL(response.url()).pathname === "/api/query/leads",
+          ),
+          openDashboardView(viewer, dashboardId),
+        ])
+        expect(sourceRead.status()).toBe(403)
+        const alert = viewer.getByTestId("stored-dashboard-denied")
         await expect(alert).toBeVisible({ timeout: 45_000 })
         await expect(alert).toHaveAttribute("role", "alert")
-        await expect(
-          financePage.getByRole("button", { name: /export/i }).first(),
-        ).toBeDisabled()
-      } finally {
-        await financeContext.close()
-      }
+        const blockedExport = viewer.getByTestId("stored-dashboard-export")
+        await expect(blockedExport).toBeDisabled()
+        await expect(blockedExport).toHaveAttribute("title", deniedSourceMessage)
+      })
     })
 
     test("a real read-API outage shows an unavailable source, blocks export, and recovers on retry", async ({
@@ -349,7 +360,7 @@ test.describe(
         await expect(alert).toHaveAttribute("role", "alert")
         await expect(page.getByTestId("stored-dashboard-denied")).toHaveCount(0)
         await expect(
-          page.getByRole("button", { name: /export/i }).first(),
+          page.getByTestId("stored-dashboard-export"),
         ).toBeDisabled()
 
         apiOutage.start()
@@ -372,7 +383,7 @@ test.describe(
           timeout: 60_000,
         })
         await expect(
-          page.getByRole("button", { name: /export/i }).first(),
+          page.getByTestId("stored-dashboard-export"),
         ).toBeEnabled()
       } finally {
         if (stopped) apiOutage.start()
