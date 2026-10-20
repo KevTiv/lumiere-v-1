@@ -1,5 +1,7 @@
 "use client"
 
+import { useTableDensity } from "../hooks/use-table-density"
+import { TableDensityControl } from "../composed/table-density-control"
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -110,6 +112,7 @@ export function InvoiceListView({
   onRecalculateTotals,
 }: InvoiceListViewProps) {
   const { t } = useTranslation()
+  const [density, setDensity] = useTableDensity("accounting-invoices-list")
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<DisplayStatus | "all">("all")
   // Set by the stat tiles above the list; "pending" groups sent and partly paid invoices.
@@ -148,7 +151,7 @@ export function InvoiceListView({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 data-[density=compact]:[&_tbody_td]:py-1 data-[density=comfortable]:[&_tbody_td]:py-3 [&_td]:tabular-nums" data-density={density} data-testid="finance-money-list">
       {/* Stats */}
       <KpiStrip
         tiles={[
@@ -176,7 +179,8 @@ export function InvoiceListView({
             <CardTitle>{t("accounting.invoices.title")}</CardTitle>
             <Button onClick={onCreateInvoice} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newInvoice")}</Button>
           </div>
-          <div className="flex items-center gap-4 mt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <TableDensityControl value={density} onChange={setDensity} />
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder={t("accounting.invoices.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
@@ -208,8 +212,8 @@ export function InvoiceListView({
                 <TableHead>{t("accounting.invoices.customer")}</TableHead>
                 <TableHead>{t("accounting.invoices.issueDate")}</TableHead>
                 <TableHead>{t("accounting.invoices.dueDate")}</TableHead>
-                <TableHead>{t("accounting.invoices.amount")}</TableHead>
-                <TableHead>{t("accounting.invoices.balanceDue")}</TableHead>
+                <TableHead className="text-right">{t("accounting.invoices.amount")}</TableHead>
+                <TableHead className="text-right">{t("accounting.invoices.balanceDue")}</TableHead>
                 <TableHead>{t("accounting.journalEntries.state")}</TableHead>
                 <TableHead className="w-12.5"></TableHead>
               </TableRow>
@@ -267,8 +271,8 @@ export function InvoiceListView({
                     </TableCell>
                     <TableCell>{formatTimestamp(inv.invoiceDate)}</TableCell>
                     <TableCell>{formatTimestamp(inv.invoiceDateDue)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(inv.amountTotal ?? 0)}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(inv.amountTotal ?? 0)}</TableCell>
+                    <TableCell className="text-right">
                       <span className={cn("font-medium", (inv.amountResidual ?? 0) > 0 ? "text-foreground" : "text-success")}>
                         {formatCurrency(inv.amountResidual ?? 0)}
                       </span>

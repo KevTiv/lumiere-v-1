@@ -4,6 +4,7 @@ import type {
   EntityDetailConfig,
   EntitySurfacePermission,
   EntityViewConfig,
+  EntityRow,
   BadgeVariant,
 } from "./entity-view-types"
 import type { FormConfig } from "./form-types"
@@ -33,6 +34,9 @@ export interface EntityRecordSheetConfig {
   statusBadgeLabels?: Record<string, string>
   /** Overview tab field layout */
   detailConfig: EntityDetailConfig
+  /** Optional contextual review content; the original detail config remains available. */
+  overviewContent?: (record: EntityRow) => ReactNode
+  wide?: boolean
   /** Additional tabs rendered as ReactNode slots */
   customTabs?: EntityRecordSheetTab[]
   /** Optional action buttons rendered in the header area */

@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { FinanceReviewWorkspace } from '@lumiere/ui/composed/finance-review-workspace';
+import { BillSourcePreview } from '../../../../../components/finance-source-preview';
 import { useResetAccountMoveToDraft } from '@lumiere/query-hooks/hooks/pass9-record-actions';
 import { useRBAC } from '@/lib/rbac-context';
 import { useUnsavedChangesGuard } from '@lumiere/ui';
@@ -644,7 +646,7 @@ function InvoicePageLoaded({
           {
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
-            content: <EntityDetail config={accountMoveDetailConfig(t)} data={move} />,
+            content: <FinanceReviewWorkspace editorLabel={t('financeReview.savedDetails', { defaultValue: 'Saved details' })} editor={<EntityDetail config={accountMoveDetailConfig(t)} data={move} />} preview={<BillSourcePreview organizationId={orgId} companyId={operatingCompanyId} recordId={moveId} />} />,
           },
           {
             id: 'lines',

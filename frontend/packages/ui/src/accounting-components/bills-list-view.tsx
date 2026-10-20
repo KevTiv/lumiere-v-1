@@ -1,5 +1,7 @@
 "use client"
 
+import { useTableDensity } from "../hooks/use-table-density"
+import { TableDensityControl } from "../composed/table-density-control"
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -109,6 +111,7 @@ export function BillsListView({
   onRecalculateTotals,
 }: BillsListViewProps) {
   const { t } = useTranslation()
+  const [density, setDensity] = useTableDensity("accounting-bills-list")
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<BillStatus | "all">("all")
   // Set by the stat tiles above the list; "pending" groups pending, approved and partly paid bills.
@@ -148,7 +151,7 @@ export function BillsListView({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 data-[density=compact]:[&_tbody_td]:py-1 data-[density=comfortable]:[&_tbody_td]:py-3 [&_td]:tabular-nums" data-density={density} data-testid="finance-money-list">
       {/* Stats */}
       <KpiStrip
         tiles={[
@@ -176,7 +179,8 @@ export function BillsListView({
             <CardTitle>{t("accounting.bills.title")}</CardTitle>
             <Button onClick={onCreateBill} className="gap-2"><Plus className="h-4 w-4" />{t("accounting.actions.newBill")}</Button>
           </div>
-          <div className="flex items-center gap-4 mt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <TableDensityControl value={density} onChange={setDensity} />
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input placeholder={t("accounting.bills.searchPlaceholder")} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
@@ -209,8 +213,8 @@ export function BillsListView({
                 <TableHead>{t("accounting.bills.vendor")}</TableHead>
                 <TableHead>{t("accounting.bills.billDate")}</TableHead>
                 <TableHead>{t("accounting.invoices.dueDate")}</TableHead>
-                <TableHead>{t("accounting.invoices.amount")}</TableHead>
-                <TableHead>{t("accounting.invoices.balanceDue")}</TableHead>
+                <TableHead className="text-right">{t("accounting.invoices.amount")}</TableHead>
+                <TableHead className="text-right">{t("accounting.invoices.balanceDue")}</TableHead>
                 <TableHead>{t("accounting.journalEntries.state")}</TableHead>
                 <TableHead className="w-12.5"></TableHead>
               </TableRow>
@@ -268,8 +272,8 @@ export function BillsListView({
                     </TableCell>
                     <TableCell>{formatTimestamp(bill.invoiceDate)}</TableCell>
                     <TableCell>{formatTimestamp(bill.invoiceDateDue)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(bill.amountTotal ?? 0)}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(bill.amountTotal ?? 0)}</TableCell>
+                    <TableCell className="text-right">
                       <span className={cn("font-medium", (bill.amountResidual ?? 0) > 0 ? "text-foreground" : "text-success")}>
                         {formatCurrency(bill.amountResidual ?? 0)}
                       </span>

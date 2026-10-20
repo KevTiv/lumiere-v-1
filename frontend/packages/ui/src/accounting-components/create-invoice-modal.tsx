@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "../components/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/tabs"
+import { FinanceReviewWorkspace } from "../composed/finance-review-workspace"
 import { isCustomField } from "../forms/config/types"
 import { useFormConfiguration } from "../forms/hooks/use-form-config"
 import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
@@ -278,20 +278,16 @@ function ReleasedCreateInvoiceModal({
   const close = () => { if (!locked) reset(); onClose() }
 
   return <Dialog open={open} onOpenChange={(next) => !next && close()}>
-    <DialogContent data-testid="create-invoice-modal" className="max-h-[90vh] max-w-5xl overflow-y-auto sm:max-w-5xl">
+    <DialogContent data-testid="create-invoice-modal" className="flex min-h-0 max-h-[90dvh] w-[calc(100vw-1rem)] flex-col overflow-hidden sm:max-w-[1440px]">
       <DialogHeader><DialogTitle>{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle></DialogHeader>
-      <Tabs defaultValue="edit">
-        <TabsList>
-          <TabsTrigger value="edit">{t("accounting.authoring.editDocument", { defaultValue: "Edit document" })}</TabsTrigger>
-          <TabsTrigger value="document">{t("accounting.authoring.documentPreview", { defaultValue: "Document preview" })}</TabsTrigger>
-        </TabsList>
-        <TabsContent value="edit">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <FinanceReviewWorkspace editor={<>
       <fieldset disabled={locked || saving} className="space-y-5">
         <div className="grid gap-4 md:grid-cols-3">
           <FieldSelect label={t(`accounting.forms.${copyKey}.fields.partner`)} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
           <FieldSelect label={t(`accounting.forms.${copyKey}.fields.journal`)} value={journalId} onChange={setJournalId} options={journalOptions} />
           <FieldSelect label={kind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={setCounterpartAccountId} options={counterpartOptions} />
-          <div className="space-y-2"><Label>Currency ID</Label><Input value={journal?.currencyId ?? ""} readOnly /></div>
+          <div className="space-y-2"><Label>{t("financeReview.currency", { defaultValue: "Currency" })}</Label><Input value={currencyOptions.find((option) => option.value === journal?.currencyId)?.label ?? journal?.currencyId ?? ""} readOnly /></div>
           <div className="space-y-2"><Label htmlFor="create-invoice-date">{kind === "bill" ? "Bill date" : "Invoice Date"}</Label><Input id="create-invoice-date" type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></div>
           <div className="space-y-2"><Label htmlFor="create-invoice-due-date">{t(`accounting.forms.${copyKey}.fields.dueDate`)}</Label><Input id="create-invoice-due-date" type="date" min={invoiceDate} value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></div>
           <FieldSelect label="Payment term (optional)" value={paymentTermId || NONE} onChange={(value) => setPaymentTermId(value === NONE ? "" : value)} options={[{ value: NONE, label: "None" }, ...paymentTermOptions]} />
@@ -306,7 +302,7 @@ function ReleasedCreateInvoiceModal({
           <div key={field.fieldId} className="space-y-2"><Label>{field.label}{field.validation.required ? " *" : ""}</Label><Input data-testid={`create-invoice-custom-${field.fieldId}`} value={customValues[field.fieldId] ?? ""} onChange={(event) => setCustomValues((previous) => ({ ...previous, [field.fieldId]: event.target.value }))} /></div>)}</div> : null}
         <div className="space-y-3">
           <div className="flex items-center justify-between"><Label>{t("accounting.forms.newInvoice.lineItems")}</Label><Button type="button" variant="outline" size="sm" onClick={() => setLineItems((previous) => [...previous, newLine(crypto.randomUUID())])}><Plus className="mr-2 h-4 w-4" />{t("accounting.forms.newInvoice.addItem")}</Button></div>
-          {lineItems.map((line, index) => <div key={line.id} className="grid gap-2 rounded-md border p-3 md:grid-cols-7">
+          {lineItems.map((line, index) => <div key={line.id} className="grid gap-2 rounded-md border p-3 sm:grid-cols-2 xl:grid-cols-4">
             <FieldSelect label="Product" value={line.productId || NONE} onChange={(value) => chooseProduct(line, value)} options={[{ value: NONE, label: "No product" }, ...productOptions]} />
             <div className="space-y-2 md:col-span-2"><Label>Description</Label><Input data-testid={index === 0 ? "create-invoice-line-description" : undefined} value={line.description} onChange={(event) => updateLine(line.id, { description: event.target.value })} /></div>
             <FieldSelect label={kind === "bill" ? "Expense account" : "Income account"} value={line.accountId} onChange={(value) => updateLine(line.id, { accountId: value })} options={commercialOptions} />
@@ -319,8 +315,7 @@ function ReleasedCreateInvoiceModal({
         </div>
         <div className="space-y-2"><Label>{t("accounting.forms.newInvoice.notesOptional")}</Label><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} /></div>
       </fieldset>
-        </TabsContent>
-        <TabsContent value="document">
+      </>} preview={<>
           <Card data-testid="invoice-document-preview">
             <CardHeader>
               <div><Badge variant="secondary">{t("accounting.authoring.unsavedDraft", { defaultValue: "Unsaved draft" })}</Badge></div>
@@ -364,8 +359,8 @@ function ReleasedCreateInvoiceModal({
               <p className="text-sm text-muted-foreground">{t("accounting.authoring.documentPreviewOnly", { defaultValue: "Preview of the current draft. Saving creates a draft, not a posted entry. The server confirms amounts and rounding." })}</p>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+      </>} />
+      </div>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       <DialogFooter><Button variant="outline" onClick={close}>{t("common.cancel")}</Button>{locked
         ? <Button onClick={() => void checkStatus()} disabled={saving}>Check previous action</Button>

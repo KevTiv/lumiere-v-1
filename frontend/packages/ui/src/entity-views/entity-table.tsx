@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useMemo, useEffect, type MouseEvent } from "react"
+import { useTableDensity } from "../hooks/use-table-density"
+import { TableDensityControl } from "../composed/table-density-control"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
 import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
 import type {
@@ -94,6 +97,8 @@ const LOADING_ROW_COUNT = 5
 
 interface EntityTableProps {
   config: EntityTableConfig
+  /** Stable list identity for density when saved filters are not enabled. */
+  densityKey?: string
   data: EntityRow[]
   /** Row key value highlighted as the ERP AI focus target */
   aiFocusRowKey?: string
@@ -136,6 +141,7 @@ function readPersistedFilters(
 
 export function EntityTable({
   config,
+  densityKey,
   data,
   aiFocusRowKey,
   onRowClick,
@@ -532,13 +538,16 @@ export function EntityTable({
     filteredRows: sorted,
     listViewKey: config.listViewKey,
   })
+  const financeProfile = useWorkspaceProfile() === "finance-alpha"
+  const [density, setDensity] = useTableDensity(financeProfile ? (config.listViewKey ?? densityKey) : undefined)
   const exportLabel = t("common.entityView.export", { defaultValue: "Export" })
   const canExport = (allowExport ?? config.allowExport ?? false) && columns.some((col) => !col.sensitive)
 
   return (
     <TooltipProvider>
       <div
-        className={cn("space-y-4", className)}
+        className={cn("space-y-4", financeProfile && "data-[density=compact]:[&_tbody_td]:py-1 data-[density=comfortable]:[&_tbody_td]:py-3", className)}
+        data-density={financeProfile ? density : undefined}
         data-testid="entity-table"
         onClickCapture={publishRecordList}
       >
@@ -634,7 +643,8 @@ export function EntityTable({
                 </Select>
               )
             })}
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {financeProfile ? <TableDensityControl value={density} onChange={setDensity} /> : null}
               {config.listViewKey && ((config.filters?.length ?? 0) > 0 || config.searchable) && (
                 <Popover>
                   <PopoverTrigger
@@ -985,6 +995,7 @@ export function EntityTable({
                           <TableCell
                             key={col.key}
                             className={cn(
+                              (col.type === "currency" || col.type === "number") && "tabular-nums",
                               col.align === "right" && "text-right",
                               col.align === "center" && "text-center",
                             )}

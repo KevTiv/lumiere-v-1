@@ -1,4 +1,7 @@
 "use client"
+import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
+import { expensesTableConfig } from "@lumiere/ui/lib/expenses-entity-configs"
+import { ExpenseSourcePreview } from "../../../components/finance-source-preview"
 import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
@@ -14,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
+  EntityDetail,
   FormModal,
   CsvImportModal,
   CSV_IMPORT_CONTRACTS,
@@ -860,65 +864,10 @@ function ExpensesClientLoaded({
 
   const rowState = (row: Record<string, unknown>) => String(row.state ?? "")
 
-  return (
-    <>
-      {toolbarError ? (
-        <p className="text-sm text-destructive mb-2" role="alert">
-          {toolbarError}
-        </p>
-      ) : null}
-      <ModuleView
-        config={config}
-        data={data}
-        dataState={{ expenses: expensesState, "expense-sheets": sheetsState }}
-        onFormSubmit={handleFormSubmit}
-        onRowClick={handleRowClick}
-        isPending={isFormMutationPending}
-      />
-      <FormModal
-        open={quickActionForm !== null}
-        onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? expenseFormConfig}
-        isPending={isFormMutationPending}
-        onSubmit={async (formData) => {
-          if (quickActionForm) {
-            await handleFormSubmit("dashboard", quickActionForm.action, formData)
-            setQuickActionForm(null)
-          }
-        }}
-      />
-
-      {csvKind && csvFormConfig ? (
-        <CsvImportModal
-          trackedImport={{ companyId: operatingCompanyId }}
-          organizationId={orgId}
-          tableName={csvKind === "expense" ? "hr_expense" : "hr_expense_sheet"}
-          key={csvKind}
-          onClose={() => setCsvKind(null)}
-          config={csvFormConfig}
-          columns={csvKind === "expense" ? CSV_IMPORT_CONTRACTS.expense : CSV_IMPORT_CONTRACTS.expenseSheet}
-          templateFileName={`${csvKind}-import-template.csv`}
-          isPending={isFormMutationPending}
-          onImport={async (text) => {
-            if (csvKind === "expense") await csvImports.importExpense.mutateAsync(text)
-            else await csvImports.importExpenseSheet.mutateAsync(text)
-          }}
-        />
-      ) : null}
-
-      <Dialog open={rowAction !== null} onOpenChange={(open) => !open && setRowAction(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {rowAction?.tabId === "expenses"
-                ? t("expenses.workflow.expenseTitle")
-                : t("expenses.workflow.reportTitle")}
-            </DialogTitle>
-            <DialogDescription>
-              {rowAction ? String(rowAction.row.name ?? rowAction.row.id ?? "") : ""}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2 py-2">
+  const expenseReviewTable = expensesTableConfig(t).view
+  const expenseReviewColumns = expenseReviewTable.mode === "table" ? expenseReviewTable.columns.map(({ width: _width, ...column }) => column) : []
+  const rowReviewActions = (
+<div className="flex flex-col gap-2 py-2">
             <p className="text-xs text-muted-foreground">
               {t("expenses.workflow.actionsTitle")} · {rowAction ? rowState(rowAction.row) : ""}
             </p>
@@ -1103,6 +1052,71 @@ function ExpensesClientLoaded({
                 <p className="text-sm text-muted-foreground">{t("expenses.workflow.noActions")}</p>
               )}
           </div>
+  )
+
+  return (
+    <>
+      {toolbarError ? (
+        <p className="text-sm text-destructive mb-2" role="alert">
+          {toolbarError}
+        </p>
+      ) : null}
+      <ModuleView
+        config={config}
+        data={data}
+        dataState={{ expenses: expensesState, "expense-sheets": sheetsState }}
+        onFormSubmit={handleFormSubmit}
+        onRowClick={handleRowClick}
+        isPending={isFormMutationPending}
+      />
+      <FormModal
+        open={quickActionForm !== null}
+        onOpenChange={(open) => !open && setQuickActionForm(null)}
+        config={quickActionForm?.form ?? expenseFormConfig}
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
+          if (quickActionForm) {
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
+            setQuickActionForm(null)
+          }
+        }}
+      />
+
+      {csvKind && csvFormConfig ? (
+        <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={csvKind === "expense" ? "hr_expense" : "hr_expense_sheet"}
+          key={csvKind}
+          onClose={() => setCsvKind(null)}
+          config={csvFormConfig}
+          columns={csvKind === "expense" ? CSV_IMPORT_CONTRACTS.expense : CSV_IMPORT_CONTRACTS.expenseSheet}
+          templateFileName={`${csvKind}-import-template.csv`}
+          isPending={isFormMutationPending}
+          onImport={async (text) => {
+            if (csvKind === "expense") await csvImports.importExpense.mutateAsync(text)
+            else await csvImports.importExpenseSheet.mutateAsync(text)
+          }}
+        />
+      ) : null}
+
+      <Dialog open={rowAction !== null} onOpenChange={(open) => !open && setRowAction(null)}>
+        <DialogContent className={rowAction?.tabId === "expenses" ? "max-h-[90dvh] overflow-y-auto sm:max-w-[min(1280px,calc(100vw-1rem))]" : "sm:max-w-md"}>
+          <DialogHeader>
+            <DialogTitle>
+              {rowAction?.tabId === "expenses"
+                ? t("expenses.workflow.expenseTitle")
+                : t("expenses.workflow.reportTitle")}
+            </DialogTitle>
+            <DialogDescription>
+              {rowAction ? String(rowAction.row.name ?? rowAction.row.id ?? "") : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {rowAction?.tabId === "expenses" ? <FinanceReviewWorkspace
+            editorLabel={t("financeReview.savedDetails", { defaultValue: "Saved details" })}
+            editor={<div className="flex flex-col gap-4"><EntityDetail config={{ mode: "detail", sections: [{ id: "expense", fields: expenseReviewColumns }] }} data={rowAction.row} />{rowReviewActions}</div>}
+            preview={<ExpenseSourcePreview organizationId={orgId} companyId={operatingCompanyId} record={rowAction.row} />}
+          /> : rowReviewActions}
           <DialogFooter>
             <Button variant="outline" onClick={() => setRowAction(null)}>
               {t("common.close")}
