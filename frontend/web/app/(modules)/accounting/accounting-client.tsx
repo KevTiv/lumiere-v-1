@@ -511,6 +511,7 @@ import {
 import { Button } from "@lumiere/ui/components/button"
 import { cn } from "@lumiere/ui/lib/utils"
 import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
+import { runtimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 function copyAsRecord<T extends object>(row: T): Record<string, unknown> {
   return Object.fromEntries(Object.entries(row))
@@ -810,7 +811,7 @@ function AccountingClientReady({
   const { toast } = useToast()
   const { askForm, cancelForm, formDialog } = useFormDialog()
   const { currentUser, checkPermission } = useRBAC()
-  const runtimeRoleId = currentUser?.roles[0]
+  const runtimeRoleId = runtimeFormRoleId(currentUser)
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   const accountingTabIds = useMemo(
     () => [
@@ -1378,7 +1379,8 @@ function AccountingClientReady({
       companyConfigured: company != null,
       baseCurrencyConfigured:
         manualInvoiceCurrencyId > 0n &&
-        currencies.some((currency) => currency.id === manualInvoiceCurrencyId),
+        // Bootstrap currencies arrive as raw JSON numbers; company currency ids are decoded bigints.
+        currencies.some((currency) => String(currency.id) === String(manualInvoiceCurrencyId)),
       fiscalYearConfigured: companyFiscalYears.length > 0,
       openPeriodAvailable: companyPeriods.some(
         (period) => accountPeriodStateTag(copyAsRecord(period)) === "Open",

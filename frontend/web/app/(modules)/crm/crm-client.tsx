@@ -180,6 +180,7 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useModuleFilters } from "@/hooks/use-module-filters"
+import { runtimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 export { CRM_UI_REDUCERS } from "@/lib/crm-ui-reducers"
 
@@ -350,7 +351,7 @@ function CrmClientLoaded({
   const { t } = useTranslation()
   const router = useRouter()
   const { currentUser } = useRBAC()
-  const runtimeRoleId = currentUser?.roles[0]
+  const runtimeRoleId = runtimeFormRoleId(currentUser)
   const { orgId } = orgBigInts(organizationId)
   const ownerLabelMap = useIdentityLabelMap(organizationId)
 

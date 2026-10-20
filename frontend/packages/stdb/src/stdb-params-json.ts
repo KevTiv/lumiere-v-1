@@ -27,6 +27,9 @@ const NESTED_ARRAY_STRUCTS: Partial<
   CreateReturnOrderParams: {
     lines: "CreateReturnOrderLineParams",
   },
+  CreatePurchaseRequisitionParams: {
+    lines: "CreatePurchaseRequisitionLineParams",
+  },
   CreatePurchaseRfqParams: {
     lines: "CreatePurchaseRfqLineParams",
   },

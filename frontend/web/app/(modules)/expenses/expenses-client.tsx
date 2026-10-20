@@ -72,6 +72,7 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useEmployees, type HrEmployee } from "@lumiere/query-hooks/hooks/hr"
 import {
+  expenseQuantity,
   newExpenseClientRequestId,
   newExpenseReceiptClientRequestId,
   parseAttachmentIds,
@@ -778,7 +779,7 @@ function ExpensesClientLoaded({
             ? {}
             : {
                 unitAmount: Number(formData.unitAmount ?? 0),
-                quantity: Number(formData.quantity ?? 1),
+                quantity: expenseQuantity(formData.quantity),
               }),
           description:
             formData.description != null && String(formData.description).trim() !== ""

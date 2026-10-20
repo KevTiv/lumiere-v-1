@@ -42,6 +42,18 @@ describe("stdbParamsToJson", () => {
     ])
   })
 
+  it("fills every Option field of nested purchase requisition lines", () => {
+    const params = stdbParamsToJson(
+      {
+        lines: [{ productId: 7n, productUom: 1n, productUomQty: 2, name: "Bolts", sequence: 10 }],
+      },
+      "CreatePurchaseRequisitionParams",
+    )
+    assert.deepEqual(params.lines, [
+      { product_id: 7, product_uom: 1, product_uom_qty: 2, name: { some: "Bolts" }, sequence: { some: 10 } },
+    ])
+  })
+
   it("converts top-level camelCase keys to snake_case", () => {
     assert.deepEqual(
       stdbParamsToJson({ contactName: "Ada", partnerId: 1n }),
