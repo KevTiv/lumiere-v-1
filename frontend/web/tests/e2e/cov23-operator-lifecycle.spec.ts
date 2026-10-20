@@ -55,12 +55,16 @@ async function toggleRoleInSettings(page: Page, roleId: number, reducer: string,
   await page.getByTestId("settings-user-edit").click()
   const checkbox = page.getByTestId(`settings-user-role-${roleId}`)
   await expect(checkbox).toBeVisible()
+  const grant = reducer === "assign_role"
+  await expect(checkbox).toHaveAttribute("aria-checked", grant ? "false" : "true")
   await checkbox.click()
+  await expect(checkbox).toHaveAttribute("aria-checked", grant ? "true" : "false")
   const [accepted] = await Promise.all([
-    page.waitForResponse((response) => matchesOperationResponse(response, reducer), { timeout: 30_000 }),
+    // Settings saves the complete revision-bound access snapshot atomically.
+    page.waitForResponse((response) => matchesOperationResponse(response, "erp.set_member_access"), { timeout: 30_000 }),
     page.getByTestId("settings-user-save").click(),
   ])
-  expect(accepted.ok()).toBe(true)
+  expect(accepted.ok(), await accepted.text()).toBe(true)
   return accepted
 }
 
@@ -224,7 +228,18 @@ async function runGrantSwitchRevokeRecover(
     await expect.poll(() => activeAssignmentCount(page, organizationId, roleId), { timeout: 30_000 }).toBe(0)
     await expect.poll(profileVisible, { timeout: 60_000 }).toBe(false)
   } finally {
-    await personaContext.close()
+    try {
+      // A failed UI wait can leave its real grant behind. Revoke only this run's
+      // uniquely created role so retries and other role specs retain their baseline.
+      const active = (await roleAssignments(page, organizationId, roleId)).filter((assignment) => assignment.isActive)
+      for (const assignment of active) {
+        if (assignment.id == null) throw new Error("active lifecycle assignment has no canonical id")
+        await postGeneratedOperationOk(page, "revoke_role", { assignmentId: assignment.id })
+      }
+      await expect.poll(() => activeAssignmentCount(page, organizationId, roleId), { timeout: 30_000 }).toBe(0)
+    } finally {
+      await personaContext.close()
+    }
   }
 }
 
@@ -271,14 +286,23 @@ test.describe("COV-23 operator lifecycle", { tag: ["@p0", "@cov23"] }, () => {
       if (!/\/onboarding/.test(owner.url())) await owner.goto("/onboarding")
       await expect(owner).toHaveURL(/\/onboarding/)
       const orgName = `COV23 ${suffix}`
+      // Currency readiness proves hydration completed before filling controlled inputs.
+      const submit = owner.locator('form button[type="submit"]')
+      await expect(owner.locator("#currency")).toBeEnabled({ timeout: 30_000 })
+      await expect(submit).toBeEnabled({ timeout: 30_000 })
       await owner.locator("#name").fill(orgName)
-      await owner.locator("#code").fill(suffix.replace(/[^a-z0-9]/g, "").slice(-10))
-      const bootstrap = owner.waitForResponse(
-        (response) => new URL(response.url()).pathname === "/api/bootstrap/tenant" && response.ok(),
-        { timeout: 60_000 },
-      )
-      await owner.locator('form button[type="submit"]').click()
-      await bootstrap
+      const shortCode = suffix.replace(/[^a-z0-9]/g, "").slice(-8).toUpperCase()
+      await owner.locator("#code").fill(shortCode)
+      await expect(owner.locator("#code")).toHaveValue(shortCode)
+      expect(await owner.locator("form").evaluate((form: HTMLFormElement) => form.checkValidity())).toBe(true)
+      const [bootstrap] = await Promise.all([
+        owner.waitForResponse(
+          (response) => response.request().method() === "POST" && new URL(response.url()).pathname === "/api/bootstrap/tenant",
+          { timeout: 60_000 },
+        ),
+        submit.click(),
+      ])
+      expect(bootstrap.ok(), await bootstrap.text()).toBe(true)
       await expect(owner.getByTestId("dashboard-sidebar").first()).toBeVisible({ timeout: 60_000 })
       await expect(owner).not.toHaveURL(/\/onboarding/)
 
