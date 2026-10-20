@@ -175,6 +175,7 @@ mod tests {
             company_id: 11,
             date: "2026-07-10".into(),
             timezone: "UTC".into(),
+            scenario: None,
         }
     }
 

@@ -233,7 +233,7 @@ pub fn test_bootstrap_new_tenant_records_complete_commit(
     }
 
     let mut expected_tables = vec!["organization", "currency", "currency"];
-    expected_tables.extend(["country"; 6]);
+    expected_tables.extend(["country"; 7]);
     for _ in 0..11 {
         expected_tables.push("country_pack_definition");
     }
@@ -699,7 +699,7 @@ pub fn test_bootstrap_new_tenant_records_complete_commit(
             .country_by_organization()
             .filter(&org.id)
             .count()
-            != 6
+            != 7
         || ctx
             .db
             .currency()

@@ -1,3 +1,5 @@
+import { isWorkOsEnabled } from '@/lib/auth-mode'
+import { AuthModeProvider } from '@/lib/auth-mode-context'
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { GeistMono } from 'geist/font/mono'
@@ -74,6 +76,7 @@ export default async function RootLayout({
         companies: validCompanies,
         membershipCompanyId,
         roleNames: serverRoleNames,
+        organizationWideAccess: Boolean(session.fieldAccess?.isSuperuser || session.fieldAccess?.rolePermissions.includes("*:*")),
       })
       companyIds = allowedCompanyIds.length === 0 ? undefined : allowedCompanyIds
     }
@@ -86,6 +89,7 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <body className="font-sans antialiased">
+        <AuthModeProvider enabled={isWorkOsEnabled()}>
         <Providers
           serverIdentity={identityHex}
           serverRoleNames={serverRoleNames}
@@ -95,6 +99,7 @@ export default async function RootLayout({
         >
           {children}
         </Providers>
+        </AuthModeProvider>
         <Analytics />
       </body>
     </html>

@@ -399,6 +399,11 @@ pub fn add_user_to_organization(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_organization", "create")?;
 
+    if crate::core::permissions::caller_delegated_company_scope(ctx, organization_id)
+        .is_some_and(|company| params.company_id != Some(company))
+    {
+        return Err("Member is outside the delegated company scope".into());
+    }
     ctx.db
         .organization()
         .id()
@@ -412,17 +417,22 @@ pub fn add_user_to_organization(
         .find(&params.role_id)
         .ok_or("Role not found")?;
 
-    if role.organization_id != organization_id {
-        return Err("Role does not belong to this organization".to_string());
+    if role.organization_id != organization_id || !role.is_active {
+        return Err("Role is inactive or does not belong to this organization".to_string());
     }
 
-    let already_member = ctx.db.user_organization().iter().any(|uo| {
-        uo.user_identity == user_identity && uo.organization_id == organization_id && uo.is_active
-    });
-
+    let already_member = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&user_identity)
+        .any(|membership| membership.organization_id == organization_id && membership.is_active);
     if already_member {
-        return Err("User is already an active member of this organization".to_string());
+        // Retry of a completed invitation must not consume another seat or
+        // alter the existing member's role and company scope.
+        return Ok(());
     }
+    enforce_alpha_membership_capacity(ctx, organization_id, false, params.is_active)?;
 
     let row = ctx.db.user_organization().insert(UserOrganization {
         id: 0,
@@ -484,6 +494,11 @@ pub fn add_org_member(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_organization", "create")?;
 
+    if crate::core::permissions::caller_delegated_company_scope(ctx, organization_id)
+        .is_some_and(|company| params.company_id != Some(company))
+    {
+        return Err("Member is outside the delegated company scope".into());
+    }
     ctx.db
         .organization()
         .id()
@@ -506,13 +521,18 @@ pub fn add_org_member(
         })
         .ok_or("Role not found in organization")?;
 
-    let already_member = ctx.db.user_organization().iter().any(|uo| {
-        uo.user_identity == user_identity && uo.organization_id == organization_id && uo.is_active
-    });
-
+    let already_member = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&user_identity)
+        .any(|membership| membership.organization_id == organization_id && membership.is_active);
     if already_member {
-        return Err("User is already an active member of this organization".to_string());
+        // Retry of a completed invitation must not consume another seat or
+        // alter the existing member's role and company scope.
+        return Ok(());
     }
+    enforce_alpha_membership_capacity(ctx, organization_id, false, params.is_active)?;
 
     let row = ctx.db.user_organization().insert(UserOrganization {
         id: 0,
@@ -600,33 +620,14 @@ pub fn update_org_member_role(
         })
         .ok_or("Role not found in organization")?;
 
-    ctx.db.user_organization().id().update(UserOrganization {
-        role_id: selected_role.id,
-        ..membership
-    });
-
-    write_audit_log_v2(
+    let mut params = crate::core::access_lifecycle::current_access_params(ctx, &membership);
+    params.primary_role_id = selected_role.id;
+    crate::core::access_lifecycle::set_member_access(
         ctx,
         membership.organization_id,
-        AuditLogParams {
-            company_id: membership.company_id,
-            table_name: "user_organization",
-            record_id: user_org_id,
-            action: "UPDATE",
-            old_values: Some(serde_json::json!({ "role_id": membership.role_id }).to_string()),
-            new_values: Some(
-                serde_json::json!({
-                    "role_id": selected_role.id,
-                    "role_name": selected_role.name,
-                })
-                .to_string(),
-            ),
-            changed_fields: vec!["role_id".to_string()],
-            metadata: None,
-        },
-    );
-
-    Ok(())
+        membership.user_identity,
+        params,
+    )
 }
 
 #[spacetimedb::reducer]
@@ -653,6 +654,11 @@ pub fn update_org_member_details(
     let updated_job_title = params.job_title.or(membership.job_title.clone());
     let updated_employee_id = params.employee_id.or(membership.employee_id.clone());
 
+    crate::core::permissions::ensure_member_in_delegated_scope(
+        ctx,
+        membership.organization_id,
+        membership.user_identity,
+    )?;
     ctx.db.user_organization().id().update(UserOrganization {
         department_id: updated_department_id,
         job_title: updated_job_title.clone(),
@@ -717,6 +723,40 @@ pub fn update_user_organization_status(
         "write",
     )?;
 
+    enforce_alpha_membership_capacity(
+        ctx,
+        membership.organization_id,
+        membership.is_active,
+        is_active,
+    )?;
+
+    if membership.is_active
+        && !is_active
+        && crate::core::permissions::effective_roles(
+            ctx,
+            membership.organization_id,
+            membership.user_identity,
+        )
+        .is_ok_and(|roles| {
+            crate::core::access_lifecycle::member_is_admin(
+                ctx,
+                membership.organization_id,
+                membership.user_identity,
+                &roles,
+            )
+        })
+    {
+        crate::core::access_lifecycle::ensure_another_admin(
+            ctx,
+            membership.organization_id,
+            membership.user_identity,
+        )?;
+    }
+    crate::core::permissions::ensure_member_in_delegated_scope(
+        ctx,
+        membership.organization_id,
+        membership.user_identity,
+    )?;
     ctx.db.user_organization().id().update(UserOrganization {
         is_active,
         is_default,
@@ -746,6 +786,11 @@ pub fn update_user_organization_status(
         },
     );
 
+    crate::core::permissions::touch_policy_snapshot_for_user(
+        ctx,
+        membership.organization_id,
+        membership.user_identity,
+    );
     Ok(())
 }
 
@@ -769,6 +814,23 @@ pub fn remove_user_from_organization(
         })
         .ok_or("User is not an active member of this organization")?;
 
+    if crate::core::permissions::effective_roles(ctx, organization_id, user_identity).is_ok_and(
+        |roles| {
+            crate::core::access_lifecycle::member_is_admin(
+                ctx,
+                membership.organization_id,
+                membership.user_identity,
+                &roles,
+            )
+        },
+    ) {
+        crate::core::access_lifecycle::ensure_another_admin(ctx, organization_id, user_identity)?;
+    }
+    crate::core::permissions::ensure_member_in_delegated_scope(
+        ctx,
+        membership.organization_id,
+        membership.user_identity,
+    )?;
     ctx.db.user_organization().id().update(UserOrganization {
         is_active: false,
         ..membership
@@ -794,6 +856,11 @@ pub fn remove_user_from_organization(
         },
     );
 
+    crate::core::permissions::touch_policy_snapshot_for_user(
+        ctx,
+        membership.organization_id,
+        membership.user_identity,
+    );
     Ok(())
 }
 
@@ -888,4 +955,83 @@ pub fn end_user_session(ctx: &ReducerContext, session_id: u64) -> Result<(), Str
     );
 
     Ok(())
+}
+
+const ALPHA_ACTIVE_MEMBERSHIP_LIMIT: usize = 100;
+
+/// The capacity check and insertion/reactivation run in the same reducer
+/// transaction, including generic membership calls and direct STDB access.
+pub(crate) fn enforce_alpha_membership_capacity(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    was_active: bool,
+    will_be_active: bool,
+) -> Result<(), String> {
+    if was_active || !will_be_active {
+        return Ok(());
+    }
+    let active_count = ctx
+        .db
+        .user_organization()
+        .user_org_by_org()
+        .filter(&organization_id)
+        .filter(|membership| membership.is_active)
+        .take(ALPHA_ACTIVE_MEMBERSHIP_LIMIT)
+        .count();
+    if membership_activation_allowed(active_count, was_active, will_be_active) {
+        Ok(())
+    } else {
+        Err("Alpha organization member limit reached; contact support".into())
+    }
+}
+
+fn membership_activation_allowed(
+    active_count: usize,
+    was_active: bool,
+    will_be_active: bool,
+) -> bool {
+    was_active || !will_be_active || active_count < ALPHA_ACTIVE_MEMBERSHIP_LIMIT
+}
+
+#[cfg(test)]
+mod alpha_membership_tests {
+    use super::{membership_activation_allowed, ALPHA_ACTIVE_MEMBERSHIP_LIMIT};
+
+    #[test]
+    fn new_or_reactivated_members_cannot_exceed_alpha_capacity() {
+        assert!(membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT - 1,
+            false,
+            true
+        ));
+        assert!(!membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT,
+            false,
+            true
+        ));
+        assert!(!membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT + 1,
+            false,
+            true
+        ));
+    }
+
+    #[test]
+    fn existing_members_and_deactivation_do_not_consume_capacity() {
+        assert!(membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT,
+            true,
+            true
+        ));
+        assert!(membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT,
+            true,
+            false
+        ));
+        assert!(membership_activation_allowed(
+            ALPHA_ACTIVE_MEMBERSHIP_LIMIT,
+            false,
+            false
+        ));
+    }
 }

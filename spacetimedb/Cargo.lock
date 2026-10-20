@@ -506,6 +506,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumiere-policy-core"
+version = "0.1.0"
+
+[[package]]
 name = "lumiere-presentation-core"
 version = "0.1.0"
 dependencies = [
@@ -522,6 +526,7 @@ dependencies = [
  "chrono-tz",
  "hex",
  "log",
+ "lumiere-policy-core",
  "lumiere-presentation-core",
  "phonenumber",
  "serde",

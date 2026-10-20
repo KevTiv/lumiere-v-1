@@ -27,6 +27,10 @@ export async function fetchQueryList<K extends QueryResourceKey>(
   path: `/api/query/${K}`,
   errorMessage: string,
 ): Promise<QueryRowFor<K>[]>
+export async function fetchQueryList<K extends QueryResourceKey>(
+  path: `/api/query/${K}?${string}`,
+  errorMessage: string,
+): Promise<QueryRowFor<K>[]>
 export async function fetchQueryList(path: string, errorMessage: string): Promise<QueryRows>
 export async function fetchQueryList(path: string, errorMessage: string): Promise<QueryRows> {
   return getLumiereApiClientOrThrow().fetchQueryList(path, errorMessage)

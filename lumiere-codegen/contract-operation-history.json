@@ -14,6 +14,10 @@
       "name": "accept_sale_order_quotation",
       "shape_fingerprint": "sha256:01824a849506b81f964c47a068a49724441a458904555204642e87e3b9960a5a"
     },
+    "erp.accept_user_invite": {
+      "name": "accept_user_invite",
+      "shape_fingerprint": "sha256:6fa6d6c167a24015f34951d847cd09242bec46039ea704863e8c3b0b91200e38"
+    },
     "erp.accrue_sale_commission": {
       "name": "accrue_sale_commission",
       "shape_fingerprint": "sha256:db38d3dd3ed6ad87597288dad7c9b4d8f1d87a8473d1aff5476324df69898536"
@@ -209,6 +213,10 @@
     "erp.apply_global_migrations": {
       "name": "apply_global_migrations",
       "shape_fingerprint": "sha256:b63c76350efcb363d4bc6bea459be76a792871a8d32d217da072fd6b3818f0ca"
+    },
+    "erp.apply_historical_payment_allocations": {
+      "name": "apply_historical_payment_allocations",
+      "shape_fingerprint": "sha256:50e80a3e94220b39b5285a8cd4534087f6041437fedcb45bb88af0ab50b156e5"
     },
     "erp.apply_hr_integration_intent": {
       "name": "apply_hr_integration_intent",
@@ -613,6 +621,10 @@
     "erp.claim_workflow_human_task": {
       "name": "claim_workflow_human_task",
       "shape_fingerprint": "sha256:45865da0d02caf4813495a4fc64591435c7439605747517092022d5b45ea386a"
+    },
+    "erp.cleanup_abandoned_account_move_import": {
+      "name": "cleanup_abandoned_account_move_import",
+      "shape_fingerprint": "sha256:1b61fd65e22b570aca77945cad7f09abff59e2752d69729d60ba794d846385fa"
     },
     "erp.cleanup_stale_proposal_presence": {
       "name": "cleanup_stale_proposal_presence",
@@ -1425,6 +1437,10 @@
     "erp.create_manual_account_invoice": {
       "name": "create_manual_account_invoice",
       "shape_fingerprint": "sha256:9ad91b5f01e10604918487f90022b00943758ca8a2a473b84eab28ad81f07a76"
+    },
+    "erp.create_manual_invoice": {
+      "name": "create_manual_invoice",
+      "shape_fingerprint": "sha256:763f3fd6a98dda39289cfb7a0d861f454493ffcb43c77eb201e5f5a6198933f9"
     },
     "erp.create_manufacturing_order": {
       "name": "create_manufacturing_order",
@@ -4762,6 +4778,10 @@
       "name": "set_iot_threshold",
       "shape_fingerprint": "sha256:948544db0bf9912c3019590c6daf9fe3614b28986e17dba4477912f5e4d9535b"
     },
+    "erp.set_member_access": {
+      "name": "set_member_access",
+      "shape_fingerprint": "sha256:f71c62a02309ec8fa82c1eacabdd7610a51727c5835782ba64cfeb85bb2948af"
+    },
     "erp.set_project_active": {
       "name": "set_project_active",
       "shape_fingerprint": "sha256:b9c680bd5259df4382f222f427ea7c3aaa855108f560fa8043e56599110adfa1"
@@ -6008,6 +6028,30 @@
       "current_operations_fingerprint": "sha256:a7671fb5a29419595c45acfeb4591a7df1b091c69486e427cf8d0da9d5d55a5c",
       "operation_count": 1446,
       "reason": "COV-08 atomic manual accounting invoice creation and exact payment reversal identity"
+    },
+    {
+      "previous_release": "v0.3.107",
+      "previous_ir_sha256": "sha256:d429d78cadb3a4f36c1777345f9d49dfd947dccd924611911e259bb8ed246e89",
+      "previous_operations_fingerprint": "sha256:a7671fb5a29419595c45acfeb4591a7df1b091c69486e427cf8d0da9d5d55a5c",
+      "current_operations_fingerprint": "sha256:b812cdb909e5802f273497136f93b6027c54cf4a3a49e083ba20617c2b5dfa18",
+      "operation_count": 1448,
+      "reason": "release on top of v0.3.107: add apply_historical_payment_allocations, create_manual_invoice; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.108",
+      "previous_ir_sha256": "sha256:649f4668f4a2e70f68483202e9fe1cf643c100e2aa30eb5a91404eee140c44b9",
+      "previous_operations_fingerprint": "sha256:b812cdb909e5802f273497136f93b6027c54cf4a3a49e083ba20617c2b5dfa18",
+      "current_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
+      "operation_count": 1449,
+      "reason": "release on top of v0.3.108: add cleanup_abandoned_account_move_import; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.109",
+      "previous_ir_sha256": "sha256:7cc56b148646660b0c43d4b3332cb1855c273c84e09ef36eafad1ee5913a2152",
+      "previous_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
+      "current_operations_fingerprint": "sha256:c6c1a33c18c0d7619085bf68d32900965f112a9b94564182a92a0f7fcc189bbb",
+      "operation_count": 1451,
+      "reason": "Complete hosted WorkOS identity and access lifecycle: atomic invitation acceptance, member access updates, editable role metadata and matching source contracts."
     }
   ]
 }

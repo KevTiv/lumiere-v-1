@@ -6,6 +6,7 @@ readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 python3 - "$ROOT" <<'PY'
 from pathlib import Path
 import re
+import shlex
 import sys
 
 root = Path(sys.argv[1])
@@ -37,6 +38,28 @@ for binary in expected - {"gateway"}:
 dockerfile_commands = "\n".join(
     line for line in dockerfile.splitlines() if not line.lstrip().startswith("#")
 )
+builder_commands, _, runtime_commands = dockerfile_commands.partition("\nFROM debian:")
+builder_sources = {
+    source.removeprefix("./").rstrip("/")
+    for line in builder_commands.splitlines()
+    if line.startswith("COPY ")
+    for source in shlex.split(line)[1:-1]
+    if not source.startswith("--")
+}
+if builder_sources & {"", ".", "*", "Makefile", "scripts"}:
+    raise SystemExit("runtime compilation must not depend on the whole context, Makefile, or scripts tree")
+build_helpers = {
+    "scripts/prepare-vendored-contracts-rust.sh",
+    "scripts/sync-directory.py",
+}
+if {source for source in builder_sources if source.startswith("scripts/")} != build_helpers:
+    raise SystemExit("runtime builder must copy only the two required contract preparation helpers")
+if (
+    "COPY --chmod=0755 scripts/lumiere-runtime-entrypoint.sh /usr/local/bin/lumiere-runtime-entrypoint"
+    not in runtime_commands
+):
+    raise SystemExit("runtime dispatcher must be copied directly into the final runtime stage")
+
 built = set(re.findall(r"--bin\s+([a-z0-9-]+)", dockerfile_commands))
 if built != expected:
     raise SystemExit(f"runtime image builds {sorted(built)}, expected {sorted(expected)}")

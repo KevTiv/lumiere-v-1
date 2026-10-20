@@ -3,7 +3,8 @@ import type { ErpRecordRef } from "./record-ref"
 import type { WorkflowOutcome, WorkflowResult } from "./result"
 
 /**
- * What the canonical readback found after a command was accepted. An observation without an
+ * What exact canonical readback found after one dispatch attempt (acknowledged or ambiguous).
+ * `applied` confirms the intended effect, not attribution to this invocation. An observation without an
  * `outcome` means the effect could not be confirmed, and the run fails as `outcome_unknown`.
  */
 export interface ObservedTransition {
@@ -24,7 +25,7 @@ interface TransitionSpecBase<TInput> {
 
 interface ObservedTransitionSpec<TInput> extends TransitionSpecBase<TInput> {
   /**
-   * Read canonical state after invalidation to resolve outcome and created/next records. It must
+   * Read exact canonical state independently of cache refresh success to resolve outcome and records. It must
    * confirm the effect: a throw or a missing `outcome` is `outcome_unknown`.
    */
   observe(input: TInput): Promise<ObservedTransition>
@@ -55,6 +56,7 @@ export interface TransitionNotice {
   /** 1 for the first run, incremented on each retry. */
   attempt: number
   result?: WorkflowResult
+  dispatch?: WorkflowResult["dispatch"]
   error?: WorkflowError
   /** The affected lists were refetched because the failure left the view out of date. */
   refreshed?: boolean
@@ -82,6 +84,7 @@ export interface TransitionEvent {
   durationMs: number
   affectedResources: readonly string[]
   createdRecords?: ReadonlyArray<{ resource: string; id: string }>
+  dispatch?: WorkflowResult["dispatch"]
 }
 
 /** Side effects a surface supplies; the completion path itself stays framework-free. */
@@ -136,38 +139,50 @@ export async function completeTransition<TInput>(
     }
   }
 
+  let dispatch: WorkflowResult["dispatch"] = "acknowledged"
+  let dispatchError: WorkflowError | undefined
   try {
     await spec.command(input)
   } catch (raw) {
-    const error = toWorkflowError(raw, { idempotent: spec.idempotent })
-    let refreshed = false
-    if (error.needsRefresh) {
-      // A write that may have landed, or a view someone else made stale: converge on canonical
-      // state even though we report failure.
-      refreshed = await ports.invalidate(spec.affects).then(
-        () => true,
-        () => false,
-      )
+    // Reconcile ambiguity before considering an explicitly idempotent resend.
+    const error = toWorkflowError(raw)
+    if (error.needsReadback && spec.observe) {
+      dispatch = "ambiguous"
+      dispatchError = error
+    } else {
+      const failure = error.needsReadback
+        ? error.kind === "already_applied"
+          ? new WorkflowError("outcome_unknown", "Canonical readback is required to confirm the effect", { cause: error })
+          : toWorkflowError(raw, { idempotent: spec.idempotent })
+        : error
+      let refreshed = false
+      if (failure.needsRefresh) {
+        // Cache convergence is best effort; it cannot prove the effect.
+        refreshed = await Promise.resolve().then(() => ports.invalidate(spec.affects)).then(
+          () => true,
+          () => false,
+        )
+      }
+      record({
+        status: "failed",
+        errorKind: failure.kind,
+        httpStatus: failure.status,
+        refreshed,
+        affectedResources: spec.affects,
+      })
+      ports.notify?.({ kind: "error", transitionId: spec.id, correlationId, attempt, error: failure, refreshed })
+      throw failure
     }
-    record({
-      status: "failed",
-      errorKind: error.kind,
-      httpStatus: error.status,
-      refreshed,
-      affectedResources: spec.affects,
-    })
-    ports.notify?.({ kind: "error", transitionId: spec.id, correlationId, attempt, error, refreshed })
-    throw error
   }
 
   const affectedResources = [...spec.affects]
-  await ports.invalidate(affectedResources)
+  const refreshed = await Promise.resolve().then(() => ports.invalidate(affectedResources)).then(() => true, () => false)
 
-  // The command was accepted, but its effect could not be confirmed: never report it as applied.
+  // Dispatch alone cannot confirm the effect: never report an unresolved observation as applied.
   const unresolved = (message: string, cause?: unknown): WorkflowError => {
     const error = new WorkflowError("outcome_unknown", message, cause === undefined ? undefined : { cause })
-    record({ status: "failed", errorKind: error.kind, refreshed: true, affectedResources })
-    ports.notify?.({ kind: "error", transitionId: spec.id, correlationId, attempt, error, refreshed: true })
+    record({ status: "failed", errorKind: error.kind, httpStatus: dispatchError?.status, refreshed, affectedResources, dispatch })
+    ports.notify?.({ kind: "error", transitionId: spec.id, correlationId, attempt, error, refreshed, dispatch })
     return error
   }
 
@@ -176,21 +191,26 @@ export async function completeTransition<TInput>(
     try {
       observed = (await spec.observe(input)) ?? {}
     } catch (cause) {
-      throw unresolved("Command was accepted but canonical readback failed", cause)
+      throw unresolved("Canonical readback failed after dispatch", cause)
     }
     if (observed.outcome === undefined) {
-      throw unresolved("Command was accepted but canonical readback did not confirm its effect")
+      throw unresolved("Canonical readback did not confirm the intended effect", dispatchError)
     }
+  } else if (!refreshed) {
+    throw unresolved("Command was accepted but cache refresh failed and canonical readback is unavailable")
   }
 
   const result: WorkflowResult = {
     outcome: observed.outcome ?? "applied",
+    dispatch,
     affectedResources,
     createdRecords: observed.createdRecords,
     next: observed.next,
   }
   record({
     status: result.outcome,
+    dispatch,
+    refreshed,
     affectedResources,
     createdRecords: result.createdRecords?.map(({ resource, id }) => ({ resource, id })),
   })
@@ -200,6 +220,8 @@ export async function completeTransition<TInput>(
     correlationId,
     attempt,
     result,
+    dispatch,
+    refreshed,
   })
   if (options.navigateToNext && result.next) ports.navigate?.(result.next)
   return result

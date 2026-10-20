@@ -30,6 +30,7 @@ import {
 import { Badge } from "@lumiere/ui/components/badge"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
+import { DashboardGrid } from "@lumiere/ui"
 import {
   AlertCircle,
   Building2,
@@ -43,6 +44,7 @@ import {
 import type {
   DailyBusinessSummaryReportV1,
   LowStockReportV1,
+  MarginSupplyScenario,
   MoneyAmount,
   ReportCatalogEntry,
   ReportPreview,
@@ -66,6 +68,15 @@ import {
   type CompanyLookupRow,
 } from "@/lib/form-lookup"
 import { useToast } from "@/hooks/use-toast"
+import {
+  createMarginSupplyDashboard,
+  DEFAULT_MARGIN_SUPPLY_SCENARIO_DRAFT,
+  marginSupplyScenarioFromDraft,
+  marginSupplyXlsxData,
+  MARGIN_SUPPLY_SCENARIO_FIELDS,
+} from "@/lib/margin-supply-outlook-config"
+import { MarginSupplyScenarioImport } from "@/lib/margin-supply-scenario-import"
+import type { ImportedMarginSupplyScenario } from "@/lib/margin-supply-scenario-csv"
 
 interface OwnerReportsPanelProps {
   organizationId: bigint
@@ -90,6 +101,7 @@ function timezoneInputValue(): string {
 }
 
 function ownerReportXlsxData(preview: ReportPreview): { title: string; headers: string[]; rows: (string | number)[][] } {
+  if (preview.reportKey === "margin_supply_outlook_v1") return marginSupplyXlsxData(preview)
   if (preview.reportKey === "low_stock_v1") return { title: "Low Stock Report", headers: ["Product", "SKU", "Available", "Reorder point", "Forecast"], rows: preview.report.lines.map((line) => [line.name, line.sku ?? "", line.available, line.reorderPoint, line.forecast]) }
   if (preview.reportKey === "stock_movement_v1") return { title: "Stock Movement Report", headers: ["Product", "Source", "Destination", "Quantity", "Value"], rows: preview.report.lines.map((line) => [line.productName, line.sourceLocation, line.destinationLocation, line.quantity, line.valuationReference.minorUnits / 10 ** line.valuationReference.scale]) }
   if (preview.reportKey === "sales_by_product_v1") return { title: "Sales by Product", headers: ["Product", "Quantity", "Gross sales", "Net sales", "Returns", "Margin"], rows: preview.report.lines.map((line) => [line.productName, line.quantity, line.grossSales.minorUnits / 10 ** line.grossSales.scale, line.netSales.minorUnits / 10 ** line.netSales.scale, line.returns.minorUnits / 10 ** line.returns.scale, line.margin.minorUnits / 10 ** line.margin.scale]) }
@@ -126,6 +138,8 @@ export function OwnerReportsPanel({
   })
   const [date, setDate] = useState(todayInputValue)
   const [timezone] = useState(timezoneInputValue)
+  const [scenarioDraft, setScenarioDraft] = useState(DEFAULT_MARGIN_SUPPLY_SCENARIO_DRAFT)
+  const [importedScenario, setImportedScenario] = useState<ImportedMarginSupplyScenario | null>(null)
   const [activePreview, setActivePreview] = useState<
     ReportPreview | null
   >(null)
@@ -183,18 +197,35 @@ export function OwnerReportsPanel({
       })
       return
     }
+    let marginSupplyScenario: MarginSupplyScenario | undefined
+    if (entry.key === "margin_supply_outlook_v1") {
+      try {
+        marginSupplyScenario = marginSupplyScenarioFromDraft(
+          scenarioDraft,
+          importedScenario?.provenance ?? { source: "manual" },
+        )
+      } catch (cause) {
+        toast({
+          title: "Review the scenario assumptions",
+          description: cause instanceof Error ? cause.message : String(cause),
+          variant: "destructive",
+        })
+        return
+      }
+    }
     const result = await preview.mutateAsync({
       reportKey: entry.key,
       companyId,
       date,
       timezone,
+      scenario: marginSupplyScenario,
     })
     setActivePreview(result)
   }
 
   const handlePdf = async () => {
     if (!activePreview) return
-    const blob = await pdf.mutateAsync({ reportKey: activePreview.reportKey, companyId: activePreview.scope.companyId, date, timezone })
+    const blob = await pdf.mutateAsync({ reportKey: activePreview.reportKey, companyId: activePreview.scope.companyId, date: activePreview.scope.localDate, timezone: activePreview.scope.timezone, scenario: activePreview.reportKey === "margin_supply_outlook_v1" ? activePreview.report.scenario : undefined })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement("a")
     anchor.href = url
@@ -310,6 +341,49 @@ export function OwnerReportsPanel({
               </InputGroup>
             </Field>
           </FieldGroup>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Margin & supply scenario</CardTitle>
+          <CardDescription>User-provided assumptions—entered directly or imported from a controlled CSV—used only by Margin & Supply Outlook. They produce warnings and advisory context; no prices, orders, or stock rules are changed.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FieldGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {MARGIN_SUPPLY_SCENARIO_FIELDS.map((field) => (
+              <Field key={field.key}>
+                <FieldLabel>{field.label}</FieldLabel>
+                <InputGroup>
+                  <InputGroupInput
+                    type="number"
+                    min={field.min}
+                    max={field.max}
+                    step={field.step}
+                    value={scenarioDraft[field.key]}
+                    onChange={(event) => {
+                      setImportedScenario(null)
+                      setScenarioDraft((current) => ({
+                        ...current,
+                        [field.key]: event.target.value,
+                      }))
+                    }}
+                  />
+                </InputGroup>
+              </Field>
+            ))}
+          </FieldGroup>
+          {importedScenario ? (
+            <p className="mt-4 text-xs text-muted-foreground" data-testid="margin-supply-scenario-provenance">
+              Scenario source: {importedScenario.name} · {importedScenario.provenance.fileName} · imported {new Date(importedScenario.provenance.importedAt).toLocaleString()} · CSV row {importedScenario.provenance.rowNumber}. Editing a field marks it as manual input.
+            </p>
+          ) : (
+            <p className="mt-4 text-xs text-muted-foreground">Scenario source: manual entry.</p>
+          )}
+          <MarginSupplyScenarioImport onApply={(scenario) => {
+            setScenarioDraft(scenario.draft)
+            setImportedScenario(scenario)
+          }} />
         </CardContent>
       </Card>
 
@@ -595,6 +669,9 @@ function LedgerReportPreviewPanel({
   preview: Exclude<ReportPreview, { reportKey: "daily_business_summary_v1" }>
 }) {
   const { t } = useTranslation()
+  if (preview.reportKey === "margin_supply_outlook_v1") {
+    return <MarginSupplyOutlookCard preview={preview} />
+  }
   if (preview.reportKey === "low_stock_v1") {
     return (
       <div className="flex flex-col gap-6">
@@ -719,6 +796,29 @@ function LedgerReportPreviewPanel({
               ))}
         </CardContent>
       </Card>
+      <ReportMetadata preview={preview} />
+    </div>
+  )
+}
+
+function MarginSupplyOutlookCard({
+  preview,
+}: {
+  preview: Extract<ReportPreview, { reportKey: "margin_supply_outlook_v1" }>
+}) {
+  const dashboard = createMarginSupplyDashboard(preview)
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h3 className="text-lg font-semibold tracking-tight">{dashboard.title}</h3>
+        <p className="text-sm text-muted-foreground">{dashboard.description}</p>
+      </div>
+      <Alert><AlertCircle /><AlertTitle>No automatic repricing</AlertTitle><AlertDescription>{preview.watermark}. Review the evidence before changing any commercial or supply setting.</AlertDescription></Alert>
+      <DashboardGrid
+        sections={dashboard.sections}
+        testId="margin-supply-outlook-dashboard"
+        widgetTestIdPrefix="margin-supply"
+      />
       <ReportMetadata preview={preview} />
     </div>
   )

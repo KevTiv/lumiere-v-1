@@ -84,6 +84,7 @@ export function RoleManagement() {
   const [selectedPermissions, setSelectedPermissions] = useState<Map<string, Set<Action>>>(new Map())
   const [selectedColor, setSelectedColor] = useState<Role["color"]>("blue")
   const [isSaving, setIsSaving] = useState(false)
+  const [roleError, setRoleError] = useState<string | null>(null)
 
   const canEdit = checkPermission("admin:roles", "update").allowed
 
@@ -197,8 +198,9 @@ export function RoleManagement() {
           roleId: editingRole.id,
           params: {
             name,
-            description: description || null,
+            description,
             permissions: permissionStrings,
+            metadata,
           },
         })
       } else {
@@ -214,8 +216,7 @@ export function RoleManagement() {
       await refetch()
       setIsDialogOpen(false)
     } catch (error) {
-      console.error(error)
-      alert(t("settings.formConfig.fieldUpdateError"))
+      setRoleError(error instanceof Error ? error.message : t("settings.formConfig.fieldUpdateError"))
     } finally {
       setIsSaving(false)
     }
@@ -228,7 +229,13 @@ export function RoleManagement() {
       return
     }
     if (await confirmDialog({ description: t("settings.roles.deleteConfirm") })) {
-      alert(t("settings.formConfig.fieldDeleteError"))
+      setRoleError(null)
+      try {
+        await updateRole.mutateAsync({ roleId, params: { isActive: false } })
+        await refetch()
+      } catch (error) {
+        setRoleError(error instanceof Error ? error.message : t("settings.formConfig.fieldDeleteError"))
+      }
     }
   }
 
@@ -244,6 +251,7 @@ export function RoleManagement() {
 
   return (
     <div className="space-y-6">
+      {roleError && <p role="alert" className="text-sm text-destructive">{roleError}</p>}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-medium">{t("settings.roles.title")}</h3>
@@ -528,6 +536,7 @@ export function RoleManagement() {
               />
             ) : null}
 
+            {roleError && <p role="alert" className="text-sm text-destructive">{roleError}</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}

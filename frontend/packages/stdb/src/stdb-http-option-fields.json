@@ -772,6 +772,9 @@
   "ApplyExpenseAdvanceParams": [
     "metadata"
   ],
+  "ApplyHistoricalPaymentAllocationsParams": [
+    "metadata"
+  ],
   "ApplyOmnichannelAllocationParams": [
     "preferred_route_id",
     "channel",
@@ -1180,9 +1183,13 @@
     "metadata"
   ],
   "CountryPackDefinition": [
+    "effective_from",
+    "effective_to",
     "metadata"
   ],
   "CountryPackTaxRule": [
+    "effective_from",
+    "effective_to",
     "metadata"
   ],
   "CreateAccountAccountParams": [
@@ -2007,6 +2014,11 @@
     "invoice_payment_term_id",
     "ref",
     "payment_reference",
+    "metadata"
+  ],
+  "CreateManualInvoiceParams": [
+    "invoice_date_due",
+    "ref",
     "metadata"
   ],
   "CreateMessageBatchParams": [
@@ -5257,6 +5269,9 @@
   "SetHelpdeskRelatedRecordParams": [
     "target"
   ],
+  "SetMemberAccessParams": [
+    "job_title"
+  ],
   "SetPurchaseApprovalDelegateParams": [
     "metadata"
   ],
@@ -6773,7 +6788,8 @@
     "name",
     "description",
     "permissions",
-    "is_active"
+    "is_active",
+    "metadata"
   ],
   "UpdateSaleOrderLineParams": [
     "product_id",

@@ -116,24 +116,30 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
     expect(await fetchOrderPickings(page, orderId)).toHaveLength(1)
   })
 
-  test("a reply lost after the server committed reports an unknown outcome, refreshes, and offers no retry", async ({
+  test("a reply lost after the server committed recovers the committed outcome without redispatching", async ({
     page,
   }) => {
     test.setTimeout(240_000)
     const orderId = await draftOrder(page, "so-o2c-lost-response")
     await selectOrderForConfirm(page, orderId)
 
+    let dispatches = 0
+    page.on("request", (request) => {
+      if (request.method() === "POST" && request.url().includes("confirm_sales_order")) dispatches += 1
+    })
     const injected = await loseNextResponse(page, "confirm_sales_order")
     await page.getByTestId("entity-action-confirm-orders").click()
 
-    // The user is told the result is unknown, not that it failed or worked.
-    await expect(page.getByText(/Result unknown/i).first()).toBeVisible({ timeout: 30_000 })
-    expect(injected.lost()).toBe(true)
-
-    // The write did commit, exactly once, and re-issuing it is not offered.
+    // Authoritative readback proves the order and its delivery committed, so the
+    // lost reply resolves to the recovered success rather than "Result unknown".
+    await expect.poll(() => injected.lost(), { timeout: 30_000 }).toBe(true)
     await waitForSaleOrderConfirmed(page, orderId)
-    await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0)
     expect(await fetchOrderPickings(page, orderId)).toHaveLength(1)
+    await expect(page.getByText(/Result unknown/i)).toHaveCount(0)
+
+    // The write committed exactly once, and re-issuing it is not offered.
+    await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0)
+    expect(dispatches).toBe(1)
 
     // The list converged on the committed state, so confirm is no longer offered for the order.
     await selectEntityRowById(page, orderId)

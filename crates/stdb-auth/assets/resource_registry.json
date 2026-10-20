@@ -265,7 +265,13 @@
     "default_restricted": [
       "name",
       "amount",
-      "company_id"
+      "company_id",
+      "type_tax_use",
+      "amount_type",
+      "active",
+      "price_include",
+      "tax_group_id",
+      "has_negative_factor"
     ],
     "mandatory": [
       "id",
@@ -3915,7 +3921,8 @@
   "payslips": {
     "aliases": [
       "payslips",
-      "hr_payslip"
+      "hr_payslip",
+      "hr_payroll"
     ],
     "default_restricted": [
       "name",
@@ -3945,7 +3952,8 @@
   "payslips-to-export": {
     "aliases": [
       "payslips-to-export",
-      "hr_payslip"
+      "hr_payslip",
+      "hr_payroll"
     ],
     "default_restricted": [
       "name",
@@ -5200,7 +5208,10 @@
     "default_restricted": [
       "state",
       "company_id",
-      "description"
+      "description",
+      "origin",
+      "vendor_id",
+      "order_count"
     ],
     "mandatory": [
       "id",
@@ -5388,7 +5399,10 @@
       "product_id",
       "location_id",
       "company_id",
-      "active"
+      "active",
+      "last_run",
+      "next_run",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -5729,7 +5743,9 @@
       "picking_ids",
       "invoice_ids",
       "invoice_count",
-      "invoice_status"
+      "invoice_status",
+      "origin",
+      "origin_so_id"
     ],
     "mandatory": [
       "id",
@@ -5770,7 +5786,10 @@
       "row_dimension",
       "measure_field",
       "measure_op",
-      "is_active"
+      "is_active",
+      "company_id",
+      "column_dimension",
+      "filter_json"
     ],
     "mandatory": [
       "id",
@@ -6553,7 +6572,16 @@
     "default_restricted": [
       "name",
       "project_id",
-      "company_id"
+      "company_id",
+      "state",
+      "priority",
+      "is_closed",
+      "date_deadline",
+      "progress",
+      "planned_hours",
+      "effective_hours",
+      "user_ids",
+      "message_ids"
     ],
     "mandatory": [
       "id",
@@ -6609,7 +6637,9 @@
     "default_restricted": [
       "name",
       "sequence",
-      "company_id"
+      "company_id",
+      "tax_payable_account_id",
+      "tax_receivable_account_id"
     ],
     "mandatory": [
       "id",

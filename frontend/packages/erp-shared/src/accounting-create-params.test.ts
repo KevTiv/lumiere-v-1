@@ -28,7 +28,7 @@ test("manual invoice params normalize the modal payload into the generated input
     lines: [{
       accountId: "19",
       name: " Consulting ",
-      quantity: "2",
+      quantity: "1.5",
       priceUnit: "125",
       discount: "10",
       taxIds: ["5"],
@@ -38,13 +38,15 @@ test("manual invoice params normalize the modal payload into the generated input
 
   assert.ok(params)
   assert.equal(params.companyId, 42n)
+  assert.equal(params.partnerId, 11n)
+  assert.equal(params.counterpartAccountId, 13n)
   assert.deepEqual(params.moveType, { tag: "OutInvoice" })
   assert.equal(params.invoiceDate.microsSinceUnixEpoch, BigInt(Date.parse("2026-10-15")) * 1000n)
   assert.equal(params.ref, "INV-42")
   assert.deepEqual(params.lines, [{
     accountId: 19n,
     name: "Consulting",
-    quantity: 2,
+    quantity: 1.5,
     priceUnit: 125,
     discount: 10,
     taxIds: [5n],
@@ -63,7 +65,7 @@ test("manual invoice params normalize the modal payload into the generated input
   assert.deepEqual(wire.lines, [{
     account_id: 19,
     name: "Consulting",
-    quantity: 2,
+    quantity: 1.5,
     price_unit: 125,
     discount: 10,
     tax_ids: [5],

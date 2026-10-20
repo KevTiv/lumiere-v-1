@@ -1,10 +1,3 @@
-const ORGANIZATION_ADMIN_ROLES = new Set([
-  "admin",
-  "administrator",
-  "organization-admin",
-  "owner",
-])
-
 export type SessionCompany = {
   readonly id: number
   readonly isParent: boolean
@@ -99,16 +92,13 @@ export function resolveSessionCompanyIds(input: {
   readonly companies: readonly SessionCompany[]
   readonly membershipCompanyId?: number | null
   readonly roleNames: readonly string[]
+  readonly organizationWideAccess?: boolean
 }): number[] {
   const companies = input.companies
     .filter((company) => Number.isSafeInteger(company.id) && company.id > 0)
     .sort((a, b) => Number(b.isParent) - Number(a.isParent) || a.id - b.id)
   const validIds = new Set(companies.map((company) => company.id))
-  const isOrganizationAdmin = input.roleNames.some((role) =>
-    ORGANIZATION_ADMIN_ROLES.has(role.trim().toLowerCase().replace(/[\s_]+/g, "-")),
-  )
-
-  if (isOrganizationAdmin) return [...validIds]
+  if (input.organizationWideAccess) return [...validIds]
   if (input.membershipCompanyId != null && validIds.has(input.membershipCompanyId)) {
     return [input.membershipCompanyId]
   }

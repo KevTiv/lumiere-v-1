@@ -29,6 +29,7 @@ export * from "./lib/kanban-board-types";
 export * from "./kanban/kanban-board";
 export * from "./kanban/kanban-column";
 export * from "./kanban/kanban-draggable-card";
+export * from "./kanban/kanban-card";
 export * from "./lib/entity-configs";
 
 // Modular forms
@@ -82,12 +83,15 @@ export * from "./import-assistant/import-assistant-wizard";
 export * from "./import-assistant/import-mapping-table";
 export * from "./import-assistant/import-preview-grid";
 export * from "./import-assistant/import-job-status-panel";
+export * from "./import-assistant/abandoned-accounting-import-cleanup";
 export * from "./import-assistant/import-template-controls";
 export * from "./lib/hr-entity-configs";
 export * from "./lib/hr-form-configs";
 export * from "./lib/documents-entity-configs";
 export * from "./lib/documents-form-configs";
 export * from "./documents/record-attachments-panel";
+export * from "./documents/file-browser";
+export * from "./productivity/productivity-widgets";
 export * from "./lib/calendar-types";
 export * from "./lib/calendar-entity-configs";
 export * from "./lib/calendar-form-configs";
@@ -229,6 +233,8 @@ export * from "./settings/field-permissions-editor";
 export * from "./settings/sso-settings";
 export * from "./settings/form-config-settings";
 export * from "./settings/user-custom-fields";
+export * from "./settings/country-pack-readiness";
+export * from "./settings/country-pack-readiness-panel";
 
 // Hooks
 export * from "./hooks/use-toast";
@@ -252,6 +258,8 @@ export * from "./accounting-components/consolidation-workspace";
 export * from "./accounting-components/fx-revaluation-panel";
 export * from "./accounting-components/partner-credit-control-panel";
 export * from "./accounting-components/amortization-panel";
+export * from "./accounting-components/accounting-setup-readiness";
+export * from "./accounting-components/accounting-setup-readiness-panel";
 
 // Calendar components
 export * from "./calendar-components/calendar-view";

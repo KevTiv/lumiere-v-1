@@ -12,9 +12,10 @@ import { Label } from "@lumiere/ui/components/label"
 import { redirectToWorkOsSignUp } from "@/app/actions/workos-auth"
 import { phCapture, phCaptureException, phIdentify } from "@/lib/posthog-browser"
 
-const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
+import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 
 export default function SignUpPage() {
+  const useWorkOsAuth = useWorkOsAuthMode()
   const { t } = useTranslation()
   const router = useRouter()
   const [email, setEmail] = useState("")
@@ -62,7 +63,8 @@ export default function SignUpPage() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {!useWorkOsAuth && (
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">{t("auth.fields.email")}</Label>
             <Input
@@ -107,13 +109,15 @@ export default function SignUpPage() {
           <Button type="submit" size="lg" className="w-full" disabled={loading}>
             {loading ? t("auth.signUp.submitting") : t("auth.signUp.submit")}
           </Button>
-        </form>
+          </form>
+        )}
 
         {useWorkOsAuth && (
-          <div className="space-y-3 border-t border-border pt-4">
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Access requires an approved invitation and organization membership.</p>
             <form action={redirectToWorkOsSignUp} className="space-y-2">
               <input type="hidden" name="returnTo" value="/onboarding" />
-              <Button type="submit" variant="outline" size="lg" className="w-full">
+              <Button type="submit" size="lg" className="w-full">
                 {t("auth.signUp.continueWithWorkOs")}
               </Button>
             </form>

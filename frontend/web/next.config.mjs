@@ -31,42 +31,16 @@ function posthogRewrites() {
   ]
 }
 
-/**
- * Local/dev fallback for Rust-owned generic ERP APIs. Production ingress sends
- * these prefixes directly to api-server, so they do not need Next route files.
- */
-function rustApiRewrites() {
-  const raw = process.env.LUMIERE_API_SERVER_URL?.trim() ?? ''
-  if (!raw || raw === 'false' || raw === 'off') return []
-  const base = raw.replace(/\/$/, '')
-  return [
-    {
-      source: '/api/query/:path*',
-      destination: `${base}/v1/query/:path*`,
-    },
-    {
-      source: '/api/compat/reducer/:path*',
-      destination: `${base}/v1/compat/reducer/:path*`,
-    },
-    {
-      source: '/api/operations/:path*',
-      destination: `${base}/v1/operations/:path*`,
-    },
-    // Settings → Users / Roles read these api-server routes; without a
-    // gateway (local, E2E) they were otherwise unreachable and 404ed in Next.
-    {
-      source: '/api/settings/:path*',
-      destination: `${base}/v1/settings/:path*`,
-    },
-  ]
-}
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
   // Keep workspace packages imported by the web app inside the standalone
   // server bundle. The release workflow copies this traced tree verbatim.
   outputFileTracingRoot: path.resolve(__dirname, '../..'),
+  experimental: {
+    // Next 16.1 requires opt-in to write the compiler cache restored by Actions.
+    turbopackFileSystemCacheForBuild: process.env.GITHUB_ACTIONS === 'true',
+  },
   skipTrailingSlashRedirect: true,
   async headers() {
     return [{
@@ -75,7 +49,7 @@ const nextConfig = {
     }]
   },
   async rewrites() {
-    return [...rustApiRewrites(), ...posthogRewrites()]
+    return posthogRewrites()
   },
   typescript: {
     ignoreBuildErrors: true,

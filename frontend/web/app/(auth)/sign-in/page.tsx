@@ -14,22 +14,26 @@ import {
 } from "@/app/actions/workos-auth"
 import { phCapture, phCaptureException, phIdentify } from "@/lib/posthog-browser"
 
-const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
+import { safeAuthReturnTo } from '@/lib/auth-mode'
+import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 
-function safeCallbackUrl(value: string | null) {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return '/overview'
-  return value
-}
 
 export default function SignInPage() {
+  const useWorkOsAuth = useWorkOsAuthMode()
   const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"))
+  const callbackUrl = safeAuthReturnTo(searchParams.get("callbackUrl"))
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const messages: Record<string, string> = {
+    admission_denied: 'Your account needs administrator approval or explicit linking to an existing account.',
+    membership_suspended: 'Your organization access is suspended. Contact your administrator.',
+    invitation_required: 'You are signed in. Open your organization invitation to finish joining.',
+    authentication_unavailable: 'Authentication is temporarily unavailable. Please retry.',
+  }
+  const [error, setError] = useState<string | null>(messages[searchParams.get('error') ?? ''] ?? null)
   const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
@@ -67,7 +71,9 @@ export default function SignInPage() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {!useWorkOsAuth && (
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">{t("auth.fields.email")}</Label>
             <Input
@@ -98,18 +104,17 @@ export default function SignInPage() {
             />
           </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
-
           <Button type="submit" size="lg" className="w-full" disabled={loading}>
             {loading ? t("auth.signIn.submitting") : t("auth.signIn.submit")}
           </Button>
-        </form>
+          </form>
+        )}
 
         {useWorkOsAuth && (
-          <div className="space-y-3 border-t border-border pt-4">
+          <div className="space-y-3">
             <form action={redirectToWorkOsSignIn} className="space-y-2">
               <input type="hidden" name="returnTo" value={callbackUrl} />
-              <Button type="submit" variant="outline" size="lg" className="w-full">
+              <Button type="submit" size="lg" className="w-full">
                 {t("auth.signIn.continueWithWorkOs")}
               </Button>
             </form>
@@ -122,7 +127,7 @@ export default function SignInPage() {
 
       <CardFooter className="justify-center">
         <p className="text-sm text-muted-foreground">
-          {process.env.NODE_ENV === 'production' ? 'Access is by invitation. Contact your administrator.' : <>
+          {useWorkOsAuth || process.env.NODE_ENV === 'production' ? 'Access is by invitation. Contact your administrator.' : <>
             {t("auth.signIn.noAccount")}{" "}
             <Link href="/sign-up" className="font-medium text-foreground hover:underline">
               {t("auth.signIn.createOne")}

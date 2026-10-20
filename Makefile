@@ -39,6 +39,7 @@ E2E_WORKERS        ?= 1
 # CI can install a checksum-verified, exact-commit build artifact before it
 # starts an isolated runtime for each Playwright shard.
 E2E_PREBUILT       ?= 0
+RWANDA_ALPHA_EVIDENCE ?=
 # Run reducer/domain validation before browser fixture seeding. Set to 0 when
 # reducer proof is run separately and the browser suite needs a pristine seed.
 E2E_RUN_DOMAIN_TESTS ?= 1
@@ -112,8 +113,10 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	generate-stdb-ts-sdk generate-stdb-rust-sdk schema-snapshot \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
-	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running e2e-docker \
+	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running e2e-single-remote e2e-docker \
 	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
+	validate-rwanda-alpha-evidence \
+	prepare-rwanda-alpha-evidence \
 	init-stack refresh-stack-tokens docker-dev docker-dev-iot \
 	register-stack-identities \
 	generate-stdb-http-option-metadata check-stdb-http-option-metadata \
@@ -154,6 +157,7 @@ help-legacy:
 	@echo "  e2e-single-test      one spec; matching local Next builds are reused (--workers=1)"
 	@echo "  e2e-web-dev          prepare API/STDB and keep Next dev running in this terminal"
 	@echo "  e2e-single-running   one spec against an existing stack; no build/publish/seed"
+	@echo "  e2e-single-remote    one spec against PLAYWRIGHT_BASE_URL; preserves caller credentials and service variables"
 	@echo "  e2e-p2p              Wave 3 gate: procure-to-pay golden path (mvp-procure-to-pay.spec.ts)"
 	@echo "  e2e-mvp-golden       Both MVP golden paths (lead-to-cash + procure-to-pay, fresh DB)"
 	@echo "  generate-stdb-rust-sdk  Regenerate api-server Rust STDB client bindings (+ keyword fix)"
@@ -235,6 +239,7 @@ help-e2e:
 	$(call print-command,e2e-playwright-only,Run Playwright against already-running services.)
 	$(call print-command,e2e-web-dev,Prepare API/STDB then keep Next dev running in this terminal.)
 	$(call print-command,e2e-single-running,One spec against a running stack without building or seeding.)
+	$(call print-command,e2e-single-remote,One spec against PLAYWRIGHT_BASE_URL without local health checks or environment overrides.)
 	$(call print-command,e2e-single,Setup plus one spec; E2E_SPEC=<file> and E2E_GREP=<pattern>.)
 	$(call print-command,e2e-single-test,One spec against an existing E2E setup.)
 	$(call print-command,e2e-p2p,Procure-to-pay golden-path spec.)
@@ -242,6 +247,7 @@ help-e2e:
 	$(call print-command,e2e-crm-isolation,Fresh live CRM organization/company read-isolation gate.)
 	$(call print-command,e2e-dx-test,Validate local E2E fingerprint and API binary helpers.)
 	$(call print-command,e2e-wipe-local-stdb,DESTRUCTIVE: delete all local SpacetimeDB data.)
+	$(call print-command,validate-rwanda-alpha-evidence,Validate a Rwanda rehearsal bundle; set RWANDA_ALPHA_EVIDENCE=<manifest.json>.)
 	@printf "\nUseful inputs: E2E_CLEAR_DB=1, E2E_SUITE=p0, E2E_SPEC=<file>, E2E_GREP=<pattern>.\n"
 
 # ── Module build and environment checks ──────────────────────────────────────
@@ -756,6 +762,30 @@ e2e-single-test:
 e2e-single-running:
 	@$(MAKE) e2e-playwright-only E2E_ONLY_SPEC="$(E2E_SPEC)"
 
+# Run one spec against an already-deployed stack. Unlike e2e-single-running,
+# this target deliberately preserves the caller's URL, login and optional
+# trusted-fixture variables and performs no localhost health checks.
+e2e-single-remote:
+	@env E2E_SPEC="$(E2E_SPEC)" E2E_GREP="$(E2E_GREP)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
+		: "$${E2E_SPEC:?Set E2E_SPEC to one Playwright spec filename}"; \
+		: "$${PLAYWRIGHT_BASE_URL:?Set PLAYWRIGHT_BASE_URL to the isolated tenant URL}"; \
+		: "$${E2E_TEST_EMAIL:?Set E2E_TEST_EMAIL for the rehearsal operator}"; \
+		if [ -z "$${E2E_TEST_PASSWORD:-}" ]; then echo "Set E2E_TEST_PASSWORD through a secret manager or hidden prompt" >&2; exit 2; fi; \
+		case "$$PLAYWRIGHT_BASE_URL" in http://*|https://*) ;; *) echo "PLAYWRIGHT_BASE_URL must be an http(s) URL" >&2; exit 2 ;; esac; \
+		PW_ARGS=("tests/e2e/$$E2E_SPEC" --workers "$$E2E_WORKERS"); \
+		if [ -n "$$E2E_GREP" ]; then PW_ARGS+=(--grep "$$E2E_GREP"); fi; \
+		cd frontend/web; \
+		pnpm exec playwright test "$${PW_ARGS[@]}"'
+
+validate-rwanda-alpha-evidence:
+	@test -n "$(RWANDA_ALPHA_EVIDENCE)" || { echo "Set RWANDA_ALPHA_EVIDENCE=/path/to/evidence-manifest.json" >&2; exit 2; }
+	@node scripts/validate-rwanda-accounting-alpha-evidence.mjs "$(RWANDA_ALPHA_EVIDENCE)"
+
+prepare-rwanda-alpha-evidence:
+	@test -n "$(RWANDA_ALPHA_CONTEXT)" || { echo "Set RWANDA_ALPHA_CONTEXT=/path/to/00-rwanda-rehearsal-context.json" >&2; exit 2; }
+	@test -n "$(RWANDA_ALPHA_BUNDLE)" || { echo "Set RWANDA_ALPHA_BUNDLE=/secure/path/to/bundle-directory" >&2; exit 2; }
+	@node scripts/prepare-rwanda-accounting-alpha-evidence.mjs "$(RWANDA_ALPHA_CONTEXT)" "$(RWANDA_ALPHA_BUNDLE)"
+
 # Foreground development server; Ctrl-C stops only this web process. The API
 # and local database prepared by setup remain available for the next session.
 e2e-web-dev: e2e-smoke-setup
@@ -1199,7 +1229,8 @@ check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pi
 contracts-staging-from-pinned:
 	@bash scripts/prepare-vendored-contracts-rust.sh
 	@cargo fetch --quiet
-	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
+	@set -euo pipefail; \
+	CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "contracts-staging-from-pinned: could not resolve the pinned lumiere-contracts checkout" >&2; \
 		exit 1; \
@@ -1214,11 +1245,12 @@ contracts-staging-from-pinned:
 			exit 1; \
 		fi; \
 	done; \
-	rm -rf .contracts-staging; \
-	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated .contracts-staging/ir; \
-	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
-	cp -R "$$CHECKOUT/manifests/." .contracts-staging/manifests/; \
-	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." .contracts-staging/ir/; fi; \
+	STAGING="$$(mktemp -d)"; \
+	trap 'rm -rf "$$STAGING"' EXIT; \
+	mkdir -p "$$STAGING/bindings" "$$STAGING/manifests" "$$STAGING/ts/generated" "$$STAGING/ir"; \
+	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." "$$STAGING/bindings/"; \
+	cp -R "$$CHECKOUT/manifests/." "$$STAGING/manifests/"; \
+	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." "$$STAGING/ir/"; fi; \
 	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
 	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
 	python3 scripts/verify-contract-ir.py \
@@ -1232,9 +1264,10 @@ contracts-staging-from-pinned:
 		python3 scripts/verify-agent-capability-artifact.py \
 			"$$CHECKOUT/ir/agent-capability-registry-v1.json"; \
 	fi; \
-	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
-	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
-	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
+	cp -R "$$CHECKOUT/packages/contracts/src/generated/." "$$STAGING/ts/generated/"; \
+	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" "$$STAGING/ts/"; \
+	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" "$$STAGING/ts/"; \
+	python3 scripts/sync-directory.py "$$STAGING" .contracts-staging; \
 	echo "contracts-staging-from-pinned: populated .contracts-staging/ from $$CHECKOUT"
 
 # CI-safe reducer drift check. Unlike full bindings drift, schema retrieval is

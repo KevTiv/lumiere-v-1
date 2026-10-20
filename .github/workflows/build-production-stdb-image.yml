@@ -6,6 +6,9 @@ on:
     paths:
       - spacetimedb/**
       - crates/presentation-core/**
+      - crates/policy-core/**
+      - lumiere-codegen/storage-policy-manifest.json
+      - crates/stdb-auth/assets/resource_registry.json
       - scripts/railway-publish-spacetimedb.sh
       - Dockerfile.spacetimedb-publisher-artifact
       - .github/workflows/build-contracts-module.yml
@@ -25,6 +28,7 @@ jobs:
     uses: ./.github/workflows/build-contracts-module.yml
     with:
       production: true
+      alpha_founder_identities: ${{ vars.LUMIERE_ALPHA_FOUNDER_IDENTITIES }}
   publish:
     needs: module
     runs-on: ubuntu-latest

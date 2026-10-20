@@ -26,6 +26,7 @@ import {
   mergeCommissionRateIntoMetadata,
   parseCommissionRatePercent,
 } from './sales-ops-panel';
+import { runtimeFormRoleId } from '@lumiere/ui/lib/runtime-form-role';
 
 type SaleOrderWorkflow = ReturnType<typeof useSaleOrderWorkflow>;
 type OrderRow = Record<string, unknown>;
@@ -108,7 +109,7 @@ export function CreateInvoiceFromOrderDialog({
       moduleId="sales"
       formId="create-invoice-from-sale-order"
       organizationId={organizationId}
-      roleId={currentUser?.roles[0]}
+      roleId={runtimeFormRoleId(currentUser)}
       preferStdbVisibility
       foldCustomFieldsIntoMetadata={false}
       closeOnSubmit={false}
@@ -160,7 +161,7 @@ export function EditSaleOrderDialog({
       moduleId="sales"
       formId="edit-sale-order"
       organizationId={organizationId}
-      roleId={currentUser?.roles[0]}
+      roleId={runtimeFormRoleId(currentUser)}
       preferStdbVisibility
       transformConfig={(cfg) =>
         mergeFieldDefaultValues(cfg, {

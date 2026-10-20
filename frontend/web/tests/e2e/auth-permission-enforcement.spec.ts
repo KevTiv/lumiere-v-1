@@ -1,3 +1,4 @@
+import { bootstrapFixtureAccountSession } from './fixture-account'
 import { expect, request as playwrightRequest, test, type Browser, type Page } from "@playwright/test"
 
 import {
@@ -81,18 +82,7 @@ async function signupIdentityHex(email: string, password: string): Promise<strin
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100"
   const isolated = await playwrightRequest.newContext({ baseURL })
   try {
-    const signup = await isolated.post("/api/auth/signup", {
-      data: { email, password },
-    })
-    if (!signup.ok()) {
-      const body = await signup.text().catch(() => "")
-      throw new Error(`signup failed (${signup.status()}): ${body}`)
-    }
-    const state = await isolated.storageState()
-    const identityCookie = state.cookies.find((c) => c.name === "stdb_identity")
-    const raw = identityCookie?.value
-    if (!raw) throw new Error("signup did not set stdb_identity cookie")
-    return raw.replace(/^0x/i, "")
+    return await bootstrapFixtureAccountSession(isolated, email, password)
   } finally {
     await isolated.dispose()
   }
@@ -589,8 +579,9 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
 
     await withLimitedUserSession(browser, async (limitedPage) => {
       await callReducerBff(limitedPage, "post_account_move", args)
-      await waitForMovePosted(limitedPage, moveId)
     })
+    // A write grant does not grant read access. Observe the effect as admin.
+    await waitForMovePosted(page, moveId)
 
     permissionId = await fetchOrgPermissionId(page, "account_move", {
       roleId: limitedRoleId,
@@ -621,12 +612,14 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
         secondaryPickingId = await adminPrepareAssignedPicking(page)
         return [orgId, secondaryPickingId, { company_id: companyId }]
       },
-      assertSuccess: async (limitedPage, args) => {
+      // The grant is Write-only, so the limited actor still cannot read pickings;
+      // the administrator observes the validated effect.
+      assertSuccess: async (_limitedPage, args) => {
         const pickingId = Number(args[1])
         await expect
           .poll(
             async () => {
-              const res = await limitedPage.request.get("/api/query/stock-pickings")
+              const res = await page.request.get("/api/query/stock-pickings")
               if (!res.ok()) return ""
               const json = (await res.json()) as {
                 data?: Array<{ id?: unknown; state?: unknown }>
@@ -663,9 +656,11 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
         secondaryPaymentId = await adminCreateDraftPayment(page)
         return [orgId, secondaryPaymentId]
       },
-      assertSuccess: async (limitedPage, args) => {
+      // The actor holds post only, not account_payment read; the administrator
+      // observes the posted payment.
+      assertSuccess: async (_limitedPage, args) => {
         const paymentId = Number(args[1])
-        await waitForPaymentPosted(limitedPage, paymentId)
+        await waitForPaymentPosted(page, paymentId)
       },
     })
   })

@@ -23,9 +23,10 @@ assert_contains() {
 }
 
 assert_contains 'url: http://web.railway.internal:3000'
-assert_contains 'url: http://api-server.railway.internal:8080/v1/query'
-assert_contains 'url: http://api-server.railway.internal:8080/v1/operations'
-assert_contains 'url: http://api-server.railway.internal:8080/v1/compat/reducer'
+assert_contains 'url: http://web.railway.internal:3000/api/query'
+assert_contains 'url: http://web.railway.internal:3000/api/operations'
+assert_contains 'url: http://web.railway.internal:3000/api/compat/reducer'
+assert_contains 'url: http://api-server.railway.internal:8080/v1/realtime'
 assert_contains '- /api/operations'
 assert_contains '- /api/compat/reducer'
 assert_contains 'policy: local'

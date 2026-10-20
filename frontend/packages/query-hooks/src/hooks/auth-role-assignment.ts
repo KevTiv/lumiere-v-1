@@ -12,6 +12,27 @@ export type RoleAssignmentProjection = {
   readonly role_id?: unknown
   readonly isActive?: unknown
   readonly is_active?: unknown
+  readonly expiresAt?: unknown
+  readonly expires_at?: unknown
+}
+
+export function roleAssignmentIsCurrent(row: RoleAssignmentProjection, nowMicros = BigInt(Date.now()) * 1000n): boolean {
+  if ((row.isActive ?? row.is_active) !== true) return false
+  const expiry = row.expiresAt ?? row.expires_at
+  if (expiry == null) return true
+  const micros = (value: unknown): bigint | null => {
+    if (value && typeof value === 'object') {
+      const record = value as {
+        __timestamp_micros_since_unix_epoch__?: unknown
+        microsSinceUnixEpoch?: unknown
+        some?: unknown
+      }
+      return micros(record.__timestamp_micros_since_unix_epoch__ ?? record.microsSinceUnixEpoch ?? record.some)
+    }
+    try { return typeof value === 'number' && !Number.isSafeInteger(value) ? null : BigInt(String(value)) } catch { return null }
+  }
+  const value = micros(expiry)
+  return value != null && value > nowMicros
 }
 
 function identityHex(value: unknown): string {
@@ -38,7 +59,7 @@ export function resolveActiveRoleAssignmentEffect(
       parseStrictU64(row.organizationId ?? row.organization_id) === organizationId &&
       parseStrictU64(row.roleId ?? row.role_id) === roleId &&
       identityHex(row.userIdentity ?? row.user_identity) === identity &&
-      (row.isActive ?? row.is_active) === true,
+      roleAssignmentIsCurrent(row),
   )
   if (matches.length > 1) throw new AmbiguousOperationEffectError(`Expected one active role assignment, found ${matches.length}`)
   const id = parseStrictU64(matches[0]?.id)

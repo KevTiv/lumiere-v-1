@@ -134,6 +134,9 @@ pub fn mask_report_preview(
         ReportPreview::MonthlyOwnerReportV1(envelope) => {
             ReportPreview::MonthlyOwnerReportV1(envelope)
         }
+        ReportPreview::MarginSupplyOutlookV1(envelope) => {
+            ReportPreview::MarginSupplyOutlookV1(envelope)
+        }
     }
 }
 
@@ -191,25 +194,11 @@ fn resolve_permission(
     resource: &str,
     action: &str,
 ) -> PermissionResolution {
-    if ctx.is_superuser {
-        return PermissionResolution::Allow;
+    if stdb_auth::permission_allowed(ctx, resource, action) {
+        PermissionResolution::Allow
+    } else {
+        PermissionResolution::NotGranted
     }
-
-    let permission = format!("{resource}:{action}");
-    let wildcard = format!("{resource}:*");
-    if ctx
-        .role_permissions
-        .iter()
-        .any(|entry| entry == "*:*" || entry == &permission || entry == &wildcard)
-    {
-        return PermissionResolution::Allow;
-    }
-
-    let org = ctx.organization_id.to_string();
-    let _ = org;
-    // Resource grants come from Role.permissions (and org_permission on the module).
-    // FieldAccessContext no longer carries Casbin rows.
-    PermissionResolution::NotGranted
 }
 
 fn can_read_contact_identity(field_access: &FieldAccessContext) -> bool {
@@ -294,6 +283,8 @@ mod tests {
             role_permissions: role_permissions.into_iter().map(str::to_string).collect(),
             identity_hex: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".into(),
             field_permissions: vec![],
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         }
     }
 

@@ -78,7 +78,7 @@ services:
           allowed_payload_size: 20
 
   - name: api-query
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/query
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/query
     routes:
       - name: api-query
         paths:
@@ -94,7 +94,7 @@ services:
           policy: local
 
   - name: api-call
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/call
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/call
     routes:
       - name: api-call
         paths:
@@ -113,7 +113,7 @@ services:
           allowed_payload_size: 20
 
   - name: api-stdb
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/stdb
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/stdb
     routes:
       - name: api-stdb
         paths:
@@ -132,7 +132,7 @@ services:
           allowed_payload_size: 32
 
   - name: api-auth-signin
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/auth/signin
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/auth/signin
     routes:
       - name: api-auth-signin
         paths:
@@ -161,7 +161,7 @@ services:
           body: '{"error":"This initial release is invite-only. Contact your administrator."}'
 
   - name: api-auth-invite
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/auth/invite
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/auth/invite
     routes:
       - name: api-auth-invite
         paths:
@@ -170,7 +170,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-auth-accept-invite
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/auth/accept-invite
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/auth/accept-invite
     routes:
       - name: api-auth-accept-invite
         paths:
@@ -179,7 +179,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-auth-forgot-password
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/auth/forgot-password
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/auth/forgot-password
     routes:
       - name: api-auth-forgot-password
         paths:
@@ -188,7 +188,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-auth-reset-password
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/auth/reset-password
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/auth/reset-password
     routes:
       - name: api-auth-reset-password
         paths:
@@ -197,7 +197,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-crm
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/crm
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/crm
     routes:
       - name: api-crm
         paths:
@@ -216,7 +216,7 @@ services:
           allowed_payload_size: 20
 
   - name: api-sales
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/sales
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/sales
     routes:
       - name: api-sales
         paths:
@@ -225,7 +225,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-accounting
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/accounting
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/accounting
     routes:
       - name: api-accounting
         paths:
@@ -234,7 +234,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-inventory
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/inventory
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/inventory
     routes:
       - name: api-inventory
         paths:
@@ -243,7 +243,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-settings
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/settings
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/settings
     routes:
       - name: api-settings
         paths:
@@ -252,7 +252,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-proposals
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/proposals
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/proposals
     routes:
       - name: api-proposals
         paths:
@@ -263,7 +263,7 @@ services:
   # Generic ERP commands are Rust-owned. Route them here rather than relying on
   # Next.js build-time rewrites, which may be absent in a standalone image.
   - name: api-operations
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/operations
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/operations
     routes:
       - name: api-operations
         paths:
@@ -272,7 +272,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-compat-reducer
-    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/compat/reducer
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/compat/reducer
     routes:
       - name: api-compat-reducer
         paths:
