@@ -4,6 +4,7 @@ export { SyncEngine, type SyncResult } from "./sync-engine.ts";
 export {
   connectCategoryTransport,
   ProjectionResetError,
+  ProjectionUnavailableError,
   type HttpProjectionOptions,
 } from "./http-transport.ts";
 export type {

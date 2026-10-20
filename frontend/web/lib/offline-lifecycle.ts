@@ -1,5 +1,6 @@
 /** No business data or credentials: this marker only revokes an open reader. */
 export const OFFLINE_REVOCATION_KEY = "lumiere:offline-revocation";
+export const OFFLINE_GRANT_KEY = "lumiere:offline-category-grant-v1";
 const CHANNEL = "lumiere:offline-lifecycle";
 export const ACTIVE_COMPANY_KEY = "lumiere:active-company";
 
@@ -7,6 +8,7 @@ export function revokeOfflineReaders(): void {
   const token =
     globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
   try {
+    localStorage.removeItem(OFFLINE_GRANT_KEY);
     localStorage.setItem(OFFLINE_REVOCATION_KEY, token);
   } catch {
     /* Broadcast still works. */
@@ -34,6 +36,7 @@ export function watchOfflineRevocation(revoke: () => void): () => void {
     if (
       event.key === null ||
       event.key === OFFLINE_REVOCATION_KEY ||
+      (event.key === OFFLINE_GRANT_KEY && event.newValue === null) ||
       event.key === ACTIVE_COMPANY_KEY
     )
       revoke();

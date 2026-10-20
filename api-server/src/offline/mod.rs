@@ -1,5 +1,6 @@
 pub(crate) mod authority;
 pub(crate) mod core;
+pub(crate) mod grant;
 mod generated_category;
 mod rows;
 pub(crate) mod source;

@@ -150,6 +150,7 @@ dependencies = [
  "printpdf",
  "rand 0.8.5",
  "reqwest",
+ "ring",
  "rust_xlsxwriter",
  "rustls 0.23.37",
  "rustls-native-certs 0.8.3",
@@ -170,6 +171,7 @@ dependencies = [
  "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber",
+ "url",
  "urlencoding",
 ]
 

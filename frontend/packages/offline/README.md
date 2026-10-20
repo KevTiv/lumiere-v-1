@@ -54,7 +54,8 @@ IndexedDB fallback. OPFS storage is subject to browser quota, eviction and
 private-mode restrictions. The host owns persistence-grant policy, connectivity,
 retry scheduling and cancellation. A disconnected restart also needs cached app,
 worker and WASM assets plus an admitted offline authentication policy; this
-package does not install a service worker or define grant expiry/encryption.
+package does not install a service worker. Its `./offline-grant` export verifies
+the app's optional signed read lease; it does not provide at-rest encryption.
 
 ## Checks
 
@@ -80,11 +81,16 @@ included in app build-cache outputs. Deploy immutable hashed assets together and
 retain old generations while their clients can still be open.
 
 The reader uses `/api/offline/product-categories/*` through Next's configured
-Rust rewrite or production Kong ingress. Every new reader must discover a live
-server scope before opening private saved rows. A cold offline launch boots its
-public shell and asks for reconnection. Open verified sessions can continue
-reading disconnected. Sign-out/company transitions revoke active readers;
-actor/policy changes are checked on refresh, focus and reconnect. This does not
-define signed offline grants, encryption policy or an all-actor storage wipe.
+Rust rewrite or production Kong ingress. By default, every new reader must
+discover a live server scope before opening private saved rows; a cold offline
+launch asks for reconnection. Operators can explicitly enable signed, expiring
+read leases with server signing configuration and build-pinned public keys.
+Then a network outage can admit a cold reader to its existing scoped OPFS rows
+until expiry. The grant never authenticates API requests or permits writes.
+Sign-out/company transitions revoke active readers; actor/policy changes and
+server denials override the lease on reconnect. Local browser time/storage are
+not tamper resistant; encryption and an all-actor storage wipe remain separate.
 
 See [app status and local gates](../../../docs/plan/offline-category-app-status.md).
+See [grant configuration and limits](../../../docs/plan/offline-access-grant-status.md)
+before enabling offline admission.

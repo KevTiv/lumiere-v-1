@@ -4,6 +4,7 @@ import { scope } from "./fixture.ts";
 const origin = "http://127.0.0.1:4179";
 const url = `${origin}/offline/categories/index.html?companyId=9`;
 test.beforeEach(async ({ context, request }) => {
+  await request.get(`${origin}/fixture/grants?enabled=false`);
   await request.get(`${origin}/fixture/status?value=200`);
   await request.get(`${origin}/fixture/delay?value=false`);
   await request.get(`${origin}/fixture/actor?value=actor-a`);

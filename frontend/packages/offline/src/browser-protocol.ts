@@ -1,5 +1,8 @@
 import type { ProjectionScope } from "./contracts.ts";
-import { ProjectionResetError } from "./http-transport.ts";
+import {
+  ProjectionResetError,
+  ProjectionUnavailableError,
+} from "./http-transport.ts";
 
 export type BrowserCommand =
   | {
@@ -17,6 +20,7 @@ export type BrowserRequest = BrowserCommand & { id: number };
 export interface WireError {
   message: string;
   status?: number;
+  unavailable?: boolean;
 }
 export type BrowserReply =
   | { id: number; ok: true; value: unknown }
@@ -30,9 +34,13 @@ export function wireError(error: unknown): WireError {
     message:
       error instanceof Error ? error.message : "Browser projection failed",
     ...(error instanceof ProjectionResetError ? { status: error.status } : {}),
+    ...(error instanceof ProjectionUnavailableError
+      ? { unavailable: true, status: error.status }
+      : {}),
   };
 }
 export function fromWireError(error: WireError): Error {
+  if (error.unavailable) return new ProjectionUnavailableError(error.status);
   return error.status === undefined
     ? new Error(error.message)
     : new ProjectionResetError(error.status);

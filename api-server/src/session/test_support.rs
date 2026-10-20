@@ -6,6 +6,7 @@ use crate::organization_placement::{
 
 pub(crate) fn test_config(server_token: Option<&str>) -> Config {
     Config {
+        offline_grants: None,
         port: 8082,
         stdb_host: "http://127.0.0.1:3000".into(),
         stdb_module: "test-module".into(),

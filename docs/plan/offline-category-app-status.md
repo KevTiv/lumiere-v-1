@@ -23,7 +23,9 @@ revoke other-tab readers. An active reader hides rows, cancels pending work, the
 clears its own scoped projection/checkpoint and closes the worker. Ordinary page
 departure preserves saved data but a restored page must verify again. This is not
 an all-actor OPFS wipe: inactive partitions can remain on disk and suspended or
-crashed tabs cannot acknowledge cleanup. Cached metadata never grants admission.
+crashed tabs cannot acknowledge cleanup. Unsigned cached scope metadata never
+grants admission. The next stacked slice adds optional
+[signed, expiring offline admission](offline-access-grant-status.md).
 
 The scoped service worker precaches only public static HTML, CSS, hashed
 client/worker JS and pinned real WASM. APIs, session responses and authenticated
@@ -57,15 +59,16 @@ browser download is added.
 
 ## Remaining admission work
 
-Cold offline launch shows the shell and a reconnect prompt, **not private rows**.
-Signed offline authorization lifetime, encryption/persistence and quota/eviction
-recovery remain undefined. An already verified open reader can read disconnected;
-new launches must reconnect. This is not a fully installed offline ERP experience
-and adds no offline business-write queue.
+Without explicit grant configuration, cold offline launch shows the shell and a
+reconnect prompt. The next stacked slice implements signed leases for cold reads
+and expiry checks; production keys and lifetime still need operator selection.
+Encryption/persistence and quota/eviction recovery remain undefined. This is not
+a fully installed offline ERP experience and adds no offline business-write queue.
 
 Run the live authenticated API/STDB snapshot/replay/revocation gate through Next
 and Kong, with actual inventory navigation, sign-out, company changes and
-production assets. Decide signed offline grants and persistence/encryption policy.
+production assets. Configure and validate the grant policy, then decide
+persistence/encryption policy.
 Larger snapshots, pagination beyond 200 displayed rows, multi-tab cooperation,
 Tauri, ChangeSets and review workflows remain later slices. A project-wide
 percent-complete estimate is not supported.

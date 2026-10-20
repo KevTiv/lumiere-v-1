@@ -33,6 +33,7 @@ enum Mode {
     Scope,
     Snapshot,
     Pull,
+    Grant,
 }
 
 fn feed_error(error: FeedError) -> ApiError {
@@ -105,6 +106,15 @@ async fn execute(
             .await
             .map_err(feed_error)?
         }
+        Mode::Grant => {
+            if query.cursor.is_some() {
+                return Err(ApiError::BadRequest(
+                    "Grant cannot select a replay cursor".into(),
+                ));
+            }
+            // Reauthorize again below before signing; unsigned client scope is never accepted.
+            serde_json::Value::Null
+        }
         Mode::Scope => unreachable!("scope discovery returned above"),
     };
     let current_session = resolve_session(state, headers, cookies)
@@ -114,6 +124,17 @@ async fn execute(
     if current_scope != scope {
         return Err(ApiError::Conflict(
             "Offline authorization changed during read".into(),
+        ));
+    }
+    if matches!(mode, Mode::Grant) {
+        let signer = state
+            .config
+            .offline_grants
+            .as_ref()
+            .ok_or_else(|| ApiError::NotFound("Offline grants are disabled".into()))?;
+        return Ok(Json(
+            serde_json::to_value(signer.issue(&current_scope).map_err(ApiError::internal)?)
+                .map_err(ApiError::internal)?,
         ));
     }
     Ok(Json(data))
@@ -167,6 +188,16 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/offline/product-categories/scope", get(scope))
         .route("/offline/product-categories/snapshot", get(snapshot))
         .route("/offline/product-categories/pull", get(pull))
+        .route("/offline/product-categories/grant", get(grant))
+}
+
+async fn grant(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Query(query): Query<ReadQuery>,
+) -> Response {
+    respond(state, headers, cookies, query, Mode::Grant).await
 }
 
 #[cfg(test)]
@@ -178,7 +209,7 @@ mod tests {
         let state = AppState::new(crate::session::test_support::test_config(Some(
             "server-test-token",
         )));
-        for endpoint in ["scope", "snapshot", "pull"] {
+        for endpoint in ["scope", "snapshot", "pull", "grant"] {
             let request = axum::http::Request::builder()
                 .uri(format!("/offline/product-categories/{endpoint}"))
                 .body(axum::body::Body::empty())
