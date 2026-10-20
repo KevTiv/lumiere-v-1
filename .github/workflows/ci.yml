@@ -116,6 +116,9 @@ jobs:
       - name: Workspace members (api-server, ai-gateway, lumiere-codegen, stdb-auth)
         run: cargo check --locked -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
 
+      - name: Query authorization and field projection tests
+        run: cargo test --locked -p stdb-auth --lib
+
       - name: Presentation contracts and draft validator
         run: cargo test --locked -p lumiere-presentation-core
 
@@ -303,6 +306,9 @@ jobs:
 
       - name: Unit tests (query-hooks params)
         run: pnpm --dir packages/query-hooks test
+
+      - name: Unit tests (stdb query policies and transport)
+        run: pnpm --dir packages/stdb test
 
       - name: Unit tests (ui)
         run: pnpm --dir packages/ui test
