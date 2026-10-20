@@ -78,15 +78,19 @@ jobs:
           fetch-depth: 0
       - name: Test E2E target selector
         if: github.event_name == 'pull_request'
-        run: python3 -m unittest discover -s scripts/tests -p 'test_ci_e2e_targets.py'
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_ci_e2e_targets.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_e2e_workflow_plan.py'
       # PRs run only the specs they add or edit, plus specs importing an
       # edited e2e helper/fixture. PRs labelled e2e:full and PRs that select no
-      # spec run the full P0 suite (sharded); pushes to the default branch run
-      # the full suite, which still guards cross-module regressions.
+      # spec run the full P0 suite (sharded). Release candidates labelled
+      # e2e:release and pushes to the default branch run the complete suite,
+      # including non-P0 cross-module and recovery regressions.
       - id: targets
         if: >-
           github.event_name == 'pull_request' &&
-          !contains(github.event.pull_request.labels.*.name, 'e2e:full')
+          !contains(github.event.pull_request.labels.*.name, 'e2e:full') &&
+          !contains(github.event.pull_request.labels.*.name, 'e2e:release')
         run: |
           python3 scripts/ci-e2e-targets.py \
             --base "${{ github.event.pull_request.base.sha }}" \
@@ -100,6 +104,7 @@ jobs:
           DISPATCH_CLEAR_DB: ${{ github.event.inputs.clear_db }}
           EVENT_NAME: ${{ github.event_name }}
           HEAD_REF: ${{ github.head_ref }}
+          RELEASE_CANDIDATE: ${{ contains(github.event.pull_request.labels.*.name, 'e2e:release') }}
         run: |
           # Split whole-suite runs across runners; each shard gets its own
           # SpacetimeDB/Postgres/seed, so shards cannot interfere.
@@ -110,11 +115,13 @@ jobs:
           }
           case "$EVENT_NAME" in
             push)
-              # Main retains one complete run; PRs use the bounded P0 suite.
+              # Main retains one complete run; ordinary PRs use bounded suites.
               configs="$(shard full 1)"
               ;;
             pull_request)
-              if [ "$HEAD_REF" = "codex/base05-pretenant-integrated-certification" ]; then
+              if [ "$RELEASE_CANDIDATE" = "true" ]; then
+                configs="$(shard full 1)"
+              elif [ "$HEAD_REF" = "codex/base05-pretenant-integrated-certification" ]; then
                 configs="$(jq -cn --argjson p0 "$(shard p0 0)" '$p0 + [{suite:"pretenant",clear_db:"1"}]')"
               elif [ -n "${TARGET_SPECS}" ]; then
                 configs="$(jq -cn --arg specs "${TARGET_SPECS}" '[{suite:"targeted",clear_db:"0",specs:$specs}]')"
