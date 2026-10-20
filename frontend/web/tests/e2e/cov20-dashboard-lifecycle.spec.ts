@@ -478,7 +478,7 @@ test.describe(
       await page.getByTestId("module-create-reports-dashboard-widgets").click()
       await fillField(page, "name", widgetName)
       await chooseFirstEnabledOption(page, "widgetType")
-      await fillField(page, "dataSource", "sale_order")
+      await chooseSelectOptionByLabel(page, "dataSource", /^Payments$/i)
       const [created] = await Promise.all([
         page.waitForResponse(
           (response) =>
@@ -492,7 +492,7 @@ test.describe(
         (row) => row.name === widgetName,
       )
       expect(widgets).toHaveLength(1)
-      expect(String(widgets[0]?.model ?? "")).toBe("sale_order")
+      expect(String(widgets[0]?.model ?? "")).toBe("account_payment")
       expect(
         scalarQueryId(widgets[0]?.companyId ?? widgets[0]?.company_id),
       ).not.toBeNull()
