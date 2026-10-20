@@ -1,4 +1,6 @@
 import type { TFunction } from "i18next"
+import { accountingWorkspaceNavigation } from "./accounting-workspace-navigation"
+import { businessWorkspaceNavigation } from "./business-workspace-navigation"
 import { chartAccountPrimaryLabel, contactPrimaryLabel, inventoryProductPrimaryLabel, proposalPrimaryLabel, saleOrderPrimaryLabel } from "@lumiere/stdb/read-models"
 import type { DashboardConfig, ModuleConfig } from "@lumiere/ui"
 import {
@@ -362,14 +364,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "Accounting",
   description: "Financial overview — P&L, cash position, and budget tracking",
   defaultTab: "dashboard",
-  tabGroups: [
-    { label: t("modules.tabGroups.invoicing", { defaultValue: "Invoicing" }), tabIds: ["invoices", "bills", "payments", "payment-operations", "credit-control"] },
-    { label: t("modules.tabGroups.ledger", { defaultValue: "Ledger" }), tabIds: ["journal-entries", "move-lines", "accounts", "account-journals"] },
-    { label: t("modules.tabGroups.banking", { defaultValue: "Banking" }), tabIds: ["bank-statements", "reconciliation-widgets", "fx-revaluation"] },
-    { label: t("modules.tabGroups.planning", { defaultValue: "Planning" }), tabIds: ["budgets", "analytic", "analytic-lines", "analytic-distribution", "fixed-assets", "amortization"] },
-    { label: t("modules.tabGroups.close", { defaultValue: "Close" }), tabIds: ["period-close", "fiscal-years", "account-periods", "consolidation", "intercompany-rules", "intercompany-transactions"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "tax-groups", "tax-jurisdictions", "tax-schedules", "tax-deadlines", "payment-terms", "payment-term-lines"] },
-  ],
+  workspaceNav: accountingWorkspaceNavigation(t),
   tabs: [
     {
       id: "dashboard",
@@ -733,15 +728,10 @@ export const salesDashboard: DashboardConfig = {
 
 export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "sales",
+  workspaceNav: businessWorkspaceNavigation("sales", t),
   title: "Sales",
   description: "Revenue performance, pipeline health, and deal activity",
   defaultTab: "dashboard",
-  tabGroups: [
-    { label: t("modules.tabGroups.orders", { defaultValue: "Orders" }), tabIds: ["orders", "order-lines", "invoices", "returns"] },
-    { label: t("modules.tabGroups.fulfillment", { defaultValue: "Fulfillment" }), tabIds: ["deliveries", "fulfillment"] },
-    { label: t("modules.tabGroups.pricing", { defaultValue: "Pricing" }), tabIds: ["pricelists", "pricelist-items", "loyalty-programs", "loyalty-cards"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["delivery-price-rules", "delivery-carriers", "shipping-methods", "pos-payment-methods", "commission-plans"] },
-  ],
   tabs: [
     {
       id: "dashboard",
@@ -981,6 +971,7 @@ export const crmDashboard: DashboardConfig = {
 
 export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "crm",
+  workspaceNav: businessWorkspaceNavigation("crm", t),
   title: "CRM",
   description: "Lead pipeline, customer lifecycle, and relationship health",
   defaultTab: "dashboard",
@@ -1510,6 +1501,7 @@ export const purchasingDashboard: DashboardConfig = {
 
 export const purchasingModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "purchasing",
+  workspaceNav: businessWorkspaceNavigation("purchasing", t),
   title: "Purchasing",
   description: "Purchase orders, vendor performance, and spend analysis",
   defaultTab: "dashboard",
@@ -2511,6 +2503,7 @@ export const calendarModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "reports",
+  workspaceNav: businessWorkspaceNavigation("reports", t),
   title: t("reports.moduleTitle"),
   description: t("reports.moduleDescription"),
   defaultTab: "dashboard",
@@ -2872,6 +2865,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "expenses",
+  workspaceNav: businessWorkspaceNavigation("expenses", t),
   title: "Expenses",
   description: "Employee expense management and reimbursement",
   defaultTab: "dashboard",

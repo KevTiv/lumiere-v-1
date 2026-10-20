@@ -19,7 +19,7 @@
   },
   "operation_history": {
     "path": "lumiere-codegen/contract-operation-history.json",
-    "checksum": "sha256:fc82b1b867924d50196427ec556ffbbf42606c826d37ea428080fc2be04487b9"
+    "checksum": "sha256:e005dffb76b06ae2e69d539dcf6557f7cc10b9a456a9e81f5d4845bf3ca45b0b"
   },
   "stdb_module": {
     "name": "lumiere_v1",
@@ -35,8 +35,8 @@
     "manifest_path": "manifests/durable-pg-schema-manifest.json",
     "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
-    "application_catalog_version": 18,
-    "application_catalog_checksum": "sha256:5bdd2c0634e6e65da2859a9d6f8c32503078103da13ad15394602a735ba8360d"
+    "application_catalog_version": 20,
+    "application_catalog_checksum": "sha256:1ffe92904e13f853eff37a16d4a7a4e7ec080469f69d623982f6b1fb2fe2a9d5"
   },
   "services": {
     "api_server": {
@@ -54,11 +54,11 @@
     "generated_contract_release": "0.3.128"
   },
   "deployment": {
-    "config_generation": 4,
+    "config_generation": 6,
     "config_sources": [
       {
         "path": ".env.docker.example",
-        "sha256": "23eb087e7ad8ce10d30bc4798f5355a59bdca498d9c2f7637377d435489dde2d"
+        "sha256": "b77fc315cc6af604141cd83875cef00fac6ff0af9d487b8c6fb5d1e1d908fa86"
       },
       {
         "path": "frontend/web/.env.example",

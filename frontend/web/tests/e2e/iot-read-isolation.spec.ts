@@ -44,7 +44,7 @@ function rowCompanyId(row: QueryRow): number | null {
 }
 
 test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
-  test("isolates same-organization companies and strips sensitive payload fields", async ({ browser, page }) => {
+  test("isolates same-organization companies and strips sensitive payload fields", async ({ page, browser }) => {
     test.setTimeout(180_000)
     const organizationId = await fetchSessionOrganizationId(page)
     const defaultCompanyId = await fetchDefaultCompanyId(page)
@@ -99,17 +99,19 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
     ])
     await callReducerBff(page, "generate_hub_pairing_token", [organizationId, defaultCompanyId])
 
-    // The wildcard administrator is authorized across its organization's
-    // companies, so the denials are proven with a member bound to the default
-    // company that holds IoT grants. Creating a sibling company does not
-    // expand that member's scope at the trusted BFF boundary.
-    const iotResources = ["iot_action", "iot_alert", "iot_device", "iot_hub", "iot_pairing_token", "iot_telemetry", "iot_threshold"]
-    const companyBound = await provisionActor(page, "iot-company-bound", [
-      "iot_hub:create",
-      ...iotResources.map((resource) => `${resource}:read`),
+    // Organization owners deliberately have organization-wide company access.
+    // Prove isolation with a company-bound member who has the IoT capability,
+    // not an owner whose legitimate authority includes the sibling company.
+    const actor = await provisionActor(page, "iot-company-scope", [
+      "iot_hub:create", "iot_hub:read", "iot_action:read", "iot_alert:read",
+      "iot_device:read", "iot_pairing_token:read", "iot_telemetry:read", "iot_threshold:read",
     ])
-    await withActor(browser, companyBound, async (actor) => {
-      const forgedBranchWrite = await callReducerBffResult(actor, "register_iot_hub", [
+    await withActor(browser, actor, async (scopedPage) => {
+      await callReducerBff(scopedPage, "register_iot_hub", [organizationId, defaultCompanyId, {
+        name: `${suffix}-scoped-hub`, serial: `${suffix}-scoped-hub`,
+        ip_address: none, firmware_version: none, metadata: none,
+      }])
+      const forgedBranchWrite = await callReducerBffResult(scopedPage, "register_iot_hub", [
         organizationId,
         branchCompanyId,
         {
@@ -202,7 +204,7 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
     expect(telemetry).not.toHaveProperty("rawValue")
     expect(telemetry).not.toHaveProperty("raw_value")
 
-    await withActor(browser, companyBound, async (actor) => {
+    await withActor(browser, actor, async (scopedPage) => {
       for (const resource of [
         "iot-actions",
         "iot-alerts",
@@ -212,9 +214,33 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
         "iot-telemetry",
         "iot-thresholds",
       ]) {
-        const response = await actor.request.get(`/api/query/${resource}?companyId=${branchCompanyId}`)
+        const own = await scopedPage.request.get(`/api/query/${resource}?companyId=${defaultCompanyId}`)
+        expect(own.status(), `${resource} own-company read`).toBe(200)
+        const response = await scopedPage.request.get(`/api/query/${resource}?companyId=${branchCompanyId}`)
         expect(response.status(), resource).toBe(403)
       }
     })
+
+    // The organization administrator is allowed to select a sibling company,
+    // but the selected company must still constrain every returned row. The
+    // company-bound member above separately proves that callers cannot expand
+    // their own scope by forging this query parameter.
+    for (const resource of [
+      "iot-actions",
+      "iot-alerts",
+      "iot-devices",
+      "iot-hubs",
+      "iot-pairing-tokens",
+      "iot-telemetry",
+      "iot-thresholds",
+    ]) {
+      const response = await page.request.get(`/api/query/${resource}?companyId=${branchCompanyId}`)
+      expect(response.ok(), resource).toBe(true)
+      const body = (await response.json()) as { data?: QueryRow[] }
+      expect(
+        (body.data ?? []).every((row) => rowCompanyId(row) === branchCompanyId),
+        `${resource} leaked a row from another company`,
+      ).toBe(true)
+    }
   })
 })

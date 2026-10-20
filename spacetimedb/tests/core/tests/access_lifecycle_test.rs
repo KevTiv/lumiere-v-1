@@ -4,8 +4,9 @@ use crate::core::auth::{
 };
 use crate::core::permissions::{
     assign_role, build_policy_snapshot_row, create_role, effective_roles, grant_permission, role,
-    update_role, AssignRoleParams, CreateRoleParams, GrantOrgPermissionParams, PermissionAction,
-    PermissionEffect, PermissionSubject, UpdateRoleParams,
+    update_role, user_role_assignment, AssignRoleParams, CreateRoleParams,
+    GrantOrgPermissionParams, PermissionAction, PermissionEffect, PermissionSubject,
+    UpdateRoleParams,
 };
 use crate::core::users::{
     add_user_to_organization, remove_user_from_organization, user_organization,
@@ -396,6 +397,226 @@ pub fn test_invitation_acceptance_retries_do_not_regrant(
         .any(|m| m.organization_id == org && m.is_active)
     {
         return Err("Revoked member became active".into());
+    }
+    Ok(())
+}
+
+pub fn test_canonical_duties_and_explicit_payment_capabilities(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    crate::core::permissions::create_sod_conflict_rule(
+        ctx,
+        org,
+        crate::core::permissions::CreateSodConflictRuleParams {
+            permission_a: "account_move:create".into(),
+            permission_b: "account_move:write".into(),
+            description: None,
+            is_active: true,
+            metadata: None,
+        },
+    )?;
+    let reader = create_test_role(ctx, org, "Canonical duty reader", &["contact:read"])?;
+    let member = Identity::from_byte_array([0x53; 32]);
+    add_user_to_organization(
+        ctx,
+        member,
+        org,
+        AddUserToOrganizationParams {
+            role_id: reader,
+            company_id: Some(fixture.company_id),
+            job_title: None,
+            department_id: None,
+            employee_id: None,
+            is_active: true,
+            is_default: false,
+            metadata: None,
+        },
+    )?;
+    // A policy denial belonging to the dispatching administrator must never
+    // exempt the target member's proposed authority from their conflict rule.
+    grant_permission(
+        ctx,
+        org,
+        GrantOrgPermissionParams {
+            subject: PermissionSubject::User(ctx.sender()),
+            resource: "account_move".into(),
+            action: PermissionAction::Write,
+            effect: PermissionEffect::Deny,
+        },
+    )?;
+    let mut module_role_id = None;
+    for (name, permission) in [
+        ("Canonical module duties", "module:accounting:*"),
+        ("Canonical alias duties", "account-moves:*"),
+    ] {
+        let role_id = create_test_role(ctx, org, name, &[permission])?;
+        module_role_id.get_or_insert(role_id);
+        let selected = ctx
+            .db
+            .role()
+            .id()
+            .find(role_id)
+            .ok_or("Duty role missing")?;
+        for action in ["create", "write"] {
+            if !crate::helpers::roles_allow_permission(
+                ctx,
+                org,
+                member,
+                &[selected.clone()],
+                false,
+                "account_move",
+                action,
+            ) {
+                return Err("Duty fixture did not grant its canonical authority".into());
+            }
+        }
+        if crate::core::permissions::validate_sod_for_permissions(ctx, org, &[permission.into()])
+            .is_ok()
+        {
+            return Err("Canonical/module duty wildcard bypassed configured conflict".into());
+        }
+        let membership = ctx
+            .db
+            .user_organization()
+            .user_org_by_user()
+            .filter(&member)
+            .find(|m| m.organization_id == org)
+            .ok_or("Duty member missing")?;
+        let mut params = crate::core::access_lifecycle::current_access_params(ctx, &membership);
+        params.primary_role_id = role_id;
+        let assignments_before = ctx
+            .db
+            .user_role_assignment()
+            .role_assign_by_user()
+            .filter(&member)
+            .count();
+        if crate::core::access_lifecycle::set_member_access(ctx, org, member, params).is_ok() {
+            return Err("Canonical/module member edit bypassed configured duty conflict".into());
+        }
+        let unchanged = ctx
+            .db
+            .user_organization()
+            .id()
+            .find(membership.id)
+            .ok_or("Duty member missing")?;
+        if unchanged.role_id != reader
+            || unchanged.is_active != membership.is_active
+            || ctx
+                .db
+                .user_role_assignment()
+                .role_assign_by_user()
+                .filter(&member)
+                .count()
+                != assignments_before
+        {
+            return Err("Denied duty edit changed membership or assignments".into());
+        }
+    }
+    // Only the target's own deny reduces their effective powers and removes the conflict.
+    grant_permission(
+        ctx,
+        org,
+        GrantOrgPermissionParams {
+            subject: PermissionSubject::User(member),
+            resource: "account_move".into(),
+            action: PermissionAction::Write,
+            effect: PermissionEffect::Deny,
+        },
+    )?;
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&member)
+        .find(|m| m.organization_id == org)
+        .ok_or("Duty member missing")?;
+    let mut params = crate::core::access_lifecycle::current_access_params(ctx, &membership);
+    params.primary_role_id = module_role_id.ok_or("Module role missing")?;
+    crate::core::access_lifecycle::set_member_access(ctx, org, member, params)?;
+    let roles = effective_roles(ctx, org, member)?;
+    if !crate::helpers::roles_allow_permission(
+        ctx,
+        org,
+        member,
+        &roles,
+        false,
+        "account_move",
+        "create",
+    ) || crate::helpers::roles_allow_permission(
+        ctx,
+        org,
+        member,
+        &roles,
+        false,
+        "account_move",
+        "write",
+    ) {
+        return Err("Target deny did not reduce effective duty powers".into());
+    }
+    let payment_role_id = create_test_role(
+        ctx,
+        org,
+        "Explicit financial actions",
+        &["payment:post", "payment:cancel", "payment:reverse"],
+    )?;
+    let payment_role = ctx
+        .db
+        .role()
+        .id()
+        .find(payment_role_id)
+        .ok_or("Payment role missing")?;
+    for action in ["post", "cancel", "reverse"] {
+        if !crate::helpers::roles_allow_permission(
+            ctx,
+            org,
+            member,
+            &[payment_role.clone()],
+            false,
+            "payment",
+            action,
+        ) {
+            return Err("Explicit payment capability was not honored".into());
+        }
+        let crud = crate::core::permissions::Role {
+            permissions: vec!["account_payment:*".into()],
+            ..payment_role.clone()
+        };
+        if crate::helpers::roles_allow_permission(
+            ctx,
+            org,
+            member,
+            &[crud],
+            false,
+            "payment",
+            action,
+        ) {
+            return Err("Account payment CRUD conferred a financial action".into());
+        }
+    }
+    grant_permission(
+        ctx,
+        org,
+        GrantOrgPermissionParams {
+            subject: PermissionSubject::User(member),
+            resource: "module:accounting".into(),
+            action: PermissionAction::All,
+            effect: PermissionEffect::Deny,
+        },
+    )?;
+    for action in ["post", "cancel", "reverse"] {
+        if crate::helpers::roles_allow_permission(
+            ctx,
+            org,
+            member,
+            &[payment_role.clone()],
+            false,
+            "payment",
+            action,
+        ) {
+            return Err("Accounting module deny did not block an explicit financial action".into());
+        }
     }
     Ok(())
 }

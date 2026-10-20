@@ -88,6 +88,8 @@ async function targetCanOpenProfileSettings(browser: Browser) {
     const targetPage = await context.newPage()
     await signIn(targetPage, TARGET_EMAIL, PERSONA_PASSWORD)
     await gotoModule(targetPage, "/settings")
+    // isVisible() is an immediate snapshot (its timeout option does not wait).
+    // Wait for the hydrated permission-filtered settings content on a new login.
     return await targetPage.getByTestId("settings-section-profile")
       .waitFor({ state: "visible", timeout: 10_000 })
       .then(() => true, () => false)

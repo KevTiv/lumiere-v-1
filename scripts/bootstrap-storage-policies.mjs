@@ -24,7 +24,7 @@ const schemaPath = path.join(
 const policyPath = path.join(repoRoot, "lumiere-codegen", "storage-policy-manifest.json");
 const resourceRegistryPath = path.join(repoRoot, "crates", "stdb-auth", "assets", "resource_registry.json");
 const checkOnly = process.argv.includes("--check");
-const EXPECTED_SCHEMA_TABLES = 511;
+const EXPECTED_SCHEMA_TABLES = 515;
 
 // C0 no longer permits application-level platform-global tables. Former
 // exceptions must be organization-owned in schema source before policy
@@ -195,6 +195,8 @@ const PARENT_OVERRIDES = {
   ai_skill_version: ["ai_skill", "skill_id", "id"],
   ai_spend_reservation: ["ai_agent_run", "run_id", "id"],
   bank_statement_import_line: ["bank_statement_import", "import_id", "id"],
+  bank_statement_settlement_attempt: ["account_bank_statement_line", "line_id", "id"],
+  bank_statement_settlement_reversal: ["bank_statement_settlement_attempt", "attempt_id", "id"],
   balance_sheet_line: ["financial_report", "report_id", "id"],
   cash_flow_line: ["financial_report", "report_id", "id"],
   contact_category_assignment: ["contact", "contact_id", "id"],

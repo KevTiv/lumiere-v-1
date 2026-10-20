@@ -168,16 +168,22 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     ensure!(migration_count(pool).await? == prefix_length as i64);
     let previous_history = applied_migration_history(pool).await?;
     let previous_tables = public_table_names(pool).await?;
-    let expected_cost_tables = [
+    // Startup upgrades the frozen v13 prefix through the whole current catalog.
+    let expected_new_tables = [
+        "bank_statement_settlement_attempt",
+        "bank_statement_settlement_reversal",
         "mrp_production_cost",
         "mrp_productivity_cost",
         "mrp_valuation_config",
         "mrp_workcenter_cost_rate",
+        "purchase_order_creation_operation",
+        "purchase_receipt_operation",
+        "user_invite_acceptance",
     ];
-    for table in expected_cost_tables {
+    for table in expected_new_tables {
         ensure!(
             !relation_exists(pool, table).await?,
-            "cost table {table} predates migration 14"
+            "table {table} predates its catalog migration"
         );
     }
 
@@ -195,12 +201,8 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
         .into_iter()
         .filter(|table| !previous_tables.contains(table))
         .collect();
-    let mut expected_added_tables = expected_cost_tables.to_vec();
-    // The full upgrade also applies the later, forward-only invitation receipt migration.
-    expected_added_tables.push("user_invite_acceptance");
-    expected_added_tables.sort_unstable();
     ensure!(
-        added_tables == expected_added_tables,
+        added_tables == expected_new_tables,
         "migration 13 upgrade produced unexpected new tables: {added_tables:?}"
     );
 

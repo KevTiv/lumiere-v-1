@@ -1,5 +1,8 @@
 'use client';
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights } from "../../../components/module-insights"
 
 import { phCapture } from '@/lib/posthog-browser';
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -369,7 +372,7 @@ function SalesClientLoaded({
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useRBAC();
-  const runtimeRoleId = runtimeFormRoleId(currentUser);
+  const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles);
   const { orgId } = orgBigInts(organizationId)
   const { askForm, formDialog } = useFormDialog();
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
@@ -404,7 +407,8 @@ function SalesClientLoaded({
   const [openReturnForm, setOpenReturnForm] = useState(false);
   const [createReturnError, setCreateReturnError] = useState<string | null>(null);
 
-  const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders);
+  const ordersQuery = useSaleOrders(orgId, initialOrders);
+  const { data: orders = [], isLoading: ordersLoading } = ordersQuery;
   const { data: orderLines = [] } = useSaleOrderLines(
     orgId,
     initialOrderLines,
@@ -452,7 +456,8 @@ function SalesClientLoaded({
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
   const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId);
   const { data: partnerCreditHolds = [] } = usePartnerCreditHolds(orgId);
-  const { data: currencies = [] } = useCurrencies();
+  const currenciesQuery = useCurrencies();
+  const { data: currencies = [] } = currenciesQuery;
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
   const { data: stockMoves = [] } = useStockMoves(orgId);
   const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
@@ -2460,6 +2465,7 @@ function SalesClientLoaded({
     <>
       <ModuleView
         config={config}
+        dashboardContent={<ModuleInsights input={{ module: "sales", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: moduleQueryState(ordersQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataLoading={{ orders: ordersLoading }}
         kpiStrips={kpiStrips}

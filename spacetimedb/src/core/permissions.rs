@@ -329,6 +329,21 @@ pub(crate) fn canonical_policy_resource(resource: &str) -> String {
         .unwrap_or_else(|| resource.to_owned())
 }
 
+/// Use the same declared aliases for policy checks and configured duty conflicts.
+pub(crate) fn canonical_permission_strings(permissions: &[String]) -> Vec<String> {
+    permissions
+        .iter()
+        .map(|permission| {
+            permission
+                .rsplit_once(':')
+                .map(|(resource, action)| {
+                    format!("{}:{action}", canonical_policy_resource(resource))
+                })
+                .unwrap_or_else(|| permission.clone())
+        })
+        .collect()
+}
+
 /// The single membership role plus current additive roles, always tenant scoped.
 pub(crate) fn effective_roles(
     ctx: &ReducerContext,
@@ -653,37 +668,19 @@ pub(crate) fn touch_policy_snapshots_for_subject(
     }
 }
 
-fn permission_strings_for_user(
-    ctx: &ReducerContext,
-    organization_id: u64,
-    user_identity: Identity,
-    extra_role_id: Option<u64>,
-) -> Result<Vec<String>, String> {
-    let mut perms =
-        effective_permission_strings(&effective_roles(ctx, organization_id, user_identity)?);
-
-    if let Some(role_id) = extra_role_id {
-        if let Some(role) = ctx.db.role().id().find(&role_id) {
-            if role.organization_id == organization_id && role.is_active {
-                perms.extend(role.permissions.clone());
-            }
-        }
-    }
-
-    perms.sort();
-    perms.dedup();
-    Ok(perms)
-}
-
 fn permission_set_has(permissions: &[String], needle: &str) -> bool {
-    if permissions.iter().any(|p| p == "*:*") {
-        return true;
-    }
-    if let Some((resource, _action)) = needle.split_once(':') {
-        let wildcard = format!("{resource}:*");
-        return permissions.iter().any(|p| p == needle || p == &wildcard);
-    }
-    false
+    let Some((resource, action)) = needle.rsplit_once(':') else {
+        return false;
+    };
+    let resource = canonical_policy_resource(resource);
+    lumiere_policy_core::allows_in_module(
+        false,
+        &canonical_permission_strings(permissions),
+        &[],
+        &resource,
+        action,
+        crate::helpers::permission_resource_module(&resource),
+    )
 }
 
 pub(crate) fn validate_sod_for_permissions(
@@ -691,20 +688,72 @@ pub(crate) fn validate_sod_for_permissions(
     organization_id: u64,
     permissions: &[String],
 ) -> Result<(), String> {
-    if permission_set_has(permissions, "*:*") {
+    validate_sod_with(
+        ctx,
+        organization_id,
+        permissions.iter().any(|permission| permission == "*:*"),
+        |needle| permission_set_has(permissions, needle),
+    )
+}
+
+/// Validate the target member's proposed authority, including their scoped policy denies.
+/// The administrator dispatching the edit never supplies the target's permission context.
+pub(crate) fn validate_sod_for_effective_roles(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    user_identity: Identity,
+    roles: &[Role],
+) -> Result<(), String> {
+    if roles
+        .iter()
+        .any(|role| role.organization_id != organization_id || !role.is_active)
+    {
+        return Err("Duty validation roles are inactive or outside the organization".into());
+    }
+    validate_sod_with(
+        ctx,
+        organization_id,
+        roles.iter().any(|role| {
+            role.permissions
+                .iter()
+                .any(|permission| permission == "*:*")
+        }),
+        |needle| {
+            let Some((resource, action)) = needle.rsplit_once(':') else {
+                return false;
+            };
+            crate::helpers::roles_allow_permission(
+                ctx,
+                organization_id,
+                user_identity,
+                roles,
+                false,
+                resource,
+                action,
+            )
+        },
+    )
+}
+
+fn validate_sod_with(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    explicit_global_admin: bool,
+    mut holds_permission: impl FnMut(&str) -> bool,
+) -> Result<(), String> {
+    // Preserve the existing explicit global administrator exemption. A module
+    // or resource wildcard does not grant that exemption.
+    if explicit_global_admin {
         return Ok(());
     }
-
     for rule in ctx
         .db
         .sod_conflict_rule()
         .sod_by_org()
         .filter(&organization_id)
-        .filter(|r| r.is_active)
+        .filter(|rule| rule.is_active)
     {
-        if permission_set_has(permissions, &rule.permission_a)
-            && permission_set_has(permissions, &rule.permission_b)
-        {
+        if holds_permission(&rule.permission_a) && holds_permission(&rule.permission_b) {
             return Err(format!(
                 "segregation of duties conflict: {} and {} cannot be held together",
                 rule.permission_a, rule.permission_b
@@ -934,7 +983,7 @@ pub(crate) fn ensure_resource_fields_writable(
     ctx: &ReducerContext,
     organization_id: u64,
     user_identity: Identity,
-    role_id: u64,
+    _role_id: u64,
     _role_name: &str,
     is_superuser: bool,
     resource: &str,
@@ -964,9 +1013,13 @@ pub(crate) fn ensure_resource_fields_writable(
         if !field_resource_matches(&rule.resource, resource) {
             continue;
         }
-        allowed
-            .get_or_insert_with(Vec::new)
-            .extend(rule.allowed_fields.clone());
+        allowed = Some(match allowed {
+            None => rule.allowed_fields.clone(),
+            Some(mut intersection) => {
+                intersection.retain(|field| rule.allowed_fields.contains(field));
+                intersection
+            }
+        });
     }
 
     let Some(allowed_fields) = allowed else {
@@ -1142,7 +1195,7 @@ pub fn update_role(
             }
         }
         roles.retain(|r| r.is_active);
-        validate_sod_for_permissions(ctx, organization_id, &effective_permission_strings(&roles))?;
+        validate_sod_for_effective_roles(ctx, organization_id, membership.user_identity, &roles)?;
         retains_admin |= crate::core::access_lifecycle::member_is_admin(
             ctx,
             organization_id,
@@ -1811,9 +1864,11 @@ pub fn assign_role(
         return Err("Role expiry must be in the future".into());
     }
 
-    let effective_permissions =
-        permission_strings_for_user(ctx, organization_id, user_identity, Some(role_id))?;
-    validate_sod_for_permissions(ctx, organization_id, &effective_permissions)?;
+    let mut proposed_roles = effective_roles(ctx, organization_id, user_identity)?;
+    if !proposed_roles.iter().any(|assigned| assigned.id == role_id) {
+        proposed_roles.push(role.clone());
+    }
+    validate_sod_for_effective_roles(ctx, organization_id, user_identity, &proposed_roles)?;
 
     let already_assigned = ctx.db.user_role_assignment().iter().any(|a| {
         a.user_identity == user_identity

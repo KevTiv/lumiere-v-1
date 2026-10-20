@@ -1,4 +1,5 @@
 import { bootstrapFixtureAccountSession } from './fixture-account'
+import { matchesOperationFaultTarget } from "./operation-response"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -363,9 +364,9 @@ async function signupIdentityHex(email: string, password: string): Promise<strin
  * Provision a non-superuser organization member holding exactly `permissions`
  * (pattern from auth-permission-enforcement.spec.ts). `ownerPage` is the seeded admin session.
  */
-export async function provisionActor(ownerPage: Page, label: string, permissions: string[]): Promise<Actor> {
+export async function provisionActor(ownerPage: Page, label: string, permissions: string[], scopedCompanyId?: number): Promise<Actor> {
   const organizationId = await fetchSessionOrganizationId(ownerPage)
-  const companyId = await fetchDefaultCompanyId(ownerPage)
+  const companyId = scopedCompanyId ?? await fetchDefaultCompanyId(ownerPage)
   const roleName = smokeName(`pretenant-${label}`)
   await callReducerBff(ownerPage, "create_role", [
     organizationId,
@@ -466,8 +467,9 @@ export function seededRng(seed: number): () => number {
 export async function loseNextResponse(page: Page, urlPart: string): Promise<{ lost: () => boolean }> {
   let lost = false
   await page.route(
-    (url) => url.pathname.includes(urlPart),
+    (url) => matchesOperationFaultTarget(url, urlPart),
     async (route) => {
+      if (route.request().method() !== "POST") return route.continue()
       if (lost) return route.continue()
       lost = true
       await route.fetch()

@@ -243,6 +243,11 @@ pub fn create_bad_debt_write_off(
     if source.state != AccountMoveState::Posted {
         return Err("Source move must be posted".to_string());
     }
+    crate::accounting::journal_entries::require_invoice_not_bank_payment(
+        ctx,
+        organization_id,
+        source.id,
+    )?;
     if params.amount > source.amount_residual + 0.01 {
         return Err("Write-off amount exceeds residual".to_string());
     }

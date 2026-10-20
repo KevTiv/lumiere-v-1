@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { useState } from "react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { ErpCommandPalette } from "./erp-command-palette"
 
@@ -107,6 +108,29 @@ function type(text: string) {
 }
 
 describe("ErpCommandPalette records", () => {
+  it("opens from the workspace search control and keeps shortcut and navigation state synchronized", () => {
+    function WorkspaceSearch() {
+      const [open, setOpen] = useState(false)
+      return <>
+        <button onClick={() => setOpen(true)}>Search workspace</button>
+        <output data-testid="palette-open">{String(open)}</output>
+        <ErpCommandPalette open={open} onOpenChange={setOpen} recordHref={recordHref} />
+      </>
+    }
+    render(<WorkspaceSearch />)
+    fireEvent.click(screen.getByRole("button", { name: "Search workspace" }))
+    expect(screen.getByRole("combobox")).toBeTruthy()
+    type("so00")
+    fireEvent.click(screen.getByTestId("erp-command-palette-record-sale_order-1"))
+    expect(push).toHaveBeenCalledWith("/sales/orders/1")
+    expect(screen.getByTestId("palette-open").textContent).toBe("false")
+    fireEvent.keyDown(window, { key: "k", metaKey: true })
+    expect(screen.getByTestId("palette-open").textContent).toBe("true")
+    expect((screen.getByRole("combobox") as HTMLInputElement).value).toBe("")
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true })
+    expect(screen.getByTestId("palette-open").textContent).toBe("false")
+  })
+
   it("reports failed reads instead of claiming no results or displaying stale rows", () => {
     data.failed.add("sale_order")
     openPalette()

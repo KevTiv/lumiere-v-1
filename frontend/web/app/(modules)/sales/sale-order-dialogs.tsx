@@ -1,4 +1,5 @@
 'use client';
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 import { useMemo, useState } from 'react';
 import { useTranslation } from '@lumiere/i18n';
@@ -109,7 +110,7 @@ export function CreateInvoiceFromOrderDialog({
       moduleId="sales"
       formId="create-invoice-from-sale-order"
       organizationId={organizationId}
-      roleId={runtimeFormRoleId(currentUser)}
+      roleId={resolveRuntimeFormRoleId(currentUser?.roles)}
       preferStdbVisibility
       foldCustomFieldsIntoMetadata={false}
       closeOnSubmit={false}
@@ -161,7 +162,7 @@ export function EditSaleOrderDialog({
       moduleId="sales"
       formId="edit-sale-order"
       organizationId={organizationId}
-      roleId={runtimeFormRoleId(currentUser)}
+      roleId={resolveRuntimeFormRoleId(currentUser?.roles)}
       preferStdbVisibility
       transformConfig={(cfg) =>
         mergeFieldDefaultValues(cfg, {

@@ -2,6 +2,8 @@
 import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights } from "../../../components/module-insights"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import {
   inlineNumberAbove,
@@ -189,6 +191,7 @@ function ExpensesClientLoaded({
 
   const expensesQuery = useExpenses(orgId, initialExpenses)
   const sheetsQuery = useExpenseSheets(orgId, initialSheets)
+  const currenciesQuery = useCurrencies()
   const expensesState = moduleQueryState(expensesQuery)
   const sheetsState = moduleQueryState(sheetsQuery)
   const expensesRaw = canUseModuleData(expensesState) ? expensesQuery.data ?? [] : []
@@ -855,6 +858,7 @@ function ExpensesClientLoaded({
       ) : null}
       <ModuleView
         config={config}
+        dashboardContent={<ModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataState={{ expenses: expensesState, "expense-sheets": sheetsState }}
         onFormSubmit={handleFormSubmit}

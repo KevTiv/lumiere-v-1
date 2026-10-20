@@ -111,6 +111,11 @@ is performed by this patch.
 
 ## Shared immutable Rust runtime image
 
+Reviewed invoice email and collection reminders require a dedicated dispatcher
+identity and explicit per-message sending. Configure the provider, renderer, and
+service binding described in [Accounting email dispatch](./ACCOUNTING_EMAIL_DISPATCH.md)
+before enabling that workflow.
+
 `lumiere-contracts` is a versioned library dependency, not a Railway service.
 Do not deploy the contracts repository as an HTTP service or add a contracts
 service URL to application configuration. The generated types and metadata are
@@ -203,6 +208,60 @@ runtime environment is production. Hash-named artifacts are not deleted when
 metadata recording fails because another report may already reference the same
 content-addressed object; orphan cleanup must be an explicit retention/repair
 operation.
+
+### Managed uploaded document storage
+
+Managed vendor-bill evidence and DMS uploads use the API server's local blob
+backend, separately from the owner-report bucket above. The production manifest
+pins `LUMIERE_DOCUMENT_BLOB_DIR=/data/document-blobs`. Before release, verify the
+API service has its persistent `api-documents-eu` volume mounted at `/data` in
+`europe-west4-drams3a`; a variable alone does not create or attach a volume.
+Preserve and back up the uploaded bytes and their sidecar metadata together,
+and verify download after container replacement and backup restoration. The
+runtime's unset default is temporary storage and is unsuitable for production.
+
+The disk backend supports one API replica. Production preflight checks the
+configured replica total from Railway service metadata and rejects more than
+one; operators must independently verify the actual volume mount and backup
+policy. Do not scale out until a shared document backend is implemented and
+verified. Docker Compose uses its persistent API-only `document-blobs` volume at
+`/var/lib/lumiere/document-blobs`. Current document upload/download and evidence
+parsing execute in the API, so worker containers do not mount this volume.
+
+### Optional reviewed-email readiness
+
+Keep reviewed email unconfigured when it is outside the release scope. Preflight
+requires the dedicated dispatcher token, owner token, provider key and sender
+address if either the dispatcher token or provider key is configured on the API,
+or if the preflight process sets `RAILWAY_ENABLE_REVIEWED_MAIL=true`. This is an
+operator selection for the check, not a runtime feature flag. A false selection
+does not suppress checks for partially configured credentials. Unsealed owner
+and dispatcher tokens must differ; sealed values cannot establish distinctness
+through Railway's variables response.
+
+The existing private-network service bootstrap accepts an already provisioned
+`LUMIERE_REVIEWED_MAIL_STDB_TOKEN` and registers `reviewed_mail_dispatcher` for
+each actual organization when selected or configured. It never mints this token,
+rejects an identity shared with another active service, and refuses to replace a
+different active reviewed-mail binding. Normal bootstrap
+still provisions its existing integration-worker identities; it is not a routine
+readiness command. For read-only identity and per-organization binding verification,
+run this from the trusted private network with the existing server and dispatcher
+credentials supplied through the normal secret environment:
+
+```bash
+node scripts/railway-bootstrap-service-identities.mjs --verify-reviewed-mail
+```
+
+This mode neither mints credentials nor registers bindings, needs no bootstrap
+encryption key, and rejects an empty tenant database as insufficient evidence.
+Repeat it after onboarding a new organization. Runtime dispatch independently
+verifies the token's database-authenticated identity and the active organization
+binding before a claim or provider request. PDF attachment selection additionally
+requires a working `LUMIERE_REPORT_RENDERER_URL`; text-only dispatch can operate
+without the renderer. Configuration checks do not replace a scoped real-provider
+smoke test or confirm recipient delivery. See [Accounting email dispatch](./ACCOUNTING_EMAIL_DISPATCH.md)
+for exact outcomes and manual recovery.
 
 ## Ordered Railway release
 
@@ -312,6 +371,33 @@ cargo run --locked -p api-server --bin storage-migrate
 
 The command uses the same `PG_*` variables as api-server and exits non-zero if
 the existing migration history is incompatible with the release.
+
+Inspect the intended database before the apply phase using the new release's
+binary and a database role with catalog/table read access:
+
+```bash
+storage-migrate --audit
+storage-migrate --verify
+```
+
+Both commands run a read-only, repeatable-read transaction. They inspect only
+the current or legacy migration-history relation, never create or adopt a
+relation, and never apply migrations or acquire the migration advisory lock.
+The JSON report includes the compiled catalog checksum, observed identities,
+pending versions and conflicts. `--audit` allows an uninitialized database or a
+valid prefix; `--verify` requires the complete matching history in
+`lumiere_platform.schema_migration`. Unknown future versions, holes, conflicting
+names/phases/checksums, or both current and legacy relations fail closed.
+Matching recorded history does not prove that all projected tables or business
+data exist; readiness and recovery checks remain separate.
+
+The canonical catalog retained from contracts 0.3.122 has purchasing keyed operations at 17,
+invitation receipts at 18, bank lifecycle at 19 and platform identity at 20.
+The independent WorkOS-only 0.3.123 release records platform identity at 17.
+A target with that history requires a reviewed transition before using the
+reconciled application and union contracts;
+these audit commands do not rewrite its history. The default invocation and
+`--apply` retain the existing migration behavior.
 
 ## Host `.env` (docker compose)
 

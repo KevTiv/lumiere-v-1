@@ -24,6 +24,7 @@ export function BarChartWidget({ data }: { data: BarChartWidgetType["data"] }) {
             <>
               <XAxis
                 type="number"
+                allowDecimals={data.allowDecimals}
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={12}
                 tickLine={false}
@@ -49,6 +50,7 @@ export function BarChartWidget({ data }: { data: BarChartWidgetType["data"] }) {
                 axisLine={false}
               />
               <YAxis
+                allowDecimals={data.allowDecimals}
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={12}
                 tickLine={false}

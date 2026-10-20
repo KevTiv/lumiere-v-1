@@ -520,6 +520,11 @@ pub fn create_subscription_ar_invoice(
         subscription.recurring_interval,
     )?;
 
+    let invoice_metadata = crate::documents::invoice_profile::capture_invoice_document_metadata(
+        ctx, organization_id, company_id, Some(subscription.partner_invoice_id),
+        Some(&serde_json::json!({ "subscription_id": subscription.id, "billing_run_key": billing_run_key, "fx_rate": fx_rate }).to_string()),
+    )?;
+
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
@@ -573,14 +578,7 @@ pub fn create_subscription_ar_invoice(
         create_date: Some(ctx.timestamp),
         write_uid: Some(created_by),
         write_date: Some(ctx.timestamp),
-        metadata: Some(
-            serde_json::json!({
-                "subscription_id": subscription.id,
-                "billing_run_key": billing_run_key,
-                "fx_rate": fx_rate,
-            })
-            .to_string(),
-        ),
+        metadata: Some(invoice_metadata),
     });
 
     let mut amount_untaxed = 0.0f64;

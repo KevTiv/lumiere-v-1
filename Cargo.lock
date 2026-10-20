@@ -148,6 +148,7 @@ dependencies = [
  "jsonwebtoken",
  "lumiere-contracts",
  "lumiere-presentation-core",
+ "openssl",
  "printpdf",
  "rand 0.8.5",
  "reqwest",

@@ -36,7 +36,8 @@ export async function signIn(
     .catch(() => false)
 
   if (!emailVisible) {
-    await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+    await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+    await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
     await expectNoAppError(page)
     return
   }
@@ -46,36 +47,68 @@ export async function signIn(
   await page.getByRole("button", { name: /sign in/i }).click()
 
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
-  await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+  await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
   await expectNoAppError(page)
 }
 
 export async function expectAuthenticatedShell(page: Page) {
-  await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+  // While a streamed page is still resolving, its server-rendered shell and the
+  // client shell can briefly coexist; wait for exactly one before asserting on it
+  // (a strict-mode violation is not retried).
+  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+  await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
   await expect(page.getByTestId("sidebar-user")).toBeVisible()
   await expect(page.getByTestId("sidebar-sign-out")).toBeVisible()
   await expectNoAppError(page)
+}
+
+/**
+ * Reload and wait for the streamed page to settle on a single shell: right after
+ * DOMContentLoaded the Suspense fallback and the streamed content can coexist, so
+ * strict test-id locators would see duplicates.
+ */
+export async function reloadSettled(page: Page) {
+  await page.reload({ waitUntil: "domcontentloaded" })
+  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+}
+
+async function expectHydratedModule(page: Page, moduleId: string) {
+  const moduleView = page.getByTestId(`module-view-${moduleId}`)
+  // Next.js may briefly render streamed and client shells together.
+  await expect(moduleView).toHaveCount(1, { timeout: 30_000 })
+  await expect(moduleView).toBeVisible()
+  await expect(moduleView).toHaveAttribute("data-hydrated", "true")
 }
 
 export async function gotoModule(page: Page, route: string, moduleId?: string) {
   await page.goto(route)
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
   await expectAuthenticatedShell(page)
-  if (moduleId) {
-    const moduleView = page.getByTestId(`module-view-${moduleId}`)
-    await expect(moduleView).toBeVisible()
-    await expect(moduleView).toHaveAttribute("data-hydrated", "true")
-  }
+  if (moduleId) await expectHydratedModule(page, moduleId)
 }
 
 /** Select a module tab and wait until its panel is the active interaction surface. */
 export async function selectModuleTab(page: Page, moduleId: string, tabId: string) {
   const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
-  await tab.click()
+  if (await tab.isVisible()) await tab.click()
+  else {
+    // Domain tests use canonical deep links for views outside the current
+    // workspace. Dedicated navigation tests cover workspace/menu interaction.
+    const target = new URL(`/${moduleId}`, page.url())
+    const current = new URL(page.url())
+    for (const [key, value] of current.searchParams) {
+      if (!["tab", "filter", "highlight"].includes(key)) target.searchParams.append(key, value)
+    }
+    if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
+    await page.goto(target.toString())
+    await expectHydratedModule(page, moduleId)
+  }
   await expect(tab).toHaveAttribute("aria-selected", "true")
-  // Base UI may regenerate the tab/tabpanel ids during the state transition.
-  // The selected tab and the single visible panel are the stable behavior.
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
+  // Nested charts and unrelated workspaces can have their own active panels.
+  // Assert the module's exact panel, not every tabpanel in the document.
+  await expect(page.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)).toHaveCount(1)
+  await expect(page.getByTestId(`module-panel-${moduleId}-${tabId}`)).toBeVisible()
 }
 
 /** Open an entity tab’s create modal and wait for the form dialog. */
@@ -95,7 +128,8 @@ export async function openEntityCreate(
 }
 
 export async function openAccountingTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-accounting-${tabId}`).click()
+  await selectModuleTab(page, "accounting", tabId)
+  await expectNoAppError(page)
 }
 
 /** Click each module tab in order, assert no app error, optionally run per-tab checks. */
@@ -106,7 +140,7 @@ export async function assertModuleTabs(
   assertTab?: (page: Page, tabId: string) => Promise<void>,
 ) {
   for (const tabId of tabIds) {
-    await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+    await selectModuleTab(page, moduleId, tabId)
     await expectNoAppError(page)
     if (assertTab) {
       await assertTab(page, tabId)
@@ -349,7 +383,7 @@ export async function expectSeededText(
     // the current route/tab, but reload once so its query cache is rebuilt from
     // the already-observed projected row.
     try {
-      await page.reload({ waitUntil: "domcontentloaded" })
+      await reloadSettled(page)
       await expect(page.getByText(text).first()).toBeVisible({ timeout: 30_000 })
       return
     } catch (refreshError) {
@@ -371,9 +405,7 @@ export async function openTabAndCancelCreate(
   tabId: string,
   formId: string,
 ) {
-  const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
-  await tab.click()
-  await expect(tab).toHaveAttribute("aria-selected", "true")
+  await selectModuleTab(page, moduleId, tabId)
   // The tab switch also updates ?tab=, which can re-render the panel; click
   // (unlike scrollIntoViewIfNeeded) re-resolves a replaced element.
   const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
@@ -385,8 +417,20 @@ export async function openTabAndCancelCreate(
   await expectNoAppError(page)
 }
 
-export async function fillField(page: Page, name: string, value: string) {
-  const field = page.getByTestId(`form-field-${name}`)
+export async function fillField(scope: Page | Locator, name: string, value: string) {
+  const field = scope.getByTestId(`form-field-${name}`)
+  await expect(field, `Missing form field "${name}" in the active form`).toHaveCount(1, { timeout: 15_000 })
+  // Textarea retains its test id on the native form bridge. User input belongs
+  // in the visible editor inside that same panel, including within a dialog.
+  if (
+    await field.getAttribute("data-slot") === "textarea" &&
+    await field.getAttribute("aria-hidden") === "true"
+  ) {
+    const editor = field.locator("..").locator('[data-slot="rich-text-editor"]')
+    await editor.click()
+    await editor.fill(value)
+    return
+  }
   await field.click()
   await field.fill(value)
 }
@@ -786,7 +830,7 @@ export async function submitForm(page: Page, formId: string) {
     await expect(modal).toBeHidden({ timeout: 15_000 })
   } catch {
     const fieldErrors = await modal.locator(".text-destructive, [role='alert']").allTextContents()
-    const toastErrors = await page.getByRole("status").allTextContents().catch(() => [] as string[])
+    const toastErrors = await page.locator('[role="status"], [data-sonner-toast]').allTextContents().catch(() => [] as string[])
     const detail = [...fieldErrors, ...toastErrors].filter(Boolean).join("; ")
     throw new Error(
       `Form "${formId}" did not close after submit${detail ? `: ${detail}` : ""}`,
@@ -873,13 +917,13 @@ export async function waitForEntityActionEnabled(page: Page, actionTestId: strin
 /** Open a sale order's own page and wait for its header. */
 export async function openSaleOrderPage(page: Page, orderId: number | string) {
   await page.goto(`/sales/orders/${orderId}`)
-  await expect(page.getByTestId("sale-order-title")).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId("sale-order-title").first()).toBeVisible({ timeout: 30_000 })
 }
 
 /** Start "Create invoice" from a sale order's page and wait for its form. */
 export async function openCreateInvoiceFromOrder(page: Page, orderId: number | string) {
   await openSaleOrderPage(page, orderId)
-  const action = page.getByTestId("record-workflow-action-sales.order.create-invoice")
+  const action = page.getByTestId("record-workflow-action-sales.order.create-invoice").first()
   await expect(action).toBeEnabled({ timeout: 30_000 })
   await action.click()
   await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible({ timeout: 15_000 })
@@ -896,7 +940,7 @@ export async function acceptEntityActionConfirm(page: Page) {
 export async function clickEntityActionAndWaitForReducer(
   page: Page,
   actionTestId: string,
-  reducerName: StdbBffReducerKey,
+  reducerName: StdbBffReducerKey | `erp.${string}`,
   options?: { timeoutMs?: number },
 ) {
   await waitForEntityActionEnabled(page, actionTestId)
@@ -1878,7 +1922,7 @@ export async function postDraftCreditNoteMove(page: Page, creditNoteId: number):
 /** @deprecated Use {@link postDraftCreditNoteMove} — credit notes are not listed on journal entries. */
 export async function postDraftCreditNoteViaGl(page: Page, partnerName: string): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-invoices").click()
+  await openAccountingTab(page, "invoices")
   const rows = activeTabCustomTableRows(page).filter({ hasText: partnerName })
   await expect(rows.first()).toBeVisible({ timeout: 30_000 })
 
@@ -1999,18 +2043,19 @@ export async function openInvoiceDetailModalFromRecordSheet(page: Page): Promise
 /** Open invoice detail and post draft via accounting invoices tab. */
 export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise<number> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-invoices").click()
+  await openAccountingTab(page, "invoices")
   await selectCustomTableRowById(page, moveId)
   await openInvoiceDetailModalFromRecordSheet(page)
+  await expect(page.getByTestId("invoice-detail-post-draft")).toBeEnabled({ timeout: 15_000 })
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => matchesOperationResponse(res, "post_invoice") && res.ok(),
+      (res) => matchesOperationResponse(res, "post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
   ])
-  expect(postRes.ok()).toBe(true)
+  await expectReducerHttpResponseOk("post_invoice", postRes)
   await waitForMovePosted(page, moveId)
   return moveId
 }
@@ -2018,15 +2063,15 @@ export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise
 /** Open one exact draft vendor bill in the accounting Bills tab. */
 async function openDraftVendorBillModal(page: Page, billId: number): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-bills").click()
+  await openAccountingTab(page, "bills")
   // The bill projection is available through the API before the accounting
   // list's query cache necessarily sees it. Rebuild the page once after the
   // tab is active so all procure-to-pay row-visibility flows use fresh data.
-  await page.reload({ waitUntil: "domcontentloaded" })
-  await page.getByTestId("module-tab-accounting-bills").click()
+  await reloadSettled(page)
+  await openAccountingTab(page, "bills")
   await selectCustomTableRowById(page, billId)
   await openInvoiceDetailModalFromRecordSheet(page)
-  await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByTestId("invoice-detail-post-draft")).toBeEnabled({ timeout: 15_000 })
 }
 
 /** Open vendor bill detail and post draft via accounting bills tab. */
@@ -2494,23 +2539,28 @@ export async function addCustomFormFieldViaSettings(
       const parsed = JSON.parse(String(value ?? "[]")) as unknown
       return Array.isArray(parsed) ? parsed.map(String) : []
     }
-    const enabledFields = stringArray(
-      adminRegistryConfig.enabledFieldsJson ?? adminRegistryConfig.enabled_fields_json,
-    )
-    await callReducerBff(page, "set_form_role_config", [
-      orgId,
-      configId,
-      {
-        role_id: String(adminRoleId),
-        enabled_fields: [...new Set([...enabledFields, fieldId])],
-        required_fields: stringArray(
-          adminRegistryConfig.requiredFieldsJson ?? adminRegistryConfig.required_fields_json,
-        ),
-        default_prompts: stringArray(
-          adminRegistryConfig.defaultPromptsJson ?? adminRegistryConfig.default_prompts_json,
-        ),
-      },
-    ])
+    // The runtime may use the registry role or its persisted numeric identity.
+    // Preserve each role's current visibility policy when adding a fixture field.
+    for (const roleId of new Set(["role-admin", String(adminRoleId)])) {
+      const current = (roleConfigsJson.data ?? []).find(
+        (row) =>
+          scalarQueryId(row.configurationId ?? row.configuration_id) === configId &&
+          String(row.roleId ?? row.role_id) === roleId,
+      ) ?? adminRegistryConfig
+      await callReducerBff(page, "set_form_role_config", [
+        orgId,
+        configId,
+        {
+          role_id: roleId,
+          enabled_fields: [...new Set([
+            ...stringArray(current.enabledFieldsJson ?? current.enabled_fields_json),
+            fieldId,
+          ])],
+          required_fields: stringArray(current.requiredFieldsJson ?? current.required_fields_json),
+          default_prompts: stringArray(current.defaultPromptsJson ?? current.default_prompts_json),
+        },
+      ])
+    }
     await openFormConfigLeadForm(page)
     await expect(page.getByTestId(`form-config-field-row-${fieldId}`)).toBeVisible({
       timeout: 30_000,
@@ -2618,14 +2668,14 @@ export async function expectMailMessageForRecord(
 
 export async function openFiscalSetupWizard(page: Page) {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-fiscal-years").click()
+  await openAccountingTab(page, "fiscal-years")
   await page.getByTestId("entity-action-fy-setup-wizard").click()
   await expect(page.getByTestId("form-modal-fiscal-setup-wizard")).toBeVisible()
 }
 
 export async function savePivotReportViaUi(page: Page, name: string) {
   await gotoModule(page, "/reports", "reports")
-  await page.getByTestId("module-tab-reports-pivot-explorer").click()
+  await selectModuleTab(page, "reports", "pivot-explorer")
   await page.getByTestId("pivot-report-name").fill(name)
   const saveBtn = page.getByTestId("pivot-save-report")
   await expect(saveBtn).toBeEnabled({ timeout: 15_000 })
@@ -2726,7 +2776,7 @@ export async function generateVatReportViaUi(
   options: { name: string; dateFrom: string; dateTo: string },
 ) {
   await gotoModule(page, "/reports", "reports")
-  await page.getByTestId("module-tab-reports-vat-report").click()
+  await selectModuleTab(page, "reports", "vat-report")
   await page.getByLabel(/name/i).first().fill(options.name)
   await page.locator('input[type="date"]').first().fill(options.dateFrom)
   await page.locator('input[type="date"]').nth(1).fill(options.dateTo)
@@ -2921,7 +2971,7 @@ export async function waitForWorkflowVersionStatus(
 /** Seed a minimal publishable linear draft (start → end) via BFF reducers. */
 export async function seedPublishableWorkflowDraft(
   page: Page,
-  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string },
+  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string; companyId?: number },
 ): Promise<{
   organizationId: number
   companyId: number
@@ -2931,7 +2981,7 @@ export async function seedPublishableWorkflowDraft(
   draftRevision: number
 }> {
   const organizationId = await fetchSessionOrganizationId(page)
-  const companyId = await fetchDefaultCompanyId(page)
+  const companyId = options?.companyId ?? await fetchDefaultCompanyId(page)
   const workflowKey = (options?.workflowKey ?? smokeName("wf")).toLowerCase().replace(/-/g, "_")
   const model = options?.model ?? "e2e.subject"
   const name = options?.name ?? `E2E ${workflowKey}`
@@ -2997,7 +3047,7 @@ export async function seedPublishableWorkflowDraft(
 
   // BFF seed bypasses React Query mutations — hard reload clears the 30s stale cache.
   await gotoModule(page, "/workflows", "workflows")
-  await page.reload({ waitUntil: "domcontentloaded" })
+  await reloadSettled(page)
   await expectAuthenticatedShell(page)
 
   return {
@@ -3125,7 +3175,7 @@ export async function seedPurchaseOrderApprovalWorkflow(
 /** Publish a company-scoped approval workflow for the guarded Sales confirm action. */
 export async function seedSaleOrderApprovalWorkflow(
   page: Page,
-  options: { workflowKey: string; name: string },
+  options: { workflowKey: string; name: string; companyId?: number },
 ): Promise<{ organizationId: number; versionId: number; revision: number }> {
   const seeded = await seedPublishableWorkflowDraft(page, {
     ...options,
@@ -3236,7 +3286,7 @@ export async function seedSaleOrderApprovalWorkflow(
 
 export async function openWorkflowVersionRow(page: Page, versionId: number) {
   await gotoModule(page, "/workflows", "workflows")
-  await page.getByTestId("module-tab-workflows-versions").click()
+  await selectModuleTab(page, "workflows", "versions")
   const row = activeTabEntityTable(page).getByTestId(`entity-row-${versionId}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()

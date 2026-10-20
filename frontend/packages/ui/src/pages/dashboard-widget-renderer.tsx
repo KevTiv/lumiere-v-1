@@ -27,6 +27,7 @@ import { ActivityRingWidget } from "./widgets/activity-ring-widget"
 import { CountdownWidget } from "./widgets/countdown-widget"
 import { IosTileWidget } from "./widgets/ios-tile-widget"
 import { QuickActionsWidget } from "./widgets/quick-actions-widget"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 interface WidgetRendererProps {
   widget: DashboardWidget
@@ -35,6 +36,8 @@ interface WidgetRendererProps {
   /** While the module's data loads, show a placeholder instead of zeros. */
   isLoading?: boolean
   exportProvenance?: ReportExportSourceProvenance
+  /** Domain-specific wording for legitimate zero-valued series. */
+  emptyMessage?: string
 }
 
 /** A chart with no points, or only zero values, renders as an empty frame. */
@@ -63,7 +66,7 @@ const CHART_WIDGET_TYPES = new Set<WidgetType>([
   "funnel-chart",
 ])
 
-export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading = false, exportProvenance }: WidgetRendererProps) {
+export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading = false, exportProvenance, emptyMessage }: WidgetRendererProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const useCard = widget.useCard !== false
   const isChart = CHART_WIDGET_TYPES.has(widget.type)
@@ -81,7 +84,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
     if (isChart && chartIsEmpty(widget)) {
       return (
         <div className="flex h-56 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-          No data for this period yet.
+          {emptyMessage ?? "No data for this period yet."}
         </div>
       )
     }
@@ -190,7 +193,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
       <div className={widthClass} data-testid={testId}>
         <div className="mb-3 flex items-center justify-between gap-2">
           {widget.title ? (
-            <h3 className="text-sm font-medium text-muted-foreground">{widget.title}</h3>
+            <h3 className={workspaceStyles.sectionTitle}>{widget.title}</h3>
           ) : (
             <span />
           )}
@@ -207,7 +210,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading 
     <div className={widthClass} data-testid={testId}>
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-          <CardTitle className="text-sm font-semibold">{widget.title}</CardTitle>
+          <CardTitle className={workspaceStyles.sectionTitle}>{widget.title}</CardTitle>
           {isChart || canExportCsv ? (
             <div className="flex shrink-0 items-center gap-1">{exportButtons}</div>
           ) : null}

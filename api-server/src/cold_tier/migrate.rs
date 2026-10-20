@@ -20,6 +20,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::ledger;
 use crate::platform_control;
 
+#[path = "migration_audit.rs"]
+mod migration_audit;
+pub use migration_audit::{audit_schema, MigrationAuditReport, MigrationAuditStatus};
+
 /// The table containing the durable migration history.
 pub const MIGRATION_TABLE: &str = platform_control::SCHEMA_MIGRATION_TABLE;
 
@@ -196,10 +200,12 @@ pub const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 17,
-        name: "platform_identity_lifecycle",
+        name: "purchasing_keyed_operations",
         change_set: 9,
         phase: MigrationPhase::Expand,
-        sql: platform_control::PLATFORM_IDENTITY_LIFECYCLE_DDL,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0017_durable_projection_delta.sql"
+        ),
     },
     Migration {
         version: 18,
@@ -209,6 +215,22 @@ pub const MIGRATIONS: &[Migration] = &[
         sql: include_str!(
             "../../../lumiere-codegen/pg-migration-ledger/0018_durable_projection_delta.sql"
         ),
+    },
+    Migration {
+        version: 19,
+        name: "bank_statement_settlement_lifecycle",
+        change_set: 11,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0019_durable_projection_delta.sql"
+        ),
+    },
+    Migration {
+        version: 20,
+        name: "platform_identity_lifecycle",
+        change_set: 12,
+        phase: MigrationPhase::Expand,
+        sql: platform_control::PLATFORM_IDENTITY_LIFECYCLE_DDL,
     },
 ];
 

@@ -15,6 +15,16 @@ test('a requisition approval requires an independent actor', () => {
   assert.equal(requisitionCanApprove({ state: 'InProgress' }, 'ccdd'), false);
 });
 
+test('requisition gates accept the single-key enum shape returned by HTTP queries', () => {
+  const requisition = {
+    state: { inProgress: [] },
+    user_id: { __identity__: '0xAABB' },
+  };
+  assert.equal(requisitionCanApprove(requisition, '0xCCDD'), true);
+  assert.equal(requisitionCanApprove(requisition, 'aabb'), false);
+  assert.equal(requisitionCanCreateRfq({ state: { approved: [] } }), true);
+});
+
 test('an RFQ can only be created from an approved requisition', () => {
   assert.equal(requisitionCanCreateRfq({ state: { tag: 'Approved' } }), true);
   assert.equal(requisitionCanCreateRfq({ state: { tag: 'Draft' } }), false);

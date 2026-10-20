@@ -240,6 +240,15 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         "dashboards".to_string(),
         ["widget_ids"].into_iter().map(String::from).collect(),
     );
+    // Purchase-tax eligibility needs explicit repartition evidence, under the
+    // same resource and field authorization as the other tax attributes.
+    m.insert(
+        "account-taxes".to_string(),
+        ["invoice_repartition_line_ids"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
     m.insert(
         "product-attribute-lines".to_string(),
         ["value_ids"].into_iter().map(String::from).collect(),
@@ -255,12 +264,26 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
             .map(String::from)
             .collect(),
     );
+    // Requisition lifecycle readback needs its lines, conversion output and
+    // the independent approver identity selected by the reducer.
+    m.insert(
+        "purchase-requisitions".to_string(),
+        ["line_ids", "purchase_ids", "write_uid"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
     m.insert(
         "sale-orders".to_string(),
         ["picking_ids", "invoice_ids"]
             .into_iter()
             .map(String::from)
             .collect(),
+    );
+    // Replenishment scheduler readback needs the last computed run summary.
+    m.insert(
+        "replenishment-rules".to_string(),
+        ["metadata"].into_iter().map(String::from).collect(),
     );
     // Exact COV-06/07 readbacks resolve effects through these owned relations.
     m.insert(
@@ -273,6 +296,20 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
             .into_iter()
             .map(String::from)
             .collect(),
+    );
+    // Immutable close-cost readback links the exact output stock moves and
+    // journal lines created by the manufacturing close transaction.
+    m.insert(
+        "mrp-production-costs".to_string(),
+        [
+            "raw_move_ids",
+            "output_move_ids",
+            "productivity_cost_ids",
+            "account_move_line_ids",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect(),
     );
     m.insert(
         "mrp-production-costs".to_string(),
@@ -301,6 +338,20 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
             .into_iter()
             .map(String::from)
             .collect(),
+    );
+    // Immutable cost snapshots expose their exact source/output relations for
+    // readback and record links. Field selection still runs before this filter.
+    m.insert(
+        "mrp-production-costs".to_string(),
+        [
+            "raw_move_ids",
+            "output_move_ids",
+            "productivity_cost_ids",
+            "account_move_line_ids",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect(),
     );
     m
 });
@@ -402,7 +453,8 @@ fn resource_module(resource_key: &str) -> Option<&'static str> {
     let table = registry_get(resource_key)
         .map(|r| r.table.as_str())
         .unwrap_or(resource_key);
-    MODULES.get(table).map(String::as_str)
+    lumiere_policy_core::operation_resource_module(table)
+        .or_else(|| MODULES.get(table).map(String::as_str))
 }
 
 /// Explicit denials apply before module grants, inherited reads and session hydration.
@@ -1418,13 +1470,44 @@ mod tests {
     }
 
     #[test]
-    fn resolve_http_sql_columns_includes_qty_fields_for_purchase_order_lines() {
-        let cols = resolve_http_sql_columns("purchase-order-lines", None)
-            .expect("purchase-order-lines columns");
-        for field in ["qty_received", "qty_invoiced", "qty_to_invoice"] {
+    fn resolve_http_sql_columns_includes_match_recovery_fields_for_purchase_order_lines() {
+        for resource in ["purchase-order-lines", "purchase-order-lines-over-billed"] {
+            let cols =
+                resolve_http_sql_columns(resource, None).expect("purchase-order-lines columns");
+            for field in [
+                "state",
+                "invoice_lines",
+                "qty_received",
+                "qty_invoiced",
+                "qty_to_invoice",
+            ] {
+                assert!(
+                    cols.iter().any(|c| c == field),
+                    "expected {field} in {resource} projection, got: {cols:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_bill_correction_fields_for_account_move_lines() {
+        let cols = resolve_http_sql_columns("account-move-lines", None)
+            .expect("account-move-lines columns");
+        for field in ["product_id", "quantity", "price_unit"] {
             assert!(
-                cols.iter().any(|c| c == field),
-                "expected {field} in purchase-order-lines projection, got: {cols:?}"
+                cols.iter().any(|column| column == field),
+                "expected {field} in account-move-lines projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_bill_correction_fields_for_account_moves() {
+        let cols = resolve_http_sql_columns("account-moves", None).expect("account-moves columns");
+        for field in ["company_currency_id", "posted_before"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in account-moves projection, got: {cols:?}"
             );
         }
     }
@@ -1518,6 +1601,27 @@ mod tests {
     }
 
     #[test]
+    fn resolve_http_sql_columns_exposes_sale_order_origin_for_exchange_readback() {
+        let cols = resolve_http_sql_columns("sale-orders", None).expect("sale-orders columns");
+        assert!(
+            cols.iter().any(|column| column == "origin"),
+            "expected origin in sale-orders projection, got: {cols:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_exposes_replenishment_scheduler_state() {
+        let cols = resolve_http_sql_columns("replenishment-rules", None)
+            .expect("replenishment-rule columns");
+        for field in ["last_run", "next_run", "metadata"] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "expected {field} in replenishment-rules projection, got: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
     fn resolve_http_sql_columns_includes_invoice_readback_for_purchase_orders() {
         let cols =
             resolve_http_sql_columns("purchase-orders", None).expect("purchase-orders columns");
@@ -1526,6 +1630,28 @@ mod tests {
                 cols.iter().any(|column| column == field),
                 "expected {field} in purchase-orders projection, got: {cols:?}"
             );
+        }
+    }
+
+    #[test]
+    fn resolve_http_sql_columns_includes_upstream_procurement_readback() {
+        for (resource, fields) in [
+            (
+                "purchase-requisitions",
+                &["state", "origin", "user_id", "write_uid", "purchase_ids"][..],
+            ),
+            (
+                "supplier-intakes",
+                &["state", "submitted_by", "approved_by", "partner_id"][..],
+            ),
+        ] {
+            let cols = resolve_http_sql_columns(resource, None).expect("procurement columns");
+            for field in fields {
+                assert!(
+                    cols.iter().any(|column| column == field),
+                    "expected {field} in {resource} projection, got: {cols:?}"
+                );
+            }
         }
     }
 
@@ -1539,6 +1665,15 @@ mod tests {
             ),
             ("mrp-workorders", &["time_ids"][..]),
             ("mrp-workcenters", &["order_ids", "productivity_ids"][..]),
+            (
+                "mrp-production-costs",
+                &[
+                    "raw_move_ids",
+                    "output_move_ids",
+                    "productivity_cost_ids",
+                    "account_move_line_ids",
+                ][..],
+            ),
         ] {
             let cols = resolve_http_sql_columns(resource, None).expect("columns");
             for field in fields {
@@ -1547,6 +1682,199 @@ mod tests {
                     "expected {field} in {resource} projection, got: {cols:?}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn manufacturing_cost_relations_respect_field_selection_and_resource_scope() {
+        let mut access = field_access(&["mrp_production:read"]);
+        select_fields(&mut access, "mrp-production-costs", &["total_value"]);
+        let cols = resolve_http_sql_columns("mrp-production-costs", Some(&access))
+            .expect("selected cost columns");
+        assert!(cols.iter().any(|column| column == "total_value"));
+        assert!(!cols.iter().any(|column| column == "output_move_ids"));
+        assert!(
+            filter_http_sql_unsafe_columns(&["output_move_ids".to_string()], Some("products"))
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn saved_report_projection_preserves_company_and_persisted_definition() {
+        let cols = resolve_http_sql_columns("saved-reports", None).expect("saved report columns");
+        for field in ["company_id", "column_dimension", "filter_json"] {
+            assert!(cols.iter().any(|column| column == field), "missing {field}");
+        }
+        let mut access = field_access(&["saved_report:read"]);
+        select_fields(&mut access, "saved-reports", &["name"]);
+        let selected = resolve_http_sql_columns("saved-reports", Some(&access))
+            .expect("selected saved report columns");
+        assert!(selected.iter().any(|column| column == "company_id"));
+        assert!(!selected.iter().any(|column| column == "filter_json"));
+        assert!(!selected.iter().any(|column| column == "column_dimension"));
+    }
+
+    #[test]
+    fn requisition_projection_preserves_operator_identity_and_exact_po_handoff() {
+        let cols = resolve_http_sql_columns("purchase-requisitions", None).unwrap();
+        for field in [
+            "origin",
+            "user_id",
+            "write_uid",
+            "vendor_id",
+            "line_ids",
+            "purchase_ids",
+            "order_count",
+        ] {
+            assert!(cols.iter().any(|column| column == field), "missing {field}");
+        }
+        let mut access = field_access(&["purchase_requisition:read"]);
+        select_fields(&mut access, "purchase-requisitions", &["state"]);
+        let selected = resolve_http_sql_columns("purchase-requisitions", Some(&access)).unwrap();
+        for field in [
+            "origin",
+            "user_id",
+            "write_uid",
+            "vendor_id",
+            "line_ids",
+            "purchase_ids",
+        ] {
+            assert!(
+                !selected.iter().any(|column| column == field),
+                "field selection leaked {field}"
+            );
+        }
+        assert!(
+            filter_http_sql_unsafe_columns(&["purchase_ids".into()], Some("products")).is_empty()
+        );
+    }
+
+    #[test]
+    fn replenishment_projection_exposes_configuration_and_scheduler_readback() {
+        let cols = resolve_http_sql_columns("replenishment-rules", None).unwrap();
+        for field in [
+            "product_min_qty",
+            "product_max_qty",
+            "qty_to_order",
+            "trigger",
+            "last_run",
+            "next_run",
+        ] {
+            assert!(cols.iter().any(|column| column == field), "missing {field}");
+        }
+        let mut access = field_access(&["replenishment_rule:read"]);
+        select_fields(&mut access, "replenishment-rules", &["active"]);
+        let selected = resolve_http_sql_columns("replenishment-rules", Some(&access)).unwrap();
+        assert!(!selected.iter().any(|column| column == "last_run"));
+    }
+
+    #[test]
+    fn tax_readiness_has_explicit_active_type_and_posting_account_evidence() {
+        let taxes = resolve_http_sql_columns("account-taxes", None).unwrap();
+        for field in [
+            "active",
+            "type_tax_use",
+            "amount_type",
+            "tax_group_id",
+            "has_negative_factor",
+            "price_include",
+        ] {
+            assert!(
+                taxes.iter().any(|column| column == field),
+                "missing {field}"
+            );
+        }
+        let groups = resolve_http_sql_columns("tax-groups", None).unwrap();
+        for field in ["tax_payable_account_id", "tax_receivable_account_id"] {
+            assert!(
+                groups.iter().any(|column| column == field),
+                "missing {field}"
+            );
+        }
+        let mut access = field_access(&["account_tax:read"]);
+        select_fields(&mut access, "account-taxes", &["name"]);
+        assert!(!resolve_http_sql_columns("account-taxes", Some(&access))
+            .unwrap()
+            .iter()
+            .any(|column| column == "active"));
+    }
+
+    #[test]
+    fn sales_exchange_origin_is_readable_without_exposing_internal_metadata() {
+        let columns = resolve_http_sql_columns("sale-orders", None).unwrap();
+        assert!(columns.iter().any(|column| column == "origin"));
+        assert!(!columns.iter().any(|column| column == "metadata"));
+        let mut access = field_access(&["sale_order:read"]);
+        select_fields(&mut access, "sale-orders", &["state"]);
+        assert!(!resolve_http_sql_columns("sale-orders", Some(&access))
+            .unwrap()
+            .iter()
+            .any(|column| column == "origin"));
+    }
+
+    #[test]
+    fn bank_matching_has_currency_and_eligibility_evidence_without_bypassing_field_masks() {
+        for (resource, fields) in [
+            ("account-accounts", vec!["reconcile"]),
+            (
+                "account-move-lines",
+                vec![
+                    "parent_state",
+                    "company_currency_id",
+                    "currency_id",
+                    "amount_residual",
+                    "blocked",
+                ],
+            ),
+            ("bank-statements", vec!["currency_id"]),
+            (
+                "bank-statement-lines",
+                vec![
+                    "date",
+                    "currency_id",
+                    "journal_currency_id",
+                    "foreign_currency_id",
+                ],
+            ),
+        ] {
+            let columns = resolve_http_sql_columns(resource, None).unwrap();
+            for field in &fields {
+                assert!(
+                    columns.iter().any(|column| column == field),
+                    "missing {resource}.{field}"
+                );
+            }
+            let mut access = field_access(&[
+                "account_account:read",
+                "account_move_line:read",
+                "account_bank_statement:read",
+                "account_bank_statement_line:read",
+            ]);
+            select_fields(&mut access, resource, &["id"]);
+            let masked = resolve_http_sql_columns(resource, Some(&access)).unwrap();
+            for field in fields {
+                assert!(
+                    !masked.iter().any(|column| column == field),
+                    "field mask exposed {resource}.{field}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn expense_readback_exposes_exact_amount_date_and_currency_with_field_masks() {
+        let columns = resolve_http_sql_columns("expenses", None).unwrap();
+        for field in ["date", "total_amount", "currency_id"] {
+            assert!(
+                columns.iter().any(|column| column == field),
+                "missing expenses.{field}"
+            );
+        }
+        let mut access = field_access(&["hr_expense:read"]);
+        select_fields(&mut access, "expenses", &["name"]);
+        let masked = resolve_http_sql_columns("expenses", Some(&access)).unwrap();
+        for field in ["date", "total_amount", "currency_id"] {
+            assert!(!masked.iter().any(|column| column == field));
         }
     }
 
@@ -1666,6 +1994,27 @@ mod tests {
     }
 
     #[test]
+    fn manufacturing_cost_http_projection_keeps_exact_effect_ids() {
+        let cols = resolve_http_sql_columns(
+            "mrp-production-costs",
+            Some(&field_access(&["mrp-production-costs:read"])),
+        )
+        .expect("manufacturing cost columns");
+
+        for field in [
+            "raw_move_ids",
+            "output_move_ids",
+            "productivity_cost_ids",
+            "account_move_line_ids",
+        ] {
+            assert!(
+                cols.iter().any(|column| column == field),
+                "manufacturing cost projection must expose {field}: {cols:?}"
+            );
+        }
+    }
+
+    #[test]
     fn selective_accounting_field_policies_keep_company_scope_metadata() {
         for resource in ["account-accounts", "account-journals", "account-taxes"] {
             let mut access = field_access(&[&format!("{resource}:read")]);
@@ -1757,7 +2106,8 @@ mod tests {
     fn resolve_http_sql_columns_exposes_helpdesk_lifecycle_without_customer_pii() {
         let cols =
             resolve_http_sql_columns("helpdesk-tickets", None).expect("helpdesk-tickets columns");
-        // The declared lifecycle projection includes the assignee ID for assignment readback.
+        // The canonical registry exposes the assigned agent's identity for
+        // ticket routing/editing. It is not the customer's personal payload.
         for field in ["state", "priority", "user_id"] {
             assert!(
                 cols.iter().any(|column| column == field),
@@ -1836,4 +2186,42 @@ mod tests {
             "the current operator pairing flow reads the newly generated token"
         );
     }
+    #[test]
+    fn purchase_tax_selection_has_canonical_flags_without_bypassing_field_policy() {
+        let columns = resolve_http_sql_columns("account-taxes", None).expect("tax projection");
+        for field in [
+            "active",
+            "type_tax_use",
+            "amount_type",
+            "price_include",
+            "include_base_amount",
+            "has_negative_factor",
+            "tax_group_id",
+            "invoice_repartition_line_ids",
+        ] {
+            assert!(
+                columns.iter().any(|column| column == field),
+                "missing selector evidence: {field}"
+            );
+        }
+
+        let mut access = field_access(&["account-taxes:read"]);
+        access.field_permissions.push(FieldPermissionLike {
+            id: Some(1),
+            organization_id: Some(7),
+            role_id: Some(9),
+            resource: "account-taxes".to_string(),
+            action: "read".to_string(),
+            allowed_fields: vec!["name".to_string()],
+            subject_user_hex: None,
+            subject_role_id: Some(9),
+        });
+        let restricted = resolve_http_sql_columns("account-taxes", Some(&access))
+            .expect("restricted tax projection");
+        assert!(!restricted.iter().any(|column| column == "active"));
+        assert!(!restricted.iter().any(|column| column == "tax_group_id"));
+        assert!(restricted.iter().any(|column| column == "company_id"));
+    }
+
+
 }

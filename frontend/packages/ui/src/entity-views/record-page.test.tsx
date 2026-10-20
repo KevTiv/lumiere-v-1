@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { RecordPage, type RecordPageProps } from "./record-page"
 import { StatusBar } from "./status-bar"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children?: React.ReactNode }) => (
@@ -67,6 +68,14 @@ function renderPage(overrides: Partial<RecordPageProps> = {}) {
   )
   return { onTabChange }
 }
+
+it("uses the shared page and action roles without truncating long record identity", () => {
+  renderPage({ title: "INV/2026/A-LONG-REFERENCE-THAT-MUST-REMAIN-READABLE" })
+  const title = screen.getByTestId("order-title")
+  expect(title.className).toBe(workspaceStyles.pageTitle)
+  expect(title.closest(".ui-page-header")).toBeTruthy()
+  expect(screen.getByTestId("order-actions").className).toBe(workspaceStyles.actions)
+})
 
 describe("RecordPage", () => {
   it("shows linked ancestors and the record itself as the current crumb", () => {
