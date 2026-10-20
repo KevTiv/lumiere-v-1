@@ -254,7 +254,10 @@ mod tests {
         assert_eq!(report.status, MigrationAuditStatus::Pending);
         assert_eq!(report.matching_versions, (1..=18).collect::<Vec<_>>());
         assert_eq!(report.observed[16].name, "platform_identity_lifecycle");
-        assert_eq!(report.observed[17].name, "durable_invite_acceptance_receipts");
+        assert_eq!(
+            report.observed[17].name,
+            "durable_invite_acceptance_receipts"
+        );
         assert_eq!(report.pending.len(), 1);
         assert_eq!(report.pending[0].version, 19);
         assert_eq!(report.pending[0].name, "financial_alpha_operations");

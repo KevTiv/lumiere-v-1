@@ -2222,6 +2222,4 @@ mod tests {
         assert!(!restricted.iter().any(|column| column == "tax_group_id"));
         assert!(restricted.iter().any(|column| column == "company_id"));
     }
-
-
 }
