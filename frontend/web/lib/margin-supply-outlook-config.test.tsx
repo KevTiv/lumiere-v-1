@@ -7,6 +7,7 @@ import {
   createMarginSupplyDashboard,
   DEFAULT_MARGIN_SUPPLY_SCENARIO_DRAFT,
   marginSupplyScenarioFromDraft,
+  marginSupplyXlsxData,
   MARGIN_SUPPLY_SCENARIO_FIELDS,
 } from "./margin-supply-outlook-config"
 
@@ -27,7 +28,15 @@ test("scenario fields and dashboard widgets are config driven", () => {
       demandChangePct: 0,
       leadTimeChangeDays: 7,
       targetMarginPct: 25,
+      provenance: { source: "manual" },
     },
+  )
+  assert.throws(
+    () => marginSupplyScenarioFromDraft({
+      ...DEFAULT_MARGIN_SUPPLY_SCENARIO_DRAFT,
+      targetMarginPct: "",
+    }),
+    /Target gross margin.*required/,
   )
 
   const money = { minorUnits: 10_000, scale: 2 }
@@ -74,6 +83,7 @@ test("scenario fields and dashboard widgets are config driven", () => {
       profitAtRisk: money,
       projectedStockShortfall: 0,
       recommendations: [],
+      suggestions: [],
       lines: [],
     },
   } as Extract<ReportPreview, { reportKey: "margin_supply_outlook_v1" }>
@@ -81,7 +91,11 @@ test("scenario fields and dashboard widgets are config driven", () => {
   const dashboard = createMarginSupplyDashboard(preview)
   assert.deepEqual(
     dashboard.sections.map((section) => section.id),
-    ["financial-impact", "assumptions", "product-warnings", "management-follow-up"],
+    ["financial-impact", "assumptions", "product-warnings", "governed-suggestions", "management-follow-up"],
   )
   assert.equal(dashboard.sections[2]?.widgets[0]?.type, "table")
+  assert.equal(dashboard.sections[3]?.widgets[0]?.type, "custom")
+  const xlsx = marginSupplyXlsxData(preview)
+  assert.ok(xlsx.headers.includes("Scenario source"))
+  assert.ok(xlsx.headers.includes("Calculation evidence and caveats"))
 })
