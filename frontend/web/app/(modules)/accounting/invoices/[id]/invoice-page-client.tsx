@@ -8,12 +8,14 @@ import { useRBAC } from '@/lib/rbac-context';
 import { useUnsavedChangesGuard } from '@lumiere/ui';
 import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { CreditCard, Download, ListOrdered, Mail, MoreHorizontal, ShoppingCart } from 'lucide-react';
+import { CreditCard, Download, ListOrdered, Mail, MoreHorizontal, Printer, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
 import { useInvoicePersonalization } from '@lumiere/query-hooks/hooks/invoice-personalization';
 import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from '@lumiere/erp-shared/invoice-personalization';
 import {
   Button,
+  PrintableInvoice,
+  printInvoice,
   EntityDetail,
   EntityView,
   Empty,
@@ -438,6 +440,27 @@ function InvoicePageLoaded({
     })),
   };
 
+  const reviewedDocument = (
+    <InvoiceDocument
+                        title={documentTitle}
+                        reference={label}
+                        personalization={outgoingDraft ? currentDraftContent?.personalization : capturedContent.personalization}
+                        notes={capturedContent.notes}
+                        personalizationError={outgoingDraft ? draftContentError : capturedContent.personalizationError}
+                        partnerLabel={kind === 'bill' || kind === 'vendorCredit' ? t('accounting.invoices.vendor', { defaultValue: 'Vendor' }) : t('accounting.invoices.customer', { defaultValue: 'Customer' })}
+                        partner={partner || undefined}
+                        date={dateLabel(move.invoiceDate ?? move.invoice_date ?? move.date)}
+                        dueDate={dateLabel(move.invoiceDateDue ?? move.invoice_date_due)}
+                        currency={currency}
+                        lines={kind === 'entry' ? undefined : invoiceDocumentLines(lines)}
+                        subtotal={invoiceRecordAmount(move.amountUntaxed ?? move.amount_untaxed)}
+                        tax={invoiceRecordAmount(move.amountTax ?? move.amount_tax)}
+                        total={total}
+                        draft={isDraft}
+                      />
+  );
+  const printReady = linesRead.state.status === 'ready' && companiesRead.state.status === 'ready' && currenciesRead.state.status === 'ready' && draftReady && !draftContentError;
+
   const saleOrderId = move.saleOrderId ?? move.sale_order_id;
   const purchaseOrder = (purchaseOrders as unknown as Row[]).find((order) =>
     sameCompany(order, operatingCompanyId) && Array.isArray(order.invoiceIds ?? order.invoice_ids)
@@ -816,23 +839,7 @@ function InvoicePageLoaded({
                     <ModuleDataNotice state={linesRead.state} />
                     {linesRead.state.status === 'loading' ? <Skeleton className="h-96 w-full" /> : null}
                     {linesRead.state.status === 'ready' || linesRead.state.status === 'partial' ? (
-                      <InvoiceDocument
-                        title={documentTitle}
-                        reference={label}
-                        personalization={outgoingDraft ? currentDraftContent?.personalization : capturedContent.personalization}
-                        notes={capturedContent.notes}
-                        personalizationError={outgoingDraft ? draftContentError : capturedContent.personalizationError}
-                        partnerLabel={kind === 'bill' || kind === 'vendorCredit' ? t('accounting.invoices.vendor', { defaultValue: 'Vendor' }) : t('accounting.invoices.customer', { defaultValue: 'Customer' })}
-                        partner={partner || undefined}
-                        date={dateLabel(move.invoiceDate ?? move.invoice_date ?? move.date)}
-                        dueDate={dateLabel(move.invoiceDateDue ?? move.invoice_date_due)}
-                        currency={currency}
-                        lines={kind === 'entry' ? undefined : invoiceDocumentLines(lines)}
-                        subtotal={invoiceRecordAmount(move.amountUntaxed ?? move.amount_untaxed)}
-                        tax={invoiceRecordAmount(move.amountTax ?? move.amount_tax)}
-                        total={total}
-                        draft={isDraft}
-                      />
+                      {reviewedDocument}
                     ) : null}
                   </div>
                   <aside className="min-w-0 rounded-xl border bg-card p-4" aria-label={t('accounting.invoices.recordDetails', { defaultValue: 'Record details' })}>
@@ -840,6 +847,17 @@ function InvoicePageLoaded({
                     <EntityDetail config={detailConfig} data={move} />
                   </aside>
                 </div>
+              </div>
+            ),
+          },
+          {
+            id: 'preview',
+            label: t('accounting.invoices.preview', { defaultValue: 'Preview' }),
+            content: (
+              <div className="space-y-4" data-testid="invoice-preview-tab">
+                <div className="flex justify-end"><Button variant="outline" size="sm" disabled={!printReady} onClick={printInvoice} data-testid="invoice-preview-print"><Printer className="mr-1 size-4" />{t('accounting.invoices.invoiceActions.print')}</Button></div>
+                {reviewedDocument}
+                {printReady ? <PrintableInvoice>{reviewedDocument}</PrintableInvoice> : null}
               </div>
             ),
           },

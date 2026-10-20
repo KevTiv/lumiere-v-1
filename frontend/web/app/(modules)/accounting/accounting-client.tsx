@@ -1,6 +1,11 @@
 "use client"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { useModuleTab } from "@/hooks/use-module-tab"
+import { DashboardWidgetRenderer } from "@lumiere/ui/pages/dashboard-widget-renderer"
+import { mapDashboardWidgets } from "@lumiere/ui/lib/dashboard-sections"
+import { agingShareRows, agingTotals, collectionRate, singleCurrencyId, revenueVsExpensesByMonth, topCustomers, weeklyCashMovements } from "./accounting-dashboard-charts"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import { formatChartValue, type ChartValueFormat } from "@lumiere/ui/lib/chart-format"
 import { AccountantOverview } from "./accountant-overview"
 import { BillDocumentIntake } from "./bill-document-intake"
 import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
@@ -4564,6 +4569,35 @@ function AccountingClientReady({
   const draftInvoicePersonalization = selectedInvoice && selectedInvoiceCompanyMatches && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType) && invoicePersonalization.profile && invoiceSeller
     ? resolveDraftInvoiceDocument(selectedInvoice.metadata, invoicePersonalization.profile, invoicePersonalization.profileVersionIds, invoiceSeller)
     : null
+  const financeChartSections = useMemo(() => {
+    const now = new Date()
+    const currentRange = { startMs: new Date(now.getFullYear(), now.getMonth(), 1).getTime(), endMs: now.getTime() }
+    const previousRange = { startMs: new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), endMs: currentRange.startMs - 1 }
+    const chartInvoices = invoices.filter((move) => move.companyId === operatingCompanyId)
+    const chartBills = bills.filter((move) => move.companyId === operatingCompanyId)
+    const chartPayments = accountPayments.filter((payment) => payment.companyId === operatingCompanyId)
+    const currencyId = singleCurrencyId([...chartInvoices, ...chartBills, ...chartPayments])
+    const currencyCode = currencyId ? currencyCodeMap(currencies).get(currencyId) : undefined
+    const money: ChartValueFormat = currencyCode ? { kind: "currency", currency: currencyCode } : { kind: "number" }
+    const sourceState = mergeModuleStates([allMovesRead.state, accountPaymentsRead.state, currenciesRead.state])
+    const ids = ["acc-revenue-expenses", "acc-collection-rate", "acc-aging-share", "acc-top-customers", "acc-cash-movements"]
+    return mapDashboardWidgets(moduleConfigBase, (w) => {
+      if (!ids.includes(w.id)) return w
+      if (sourceState.status !== "ready" || !currencyCode) return { ...w, type: "diagnostic", data: { code: "missing-measure", message: sourceState.status !== "ready" ? "Financial source data is not ready. Refresh this overview before interpreting totals." : "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
+      if (w.type === "combo-chart" && w.id === "acc-revenue-expenses") return { ...w, data: { ...w.data, values: revenueVsExpensesByMonth(chartInvoices, chartBills, now), valueFormat: money } }
+      if (w.type === "radial-gauge" && w.id === "acc-collection-rate") {
+        const rate = collectionRate(chartInvoices, currentRange)
+        return { ...w, data: { ...w.data, value: rate.collected, max: rate.invoiced, stats: [{ label: "Invoiced", value: formatChartValue(rate.invoiced, money) }, { label: "Collected", value: formatChartValue(rate.collected, money) }, { label: "Outstanding", value: formatChartValue(rate.outstanding, money) }] } }
+      }
+      if (w.type === "share-bar" && w.id === "acc-aging-share") return { ...w, data: { ...w.data, rows: agingShareRows(agingTotals(chartInvoices, chartBills, now.getTime()), { ar: "AR", ap: "AP" }), valueFormat: money } }
+      if (w.type === "ranked-bars" && w.id === "acc-top-customers") return { ...w, data: { ...w.data, items: topCustomers(chartInvoices, partnerLabelMap, currentRange, previousRange), valueFormat: money } }
+      if (w.type === "step-chart" && w.id === "acc-cash-movements") {
+        const cash = weeklyCashMovements(chartPayments, now)
+        return { ...w, data: { ...w.data, values: cash.values, anomalies: cash.anomalies, valueFormat: money } }
+      }
+      return w
+    }).map((section) => ({ ...section, widgets: section.widgets.filter((widget) => ids.includes(widget.id)) })).filter((section) => section.widgets.length > 0)
+  }, [invoices, bills, accountPayments, operatingCompanyId, currencies, allMovesRead.state, accountPaymentsRead.state, currenciesRead.state, moduleConfigBase, partnerLabelMap])
   const accountantOverview = (
     <AccountantOverview
       companyName={companyLabelMap.get(String(operatingCompanyId))}
@@ -5283,7 +5317,7 @@ function AccountingClientReady({
         tabs: (() => {
           const mapped = moduleConfigBase.tabs.map((tab) => {
             if (tab.id === "dashboard") {
-              return { ...tab, type: "custom" as const, customContent: accountantOverview }
+              return { ...tab, type: "custom" as const, customContent: <div className="space-y-8">{accountantOverview}<section aria-label="Financial charts" data-testid="accounting-finance-charts" className="grid grid-cols-1 gap-4 lg:grid-cols-3">{financeChartSections.flatMap((section) => section.widgets.map((widget) => <DashboardWidgetRenderer key={widget.id} widget={widget} widthClass={widget.width === "full" ? "lg:col-span-3" : widget.width === "2/3" ? "lg:col-span-2" : "lg:col-span-1"} />))}</section></div> }
             }
             if (tab.id === "analytic-lines") {
               return {
@@ -5908,6 +5942,7 @@ function AccountingClientReady({
     },
     [
       accountantOverview,
+      financeChartSections,
       invoiceCurrencyOptions,
       invoiceFilters,
       clearInvoiceFilter,

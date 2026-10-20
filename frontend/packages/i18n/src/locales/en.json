@@ -1306,6 +1306,7 @@
       "postMissingCogsAccounts": "Cannot post: chart of accounts is missing COGS and inventory GL accounts. Add expense (COGS) and asset (inventory) accounts first.",
       "attachments": "Attachments",
       "backToInvoices": "Back to invoices",
+      "preview": "Preview",
       "discussion": "Discussion",
       "draftName": "Draft",
       "moreActions": "More",
