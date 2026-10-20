@@ -20,7 +20,7 @@ function access(resource: string, fields?: string[]): FieldAccessContext {
   }
 }
 
-test('subscription line defaults select only released SQL columns', () => {
+test('subscription line defaults match released SQL columns', () => {
   const generated = sqlColumnListForGeneratedType('SubscriptionLine')
   assert.equal(generated.includes('active'), false)
   assert.equal(RESOURCE_REGISTRY['subscription-lines'].defaultRestricted.includes('active'), true)
