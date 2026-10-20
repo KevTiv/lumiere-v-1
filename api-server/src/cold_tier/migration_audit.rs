@@ -240,12 +240,26 @@ mod tests {
         let pending = inspect_history(true, false, &history(16), MIGRATIONS);
         assert_eq!(pending.status, MigrationAuditStatus::Pending);
         assert_eq!(pending.matching_versions, (1..=16).collect::<Vec<_>>());
-        assert_eq!(pending.pending[0].name, "purchasing_keyed_operations");
+        assert_eq!(pending.pending[0].name, "platform_identity_lifecycle");
         assert!(pending.require_compatible().is_ok());
         assert!(pending.require_current().is_err());
         let complete = inspect_history(true, false, &history(MIGRATIONS.len()), MIGRATIONS);
         assert_eq!(complete.status, MigrationAuditStatus::Matching);
         assert!(complete.require_current().is_ok());
+    }
+
+    #[test]
+    fn accepts_main_catalog_as_exact_prefix_with_only_additive_finance_pending() {
+        let report = inspect_history(true, false, &history(18), MIGRATIONS);
+        assert_eq!(report.status, MigrationAuditStatus::Pending);
+        assert_eq!(report.matching_versions, (1..=18).collect::<Vec<_>>());
+        assert_eq!(report.observed[16].name, "platform_identity_lifecycle");
+        assert_eq!(report.observed[17].name, "durable_invite_acceptance_receipts");
+        assert_eq!(report.pending.len(), 1);
+        assert_eq!(report.pending[0].version, 19);
+        assert_eq!(report.pending[0].name, "financial_alpha_operations");
+        assert!(report.require_compatible().is_ok());
+        assert!(report.require_current().is_err());
     }
 
     #[test]
@@ -281,12 +295,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_divergent_platform_seventeen_and_each_catalog_identity_drift() {
+    fn rejects_divergent_purchasing_seventeen_and_each_catalog_identity_drift() {
         for column in ["name", "phase", "change_set", "checksum"] {
             let mut applied = history(17);
             let row = &mut applied[16];
             match column {
-                "name" => row.name = "platform_identity_lifecycle".into(),
+                "name" => row.name = "purchasing_keyed_operations".into(),
                 "phase" => row.phase = "verify".into(),
                 "change_set" => row.change_set += 1,
                 "checksum" => row.checksum = migration_checksum("changed SQL"),
