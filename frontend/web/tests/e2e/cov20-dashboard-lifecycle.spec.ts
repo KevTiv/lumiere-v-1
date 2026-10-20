@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { expect, test, type Download, type Page, type Request } from "@playwright/test"
@@ -18,6 +17,7 @@ import {
   submitForm,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
+import { readApiOutageControl } from "./api-outage"
 
 const PERSONA_PASSWORD =
   process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -321,8 +321,7 @@ test.describe(
       page,
     }) => {
       test.setTimeout(300_000)
-      const container =
-        process.env.E2E_API_CONTAINER ?? "lumiere-dev-api-server-1"
+      const apiOutage = readApiOutageControl()
       await gotoModule(page, "/reports", "reports")
       // Reuse the dashboard the previous test composed (serial mode): the seeded
       // dashboard's legacy widget settings are rejected by the fail-closed
@@ -340,9 +339,9 @@ test.describe(
 
       let stopped = false
       try {
-        // Stop the real read API (no route mocking), then open the dashboard so
-        // its source reads fail against the missing dependency.
-        execFileSync("docker", ["stop", "--time", "2", container])
+        // Make the real read API unreachable (no route mocking), then open the
+        // dashboard so its source reads fail against the missing dependency.
+        apiOutage.stop()
         stopped = true
         await view.click()
         const alert = page.getByTestId("stored-dashboard-error")
@@ -353,7 +352,7 @@ test.describe(
           page.getByRole("button", { name: /export/i }).first(),
         ).toBeDisabled()
 
-        execFileSync("docker", ["start", container])
+        apiOutage.start()
         stopped = false
         await expect
           .poll(
@@ -376,7 +375,7 @@ test.describe(
           page.getByRole("button", { name: /export/i }).first(),
         ).toBeEnabled()
       } finally {
-        if (stopped) execFileSync("docker", ["start", container])
+        if (stopped) apiOutage.start()
       }
     })
 

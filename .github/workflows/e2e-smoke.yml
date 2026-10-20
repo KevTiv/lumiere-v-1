@@ -486,6 +486,8 @@ jobs:
           E2E_SPEC_FILES: ${{ matrix.config.specs || '' }}
           E2E_SHARD: ${{ matrix.config.shard || '' }}
           E2E_PREBUILT: '1'
+          # This lane owns a native loopback API, not the local Compose service.
+          E2E_API_OUTAGE_MODE: loopback-reject
           E2E_ARTIFACT_EXPECTED_SHA: ${{ github.sha }}
           # Run the heavyweight Inventory + Analytics reducers once on the
           # fixture-repair PR; shard 1 owns the bounded certification cost.
@@ -500,6 +502,8 @@ jobs:
           PG_TLS_MODE: disable
         run: |
           set -euo pipefail
+          pnpm --dir frontend/web exec node --import tsx tests/e2e/api-outage.unit.ts
+          sudo -n iptables --version
           # Makefile defaults to a macOS dev PATH; use the runner PATH in CI.
           export E2E_PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${HOME}/.cargo/bin:${HOME}/.local/bin:${PNPM_HOME}"
           echo "E2E_SUITE=${E2E_SUITE} E2E_CLEAR_DB=${E2E_CLEAR_DB} E2E_SHARD=${E2E_SHARD} E2E_SPEC_FILES=${E2E_SPEC_FILES}"
