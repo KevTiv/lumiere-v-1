@@ -108,9 +108,12 @@ jobs:
         run: |
           # Split whole-suite runs across runners; each shard gets its own
           # SpacetimeDB/Postgres/seed, so shards cannot interfere.
-          SHARDS=3
           shard() {
-            jq -cn --arg suite "$1" --arg clear_db "$2" --argjson n "${SHARDS}" \
+            # The complete suite needs more partitions than the bounded P0
+            # lane so long serial lifecycles cannot starve later test files.
+            local shards=3
+            if [ "$1" = full ]; then shards=6; fi
+            jq -cn --arg suite "$1" --arg clear_db "$2" --argjson n "${shards}" \
               '[range(1; $n + 1) | {suite: $suite, clear_db: $clear_db, shard: "\(.)/\($n)", slot: "\(.)"}]'
           }
           case "$EVENT_NAME" in

@@ -38,24 +38,26 @@ class E2eWorkflowPlanTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             return json.loads(output.read_text().removeprefix("configs="))
 
-    def assert_shards(self, matrix, suite, clear_db):
-        self.assertEqual(len(matrix), 3)
-        self.assertEqual([entry["shard"] for entry in matrix], ["1/3", "2/3", "3/3"])
-        self.assertEqual([entry["slot"] for entry in matrix], ["1", "2", "3"])
+    def assert_shards(self, matrix, suite, clear_db, count=3):
+        self.assertEqual(len(matrix), count)
+        self.assertEqual([entry["shard"] for entry in matrix],
+                         [f"{index}/{count}" for index in range(1, count + 1)])
+        self.assertEqual([entry["slot"] for entry in matrix],
+                         [str(index) for index in range(1, count + 1)])
         self.assertTrue(all(entry["suite"] == suite and entry["clear_db"] == clear_db
                             for entry in matrix))
 
     def test_release_candidate_runs_complete_fresh_suite(self):
-        self.assert_shards(self.plan(RELEASE_CANDIDATE="true"), "full", "1")
+        self.assert_shards(self.plan(RELEASE_CANDIDATE="true"), "full", "1", count=6)
 
     def test_release_candidate_cannot_be_narrowed_to_changed_specs(self):
         self.assert_shards(self.plan(RELEASE_CANDIDATE="true", TARGET_SPECS="one.spec.ts"),
-                           "full", "1")
+                           "full", "1", count=6)
 
     def test_release_candidate_takes_precedence_over_special_pretenant_branch(self):
         self.assert_shards(self.plan(RELEASE_CANDIDATE="true",
                                     HEAD_REF="codex/base05-pretenant-integrated-certification"),
-                           "full", "1")
+                           "full", "1", count=6)
 
     def test_ordinary_unselected_pr_retains_p0(self):
         self.assert_shards(self.plan(), "p0", "0")
@@ -73,11 +75,11 @@ class E2eWorkflowPlanTests(unittest.TestCase):
     def test_main_and_scheduled_runs_retain_complete_suite(self):
         for event in ("push", "schedule"):
             with self.subTest(event=event):
-                self.assert_shards(self.plan(EVENT_NAME=event), "full", "1")
+                self.assert_shards(self.plan(EVENT_NAME=event), "full", "1", count=6)
 
     def test_explicit_dispatch_retains_selected_suite(self):
         self.assert_shards(self.plan(EVENT_NAME="workflow_dispatch", DISPATCH_SUITE="full",
-                                    DISPATCH_CLEAR_DB="true"), "full", "1")
+                                    DISPATCH_CLEAR_DB="true"), "full", "1", count=6)
 
 
 if __name__ == "__main__":
