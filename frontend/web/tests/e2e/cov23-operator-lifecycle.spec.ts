@@ -181,7 +181,11 @@ async function runGrantSwitchRevokeRecover(
     const profileVisible = async () => {
       await persona.reload({ waitUntil: "domcontentloaded" })
       await gotoModule(persona, "/settings")
-      return persona.getByTestId("settings-section-profile").isVisible({ timeout: 10_000 })
+      // isVisible() ignores its timeout; give the permission-filtered client
+      // content time to hydrate before accepting an absent capability.
+      return persona.getByTestId("settings-section-profile")
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => true, () => false)
     }
     expect(await profileVisible()).toBe(false)
 
