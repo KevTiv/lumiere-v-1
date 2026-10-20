@@ -4,7 +4,7 @@ type RunCommand = (command: string, args: string[]) => unknown
 
 /** Control only the API dependency owned by the disposable E2E harness. */
 export function readApiOutageControl(
-  env: NodeJS.ProcessEnv = process.env,
+  env: Readonly<Record<string, string | undefined>> = process.env,
   run: RunCommand = execFileSync,
 ): { stop: () => void; start: () => void } {
   if (env.E2E_API_OUTAGE_MODE === "loopback-reject") {
