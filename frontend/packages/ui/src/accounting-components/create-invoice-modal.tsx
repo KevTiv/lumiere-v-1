@@ -12,6 +12,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "../components/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/tabs"
 import { isCustomField } from "../forms/config/types"
 import { useFormConfiguration } from "../forms/hooks/use-form-config"
 import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
@@ -94,6 +98,8 @@ interface ReleasedCreateInvoiceModalProps {
   open: boolean
   kind?: "invoice" | "bill"
   companyId: bigint
+  companyLabel?: string
+  currencyOptions?: readonly ManualInvoiceOption[]
   onClose: () => void
   onSave: (params: CreateManualAccountInvoiceParams) => Promise<OperationEffectOutcome<CanonicalRecordRef>>
   onCheckStatus: (params: CreateManualAccountInvoiceParams) => Promise<CanonicalRecordRef | null>
@@ -110,7 +116,7 @@ interface ReleasedCreateInvoiceModalProps {
 }
 
 function ReleasedCreateInvoiceModal({
-  open, kind = "invoice", companyId, onClose, onSave, onCheckStatus, onResolved,
+  open, kind = "invoice", companyId, companyLabel, currencyOptions = [], onClose, onSave, onCheckStatus, onResolved,
   journalOptions, partnerOptions, counterpartAccountOptions, lineAccountOptions,
   taxOptions = [], productOptions = [], paymentTermOptions = [], organizationId,
   formId = kind === "bill" ? "new-bill" : "new-invoice",
@@ -274,6 +280,12 @@ function ReleasedCreateInvoiceModal({
   return <Dialog open={open} onOpenChange={(next) => !next && close()}>
     <DialogContent data-testid="create-invoice-modal" className="max-h-[90vh] max-w-5xl overflow-y-auto sm:max-w-5xl">
       <DialogHeader><DialogTitle>{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle></DialogHeader>
+      <Tabs defaultValue="edit">
+        <TabsList>
+          <TabsTrigger value="edit">{t("accounting.authoring.editDocument", { defaultValue: "Edit document" })}</TabsTrigger>
+          <TabsTrigger value="document">{t("accounting.authoring.documentPreview", { defaultValue: "Document preview" })}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="edit">
       <fieldset disabled={locked || saving} className="space-y-5">
         <div className="grid gap-4 md:grid-cols-3">
           <FieldSelect label={t(`accounting.forms.${copyKey}.fields.partner`)} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
@@ -307,6 +319,53 @@ function ReleasedCreateInvoiceModal({
         </div>
         <div className="space-y-2"><Label>{t("accounting.forms.newInvoice.notesOptional")}</Label><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} /></div>
       </fieldset>
+        </TabsContent>
+        <TabsContent value="document">
+          <Card data-testid="invoice-document-preview">
+            <CardHeader>
+              <div><Badge variant="secondary">{t("accounting.authoring.unsavedDraft", { defaultValue: "Unsaved draft" })}</Badge></div>
+              <CardTitle>{kind === "bill" ? t("accounting.authoring.bill", { defaultValue: "Bill" }) : t("accounting.authoring.invoice", { defaultValue: "Invoice" })}{reference ? ` · ${reference}` : ""}</CardTitle>
+              <CardDescription>{companyLabel || t("accounting.authoring.companyId", { defaultValue: "Company {{id}}", id: String(companyId) })} · {currencyOptions.find((option) => option.value === journal?.currencyId)?.label || t("accounting.authoring.currencyId", { defaultValue: "Currency {{id}}", id: journal?.currencyId ?? "—" })}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div><p className="text-sm text-muted-foreground">{kind === "bill" ? t("accounting.authoring.vendor", { defaultValue: "Vendor" }) : t("accounting.authoring.customer", { defaultValue: "Customer" })}</p><p>{partnerOptions.find((option) => option.value === partnerId)?.label || "—"}</p></div>
+                <div><p className="text-sm text-muted-foreground">{t("accounting.authoring.documentDate", { defaultValue: "Document date" })}</p><p>{invoiceDate || "—"}</p></div>
+                <div><p className="text-sm text-muted-foreground">{t("accounting.authoring.dueDate", { defaultValue: "Due date" })}</p><p>{dueDate || "—"}</p></div>
+                <div><p className="text-sm text-muted-foreground">{t("accounting.authoring.paymentTerms", { defaultValue: "Payment terms" })}</p><p>{paymentTermOptions.find((option) => option.value === paymentTermId)?.label || "—"}</p></div>
+              </div>
+              <Table>
+                <TableHeader><TableRow>
+                  <TableHead>{t("accounting.authoring.description", { defaultValue: "Description" })}</TableHead>
+                  <TableHead className="text-right">{t("accounting.authoring.quantity", { defaultValue: "Quantity" })}</TableHead>
+                  <TableHead className="text-right">{t("accounting.authoring.unitPrice", { defaultValue: "Unit price" })}</TableHead>
+                  <TableHead className="text-right">{t("accounting.authoring.tax", { defaultValue: "Tax" })}</TableHead>
+                  <TableHead className="text-right">{t("accounting.authoring.total", { defaultValue: "Total" })}</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>{lineItems.map((line) => {
+                  const base = line.quantity * line.unitPrice * (1 - line.discount / 100)
+                  const tax = taxAmount(base, taxOptions.find((option) => option.value === line.taxId))
+                  return <TableRow key={line.id}>
+                    <TableCell>{line.description || "—"}{line.discount ? <p className="text-sm text-muted-foreground">{t("accounting.authoring.discount", { defaultValue: "Discount: {{amount}}%", amount: line.discount })}</p> : null}</TableCell>
+                    <TableCell className="text-right">{Number.isFinite(line.quantity) ? money(line.quantity) : "—"}</TableCell>
+                    <TableCell className="text-right">{Number.isFinite(line.unitPrice) ? money(line.unitPrice) : "—"}</TableCell>
+                    <TableCell className="text-right">{Number.isFinite(tax) ? money(tax) : "—"}</TableCell>
+                    <TableCell className="text-right">{Number.isFinite(base + tax) ? money(base + tax) : "—"}</TableCell>
+                  </TableRow>
+                })}</TableBody>
+              </Table>
+              <div className="flex flex-col items-end gap-1">
+                <p>{t("accounting.authoring.untaxed", { defaultValue: "Untaxed amount" })}: {Number.isFinite(subtotal) ? money(subtotal) : "—"}</p>
+                <p>{t("accounting.authoring.tax", { defaultValue: "Tax" })}: {Number.isFinite(totalTax) ? money(totalTax) : "—"}</p>
+                <p>{t("accounting.authoring.total", { defaultValue: "Total" })}: {Number.isFinite(subtotal + totalTax) ? money(subtotal + totalTax) : "—"}</p>
+              </div>
+              {paymentReference ? <p>{t("accounting.authoring.paymentReference", { defaultValue: "Payment reference" })}: {paymentReference}</p> : null}
+              {notes ? <p className="whitespace-pre-wrap">{notes}</p> : null}
+              <p className="text-sm text-muted-foreground">{t("accounting.authoring.documentPreviewOnly", { defaultValue: "Preview of the current draft. Saving creates a draft, not a posted entry. The server confirms amounts and rounding." })}</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       <DialogFooter><Button variant="outline" onClick={close}>{t("common.cancel")}</Button>{locked
         ? <Button onClick={() => void checkStatus()} disabled={saving}>Check previous action</Button>

@@ -5,7 +5,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useAiFormSuggest } from "@lumiere/query-hooks/hooks/ai-forms"
 import { cn } from "../lib/utils"
-import type { AiFormAssistConfig, FormConfig, FormField } from "../lib/form-types"
+import type { AiFormAssistConfig, FormConfig, FormField, FormPreviewRenderer } from "../lib/form-types"
 import { serializeAiFormSchema } from "../lib/ai-form-schema"
 import { FormFieldRenderer } from "./forms-field-render"
 import { formValuesDiffer } from "./use-unsaved-changes-guard"
@@ -47,6 +47,8 @@ interface ModularFormProps {
   aiAssist?: AiFormAssistConfig
   /** Reports whether the fields differ from their initial (or last submitted) values. */
   onDirtyChange?: (dirty: boolean) => void
+  /** Renders beside the controls using the current, unsaved form values. */
+  renderPreview?: FormPreviewRenderer
 }
 
 export function ModularForm({
@@ -60,6 +62,7 @@ export function ModularForm({
   submissionDisabled = false,
   aiAssist,
   onDirtyChange,
+  renderPreview,
 }: ModularFormProps) {
   const { t } = useTranslation()
   const aiSuggest = useAiFormSuggest()
@@ -330,8 +333,8 @@ export function ModularForm({
     }
   }
 
-  const formContent = (
-    <form noValidate onSubmit={handleSubmit} className="space-y-6">
+  const fieldsContent = (
+    <>
       {aiEnabled ? (
         <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
           <div className="flex items-center justify-between gap-3">
@@ -443,6 +446,31 @@ export function ModularForm({
           </div>
         )
       })}
+
+    </>
+  )
+  const preview = renderPreview?.(values)
+  const hasPreview = preview != null && preview !== false
+
+  const formContent = (
+    <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-6">
+      <div className={cn(hasPreview && "grid items-start gap-6 lg:grid-cols-2")}>
+        <div className="flex min-w-0 flex-col gap-6">{fieldsContent}</div>
+        {hasPreview ? (
+          <aside
+            data-form-preview
+            data-testid={`form-preview-${config.id}`}
+            aria-label={t("common.formPreview.label", { defaultValue: "Preview" })}
+            className="min-w-0 lg:sticky lg:top-0"
+            onKeyDown={(event) => {
+              // Editing a local example must not implicitly submit the record form.
+              if (event.key === "Enter" && event.target instanceof HTMLInputElement) event.preventDefault()
+            }}
+          >
+            {preview}
+          </aside>
+        ) : null}
+      </div>
 
       {config.showActions !== false ? (
         <div

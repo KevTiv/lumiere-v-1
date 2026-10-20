@@ -24,6 +24,7 @@ import { RuntimeFormModal } from "../forms/runtime-form-modal"
 import { buildModuleTabRow, type ModuleConfig, type ModuleTab } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import type { EntitySurfacePermission } from "../lib/entity-view-types"
+import type { FormConfig, FormValues } from "../lib/form-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
 import { decideCreateGate, withTabCreateCta } from "../lib/list-empty-state"
 import { useRBAC } from "../lib/rbac-context"
@@ -50,6 +51,12 @@ interface ModuleViewProps {
   ) => void | Promise<void>
   /** Forwarded to tab create {@link FormModal} — e.g. parent mutation `isPending`. */
   isPending?: boolean
+  /** Optional local authoring tool shared by table and dashboard creation paths. */
+  renderCreatePreview?: (
+    tabId: string,
+    values: FormValues,
+    config: FormConfig,
+  ) => React.ReactNode
   /** Called when a table row is clicked: tabId, row record */
   onRowClick?: (tabId: string, row: Record<string, unknown>) => void
   /** Controlled tab (use with `onActiveTabChange`, e.g. dashboard quick action → vendors tab) */
@@ -89,6 +96,7 @@ export function ModuleView({
   activeTab: activeTabProp,
   onActiveTabChange,
   isPending,
+  renderCreatePreview,
   entityBoardContext,
   dataLoading,
   dataState,
@@ -421,6 +429,9 @@ export function ModuleView({
                       open={openForm === tab.id}
                       onOpenChange={(open) => !open && setOpenForm(null)}
                       staticConfig={tab.createForm}
+                      renderPreview={renderCreatePreview
+                        ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
+                        : undefined}
                       moduleId={config.id}
                       formId={tab.createForm.id}
                       organizationId={runtimeForms.organizationId}
@@ -451,6 +462,9 @@ export function ModuleView({
                       open={openForm === tab.id}
                       onOpenChange={(open) => !open && setOpenForm(null)}
                       config={tab.createForm}
+                      renderPreview={renderCreatePreview
+                        ? (values) => renderCreatePreview(tab.id, values, tab.createForm!)
+                        : undefined}
                       isPending={isPending}
                       aiAssist={
                         defaultCompanyId && tab.entityConfig

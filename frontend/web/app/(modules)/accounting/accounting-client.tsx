@@ -1,6 +1,8 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { useModuleTab } from "@/hooks/use-module-tab"
+import { AccountingAuthoringPreview, hasAccountingAuthoringPreview } from "./accounting-authoring-preview"
+import type { FormValues } from "@lumiere/ui/lib/form-types"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -6145,6 +6147,25 @@ function AccountingClientReady({
     [paymentsLoading, bankStatementsLoading, movesLoading],
   )
 
+  const authoringCompanyLabel = companies.find((company) => company.id === operatingCompanyId)?.name
+    ?? t("accounting.authoring.companyId", { defaultValue: "Company {{id}}", id: String(operatingCompanyId) })
+  const renderAccountingAuthoringPreview = (values: FormValues, form: FormConfig) => {
+    if (!hasAccountingAuthoringPreview(form.id)) return null
+    const selectedJournal = journals.find((journal) => String(journal.id) === String(values.journalId ?? ""))
+    const currencyId = String(selectedJournal?.currencyId ?? defaultCurrencyId)
+    return <AccountingAuthoringPreview
+      key={form.id}
+      config={form}
+      values={values}
+      companyId={String(operatingCompanyId)}
+      companyLabel={authoringCompanyLabel}
+      currencyLabel={currencySelectOptions.find((option) => option.value === currencyId)?.label ?? "—"}
+      moves={allMoves}
+      moveLines={accountMoveLines}
+      ledgerLoaded={canUseModuleData(allMovesRead.state) && canUseModuleData(accountMoveLinesRead.state)}
+    />
+  }
+
   return (
     <>
       {activeTabUsable && formDialog}
@@ -6160,6 +6181,7 @@ function AccountingClientReady({
         dataLoading={dataLoading}
         dataState={dataState}
         onFormSubmit={handleFormSubmit}
+        renderCreatePreview={(_tabId, values, form) => renderAccountingAuthoringPreview(values, form)}
         onRowClick={handleEntityRowClick}
         activeTab={accountingActiveTab}
         onActiveTabChange={setAccountingActiveTab}
@@ -6452,6 +6474,8 @@ function AccountingClientReady({
         open={showCreateInvoice}
         kind="invoice"
         companyId={operatingCompanyId}
+        companyLabel={authoringCompanyLabel}
+        currencyOptions={currencySelectOptions}
         onClose={() => setShowCreateInvoice(false)}
         organizationId={organizationId}
         journalOptions={manualInvoiceOptions.invoice.journals}
@@ -6481,6 +6505,8 @@ function AccountingClientReady({
         open={showCreateBill}
         kind="bill"
         companyId={operatingCompanyId}
+        companyLabel={authoringCompanyLabel}
+        currencyOptions={currencySelectOptions}
         onClose={() => setShowCreateBill(false)}
         organizationId={organizationId}
         journalOptions={manualInvoiceOptions.bill.journals}
@@ -6510,6 +6536,9 @@ function AccountingClientReady({
         open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         staticConfig={quickActionForm?.form ?? journalEntryFormConfig}
+        renderPreview={(values) => renderAccountingAuthoringPreview(values, quickActionForm?.form ?? journalEntryFormConfig)}
+        closeOnSubmit={false}
+        showSubmitSuccessToast={false}
         moduleId="accounting"
         organizationId={organizationId}
         roleId={runtimeRoleId}
@@ -6580,6 +6609,7 @@ function AccountingClientReady({
           if (!open) setPaymentTermLineEdit(null)
         }}
         config={paymentTermLineEditFormConfig}
+        renderPreview={(values) => renderAccountingAuthoringPreview(values, paymentTermLineEditFormConfig)}
         onSubmit={async (formData) => {
           if (!paymentTermLineEdit?.id) return
           await updatePaymentTermLine.mutateAsync({

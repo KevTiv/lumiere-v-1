@@ -48,6 +48,7 @@ import {
   csvImportForm,
 } from "@lumiere/ui"
 import type { EntityTableConfig, EntityViewConfig, FormConfig } from "@lumiere/ui"
+import type { FormValues } from "@lumiere/ui/lib/form-types"
 import { reportsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useReportsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -142,6 +143,10 @@ import { VatReportPanel } from "./vat-report-panel"
 import { StatementsPanel } from "./statements-panel"
 import { QueryBuilder, type QueryBuilderStatus } from "./query-builder"
 import { OwnerReportsPanel } from "./owner-reports-panel"
+import { ReportAuthoringPreview } from "./report-authoring-preview"
+import { reportAuthoringKind, enhanceWidgetAuthoringForm } from "./report-authoring-model"
+import { enhanceMetricForm } from "./metric-authoring"
+import { MetricAuthoringPreview } from "./metric-authoring-preview"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
 
@@ -423,12 +428,12 @@ function ReportsClientLoaded({
 
   const analyticsMetricFormConfig = useMemo(
     () =>
-      mergeFieldDefaultValues(
+      enhanceMetricForm(mergeFieldDefaultValues(
         mergeSelectOptionsForFields(newAnalyticsMetricForm(t), {
           companyId: companySelectOptions,
         }),
         { companyId: operatingCompanyId != null ? String(operatingCompanyId) : "" },
-      ),
+      ), t),
     [t, companySelectOptions, operatingCompanyId],
   )
 
@@ -445,12 +450,12 @@ function ReportsClientLoaded({
 
   const dashboardWidgetFormConfig = useMemo(
     () =>
-      mergeFieldDefaultValues(
+      enhanceWidgetAuthoringForm(mergeFieldDefaultValues(
         mergeSelectOptionsForFields(newDashboardWidgetForm(t), {
           companyId: companySelectOptions,
         }),
         { companyId: operatingCompanyId != null ? String(operatingCompanyId) : "" },
-      ),
+      ), t),
     [t, companySelectOptions, operatingCompanyId],
   )
 
@@ -901,7 +906,7 @@ function ReportsClientLoaded({
     () => ({
       ...moduleConfig,
       tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
-        if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig }
+        if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig, createForm: financialReportFormConfig }
         if (tab.id === "trial-balance") return { ...tab, entityConfig: trialBalanceEntityConfig, createForm: trialBalanceEntryFormConfig, createAction: "createTrialBalanceEntry", createLabel: t("reports.trialBalance.createEntryLabel") }
         if (tab.id === "report-templates") return { ...tab, entityConfig: reportTemplatesEntityConfig, createForm: reportTemplateFormConfig }
         if (tab.id === "analytics-metrics") return { ...tab, entityConfig: analyticsMetricsEntityConfig, createForm: analyticsMetricFormConfig }
@@ -992,6 +997,7 @@ function ReportsClientLoaded({
       liveSections,
       moduleConfig,
       financialReportsEntityConfig,
+      financialReportFormConfig,
       trialBalanceEntityConfig,
       trialBalanceEntryFormConfig,
       reportTemplatesEntityConfig,
@@ -1012,6 +1018,12 @@ function ReportsClientLoaded({
       t
     ],
   )
+
+  const renderAuthoringPreview = (values: FormValues, formConfig: FormConfig) => {
+    if (formConfig.id === "new-analytics-metric") return <MetricAuthoringPreview values={values} config={formConfig} />
+    if (!reportAuthoringKind(formConfig.id)) return null
+    return <ReportAuthoringPreview values={values} config={formConfig} organizationId={orgId} companyLabel={companySelectOptions.find((option) => option.value === String(operatingCompanyId ?? ""))?.label} />
+  }
 
   const data = useMemo(
     () => ({
@@ -1083,6 +1095,7 @@ function ReportsClientLoaded({
         config={config}
         data={data}
         onFormSubmit={handleFormSubmit}
+        renderCreatePreview={(_tabId, values, formConfig) => renderAuthoringPreview(values, formConfig)}
         isPending={isFormMutationPending}
         onRowClick={(tabId, row) => {
           if (tabId === "reports") {
@@ -1095,6 +1108,7 @@ function ReportsClientLoaded({
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? financialReportFormConfig}
+        renderPreview={(values) => renderAuthoringPreview(values, quickActionForm?.form ?? financialReportFormConfig)}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
@@ -1229,6 +1243,7 @@ function ReportsClientLoaded({
         open={createDashboardOpen}
         onOpenChange={(open) => !open && setCreateDashboardOpen(false)}
         config={dashboardFormConfig}
+        renderPreview={(values) => renderAuthoringPreview(values, dashboardFormConfig)}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           await handleFormSubmit("dashboard", "createDashboard", formData)
@@ -1240,6 +1255,7 @@ function ReportsClientLoaded({
         open={createWidgetOpen}
         onOpenChange={(open) => !open && setCreateWidgetOpen(false)}
         config={dashboardWidgetFormConfig}
+        renderPreview={(values) => renderAuthoringPreview(values, dashboardWidgetFormConfig)}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           await handleFormSubmit("dashboard", "createDashboardWidget", formData)
