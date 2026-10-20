@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
-import { gotoModule, selectModuleTab } from "./helpers"
+import { chooseSelectOptionByTriggerValue, fetchDefaultCompanyId, gotoModule, selectModuleTab } from "./helpers"
 
 async function cancelDraft(page: Page) {
   await page.getByRole("button", { name: "Cancel", exact: true }).click()
@@ -7,6 +7,22 @@ async function cancelDraft(page: Page) {
   await expect(discard).toBeVisible()
   await page.getByTestId("discard-changes-confirm").click()
   await expect(discard).toBeHidden()
+}
+
+function observeOperationWrites(page: Page): string[] {
+  const writes: string[] = []
+  page.on("request", (request) => {
+    if (request.method() === "POST" && /\/(?:api|v1)\/(?:operations|compat\/reducer)\//.test(new URL(request.url()).pathname)) writes.push(request.url())
+  })
+  return writes
+}
+
+async function openDraftDocument(page: Page, kind: "invoice" | "bill") {
+  // Setup readiness comes from several asynchronous reads. Wait for the UI to open.
+  await expect(async () => {
+    await page.getByTestId(`quick-action-create_${kind}`).click()
+    await expect(page.getByTestId("create-invoice-modal")).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 60_000 })
 }
 
 test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
@@ -74,6 +90,90 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
     await expect(page.getByTestId("form-field-amount")).toHaveValue("18")
   })
 
+  test("previews a new empty dashboard without saving placeholder widgets", async ({ page }) => {
+    const writes = observeOperationWrites(page)
+    await gotoModule(page, "/reports?tab=dashboard", "reports")
+    await page.getByTestId("quick-action-new_dashboard").click()
+    const modal = page.getByTestId("form-modal-new-dashboard")
+    await expect(modal).toBeVisible()
+    await modal.getByTestId("form-field-name").fill("Monthly finance board")
+    await modal.getByTestId("form-field-description").fill("Cash and collections review")
+    const preview = modal.getByTestId("report-authoring-preview-dashboard")
+    await expect(preview).toContainText("Monthly finance board")
+    await expect(preview).toContainText("Cash and collections review")
+    await expect(preview).toContainText("Start with an empty dashboard")
+    await expect(preview).toContainText("Save the dashboard, then use Add widget")
+    await expect(preview).toContainText("Unsaved")
+    await cancelDraft(page)
+    await expect(modal).toBeHidden()
+    expect(writes).toEqual([])
+  })
+
+  test("previews supported widget sources and chart choices without saving", async ({ page }) => {
+    const writes = observeOperationWrites(page)
+    const companyId = await fetchDefaultCompanyId(page)
+    await gotoModule(page, "/reports?tab=dashboard", "reports")
+    await page.getByTestId("quick-action-new_widget").click()
+    const modal = page.getByTestId("form-modal-new-dashboard-widget")
+    await expect(modal).toBeVisible()
+    await modal.getByTestId("form-field-name").fill("Payments by status")
+    await chooseSelectOptionByTriggerValue(page, modal.getByTestId("form-field-companyId"), companyId)
+    await modal.getByTestId("form-field-dataSource").click()
+    await expect(page.getByRole("option", { name: "Invoices, bills and journal entries", exact: true })).toBeVisible()
+    await page.getByRole("option", { name: "Payments", exact: true }).click()
+    const preview = modal.getByTestId("report-authoring-preview-widget")
+    await expect(preview).toContainText("Number of records")
+    await expect(preview).toContainText("Read-only preview of the selected company")
+    await expect(preview.getByTestId("widget-authoring-live-preview-grid")).toBeVisible()
+    await modal.getByTestId("form-field-widgetType").click()
+    await expect(page.getByRole("option")).toHaveText(["KPI Card", "Chart", "Data Table"])
+    await page.getByRole("option", { name: "Chart", exact: true }).click()
+    await expect(modal.getByTestId("form-field-groupBy")).toContainText("Status")
+    await modal.getByTestId("form-field-chartType").click()
+    await page.getByRole("option", { name: "Donut", exact: true }).click()
+    await expect(modal.getByTestId("form-field-chartType")).toContainText("Donut")
+    await expect(preview.getByTestId("widget-authoring-live-preview-grid")).toBeVisible()
+    await expect(preview.getByTestId("dashboard-widget-diagnostic")).toHaveCount(0)
+    await cancelDraft(page)
+    expect(writes).toEqual([])
+  })
+
+  for (const kind of ["invoice", "bill"] as const) {
+    test(`previews the edited ${kind} document without creating a draft`, async ({ page }) => {
+      test.setTimeout(90_000)
+      const writes = observeOperationWrites(page)
+      await gotoModule(page, "/accounting?tab=dashboard", "accounting")
+      await openDraftDocument(page, kind)
+      const modal = page.getByTestId("create-invoice-modal")
+      await modal.getByTestId("create-invoice-partner").click()
+      await page.getByRole("option", { disabled: false }).first().click()
+      const partner = (await modal.getByTestId("create-invoice-partner").innerText()).trim()
+      await modal.getByTestId("create-invoice-line-description").fill(`Authoring ${kind} line`)
+      await modal.getByLabel("Qty", { exact: true }).fill("2")
+      await modal.getByTestId("create-invoice-line-unit-price").fill("125.50")
+      await modal.locator("#create-invoice-date").fill("2026-10-20")
+      await modal.locator("#create-invoice-due-date").fill("2026-11-20")
+      await modal.getByRole("tab", { name: "Document preview", exact: true }).click()
+      const preview = modal.getByTestId("invoice-document-preview")
+      await expect(preview).toBeVisible()
+      await expect(preview).toContainText(kind === "bill" ? "Bill" : "Invoice")
+      await expect(preview).toContainText(partner)
+      await expect(preview).toContainText("2026-10-20")
+      await expect(preview).toContainText("2026-11-20")
+      await expect(preview.getByRole("row").nth(1).getByRole("cell")).toHaveText([`Authoring ${kind} line`, "2", "125.5", "0", "251"])
+      await expect(preview).toContainText("Unsaved draft")
+      await expect(preview).toContainText("Saving creates a draft, not a posted entry")
+      await modal.getByRole("tab", { name: "Edit document", exact: true }).click()
+      await expect(modal.getByTestId("create-invoice-line-description")).toHaveValue(`Authoring ${kind} line`)
+      await modal.getByLabel("Qty", { exact: true }).fill("3")
+      await modal.getByRole("tab", { name: "Document preview", exact: true }).click()
+      await expect(preview.getByRole("row").nth(1).getByRole("cell")).toHaveText([`Authoring ${kind} line`, "3", "125.5", "0", "376.5"])
+      await modal.getByRole("button", { name: "Cancel", exact: true }).click()
+      await expect(modal).toBeHidden()
+      expect(writes).toEqual([])
+    })
+  }
+
   test("keeps metric controls and preview within a narrow viewport", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await gotoModule(page, "/reports?tab=dashboard", "reports")
@@ -82,5 +182,14 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
     await expect(modal).toBeVisible()
     await page.getByTestId("metric-authoring-preview").scrollIntoViewIfNeeded()
     expect(await modal.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
+    const previewBox = await page.getByTestId("metric-authoring-preview").boundingBox()
+    expect(previewBox).not.toBeNull()
+    expect(previewBox!.x).toBeGreaterThanOrEqual(0)
+    expect(previewBox!.x + previewBox!.width).toBeLessThanOrEqual(391)
+    const cancel = modal.getByRole("button", { name: "Cancel", exact: true })
+    await cancel.scrollIntoViewIfNeeded()
+    await expect(cancel).toBeInViewport()
+    await cancel.click()
+    await expect(modal).toBeHidden()
   })
 })

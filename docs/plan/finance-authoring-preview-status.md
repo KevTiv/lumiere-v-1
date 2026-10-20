@@ -53,9 +53,17 @@ does not replace those paths or claim canonical create certification for them.
   numeric/date examples, exact draft identity, and saved/preview widget company scope.
 - Frontend type checking, production build, translation checks, opaque-record
   ratchet, and browser operation-transport checks are recorded in the PR.
-- `frontend/web/tests/e2e/finance-authoring.spec.ts` adds read-only operator checks
-  for both metric entry points, report/template/schedule previews, tax interaction,
-  and a narrow viewport.
-- Local operator execution stopped in `auth.setup.ts`: the available local API
-  returned HTTP 500 during sign-in. The preview tests did not execute. A seeded
-  same-head browser run and CI remain required before acceptance.
+- `frontend/web/tests/e2e/finance-authoring.spec.ts` has ten read-only operator
+  cases: both metric entry points, report/template/schedule previews, dashboard
+  and widget previews, invoice/bill document previews, tax interaction, and a
+  narrow viewport. The new preview cases check that they perform no operation writes.
+- The initial local run stopped in `auth.setup.ts` with HTTP 500. That run used
+  a stale API process on port 48082 without `STDB_CREDENTIAL_ENCRYPTION_KEY`,
+  targeting an unrelated module on port 3917. The web environment also contained
+  Maincloud settings. This was a mixed local stack, not evidence of an application
+  password regression.
+- Reproduction uses `make e2e-smoke-setup` with dedicated local module
+  `lumiere-v1-finance239-e2e`, PostgreSQL database `lumiere_finance239_e2e`, API
+  port 48083, and web port 4317. API and web share the generated test credential
+  key. No Maincloud data reset is needed. Current execution results and exact-head
+  CI evidence are recorded in PR #239.
