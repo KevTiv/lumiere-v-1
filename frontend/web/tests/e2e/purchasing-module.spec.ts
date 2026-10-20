@@ -107,7 +107,7 @@ test.describe("Purchasing module e2e", { tag: "@dev-fixture" }, () => {
 
   test("RFQ award action opens a typed selection dialog", async ({ page }) => {
     await gotoModule(page, "/purchasing", "purchasing")
-    await openPurchasingTab(page, "dashboard")
+    await openPurchasingTab(page, "operations")
 
     await page.getByTestId("purchasing-ops-award-rfq-bid").click()
     const dialog = page.getByRole("dialog", { name: "Award RFQ bid" })

@@ -30,7 +30,7 @@ test.describe("Phase 10 overview smoke", { tag: "@phase-10" }, () => {
     await page.getByTestId("module-tab-documents-knowledge-categories").click()
     await page.getByTestId("entity-action-csv-kb-category-tab").click()
 
-    const csvModal = page.locator('[data-testid^="form-modal-csv-import-"]')
+    const csvModal = page.getByRole("dialog", { name: "Import knowledge categories", exact: true })
     await expect(csvModal).toBeVisible()
     await csvModal.getByRole("button", { name: /^cancel$/i }).click()
     await expect(csvModal).toBeHidden()

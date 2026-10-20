@@ -5208,7 +5208,10 @@
     "default_restricted": [
       "state",
       "company_id",
-      "description"
+      "description",
+      "origin",
+      "vendor_id",
+      "order_count"
     ],
     "mandatory": [
       "id",
