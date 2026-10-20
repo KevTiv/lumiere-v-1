@@ -177,11 +177,11 @@ export function FormModal({
         className={cn(
           maxW,
           "sm:has-[[data-form-preview]]:max-w-[min(1200px,calc(100vw-2rem))]",
-          "max-h-[86vh] gap-0 overflow-hidden border-border bg-card p-0 shadow-2xl",
+          "flex max-h-[86dvh] min-h-0 flex-col gap-0 overflow-hidden border-border bg-card p-0 shadow-2xl",
           className
         )}
       >
-        <DialogHeader className="sticky top-0 z-10 flex-shrink-0 border-b border-border/70 bg-card/95 px-6 py-5 backdrop-blur">
+        <DialogHeader className="shrink-0 border-b border-border/70 bg-card/95 px-6 py-5 backdrop-blur">
           <div className="flex items-center gap-3">
             {HeaderIcon && (
               <div className={cn(
@@ -204,14 +204,15 @@ export function FormModal({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {submitError ? (
-            <p className="mb-4 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+            <p className="mx-6 mt-4 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
               {submitError}
             </p>
           ) : null}
           <ModularForm
-            config={{ ...config, title: "", description: "" }}
+            config={{ ...config, title: "", description: "", layout: "default" }}
+            scrollable
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             leadingActions={formLeadingActions}
