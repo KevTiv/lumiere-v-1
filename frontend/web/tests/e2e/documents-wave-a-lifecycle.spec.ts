@@ -165,6 +165,7 @@ test.describe("DOC-009 document upload → attach → legal hold", { tag: "@p0" 
 
     await gotoModule(page, "/documents", "documents")
     await selectModuleTab(page, "documents", "documents")
+    await page.getByTestId("module-view-table-documents").click()
     await selectEntityRowByText(page, docName)
 
     await expectNoAppError(page)

@@ -111,6 +111,7 @@ test.describe("COV-18 exact document lock/unlock", { tag: ["@p0", "@cov18"] }, (
 
     await gotoModule(page, "/documents", "documents")
     await selectModuleTab(page, "documents", "documents")
+    await page.getByTestId("module-view-table-documents").click()
     await selectEntityRowById(page, documentId)
     const lock = page.getByTestId("entity-action-lock-document")
     await expect(lock).toBeEnabled()
@@ -183,6 +184,7 @@ test.describe("COV-18 exact document lock/unlock", { tag: ["@p0", "@cov18"] }, (
 
     await gotoModule(page, "/documents", "documents")
     await selectModuleTab(page, "documents", "documents")
+    await page.getByTestId("module-view-table-documents").click()
     await selectEntityRowById(page, documentId)
     await page.getByTestId("entity-action-upload-document-version").click()
     await page.locator('input[type="file"]').first().setInputFiles({

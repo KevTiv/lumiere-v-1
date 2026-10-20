@@ -39,6 +39,12 @@ async function assertDocumentsTab(page: Page, tabId: string) {
       await expect(page.getByTestId("quick-action-upload_document")).toBeVisible()
       break
     case "documents":
+      await page.getByTestId("module-view-alt-documents").click()
+      await expect(page.getByTestId("module-view-alt-documents")).toHaveAttribute("aria-pressed", "true")
+      await expect(page.getByTestId("file-browser")).toBeVisible()
+      await expect(page.getByTestId("file-browser-upload")).toBeVisible()
+      await page.getByTestId("module-view-table-documents").click()
+      await expect(page.getByTestId("module-view-table-documents")).toHaveAttribute("aria-pressed", "true")
       await expect(page.getByTestId("module-create-documents-documents")).toBeVisible()
       await expect(activeTabEntityTable(page)).toBeVisible()
       break
