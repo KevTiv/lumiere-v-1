@@ -11,6 +11,7 @@ import {
   gotoModule,
   scalarQueryId,
   selectEntityRowById,
+  selectModuleTab,
   signIn,
   waitForBffQueryMinRows,
   smokeName,
@@ -33,7 +34,7 @@ async function rows(page: Page, resource: string): Promise<Row[]> {
 
 async function openDashboardView(page: Page, dashboardId: number) {
   await gotoModule(page, "/reports", "reports")
-  await page.getByTestId("module-tab-reports-dashboards").click()
+  await selectModuleTab(page, "reports", "dashboards")
   await selectEntityRowById(page, dashboardId)
   const view = page.getByTestId("entity-action-view-dashboard")
   await expect(view).toBeEnabled()
@@ -55,7 +56,7 @@ test.describe(
 
       // --- compose: dashboard through the operator form ---------------------
       const dashboardName = smokeName("cov20-dash")
-      await page.getByTestId("module-tab-reports-dashboards").click()
+      await selectModuleTab(page, "reports", "dashboards")
       await waitForBffQueryMinRows(page, "/api/query/companies")
       await page.getByTestId("module-create-reports-dashboards").click()
       await fillField(page, "name", dashboardName)
@@ -87,7 +88,7 @@ test.describe(
           widgetRequest ??= request
         }
       })
-      await page.getByTestId("module-tab-reports-query-builder").click()
+      await selectModuleTab(page, "reports", "query-builder")
       await page.getByTestId("qb-model").click()
       await page.getByRole("option", { name: "Sale Order", exact: true }).click()
       await expect(page.getByTestId("qb-source-row-count")).toContainText(
@@ -135,7 +136,7 @@ test.describe(
 
       // --- compose: a CRM-model widget; CRM reads are permission-gated ------
       const leadWidgetName = smokeName("cov20-lead-widget")
-      await page.getByTestId("module-tab-reports-query-builder").click()
+      await selectModuleTab(page, "reports", "query-builder")
       await page.getByTestId("qb-model").click()
       await page.getByRole("option", { name: "Lead", exact: true }).click()
       await expect(page.getByTestId("qb-source-row-count")).toContainText(
@@ -332,7 +333,7 @@ test.describe(
       const dashboardId = scalarQueryId(composed?.id)
       if (dashboardId == null) throw new Error("the composed dashboard is required")
 
-      await page.getByTestId("module-tab-reports-dashboards").click()
+      await selectModuleTab(page, "reports", "dashboards")
       await selectEntityRowById(page, dashboardId)
       const view = page.getByTestId("entity-action-view-dashboard")
       await expect(view).toBeEnabled()
@@ -387,7 +388,7 @@ test.describe(
       const organizationId = await fetchSessionOrganizationId(page)
 
       const templateName = smokeName("cov20-op-template")
-      await page.getByTestId("module-tab-reports-report-templates").click()
+      await selectModuleTab(page, "reports", "report-templates")
       await page.getByTestId("module-create-reports-report-templates").click()
       await fillField(page, "name", templateName)
       await fillField(page, "model", "sale_order")
@@ -407,7 +408,7 @@ test.describe(
       if (templateId == null) throw new Error("created template not found")
 
       const scheduleName = smokeName("cov20-op-schedule")
-      await page.getByTestId("module-tab-reports-scheduled-reports").click()
+      await selectModuleTab(page, "reports", "scheduled-reports")
       await page.getByTestId("module-create-reports-scheduled-reports").click()
       await fillField(page, "name", scheduleName)
       await chooseSelectOptionByLabel(page, "reportTemplateId", templateName)
@@ -463,7 +464,7 @@ test.describe(
       await gotoModule(page, "/reports", "reports")
       await waitForBffQueryMinRows(page, "/api/query/companies")
       const widgetName = smokeName("cov20-tab-widget")
-      await page.getByTestId("module-tab-reports-dashboard-widgets").click()
+      await selectModuleTab(page, "reports", "dashboard-widgets")
       await page.getByTestId("module-create-reports-dashboard-widgets").click()
       await fillField(page, "name", widgetName)
       await chooseFirstEnabledOption(page, "widgetType")
