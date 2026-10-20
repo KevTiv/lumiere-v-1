@@ -18,6 +18,8 @@ import {
   LogOut,
 } from "lucide-react"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
 import { isFirstOrgSurfaceAdmitted } from "../lib/product-surface-catalog"
 
 interface DashboardSidebarProps {
@@ -68,13 +70,15 @@ export function DashboardSidebar({
   const isCollapsed = forceCollapsed || collapsed
   const userLabel = sidebarUserLabel(userProfile) || currentUser?.name?.trim() || ""
 
+  const workspaceProfile = useWorkspaceProfile()
   const userIsAdmin = isAdmin()
   const navGroups = useMemo(
-    (): NavGroup[] => buildNavGroups(t, { firstOrgProfile, isAdmin: userIsAdmin }),
-    [firstOrgProfile, t, userIsAdmin],
+    (): NavGroup[] => buildNavGroups(t, { workspaceProfile, firstOrgProfile, isAdmin: userIsAdmin }),
+    [workspaceProfile, firstOrgProfile, t, userIsAdmin],
   )
   const quickActionIsVisible = (surfaceId: string) =>
-    !firstOrgProfile || isFirstOrgSurfaceAdmitted(surfaceId, userIsAdmin)
+    isWorkspaceSurfaceVisible(workspaceProfile, surfaceId) &&
+      (!firstOrgProfile || isFirstOrgSurfaceAdmitted(surfaceId, userIsAdmin))
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/")
 

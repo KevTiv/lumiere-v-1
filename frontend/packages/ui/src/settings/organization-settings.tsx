@@ -50,6 +50,8 @@ import {
 } from "../lib/organization-company-form-configs"
 import { createCountryForm, createCurrencyForm } from "../lib/settings-platform-form-configs"
 import { useRBAC } from "@/lib/rbac-context"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
 import { cn } from "@/lib/utils"
 import { CountryPackReadinessPanel } from "./country-pack-readiness-panel"
 import {
@@ -84,6 +86,7 @@ function companyIdFromForm(data: Record<string, unknown>): string {
  */
 export function OrganizationSettings() {
   const { t } = useTranslation()
+  const workspaceProfile = useWorkspaceProfile()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
@@ -1130,7 +1133,7 @@ export function OrganizationSettings() {
                 {t("settings.organization.csvImport.toolbarRoles")}
               </Button>
             ) : null}
-            {canImportCsv("aiAgent") ? (
+            {isWorkspaceSurfaceVisible(workspaceProfile, "ai-skills") && canImportCsv("aiAgent") ? (
               <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("aiAgent")}>
                 {t("settings.organization.csvImport.toolbarAiAgents")}
               </Button>

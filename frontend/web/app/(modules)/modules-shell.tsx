@@ -1,5 +1,6 @@
 "use client"
 
+import { WorkspaceProfileProvider } from "@lumiere/ui/lib/workspace-profile-context"
 import { Suspense, useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react"
 import {
   DashboardSidebar,
@@ -646,12 +647,14 @@ export default function ModulesShell({
   firstOrgProfile?: boolean
 }) {
   return (
-    <Suspense fallback={null}>
-      <ErpAiRouteContextProvider>
-        <ChatterUploaderProvider value={useWebChatterUploader}>
-          <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
-        </ChatterUploaderProvider>
-      </ErpAiRouteContextProvider>
-    </Suspense>
+    <WorkspaceProfileProvider value="finance-alpha">
+      <Suspense fallback={null}>
+        <ErpAiRouteContextProvider>
+          <ChatterUploaderProvider value={useWebChatterUploader}>
+            <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+          </ChatterUploaderProvider>
+        </ErpAiRouteContextProvider>
+      </Suspense>
+    </WorkspaceProfileProvider>
   )
 }

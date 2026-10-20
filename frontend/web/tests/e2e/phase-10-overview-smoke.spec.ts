@@ -12,7 +12,7 @@ test.describe("Phase 10 overview smoke", { tag: "@phase-10" }, () => {
     const controlLoop = page.getByTestId("owner-control-loop")
     await expect(controlLoop).toBeVisible()
     await expect(controlLoop.getByText("Reconciliation exceptions")).toBeVisible()
-    await expect(controlLoop.getByRole("link", { name: "Open inventory" })).toHaveAttribute("href", "/inventory")
+    await expect(controlLoop.getByRole("link", { name: "Open inventory" })).toHaveCount(0)
     await expect(controlLoop.getByRole("link", { name: "Review owner reports" })).toHaveAttribute("href", "/reports")
     await expectNoAppError(page)
   })

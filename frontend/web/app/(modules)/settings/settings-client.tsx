@@ -5,6 +5,8 @@ import { useWorkOsAuthMode } from "@/lib/auth-mode-context"
 import { useMemo, useState } from "react"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useTranslation, i18n } from "@lumiere/i18n"
+import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
 import { DashboardHeader, FormModal, MissingOrganization, SettingsModule, type FormConfig } from "@lumiere/ui"
 import {
   toCreateCompanyParams,
@@ -647,6 +649,7 @@ function SettingsLoaded({
   useSettingsModuleSubscription()
   const { orgId } = orgBigInts(organizationId)
   const hostedAuth = useWorkOsAuthMode()
+  const workspaceProfile = useWorkspaceProfile()
   const [activeAction, setActiveAction] = useState<SettingsAction | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -966,10 +969,11 @@ function SettingsLoaded({
     { id: "logAuditEvent", title: "Log audit event", description: "Insert a manual audit log entry." },
   ]
 
-  const integrationActions = actions.filter((action) =>
+  const visibleActions = actions.filter((action) => action.id !== "archiveAiChatSession" || isWorkspaceSurfaceVisible(workspaceProfile, "ai-skills"))
+  const integrationActions = visibleActions.filter((action) =>
     INTEGRATION_SETTINGS_ACTIONS.includes(action.id),
   )
-  const adminActions = actions.filter(
+  const adminActions = visibleActions.filter(
     (action) => !INTEGRATION_SETTINGS_ACTIONS.includes(action.id) && !(hostedAuth && action.id === "updateEmail"),
   )
 

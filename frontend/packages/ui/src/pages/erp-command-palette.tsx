@@ -13,6 +13,8 @@ import { useRBAC } from "@/lib/rbac-context"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
 import { isRecordSearchQuery } from "../lib/record-search"
 import { RecordSearchResults, type RecordSearchSummary } from "./erp-command-palette-records"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
 import { isFirstOrgSurfaceAdmitted } from "../lib/product-surface-catalog"
 import {
   Command,
@@ -56,15 +58,17 @@ export function ErpCommandPalette({
   const { checkPermission, isAdmin } = useRBAC()
   const { t } = useTranslation()
 
+  const workspaceProfile = useWorkspaceProfile()
   const userIsAdmin = isAdmin()
   const navGroups = useMemo(
-    (): NavGroup[] => buildNavGroups(t, { firstOrgProfile, isAdmin: userIsAdmin }),
-    [firstOrgProfile, t, userIsAdmin],
+    (): NavGroup[] => buildNavGroups(t, { workspaceProfile, firstOrgProfile, isAdmin: userIsAdmin }),
+    [workspaceProfile, firstOrgProfile, t, userIsAdmin],
   )
   const quickActionIsVisible = useCallback(
     (surfaceId: string) =>
-      !firstOrgProfile || isFirstOrgSurfaceAdmitted(surfaceId, userIsAdmin),
-    [firstOrgProfile, userIsAdmin],
+      isWorkspaceSurfaceVisible(workspaceProfile, surfaceId) &&
+      (!firstOrgProfile || isFirstOrgSurfaceAdmitted(surfaceId, userIsAdmin)),
+    [workspaceProfile, firstOrgProfile, userIsAdmin],
   )
 
   const accessibleNavGroups = useMemo(
