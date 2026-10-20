@@ -286,6 +286,8 @@ const HTTP_SQL_EXCLUDED_COLUMNS: Record<string, Set<string>> = {
   'contact-segments': new Set(['domain']),
   'opportunity-stages': new Set(['requirements']),
   roles: new Set(['permissions']),
+  // The legacy registry selects active, absent from released v0.3.129 SubscriptionLine.
+  'subscription-lines': new Set(['active']),
 }
 
 /** Per-resource columns selected even when globally excluded (e.g. metadata for credit-note linkage). */
@@ -293,6 +295,7 @@ const HTTP_SQL_INCLUDED_COLUMNS: Record<string, Set<string>> = {
   'purchase-requisitions': new Set(['purchase_ids']),
   'account-moves': new Set(['metadata']),
   'mail-messages': new Set(['metadata']),
+  'bank-statement-lines': new Set(['move_ids', 'payment_ids', 'metadata']),
 }
 
 /** Columns unsafe in SpacetimeDB HTTP SQL across most tables (audit, vecs, identity refs). */
