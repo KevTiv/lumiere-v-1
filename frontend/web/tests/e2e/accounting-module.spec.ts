@@ -5,6 +5,7 @@ import {
   chooseFirstOption,
   chooseSelectOptionByLabel,
   expectNoAppError,
+  expectModuleTabSurface,
   expectSeededText,
   fillField,
   gotoModule,
@@ -62,8 +63,7 @@ async function openAndAssertAccountingTab(page: Page, tabId: AccountingTabId) {
   )
   await expect(tab).toHaveCount(1, { timeout: 30_000 })
   await expect(tab).toHaveAttribute("aria-selected", "true")
-  await expect(page.locator('[data-testid^="module-panel-accounting-"]:visible')).toHaveCount(1)
-  await expect(page.getByTestId(`module-panel-accounting-${tabId}`)).toBeVisible()
+  await expectModuleTabSurface(page, "accounting", tabId)
 }
 
 async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {

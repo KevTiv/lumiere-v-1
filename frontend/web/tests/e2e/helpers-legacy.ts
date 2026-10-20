@@ -123,10 +123,28 @@ export async function selectModuleTab(page: Page, moduleId: string, tabId: strin
     await expectHydratedModule(page, moduleId)
   }
   await expect(tab).toHaveAttribute("aria-selected", "true")
+  await expectModuleTabSurface(page, moduleId, tabId)
+}
+
+/** Assert the selected workspace's actual interaction surface. */
+export async function expectModuleTabSurface(page: Page, moduleId: string, tabId: string) {
+  const panel = page.getByTestId(`module-panel-${moduleId}-${tabId}`)
+  await expect(panel).toHaveCount(1)
+  const visiblePanels = page.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)
+  if (moduleId === "accounting" && tabId === "payment-operations") {
+    // The payment controller stays outside the empty module panel so switching
+    // tabs cannot discard an in-flight allocation or its uncertain result.
+    await expect(visiblePanels).toHaveCount(0)
+    const operations = page.getByRole("region", { name: "Payment operations", exact: true })
+    await expect(operations).toHaveCount(1)
+    await expect(operations).toBeVisible()
+    await expect(operations.getByText("Payment accounts", { exact: true })).toBeVisible()
+    await expect(operations.getByText("Transactions & reconciliation", { exact: true })).toBeVisible()
+    return
+  }
   // Nested charts and unrelated workspaces can have their own active panels.
-  // Assert the module's exact panel, not every tabpanel in the document.
-  await expect(page.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)).toHaveCount(1)
-  await expect(page.getByTestId(`module-panel-${moduleId}-${tabId}`)).toBeVisible()
+  await expect(visiblePanels).toHaveCount(1)
+  await expect(panel).toBeVisible()
 }
 
 /** Open an entity tab’s create modal and wait for the form dialog. */
