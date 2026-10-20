@@ -2,7 +2,7 @@
 -- Migration version: 19
 -- Migration name: 0019_durable_projection_delta
 -- Checksum algorithm: sha256
--- Body checksum: sha256:de50b7d0dd379f36920855311bf9b10d71a939171735a8b7238748bff6aa5618
+-- Body checksum: sha256:64b5bf5383f51f917129fc2f54e961d38e888ad8d979895e0dcd3a6e00d98028
 
 -- Durable projection: bank_statement_settlement_attempt
 CREATE TABLE IF NOT EXISTS "bank_statement_settlement_attempt" (
@@ -56,3 +56,39 @@ CREATE TABLE IF NOT EXISTS "bank_statement_settlement_reversal" (
 CREATE INDEX IF NOT EXISTS "bank_statement_settlement_reversal_attempt_id" ON "bank_statement_settlement_reversal" ("attempt_id");
 CREATE INDEX IF NOT EXISTS "bank_statement_settlement_reversal_company_id" ON "bank_statement_settlement_reversal" ("company_id");
 CREATE INDEX IF NOT EXISTS "bank_statement_settlement_reversal_organization_id" ON "bank_statement_settlement_reversal" ("organization_id");
+-- Durable projection: purchase_order_creation_operation
+CREATE TABLE IF NOT EXISTS "purchase_order_creation_operation" (
+    "id" TEXT NOT NULL,
+    "organization_id" NUMERIC(20,0) NOT NULL,
+    "company_id" NUMERIC(20,0) NOT NULL,
+    "operation_key" TEXT NOT NULL,
+    "purchase_order_id" NUMERIC(20,0) NOT NULL,
+    "payload_hash" TEXT NOT NULL,
+    "created_by" BYTEA NOT NULL,
+    "created_at" BIGINT NOT NULL,
+    CONSTRAINT "purchase_order_creation_operation_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "purchase_order_creation_operation_organization_id" ON "purchase_order_creation_operation" ("organization_id");
+CREATE INDEX IF NOT EXISTS "purchase_order_creation_operation_purchase_order_id" ON "purchase_order_creation_operation" ("purchase_order_id");
+-- Durable projection: purchase_receipt_operation
+CREATE TABLE IF NOT EXISTS "purchase_receipt_operation" (
+    "id" TEXT NOT NULL,
+    "organization_id" NUMERIC(20,0) NOT NULL,
+    "company_id" NUMERIC(20,0) NOT NULL,
+    "operation_key" TEXT NOT NULL,
+    "line_id" NUMERIC(20,0) NOT NULL,
+    "order_id" NUMERIC(20,0) NOT NULL,
+    "quantity" DOUBLE PRECISION NOT NULL,
+    "lot_id" NUMERIC(20,0),
+    "received_before" DOUBLE PRECISION NOT NULL,
+    "received_after" DOUBLE PRECISION NOT NULL,
+    "move_id" NUMERIC(20,0),
+    "picking_id" NUMERIC(20,0),
+    "continuation_move_id" NUMERIC(20,0),
+    "continuation_picking_id" NUMERIC(20,0),
+    "created_by" BYTEA NOT NULL,
+    "created_at" BIGINT NOT NULL,
+    CONSTRAINT "purchase_receipt_operation_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "purchase_receipt_operation_line_id" ON "purchase_receipt_operation" ("line_id");
+CREATE INDEX IF NOT EXISTS "purchase_receipt_operation_organization_id" ON "purchase_receipt_operation" ("organization_id");
