@@ -1,93 +1,58 @@
 "use client"
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "../../components/chart"
+import { formatChartTick } from "../../lib/chart-format"
+import { seriesChartConfig } from "../../charts/chart-kit"
 import type { BarChartWidget as BarChartWidgetType } from "../../lib/dashboard-types"
 
 export function BarChartWidget({ data }: { data: BarChartWidgetType["data"] }) {
   const isHorizontal = data.layout === "horizontal"
+  const clickable = Boolean(data.onCategoryClick || data.onSegmentClick)
+  const config = seriesChartConfig(data.series.map((s) => ({ key: s.name, label: s.name })))
 
   return (
-    <div className="h-[300px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={data.values}
-          layout={isHorizontal ? "vertical" : "horizontal"}
-          margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="hsl(var(--border))"
-            horizontal={!isHorizontal}
-            vertical={isHorizontal}
-          />
-          {isHorizontal ? (
-            <>
-              <XAxis
-                type="number"
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                type="category"
-                dataKey={data.categoryKey}
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                width={80}
-              />
-            </>
-          ) : (
-            <>
-              <XAxis
-                dataKey={data.categoryKey}
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="hsl(var(--muted-foreground))"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-            </>
-          )}
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "8px",
-              color: "hsl(var(--foreground))",
+    <ChartContainer config={config} className="aspect-auto h-[300px] w-full">
+      <BarChart
+        data={data.values}
+        layout={isHorizontal ? "vertical" : "horizontal"}
+        margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" horizontal={!isHorizontal} vertical={isHorizontal} />
+        {isHorizontal ? (
+          <>
+            <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={(value: number) => formatChartTick(value)} />
+            <YAxis type="category" dataKey={data.categoryKey} tickLine={false} axisLine={false} width={80} />
+          </>
+        ) : (
+          <>
+            <XAxis dataKey={data.categoryKey} tickLine={false} axisLine={false} tickMargin={8} minTickGap={8} />
+            <YAxis tickLine={false} axisLine={false} width={48} tickFormatter={(value: number) => formatChartTick(value)} />
+          </>
+        )}
+        <ChartTooltip cursor={{ fillOpacity: 0.4 }} content={<ChartTooltipContent />} />
+        {data.series.length > 1 ? <ChartLegend content={<ChartLegendContent />} /> : null}
+        {data.series.map((s) => (
+          <Bar
+            key={s.name}
+            dataKey={s.name}
+            fill={s.color}
+            radius={isHorizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}
+            maxBarSize={40}
+            stackId={data.stacked ? "stack" : undefined}
+            style={{ cursor: clickable ? "pointer" : "default" }}
+            onClick={(row: { payload?: { [key: string]: string | number } }) => {
+              const category = row?.payload?.[data.categoryKey]
+              if (data.onCategoryClick && category != null) {
+                data.onCategoryClick(String(category))
+              }
+              if (data.onSegmentClick) {
+                data.onSegmentClick(s.name)
+              }
             }}
           />
-          {data.series.map((s) => (
-            <Bar
-              key={s.name}
-              dataKey={s.name}
-              fill={s.color}
-              radius={[4, 4, 0, 0]}
-              stackId={data.stacked ? "stack" : undefined}
-              style={{ cursor: data.onCategoryClick || data.onSegmentClick ? "pointer" : "default" }}
-              onClick={(row) => {
-                if (data.onCategoryClick && row) {
-                  data.onCategoryClick(String(row[data.categoryKey]))
-                }
-                if (data.onSegmentClick) {
-                  data.onSegmentClick(s.name)
-                }
-              }}
-            >
-              {data.values.map((_, index) => (
-                <Cell key={`cell-${index}`} />
-              ))}
-            </Bar>
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+        ))}
+      </BarChart>
+    </ChartContainer>
   )
 }

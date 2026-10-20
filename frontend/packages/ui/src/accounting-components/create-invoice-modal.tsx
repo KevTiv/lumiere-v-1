@@ -15,6 +15,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { isCustomField } from "../forms/config/types"
 import { useFormConfiguration } from "../forms/hooks/use-form-config"
 import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
+import { InvoiceComposer } from "./invoice-composer"
+import { invoiceTotals, lineSubtotal, taxOnAmount, type InvoiceMathTax } from "./invoice-math"
+import type { InvoicePreviewModel } from "./invoice-preview"
 
 export interface ManualInvoiceOption { value: string; label: string }
 export interface ManualInvoiceJournalOption extends ManualInvoiceOption { currencyId: string }
@@ -83,11 +86,8 @@ const newLine = (id = "1"): LineItem => ({
   accountId: "", taxId: "", productId: "",
 })
 
-function taxAmount(subtotal: number, tax?: ManualInvoiceTaxOption): number {
-  if (!tax) return 0
-  if (tax.amountType === "Fixed") return tax.amount
-  if (tax.amountType === "Division") return tax.amount < 100 ? subtotal / (1 - tax.amount / 100) - subtotal : 0
-  return subtotal * tax.amount / 100
+function mathTax(tax?: ManualInvoiceTaxOption): InvoiceMathTax | undefined {
+  return tax ? { label: tax.label, amount: tax.amount, amountType: tax.amountType } : undefined
 }
 
 interface ReleasedCreateInvoiceModalProps {
@@ -184,12 +184,27 @@ function ReleasedCreateInvoiceModal({
       taxId: product?.taxIds[0] || line.taxId,
     })
   }
-  const subtotal = lineItems.reduce((sum, line) =>
-    sum + line.quantity * line.unitPrice * (1 - line.discount / 100), 0)
-  const totalTax = lineItems.reduce((sum, line) => {
-    const base = line.quantity * line.unitPrice * (1 - line.discount / 100)
-    return sum + taxAmount(base, taxOptions.find((option) => option.value === line.taxId))
-  }, 0)
+  const totals = invoiceTotals(lineItems.map((line) => ({
+    quantity: line.quantity, unitPrice: line.unitPrice, discount: line.discount,
+    tax: mathTax(taxOptions.find((option) => option.value === line.taxId)),
+  })))
+  const preview: InvoicePreviewModel = {
+    kind,
+    partnerName: partnerOptions.find((option) => option.value === partnerId)?.label,
+    invoiceDate, dueDate: dueDate || undefined,
+    reference: reference.trim() || undefined, paymentReference: paymentReference.trim() || undefined,
+    statusLabel: "Draft",
+    notes,
+    totals,
+    lines: lineItems.map((line) => {
+      const tax = mathTax(taxOptions.find((option) => option.value === line.taxId))
+      const net = lineSubtotal({ quantity: line.quantity, unitPrice: line.unitPrice, discount: line.discount, tax })
+      return {
+        key: line.id, description: line.description, quantity: line.quantity, unitPrice: line.unitPrice,
+        discount: line.discount, taxLabel: tax?.label, total: net + taxOnAmount(net, tax),
+      }
+    }),
+  }
   const money = (value: number) => new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 2,
   }).format(value)
@@ -272,10 +287,10 @@ function ReleasedCreateInvoiceModal({
   const close = () => { if (!locked) reset(); onClose() }
 
   return <Dialog open={open} onOpenChange={(next) => !next && close()}>
-    <DialogContent data-testid="create-invoice-modal" className="max-h-[90vh] max-w-5xl overflow-y-auto sm:max-w-5xl">
+    <DialogContent data-testid="create-invoice-modal" className="max-h-[90vh] max-w-6xl overflow-y-auto sm:max-w-6xl">
       <DialogHeader><DialogTitle>{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle></DialogHeader>
-      <fieldset disabled={locked || saving} className="space-y-5">
-        <div className="grid gap-4 md:grid-cols-3">
+      <InvoiceComposer preview={preview} form={<fieldset disabled={locked || saving} className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-2">
           <FieldSelect label={t(`accounting.forms.${copyKey}.fields.partner`)} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
           <FieldSelect label={t(`accounting.forms.${copyKey}.fields.journal`)} value={journalId} onChange={setJournalId} options={journalOptions} />
           <FieldSelect label={kind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={setCounterpartAccountId} options={counterpartOptions} />
@@ -294,19 +309,19 @@ function ReleasedCreateInvoiceModal({
           <div key={field.fieldId} className="space-y-2"><Label>{field.label}{field.validation.required ? " *" : ""}</Label><Input data-testid={`create-invoice-custom-${field.fieldId}`} value={customValues[field.fieldId] ?? ""} onChange={(event) => setCustomValues((previous) => ({ ...previous, [field.fieldId]: event.target.value }))} /></div>)}</div> : null}
         <div className="space-y-3">
           <div className="flex items-center justify-between"><Label>{t("accounting.forms.newInvoice.lineItems")}</Label><Button type="button" variant="outline" size="sm" onClick={() => setLineItems((previous) => [...previous, newLine(crypto.randomUUID())])}><Plus className="mr-2 h-4 w-4" />{t("accounting.forms.newInvoice.addItem")}</Button></div>
-          {lineItems.map((line, index) => <div key={line.id} className="grid gap-2 rounded-md border p-3 md:grid-cols-7">
+          {lineItems.map((line, index) => <div key={line.id} className="grid gap-2 rounded-md border p-3 sm:grid-cols-2 xl:grid-cols-4">
             <FieldSelect label="Product" value={line.productId || NONE} onChange={(value) => chooseProduct(line, value)} options={[{ value: NONE, label: "No product" }, ...productOptions]} />
-            <div className="space-y-2 md:col-span-2"><Label>Description</Label><Input data-testid={index === 0 ? "create-invoice-line-description" : undefined} value={line.description} onChange={(event) => updateLine(line.id, { description: event.target.value })} /></div>
+            <div className="space-y-2 sm:col-span-2"><Label>Description</Label><Input data-testid={index === 0 ? "create-invoice-line-description" : undefined} value={line.description} onChange={(event) => updateLine(line.id, { description: event.target.value })} /></div>
             <FieldSelect label={kind === "bill" ? "Expense account" : "Income account"} value={line.accountId} onChange={(value) => updateLine(line.id, { accountId: value })} options={commercialOptions} />
             <div className="space-y-2"><Label htmlFor={`invoice-line-quantity-${line.id}`}>Qty</Label><Input id={`invoice-line-quantity-${line.id}`} type="number" min={0.000001} step="any" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: Number(event.target.value) })} /></div>
             <div className="space-y-2"><Label>Unit price</Label><Input data-testid={index === 0 ? "create-invoice-line-unit-price" : undefined} type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => updateLine(line.id, { unitPrice: Number(event.target.value) })} /></div>
             <div className="flex items-end gap-1"><FieldSelect label="Tax" value={line.taxId || NONE} onChange={(value) => updateLine(line.id, { taxId: value === NONE ? "" : value })} options={[{ value: NONE, label: "No tax" }, ...taxOptions]} /><Button type="button" variant="ghost" size="icon" disabled={lineItems.length === 1} onClick={() => setLineItems((previous) => previous.filter((item) => item.id !== line.id))}><Trash2 className="h-4 w-4" /></Button></div>
             <div className="space-y-2"><Label>Discount %</Label><Input type="number" min={0} max={100} value={line.discount} onChange={(event) => updateLine(line.id, { discount: Number(event.target.value) })} /></div>
           </div>)}
-          <div className="text-right text-sm">Subtotal: {money(subtotal)} · Tax: {money(totalTax)} · <strong>Total: {money(subtotal + totalTax)}</strong></div>
+          <div className="text-right text-sm">Subtotal: {money(totals.subtotal)} · Tax: {money(totals.tax)} · <strong>Total: {money(totals.total)}</strong></div>
         </div>
         <div className="space-y-2"><Label>{t("accounting.forms.newInvoice.notesOptional")}</Label><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} /></div>
-      </fieldset>
+      </fieldset>} />
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       <DialogFooter><Button variant="outline" onClick={close}>{t("common.cancel")}</Button>{locked
         ? <Button onClick={() => void checkStatus()} disabled={saving}>Check previous action</Button>

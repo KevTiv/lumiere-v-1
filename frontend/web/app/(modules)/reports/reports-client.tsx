@@ -102,7 +102,17 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
-import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
+import {
+  useAccountAccounts,
+  useAccountMoveLines,
+  useAccountMoves,
+  useAccountPayments,
+} from "@lumiere/query-hooks/hooks/accounting"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import { type ChartValueFormat } from "@lumiere/ui/lib/chart-format"
+import { variantTag } from "@lumiere/erp-workflows"
+import { singleCurrencyId } from "../accounting/accounting-dashboard-charts"
+import { expenseBreakdown, profitAndLossByMonth } from "./finance-dashboard-charts"
 import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources"
 import {
   companyRowsToSelectOptions,
@@ -225,6 +235,9 @@ function ReportsClientLoaded({
   const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
+  const { data: accountMoves = [] } = useAccountMoves(orgId, { enabled: organizationId > 0 })
+  const { data: accountMoveLines = [] } = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
+  const { data: accountPayments = [] } = useAccountPayments(orgId, { enabled: organizationId > 0 })
   const { data: currencies = [] } = useCurrencies()
 
   const reports = useMemo(
@@ -812,7 +825,42 @@ function ReportsClientLoaded({
     const generated = reports.filter((r) => String(r.state) === "generated").length
     const exported = reports.filter((r) => String(r.state) === "exported").length
 
+    const now = new Date()
+    const chartAccounts = accountAccounts.filter((account) => account.companyId === operatingCompanyId)
+    const chartLines = accountMoveLines.filter((line) => line.companyId === operatingCompanyId)
+    const chartMoves = accountMoves.filter((move) => move.companyId === operatingCompanyId)
+    const accountsById = new Map(chartAccounts.map((account) => [String(account.id), account]))
+    const companyCurrencyId = singleCurrencyId(chartMoves.map((move) => ({ currencyId: move.companyCurrencyId })))
+    const companyCurrencyCode = companyCurrencyId ? currencyCodeMap(currencies).get(companyCurrencyId) : undefined
+    const money: ChartValueFormat = companyCurrencyCode ? { kind: "currency", currency: companyCurrencyCode } : { kind: "number" }
+    const ninetyDays = 90 * 86_400_000
+    const currentWindow = { startMs: now.getTime() - ninetyDays, endMs: now.getTime() }
+    const previousWindow = { startMs: now.getTime() - 2 * ninetyDays, endMs: now.getTime() - ninetyDays - 1 }
+
     return mapDashboardWidgets(moduleConfig, (w) => {
+        if (["rep-pl-trend", "rep-expense-breakdown"].includes(w.id) && !companyCurrencyCode) {
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "Select a company with a known reporting currency to view this aggregate." } }
+        }
+        if (w.type === "combo-chart" && w.id === "rep-pl-trend") {
+          return {
+            ...w,
+            data: { ...w.data, values: profitAndLossByMonth(chartLines, accountsById, now), valueFormat: money },
+          }
+        }
+        if (w.id === "rep-cash-runway") {
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "Cash runway is unavailable until reconciled bank balances and verified cash-flow evidence are connected." } }
+        }
+        if (w.type === "ranked-bars" && w.id === "rep-expense-breakdown") {
+          return {
+            ...w,
+            data: {
+              ...w.data,
+              items: expenseBreakdown(chartLines, accountsById, currentWindow, previousWindow),
+              valueFormat: money,
+              changeLabel: "vs prior 90 days",
+            },
+          }
+        }
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -885,11 +933,17 @@ function ReportsClientLoaded({
           })
   }, [
     reports,
+    accountAccounts,
+    accountMoves,
+    accountMoveLines,
+    accountPayments,
+    currencies,
     trialBalances,
     reportTemplates,
     scheduledReports,
     analyticsMetrics,
     moduleConfig,
+    operatingCompanyId,
     t,
     scheduledReportFormConfig,
     financialReportFormConfig,

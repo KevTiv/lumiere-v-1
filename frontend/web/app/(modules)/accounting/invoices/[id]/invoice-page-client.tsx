@@ -7,10 +7,17 @@ import { useRBAC } from '@/lib/rbac-context';
 import { useUnsavedChangesGuard } from '@lumiere/ui';
 import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ListOrdered, MoreHorizontal, ShoppingCart } from 'lucide-react';
+import { ListOrdered, MoreHorizontal, Printer, ShoppingCart } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
+import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
+import { currencyCodeMap } from '@lumiere/ui/lib/kpi-tiles';
+import { invoicePreviewLines } from '../../invoice-preview-lines';
 import {
   Button,
+  InvoicePreview,
+  invoicePreviewModelFromMove,
+  printInvoice,
+  PrintableInvoice,
   EntityDetail,
   EntityView,
   Empty,
@@ -112,7 +119,7 @@ interface InvoicePageClientProps {
 type Row = Record<string, unknown>;
 type WorkflowAction = AnyWorkflowAction<RowValueMap>;
 
-const TAB_IDS = ['overview', 'lines', 'discussion', 'audit'] as const;
+const TAB_IDS = ['overview', 'preview', 'lines', 'discussion', 'audit'] as const;
 type TabId = (typeof TAB_IDS)[number];
 
 /** Which accounting list a kind of document belongs to, and what to call it. */
@@ -163,6 +170,7 @@ function InvoicePageLoaded({
   const { data: moves = [], isLoading: movesLoading } = useAccountMoves(orgId, { enabled: true });
   const { data: moveLines = [] } = useAccountMoveLines(orgId, { enabled: true });
   const { data: accounts = [] } = useAccountAccounts(orgId, { enabled: true });
+  const { data: currencies = [] } = useCurrencies();
   const { data: saleOrders = [] } = useSaleOrders(orgId);
   const { data: purchaseOrders = [] } = usePurchaseOrders(orgId);
 
@@ -290,6 +298,14 @@ function InvoicePageLoaded({
   const status = invoiceStatus(move, t);
   const listTab = KIND_TAB[kind];
   const partner = String(move.invoicePartnerDisplayName ?? move.invoice_partner_display_name ?? '').trim();
+  const previewModel = invoicePreviewModelFromMove(
+    move as unknown as Parameters<typeof invoicePreviewModelFromMove>[0],
+    invoicePreviewLines(moveLines, moveId),
+    {
+      currencyCode: currencyCodeMap(currencies).get(String(move.currencyId ?? '')),
+      statusLabel: status.badge.label,
+    },
+  );
 
   const saleOrderId = move.saleOrderId ?? move.sale_order_id;
   const purchaseOrder = (purchaseOrders as unknown as Row[]).find((order) =>
@@ -645,6 +661,22 @@ function InvoicePageLoaded({
             id: 'overview',
             label: t('common.overview', { defaultValue: 'Overview' }),
             content: <EntityDetail config={accountMoveDetailConfig(t)} data={move} />,
+          },
+          {
+            id: 'preview',
+            label: t('accounting.invoices.preview', { defaultValue: 'Preview' }),
+            content: (
+              <div className="space-y-4" data-testid="invoice-preview-tab">
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={printInvoice} data-testid="invoice-preview-print">
+                    <Printer className="mr-1 h-4 w-4" />
+                    {t('accounting.invoices.invoiceActions.print')}
+                  </Button>
+                </div>
+                <InvoicePreview model={previewModel} />
+                <PrintableInvoice model={previewModel} />
+              </div>
+            ),
           },
           {
             id: 'lines',

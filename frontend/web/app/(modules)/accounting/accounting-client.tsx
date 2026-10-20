@@ -92,7 +92,7 @@ import {
 } from "@lumiere/ui"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
-import type { BadgeVariant, EntityAction, EntityRecordSheetConfig, FormField, EntityRow, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import type { TabbedTableRow, BadgeVariant, EntityAction, EntityRecordSheetConfig, FormField, EntityRow, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   accountingParamsToJson,
   analyticParamsToJson,
@@ -203,6 +203,18 @@ import type {
 } from "@lumiere/stdb/types"
 import { accountingModuleConfig } from "@/lib/module-dashboard-configs"
 import { invoiceRecordHref } from "./invoice-record"
+import {
+  agingShareRows,
+  agingTotals,
+  collectionRate,
+  singleCurrencyId,
+  recentInvoiceRows,
+  revenueVsExpensesByMonth,
+  topCustomers,
+  weeklyCashMovements,
+} from "./accounting-dashboard-charts"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import { formatChartValue, type ChartValueFormat } from "@lumiere/ui/lib/chart-format"
 import { historicalPaymentReplayIsCallable } from "./historical-payment-replay-capability"
 import {
   buildHistoricalPaymentReplayBatches,
@@ -4462,7 +4474,23 @@ function AccountingClientReady({
     const currentPaymentsReceived = paymentsReceivedIn(currentRange)
     const previousPaymentsReceived = paymentsReceivedIn(previousRange)
 
+    const now = new Date()
+    const nowMs = now.getTime()
+    const currencyCodeById = currencyCodeMap(currencies)
+    const chartInvoices = invoices.filter((move) => move.companyId === operatingCompanyId)
+    const chartBills = bills.filter((move) => move.companyId === operatingCompanyId)
+    const chartPayments = accountPayments.filter((payment) => payment.companyId === operatingCompanyId)
+    const chartCurrencyId = singleCurrencyId([...chartInvoices, ...chartBills, ...chartPayments])
+    const chartCurrencyCode = chartCurrencyId ? currencyCodeById.get(chartCurrencyId) : undefined
+    const money: ChartValueFormat = chartCurrencyCode ? { kind: "currency", currency: chartCurrencyCode } : { kind: "number" }
+    const monthlyTrend = revenueVsExpensesByMonth(chartInvoices, chartBills, now)
+    const collection = collectionRate(chartInvoices, currentRange)
+    const cashMovements = weeklyCashMovements(chartPayments, now)
+
     return mapDashboardWidgets(moduleConfigBase, (w) => {
+        if (["acc-revenue-expenses", "acc-collection-rate", "acc-aging-share", "acc-top-customers", "acc-cash-movements"].includes(w.id) && !chartCurrencyCode) {
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "Choose a company with documents in one known currency to view this aggregate. Mixed currencies require verified conversion." } }
+        }
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -4564,34 +4592,77 @@ function AccountingClientReady({
             data: { accounts: accountRows },
           }
         }
-        if (w.id === "accounting-ar-ap-aging") {
-          const nowMs = Date.now()
-          const buckets = ["Current", "1-30", "31-60", "61-90", "90+"] as const
-          const bucketFor = (row: Record<string, unknown>): (typeof buckets)[number] => {
-            const dueMs = flexibleTimestampMs(row.invoiceDateDue ?? row.invoice_date_due)
-            if (dueMs == null || dueMs >= nowMs) return "Current"
-            const days = Math.floor((nowMs - dueMs) / 86_400_000)
-            if (days <= 0) return "Current"
-            if (days <= 30) return "1-30"
-            if (days <= 60) return "31-60"
-            if (days <= 90) return "61-90"
-            return "90+"
+        if (w.type === "combo-chart" && w.id === "acc-revenue-expenses") {
+          return { ...w, data: { ...w.data, values: monthlyTrend, valueFormat: money } }
+        }
+        if (w.type === "radial-gauge" && w.id === "acc-collection-rate") {
+          return {
+            ...w,
+            data: {
+              ...w.data,
+              value: collection.collected,
+              max: collection.invoiced,
+              tone: collection.rate >= 80 ? "success" : collection.rate >= 50 ? "warning" : "destructive",
+              stats: [
+                { label: "Invoiced", value: formatChartValue(collection.invoiced, money) },
+                { label: "Collected", value: formatChartValue(collection.collected, money) },
+                { label: "Outstanding", value: formatChartValue(collection.outstanding, money) },
+              ],
+            },
           }
-          const totals = new Map(buckets.map((b) => [b, { AR: 0, AP: 0 }]))
-          for (const m of invoices) {
-            const residual = Number(m.amountResidual ?? 0)
-            if (residual > 0) totals.get(bucketFor(m as Record<string, unknown>))!.AR += residual
+        }
+        if (w.type === "share-bar" && w.id === "acc-aging-share") {
+          return {
+            ...w,
+            data: {
+              ...w.data,
+              rows: agingShareRows(agingTotals(chartInvoices, chartBills, nowMs), { ar: "AR", ap: "AP" }),
+              valueFormat: money,
+            },
           }
-          for (const m of bills) {
-            const residual = Number(m.amountResidual ?? 0)
-            if (residual > 0) totals.get(bucketFor(m as Record<string, unknown>))!.AP += residual
+        }
+        if (w.type === "ranked-bars" && w.id === "acc-top-customers") {
+          return {
+            ...w,
+            data: {
+              ...w.data,
+              items: topCustomers(chartInvoices, partnerLabelMap, currentRange, previousRange),
+              valueFormat: money,
+              changeLabel: "",
+            },
           }
-          const values = buckets.map((bucket) => ({
-            bucket,
-            AR: Math.round(totals.get(bucket)!.AR),
-            AP: Math.round(totals.get(bucket)!.AP),
-          }))
-          return { ...w, data: { ...(w.data as Record<string, unknown>), values } }
+        }
+        if (w.type === "step-chart" && w.id === "acc-cash-movements") {
+          return {
+            ...w,
+            data: { ...w.data, values: cashMovements.values, anomalies: cashMovements.anomalies, valueFormat: money },
+          }
+        }
+        if (w.type === "tabbed-table" && w.id === "acc-recent-invoices") {
+          const rows = recentInvoiceRows(invoices, partnerLabelMap, currencyCodeById, t, nowMs)
+          const statusVariants = Object.fromEntries(rows.map((row) => [row.status, row.statusVariant]))
+          return {
+            ...w,
+            data: {
+              tabs: [
+                { id: "all", label: "All" },
+                { id: "overdue", label: "Overdue" },
+                { id: "draft", label: "Draft" },
+                { id: "paid", label: "Paid" },
+              ],
+              columns: [
+                { key: "number", label: "Number" },
+                { key: "customer", label: "Customer" },
+                { key: "date", label: "Date" },
+                { key: "due", label: "Due" },
+                { key: "amount", label: "Amount", type: "currency", currencyKey: "currency", align: "right" },
+                { key: "status", label: "Status", type: "badge", badgeVariants: statusVariants },
+              ],
+              rows,
+              emptyMessage: "No invoices yet.",
+              onRowClick: (row: TabbedTableRow) => router.push(`/accounting/invoices/${String(row.id)}`),
+            },
+          }
         }
         if (w.id === "acc-tax-deadlines") {
           const nowMs = Date.now()
@@ -4625,13 +4696,18 @@ function AccountingClientReady({
           })
   }, [
     accounts,
+    allMoves,
     invoices,
     bills,
     budgets,
     taxDeadlines,
     accountPayments,
+    currencies,
+    partnerLabelMap,
+    router,
     dashboardTimeRange,
     moduleConfigBase,
+    operatingCompanyId,
     t,
     journalEntryFormConfig,
     currencyRateFormConfig,

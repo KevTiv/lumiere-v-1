@@ -1,4 +1,9 @@
 import type { ReactNode } from "react"
+import type { ChartDatum, ChartSeriesSpec, ChartValueFormat } from "./chart-format"
+import type { RankedBarItem } from "../charts/ranked-bar-list"
+import type { ShareBarRow } from "../charts/segmented-share-bar"
+import type { RadialGaugeStat, RadialGaugeTone } from "../charts/radial-gauge"
+import type { EntityColumn, EntityRow } from "./entity-view-types"
 
 export type GridWidth = "full" | "2/3" | "1/2" | "1/3"
 
@@ -23,6 +28,12 @@ export type WidgetType =
   | "activity-rings"
   | "countdown"
   | "quick-actions"
+  | "combo-chart"
+  | "step-chart"
+  | "ranked-bars"
+  | "share-bar"
+  | "radial-gauge"
+  | "tabbed-table"
 
 export interface BaseWidget {
   id: string
@@ -148,6 +159,10 @@ export interface StatCardsWidget extends BaseWidget {
       label: string
       value: string | number
       change?: number
+      /** Comparison the change refers to, e.g. "vs last month". */
+      changeLabel?: string
+      /** A rise is bad (costs, overdue): colours flip. */
+      invertChange?: boolean
       icon?: string
       testId?: string
       onClick?: () => void
@@ -248,6 +263,90 @@ export interface QuickActionsWidget extends BaseWidget {
   }
 }
 
+export interface ComboChartWidget extends BaseWidget {
+  type: "combo-chart"
+  data: {
+    xAxisKey: string
+    bars: ChartSeriesSpec[]
+    line: ChartSeriesSpec
+    /** "right" (default) gives the line its own axis; "left" shares the bars' axis. */
+    lineAxis?: "left" | "right"
+    stacked?: boolean
+    values: ChartDatum[]
+    valueFormat?: ChartValueFormat
+    lineFormat?: ChartValueFormat
+  }
+}
+
+export interface StepChartWidget extends BaseWidget {
+  type: "step-chart"
+  data: {
+    xAxisKey: string
+    series: ChartSeriesSpec
+    values: ChartDatum[]
+    variant?: "line" | "bar"
+    /** Flagged x values; omitted → outliers are detected automatically. */
+    anomalies?: string[]
+    reference?: { value: number; label: string }
+    valueFormat?: ChartValueFormat
+  }
+}
+
+export interface RankedBarsWidget extends BaseWidget {
+  type: "ranked-bars"
+  data: {
+    items: RankedBarItem[]
+    valueFormat?: ChartValueFormat
+    maxItems?: number
+    changeLabel?: string
+    emptyLabel?: string
+    onItemClick?: (label: string) => void
+  }
+}
+
+export interface ShareBarWidget extends BaseWidget {
+  type: "share-bar"
+  data: {
+    segments: ChartSeriesSpec[]
+    rows: ShareBarRow[]
+    valueFormat?: ChartValueFormat
+    showTable?: boolean
+    emptyLabel?: string
+  }
+}
+
+export interface RadialGaugeWidget extends BaseWidget {
+  type: "radial-gauge"
+  data: {
+    value: number
+    max: number
+    label: string
+    valueFormat?: ChartValueFormat
+    /** Centre text written out in full; wins over `valueFormat`. */
+    display?: string
+    stats?: RadialGaugeStat[]
+    tone?: RadialGaugeTone
+  }
+}
+
+/** A table row in a tabbed table: the row's fields plus the tabs it shows under. */
+export interface TabbedTableRow extends EntityRow {
+  id: string | number
+  tabIds: string[]
+}
+
+export interface TabbedTableWidget extends BaseWidget {
+  type: "tabbed-table"
+  data: {
+    /** A tab with id "all" lists every row; any other tab lists rows whose `tabIds` include it. */
+    tabs: Array<{ id: string; label: string }>
+    columns: EntityColumn[]
+    rows: TabbedTableRow[]
+    emptyMessage?: string
+    onRowClick?: (row: TabbedTableRow) => void
+  }
+}
+
 export type DashboardWidget =
   | KPIWidget
   | DiagnosticWidget
@@ -269,6 +368,12 @@ export type DashboardWidget =
   | ActivityRingsWidget
   | CountdownWidget
   | QuickActionsWidget
+  | ComboChartWidget
+  | StepChartWidget
+  | RankedBarsWidget
+  | ShareBarWidget
+  | RadialGaugeWidget
+  | TabbedTableWidget
 
 export interface DashboardSection {
   id: string

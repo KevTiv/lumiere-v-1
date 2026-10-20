@@ -2,7 +2,10 @@ type Row = Record<string, unknown>;
 
 function isSet(value: unknown): boolean {
   if (value == null) return false;
-  if (typeof value === 'object' && 'some' in (value as object)) return isSet((value as { some?: unknown }).some);
+  if (typeof value === 'object') {
+    if ('none' in value) return false;
+    if ('some' in value) return isSet((value as { some?: unknown }).some);
+  }
   return true;
 }
 
