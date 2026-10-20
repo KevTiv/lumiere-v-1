@@ -5,11 +5,15 @@ import { expectNoAppError } from "./helpers"
 test.describe("auth lifecycle", { tag: "@unauthenticated" }, () => {
   test.use({ storageState: { cookies: [], origins: [] } })
 
-  test("sign-up page renders email/password form", async ({ page }) => {
+  test("private alpha redirects public sign-up and rejects native registration", async ({ page }) => {
     await page.goto("/sign-up")
-    await expect(page.getByLabel(/email/i)).toBeVisible()
-    await expect(page.getByLabel(/^password/i).first()).toBeVisible()
-    await expect(page.getByRole("button", { name: /sign up|create account/i })).toBeVisible()
+    await expect(page).toHaveURL(/\/sign-in\?/)
+    expect(new URL(page.url()).searchParams.get("callbackUrl")).toBe("/sign-up")
+    await expect(page.getByRole("button", { name: /^sign up$|^create account$/i })).toBeHidden()
+    const rejected = await page.request.post("/api/auth/signup", {
+      data: { email: "unapproved-alpha@example.test", password: "UnapprovedAlpha123!" },
+    })
+    expect(rejected.status()).toBe(410)
     await expectNoAppError(page)
   })
 
