@@ -248,13 +248,16 @@ function ReportsClientLoaded({
   const { data: dashboards = [] } = useDashboards(orgId, initialDashboards)
   const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
-  const { data: accountAccounts = [] } = useAccountAccounts(orgId)
+  const accountAccountsQuery = useAccountAccounts(orgId)
+  const { data: accountAccounts = [] } = accountAccountsQuery
   const currenciesQuery = useCurrencies()
   const { data: currencies = [] } = currenciesQuery
   const periodState = periodReportContextState(periodContext, { organizationId: orgId, companyId: operatingCompanyId, periods: periodsQuery.data ?? [], periodState: moduleQueryState(periodsQuery), reportState: moduleQueryState(reportsQuery) })
   const validPeriodContext = periodRequested && periodState.status === "ready" ? periodContext : null
-  const { data: accountMoves = [] } = useAccountMoves(orgId, { enabled: organizationId > 0 })
-  const { data: accountMoveLines = [] } = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
+  const accountMovesQuery = useAccountMoves(orgId, { enabled: organizationId > 0 })
+  const { data: accountMoves = [] } = accountMovesQuery
+  const accountMoveLinesQuery = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
+  const { data: accountMoveLines = [] } = accountMoveLinesQuery
   const { data: accountPayments = [] } = useAccountPayments(orgId, { enabled: organizationId > 0 })
 
   const reports = useMemo(
@@ -851,6 +854,7 @@ function ReportsClientLoaded({
     const exported = reports.filter((r) => String(r.state) === "exported").length
 
     const now = new Date()
+    const chartSourceState = mergeModuleStates([moduleQueryState(accountAccountsQuery), moduleQueryState(accountMovesQuery), moduleQueryState(accountMoveLinesQuery), moduleQueryState(currenciesQuery)])
     const chartAccounts = accountAccounts.filter((account) => account.companyId === operatingCompanyId)
     const chartLines = accountMoveLines.filter((line) => line.companyId === operatingCompanyId)
     const chartMoves = accountMoves.filter((move) => move.companyId === operatingCompanyId)
@@ -863,8 +867,8 @@ function ReportsClientLoaded({
     const previousWindow = { startMs: now.getTime() - 2 * ninetyDays, endMs: now.getTime() - ninetyDays - 1 }
 
     return mapDashboardWidgets(moduleConfig, (w) => {
-        if (["rep-pl-trend", "rep-expense-breakdown"].includes(w.id) && !companyCurrencyCode) {
-          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "Select a company with a known reporting currency to view this aggregate." } }
+        if (["rep-pl-trend", "rep-expense-breakdown"].includes(w.id) && (chartSourceState.status !== "ready" || !companyCurrencyCode)) {
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: chartSourceState.status !== "ready" ? "Financial source data is not ready. Refresh before interpreting this chart." : "Select a company with a known reporting currency to view this aggregate." } }
         }
         if (w.type === "combo-chart" && w.id === "rep-pl-trend") {
           return {
@@ -959,8 +963,12 @@ function ReportsClientLoaded({
   }, [
     reports,
     accountAccounts,
+    accountAccountsQuery,
     accountMoves,
+    accountMovesQuery,
     accountMoveLines,
+    accountMoveLinesQuery,
+    currenciesQuery,
     accountPayments,
     currencies,
     trialBalances,

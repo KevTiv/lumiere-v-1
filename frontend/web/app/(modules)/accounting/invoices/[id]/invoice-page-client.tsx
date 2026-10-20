@@ -838,9 +838,7 @@ function InvoicePageLoaded({
                     </div>
                     <ModuleDataNotice state={linesRead.state} />
                     {linesRead.state.status === 'loading' ? <Skeleton className="h-96 w-full" /> : null}
-                    {linesRead.state.status === 'ready' || linesRead.state.status === 'partial' ? (
-                      {reviewedDocument}
-                    ) : null}
+                    {linesRead.state.status === 'ready' || linesRead.state.status === 'partial' ? reviewedDocument : null}
                   </div>
                   <aside className="min-w-0 rounded-xl border bg-card p-4" aria-label={t('accounting.invoices.recordDetails', { defaultValue: 'Record details' })}>
                     <h2 className="mb-4 text-sm font-semibold">{t('accounting.invoices.recordDetails', { defaultValue: 'Record details' })}</h2>
