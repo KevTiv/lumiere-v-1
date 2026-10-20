@@ -184,6 +184,13 @@ static HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         "roles".to_string(),
         ["permissions"].into_iter().map(String::from).collect(),
     );
+    // The legacy registry selects `active`, but released v0.3.129
+    // SubscriptionLine has no such column. Keep this compatibility exclusion
+    // scoped to that resource rather than dropping arbitrary unknown columns.
+    m.insert(
+        "subscription-lines".to_string(),
+        ["active"].into_iter().map(String::from).collect(),
+    );
     m
 });
 
@@ -1575,6 +1582,56 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn subscription_line_http_projection_matches_released_sql_schema() {
+        let generated = sql_column_list_for_generated_type("SubscriptionLine")
+            .expect("released SubscriptionLine columns");
+        assert!(!generated.iter().any(|column| column == "active"));
+        let registry = registry_get("subscription-lines").expect("subscription-lines registry");
+        assert!(registry
+            .default_restricted
+            .iter()
+            .any(|column| column == "active"));
+
+        let access = field_access(&["subscription_line:read"]);
+        for context in [None, Some(&access)] {
+            let columns = resolve_http_sql_columns("subscription-lines", context)
+                .expect("subscription line columns");
+            for column in &columns {
+                assert!(
+                    generated.contains(column),
+                    "subscription-lines selected unsupported SQL column: {column}"
+                );
+            }
+            for field in [
+                "company_id",
+                "subscription_id",
+                "product_id",
+                "price_unit",
+                "price_subtotal",
+            ] {
+                assert!(columns.iter().any(|column| column == field));
+            }
+        }
+
+        let mut masked_access = field_access(&["subscription_line:read"]);
+        select_fields(
+            &mut masked_access,
+            "subscription-lines",
+            &["active", "price_unit"],
+        );
+        let selected = resolve_http_sql_columns("subscription-lines", Some(&masked_access))
+            .expect("selected subscription line columns");
+        assert!(selected.iter().all(|column| generated.contains(column)));
+        assert!(selected.iter().any(|column| column == "price_unit"));
+        assert!(selected.iter().any(|column| column == "company_id"));
+        assert!(!selected.iter().any(|column| column == "product_id"));
+        assert!(resolve_http_sql_columns("account-journals", None)
+            .expect("journal columns")
+            .iter()
+            .any(|column| column == "active"));
     }
 
     #[test]
