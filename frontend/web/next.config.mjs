@@ -58,6 +58,10 @@ function rustApiRewrites() {
       source: '/api/settings/:path*',
       destination: `${base}/v1/settings/:path*`,
     },
+    {
+      source: '/api/offline/:path*',
+      destination: `${base}/v1/offline/:path*`,
+    },
   ]
 }
 
@@ -65,7 +69,10 @@ function rustApiRewrites() {
 const nextConfig = {
   skipTrailingSlashRedirect: true,
   async rewrites() {
-    return [...rustApiRewrites(), ...posthogRewrites()]
+    return [
+      { source: '/offline/categories/', destination: '/offline/categories/index.html' },
+      ...rustApiRewrites(), ...posthogRewrites(),
+    ]
   },
   typescript: {
     ignoreBuildErrors: true,

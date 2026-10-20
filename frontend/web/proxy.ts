@@ -50,6 +50,8 @@ export function proxy(request: NextRequest) {
 
   // Allow static assets and Next.js internals
   if (
+    // Public, data-free shell. Private rows require live API scope verification.
+    pathname.startsWith('/offline/categories/') ||
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/public/') ||
     pathname === '/favicon.ico'

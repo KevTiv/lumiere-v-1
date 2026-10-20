@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "pnpm build:offline && next dev",
+    "build": "pnpm build:offline && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -22,7 +22,8 @@
     "seed-test-user": "node ./scripts/seed-test-user.mjs",
     "seed-first-org-personas": "node ./scripts/seed-test-user.mjs --all-personas",
     "first-org-fixture:check": "node ./scripts/seed-test-user.mjs --check-manifest",
-    "e2e-seed-fixture": "node ./scripts/e2e-seed-fixture.mjs"
+    "e2e-seed-fixture": "node ./scripts/e2e-seed-fixture.mjs",
+    "build:offline": "pnpm --dir ../packages/offline build:app"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -97,7 +98,8 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^3.3.1",
     "vaul": "^1.1.2",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "@lumiere/offline": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

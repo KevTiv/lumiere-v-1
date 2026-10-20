@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Categories · Lumière</title>
+    <link rel="stylesheet" href="__STYLE__" />
+  </head>
+  <body>
+    <main>
+      <nav><a href="/inventory">Back to inventory</a></nav>
+      <header>
+        <p>Lumière · Inventory</p>
+        <h1>Product categories</h1>
+      </header>
+      <p>Read-only saved categories. Changes are made in inventory.</p>
+      <p id="status" role="status" aria-live="polite">
+        Verifying your session…
+      </p>
+      <p id="cache-status" role="status">Preparing offline startup…</p>
+      <div class="tools">
+        <label
+          >Find in displayed categories
+          <input id="search" type="search" disabled
+        /></label>
+        <button id="refresh" type="button">Reconnect / refresh</button>
+        <button id="clear" type="button" disabled>
+          Clear saved categories
+        </button>
+      </div>
+      <p id="scope"></p>
+      <p id="count"></p>
+      <table aria-label="Product categories" hidden id="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>ID</th>
+            <th>Parent ID</th>
+            <th>Order</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <noscript>Enable JavaScript to read saved categories.</noscript>
+    </main>
+    <script type="module" src="__CLIENT__"></script>
+  </body>
+</html>

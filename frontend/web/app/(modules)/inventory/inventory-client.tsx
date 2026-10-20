@@ -3611,6 +3611,15 @@ function InventoryClientLoaded({
               ...v,
               actions: [
                 {
+                  id: 'offline-category-reader',
+                  label: t('inventory.categoryActions.openSavedReader'),
+                  onClick: () => {
+                    const url = new URL('/offline/categories/index.html', window.location.origin);
+                    if (selectedOperatingCompanyId != null) url.searchParams.set('companyId', String(selectedOperatingCompanyId));
+                    window.location.assign(url.href);
+                  },
+                },
+                {
                   id: 'csv-product-category-tab',
                   label: t('inventory.csvImport.toolbarProductCategories'),
                   onClick: () => setCsvKind('productCategory'),
@@ -4042,6 +4051,7 @@ function InventoryClientLoaded({
     } as ModuleConfig;
   }, [
     moduleConfig,
+    selectedOperatingCompanyId,
     liveSections,
     cycleCountWizardTab,
     locationHierarchyTab,

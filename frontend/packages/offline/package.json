@@ -12,7 +12,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test src/*.test.ts",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "build:app": "node --import tsx scripts/build-category-app.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.44.7",

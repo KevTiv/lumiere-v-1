@@ -3,6 +3,24 @@ import test from "node:test"
 
 import nextConfig from "./next.config.mjs"
 
+test("Next forwards authenticated offline reads and serves the public directory shell", async () => {
+  const previous = process.env.LUMIERE_API_SERVER_URL
+  process.env.LUMIERE_API_SERVER_URL = "http://127.0.0.1:8082/"
+  try {
+    const result = await nextConfig.rewrites()
+    const rewrites = Array.isArray(result) ? result : result.afterFiles ?? []
+    assert.deepEqual(rewrites.find(rewrite => rewrite.source === "/api/offline/:path*"), {
+      source: "/api/offline/:path*", destination: "http://127.0.0.1:8082/v1/offline/:path*",
+    })
+    assert.deepEqual(rewrites.find(rewrite => rewrite.source === "/offline/categories/"), {
+      source: "/offline/categories/", destination: "/offline/categories/index.html",
+    })
+  } finally {
+    if (previous === undefined) delete process.env.LUMIERE_API_SERVER_URL
+    else process.env.LUMIERE_API_SERVER_URL = previous
+  }
+})
+
 test("Next forwards typed operation paths to api-server", async () => {
   const previous = process.env.LUMIERE_API_SERVER_URL
   process.env.LUMIERE_API_SERVER_URL = "http://127.0.0.1:8082/"

@@ -68,12 +68,14 @@ browser download in routine CI.
 
 ## Next admission work
 
-Follow [`frontend/packages/offline/README.md`](../../frontend/packages/offline/README.md)
-to serve the pinned WASM and bundle the worker in the host app. Adopt the repository
-on one read-only category surface and wire query invalidation, connectivity and
-logout/scope changes. Cache app/worker/WASM assets for offline boot. Define the
-offline grant lifetime and encryption/persistence policy before admitting an
-installed experience. Then run the actual authenticated API/STDB reconnect and
-revocation gate alongside browser/profile/device coverage. Tauri, larger staged
-snapshots, multi-tab cooperation, ChangeSets and review workflows remain later
-slices. No project-wide percent-complete estimate is supported by this evidence.
+The [read-only category app slice](offline-category-app-status.md) supplies the
+static reader, scoped asset cache and session/company lifecycle hooks. Its cold
+offline shell boots, but private rows still require fresh online admission.
+Remaining gates and policy decisions are tracked there.
+
+Define the offline grant lifetime and encryption/persistence policy before
+admitting an installed experience. Then run the actual authenticated API/STDB
+reconnect and revocation gate alongside browser/profile/device coverage. Tauri,
+larger staged snapshots, multi-tab cooperation, ChangeSets and review workflows
+remain later slices. No project-wide percent-complete estimate is supported by
+this evidence.

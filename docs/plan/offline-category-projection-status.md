@@ -112,7 +112,7 @@ checks; they do not certify a live server feed or installed desktop/PWA experien
 
 The server snapshot and durable replay implementation is now in the stacked
 server-feed slice. Complete its live authorization/concurrent mutation/reconnect
-gate before admitting an installed experience. Browser OPFS storage is implemented
-in the next stacked slice. Read-only application adoption remains next; Tauri is
+gate before admitting an installed experience. Browser OPFS storage and [read-only application adoption](offline-category-app-status.md)
+are implemented in subsequent stacked slices; Tauri is
 a later runtime. Only after those gates should
 ChangeSet capture and admin review begin.

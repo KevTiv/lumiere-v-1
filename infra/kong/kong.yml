@@ -179,6 +179,15 @@ services:
         strip_path: true
     plugins: *domain_plugins
 
+  - name: api-offline
+    url: http://api-server:8082/v1/offline
+    routes:
+      - name: api-offline
+        paths:
+          - /api/offline
+        strip_path: true
+    plugins: *domain_plugins
+
   - name: api-settings
     url: http://api-server:8082/v1/settings
     routes:

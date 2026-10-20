@@ -26,6 +26,11 @@ const baseline = graph()
 const web = baseline.find(task => task.taskId === 'my-project#build')
 assert.ok(web, 'web build must be present')
 assert.ok(web.outputs.includes('.next/**'), 'production output must be cached')
+assert.ok(web.outputs.includes('public/offline/categories/**'), 'offline startup assets must be restored with the app')
+assert.ok(web.resolvedTaskDefinition.inputs.some(input => input.endsWith('/frontend/packages/offline/src/**')),
+  'offline worker/library changes must invalidate the app shell')
+assert.ok(web.resolvedTaskDefinition.inputs.some(input => input.endsWith('/frontend/packages/offline/scripts/**')),
+  'static shell build changes must invalidate the app shell')
 assert.ok(web.excludedOutputs.includes('.next/cache/**'), 'compiler cache is not a build artifact')
 assert.ok(web.excludedOutputs.includes('.next/dev/**'), 'development output must not be restored')
 assert.ok(web.resolvedTaskDefinition.inputs.includes('.env*'), 'dotenv files must invalidate the build')

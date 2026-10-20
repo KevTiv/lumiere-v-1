@@ -7,8 +7,18 @@
     },
     "my-project#build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "!.next/dev/**",
+        "public/offline/categories/**"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*",
+        "$TURBO_ROOT$/frontend/packages/offline/src/**",
+        "$TURBO_ROOT$/frontend/packages/offline/scripts/**"
+      ],
       "env": [
         "NEXT_PUBLIC_*",
         "LUMIERE_*",
