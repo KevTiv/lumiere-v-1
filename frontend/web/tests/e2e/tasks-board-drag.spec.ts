@@ -12,6 +12,7 @@ import {
   gotoModule,
   smokeName,
 } from "./helpers"
+import { matchesOperationResponse } from "./operation-response"
 
 const some = <T>(value: T) => ({ some: value })
 const none = { none: [] as [] }
@@ -188,7 +189,11 @@ test.describe("Tasks board drag and drop @tasks", () => {
     await expect(card).toContainText(taskName)
     await expect(card).toContainText("High")
 
-    await dragTo(page, card, page.getByTestId("kanban-column-Approved"))
+    const [updated] = await Promise.all([
+      page.waitForResponse((response) => matchesOperationResponse(response, "update_task_state")),
+      dragTo(page, card, page.getByTestId("kanban-column-Approved")),
+    ])
+    expect(updated.status(), await updated.text()).toBe(200)
     await expect(page.getByTestId("kanban-column-Approved").getByTestId(`kanban-card-${taskId}`)).toBeVisible()
 
     await expect
