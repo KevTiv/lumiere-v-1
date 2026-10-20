@@ -36,9 +36,7 @@ export async function signIn(
     .catch(() => false)
 
   if (!emailVisible) {
-    await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
-    await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
-    await expectNoAppError(page)
+    await expectAuthenticatedShell(page)
     return
   }
 
@@ -47,12 +45,26 @@ export async function signIn(
   await page.getByRole("button", { name: /sign in/i }).click()
 
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
-  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
-  await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
-  await expectNoAppError(page)
+  await expectAuthenticatedShell(page)
 }
 
 export async function expectAuthenticatedShell(page: Page) {
+  const mobile = await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches)
+  const navigationToggle = page.getByTestId("workspace-navigation-toggle")
+  let openedNavigation = false
+  if (mobile) {
+    // Mobile navigation is an unmounted drawer until opened. Prove that the
+    // actual authenticated navigation is keyboard reachable before inspecting it.
+    await expect(navigationToggle).toHaveCount(1, { timeout: 30_000 })
+    await expect(navigationToggle).toBeVisible()
+    if ((await navigationToggle.getAttribute("aria-expanded")) !== "true") {
+      await navigationToggle.focus()
+      await expect(navigationToggle).toBeFocused()
+      await navigationToggle.press("Enter")
+      await expect(navigationToggle).toHaveAttribute("aria-expanded", "true")
+      openedNavigation = true
+    }
+  }
   // While a streamed page is still resolving, its server-rendered shell and the
   // client shell can briefly coexist; wait for exactly one before asserting on it
   // (a strict-mode violation is not retried).
@@ -60,6 +72,12 @@ export async function expectAuthenticatedShell(page: Page) {
   await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
   await expect(page.getByTestId("sidebar-user")).toBeVisible()
   await expect(page.getByTestId("sidebar-sign-out")).toBeVisible()
+  if (openedNavigation) {
+    await page.keyboard.press("Escape")
+    await expect(navigationToggle).toHaveAttribute("aria-expanded", "false")
+    await expect(page.getByTestId("dashboard-sidebar")).toBeHidden()
+    await expect(navigationToggle).toBeFocused()
+  }
   await expectNoAppError(page)
 }
 
@@ -70,7 +88,7 @@ export async function expectAuthenticatedShell(page: Page) {
  */
 export async function reloadSettled(page: Page) {
   await page.reload({ waitUntil: "domcontentloaded" })
-  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+  await expectAuthenticatedShell(page)
 }
 
 async function expectHydratedModule(page: Page, moduleId: string) {
