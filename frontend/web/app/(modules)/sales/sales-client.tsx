@@ -1,7 +1,7 @@
 'use client';
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
-import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleInsights } from "../../../components/module-insights"
 
 import { phCapture } from '@/lib/posthog-browser';
@@ -449,7 +449,8 @@ function SalesClientLoaded({
   const { data: products = [] } = useProducts(orgId);
   const { data: productCategories = [] } = useProductCategories(orgId);
   const { data: uoms = [] } = useUoms(orgId);
-  const { data: accountMoves = [] } = useAccountMoves(orgId);
+  const accountMovesQuery = useAccountMoves(orgId);
+  const { data: accountMoves = [] } = accountMovesQuery;
   const { data: accountPayments = [] } = useAccountPayments(orgId);
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
@@ -1183,6 +1184,15 @@ function SalesClientLoaded({
       }),
     [t, loyaltyProgramFieldOptions, partnerFieldOptions],
   );
+
+  const invoiceCurrencyOptions = useMemo(() => currencies.map((row) => {
+    const code = String(row.code ?? '').trim().toUpperCase();
+    return {
+      value: String(row.id),
+      label: String(row.code ?? row.name ?? row.id),
+      code: /^[A-Z]{3}$/.test(code) ? code : undefined,
+    };
+  }), [currencies]);
 
   const salesInvoices = useMemo(
     () =>
@@ -2098,6 +2108,9 @@ function SalesClientLoaded({
               customContent: (
                 <InvoiceListView
                   invoices={salesInvoices}
+                  worklistScope={{ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }}
+                  sourceState={mergeModuleStates([moduleQueryState(accountMovesQuery), moduleQueryState(currenciesQuery)])}
+                  currencyOptions={invoiceCurrencyOptions}
                   onRecalculateTotals={(inv) =>
                     void computeInvoiceTotals
                       .mutateAsync(inv.id as string | number | bigint)
@@ -2249,6 +2262,12 @@ function SalesClientLoaded({
       linesForSelectedReturn,
       returnOrderFormConfig,
       salesInvoices,
+      invoiceCurrencyOptions,
+      accountMovesQuery,
+      currenciesQuery,
+      organizationId,
+      operatingCompanyId,
+      currentUser?.id,
       computeInvoiceTotals,
       loyaltyCardFormConfig,
       t,
