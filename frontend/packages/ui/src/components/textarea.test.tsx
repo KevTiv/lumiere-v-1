@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import * as React from "react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
@@ -66,6 +66,21 @@ describe("Textarea", () => {
 
     fireEvent.focus(formField)
     expect(document.activeElement).toBe(labeledEditor)
+  })
+
+  it("clears both the rich-text editor and native bridge after a controlled reset", async () => {
+    const onChange = vi.fn()
+    const { rerender } = render(
+      <Textarea aria-label="Description" value="Posted internal note" onChange={onChange} />
+    )
+    expect(editor().textContent).toBe("Posted internal note")
+    expect(nativeTextarea().value).toBe("Posted internal note")
+
+    rerender(<Textarea aria-label="Description" value="" onChange={onChange} />)
+
+    await waitFor(() => expect(editor().textContent).toBe(""))
+    expect(nativeTextarea().value).toBe("")
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it("renders compact and spaced Markdown emphasis without showing artifacts", () => {
