@@ -330,7 +330,7 @@ export const accountingDashboard: DashboardConfig = {
         {
           id: "acc-aging-share",
           type: "share-bar",
-          title: "AR/AP Aging",
+          title: "Open invoices and bills by due date",
           width: "1/2",
           data: {
             segments: [
@@ -341,7 +341,7 @@ export const accountingDashboard: DashboardConfig = {
               { key: "90+", label: "90+ days", color: "hsl(var(--destructive))" },
             ],
             rows: [],
-            emptyLabel: "Nothing open — no receivables or payables outstanding.",
+            emptyLabel: "No open invoices or bills in this company.",
           },
         },
         {

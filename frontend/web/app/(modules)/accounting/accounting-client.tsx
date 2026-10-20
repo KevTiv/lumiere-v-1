@@ -1,7 +1,6 @@
 "use client"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { useModuleTab } from "@/hooks/use-module-tab"
-import { DashboardWidgetRenderer } from "@lumiere/ui/pages/dashboard-widget-renderer"
 import { mapDashboardWidgets } from "@lumiere/ui/lib/dashboard-sections"
 import { agingShareRows, agingTotals, collectionRate, singleCurrencyId, revenueVsExpensesByMonth, topCustomers, weeklyCashMovements } from "./accounting-dashboard-charts"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
@@ -29,6 +28,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
   ModuleView,
+  DashboardWidgetRenderer,
   FormModal,
   CsvImportModal,
   CSV_IMPORT_CONTRACTS,
@@ -4589,7 +4589,7 @@ function AccountingClientReady({
         const rate = collectionRate(chartInvoices, currentRange)
         return { ...w, data: { ...w.data, value: rate.collected, max: rate.invoiced, stats: [{ label: "Invoiced", value: formatChartValue(rate.invoiced, money) }, { label: "Collected", value: formatChartValue(rate.collected, money) }, { label: "Outstanding", value: formatChartValue(rate.outstanding, money) }] } }
       }
-      if (w.type === "share-bar" && w.id === "acc-aging-share") return { ...w, data: { ...w.data, rows: agingShareRows(agingTotals(chartInvoices, chartBills, now.getTime()), { ar: "AR", ap: "AP" }), valueFormat: money } }
+      if (w.type === "share-bar" && w.id === "acc-aging-share") return { ...w, data: { ...w.data, rows: agingShareRows(agingTotals(chartInvoices, chartBills, now.getTime()), { ar: "Invoices", ap: "Bills" }), valueFormat: money } }
       if (w.type === "ranked-bars" && w.id === "acc-top-customers") return { ...w, data: { ...w.data, items: topCustomers(chartInvoices, partnerLabelMap, currentRange, previousRange), valueFormat: money } }
       if (w.type === "step-chart" && w.id === "acc-cash-movements") {
         const cash = weeklyCashMovements(chartPayments, now)
