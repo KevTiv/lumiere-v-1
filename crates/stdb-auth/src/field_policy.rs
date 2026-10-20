@@ -234,7 +234,12 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     );
     m.insert(
         "bank-statement-lines".to_string(),
-        ["move_ids"].into_iter().map(String::from).collect(),
+        // Settlement readback needs its exact payment link and persisted
+        // lifecycle hints, under the registry's existing field authorization.
+        ["move_ids", "payment_ids", "metadata"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
     );
     m.insert(
         "dashboards".to_string(),
@@ -1559,14 +1564,44 @@ mod tests {
 
     #[test]
     fn resolve_http_sql_columns_includes_bank_reconciliation_readback() {
-        let cols = resolve_http_sql_columns("bank-statement-lines", None)
-            .expect("bank-statement-lines columns");
-        for field in ["move_ids", "amount_residual"] {
+        let access = field_access(&["account_bank_statement_line:read"]);
+        for context in [None, Some(&access)] {
+            let cols = resolve_http_sql_columns("bank-statement-lines", context)
+                .expect("bank-statement-lines columns");
+            for field in ["move_ids", "payment_ids", "metadata", "amount_residual"] {
+                assert!(
+                    cols.iter().any(|column| column == field),
+                    "expected {field} in bank-statement-lines projection, got: {cols:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn bank_settlement_readback_respects_explicit_field_masks() {
+        let mut access = field_access(&["account_bank_statement_line:read"]);
+        select_fields(&mut access, "bank-statement-lines", &["amount_residual"]);
+        let masked = resolve_http_sql_columns("bank-statement-lines", Some(&access))
+            .expect("masked bank-statement-lines columns");
+        assert!(masked.iter().any(|column| column == "amount_residual"));
+        for field in ["move_ids", "payment_ids", "metadata"] {
             assert!(
-                cols.iter().any(|column| column == field),
-                "expected {field} in bank-statement-lines projection, got: {cols:?}"
+                !masked.iter().any(|column| column == field),
+                "explicit field mask exposed bank-statement-lines.{field}"
             );
         }
+
+        select_fields(
+            &mut access,
+            "bank-statement-lines",
+            &["payment_ids", "metadata"],
+        );
+        let selected = resolve_http_sql_columns("bank-statement-lines", Some(&access))
+            .expect("explicit bank settlement fields");
+        for field in ["payment_ids", "metadata"] {
+            assert!(selected.iter().any(|column| column == field));
+        }
+        assert!(!selected.iter().any(|column| column == "move_ids"));
     }
 
     #[test]
