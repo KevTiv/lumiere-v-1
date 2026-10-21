@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { useImportJobs, useImportJobErrors, type ImportJobRow, type ImportJobErrorRow } from "@lumiere/query-hooks/hooks/import-jobs"
+import { useImportJobs, useImportJobErrors, useRollbackImportJob, type ImportJobRow, type ImportJobErrorRow } from "@lumiere/query-hooks/hooks/import-jobs"
 import { csvImportHistoryJobs, selectedCsvImportJob } from "../lib/csv-import-history"
 import { Button } from "../components/button"
 import { Label } from "../components/label"
@@ -31,7 +31,9 @@ export function CsvImportHistory({
   const { t } = useTranslation()
   const jobsQuery = useImportJobs(organizationId)
   const errorsQuery = useImportJobErrors(organizationId)
+  const rollbackJob = useRollbackImportJob(organizationId)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [rollbackError, setRollbackError] = useState<string | null>(null)
   const { refetch } = jobsQuery
   // Refresh even when cached jobs are terminal: the submitted reducer does not return its job ID.
   useEffect(() => {
@@ -44,6 +46,15 @@ export function CsvImportHistory({
   const jobs = jobsQuery.isError ? [] : csvImportHistoryJobs((jobsQuery.data ?? []) as unknown as ImportJobRow[], tableName)
   const job = selectedCsvImportJob(jobs, selectedId)
   const failed = jobsQuery.isError || errorsQuery.isError
+  const handleRollback = async (target: ImportJobRow) => {
+    if (!target.id) return
+    setRollbackError(null)
+    try {
+      await rollbackJob.mutateAsync(typeof target.id === "string" ? Number(target.id) : target.id)
+    } catch (e) {
+      setRollbackError(e instanceof Error ? e.message : t("common.importAssistant.rollbackFailed"))
+    }
+  }
   return (
     <div className="space-y-3" aria-live="polite">
       {abandonedAccountingCleanup ? (
@@ -83,7 +94,9 @@ export function CsvImportHistory({
           </SelectContent>
         </Select>
       </div> : null}
-      {job ? <ImportJobStatusPanel job={job} errors={errorsQuery.isError ? [] : (errorsQuery.data ?? []) as unknown as ImportJobErrorRow[]} /> : null}
+      {rollbackError ? <p role="alert" className="text-sm text-destructive">{rollbackError}</p> : null}
+      {job ? <ImportJobStatusPanel job={job} errors={errorsQuery.isError ? [] : (errorsQuery.data ?? []) as unknown as ImportJobErrorRow[]}
+        onRollback={() => void handleRollback(job)} isRollbackPending={rollbackJob.isPending} /> : null}
     </div>
   )
 }
