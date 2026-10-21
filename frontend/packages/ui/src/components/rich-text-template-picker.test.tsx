@@ -153,6 +153,9 @@ describe("rich text templates", () => {
     expect(
       await screen.findByRole("button", { name: "Insert Greeting" })
     ).toBeTruthy()
+    expect(
+      screen.getByRole("button", { name: "Insert Closing" }).textContent
+    ).toContain("Thank you")
     fireEvent.change(
       screen.getByRole("searchbox", { name: "Search text templates" }),
       {
@@ -167,6 +170,11 @@ describe("rich text templates", () => {
     expect(screen.getByRole("status").textContent).toBe(
       "No matching text templates."
     )
+    fireEvent.click(
+      screen.getByRole("button", { name: "Clear template search" })
+    )
+    expect(screen.getByRole("button", { name: "Insert Greeting" })).toBeTruthy()
+    expect(document.activeElement).toBe(screen.getByRole("searchbox"))
   })
 
   it("replaces the captured selection through the native Markdown bridge and restores focus", async () => {
@@ -238,6 +246,9 @@ describe("rich text templates", () => {
     )
     const editor = await getEditor()
     openTemplates()
+    const card = await screen.findByRole("button", { name: "Insert Greeting" })
+    expect(card.textContent).toContain("Hello team.")
+    expect(card.querySelector("script, img, a")).toBeNull()
     await insertGreeting()
     const restored = new Editor({
       extensions: createRichTextExtensions(),
@@ -376,6 +387,10 @@ describe("rich text templates", () => {
     )
     const editor = await getEditor()
     openTemplates()
+    const card = await screen.findByRole("button", { name: "Insert Greeting" })
+    expect(card.textContent).toContain("Safe text")
+    expect(card.textContent).not.toContain("alert(1)")
+    expect(card.querySelector("script, img, a")).toBeNull()
     await insertGreeting()
     expect(editor.getText()).toBe("Safe text")
     expect(editor.getHTML()).not.toMatch(/script|onclick|<img|example\.com/)

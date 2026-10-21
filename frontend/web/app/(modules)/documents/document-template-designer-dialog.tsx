@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { ArrowLeft, Check, ChevronDown, FileText, LoaderCircle } from "lucide-react"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -10,7 +11,7 @@ import {
 } from "@lumiere/query-hooks/hooks/templates"
 import { Button } from "@lumiere/ui/components/button"
 import { Checkbox } from "@lumiere/ui/components/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@lumiere/ui/components/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/ui/components/dialog"
 import { DocumentTemplateDesigner } from "@lumiere/ui/components/document-template-designer"
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
@@ -26,6 +27,7 @@ import {
 } from "@lumiere/ui/lib/document-template-designer"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import "./document-template-designer-dialog.css"
 
 export interface DocumentTemplateDesignSource {
   row: DocumentTemplateRow
@@ -156,31 +158,58 @@ export function DocumentTemplateDesignerDialog({ organizationId, companyId, iden
     {navigationGuard}
     {confirmDialog}
     <Dialog open onOpenChange={(open) => { if (!open) void requestClose() }}>
-      <DialogContent className="flex h-[94dvh] w-[96vw] max-w-none flex-col gap-3 overflow-hidden sm:max-w-none" showCloseButton={!pending}>
-        <DialogHeader className="pr-8">
-          <DialogTitle>{template
+      <DialogContent className="document-template-dialog" showCloseButton={false}>
+        <DialogTitle className="sr-only">{template
             ? t("documents.designer.copyTitle", { defaultValue: "Customize a template copy" })
             : t("documents.designer.createTitle", { defaultValue: "Design a template" })}</DialogTitle>
-          <DialogDescription>{t("documents.designer.description", { defaultValue: "Design reusable page layouts or text for editor fields." })}</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
-          <div className="space-y-1">
-            <Label htmlFor="document-designer-name">{t("documents.documents.columns.name")}</Label>
-            <Input id="document-designer-name" value={name} onChange={(event) => setName(event.target.value)} disabled={pending || !canSave} maxLength={200} />
+        <DialogDescription className="sr-only">{t("documents.designer.description", { defaultValue: "Design reusable page layouts or text for editor fields." })}</DialogDescription>
+        <header className="document-template-dialog__header">
+          <Button variant="ghost" size="icon" className="document-template-dialog__back" disabled={pending} aria-label={t("common.cancel", { defaultValue: "Cancel" })} title={t("common.cancel", { defaultValue: "Cancel" })} onClick={() => { void requestClose() }}>
+            <ArrowLeft aria-hidden="true" />
+          </Button>
+          <span className="document-template-dialog__mark" aria-hidden="true"><FileText /></span>
+          <div className="document-template-dialog__identity">
+            <div className="document-template-dialog__breadcrumb">
+              <span>{t("documents.documents.title", { defaultValue: "Documents" })}</span>
+              <span aria-hidden="true">/</span>
+              <span>{t("documents.designer.studio", { defaultValue: "Template studio" })}</span>
+            </div>
+            <Label htmlFor="document-designer-name" className="sr-only">{t("documents.documents.columns.name")}</Label>
+            <Input id="document-designer-name" className="document-template-dialog__name" placeholder={t("documents.designer.untitled", { defaultValue: "Untitled template" })} value={name} onChange={(event) => setName(event.target.value)} disabled={pending || !canSave} maxLength={200} />
           </div>
-          <div className="space-y-1">
+          <div className="document-template-dialog__actions">
+            <span className="document-template-dialog__draft">
+              <span aria-hidden="true" />
+              {dirty ? t("documents.designer.unsaved", { defaultValue: "Unsaved changes" }) : t("documents.designer.draft", { defaultValue: "Draft" })}
+            </span>
+            <Button className="document-template-dialog__save" disabled={pending || !canSave || !snapshot || Boolean(designError) || !name.trim()} onClick={() => { void save() }}>
+              {pending ? <LoaderCircle className="animate-spin" aria-hidden="true" /> : <Check aria-hidden="true" />}
+              {pending ? t("common.saving", { defaultValue: "Saving…" }) : template
+                ? t("documents.designer.saveCopy", { defaultValue: "Save template copy" })
+                : t("documents.designer.save", { defaultValue: "Save template" })}
+            </Button>
+          </div>
+        </header>
+        <div className="document-template-dialog__metadata">
+          <div className="document-template-dialog__kind">
             <Label htmlFor="document-designer-kind">{t("documents.designer.kind", { defaultValue: "Template type" })}</Label>
-            <select id="document-designer-kind" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50" value={kind} disabled={Boolean(template) || pending || !canSave} onChange={(event) => { if (event.target.value === "rich-text" || event.target.value === "document") void changeKind(event.target.value) }}>
-              <option value="rich-text">{t("documents.designer.richText", { defaultValue: "Text for editor fields" })}</option>
-              <option value="document">{t("documents.designer.document", { defaultValue: "Document layout" })}</option>
-            </select>
+            <div className="document-template-dialog__select">
+              <select id="document-designer-kind" value={kind} disabled={Boolean(template) || pending || !canSave} onChange={(event) => { if (event.target.value === "rich-text" || event.target.value === "document") void changeKind(event.target.value) }}>
+                <option value="rich-text">{t("documents.designer.richText", { defaultValue: "Text for editor fields" })}</option>
+                <option value="document">{t("documents.designer.document", { defaultValue: "Document layout" })}</option>
+              </select>
+              <ChevronDown aria-hidden="true" />
+            </div>
           </div>
-          <div className="flex items-center gap-2 sm:self-end sm:pb-2">
+          <div className="document-template-dialog__active">
             <Checkbox id="document-designer-active" checked={isActive} onCheckedChange={(checked) => setIsActive(checked === true)} disabled={pending || !canSave} />
             <Label htmlFor="document-designer-active">{t("common.active", { defaultValue: "Active" })}</Label>
           </div>
+          <span className="document-template-dialog__hint">{kind === "rich-text"
+            ? t("documents.designer.textHint", { defaultValue: "Reusable content for your editor fields" })
+            : t("documents.designer.layoutHint", { defaultValue: "Reusable layouts for your documents" })}</span>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto rounded-md border">
+        <div className="document-template-dialog__workspace">
           <DocumentTemplateDesigner
             key={`${template?.row.id ?? "new"}:${kind}`}
             kind={kind}
@@ -200,15 +229,7 @@ export function DocumentTemplateDesignerDialog({ organizationId, companyId, iden
             }}
           />
         </div>
-        {designError || saveError ? <p role="alert" className="text-sm text-destructive">{designError ?? saveError}</p> : null}
-        <div className="flex justify-end gap-2 border-t pt-3">
-          <Button variant="outline" disabled={pending} onClick={() => { void requestClose() }}>{t("common.cancel", { defaultValue: "Cancel" })}</Button>
-          <Button disabled={pending || !canSave || !snapshot || Boolean(designError) || !name.trim()} onClick={() => { void save() }}>
-            {pending ? t("common.saving", { defaultValue: "Saving…" }) : template
-              ? t("documents.designer.saveCopy", { defaultValue: "Save template copy" })
-              : t("documents.designer.save", { defaultValue: "Save template" })}
-          </Button>
-        </div>
+        {designError || saveError ? <p role="alert" className="document-template-dialog__error">{designError ?? saveError}</p> : null}
       </DialogContent>
     </Dialog>
   </>

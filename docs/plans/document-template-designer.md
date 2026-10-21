@@ -13,6 +13,20 @@ In **Documents → Document templates**, users can choose **Design template**, a
 
 Whole page layouts are deliberately absent from the prose picker. Markdown cannot preserve positioning, page styles, arbitrary containers or fonts. These are two projections of a shared template record, not two independent mutable copies of the same field.
 
+## Template studio interface
+
+The editor uses the application's mineral surfaces and teal accent, with an inline template name and a persistent Save action. A searchable block library, page workspace and separate properties inspector provide the main authoring areas. Blocks have visual previews, text/layout filters and both click-to-add and pointer drag placement. The inspector groups the selected block's typography, colors, spacing and border controls.
+
+Canvas zoom and Fit change the editing viewport without changing the saved project. At narrower widths the inspector and block library open as side panels, keeping the canvas mounted and visible. The phone layout fills the viewport and retains the Save action at the top. These controls describe a single template canvas; they do not introduce PDF pagination or export behavior.
+
+The Tiptap picker presents searchable cards with inert previews of sanitized template content, a content-type badge and an Insert action. It retains the existing captured-selection insertion and Markdown persistence. The field itself has a lighter toolbar, a roomier writing area and a visible accent for active formatting.
+
+The previews below render the actual editor components with sample content and a local API adapter. The surrounding proposal form in the second image is a preview fixture.
+
+![Template studio with block library, page canvas and selection inspector](../assets/document-template-studio.png)
+
+![Text template picker in a sample Tiptap form](../assets/document-template-picker.png)
+
 ## Storage and rendering contract
 
 The existing `document_template` row remains the persisted entity. No database schema or generated contracts release is changed.
@@ -52,6 +66,8 @@ The supported workflow therefore creates a new template with an explicit **Save 
 ## Validation
 
 Focused tests exercise real Tiptap and real GrapesJS core, including project serialization/reopening, table semantics, escaped text, placeholder literals, styles, script/resource rejection, Markdown round trips, native `FormData`, selection, character limits, disabled/read-only fields and undo. Provider tests cover lazy loading, scope changes, permission changes and template filtering. Dialog tests cover the existing create transport, copying, failed saves, discard guards and duplicate submit protection.
+
+Studio tests also verify block filtering and that changing canvas zoom leaves the saved snapshot intact. Chromium checks cover pointer dragging at 50% zoom, canceled drags, click-to-add, undo, immediate save/reopen, inspector changes and template insertion. Visual checks at 1440×960, 1024×768 and 390×844 verify dialog bounds, a visible canvas and persistent Save controls.
 
 Run the relevant UI tests with:
 
