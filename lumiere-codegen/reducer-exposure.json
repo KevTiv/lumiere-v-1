@@ -4401,6 +4401,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "update_document_template",
+      "exposure": "session",
+      "reason": "reviewed template editing and activation lifecycle; document_template write permission, exact organization/company scope and immutable invoice-profile protections remain reducer-enforced"
+    },
+    {
       "name": "update_employee",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
