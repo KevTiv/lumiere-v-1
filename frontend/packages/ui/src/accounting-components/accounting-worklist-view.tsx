@@ -74,6 +74,8 @@ interface AccountingWorklistViewProps extends AccountingWorklistProps {
   onSelect?: (move: AccountMove) => void
   onCreate?: () => void
   onPay?: (move: AccountMove) => void
+  onSend?: (move: AccountMove) => void
+  onDownload?: (move: AccountMove) => void
   onRecalculateTotals?: (move: AccountMove) => void
 }
 
@@ -174,6 +176,8 @@ function ReadyAccountingWorklist({
   onSelect,
   onCreate,
   onPay,
+  onSend,
+  onDownload,
   onRecalculateTotals,
 }: AccountingWorklistViewProps) {
   const { t } = useTranslation()
@@ -748,7 +752,7 @@ function ReadyAccountingWorklist({
                           </TableCell>
                         ))}
                         <TableCell>
-                          {(onSelect || canRecalculate || canPay) && (
+                          {(onSelect || canRecalculate || canPay || (canRead && (onSend || onDownload))) && (
                             <DropdownMenu>
                               <DropdownMenuTrigger
                                 asChild
@@ -775,6 +779,16 @@ function ReadyAccountingWorklist({
                                     {t(
                                       "accounting.invoices.invoiceActions.viewDetails"
                                     )}
+                                  </DropdownMenuItem>
+                                )}
+                                {canRead && onSend && !isBill && (
+                                  <DropdownMenuItem className="min-h-11" onClick={(event) => { event.stopPropagation(); onSend(move) }}>
+                                    {t("accounting.invoices.invoiceActions.send")}
+                                  </DropdownMenuItem>
+                                )}
+                                {canRead && onDownload && (
+                                  <DropdownMenuItem className="min-h-11" onClick={(event) => { event.stopPropagation(); onDownload(move) }}>
+                                    {t("accounting.invoices.invoiceActions.downloadPdf")}
                                   </DropdownMenuItem>
                                 )}
                                 {canRecalculate && (
