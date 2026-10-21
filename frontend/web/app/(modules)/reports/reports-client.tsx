@@ -1196,6 +1196,11 @@ function ReportsClientLoaded({
     importReportTemplateCsv.isPending ||
     importAnalyticsMetricCsv.isPending
 
+  // The actor is part of ModuleView's scope key. Mounting its interactive state
+  // before initial authorization resolves would discard selections and drafts
+  // as soon as that key acquires the actor, even though the session did not change.
+  if (permissionsReady === false || !currentUser?.id) return <p role="status" className="m-4 text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p>
+
   if (periodRequested && periodState.status !== "ready") return <ReportPeriodNotice state={periodState} context={periodContext} />
 
   return (
