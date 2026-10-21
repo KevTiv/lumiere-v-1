@@ -10,6 +10,7 @@ import {
   signIn,
   smokeName,
 } from "./helpers"
+import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
 import { matchesOperationResponse } from "./operation-response"
 
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -45,7 +46,21 @@ test.describe("COV-08c exact period close", { tag: ["@p0", "@cov08", "@cov08c"] 
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
     const suffix = Date.now() % 100000
-    const year = 2200 + (suffix % 100)
+    const fiscalYears = (await rows(page, "fiscal-years")).filter(
+      (row) => scalarQueryId(row.companyId ?? row.company_id) === companyId,
+    )
+    // Earlier tests and retries retain fiscal years. Select a verified unused
+    // range instead of rolling a timestamp into the same small date window.
+    let year = 2150
+    while (year <= 2254 && fiscalYears.some((row) => {
+      const from = kpiDate(row.dateFrom ?? row.date_from)
+      const to = kpiDate(row.dateTo ?? row.date_to)
+      if (!from || !to) throw new Error("Cannot verify existing fiscal-year ranges for fixture setup")
+      return from.getTime() <= Date.parse(`${year}-12-31T23:59:59Z`)
+        && to.getTime() >= Date.parse(`${year}-01-01T00:00:00Z`)
+    })) year += 1
+    // Keep the microsecond timestamps below Number.MAX_SAFE_INTEGER.
+    if (year > 2254) throw new Error("No unused safe fiscal-year range for fixture setup")
     const yearName = smokeName(`cov08c-fy-${suffix}`)
     // Setup only: fiscal year and open period are fixture data, created with
     // the trusted owner call (the session compat route returns a redacted 500
