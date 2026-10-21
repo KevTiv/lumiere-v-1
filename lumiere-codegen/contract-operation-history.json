@@ -6092,6 +6092,14 @@
       "current_operations_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
       "operation_count": 1458,
       "reason": "release on top of v0.3.128: add abandon_bank_statement_settlement, claim_reviewed_mail_delivery, create_purchase_order_once, receive_po_line_once, resubmit_bank_statement_settlement, reverse_bank_statement_settlement, run_purchasing_keyed_operations_test; change the shape of add_workflow_human_task_comment, cancel_workflow, claim_workflow_human_task, decide_workflow_human_task, invalidate_workflow_human_task, post_payment, reconcile_account_bank_statement_line"
+    },
+    {
+      "previous_release": "v0.3.129",
+      "previous_ir_sha256": "sha256:dfc31a6c53f8d328e2bdd3701d005c2c91c8ae540ebff742ee15ae23e8d7dcf2",
+      "previous_operations_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
+      "current_operations_fingerprint": "sha256:b111e5b9c89f8dcabd00ee2b8592bcd3c09e323d64acc2691cc1f808f6bc3c8d",
+      "operation_count": 1459,
+      "reason": "Add atomic embedding-job finalization on top of released v0.3.129 while preserving every released operation shape."
     }
   ]
 }
