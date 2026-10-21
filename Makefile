@@ -418,6 +418,9 @@ e2e-smoke-setup:
 					fi; \
 				done; \
 				echo "[e2e] Domain reducer tests passed."; \
+				if [ "$${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
+					spacetime call "$(E2E_DB)" run_all_inventory_tests --server local --no-config || exit 1; \
+				fi; \
 				if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 					for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
 						echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
@@ -962,6 +965,9 @@ e2e-smoke:
 				fi; \
 			done; \
 			echo "[e2e] Domain reducer tests passed."; \
+			if [ "$${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
+				spacetime call "$(E2E_DB)" run_all_inventory_tests --server local --no-config || exit 1; \
+			fi; \
 			if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
 					echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
