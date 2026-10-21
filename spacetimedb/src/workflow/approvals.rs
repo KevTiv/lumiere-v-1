@@ -7,7 +7,7 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::permissions::{role, user_role_assignment};
+use crate::core::permissions::role;
 use crate::core::users::user_organization;
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
@@ -562,6 +562,7 @@ pub(crate) fn claim_workflow_human_task_for_actor(
         None,
         actor,
     );
+    crate::accounting::bank_settlement_lifecycle::record_bank_task_claim(ctx, &updated)?;
     Ok(updated)
 }
 
@@ -615,6 +616,14 @@ pub(crate) fn decide_workflow_human_task_for_actor(
     validate_key(&params.correlation_id, "correlation id")?;
     let comment = normalize_comment(params.comment.clone())?;
     let input_hash = decision_input_hash(organization_id, &params, comment.as_deref());
+    let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
+    let permission = match params.decision {
+        WorkflowHumanTaskDecision::Approve => "workflow_task:approve",
+        WorkflowHumanTaskDecision::Reject => "workflow_task:reject",
+        WorkflowHumanTaskDecision::Complete => "workflow_task:complete",
+    };
+    let authorization = authorize_task_actor(ctx, actor, &task, params.acting_for, permission)
+        .map_err(|error| format!("Permission denied: {error}"))?;
     if let Some(receipt) = replay_receipt(
         ctx,
         organization_id,
@@ -623,10 +632,14 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         &params.idempotency_key,
         &input_hash,
     )? {
-        return require_task(ctx, organization_id, params.company_id, receipt.task_id);
+        if receipt.created_by != actor {
+            return Err(
+                "Permission denied: workflow task receipt belongs to another actor".to_string(),
+            );
+        }
+        return Ok(task);
     }
 
-    let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
     require_revision(&task, params.expected_task_revision)?;
     if !matches!(
         task.status,
@@ -640,29 +653,7 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         return Err("workflow task is claimed by another actor".to_string());
     }
     validate_decision(&task, &params.decision, comment.as_deref())?;
-    let permission = match params.decision {
-        WorkflowHumanTaskDecision::Approve => "workflow_task:approve",
-        WorkflowHumanTaskDecision::Reject => "workflow_task:reject",
-        WorkflowHumanTaskDecision::Complete => "workflow_task:complete",
-    };
-    let authorization = authorize_task_actor(ctx, actor, &task, params.acting_for, permission)?;
     let principal = authorization.acting_for_identity.unwrap_or(actor);
-
-    if task.assignment == WorkflowTaskAssignment::AllCandidates {
-        if let Some(partial) = record_all_candidates_vote(
-            ctx,
-            organization_id,
-            actor,
-            principal,
-            &task,
-            &params,
-            &authorization,
-            &input_hash,
-            comment.clone(),
-        )? {
-            return Ok(partial);
-        }
-    }
 
     let instance = require_instance(
         ctx,
@@ -678,6 +669,29 @@ pub(crate) fn decide_workflow_human_task_for_actor(
     }
     if instance.subject_revision_hash != task.condition_revision_hash {
         return Err("workflow task subject revision no longer matches its instance".to_string());
+    }
+
+    // Re-snapshot every guarded decision before recording a vote, evidence or
+    // terminal state. A stale rejection is just as material as a stale
+    // approval, and an AllCandidates rejection must not persist its vote
+    // before the same freshness proof succeeds.
+    require_current_guarded_task_snapshot(ctx, &task)?;
+
+    if task.assignment == WorkflowTaskAssignment::AllCandidates {
+        if let Some(partial) = record_all_candidates_vote(
+            ctx,
+            organization_id,
+            actor,
+            principal,
+            &task,
+            &params,
+            &authorization,
+            &input_hash,
+            comment.clone(),
+        )? {
+            crate::accounting::bank_settlement_lifecycle::synchronize_bank_task(ctx, &partial)?;
+            return Ok(partial);
+        }
     }
 
     let edge = decision_edge(ctx, &task, &params.decision)?;
@@ -781,7 +795,29 @@ pub(crate) fn decide_workflow_human_task_for_actor(
     if updated_instance.revision != expected_runtime_revision {
         return Err("workflow decision advanced an unexpected number of revisions".to_string());
     }
+    crate::accounting::bank_settlement_lifecycle::synchronize_bank_task(ctx, &updated)?;
     Ok(updated)
+}
+
+fn require_current_guarded_task_snapshot(
+    ctx: &ReducerContext,
+    task: &WorkflowHumanTask,
+) -> Result<(), String> {
+    let Some(action) = task.guarded_action.as_ref() else {
+        return Ok(());
+    };
+    let snapshot = snapshot_guarded_action(
+        ctx,
+        task.organization_id,
+        task.company_id,
+        action.key.clone(),
+        action.schema_version,
+        GuardedActionInput::for_subject(&action.key, task.subject_id),
+    )?;
+    if snapshot.subject_revision_hash != task.subject_revision_hash {
+        return Err("workflow task subject changed after the task was created".to_string());
+    }
+    Ok(())
 }
 
 #[reducer]
@@ -872,6 +908,7 @@ pub(crate) fn invalidate_workflow_human_task_internal(
         None,
         actor,
     );
+    crate::accounting::bank_settlement_lifecycle::synchronize_bank_task(ctx, &updated)?;
     Ok(updated)
 }
 
@@ -943,6 +980,7 @@ pub(crate) fn add_workflow_human_task_comment_for_actor(
         None,
         actor,
     );
+    crate::accounting::bank_settlement_lifecycle::record_bank_task_comment(ctx, &updated)?;
     Ok(updated)
 }
 
@@ -1330,19 +1368,25 @@ fn project_all_candidates(
 ) -> Result<Vec<Identity>, String> {
     let mut identities = BTreeSet::new();
     if !policy.candidate_role_ids.is_empty() {
-        for assignment in ctx
+        for membership in ctx
             .db
-            .user_role_assignment()
-            .role_assign_by_org()
+            .user_organization()
+            .user_org_by_org()
             .filter(&organization_id)
         {
-            if assignment.is_active
-                && policy.candidate_role_ids.contains(&assignment.role_id)
-                && assignment
-                    .expires_at
-                    .is_none_or(|expires| expires > ctx.timestamp)
-            {
-                identities.insert(assignment.user_identity);
+            if !membership.is_active || !membership.company_id.is_none_or(|id| id == company_id) {
+                continue;
+            }
+            let has_candidate_role = super::authorization::current_workflow_roles(
+                ctx,
+                organization_id,
+                membership.user_identity,
+                ctx.timestamp,
+            )?
+            .iter()
+            .any(|role| policy.candidate_role_ids.contains(&role.role_id));
+            if has_candidate_role {
+                identities.insert(membership.user_identity);
             }
         }
     }

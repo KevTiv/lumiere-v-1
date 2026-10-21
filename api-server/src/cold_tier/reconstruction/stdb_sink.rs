@@ -1,5 +1,6 @@
 //! SpacetimeDB reconstruction sink.
 
+use super::super::pg_codec::rust_field_name;
 use super::super::{pg_codec, reconciliation};
 use super::catalog::RestoreTable;
 use super::integrity::{
@@ -479,22 +480,6 @@ pub(crate) fn canonical_stdb_row_json(
         );
     }
     canonical_json(&Value::Object(stdb_row))
-}
-
-fn rust_field_name(column_name: &str) -> &str {
-    match column_name {
-        "cost_per_1_k_tokens" => "cost_per_1k_tokens",
-        "iso_3" => "iso3",
-        "kpi_1_month_mrr" => "kpi_1month_mrr",
-        "kpi_3_months_mrr" => "kpi_3months_mrr",
-        "kpi_12_months_mrr" => "kpi_12months_mrr",
-        "normalized_e_164" => "normalized_e164",
-        "ref" => "ref_",
-        "show_lots_m_2_o" => "show_lots_m2o",
-        "street_2" => "street2",
-        "type" => "type_",
-        name => name,
-    }
 }
 
 pub(crate) fn stdb_sql_field_name(column_name: &str) -> &str {

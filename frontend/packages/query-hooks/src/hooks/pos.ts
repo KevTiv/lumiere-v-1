@@ -1,5 +1,6 @@
 'use client';
 
+import { decodeOperationDispatch } from '@lumiere/api-client';
 import { stdbBffCommandPost } from '@lumiere/stdb/commands';
 /**
  * POS hooks — Point of Sale terminal and session management
@@ -12,8 +13,23 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { apiFetch, fetchQueryList, rqBigIntKey } from '../http';
 import { stdbParamsToJson } from '@lumiere/erp-shared/stdb-params-json';
-import { scalarToU64 as toScalarU64, type ScalarId } from '@lumiere/erp-shared/u64';
+import {
+  parseStrictU64,
+  scalarToU64 as toScalarU64,
+  type ScalarId,
+} from '@lumiere/erp-shared/u64';
 import type { CreatePosConfigParams, CreatePosOrderParams, PosConfig, PosSession, PosTerminal } from '@lumiere/stdb/types';
+import {
+  AmbiguousOperationEffectError,
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+  type CanonicalRecordRef,
+  type ResolvedOperationEffectOutcome,
+} from './operation-effect';
+import {
+  resolvePosConfigStateEffect,
+  type PosConfigStateRef,
+} from './pos-config-state-effect';
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -139,32 +155,58 @@ export function useCreatePosConfig(organizationId: bigint, companyId: bigint) {
   });
 }
 
-export function useActivatePosConfig(organizationId: bigint) {
+function useSetPosConfigActive(organizationId: bigint, isActive: boolean) {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (configId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost('activate_pos_config', {
-        configId: toScalarU64(configId),
+  return useMutation<
+    ResolvedOperationEffectOutcome<PosConfigStateRef>,
+    Error,
+    ScalarId
+  >({
+    mutationFn: async (configIdInput) => {
+      const configId = parseStrictU64(configIdInput);
+      if (configId == null) throw new Error('Invalid POS config id');
+
+      const resolveEffect = async () =>
+        resolvePosConfigStateEffect(
+          await fetchQueryList(
+            '/api/query/pos-configs',
+            'Failed to read POS configs',
+          ),
+          organizationId,
+          configId,
+          isActive,
+        );
+
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect,
+        dispatch: async () => {
+          const operation = isActive
+            ? 'activate_pos_config'
+            : 'deactivate_pos_config';
+          const { urlPath, init } = stdbBffCommandPost(operation, {
+            configId,
+          });
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            `Failed to ${isActive ? 'activate' : 'deactivate'} POS config`,
+          );
+        },
+        afterDispatch: () => invalidatePosQueries(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
       });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to activate POS config');
+
+      return requireResolvedOperationEffect(outcome);
     },
-    onSuccess: () => invalidatePosQueries(qc, organizationId),
   });
 }
 
+export function useActivatePosConfig(organizationId: bigint) {
+  return useSetPosConfigActive(organizationId, true);
+}
+
 export function useDeactivatePosConfig(organizationId: bigint) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (configId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost('deactivate_pos_config', {
-        configId: toScalarU64(configId),
-      });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to deactivate POS config');
-    },
-    onSuccess: () => invalidatePosQueries(qc, organizationId),
-  });
+  return useSetPosConfigActive(organizationId, false);
 }
 
 export function useOpenPosSession(organizationId: bigint) {
@@ -185,21 +227,169 @@ export function useOpenPosSession(organizationId: bigint) {
   });
 }
 
-export function useClosePosSession(organizationId: bigint) {
+export interface PosSessionCloseProjection {
+  readonly id?: unknown;
+  readonly organizationId?: unknown;
+  readonly organization_id?: unknown;
+  readonly configId?: unknown;
+  readonly config_id?: unknown;
+  readonly state?: unknown;
+  readonly stopAt?: unknown;
+  readonly stop_at?: unknown;
+  readonly cashRegisterBalanceEndReal?: unknown;
+  readonly cash_register_balance_end_real?: unknown;
+}
+
+export interface PosConfigScopeProjection {
+  readonly id?: unknown;
+  readonly organizationId?: unknown;
+  readonly organization_id?: unknown;
+  readonly companyId?: unknown;
+  readonly company_id?: unknown;
+}
+
+export interface ClosedPosSessionRef extends CanonicalRecordRef {
+  readonly resource: 'pos-sessions';
+  readonly configId: string;
+  readonly companyId: string;
+  readonly closingBalance: number;
+}
+
+function posStateTag(value: unknown): string {
+  if (typeof value === 'string') return value.toLowerCase();
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if ('tag' in value) {
+      return String((value as { tag?: unknown }).tag ?? '').toLowerCase();
+    }
+    const keys = Object.keys(value);
+    if (keys.length === 1) return keys[0]!.toLowerCase();
+  }
+  return '';
+}
+
+/** COV-13: resolve the same session through its canonical config/company relation. */
+export function resolveClosedPosSessionEffect(
+  sessions: readonly PosSessionCloseProjection[],
+  configs: readonly PosConfigScopeProjection[],
+  organizationId: bigint,
+  companyId: bigint,
+  sessionId: bigint,
+  closingBalance: number,
+): ClosedPosSessionRef | null {
+  const sessionMatches = sessions.filter(
+    (row) => parseStrictU64(row.id) === sessionId,
+  );
+  if (sessionMatches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one POS session, found ${sessionMatches.length}`,
+    );
+  }
+  const session = sessionMatches[0];
+  if (
+    !session ||
+    parseStrictU64(session.organizationId ?? session.organization_id) !==
+      organizationId ||
+    posStateTag(session.state) !== 'closed'
+  ) {
+    return null;
+  }
+
+  const configId = parseStrictU64(session.configId ?? session.config_id);
+  if (configId == null) return null;
+  const configMatches = configs.filter(
+    (row) => parseStrictU64(row.id) === configId,
+  );
+  if (configMatches.length > 1) {
+    throw new AmbiguousOperationEffectError(
+      `Expected one POS config, found ${configMatches.length}`,
+    );
+  }
+  const config = configMatches[0];
+  if (
+    !config ||
+    parseStrictU64(config.organizationId ?? config.organization_id) !==
+      organizationId ||
+    parseStrictU64(config.companyId ?? config.company_id) !== companyId
+  ) {
+    return null;
+  }
+
+  const actualBalance = Number(
+    session.cashRegisterBalanceEndReal ??
+      session.cash_register_balance_end_real ??
+      Number.NaN,
+  );
+  if (
+    !Number.isFinite(actualBalance) ||
+    Math.abs(actualBalance - closingBalance) > 0.0001
+  ) {
+    return null;
+  }
+
+  return {
+    resource: 'pos-sessions',
+    id: sessionId.toString(),
+    configId: configId.toString(),
+    companyId: companyId.toString(),
+    closingBalance: actualBalance,
+  };
+}
+
+export function useClosePosSession(
+  organizationId: bigint,
+  companyId?: bigint,
+) {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (args: {
+  return useMutation<
+    ResolvedOperationEffectOutcome<ClosedPosSessionRef>,
+    Error,
+    {
       sessionId: bigint | number | string;
       closingBalance: number;
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost('close_pos_session', {
-        sessionId: toScalarU64(args.sessionId),
-        cashRegisterBalanceEndReal: args.closingBalance,
+    }
+  >({
+    mutationFn: async (args) => {
+      if (companyId == null || companyId <= 0n) {
+        throw new Error('Operating company is required to close a POS session');
+      }
+      const sessionId = parseStrictU64(args.sessionId);
+      if (sessionId == null) throw new Error('Invalid POS session id');
+
+      const resolveEffect = async () =>
+        resolveClosedPosSessionEffect(
+          await fetchQueryList(
+            '/api/query/pos-sessions',
+            'Failed to read POS sessions',
+          ),
+          await fetchQueryList(
+            '/api/query/pos-configs',
+            'Failed to read POS configs',
+          ),
+          organizationId,
+          companyId,
+          sessionId,
+          args.closingBalance,
+        );
+
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect,
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost('close_pos_session', {
+            sessionId,
+            cashRegisterBalanceEndReal: args.closingBalance,
+          });
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            'Failed to close POS session',
+          );
+        },
+        afterDispatch: () => invalidatePosQueries(qc, organizationId),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
       });
-      const r = await apiFetch(urlPath, init);
-      if (!r.ok) throw new Error('Failed to close POS session');
+
+      return requireResolvedOperationEffect(outcome);
     },
-    onSuccess: () => invalidatePosQueries(qc, organizationId),
   });
 }
 

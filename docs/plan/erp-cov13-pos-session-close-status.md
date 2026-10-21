@@ -1,49 +1,116 @@
 # COV-13 — Session order/payment → close
 
-**Status:** SCAFFOLDED — implementation pending  
+**Status:** IMPLEMENTED — runtime acceptance pending  
+**Branch:** `codex/cov13-pos-session-close`  
+**Stack base:** `codex/cov12-subscription-invoice-run`  
 **Module/surface:** POS  
-**Plan target:** one session order, payment and close  
-**Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
+**Plan target:** one paid POS session closed through the operator surface
 
-## Bounded path (to implement)
+## Bounded path
 
-Operator surface: /pos
+Operator surface: `/pos` → Admin.
 
-Existing operations (already reachable from the frontend command layer):
+The browser proof:
 
-- `close_pos_session` — hook: `frontend/packages/query-hooks/src/hooks/pos.ts`
+1. opens a fresh session for seeded `Front Desk Demo POS` through the visible
+   **Open POS Session** form;
+2. creates one paid POS order as trusted fixture setup against that exact
+   session;
+3. verifies the session carries the order;
+4. drives **Close POS Session** through the visible admin form;
+5. resolves the same session as Closed through its exact config/company scope;
+6. replays the accepted close request to prove stale rejection and unchanged
+   state;
+7. replays as `fixture.reader@example.test` and requires HTTP 403 with the
+   exact effect unchanged.
 
-Canonical resources: pos-sessions, pos-configs
+The order/payment setup uses the existing `create_pos_order` domain operation;
+the COV-13 action under certification remains `close_pos_session`.
 
-## Effect contract
+## Corrected scope finding
 
-Same session id reads back `state` = closed; company scope derives through config_id → pos-configs.company_id.
+The scaffold said the `pos_session` table had no organization/company scope
+available. Source inspection showed:
 
-Implementation pattern: wrap the mutation's readback with `resolveUniqueEffect` /
-`executeOperationWithCanonicalReadback` from
-`frontend/packages/query-hooks/src/hooks/operation-effect.ts` (see COV-08c and
-COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
+- `PosSession` already has `organization_id` and `config_id`;
+- `PosConfig` already has `organization_id` and `company_id`.
+
+No new domain column or join table is required.
+
+COV-13 exposes the existing `organization_id` fields on the
+`pos-sessions` and `pos-configs` read projections. Company scope is then
+resolved canonically as:
+
+`pos_session.config_id → pos_config.id → pos_config.company_id`.
+
+This projection change intentionally triggers the automatic contracts release.
+
+## Exact effect contract
+
+`resolveClosedPosSessionEffect` requires:
+
+- exactly one session with the requested primary key;
+- session `organization_id` = current organization;
+- session state = `Closed`;
+- session `config_id` resolves to exactly one config;
+- config `organization_id` = current organization;
+- config `company_id` = selected operating company;
+- persisted `cash_register_balance_end_real` equals the requested closing
+  balance.
+
+Duplicate exact session/config identities fail closed. No newest-session,
+terminal-name or timestamp correlation is used.
+
+The React Query close hook uses
+`executeOperationWithCanonicalReadback`, so a lost response can reconcile to
+the already-closed exact session without a second dispatch.
+
+## Domain replay semantics
+
+`close_pos_session` is a one-way state transition:
+
+- Opened / ClosingControl → Closed succeeds once;
+- replay after Closed is rejected by the domain state guard;
+- cross-organization close is rejected before mutation;
+- rejected replay leaves session stop time, closing balance, session write
+  timestamp, config closing cash/date and config write timestamp unchanged.
+
+The native proof is wired directly into `run_all_sales_tests`; no new public
+test reducer was added.
 
 ## Contract disposition
 
-**Contract release required.** `pos-sessions` has neither organization_id nor company_id in its projection (the table has no company column); exact scoped readback needs the config/company relation exposed or a join-backed resource
+**Contract release required and triggered.**
 
-Contract releases are automatic: pushing the registry or reducer change runs `.github/workflows/release-contracts.yml`, which publishes the next lumiere-contracts version and pins it on the branch. Pull its pin commit before continuing.
+Changed projection only:
 
-## Prerequisites / decisions
+- `pos-sessions.organization_id` exposed;
+- `pos-configs.organization_id` exposed.
 
-Stock/accounting convergence proof depends on COV-06/08 acceptance.
+The existing `config_id`, `company_id`, session state/order count and
+closing-balance fields remain the canonical data model.
 
-## D/A/O/E proof checklist
+## D/A/O/E proof
 
-| Gate | Required proof | State |
+| Gate | Proof in this branch | Acceptance condition |
 | --- | --- | --- |
-| D | Native domain test: transition, replay rejection leaving the row unchanged, invariant/denial cases | TODO |
-| A | Generated operation keeps permission + organization/company scope; reader persona denied (403) | TODO |
-| O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | TODO — `frontend/web/tests/e2e/cov13-pos-session-close.spec.ts` |
-| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | TODO |
+| D | `pos_session_close_test.rs` creates a real config/session, proves cross-org denial, closes once, then proves stale replay leaves session and config close fields unchanged. Wired into `run_all_sales_tests`. | `run_all_sales_tests` passes. |
+| A | Existing reducer checks session organization, config organization, `pos_session:close` permission and opener identity. Browser reader replay must return 403. | Authorized opener succeeds; wrong org/reader cannot change the effect. |
+| O | `cov13-pos-session-close.spec.ts` visibly opens a session, attaches a paid order fixture, then closes it through `/pos` Admin. | Focused Playwright proof passes. |
+| E | `pos-session-close-effect.test.ts` covers identity, org/config/company scope, state, balance and ambiguity; browser snapshot is preserved after stale 422 and reader 403. | Query-hook unit/native/browser evidence green on one head. |
 
 ## Acceptance
 
-Becomes IMPLEMENTED when the bounded path and proofs above exist, and ACCEPTED only
-with same-head green CI (plus the contract release, when required).
+COV-13 becomes **ACCEPTED** only when the same branch head records:
+
+1. automatic contracts release/pin for the POS scope projection;
+2. query-hooks typecheck + unit tests;
+3. `run_all_sales_tests` on a live stack;
+4. focused COV-13 Playwright proof;
+5. branch CI green.
+
+Stock/accounting convergence remains covered by the prerequisite COV-06/COV-08
+acceptance lanes; this bounded slice does not duplicate those domains.
+
+Until the gates above pass, the truthful disposition is **IMPLEMENTED —
+runtime acceptance pending**.

@@ -2,14 +2,9 @@
 
 import { useMemo, useState } from "react"
 
+import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@lumiere/ui/components/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 import type { QueryRows } from "@lumiere/query-hooks/http"
 import {
   useAssignOnboardingTemplate,
@@ -39,11 +34,8 @@ interface HrOnboardingPanelProps {
 }
 
 /** Employee record sheet tab — hire onboarding checklist progress. */
-export function HrOnboardingPanel({
-  organizationId,
-  companyId,
-  employeeId,
-}: HrOnboardingPanelProps) {
+export function HrOnboardingPanel({ organizationId, companyId, employeeId }: HrOnboardingPanelProps) {
+  const { t } = useTranslation()
   const { data: templates = [] } = useOnboardingTemplates(organizationId)
   const { data: templateItems = [] } = useOnboardingTemplateItems(organizationId)
   const { data: progress = [] } = useOnboardingProgress(organizationId)
@@ -64,15 +56,12 @@ export function HrOnboardingPanel({
   const assignment = useMemo(
     () =>
       employeeProgress.find(
-        (row) =>
-          rowNum(row as Record<string, unknown>, "templateItemId", "template_item_id") === 0,
+        (row) => rowNum(row as Record<string, unknown>, "templateItemId", "template_item_id") === 0,
       ) as Record<string, unknown> | undefined,
     [employeeProgress],
   )
 
-  const templateId = assignment
-    ? rowNum(assignment, "templateId", "template_id")
-    : 0
+  const templateId = assignment ? rowNum(assignment, "templateId", "template_id") : 0
 
   const itemProgress = useMemo(() => {
     const items = (templateItems as QueryRows).filter(
@@ -82,8 +71,7 @@ export function HrOnboardingPanel({
       const itemRow = item as Record<string, unknown>
       const itemId = rowId(itemRow)
       const prog = employeeProgress.find(
-        (p) =>
-          rowNum(p as Record<string, unknown>, "templateItemId", "template_item_id") === itemId,
+        (p) => rowNum(p as Record<string, unknown>, "templateItemId", "template_item_id") === itemId,
       ) as Record<string, unknown> | undefined
       return { item: itemRow, prog }
     })
@@ -97,7 +85,7 @@ export function HrOnboardingPanel({
     try {
       await fn()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed")
+      setError(e instanceof Error ? e.message : t("hr.onboarding.actionFailed", { defaultValue: "Action failed" }))
     }
   }
 
@@ -105,19 +93,31 @@ export function HrOnboardingPanel({
     return (
       <div className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          No onboarding checklist assigned. Choose a template to start hire onboarding.
+          {t("hr.onboarding.unassigned", {
+            defaultValue: "No onboarding checklist assigned. Choose a template to start hire onboarding.",
+          })}
         </p>
         <div className="flex flex-wrap items-end gap-2">
           <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
             <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Select template" />
+              <SelectValue
+                placeholder={t("hr.onboarding.selectTemplate", {
+                  defaultValue: "Select template",
+                })}
+              />
             </SelectTrigger>
             <SelectContent>
               {(templates as QueryRows).map((tpl) => {
                 const row = tpl as Record<string, unknown>
                 return (
                   <SelectItem key={String(row.id)} value={String(row.id)}>
-                    {String(row.name ?? `Template ${String(row.id)}`)}
+                    {String(
+                      row.name ??
+                        t("hr.onboarding.templateFallback", {
+                          defaultValue: "Template {{id}}",
+                          id: String(row.id),
+                        }),
+                    )}
                   </SelectItem>
                 )
               })}
@@ -135,7 +135,9 @@ export function HrOnboardingPanel({
               )
             }
           >
-            Assign template
+            {t("hr.onboarding.assignTemplate", {
+              defaultValue: "Assign template",
+            })}
           </Button>
         </div>
         {error ? (
@@ -151,8 +153,14 @@ export function HrOnboardingPanel({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm">
-          Status:{" "}
-          <span className="font-medium">{isDone ? "Complete" : "In progress"}</span>
+          {t("hr.onboarding.statusLabel", { defaultValue: "Status:" })}{" "}
+          <span className="font-medium">
+            {isDone
+              ? t("hr.onboarding.status.complete", { defaultValue: "Complete" })
+              : t("hr.onboarding.status.inProgress", {
+                  defaultValue: "In progress",
+                })}
+          </span>
         </p>
         {!isDone ? (
           <Button
@@ -161,30 +169,36 @@ export function HrOnboardingPanel({
             disabled={markDone.isPending}
             onClick={() => void run(() => markDone.mutateAsync(employeeId))}
           >
-            Mark onboarding done
+            {t("hr.onboarding.markDone", {
+              defaultValue: "Mark onboarding done",
+            })}
           </Button>
         ) : null}
       </div>
       <ul className="space-y-2">
         {itemProgress.map(({ item, prog }) => {
           const itemId = rowId(item)
-          const title = String(item.title ?? item.name ?? `Item ${itemId}`)
+          const title = String(
+            item.title ??
+              item.name ??
+              t("hr.onboarding.itemFallback", {
+                defaultValue: "Item {{id}}",
+                id: itemId,
+              }),
+          )
           const required = Boolean(item.required)
           const complete =
             String(prog?.status ?? prog?.Status ?? "") === "complete" ||
             prog?.completedAt != null ||
             prog?.completed_at != null
           return (
-            <li
-              key={itemId}
-              className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
-            >
+            <li key={itemId} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
               <span>
                 {title}
                 {required ? " *" : ""}
               </span>
               {complete ? (
-                <span className="text-muted-foreground">Done</span>
+                <span className="text-muted-foreground">{t("hr.onboarding.itemDone", { defaultValue: "Done" })}</span>
               ) : (
                 <Button
                   size="sm"
@@ -192,11 +206,16 @@ export function HrOnboardingPanel({
                   disabled={isDone || completeItem.isPending}
                   onClick={() =>
                     void run(() =>
-                      completeItem.mutateAsync({ employeeId, templateItemId: itemId }),
+                      completeItem.mutateAsync({
+                        employeeId,
+                        templateItemId: itemId,
+                      }),
                     )
                   }
                 >
-                  Complete
+                  {t("hr.onboarding.completeItem", {
+                    defaultValue: "Complete",
+                  })}
                 </Button>
               )}
             </li>

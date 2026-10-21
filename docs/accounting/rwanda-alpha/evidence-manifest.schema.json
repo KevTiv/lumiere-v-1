@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumiere.invalid/schemas/rwanda-accounting-alpha-evidence-v1.json",
+  "title": "Rwanda accounting alpha rehearsal evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "run", "technical", "controlTotals", "roleChecks", "manualChecks", "signoffs", "countryPack", "exceptions", "decisions"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "executedAt", "cutoverDate", "tenantRef", "companyId", "isolatedTenantAcknowledged", "migrationMode", "operator", "release"],
+      "properties": {
+        "runId": { "$ref": "#/$defs/nonEmpty" },
+        "executedAt": { "type": "string", "format": "date-time" },
+        "cutoverDate": { "type": "string", "format": "date" },
+        "tenantRef": { "$ref": "#/$defs/nonEmpty" },
+        "companyId": { "type": "integer", "minimum": 1 },
+        "isolatedTenantAcknowledged": { "const": true },
+        "migrationMode": { "enum": ["residual_only", "original_total_with_payment_replay"] },
+        "operator": { "$ref": "#/$defs/person" },
+        "release": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["commit", "contractVersion", "moduleVersion"],
+          "properties": {
+            "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+            "contractVersion": { "$ref": "#/$defs/nonEmpty" },
+            "moduleVersion": { "$ref": "#/$defs/nonEmpty" }
+          }
+        }
+      }
+    },
+    "technical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkpoints", "companionSpecs"],
+      "properties": {
+        "checkpoints": { "type": "array", "minItems": 8, "maxItems": 8, "items": { "$ref": "#/$defs/check" } },
+        "companionSpecs": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/namedCheck" } }
+      }
+    },
+    "controlTotals": { "type": "array", "minItems": 7, "maxItems": 7, "items": { "$ref": "#/$defs/controlTotal" } },
+    "roleChecks": { "type": "array", "minItems": 3, "maxItems": 3, "items": { "$ref": "#/$defs/namedCheck" } },
+    "manualChecks": { "type": "array", "minItems": 7, "maxItems": 7, "items": { "$ref": "#/$defs/manualCheck" } },
+    "signoffs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["alphaUser", "accountant", "legal", "tax", "rraVsdc"],
+      "properties": {
+        "alphaUser": { "$ref": "#/$defs/humanSignoff" },
+        "accountant": { "$ref": "#/$defs/humanSignoff" },
+        "legal": { "$ref": "#/$defs/professionalSignoff" },
+        "tax": { "$ref": "#/$defs/professionalSignoff" },
+        "rraVsdc": { "$ref": "#/$defs/rraSignoff" }
+      }
+    },
+    "countryPack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packKey", "version", "acceptanceStatus", "enabled"],
+      "properties": {
+        "packKey": { "const": "rw" },
+        "version": { "$ref": "#/$defs/nonEmpty" },
+        "acceptanceStatus": { "enum": ["review_required", "accepted"] },
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "exceptions": { "type": "array", "items": { "$ref": "#/$defs/exception" } },
+    "decisions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationalAlpha", "statutoryUse"],
+      "properties": {
+        "operationalAlpha": { "enum": ["pass", "fail"] },
+        "statutoryUse": { "enum": ["pass", "fail"] }
+      }
+    }
+  },
+  "$defs": {
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "person": {
+      "type": "object", "additionalProperties": false, "required": ["name", "email"],
+      "properties": { "name": { "$ref": "#/$defs/nonEmpty" }, "email": { "type": "string", "format": "email" } }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false, "required": ["path", "sha256", "runId", "releaseCommit", "cutoverDate"],
+      "properties": {
+        "path": { "$ref": "#/$defs/nonEmpty" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "runId": { "$ref": "#/$defs/nonEmpty" },
+        "releaseCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "cutoverDate": { "type": "string", "format": "date" }
+      }
+    },
+    "check": {
+      "type": "object", "additionalProperties": false, "required": ["id", "status"],
+      "properties": { "id": { "type": "integer", "minimum": 1, "maximum": 8 }, "status": { "enum": ["pass", "not_applicable"] }, "reason": { "$ref": "#/$defs/nonEmpty" }, "evidence": { "$ref": "#/$defs/evidence" } }
+    },
+    "namedCheck": {
+      "type": "object", "additionalProperties": false, "required": ["name", "status", "evidence"],
+      "properties": { "name": { "$ref": "#/$defs/nonEmpty" }, "status": { "enum": ["pass", "fail"] }, "evidence": { "$ref": "#/$defs/evidence" } }
+    },
+    "manualCheck": {
+      "type": "object", "additionalProperties": false, "required": ["id", "status", "reviewedBy", "evidence"],
+      "properties": { "id": { "type": "integer", "minimum": 1, "maximum": 7 }, "status": { "enum": ["pass", "fail"] }, "reviewedBy": { "$ref": "#/$defs/nonEmpty" }, "evidence": { "$ref": "#/$defs/evidence" } }
+    },
+    "controlTotal": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "asOfDate", "currency", "sourceAmount", "lumiereAmount", "difference", "tolerance", "status", "reviewedBy", "evidence"],
+      "properties": {
+        "name": { "enum": ["trial_balance_debits", "trial_balance_credits", "receivables_aging", "payables_aging", "tax_control", "bank_and_cash", "retained_earnings"] },
+        "asOfDate": { "type": "string", "format": "date" }, "currency": { "const": "RWF" },
+        "sourceAmount": { "type": "number" }, "lumiereAmount": { "type": "number" }, "difference": { "type": "number" }, "tolerance": { "const": 0 },
+        "status": { "enum": ["pass", "fail"] }, "reviewedBy": { "$ref": "#/$defs/nonEmpty" }, "evidence": { "$ref": "#/$defs/evidence" }
+      }
+    },
+    "humanSignoff": {
+      "type": "object", "additionalProperties": false, "required": ["decision", "name", "role"],
+      "properties": { "decision": { "enum": ["accepted", "rejected", "pending"] }, "name": { "$ref": "#/$defs/nonEmpty" }, "role": { "$ref": "#/$defs/nonEmpty" }, "signedAt": { "type": "string", "format": "date-time" }, "runId": { "$ref": "#/$defs/nonEmpty" }, "releaseCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }, "cutoverDate": { "type": "string", "format": "date" }, "evidence": { "$ref": "#/$defs/evidence" } },
+      "allOf": [{ "if": { "properties": { "decision": { "const": "accepted" } } }, "then": { "required": ["signedAt", "runId", "releaseCommit", "cutoverDate", "evidence"] } }]
+    },
+    "professionalSignoff": {
+      "type": "object", "additionalProperties": false, "required": ["decision", "name", "qualification", "rulesetVersion"],
+      "properties": { "decision": { "enum": ["approved", "rejected", "pending"] }, "name": { "$ref": "#/$defs/nonEmpty" }, "qualification": { "$ref": "#/$defs/nonEmpty" }, "rulesetVersion": { "$ref": "#/$defs/nonEmpty" }, "signedAt": { "type": "string", "format": "date-time" }, "evidence": { "$ref": "#/$defs/evidence" } }
+    },
+    "rraSignoff": {
+      "type": "object", "additionalProperties": false, "required": ["status"],
+      "properties": { "status": { "enum": ["certified", "not_certified", "pending"] }, "certificateReference": { "$ref": "#/$defs/nonEmpty" }, "validFrom": { "type": "string", "format": "date" }, "validTo": { "type": "string", "format": "date" }, "evidence": { "$ref": "#/$defs/evidence" } }
+    },
+    "exception": {
+      "type": "object", "additionalProperties": false, "required": ["id", "severity", "status", "description"],
+      "properties": { "id": { "$ref": "#/$defs/nonEmpty" }, "severity": { "enum": ["low", "medium", "high", "critical"] }, "status": { "enum": ["open", "closed"] }, "description": { "$ref": "#/$defs/nonEmpty" }, "owner": { "type": "string" }, "workaround": { "type": "string" }, "targetRelease": { "type": "string" } }
+    }
+  }
+}

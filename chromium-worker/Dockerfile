@@ -5,6 +5,7 @@ RUN apt-get update \
     chromium \
     ca-certificates \
     fonts-liberation \
+    fonts-noto-core \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

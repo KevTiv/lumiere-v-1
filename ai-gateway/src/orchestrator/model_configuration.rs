@@ -547,8 +547,8 @@ fn decode_profile(row: &Value) -> Result<ModelProfile> {
         supports_tool_calling: row_bool(row, "supportsToolCalling").unwrap_or(false),
         supports_structured_output: row_bool(row, "supportsStructuredOutput").unwrap_or(false),
         supports_parallel_requests: row_bool(row, "supportsParallelRequests").unwrap_or(false),
-        input_cost_per_1k_microunits: row_u64(row, "inputCostPer1kMicrounits"),
-        output_cost_per_1k_microunits: row_u64(row, "outputCostPer1kMicrounits"),
+        input_cost_per_1k_microunits: row_u64(row, "inputCostPer1KMicrounits"),
+        output_cost_per_1k_microunits: row_u64(row, "outputCostPer1KMicrounits"),
         per_request_cost_ceiling_microunits: row_u64(row, "perRequestCostCeilingMicrounits"),
     };
     Ok(profile)
@@ -827,6 +827,23 @@ mod tests {
             output_cost_per_1k_microunits: None,
             per_request_cost_ceiling_microunits: None,
         }
+    }
+
+    #[test]
+    fn decodes_generated_1_k_cost_field_names() {
+        let decoded = decode_profile(&serde_json::json!({
+            "profileKey": "generation",
+            "profileVersion": 1,
+            "provider": "ollama",
+            "model": "gemma4:e2b-mlx",
+            "allowedRoles": ["generation"],
+            "inputCostPer1KMicrounits": 125,
+            "outputCostPer1KMicrounits": 375
+        }))
+        .unwrap();
+
+        assert_eq!(decoded.input_cost_per_1k_microunits, Some(125));
+        assert_eq!(decoded.output_cost_per_1k_microunits, Some(375));
     }
 
     fn policy() -> IntelligencePolicy {

@@ -1,5 +1,5 @@
-name: Setup contracts SSH
-description: Configure read-only SSH for the private lumiere-contracts git dependency
+name: Prepare contracts and SSH
+description: Materialize the verified contracts release and configure repository access for publishing jobs
 
 inputs:
   deploy-key:
@@ -9,9 +9,13 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Prepare checksum-verified contracts release
+      shell: bash
+      run: bash scripts/prepare-vendored-contracts-rust.sh
+
     # Generated STDB bindings + manifests live in the private
-    # KevTiv/lumiere-contracts repo, consumed as a tag-pinned git
-    # dependency. This runner needs read-only SSH access to fetch it. The
+    # KevTiv/lumiere-contracts repo. Release jobs need SSH access to inspect
+    # and publish it; application Cargo builds use the vendored path. The
     # deploy key on lumiere-contracts is read-only, so a compromised
     # secret here cannot write to that repo. github.com's SSH host key is
     # pinned to the value GitHub publishes rather than trusted on first

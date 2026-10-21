@@ -5,13 +5,18 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 #[derive(Debug, Deserialize, Clone)]
-struct TimerRow {
-    id: u64,
+pub(super) struct TimerRow {
+    pub(super) id: u64,
+    #[serde(alias = "organizationId")]
+    pub(super) organization_id: u64,
     #[serde(alias = "companyId")]
-    company_id: u64,
-    revision: u64,
-    #[serde(alias = "workflowInstanceId")]
-    workflow_instance_id: u64,
+    pub(super) company_id: u64,
+    pub(super) revision: u64,
+    #[serde(alias = "instanceId")]
+    pub(super) instance_id: u64,
+    pub(super) status: String,
+    #[serde(alias = "dueAt")]
+    pub(super) due_at: Value,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -19,30 +24,31 @@ struct InstanceRow {
     revision: u64,
 }
 
-pub(super) async fn fire_due_timers(service: &ScheduledService) -> anyhow::Result<()> {
+pub(super) async fn fire_due_timers(
+    source_stdb: &stdb_client::StdbClient,
+    service: &ScheduledService,
+) -> anyhow::Result<()> {
     let organization_id = service.organization_id();
-    let rows = service
-        .client()
+    let rows = source_stdb
         .query_sql(&format!(
-            "SELECT id, organization_id, company_id, revision, workflow_instance_id, due_at \
-             FROM workflow_timer WHERE organization_id = {organization_id} \
-             AND status = 'Pending' LIMIT {BATCH_SIZE}"
+            "SELECT id, organization_id, company_id, revision, instance_id, due_at, status \
+             FROM workflow_timer WHERE organization_id = {organization_id}"
         ))
         .await?;
     let now = now_micros();
+    let mut timers = Vec::with_capacity(rows.len());
     for row in rows {
-        let due_at = timestamp_micros(&row, "dueAt", "due_at").unwrap_or(u64::MAX);
-        if !timer_is_due(due_at, now) {
-            continue;
-        }
-        let timer: TimerRow = match serde_json::from_value(row) {
+        let timer = match serde_json::from_value::<TimerRow>(row) {
             Ok(t) => t,
             Err(error) => {
                 tracing::warn!(%error, "skip malformed workflow_timer row");
                 continue;
             }
         };
-        let instance_revision = instance_revision(service.client(), timer.workflow_instance_id)
+        timers.push(timer);
+    }
+    for timer in select_due_timers(timers, organization_id, now) {
+        let instance_revision = instance_revision(source_stdb, timer.instance_id)
             .await
             .unwrap_or(0);
         let idem = timer_fire_idempotency_key(timer.id, timer.revision);
@@ -68,6 +74,22 @@ pub(super) async fn fire_due_timers(service: &ScheduledService) -> anyhow::Resul
         }
     }
     Ok(())
+}
+
+pub(super) fn select_due_timers(
+    mut rows: Vec<TimerRow>,
+    organization_id: u64,
+    now_micros: u64,
+) -> Vec<TimerRow> {
+    rows.retain(|row| {
+        row.organization_id == organization_id
+            && row.status == "Pending"
+            && timestamp_value_micros(&row.due_at)
+                .is_some_and(|due_at| timer_is_due(due_at, now_micros))
+    });
+    rows.sort_by_key(|row| (timestamp_value_micros(&row.due_at), row.id));
+    rows.truncate(BATCH_SIZE);
+    rows
 }
 
 pub(super) async fn instance_revision(
@@ -96,8 +118,7 @@ pub(super) fn timer_fire_idempotency_key(timer_id: u64, revision: u64) -> String
     format!("timer-fire:{timer_id}:{revision}")
 }
 
-fn timestamp_micros(row: &Value, camel: &str, snake: &str) -> Option<u64> {
-    let value = row.get(camel).or_else(|| row.get(snake))?;
+fn timestamp_value_micros(value: &Value) -> Option<u64> {
     if let Some(micros) = value.as_u64() {
         return Some(micros);
     }

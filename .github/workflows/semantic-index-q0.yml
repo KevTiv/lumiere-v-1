@@ -55,9 +55,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: ./.github/actions/setup-contracts-ssh
-        with:
-          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
+      - uses: ./.github/actions/prepare-contracts
 
       - uses: Swatinem/rust-cache@v2
         with:
@@ -91,15 +89,15 @@ jobs:
   frontend-contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
     defaults:
       run:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
 
-      - uses: ./.github/actions/setup-contracts-ssh
-        with:
-          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
+      - uses: ./.github/actions/prepare-contracts
 
       - uses: ./.github/actions/setup-frontend
 
@@ -110,4 +108,6 @@ jobs:
         run: pnpm --dir web test:unit
 
       - name: Frontend typecheck
-        run: pnpm --filter ./web exec tsc --noEmit
+        # This job has no incremental-state cache. Check the full project without
+        # retaining build metadata on each cold checkout; CI owns the cached check.
+        run: pnpm --filter ./web exec tsc --noEmit --incremental false

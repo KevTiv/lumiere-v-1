@@ -12,6 +12,7 @@ import {
 } from "lucide-react"
 
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
   assignContactRoleForm,
   contactIdentityForm,
@@ -133,6 +134,7 @@ export function ContactIdentitiesPanel({
   companyId,
 }: ContactIdentitiesPanelProps) {
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const organization = BigInt(organizationId)
   const { data: identityRows = [], isLoading: identitiesLoading } = useContactPhoneIdentities(organization)
   const { data: roleRows = [], isLoading: rolesLoading } = useContactRoleAssignments(organization)
@@ -235,7 +237,8 @@ export function ContactIdentitiesPanel({
 
   const archive = async (row: Row) => {
     const id = rowId(row)
-    if (id == null || !window.confirm("Archive this phone identity? It will remain in the audit history.")) return
+    if (id == null) return
+    if (!(await confirmDialog({ description: "Archive this phone identity? It will remain in the audit history." }))) return
     try {
       setActionError(null)
       await archiveIdentity.mutateAsync(id)
@@ -407,6 +410,7 @@ export function ContactIdentitiesPanel({
         submitError={endRoleFormError}
         onSubmit={finishRole}
       />
+      {confirmDialogNode}
     </div>
   )
 }

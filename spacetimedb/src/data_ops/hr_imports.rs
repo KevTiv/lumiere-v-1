@@ -4,7 +4,10 @@
 use spacetimedb::{ReducerContext, Table};
 
 use crate::data_ops::helpers::*;
-use crate::data_ops::import_tracker::{begin_import_job, finish_import_job, record_import_error};
+use crate::data_ops::import_tracker::{
+    begin_import_job, finish_import_job, import_content_sha256, record_import_error,
+    reject_committed_import_replay, stamp_import_sha256,
+};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::contracts::{hr_contract, HrContract};
 use crate::hr::employees::{
@@ -699,12 +702,43 @@ pub fn import_hr_payslip_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "hr_payroll", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
+    for required in ["employee_id", "struct_id"] {
+        if !headers.iter().any(|header| header == required) {
+            return Err(format!("CSV is missing required header '{required}'"));
+        }
+    }
+    for (index, header) in headers.iter().enumerate() {
+        if header.is_empty() {
+            return Err("CSV contains an empty header".to_string());
+        }
+        if headers[..index].contains(header) {
+            return Err(format!("CSV contains duplicate header '{header}'"));
+        }
+    }
+    if rows.is_empty() {
+        return Err("CSV contains no data rows".to_string());
+    }
+    let sha256 = import_content_sha256(&csv_data);
+    reject_committed_import_replay(ctx, organization_id, "hr_payslip", &sha256)?;
     let job = begin_import_job(ctx, organization_id, "hr_payslip", None, rows.len() as u32);
+    let job = stamp_import_sha256(ctx, job, &sha256);
     let mut imported = 0u32;
     let mut errors = 0u32;
 
     for (i, row) in rows.iter().enumerate() {
         let row_num = (i + 2) as u32;
+        if row.len() != headers.len() {
+            record_import_error(
+                ctx,
+                job.id,
+                row_num,
+                None,
+                None,
+                "row column count does not match the header; quote values containing commas",
+            );
+            errors += 1;
+            continue;
+        }
         let employee_id = parse_u64(col(&headers, row, "employee_id"));
 
         if employee_id == 0 {
@@ -743,7 +777,40 @@ pub fn import_hr_payslip_csv(
                 n
             }
         };
-        let basic_wage = parse_f64(col(&headers, row, "basic_wage"));
+        let basic_wage_raw = col(&headers, row, "basic_wage");
+        let basic_wage = match parse_import_money(basic_wage_raw) {
+            Ok(value) => value.unwrap_or(0.0),
+            Err(message) => {
+                record_import_error(
+                    ctx,
+                    job.id,
+                    row_num,
+                    Some("basic_wage"),
+                    Some(basic_wage_raw),
+                    message,
+                );
+                errors += 1;
+                continue;
+            }
+        };
+        let gross_wage = match parse_import_money(col(&headers, row, "gross_wage")) {
+            Ok(value) => value.filter(|amount| *amount != 0.0).unwrap_or(basic_wage),
+            Err(message) => {
+                let raw = col(&headers, row, "gross_wage");
+                record_import_error(ctx, job.id, row_num, Some("gross_wage"), Some(raw), message);
+                errors += 1;
+                continue;
+            }
+        };
+        let net_wage = match parse_import_money(col(&headers, row, "net_wage")) {
+            Ok(value) => value.filter(|amount| *amount != 0.0).unwrap_or(basic_wage),
+            Err(message) => {
+                let raw = col(&headers, row, "net_wage");
+                record_import_error(ctx, job.id, row_num, Some("net_wage"), Some(raw), message);
+                errors += 1;
+                continue;
+            }
+        };
         let state_raw = col(&headers, row, "state").trim().to_lowercase();
         if !state_raw.is_empty() && state_raw != "draft" {
             record_import_error(
@@ -770,22 +837,8 @@ pub fn import_hr_payslip_csv(
             date_from: opt_timestamp(col(&headers, row, "date_from")).unwrap_or(ctx.timestamp),
             date_to: opt_timestamp(col(&headers, row, "date_to")).unwrap_or(ctx.timestamp),
             basic_wage,
-            gross_wage: {
-                let g = parse_f64(col(&headers, row, "gross_wage"));
-                if g == 0.0 {
-                    basic_wage
-                } else {
-                    g
-                }
-            },
-            net_wage: {
-                let n = parse_f64(col(&headers, row, "net_wage"));
-                if n == 0.0 {
-                    basic_wage
-                } else {
-                    n
-                }
-            },
+            gross_wage,
+            net_wage,
             state: PayslipState::Draft,
             calculation_source: opt_str(col(&headers, row, "calculation_source")),
             calculation_metadata: opt_str(col(&headers, row, "calculation_metadata")),
@@ -826,4 +879,25 @@ pub fn import_hr_payslip_csv(
         errors
     );
     Ok(())
+}
+
+/// Import money is deliberately locale-neutral. Accepting commas here would
+/// make `1,234` ambiguous between a decimal and a thousands separator and can
+/// also shift columns in an unquoted CSV row. Callers must export a dot-decimal
+/// value without grouping separators.
+fn parse_import_money(raw: &str) -> Result<Option<f64>, &'static str> {
+    let value = raw.trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    if value.contains(',') {
+        return Err("use dot-decimal numbers without locale grouping separators");
+    }
+    let parsed = value
+        .parse::<f64>()
+        .map_err(|_| "must be a valid dot-decimal number")?;
+    if !parsed.is_finite() {
+        return Err("must be a finite number");
+    }
+    Ok(Some(parsed))
 }

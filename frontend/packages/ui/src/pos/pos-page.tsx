@@ -434,7 +434,7 @@ export function POSPage({
               Operations
             </p>
             <Badge variant="outline" className="text-[10px]">
-              {terminals.length} terminals
+              {terminals.length} {terminals.length === 1 ? "terminal" : "terminals"}
             </Badge>
           </div>
           <div className="grid grid-cols-2 gap-1.5">

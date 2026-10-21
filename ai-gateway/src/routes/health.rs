@@ -29,8 +29,9 @@ pub async fn health_ready(State(state): State<AppState>) -> impl IntoResponse {
 async fn dependency_probe(state: &AppState) -> anyhow::Result<()> {
     state
         .stdb
-        .query_sql("SELECT 1")
+        .authenticated_identity()
         .await
+        .map(|_| ())
         .map_err(|error| anyhow::anyhow!("SpacetimeDB readiness probe failed: {error}"))?;
     state.vector_store.check_ready().await?;
     crate::providers::check_readiness(&state.config, &state.http).await?;

@@ -212,7 +212,7 @@ fn validate_scheduled_operation_scope(
 
 /// Start a bounded polling worker and its internal health endpoint.
 pub async fn serve(spec: IntegrationWorkerSpec) -> anyhow::Result<()> {
-    let config = Config::from_worker_env()?;
+    let config = Config::from_nonreporting_worker_env()?;
     let token_env = format!("STDB_{}_WORKER_TOKEN", spec.env_prefix);
     let worker_token = config.require_dedicated_worker_token(&token_env)?;
     let port = std::env::var(format!("LUMIERE_{}_WORKER_PORT", spec.env_prefix))

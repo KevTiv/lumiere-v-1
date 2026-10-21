@@ -47,6 +47,7 @@ import {
 import type { Role, Resource, Action } from "@/lib/rbac-types"
 import { cn } from "@/lib/utils"
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { rolePillClassForColor, roleSwatchClass } from "@/lib/theme-colors"
 import { FieldPermissionsEditor } from "./field-permissions-editor"
 
@@ -61,6 +62,7 @@ const roleColors = [
 
 export function RoleManagement() {
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { organizationId } = useErpSession()
   const orgReady = hasValidOrganizationId(organizationId)
   const orgBigInt = orgReady ? BigInt(organizationId) : 0n
@@ -82,6 +84,7 @@ export function RoleManagement() {
   const [selectedPermissions, setSelectedPermissions] = useState<Map<string, Set<Action>>>(new Map())
   const [selectedColor, setSelectedColor] = useState<Role["color"]>("blue")
   const [isSaving, setIsSaving] = useState(false)
+  const [roleError, setRoleError] = useState<string | null>(null)
 
   const canEdit = checkPermission("admin:roles", "update").allowed
 
@@ -195,8 +198,9 @@ export function RoleManagement() {
           roleId: editingRole.id,
           params: {
             name,
-            description: description || null,
+            description,
             permissions: permissionStrings,
+            metadata,
           },
         })
       } else {
@@ -212,21 +216,26 @@ export function RoleManagement() {
       await refetch()
       setIsDialogOpen(false)
     } catch (error) {
-      console.error(error)
-      alert(t("settings.formConfig.fieldUpdateError"))
+      setRoleError(error instanceof Error ? error.message : t("settings.formConfig.fieldUpdateError"))
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleDeleteRole = (roleId: string) => {
+  const handleDeleteRole = async (roleId: string) => {
     const role = roles.find(r => r.id === roleId)
     if (role?.isSystem) {
       alert(t("settings.roles.systemCannotDelete"))
       return
     }
-    if (confirm(t("settings.roles.deleteConfirm"))) {
-      alert(t("settings.formConfig.fieldDeleteError"))
+    if (await confirmDialog({ description: t("settings.roles.deleteConfirm") })) {
+      setRoleError(null)
+      try {
+        await updateRole.mutateAsync({ roleId, params: { isActive: false } })
+        await refetch()
+      } catch (error) {
+        setRoleError(error instanceof Error ? error.message : t("settings.formConfig.fieldDeleteError"))
+      }
     }
   }
 
@@ -242,6 +251,7 @@ export function RoleManagement() {
 
   return (
     <div className="space-y-6">
+      {roleError && <p role="alert" className="text-sm text-destructive">{roleError}</p>}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-medium">{t("settings.roles.title")}</h3>
@@ -526,6 +536,7 @@ export function RoleManagement() {
               />
             ) : null}
 
+            {roleError && <p role="alert" className="text-sm text-destructive">{roleError}</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}
@@ -604,6 +615,7 @@ export function RoleManagement() {
           </DialogContent>
         </Dialog>
       ) : null}
+      {confirmDialogNode}
     </div>
   )
 }

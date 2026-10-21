@@ -298,7 +298,9 @@ export function useCreateEmployee(organizationId: bigint, companyId?: bigint) {
         ...params,
         companyId: params.companyId ?? companyId,
       })
-      const { urlPath, init } = stdbBffCommandPost("create_employee", { params: stdbParamsToJson(finalized) })
+      const { urlPath, init } = stdbBffCommandPost("create_employee", {
+        params: stdbParamsToJson(finalized, "CreateEmployeeParams"),
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create employee')

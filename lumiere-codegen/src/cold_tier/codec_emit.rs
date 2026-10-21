@@ -262,7 +262,7 @@ fn is_durable_json_column(table: &str, column: &str) -> bool {
 
 /// Resolve deliberate durable-store overrides before falling back to the
 /// canonical SpacetimeDB-to-PostgreSQL type mapping.
-pub(super) fn durable_pg_type<'a>(table: &str, column: &str, ty: &'a GeneratedType) -> &'a str {
+pub(crate) fn durable_pg_type<'a>(table: &str, column: &str, ty: &'a GeneratedType) -> &'a str {
     if is_durable_json_column(table, column) {
         "JSONB"
     } else {

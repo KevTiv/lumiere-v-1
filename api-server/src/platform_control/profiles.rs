@@ -4,6 +4,64 @@ use super::{PlatformId, UserProfile};
 use anyhow::{Context, Result};
 use deadpool_postgres::Pool;
 
+/// Apply an operator-approved address change for the same verified provider subject.
+pub async fn sync_workos_email(
+    pool: &Pool,
+    id: &PlatformId,
+    subject: &str,
+    email: &str,
+    organizations: &[i64],
+) -> Result<bool> {
+    let mut client = pool.get().await?;
+    let tx = client.transaction().await?;
+    let credential = tx.execute("UPDATE lumiere_platform.user_credential SET email=$3,email_verified=true,updated_at=now() WHERE platform_user_id=$1 AND workos_user_id=$2", &[&id.as_str(), &subject, &email]).await?;
+    let profile = tx.execute("UPDATE lumiere_platform.user_profile SET email=$2,email_verified=true,updated_at=now() WHERE platform_user_id=$1 AND is_active=true", &[&id.as_str(), &email]).await?;
+    if credential != 1 || profile != 1 {
+        tx.rollback().await?;
+        return Ok(false);
+    }
+    tx.execute("INSERT INTO lumiere_platform.profile_projection_pending (platform_user_id,organization_id) SELECT $1,unnest($2::bigint[]) ON CONFLICT (platform_user_id,organization_id) DO UPDATE SET revision=profile_projection_pending.revision+1", &[&id.as_str(), &organizations]).await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
+/// Save a self-service patch and its projection work in one PostgreSQL transaction.
+#[allow(clippy::too_many_arguments)]
+pub async fn save_profile_patch(
+    pool: &Pool,
+    id: &PlatformId,
+    organizations: &[i64],
+    email: Option<&str>,
+    name: Option<&str>,
+    first_name: Option<&str>,
+    last_name: Option<&str>,
+    timezone: Option<&str>,
+    language: Option<&str>,
+) -> Result<bool> {
+    let mut client = pool.get().await?;
+    let tx = client.transaction().await?;
+    let count = tx.execute(
+        "UPDATE lumiere_platform.user_profile SET name=COALESCE($2,name), first_name=COALESCE($3,first_name), last_name=COALESCE($4,last_name), timezone=COALESCE($5,timezone), language=COALESCE($6,language), updated_at=now() WHERE platform_user_id=$1",
+        &[&id.as_str(), &name, &first_name, &last_name, &timezone, &language],
+    ).await?;
+    if count != 1 {
+        tx.rollback().await?;
+        return Ok(false);
+    }
+    if let Some(email) = email {
+        if tx.execute("UPDATE lumiere_platform.user_credential SET email=$2,email_verified=false,updated_at=now() WHERE platform_user_id=$1", &[&id.as_str(), &email]).await? != 1 {
+            anyhow::bail!("profile credential is missing");
+        }
+        tx.execute("UPDATE lumiere_platform.user_profile SET email=$2,email_verified=false WHERE platform_user_id=$1", &[&id.as_str(), &email]).await?;
+    }
+    tx.execute(
+        "INSERT INTO lumiere_platform.profile_projection_pending (platform_user_id,organization_id) SELECT $1,unnest($2::bigint[]) ON CONFLICT (platform_user_id,organization_id) DO UPDATE SET revision=profile_projection_pending.revision+1",
+        &[&id.as_str(), &organizations],
+    ).await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
 /// Look up a profile by its opaque platform key.
 pub async fn find_user_profile_by_platform_id(
     pool: &Pool,

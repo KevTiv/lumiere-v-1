@@ -5,6 +5,13 @@ import type { ImportAnalyzeResponse } from "@lumiere/query-hooks/hooks/ai-import
 
 import { Badge } from "../components/badge"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/select"
+import {
   Table,
   TableBody,
   TableCell,
@@ -73,20 +80,24 @@ export function ImportMappingTable({
               <TableRow key={header}>
                 <TableCell className="font-medium">{header}</TableCell>
                 <TableCell>
-                  <select
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                  <Select
                     value={mapping[header] ?? SKIP_VALUE}
-                    onChange={(e) =>
-                      onMappingChange({ ...mapping, [header]: e.target.value })
+                    onValueChange={(value) =>
+                      onMappingChange({ ...mapping, [header]: value })
                     }
                   >
-                    <option value={SKIP_VALUE}>{t("common.importAssistant.skipColumn")}</option>
-                    {targetFieldOptions.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={SKIP_VALUE}>{t("common.importAssistant.skipColumn")}</SelectItem>
+                      {targetFieldOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </TableCell>
                 <TableCell>{confidenceBadge(suggested?.confidence)}</TableCell>
               </TableRow>

@@ -176,11 +176,11 @@ Definitions:
 |-----------|-------------------|----------|------------------------|
 | Operational vehicle linked to FA when capitalized | **No** | No FK | `fleet_vehicle.account_asset_id` (or reverse) required for owned assets; lease flag for non-owned |
 | Acquisition cost from purchasing → FA → fleet | **No** | Modules disconnected | Capitalize from bill/receipt; create FA + vehicle in one txn or explicit follow-on with audit |
-| Fuel/maintenance/toll costs post to correct expense/analytic | **No** | No fleet cost rows | Cost documents with `vehicle_id` + optional `account_move_id`; period lock |
+| Fuel/maintenance/toll costs post to correct expense/analytic | **Partial — maintenance service cost implemented** | `FleetServiceRecord.cost_amount/currency_id/account_move_id`; `record_fleet_service` posts a balanced standard Entry | Fuel/toll documents, analytic allocation and fuel-card ingestion remain |
 | Disposal of FA retires operational assignment | **No** | FA dispose independent | Block Active dispatch when FA Removed/Close; clear assignment |
 | Depreciation unaffected by GPS noise | **Yes** (by isolation) | FA separate | Keep telemetry out of FA tables |
 | Multicurrency fuel in regional ops | **No** | — | FX snapshot on fuel/expense docs (reuse expenses pattern) |
-| Period locks on cost postings | **No** (fleet) | — | Shared `ensure_accounting_period_open` |
+| Period locks on cost postings | **Yes for service costs** | Fleet cost uses `post_account_move`, which enforces the shared accounting-period lock; Fleet native test proves atomic rollback | Extend the same invariant to future fuel/toll cost documents |
 
 ### Authorization
 
@@ -197,7 +197,7 @@ Definitions:
 |-----------|-------------------|----------|------------------------|
 | Mutation audit | Yes | CREATE/UPDATE on vehicle/position | Do **not** audit every GPS sample — audit status/assignment/cost events; sample refs in metadata |
 | Assignment / inspection history | **No** | — | Append-only assignment + inspection event tables |
-| Source links cost → JE | **No** | — | Store `account_move_id` on cost docs |
+| Source links cost → JE | **Present for service costs** | `fleet_service_record.account_move_id` points to the Posted Entry; currency is persisted from that move | Extend direct linkage to future fuel/toll/maintenance-WO cost documents |
 
 ### Concurrency / integrity / scale
 
@@ -223,7 +223,7 @@ SpacetimeDB atomicity model: each reducer runs in one transaction that commits o
 6. **Pre-trip inspection** (offline-capable) — Absent.
 7. **Dispatch trip / long-haul route** — Absent.
 8. **Fuel / energy purchase** → cost + optional inventory — Absent (expense mileage adjacent only).
-9. **Maintenance WO** → parts from inventory → cost — Absent.
+9. **Maintenance WO** → parts from inventory → cost — **Partial**: direct service-cost records now post and link a balanced GL Entry; maintenance work orders, parts consumption and labour roll-up remain absent.
 10. **Incident / claim** — Absent.
 11. **Utilisation / TCO report** with drill-down to GL — Absent.
 12. **Transfer multi-entity** (company A → B) with FA history — Absent.

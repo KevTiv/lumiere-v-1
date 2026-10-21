@@ -136,7 +136,7 @@ fn require_split_stdb_tokens(
 
 /// Start the standalone projection worker service.
 pub async fn serve() -> Result<()> {
-    let config = Config::from_env()?;
+    let config = Config::from_projection_worker_env()?;
     let finalization_token = require_split_stdb_tokens(
         config.stdb_server_token.as_deref(),
         config.stdb_finalization_token.as_deref(),
@@ -227,18 +227,24 @@ pub async fn serve() -> Result<()> {
             .await
             .context("apply projection infrastructure schema")?;
         ensure_projection_relations(&admin_pool, PROJECTION_CODEC_MANIFEST_JSON).await?;
-        let finalization_tables = finalization_worker::parse_archive_manifest(
+        let finalization_candidates = finalization_worker::parse_archive_manifest(
             finalization_worker::ARCHIVE_MANIFEST_JSON,
-        )?
-        .into_iter()
-        .map(|candidate| candidate.cold_table)
-        .collect::<Vec<_>>();
+        )?;
+        let finalization_read_tables = finalization_candidates
+            .iter()
+            .flat_map(|candidate| [candidate.table.clone(), candidate.cold_table.clone()])
+            .collect::<Vec<_>>();
+        let finalization_write_tables = finalization_candidates
+            .into_iter()
+            .map(|candidate| candidate.cold_table)
+            .collect::<Vec<_>>();
         pg_pool::ensure_runtime_role_grants(
             &admin_pool,
             &projection_pg_config.user,
             &finalization_pg_config.user,
             &reconstruction_pg_config.user,
-            &finalization_tables,
+            &finalization_read_tables,
+            &finalization_write_tables,
         )
         .await?;
     }

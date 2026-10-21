@@ -5,6 +5,13 @@ import { useTranslation } from '@lumiere/i18n';
 import { Button, EntityView, cn } from '@lumiere/ui';
 import { Input } from '@lumiere/ui';
 import { Label } from '@lumiere/ui';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { qualityAlertsTableConfig } from '@lumiere/ui';
 import {
   useCreateCycleCountPlan,
@@ -17,6 +24,8 @@ import {
   useCancelQualityAlert,
 } from '@lumiere/query-hooks/hooks/inventory';
 import { useCycleCountAdjustmentWorkflow } from '@lumiere/query-hooks/hooks/cycle-count-adjustment-workflow';
+import { variantTag } from '@lumiere/erp-workflows';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import type { QueryRows } from '@/lib/query-fetch';
 import { ChevronRight, MapPin, Package } from 'lucide-react';
@@ -35,6 +44,29 @@ function strId(v: unknown): string {
 type WizardStep = 1 | 2 | 3 | 4 | 5;
 
 const WIZARD_STEPS: WizardStep[] = [1, 2, 3, 4, 5];
+
+/** Lower-cased state of a row (handles `{tag}` enum values), for action gating. */
+function rowState(row: Record<string, unknown>, key = 'state'): string {
+  return variantTag(row[key]).toLowerCase();
+}
+
+/** Runs a wizard mutation; failures surface as an error toast and the wizard stays on its step. */
+async function runStep(
+  run: () => Promise<unknown>,
+  title: string,
+  onDone?: () => void,
+): Promise<void> {
+  try {
+    await run();
+    onDone?.();
+  } catch (error) {
+    showWorkflowToast({
+      kind: 'error',
+      title,
+      description: error instanceof Error ? error.message : undefined,
+    });
+  }
+}
 
 export function CycleCountWizard({
   organizationId,
@@ -114,36 +146,36 @@ export function CycleCountWizard({
   const locOpts = locations.map((l) => {
     const id = strId(l.id);
     return (
-      <option key={id} value={id}>
+      <SelectItem key={id} value={id}>
         {String(l.completeName ?? l.name ?? id)}
-      </option>
+      </SelectItem>
     );
   });
 
   const countOpts = cycleCounts.map((c) => {
     const id = strId(c.id);
     return (
-      <option key={id} value={id}>
+      <SelectItem key={id} value={id}>
         {`${id} — ${String(c.name ?? 'Count')} (${String(c.state ?? '—')})`}
-      </option>
+      </SelectItem>
     );
   });
 
   const productOpts = products.map((p) => {
     const id = strId(p.id);
     return (
-      <option key={id} value={id}>
+      <SelectItem key={id} value={id}>
         {String(p.name ?? p.defaultCode ?? id)}
-      </option>
+      </SelectItem>
     );
   });
 
   const uomOpts = uoms.map((u) => {
     const id = strId(u.id);
     return (
-      <option key={id} value={id}>
+      <SelectItem key={id} value={id}>
         {String(u.name ?? id)}
-      </option>
+      </SelectItem>
     );
   });
 
@@ -219,15 +251,12 @@ export function CycleCountWizard({
               <Label htmlFor="cc-loc">
                 {t('inventory.cycleCountWizard.locationId')}
               </Label>
-              <select
-                id="cc-loc"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3"
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-              >
-                <option value="">—</option>
-                {locOpts}
-              </select>
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger id="cc-loc">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>{locOpts}</SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="cc-name">
@@ -297,26 +326,29 @@ export function CycleCountWizard({
                     .map((c) => num(c.id)),
                 ),
               );
-              void createPlan
-                .mutateAsync({
-                  locationId: lid,
-                  params: {
-                    name: planName.trim() ? planName.trim() : undefined,
-                    countBy,
-                    frequency,
-                    tolerancePercentage: num(tolPct),
-                    toleranceValue: num(tolVal),
-                    nextCountDate: undefined,
-                    userId: undefined,
-                    teamId: undefined,
-                    productIds: [],
-                    productCategoryIds: [],
-                    reason: undefined,
-                    notes: undefined,
-                    metadata: undefined,
-                  },
-                })
-                .then(() => setPlanCreatedAt(Date.now()));
+              void runStep(
+                () =>
+                  createPlan.mutateAsync({
+                    locationId: lid,
+                    params: {
+                      name: planName.trim() ? planName.trim() : undefined,
+                      countBy,
+                      frequency,
+                      tolerancePercentage: num(tolPct),
+                      toleranceValue: num(tolVal),
+                      nextCountDate: undefined,
+                      userId: undefined,
+                      teamId: undefined,
+                      productIds: [],
+                      productCategoryIds: [],
+                      reason: undefined,
+                      notes: undefined,
+                      metadata: undefined,
+                    },
+                  }),
+                t('inventory.cycleCountWizard.createPlan'),
+                () => setPlanCreatedAt(Date.now()),
+              );
             }}
           >
             {t('inventory.cycleCountWizard.createPlan')}
@@ -331,24 +363,26 @@ export function CycleCountWizard({
             <Label htmlFor="cc-id">
               {t('inventory.cycleCountWizard.cycleCountId')}
             </Label>
-            <select
-              id="cc-id"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3"
+            <Select
               value={cycleCountId === '' ? '' : strId(cycleCountId)}
-              onChange={(e) =>
-                setCycleCountId(e.target.value === '' ? '' : e.target.value)
-              }
+              onValueChange={setCycleCountId}
             >
-              <option value="">—</option>
-              {countOpts}
-            </select>
+              <SelectTrigger id="cc-id">
+                <SelectValue placeholder="—" />
+              </SelectTrigger>
+              <SelectContent>{countOpts}</SelectContent>
+            </Select>
           </div>
           <Button
             type="button"
             data-testid="cycle-wizard-start-session"
             disabled={startSession.isPending || cycleCountId === ''}
             onClick={() =>
-              void startSession.mutateAsync(cycleCountId).then(goNext)
+              void runStep(
+                () => startSession.mutateAsync(cycleCountId),
+                t('inventory.cycleCountWizard.startSession'),
+                goNext,
+              )
             }
           >
             {t('inventory.cycleCountWizard.startSession')}
@@ -364,29 +398,23 @@ export function CycleCountWizard({
               <Label htmlFor="cc-prod">
                 {t('inventory.cycleCountWizard.productId')}
               </Label>
-              <select
-                id="cc-prod"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3"
-                value={recProductId}
-                onChange={(e) => setRecProductId(e.target.value)}
-              >
-                <option value="">—</option>
-                {productOpts}
-              </select>
+              <Select value={recProductId} onValueChange={setRecProductId}>
+                <SelectTrigger id="cc-prod">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>{productOpts}</SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="cc-rec-loc">
                 {t('inventory.cycleCountWizard.recordLocationId')}
               </Label>
-              <select
-                id="cc-rec-loc"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3"
-                value={recLocId}
-                onChange={(e) => setRecLocId(e.target.value)}
-              >
-                <option value="">—</option>
-                {locOpts}
-              </select>
+              <Select value={recLocId} onValueChange={setRecLocId}>
+                <SelectTrigger id="cc-rec-loc">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>{locOpts}</SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="cc-qty">
@@ -402,15 +430,12 @@ export function CycleCountWizard({
               <Label htmlFor="cc-uom">
                 {t('inventory.cycleCountWizard.uomId')}
               </Label>
-              <select
-                id="cc-uom"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3"
-                value={recUom}
-                onChange={(e) => setRecUom(e.target.value)}
-              >
-                <option value="">—</option>
-                {uomOpts}
-              </select>
+              <Select value={recUom} onValueChange={setRecUom}>
+                <SelectTrigger id="cc-uom">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>{uomOpts}</SelectContent>
+              </Select>
             </div>
           </div>
           <Button
@@ -418,20 +443,23 @@ export function CycleCountWizard({
             data-testid="cycle-wizard-record-line"
             disabled={recordLine.isPending || cycleCountId === ''}
             onClick={() =>
-              void recordLine
-                .mutateAsync({
-                  cycleCountId,
-                  params: {
-                    productId: BigInt(num(recProductId)),
-                    locationId: BigInt(num(recLocId)),
-                    lotId: undefined,
-                    qtyCounted: num(recQty),
-                    uomId: BigInt(num(recUom)),
-                    notes: undefined,
-                    metadata: undefined,
-                  },
-                })
-                .then(goNext)
+              void runStep(
+                () =>
+                  recordLine.mutateAsync({
+                    cycleCountId,
+                    params: {
+                      productId: BigInt(num(recProductId)),
+                      locationId: BigInt(num(recLocId)),
+                      lotId: undefined,
+                      qtyCounted: num(recQty),
+                      uomId: BigInt(num(recUom)),
+                      notes: undefined,
+                      metadata: undefined,
+                    },
+                  }),
+                t('inventory.cycleCountWizard.recordLine'),
+                goNext,
+              )
             }
           >
             {t('inventory.cycleCountWizard.recordLine')}
@@ -450,7 +478,13 @@ export function CycleCountWizard({
             variant="secondary"
             data-testid="cycle-wizard-validate"
             disabled={validate.isPending || cycleCountId === ''}
-            onClick={() => void validate.mutateAsync(cycleCountId).then(goNext)}
+            onClick={() =>
+              void runStep(
+                () => validate.mutateAsync(cycleCountId),
+                t('inventory.cycleCountWizard.validate'),
+                goNext,
+              )
+            }
           >
             {t('inventory.cycleCountWizard.validate')}
           </Button>
@@ -718,9 +752,14 @@ export function QualityAlertsPanel({
             id: 'open-alert',
             label: t('inventory.qualityAlerts.actions.open'),
             requiresSelection: true,
-            onClick: (rows: Record<string, unknown>[]) => {
+            isApplicable: (rows) =>
+              rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
+            successMessage: t('common.actionCompleted', {
+              action: t('inventory.qualityAlerts.actions.open'),
+            }),
+            onClick: async (rows: Record<string, unknown>[]) => {
               const id = rows[0]?.id as ScalarId | undefined;
-              if (id != null) void openAlert.mutateAsync(id);
+              if (id != null) await openAlert.mutateAsync(id);
             },
           },
           {
@@ -736,6 +775,11 @@ export function QualityAlertsPanel({
             id: 'solve-alert',
             label: t('inventory.qualityAlerts.actions.solve'),
             requiresSelection: true,
+            isApplicable: (rows) =>
+              rows.every(
+                (row) =>
+                  !['solved', 'cancelled'].includes(rowState(row, 'state')),
+              ),
             onClick: (rows: Record<string, unknown>[]) => {
               const id = rows[0]?.id as ScalarId | undefined;
               if (id != null) onSolveAlert(id);
@@ -746,9 +790,17 @@ export function QualityAlertsPanel({
             label: t('inventory.qualityAlerts.actions.cancel'),
             variant: 'destructive' as const,
             requiresSelection: true,
-            onClick: (rows: Record<string, unknown>[]) => {
+            isApplicable: (rows) =>
+              rows.every(
+                (row) =>
+                  !['solved', 'cancelled'].includes(rowState(row, 'state')),
+              ),
+            successMessage: t('common.actionCompleted', {
+              action: t('inventory.qualityAlerts.actions.cancel'),
+            }),
+            onClick: async (rows: Record<string, unknown>[]) => {
               const id = rows[0]?.id as ScalarId | undefined;
-              if (id != null) void cancelAlert.mutateAsync({ alertId: id });
+              if (id != null) await cancelAlert.mutateAsync({ alertId: id });
             },
           },
         ],

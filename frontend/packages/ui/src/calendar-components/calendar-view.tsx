@@ -42,6 +42,8 @@ interface CalendarViewProps {
   onCreateEvent?: () => void
   onEditEvent?: (eventId: string) => void
   onDeleteEvent?: (eventId: string) => void
+  /** Where an event has a page of its own: the detail panel then offers an "Open" link. */
+  eventHref?: (eventId: string) => string | undefined
 }
 
 export function CalendarView({
@@ -62,6 +64,7 @@ export function CalendarView({
   onCreateEvent,
   onEditEvent,
   onDeleteEvent,
+  eventHref,
 }: CalendarViewProps) {
   const { t, i18n } = useTranslation()
   const filteredEvents = useMemo(
@@ -284,6 +287,7 @@ export function CalendarView({
           onClose={() => onSelectEvent(null)}
           onEdit={onEditEvent ? () => onEditEvent(selectedEventId) : undefined}
           onDelete={onDeleteEvent ? () => onDeleteEvent(selectedEventId) : undefined}
+          openHref={eventHref?.(selectedEventId)}
         />
       )}
     </div>

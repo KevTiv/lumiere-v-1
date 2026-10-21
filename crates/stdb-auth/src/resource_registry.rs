@@ -91,4 +91,57 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn rfq_child_projections_expose_company_scope() {
+        for resource in ["purchase-rfq-bids", "purchase-rfq-lines"] {
+            let entry = registry_get(resource).expect("RFQ child resource must be registered");
+            assert!(
+                entry
+                    .default_restricted
+                    .iter()
+                    .any(|field| field == "company_id"),
+                "{resource} must expose company_id for purchasing scope enforcement"
+            );
+        }
+    }
+
+    #[test]
+    fn workflow_readback_projections_expose_exact_effect_fields() {
+        for (resource, fields) in [
+            (
+                "account-payments",
+                &["reconciled_invoice_ids", "reconciled_bill_ids"][..],
+            ),
+            ("sale-orders", &["order_line"][..]),
+            ("stock-production-serials", &["is_locked"][..]),
+        ] {
+            let entry = registry_get(resource).expect("workflow resource must be registered");
+            for field in fields {
+                assert!(
+                    entry
+                        .default_restricted
+                        .iter()
+                        .any(|candidate| candidate == field),
+                    "{resource} projection must expose {field} for exact workflow readback"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn replenishment_projection_exposes_scheduler_state() {
+        let entry =
+            registry_get("replenishment-rules").expect("replenishment rules must be registered");
+
+        for field in ["last_run", "next_run", "metadata"] {
+            assert!(
+                entry
+                    .default_restricted
+                    .iter()
+                    .any(|candidate| candidate == field),
+                "replenishment projection must expose {field}"
+            );
+        }
+    }
 }

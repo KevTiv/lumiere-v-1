@@ -5,6 +5,7 @@ import {
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
+  openAccountingTab,
   scalarQueryId,
   signIn,
   smokeName,
@@ -78,7 +79,7 @@ async function assetSnapshot(page: Page, assetId: number) {
 
 async function clickAssetAction(page: Page, assetId: number, actionId: string, reducer: string) {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-fixed-assets").click()
+  await openAccountingTab(page, "fixed-assets")
   const assetRow = page.getByTestId(`entity-row-${assetId}`)
   await expect(assetRow).toBeVisible({ timeout: 30_000 })
   await assetRow.click()

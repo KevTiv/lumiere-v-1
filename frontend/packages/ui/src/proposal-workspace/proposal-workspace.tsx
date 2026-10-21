@@ -24,7 +24,27 @@ import { VersionHistoryBar, SaveVersionButton } from "./version-history-bar"
 import { PresenceBar } from "./presence-bar"
 import { DocumentInputPanel } from "./document-input-panel"
 import { ComplianceChecklist } from "./compliance-checklist"
+import { parseBidDecisionInput } from "./bid-decision"
+import { parseProcurementScoreInput, procurementScoresForProposal, type ProcurementScoreView } from "./procurement-score"
+import { moveLineItemOrder, proposalLineItemsInOrder, type LineItemMoveDirection } from "./line-item-order"
+import {
+  DEFAULT_TEMPLATE_CATEGORY,
+  DEFAULT_TEMPLATE_LOCALE,
+  parseSectionTemplateInput,
+} from "./section-template"
+import { ProcurementScoresPanel } from "./procurement-scores-panel"
+import { PROJECT_BILL_TYPES, PROJECT_PRICING_TYPES, parseProjectConversionInput } from "./project-conversion"
+import { useFormDialog } from "../forms/use-form-dialog"
+import { showWorkflowToast } from "../lib/workflow-toast"
 import { rowBool, rowNumber, rowString } from "./row-field-utils"
+import {
+  buildSectionConflictView,
+  readSectionConflictError,
+  sectionResolveParams,
+  updateConflictDraft,
+  type SectionConflict,
+  type SectionDraft,
+} from "./section-conflict"
 
 /** Stable fallback when query hooks return undefined — inline `= []` creates a new ref each render. */
 const EMPTY_QUERY_ROWS: Record<string, unknown>[] = []
@@ -111,7 +131,13 @@ export type UseQueryHookWithId<T = unknown> = (
 ) => QueryResult<T>
 
 export type MutationResult<T> = {
-  mutate: (params: T, options?: { onSettled?: () => void }) => void
+  mutate: (params: T, options?: { onSettled?: () => void; onError?: (error: unknown) => void }) => void
+  isPending?: boolean
+}
+
+/** A mutation the caller awaits, so the workspace can report success or failure itself. */
+export type AsyncMutationResult<T> = {
+  mutateAsync: (params: T) => Promise<unknown>
   isPending?: boolean
 }
 
@@ -199,6 +225,7 @@ export interface ProposalWorkspaceHooks {
   useResolveProposalComment: () => MutationResult<bigint | number | string>
   useProposalTemplates: UseQueryHook<unknown>
   useProposalComplianceRequirements: UseQueryHook<unknown>
+  useProposalProcurementScores: UseQueryHook<unknown>
   useApplyProposalTemplate: () => MutationResult<{
     proposalId: bigint | number | string
     templateId: bigint | number | string
@@ -224,6 +251,46 @@ export interface ProposalWorkspaceHooks {
     payload: string
     metadata?: string | null
   }>
+  useRecordProposalBidDecision: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    decision: string
+    rationale: string
+  }>
+  useConvertProposalToProject: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    billType: string
+    pricingType: string
+  }>
+  useCreateProposalTemplate: () => AsyncMutationResult<{
+    name: string
+    category: string
+    locale: string
+    countryPackKey?: string | null
+    sectionsJson: string
+    isActive: boolean
+    metadata?: string | null
+  }>
+  useReorderProposalLineItems: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    orderedIds: Array<bigint | number | string>
+  }>
+  useResolveProposalSectionConflict: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    sectionId: bigint | number | string
+    title: string
+    content: string
+    status: string
+    sequence?: number
+    aiSuggestion?: string | null
+  }>
+  useUpsertProposalProcurementScore: () => AsyncMutationResult<{
+    proposalId: bigint | number | string
+    countryPackKey: string
+    scoreKind: string
+    scoreValue: number
+    maxValue: number
+    notes?: string | null
+  }>
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -237,6 +304,20 @@ interface ProposalWorkspaceProps {
   currentUserId?: string
   currentUserName?: string
   onAnalyze: (text: string) => Promise<AIAnalysis>
+  /** Shows the bid / no-bid action; the caller passes the user's `proposal:write` permission. */
+  canRecordBidDecision?: boolean
+  /** Shows the "Convert to project" action; the caller passes the user's `proposal:write` and `project_project:create` permissions. */
+  canConvertToProject?: boolean
+  /** Enables it: the proposal is Awarded and has no project yet (see `canConvertProposalToProject`). */
+  convertToProjectReady?: boolean
+  /** Shows the procurement score add / edit actions; the caller passes the user's `proposal:write` permission. */
+  canManageProcurementScores?: boolean
+  /** Shows the line item move up / down controls; the caller passes the user's `proposal:write` permission. */
+  canReorderLineItems?: boolean
+  /** Shows "Save as template"; the caller passes the user's `proposal:write` permission. */
+  canSaveAsTemplate?: boolean
+  /** Enables "Keep mine" on a section revision conflict; the caller passes the user's `proposal:write` permission. */
+  canResolveSectionConflict?: boolean
   hooks: ProposalWorkspaceHooks
 }
 
@@ -251,6 +332,13 @@ export function ProposalWorkspace({
   currentUserId,
   currentUserName,
   onAnalyze,
+  canRecordBidDecision = false,
+  canConvertToProject = false,
+  convertToProjectReady = false,
+  canManageProcurementScores = false,
+  canReorderLineItems = false,
+  canSaveAsTemplate = false,
+  canResolveSectionConflict = false,
   hooks,
 }: ProposalWorkspaceProps) {
   const { t } = useTranslation()
@@ -306,6 +394,13 @@ export function ProposalWorkspace({
     useApplyProposalTemplate,
     useUpsertProposalComplianceRequirement,
     useCreateProposalIntegrationIntent,
+    useRecordProposalBidDecision,
+    useConvertProposalToProject,
+    useProposalProcurementScores,
+    useUpsertProposalProcurementScore,
+    useResolveProposalSectionConflict,
+    useReorderProposalLineItems,
+    useCreateProposalTemplate,
   } = hooks
 
   // ── Data queries ──────────────────────────────────────────────────────────────
@@ -318,6 +413,7 @@ export function ProposalWorkspace({
   const { data: products } = useProducts(organizationId)
   const { data: templates } = useProposalTemplates(organizationId)
   const { data: complianceRows } = useProposalComplianceRequirements(organizationId)
+  const { data: procurementScoreRows } = useProposalProcurementScores(organizationId)
   const sectionsList = sections ?? EMPTY_QUERY_ROWS
   const sourceDocsList = sourceDocs ?? EMPTY_QUERY_ROWS
   const versionsList = versions ?? EMPTY_QUERY_ROWS
@@ -327,6 +423,7 @@ export function ProposalWorkspace({
   const lineItemsList = lineItems ?? EMPTY_QUERY_ROWS
   const templatesList = templates ?? EMPTY_QUERY_ROWS
   const complianceList = complianceRows ?? EMPTY_QUERY_ROWS
+  const procurementScoreList = procurementScoreRows ?? EMPTY_QUERY_ROWS
 
   // Filter to this proposal (memoized so effect/callback deps stay referentially
   // stable across renders — otherwise fresh arrays each render trigger setState
@@ -368,6 +465,11 @@ export function ProposalWorkspace({
     [complianceList, proposalId],
   )
 
+  const procurementScores = useMemo(
+    () => procurementScoresForProposal(procurementScoreList as Record<string, unknown>[], proposalId),
+    [procurementScoreList, proposalId],
+  )
+
   const [draftSources, setDraftSources] = useState<SourceDocument[]>([])
 
   useEffect(() => {
@@ -381,7 +483,13 @@ export function ProposalWorkspace({
 
   const effectiveActiveSectionId = (activeSection as { id?: bigint } | null)?.id ?? null
 
-  const activeSectionLineItems = lineItemsList.filter(
+  // The line items query is org-wide; reorder needs this proposal's complete, ordered set.
+  const proposalLineItems = useMemo(
+    () => proposalLineItemsInOrder(lineItemsList as Record<string, unknown>[], proposalId),
+    [lineItemsList, proposalId],
+  )
+
+  const activeSectionLineItems = proposalLineItems.filter(
     (item) => effectiveActiveSectionId && String((item as { sectionId?: unknown }).sectionId) === String(effectiveActiveSectionId)
   )
 
@@ -405,8 +513,8 @@ export function ProposalWorkspace({
     return map
   }, [proposalPresence])
 
-  // Total proposal value from all line items
-  const totalValue = lineItemsList.reduce((sum: number, item) => {
+  // Total proposal value across this proposal's sections
+  const totalValue = proposalLineItems.reduce((sum: number, item) => {
     const quantity = (item as { quantity?: number }).quantity ?? 1
     const priceUnit = (item as { priceUnit?: number }).priceUnit ?? 0
     const discount = (item as { discount?: number }).discount ?? 0
@@ -432,6 +540,16 @@ export function ProposalWorkspace({
   const applyTemplate = useApplyProposalTemplate()
   const upsertCompliance = useUpsertProposalComplianceRequirement()
   const createIntent = useCreateProposalIntegrationIntent()
+  const recordBidDecision = useRecordProposalBidDecision()
+  const convertToProject = useConvertProposalToProject()
+  const upsertProcurementScore = useUpsertProposalProcurementScore()
+  const resolveSectionConflict = useResolveProposalSectionConflict()
+  const reorderLineItems = useReorderProposalLineItems()
+  const createTemplate = useCreateProposalTemplate()
+  const { askForm, formDialog } = useFormDialog()
+
+  // Revision conflict on the active section: the rejected draft is kept ("mine"); the live row is "theirs".
+  const [sectionConflict, setSectionConflict] = useState<SectionConflict | null>(null)
 
   const libraryTemplates = useMemo(
     () =>
@@ -551,38 +669,120 @@ export function ProposalWorkspace({
     })
   }, [proposalIdBig, proposalSections, upsertSection])
 
+  /** Sends a section save; on a revision conflict keeps the rejected draft instead of dropping it. */
+  const saveSectionWithConflictCapture = useCallback(
+    (
+      sectionId: bigint,
+      expectedRevision: number,
+      draft: SectionDraft,
+      options?: { onSettled?: () => void },
+    ) => {
+      upsertSection.mutate(
+        {
+          proposalId: proposalIdBig,
+          sectionId,
+          expectedRevision,
+          title: draft.title,
+          content: draft.content,
+          status: draft.status,
+          sequence: draft.sequence,
+          aiSuggestion: draft.aiSuggestion ?? undefined,
+        },
+        {
+          ...options,
+          onError: (error) => {
+            const revisions = readSectionConflictError(error)
+            if (revisions) setSectionConflict({ sectionId: String(sectionId), draft, ...revisions })
+          },
+        },
+      )
+    },
+    [proposalIdBig, upsertSection],
+  )
+
   const handleSaveContent = useCallback((content: string, sectionStatus: SectionStatus) => {
     if (!effectiveActiveSectionId) return
+    if (sectionConflict && String(effectiveActiveSectionId) === sectionConflict.sectionId) {
+      // Unresolved conflict: keep the latest edit in the draft rather than sending another stale save.
+      setSectionConflict(updateConflictDraft(sectionConflict, { content, status: sectionStatus }))
+      return
+    }
     setIsSaving(true)
     const wordCount = countWords(content)
-    upsertSection.mutate(
+    saveSectionWithConflictCapture(
+      effectiveActiveSectionId,
+      (activeSection as { revision?: number })?.revision ?? 0,
       {
-        proposalId: proposalIdBig,
-        sectionId: effectiveActiveSectionId,
-        expectedRevision: (activeSection as { revision?: number })?.revision ?? 0,
         title: (activeSection as { title?: string })?.title ?? "",
         content,
         status: sectionStatus,
         sequence: (activeSection as { sequence?: number })?.sequence ?? 0,
-        aiSuggestion: (activeSection as { aiSuggestion?: string })?.aiSuggestion ?? undefined,
+        aiSuggestion: (activeSection as { aiSuggestion?: string })?.aiSuggestion ?? null,
       },
-      { onSettled: () => setIsSaving(false) }
+      { onSettled: () => setIsSaving(false) },
     )
     void wordCount // used server-side
-  }, [proposalIdBig, effectiveActiveSectionId, activeSection, upsertSection])
+  }, [effectiveActiveSectionId, activeSection, sectionConflict, saveSectionWithConflictCapture])
 
   const handleSaveTitle = useCallback((title: string) => {
     if (!effectiveActiveSectionId) return
-    upsertSection.mutate({
-      proposalId: proposalIdBig,
-      sectionId: effectiveActiveSectionId,
-      expectedRevision: (activeSection as { revision?: number })?.revision ?? 0,
-      title,
-      content: (activeSection as { content?: string })?.content ?? "",
-      status: ((activeSection as { status?: string })?.status as string)?.toLowerCase() ?? "draft",
-      sequence: (activeSection as { sequence?: number })?.sequence ?? 0,
+    if (sectionConflict && String(effectiveActiveSectionId) === sectionConflict.sectionId) {
+      setSectionConflict(updateConflictDraft(sectionConflict, { title }))
+      return
+    }
+    saveSectionWithConflictCapture(
+      effectiveActiveSectionId,
+      (activeSection as { revision?: number })?.revision ?? 0,
+      {
+        title,
+        content: (activeSection as { content?: string })?.content ?? "",
+        status: ((activeSection as { status?: string })?.status as string)?.toLowerCase() ?? "draft",
+        sequence: (activeSection as { sequence?: number })?.sequence ?? 0,
+        aiSuggestion: null,
+      },
+    )
+  }, [effectiveActiveSectionId, activeSection, sectionConflict, saveSectionWithConflictCapture])
+
+  const [isResolvingConflict, setIsResolvingConflict] = useState(false)
+
+  const handleKeepMine = useCallback(async () => {
+    if (!sectionConflict) return
+    setIsResolvingConflict(true)
+    try {
+      await resolveSectionConflict.mutateAsync(
+        sectionResolveParams(proposalIdBig, sectionConflict.sectionId, sectionConflict.draft),
+      )
+      setSectionConflict(null)
+      showWorkflowToast({
+        kind: "success",
+        title: t("proposalWorkspace.sectionConflict.resolved", { defaultValue: "Your version was saved" }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("proposalWorkspace.sectionConflict.resolveFailed", { defaultValue: "Could not save your version" }),
+        description: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      setIsResolvingConflict(false)
+    }
+  }, [proposalIdBig, resolveSectionConflict, sectionConflict, t])
+
+  const handleKeepTheirs = useCallback(() => {
+    setSectionConflict(null)
+    showWorkflowToast({
+      kind: "success",
+      title: t("proposalWorkspace.sectionConflict.discarded", { defaultValue: "Your edits were discarded; showing the server version" }),
     })
-  }, [proposalIdBig, effectiveActiveSectionId, activeSection, upsertSection])
+  }, [t])
+
+  const sectionConflictView = useMemo(
+    () =>
+      sectionConflict && String(effectiveActiveSectionId) === sectionConflict.sectionId
+        ? buildSectionConflictView(sectionConflict, activeSection as Record<string, unknown> | null)
+        : null,
+    [sectionConflict, effectiveActiveSectionId, activeSection],
+  )
 
   const handleApplyStructure = useCallback(() => {
     if (!analysis) return
@@ -623,6 +823,314 @@ export function ProposalWorkspace({
     setStatus(newStatus)
     updateStatus.mutate({ proposalId: proposalIdBig, status: newStatus })
   }, [proposalIdBig, updateStatus])
+
+  const handleRecordBidDecision = useCallback(async () => {
+    const title = t("proposalWorkspace.bidDecision.title", { defaultValue: "Record bid decision" })
+    const values = await askForm({
+      title,
+      description: t("proposalWorkspace.bidDecision.description", {
+        defaultValue: "A bid decision is required before this proposal can be submitted.",
+      }),
+      fields: [
+        {
+          id: "decision",
+          name: "decision",
+          label: t("proposalWorkspace.bidDecision.decision", { defaultValue: "Decision" }),
+          type: "select",
+          required: true,
+          options: [
+            { value: "bid", label: t("proposalWorkspace.bidDecision.bid", { defaultValue: "Bid" }) },
+            { value: "no_bid", label: t("proposalWorkspace.bidDecision.noBid", { defaultValue: "No bid" }) },
+          ],
+        },
+        {
+          id: "rationale",
+          name: "rationale",
+          label: t("proposalWorkspace.bidDecision.rationale", { defaultValue: "Rationale" }),
+          type: "textarea",
+          required: true,
+        },
+      ],
+    })
+    if (values == null) return
+    const failed = t("proposalWorkspace.bidDecision.failed", { defaultValue: "Record bid decision failed" })
+    const input = parseBidDecisionInput(values)
+    if (input == null) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: t("proposalWorkspace.bidDecision.invalid", {
+          defaultValue: "Choose bid or no bid and give a rationale.",
+        }),
+      })
+      return
+    }
+    try {
+      await recordBidDecision.mutateAsync({ proposalId: proposalIdBig, ...input })
+      showWorkflowToast({
+        kind: "success",
+        title: t("proposalWorkspace.bidDecision.done", { defaultValue: "Bid decision recorded" }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }, [askForm, proposalIdBig, recordBidDecision, t])
+
+  const handleConvertToProject = useCallback(async () => {
+    const title = t("proposalWorkspace.convertToProject.title", { defaultValue: "Convert to project" })
+    const values = await askForm({
+      title,
+      description: t("proposalWorkspace.convertToProject.description", {
+        defaultValue: "Creates a project from this awarded proposal. A proposal can only be converted once.",
+      }),
+      fields: [
+        {
+          id: "billType",
+          name: "billType",
+          label: t("proposalWorkspace.convertToProject.billType", { defaultValue: "Billing" }),
+          type: "select",
+          required: true,
+          defaultValue: "customer_task",
+          width: "1/2",
+          options: PROJECT_BILL_TYPES.map((value) => ({
+            value,
+            label: t(`proposalWorkspace.convertToProject.billTypes.${value}`, {
+              defaultValue: { customer_task: "Billed by task", customer_project: "Billed by project", no: "Not billable" }[value],
+            }),
+          })),
+        },
+        {
+          id: "pricingType",
+          name: "pricingType",
+          label: t("proposalWorkspace.convertToProject.pricingType", { defaultValue: "Pricing" }),
+          type: "select",
+          required: true,
+          defaultValue: "task_rate",
+          width: "1/2",
+          options: PROJECT_PRICING_TYPES.map((value) => ({
+            value,
+            label: t(`proposalWorkspace.convertToProject.pricingTypes.${value}`, {
+              defaultValue: { task_rate: "Task rate", fixed_rate: "Fixed rate", employee_rate: "Employee rate" }[value],
+            }),
+          })),
+        },
+      ],
+    })
+    if (values == null) return
+    const failed = t("proposalWorkspace.convertToProject.failed", { defaultValue: "Convert to project failed" })
+    const input = parseProjectConversionInput(values)
+    if (input == null) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: t("proposalWorkspace.convertToProject.invalid", {
+          defaultValue: "Choose a billing type and a pricing type.",
+        }),
+      })
+      return
+    }
+    try {
+      await convertToProject.mutateAsync({ proposalId: proposalIdBig, ...input })
+      showWorkflowToast({
+        kind: "success",
+        title: t("proposalWorkspace.convertToProject.done", { defaultValue: "Project created from proposal" }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }, [askForm, convertToProject, proposalIdBig, t])
+
+  const handleEditProcurementScore = useCallback(
+    async (existing?: ProcurementScoreView) => {
+      const values = await askForm({
+        title: existing
+          ? t("proposalWorkspace.procurementScores.editTitle", { defaultValue: "Edit procurement score" })
+          : t("proposalWorkspace.procurementScores.addTitle", { defaultValue: "Add procurement score" }),
+        description: t("proposalWorkspace.procurementScores.description", {
+          defaultValue: "A score is identified by its country pack and score kind; saving an existing pair updates it.",
+        }),
+        fields: [
+          {
+            id: "countryPackKey",
+            name: "countryPackKey",
+            label: t("proposalWorkspace.procurementScores.countryPackKey", { defaultValue: "Country pack key" }),
+            type: "text",
+            required: true,
+            defaultValue: existing?.countryPackKey,
+            width: "1/2",
+          },
+          {
+            id: "scoreKind",
+            name: "scoreKind",
+            label: t("proposalWorkspace.procurementScores.scoreKind", { defaultValue: "Score kind" }),
+            type: "text",
+            required: true,
+            defaultValue: existing?.scoreKind,
+            width: "1/2",
+          },
+          {
+            id: "scoreValue",
+            name: "scoreValue",
+            label: t("proposalWorkspace.procurementScores.scoreValue", { defaultValue: "Score" }),
+            type: "number",
+            required: true,
+            defaultValue: existing?.scoreValue,
+            width: "1/2",
+          },
+          {
+            id: "maxValue",
+            name: "maxValue",
+            label: t("proposalWorkspace.procurementScores.maxValue", { defaultValue: "Maximum" }),
+            type: "number",
+            required: true,
+            defaultValue: existing?.maxValue,
+            width: "1/2",
+          },
+          {
+            id: "notes",
+            name: "notes",
+            label: t("proposalWorkspace.procurementScores.notes", { defaultValue: "Notes" }),
+            type: "textarea",
+            defaultValue: existing?.notes,
+          },
+        ],
+      })
+      if (values == null) return
+      const failed = t("proposalWorkspace.procurementScores.failed", { defaultValue: "Save procurement score failed" })
+      const parsed = parseProcurementScoreInput(values)
+      if (!parsed.ok) {
+        showWorkflowToast({
+          kind: "error",
+          title: failed,
+          description:
+            parsed.reason === "required"
+              ? t("proposalWorkspace.procurementScores.invalidKeys", {
+                  defaultValue: "Country pack key and score kind are required.",
+                })
+              : t("proposalWorkspace.procurementScores.invalidNumbers", {
+                  defaultValue: "Score and maximum must be numbers.",
+                }),
+        })
+        return
+      }
+      try {
+        await upsertProcurementScore.mutateAsync({ proposalId: proposalIdBig, ...parsed.value })
+        showWorkflowToast({
+          kind: "success",
+          title: t("proposalWorkspace.procurementScores.done", { defaultValue: "Procurement score saved" }),
+        })
+      } catch (error) {
+        showWorkflowToast({
+          kind: "error",
+          title: failed,
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+    [askForm, proposalIdBig, upsertProcurementScore, t],
+  )
+
+  const handleSaveAsTemplate = useCallback(async () => {
+    const values = await askForm({
+      title: t("proposalWorkspace.saveAsTemplate.title", { defaultValue: "Save as template" }),
+      description: t("proposalWorkspace.saveAsTemplate.description", {
+        defaultValue: "Saves this proposal's sections (titles and content) to the template library.",
+      }),
+      fields: [
+        {
+          id: "name",
+          name: "name",
+          label: t("proposalWorkspace.saveAsTemplate.name", { defaultValue: "Template name" }),
+          type: "text",
+          required: true,
+          defaultValue: proposalTitle,
+        },
+        {
+          id: "category",
+          name: "category",
+          label: t("proposalWorkspace.saveAsTemplate.category", { defaultValue: "Category" }),
+          type: "text",
+          required: true,
+          defaultValue: DEFAULT_TEMPLATE_CATEGORY,
+          width: "1/2",
+        },
+        {
+          id: "locale",
+          name: "locale",
+          label: t("proposalWorkspace.saveAsTemplate.locale", { defaultValue: "Locale" }),
+          type: "text",
+          required: true,
+          defaultValue: DEFAULT_TEMPLATE_LOCALE,
+          width: "1/2",
+        },
+        {
+          id: "countryPackKey",
+          name: "countryPackKey",
+          label: t("proposalWorkspace.saveAsTemplate.countryPackKey", { defaultValue: "Country pack key (optional)" }),
+          type: "text",
+        },
+      ],
+    })
+    if (values == null) return
+    const failed = t("proposalWorkspace.saveAsTemplate.failed", { defaultValue: "Save as template failed" })
+    const parsed = parseSectionTemplateInput(values, proposalSections as Record<string, unknown>[])
+    if (!parsed.ok) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description:
+          parsed.reason === "sections"
+            ? t("proposalWorkspace.saveAsTemplate.noSections", { defaultValue: "Add at least one section first." })
+            : t("proposalWorkspace.saveAsTemplate.invalid", {
+                defaultValue: "Template name, category and locale are required.",
+              }),
+      })
+      return
+    }
+    try {
+      await createTemplate.mutateAsync(parsed.value)
+      showWorkflowToast({
+        kind: "success",
+        title: t("proposalWorkspace.saveAsTemplate.done", { defaultValue: "Template saved" }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: failed,
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }, [askForm, createTemplate, proposalSections, proposalTitle, t])
+
+  const handleMoveLineItem = useCallback(
+    async (id: bigint, direction: LineItemMoveDirection) => {
+      const orderedIds = moveLineItemOrder(
+        proposalLineItems,
+        activeSectionLineItems.map((item) => String((item as { id?: unknown }).id)),
+        String(id),
+        direction,
+      )
+      if (orderedIds == null) return
+      try {
+        await reorderLineItems.mutateAsync({ proposalId: proposalIdBig, orderedIds })
+      } catch (error) {
+        showWorkflowToast({
+          kind: "error",
+          title: t("proposalWorkspace.reorderLineItems.failed", { defaultValue: "Reorder line items failed" }),
+          description: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+    [activeSectionLineItems, proposalIdBig, proposalLineItems, reorderLineItems, t],
+  )
 
   const handleSaveVersion = useCallback((message: string) => {
     saveVersion.mutate({ proposalId: proposalIdBig, message })
@@ -721,6 +1229,8 @@ export function ProposalWorkspace({
         }
       `}</style>
 
+      {formDialog}
+
       {/* Hidden print target */}
       <div id="proposal-print-root" className="hidden print:block">
         <h1>{proposalTitle}</h1>
@@ -774,6 +1284,49 @@ export function ProposalWorkspace({
               />
             </div>
 
+            {canRecordBidDecision ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={recordBidDecision.isPending || proposalIdBig === 0n}
+                data-testid="proposal-bid-decision"
+                onClick={() => void handleRecordBidDecision()}
+              >
+                {t("proposalWorkspace.bidDecision.button", { defaultValue: "Bid / no bid" })}
+              </Button>
+            ) : null}
+
+            {canConvertToProject ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!convertToProjectReady || convertToProject.isPending || proposalIdBig === 0n}
+                title={
+                  convertToProjectReady
+                    ? undefined
+                    : t("proposalWorkspace.convertToProject.unavailable", {
+                        defaultValue: "Only an awarded proposal without a project can be converted.",
+                      })
+                }
+                data-testid="proposal-convert-to-project"
+                onClick={() => void handleConvertToProject()}
+              >
+                {t("proposalWorkspace.convertToProject.button", { defaultValue: "Convert to project" })}
+              </Button>
+            ) : null}
+
+            {canSaveAsTemplate ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={createTemplate.isPending || proposalSections.length === 0}
+                data-testid="proposal-save-as-template"
+                onClick={() => void handleSaveAsTemplate()}
+              >
+                {t("proposalWorkspace.saveAsTemplate.button", { defaultValue: "Save as template" })}
+              </Button>
+            ) : null}
+
             <div className="relative group">
               <Button variant="outline" size="sm" className="gap-1">
                 {t("proposalWorkspace.status.label")}
@@ -819,11 +1372,20 @@ export function ProposalWorkspace({
             onAddSourceDoc={() => setShowDocInput(true)}
             onDeleteSourceDoc={(id) => deleteSourceDoc.mutate({ docId: id })}
             complianceSlot={
-              <ComplianceChecklist
-                rows={proposalCompliance as Record<string, unknown>[]}
-                proposalId={proposalIdBig}
-                onToggleComplete={handleToggleCompliance}
-              />
+              <>
+                <ComplianceChecklist
+                  rows={proposalCompliance as Record<string, unknown>[]}
+                  proposalId={proposalIdBig}
+                  onToggleComplete={handleToggleCompliance}
+                />
+                <ProcurementScoresPanel
+                  scores={procurementScores}
+                  canEdit={canManageProcurementScores}
+                  disabled={upsertProcurementScore.isPending || proposalIdBig === 0n}
+                  onAdd={() => void handleEditProcurementScore()}
+                  onEdit={(score) => void handleEditProcurementScore(score)}
+                />
+              </>
             }
           />
 
@@ -837,6 +1399,17 @@ export function ProposalWorkspace({
               onSaveContent={handleSaveContent}
               onSaveTitle={handleSaveTitle}
               onFocus={handleEditorFocus}
+              conflict={
+                sectionConflictView
+                  ? {
+                      view: sectionConflictView,
+                      canKeepMine: canResolveSectionConflict,
+                      isResolving: isResolvingConflict || Boolean(resolveSectionConflict.isPending),
+                      onKeepMine: () => void handleKeepMine(),
+                      onKeepTheirs: handleKeepTheirs,
+                    }
+                  : null
+              }
               onAddLineItem={(productId, productName, priceUnit) =>
                 addLineItem.mutate({
                   proposalId: proposalIdBig,
@@ -859,6 +1432,8 @@ export function ProposalWorkspace({
                 })
               }
               onDeleteLineItem={(id) => deleteLineItem.mutate({ lineItemId: id })}
+              onMoveLineItem={canReorderLineItems ? (id, direction) => void handleMoveLineItem(id, direction) : undefined}
+              isReorderingLineItems={reorderLineItems.isPending || proposalIdBig === 0n}
               onAddComment={(content) => {
                 if (!effectiveActiveSectionId) return
                 addComment.mutate({

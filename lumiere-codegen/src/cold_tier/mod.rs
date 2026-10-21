@@ -10,13 +10,15 @@
 //! 2. `storage_policy_manifest_emit` — validate the C1 all-table census
 //! 3. `archive_manifest_emit` — generate the cooling-eligible archive subset
 //!    from the storage-policy census and validate it against the schema IR
-//! 4. `pg_ddl_emit` — one cold-table `CREATE TABLE` per active candidate
-//! 5. `codec_emit` — STDB ↔ PG type-mapping manifests for archive candidates
+//! 4. `codec_emit` — STDB ↔ PG type-mapping manifests for archive candidates
 //!    and all projection tables
-//! 6. `hydration_manifest_emit` — reducers that may target archived rows
+//! 5. `hydration_manifest_emit` — reducers that may target archived rows
 //!    (validated against the schema manifest + active candidate set)
-//! 7. `reconstruction_manifest_emit` — reviewed aggregate relationships and
+//! 6. `reconstruction_manifest_emit` — reviewed aggregate relationships and
 //!    deterministic parent-before-child organization restore order
+//!
+//! PostgreSQL DDL is emitted only after the canonical v2 IR handoff by
+//! `durable_postgresql_ir`; this stage plans prerequisite manifests only.
 
 pub mod archive_manifest_emit;
 pub mod codec_emit;
@@ -34,6 +36,7 @@ use crate::support::{read_to_string, write_file};
 use anyhow::{Context, Result};
 use schema_ir::{LumiereSchemaManifest, OwnershipCounts};
 use serde_json::Value;
+use std::collections::BTreeSet;
 
 /// Fast path for regenerating the closed STDB apply dispatch from an already
 /// generated canonical contracts manifest.
@@ -52,8 +55,12 @@ pub fn run_reconstruction_apply(paths: &Paths) -> Result<()> {
 pub fn run(paths: &Paths) -> Result<()> {
     // ── 1. Schema IR: STDB Rust bindings → lumiere-schema-manifest.json ────
 
-    let schema_manifest = stdb_bindings_parse::parse_bindings(&paths.stdb_bindings_dir)
-        .context("extracting schema IR from STDB Rust bindings")?;
+    let module_schema: Value = serde_json::from_str(&read_to_string(&paths.module_schema_json)?)
+        .with_context(|| format!("parse {}", paths.module_schema_json.display()))?;
+    let view_names = module_view_names(&module_schema)?;
+    let schema_manifest =
+        stdb_bindings_parse::parse_bindings(&paths.stdb_bindings_dir, &view_names)
+            .context("extracting schema IR from STDB Rust bindings")?;
     let c0_enforced = std::env::var("C0_ENFORCE_TENANT_OWNERSHIP").as_deref() == Ok("1");
     let ownership_counts: Option<OwnershipCounts> = match schema_manifest.ownership_counts() {
         Ok(counts) => Some(counts),
@@ -146,16 +153,6 @@ pub fn run(paths: &Paths) -> Result<()> {
         .as_array()
         .context("generated archive-manifest.json: 'candidates' must be an array")?;
 
-    // ── 3. PG DDL: one SQL file per active archive candidate ───────────────
-
-    let ddl_file_count = emit_ddl(paths, &schema_manifest, candidates_arr)?;
-
-    for (file_name, ddl) in pg_ddl_emit::emit_commit_stream_ddl() {
-        let ddl_path = paths.cold_ddl_dir.join(file_name);
-        write_file(&ddl_path, &ddl)?;
-        println!("Wrote {}", ddl_path.display());
-    }
-
     // ── 4. Codec manifest: STDB ↔ PG type mapping per archive candidate ────
 
     let codec_manifest_json =
@@ -178,21 +175,25 @@ pub fn run(paths: &Paths) -> Result<()> {
 
     // ── 4b. Versioned durable PG schema and migration ────────────────────
 
-    let durable_migration =
-        pg_migration_emit::emit_durable_migration(&schema_manifest, &storage_policy_manifest)
-            .context("generating durable PostgreSQL migration")?;
-    let migration_path = paths
-        .durable_migration_dir
-        .join(format!("{}.sql", pg_migration_emit::DURABLE_MIGRATION_NAME));
-    write_file(&migration_path, &durable_migration.sql)?;
+    let ledger = pg_migration_emit::MigrationLedger::load(&paths.durable_migration_ledger_dir)
+        .context("loading the released durable migration ledger")?;
+    let durable_migration = pg_migration_emit::emit_durable_migrations(
+        &schema_manifest,
+        &storage_policy_manifest,
+        &ledger,
+    )
+    .context("generating durable PostgreSQL migrations")?;
+    // Plan the schema for downstream hydration/read metadata, but emit no
+    // durable SQL before the canonical IR handoff. durable_postgresql_ir owns
+    // actual migration emission after contract_ir::run.
     write_file(
         &paths.durable_migration_manifest_out,
         &durable_migration.manifest,
     )?;
-    println!("Wrote {}", migration_path.display());
     println!(
-        "Wrote {} durable PG tables (checksum {})",
-        durable_migration.applicable_table_count, durable_migration.sql_checksum
+        "Wrote {} durable PG tables across {} migration(s)",
+        durable_migration.applicable_table_count,
+        durable_migration.migrations.len()
     );
 
     // ── 5. Hydration manifest: reducers that may target archived rows ──────
@@ -258,21 +259,72 @@ pub fn run(paths: &Paths) -> Result<()> {
             })
             .unwrap_or_else(|| "ownership not verified (gate disabled)".to_string())
     );
-    println!(
-        "lumiere-codegen: {ddl_file_count} cold PG DDL file(s) from storage-policy-manifest.json"
-    );
     println!("Wrote {}", paths.schema_manifest_out.display());
     println!("Wrote {}", paths.archive_manifest_out.display());
 
     Ok(())
 }
 
-fn emit_ddl(
-    paths: &Paths,
+fn module_view_names(module_schema: &Value) -> Result<BTreeSet<String>> {
+    let exports = module_schema["misc_exports"]
+        .as_array()
+        .context("module schema misc_exports must be an array")?;
+    let mut names = BTreeSet::new();
+    for export in exports {
+        let Some(view) = export.get("View") else {
+            continue;
+        };
+        let name = view["name"]
+            .as_str()
+            .filter(|name| !name.is_empty())
+            .context("module schema view must have a non-empty name")?;
+        if !names.insert(name.to_owned()) {
+            anyhow::bail!("module schema contains duplicate view {name}");
+        }
+    }
+    Ok(names)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::module_view_names;
+
+    #[test]
+    fn extracts_only_view_relations_from_misc_exports() {
+        let schema = serde_json::json!({
+            "misc_exports": [
+                { "View": { "name": "tenant_read" } },
+                { "Procedure": { "name": "refresh_projection" } },
+                { "ColumnDefaultValue": { "table": "orders", "col_id": 1, "value": "00" } }
+            ]
+        });
+
+        let names = module_view_names(&schema).unwrap();
+
+        assert_eq!(names.into_iter().collect::<Vec<_>>(), vec!["tenant_read"]);
+    }
+
+    #[test]
+    fn rejects_duplicate_view_names() {
+        let schema = serde_json::json!({
+            "misc_exports": [
+                { "View": { "name": "tenant_read" } },
+                { "View": { "name": "tenant_read" } }
+            ]
+        });
+
+        assert!(module_view_names(&schema)
+            .unwrap_err()
+            .to_string()
+            .contains("duplicate view tenant_read"));
+    }
+}
+
+pub(crate) fn emit_archive_ddl(
     schema_manifest: &LumiereSchemaManifest,
     candidates_arr: &[Value],
-) -> Result<usize> {
-    let mut ddl_count = 0;
+) -> Result<Vec<(String, String)>> {
+    let mut artifacts = Vec::new();
     for (index, cand) in candidates_arr.iter().enumerate() {
         let table = cand["table"]
             .as_str()
@@ -311,10 +363,7 @@ fn emit_ddl(
         };
         let ddl = pg_ddl_emit::emit_cold_table_ddl(schema_manifest, &cfg)
             .with_context(|| format!("generating DDL for '{table}' → '{cold_table}'"))?;
-        let ddl_path = paths.cold_ddl_dir.join(format!("{cold_table}.sql"));
-        write_file(&ddl_path, &ddl)?;
-        println!("Wrote {}", ddl_path.display());
-        ddl_count += 1;
+        artifacts.push((format!("{cold_table}.sql"), ddl));
     }
-    Ok(ddl_count)
+    Ok(artifacts)
 }

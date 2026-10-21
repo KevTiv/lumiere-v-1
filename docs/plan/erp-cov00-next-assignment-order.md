@@ -85,9 +85,9 @@ Current disposition: `ACCEPTED` for the bounded sale-order confirmation slice. T
 
 ### COV-05
 
-Current disposition: `IMPLEMENTED` for the three-slice first-adoption chain; runtime acceptance is pending. COV-05a confirms the PO and correlates inbound receipts through exact `stock_picking.purchase_id`. COV-05b captures the exact open `stock_move.purchase_line_id` identity before receipt and requires the same move/picking after validation. COV-05c snapshots the durable `purchase_order.invoice_ids` relation before bill dispatch and accepts exactly one new `account_move` id after readback. All slices preserve stale/deny effect sets. See [`erp-cov05-purchase-order-confirmation-status.md`](./erp-cov05-purchase-order-confirmation-status.md), [`erp-cov05b-purchase-receipt-status.md`](./erp-cov05b-purchase-receipt-status.md), and [`erp-cov05c-vendor-bill-status.md`](./erp-cov05c-vendor-bill-status.md).
+Current disposition: `REVIEW` for COV-05a/b/c/d; all four bounded operator gates passed on dedicated local stacks. COV-05a confirms the PO and correlates inbound receipts through exact `stock_picking.purchase_id`. COV-05b captures the exact open `stock_move.purchase_line_id` identity before receipt and requires the same move/picking after validation. COV-05c snapshots the durable `purchase_order.invoice_ids` relation before bill dispatch and accepts exactly one new `account_move` id after readback. COV-05d adds scoped canonical quantity proof, strict receipt-state evidence, and committed-response-lost recovery without redispatch. All earlier slices preserve stale/deny effect sets. See [`erp-cov05-purchase-order-confirmation-status.md`](./erp-cov05-purchase-order-confirmation-status.md), [`erp-cov05b-purchase-receipt-status.md`](./erp-cov05b-purchase-receipt-status.md), [`erp-cov05c-vendor-bill-status.md`](./erp-cov05c-vendor-bill-status.md), and [`erp-cov05d-purchase-receipt-recovery-status.md`](./erp-cov05d-purchase-receipt-recovery-status.md). Local runtime proof does not promote the full module or substitute for remote CI.
 
-The original Lane-B first-adoption path (PO → receipt → vendor bill) is now implemented without newest-row/id-delta effect discovery. Full COV-05 remains open. Next bounded Purchasing work should target three-way-match rejection/recovery or partial receipt/backorder billing; bill posting/payment belongs with COV-08 Accounting.
+Next bounded Purchasing work is COV-05e partial receipt/backorder billing and COV-05f three-way-match rejection/recovery. Establish receipt replay/continuation identity and exact bill-line provenance first; any missing stable contract requires producer → release → consumer work, not client metadata or product/name heuristics. Full COV-05 remains open. Bill posting/payment belongs with COV-08 Accounting.
 
 ### COV-06
 
@@ -100,13 +100,30 @@ COV-06's stock-movement lineage (picking lifecycle, backorder, quant transfer, c
 
 ### COV-07
 
-Current disposition: `IMPLEMENTED` for COV-07a through COV-07d; runtime acceptance is pending. COV-07a proves exact same-MO Draft → Confirmed readback. COV-07b closes exact BOM material consumption and the `move_raw_ids` effect set. COV-07c closes exact production quantity → finished move → destination quant → Done. COV-07d adds one exact workorder execution path and closes the previously disconnected workorder/productivity projections: workcenter `order_ids` and state counts are derived from authoritative workorders; Start requires an MO-owned workorder under an executing parent and a completed blocker when present; productivity is Progress-only and writes the exact inserted productivity ID into both `workorder.time_ids` and `workcenter.productivity_ids`; workorder duration/workcenter productive time advance by the submitted duration; Finish requires the productivity reverse relation to match authoritative rows, derives duration rather than adding a placeholder, closes open productivity logs, and refreshes workcenter state counters. The certified UI path logs productivity from the selected workorder row using its exact workcenter, rather than asking the operator to type a workorder ID. See [`erp-cov07a-mo-confirmation-status.md`](./erp-cov07a-mo-confirmation-status.md), [`erp-cov07b-material-consumption-status.md`](./erp-cov07b-material-consumption-status.md), [`erp-cov07c-production-close-status.md`](./erp-cov07c-production-close-status.md), and [`erp-cov07d-workorder-execution-status.md`](./erp-cov07d-workorder-execution-status.md).
+Current disposition: `REVIEW`, module floor U2. COV-07a–g are implemented:
+same-MO confirmation; exact raw consumption and finished output; MO-owned
+workorders, productivity and workcenter projections; required quality gating;
+untracked finished-output scrap; and authoritative BOM byproduct output.
+The historical Docker lane passed all 46 tests twice, including the four
+Manufacturing lifecycle specs and COV-07f/g. Its second run proved projection
+convergence. The 2026-10-07 follow-up passed two PostgreSQL upgrade tests and
+closed the migration checksum blocker at contracts v0.3.86. See
+[`cov-runtime-docker-acceptance-2026-10-04.md`](../evidence/cov-runtime-docker-acceptance-2026-10-04.md).
+This supersedes the earlier backend-only/runtime-pending descriptions for
+COV-07e/f/g without declaring full Manufacturing acceptance.
 
-Next bounded Manufacturing work is COV-07e: one production/workorder-linked quality gate with exact pass/fail effect, completion gating, and stale/replay/deny preservation. The backend gate and persisted test are implemented on `codex/cov07e-manufacturing-quality-gate`; contract release, UI readback, browser denial/replay, and runtime acceptance remain pending. See [`erp-cov07e-manufacturing-quality-gate-status.md`](./erp-cov07e-manufacturing-quality-gate-status.md). Keep scrap/byproducts and full costing separate.
-
-COV-07f now implements one bounded post-production scrap backend path, stacked on COV-07e. It records exact MO-owned scrap move identity and moves an untracked finished quantity to a designated scrap location; contract/UI and runtime certification remain pending. See [`erp-cov07f-finished-output-scrap-status.md`](./erp-cov07f-finished-output-scrap-status.md). Byproducts, tracked scrap, and full costing remain separate.
-
-COV-07g now implements authoritative BOM byproducts and exact untracked byproduct output at MO completion, stacked on COV-07f. Contract/UI and runtime certification remain pending. See [`erp-cov07g-bom-byproduct-output-status.md`](./erp-cov07g-bom-byproduct-output-status.md). Tracked byproducts and full accounting valuation remain separate.
+Remaining work is assigned as COV-07h complete domain lifecycle, COV-07i
+operator BOM/MO creation, COV-07j exact result navigation, COV-07k actual
+material/labor costing and accounting valuation, COV-07l lot/serial output and
+scrap during production, and COV-07m routing/workcenter integrity. The intended
+changes, upstream-stack verification and final D/A/O/E gates are recorded in
+[`erp-cov07-completion-stack-plan.md`](./erp-cov07-completion-stack-plan.md).
+Integrate on PR #175 head `9eb67a11` (aggregate contracts v0.3.99), then execute
+the final same-head domain, contract, unit, browser and projection gates.
+Historical browser evidence leaves fixture-assisted BOM/MO creation,
+result-navigation debt and complete material/cost identities open. The module
+stays U2/review until the complete lifecycle and required adversarial proof
+pass; keep unsupported capabilities hidden or explicitly restricted.
 
 
 ### COV-08
@@ -143,6 +160,33 @@ depreciation/disposal exact effects, then COV-08e finance certification. The ful
 COV-08..27 targets are recorded in
 [`erp-cov08-27-stacked-acceptance-plan.md`](./erp-cov08-27-stacked-acceptance-plan.md).
 
+
+## Maintainability convergence rule
+
+The remaining COV implementation must converge on the codebase's strongest existing patterns rather than add parallel conventions. Treat this as an implementation constraint for every new bounded slice:
+
+- consequential mutations use one canonical operation path: generated command dispatch, exact cache-independent readback, explicit affected resources, and typed unresolved/rejected outcomes; transport acceptance alone is never business success;
+- a workflow that declares canonical observation must fail closed as `outcome_unknown` when that observation itself fails, or when it completes without confirming the effect; never silently downgrade failed or empty readback to `applied`;
+- every `TransitionSpec` declares either `observe` or a reviewed `noReadback` reason (enforced by the type). An exemption names why no exact effect is readable yet, so removing it is a tracked follow-up rather than a silent default;
+- effect identity comes from stable primary keys or owned relations. Do not add newest/highest-row, first-match, global child-scan, or id-delta discovery;
+- decode/normalize transport/query shapes at a shared boundary where practical. New feature code should not introduce fresh `Record<string, unknown>` casts or duplicate camelCase/snake_case projection adapters unless the boundary genuinely cannot express the type yet;
+- domain invariants have one owner. Cross-domain workflows call that owner's operation/helper rather than reproducing its bookkeeping locally;
+- UI action availability may mirror server policy for presentation, but the server remains authoritative. Prefer server/contract-derived action capability as those surfaces become available rather than creating another independent transition map;
+- extract shared infrastructure only after at least two concrete consumers need the same behavior. Do not generalize domain-specific effect verification merely to reduce line count;
+- each bounded slice should remove or leave unchanged local convention count. If it needs a new convention, document why the existing generated-command, operation-effect, workflow, or domain-helper seams cannot own it.
+
+### Agent coordination
+
+Use bounded Luna-style tracks with isolated file ownership. A worker may investigate or implement one concern, but the coordinator reviews every diff and its tests before integration. Do not let parallel agents invent competing abstractions.
+
+For the remaining ERP sequence, assign work in this order:
+
+1. **Correctness seam first** — remove false-success, ambiguous identity, stale retry, and parser/input-normalization defects in the touched workflow.
+2. **Reuse second** — move the repaired path onto an existing shared operation/workflow/domain seam when one already exists.
+3. **Feature breadth third** — only then add the next operator-visible lifecycle step.
+4. **Ratchet** — add focused native/unit/browser evidence so later slices cannot reintroduce the older convention.
+
+COV-07e and later Manufacturing slices must therefore build on the COV-07a–d exact-readback protocol rather than the older raw `apiFetch + response.ok + invalidate` mutation style. COV-07d already moved work-order execution onto it (exact workorder id, parent-MO relation, canonical state/effect observation, stale/replay/deny preservation, no duplicated stock/workcenter bookkeeping); the quality gate should follow the same shape.
 
 ## First implementation convergence
 

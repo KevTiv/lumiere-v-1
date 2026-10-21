@@ -111,7 +111,7 @@ test.describe(
         await failQualityCheckViaUi(
           warehousePage,
           checkId,
-          qcLocationId,
+          qcName,
           "Damaged in transit",
         )
 

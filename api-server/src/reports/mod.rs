@@ -8,6 +8,7 @@ pub(crate) mod execution_context;
 pub mod financial_position;
 pub(crate) mod generation;
 pub mod low_stock;
+pub mod margin_supply;
 pub mod open_balances;
 pub mod render;
 pub mod service;

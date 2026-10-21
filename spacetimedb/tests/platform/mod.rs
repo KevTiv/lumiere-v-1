@@ -132,5 +132,14 @@ pub fn run_tenant_isolation_tests(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_country_pack_test(ctx: &ReducerContext) -> Result<(), String> {
-    country_pack_test::test_country_pack_activation(ctx).map_err(|e| format!("country_pack: {e}"))
+    country_pack_test::test_country_pack_activation(ctx)
+        .map_err(|e| format!("country_pack: {e}"))?;
+    country_pack_test::test_document_pack_lookup_requires_accepted_effective_pin(ctx)
+        .map_err(|e| format!("document pack resolution: {e}"))?;
+    country_pack_test::test_document_fiscal_archive_requires_declared_kind(ctx)
+        .map_err(|e| format!("document fiscal archive: {e}"))?;
+    country_pack_test::test_fiscal_document_versions_revalidate_pack_and_mime(ctx)
+        .map_err(|e| format!("fiscal document versions: {e}"))?;
+    country_pack_test::test_fiscal_document_restore_revalidates_pack_without_writes(ctx)
+        .map_err(|e| format!("fiscal document restore: {e}"))
 }
