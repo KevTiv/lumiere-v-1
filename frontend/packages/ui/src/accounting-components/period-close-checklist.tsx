@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,7 +20,11 @@ import { accountPeriodStateTag } from "@lumiere/erp-shared/accounting-create-par
 import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { kpiDate } from "@/lib/kpi-tiles"
-import type { ModuleDataState } from "../lib/module-data-state"
+import { stbEnumTag } from "../lib/accounting-move-utils"
+import { mergeModuleStates, type ModuleDataState } from "../lib/module-data-state"
+import { ModuleDataNotice } from "../pages/module-data-notice"
+import { periodReportHref } from "../lib/period-report-context"
+import { stbTimestampMicros, stbTimestampToExactIso } from "@lumiere/erp-shared/stb-timestamp"
 import {
   Dialog,
   DialogContent,
@@ -42,6 +46,7 @@ type CloseStep = {
   tabId?: string
   href?: string
   icon: ReactNode
+  sourceState?: ModuleDataState
 }
 
 type ScopedCount = {
@@ -89,7 +94,10 @@ function rowId(row: PeriodCloseLookupRow, ...keys: (keyof PeriodCloseLookupRow)[
 function rowDate(row: PeriodCloseLookupRow, ...keys: (keyof PeriodCloseLookupRow)[]): Date | null {
   for (const key of keys) {
     const value = row[key]
-    if (value != null) return kpiDate(value)
+    if (value != null) {
+      const date = kpiDate(value)
+      return date && Number.isFinite(date.getTime()) ? date : null
+    }
   }
   return null
 }
@@ -113,38 +121,33 @@ function isInPeriod(date: Date, dateFrom: Date, dateTo: Date): boolean {
   return value >= dateFrom.getTime() && value <= dateTo.getTime()
 }
 
-function reportCoversPeriod(row: PeriodCloseLookupRow, dateFrom: Date, dateTo: Date): boolean {
-  const reportFrom = rowDate(row, "dateFrom", "date_from")
-  const reportTo = rowDate(row, "dateTo", "date_to")
-  return reportFrom?.getTime() === dateFrom.getTime() && reportTo?.getTime() === dateTo.getTime()
+function reportCoversPeriod(
+  row: PeriodCloseLookupRow,
+  dateFrom: bigint,
+  dateTo: bigint,
+): boolean {
+  const reportFrom = stbTimestampMicros(row.dateFrom ?? row.date_from)
+  const reportTo = stbTimestampMicros(row.dateTo ?? row.date_to)
+  return reportFrom === dateFrom && reportTo === dateTo
 }
 
 function moveStateIsDraft(state: unknown): boolean | null {
-  const tag =
-    state != null && typeof state === "object" && "tag" in state
-      ? String((state as { tag: unknown }).tag).toLowerCase()
-      : String(state ?? "").toLowerCase()
+  const tag = stbEnumTag(state).toLowerCase()
   if (tag === "draft") return true
-  if (tag === "posted" || tag === "cancelled") return false
+  if (["posted", "cancelled", "cancel"].includes(tag)) return false
   return null
 }
 
 function reportTypeIsVat(row: Record<string, unknown>): boolean {
-  const raw = row.reportType ?? row.report_type
-  const tag =
-    raw != null && typeof raw === "object" && "tag" in raw
-      ? String((raw as { tag?: string }).tag ?? "")
-      : String(raw ?? "")
+  const tag = stbEnumTag(row.reportType ?? row.report_type)
   return tag.toLowerCase().includes("vat")
 }
 
 function reportStateNormalized(row: Record<string, unknown>): string {
-  const raw = row.state
-  if (raw != null && typeof raw === "object" && "tag" in raw) {
-    return String((raw as { tag: string }).tag).toLowerCase()
-  }
-  return String(raw ?? "").toLowerCase()
+  return stbEnumTag(row.state).toLowerCase()
 }
+
+export type PeriodCloseSource = "fiscalYears" | "accountPeriods" | "moves" | "bankStatements" | "bankStatementLines" | "financialReports"
 
 function statusBadge(status: StepStatus, t: (key: string) => string) {
   if (status === "done") {
@@ -172,6 +175,7 @@ function statusBadge(status: StepStatus, t: (key: string) => string) {
 }
 
 export interface PeriodCloseChecklistProps {
+  organizationId?: bigint
   companyId: bigint
   companyLabel?: string
   fiscalYears: Record<string, unknown>[]
@@ -180,6 +184,9 @@ export interface PeriodCloseChecklistProps {
   bankStatements: PeriodCloseLookupRow[]
   bankStatementLines: Record<string, unknown>[]
   financialReports: Record<string, unknown>[]
+  sourceStates?: Partial<Record<PeriodCloseSource, ModuleDataState>>
+  /** Only explicitly applicable report policies may block closing. VAT is not universal. */
+  requiredReports?: readonly ("trial-balance" | "vat-report")[]
   onNavigateToTab: (tabId: string) => void
   dataState?: ModuleDataState
   onClosePeriod?: (periodId: bigint) => Promise<unknown>
@@ -188,6 +195,7 @@ export interface PeriodCloseChecklistProps {
 }
 
 export function PeriodCloseChecklist({
+  organizationId,
   companyId,
   companyLabel,
   fiscalYears,
@@ -196,6 +204,8 @@ export function PeriodCloseChecklist({
   bankStatements,
   bankStatementLines,
   financialReports,
+  sourceStates,
+  requiredReports = [],
   onNavigateToTab,
   dataState = { status: "ready" },
   onClosePeriod,
@@ -208,33 +218,58 @@ export function PeriodCloseChecklist({
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string | null>(null)
 
+  const [selectionCompany, setSelectionCompany] = useState(companyId)
+  useEffect(() => {
+    setTargetPeriodId("")
+    setSelectionCompany(companyId)
+    setReviewPeriodId(null)
+    setCloseError(null)
+  }, [companyId])
+  const stateFor = (...keys: PeriodCloseSource[]) => mergeModuleStates(keys.map((key) => sourceStates?.[key] ?? { status: "ready" }))
+  const fiscalSource = stateFor("fiscalYears", "accountPeriods")
+  const movesSource = stateFor("moves")
+  const bankSource = stateFor("bankStatements", "bankStatementLines")
+  const reportsSource = stateFor("financialReports")
+
   const companyFiscalYears = useMemo(
-    () => fiscalYears.filter((fy) => rowCompanyId(fy) === String(companyId)),
-    [fiscalYears, companyId],
+    () =>
+      fiscalSource.status !== "ready" ? [] : fiscalYears.filter(
+        (fy) => rowCompanyId(fy) === String(companyId),
+      ),
+    [fiscalYears, companyId, fiscalSource.status],
   )
 
   const companyPeriods = useMemo(
-    () => accountPeriods.filter((p) => rowCompanyId(p) === String(companyId)),
-    [accountPeriods, companyId],
+    () =>
+      fiscalSource.status !== "ready" ? [] : accountPeriods.filter(
+        (p) => rowCompanyId(p) === String(companyId),
+      ),
+    [accountPeriods, companyId, fiscalSource.status],
   )
 
   const fiscalConfigured =
     dataState.status === "ready" && companyFiscalYears.length > 0 && companyPeriods.length > 0
 
-  const targetPeriod = useMemo(() => {
-    const matches = companyPeriods.filter((period) => String(period.id ?? "") === targetPeriodId)
-    return matches.length === 1 ? matches[0]! : null
-  }, [companyPeriods, targetPeriodId])
+  const targetPeriod = useMemo(
+    () => {
+      if (selectionCompany !== companyId || fiscalSource.status !== "ready") return null
+      const matches = companyPeriods.filter((period) => String(period.id ?? "") === targetPeriodId)
+      return matches.length === 1 ? matches[0]! : null
+    },
+    [companyPeriods, targetPeriodId, selectionCompany, companyId, fiscalSource.status],
+  )
 
   const targetRange = useMemo(() => {
     if (!targetPeriod) return null
     const dateFrom = rowDate(targetPeriod, "dateFrom", "date_from")
     const dateTo = rowDate(targetPeriod, "dateTo", "date_to")
-    return dateFrom && dateTo && dateFrom <= dateTo ? { dateFrom, dateTo } : null
+    const fromMicros = stbTimestampMicros(targetPeriod.dateFrom ?? targetPeriod.date_from)
+    const toMicros = stbTimestampMicros(targetPeriod.dateTo ?? targetPeriod.date_to)
+    return dateFrom && dateTo && fromMicros != null && toMicros != null && fromMicros <= toMicros && Number.isFinite(dateFrom.getTime()) && Number.isFinite(dateTo.getTime()) ? { dateFrom, dateTo, fromMicros, toMicros } : null
   }, [targetPeriod])
 
   const draftMoves = useMemo<ScopedCount>(() => {
-    if (!targetRange || dataState.status !== "ready")
+    if (!targetRange || dataState.status !== "ready" || movesSource.status !== "ready")
       return { available: false, count: 0, unknownCount: 0, records: [] }
     let available = true
     let count = 0
@@ -272,10 +307,10 @@ export function PeriodCloseChecklist({
       })
     }
     return { available, count, unknownCount, records }
-  }, [moves, companyId, targetRange, dataState.status])
+  }, [moves, companyId, targetRange, dataState.status, movesSource.status])
 
   const bankLines = useMemo<ScopedCount>(() => {
-    if (!targetRange || dataState.status !== "ready")
+    if (!targetRange || dataState.status !== "ready" || bankSource.status !== "ready")
       return { available: false, count: 0, unknownCount: 0, records: [] }
     const statementsById = new Map<string, PeriodCloseLookupRow[]>()
     for (const statement of bankStatements) {
@@ -339,16 +374,16 @@ export function PeriodCloseChecklist({
       })
     }
     return { available, count, unknownCount, records }
-  }, [bankStatements, bankStatementLines, companyId, targetRange, dataState.status])
+  }, [bankStatements, bankStatementLines, companyId, targetRange, dataState.status, bankSource.status])
 
   const periodReports = useMemo(() => {
-    if (!targetRange || dataState.status !== "ready") return []
+    if (!targetRange || dataState.status !== "ready" || reportsSource.status !== "ready") return []
     return financialReports.filter(
       (report) =>
         rowCompanyId(report) === String(companyId) &&
-        reportCoversPeriod(report, targetRange.dateFrom, targetRange.dateTo),
+        reportCoversPeriod(report, targetRange.fromMicros, targetRange.toMicros),
     )
-  }, [financialReports, companyId, targetRange, dataState.status])
+  }, [financialReports, companyId, targetRange, reportsSource.status, dataState.status])
 
   const vatReady = useMemo(() => {
     return periodReports.some((r) => {
@@ -360,11 +395,7 @@ export function PeriodCloseChecklist({
 
   const trialBalanceReady = useMemo(() => {
     return periodReports.some((r) => {
-      const raw = r.reportType ?? r.report_type
-      const tag =
-        raw != null && typeof raw === "object" && "tag" in raw
-          ? String((raw as { tag?: string }).tag ?? "")
-          : String(raw ?? "")
+      const tag = stbEnumTag(r.reportType ?? r.report_type)
       if (!tag.toLowerCase().includes("trial")) return false
       const st = reportStateNormalized(r)
       return st === "generated" || st === "exported" || st === "archived"
@@ -375,30 +406,36 @@ export function PeriodCloseChecklist({
   const targetOpenPeriodCount = targetPeriodState === "Open" ? 1 : 0
 
   const steps: CloseStep[] = useMemo(() => {
-    const fiscalStatus: StepStatus = fiscalConfigured ? "done" : "pending"
+    const fiscalStatus: StepStatus = fiscalSource.status !== "ready" ? "blocked" : fiscalConfigured ? "done" : "pending"
     const hasTargetPeriod = targetPeriod != null && targetRange != null
-    const bankStatus: StepStatus =
-      !fiscalConfigured || !hasTargetPeriod || !bankLines.available
-        ? "blocked"
-        : bankLines.count === 0
-          ? "done"
-          : "pending"
-    const draftStatus: StepStatus =
-      !fiscalConfigured || !hasTargetPeriod || !draftMoves.available
-        ? "blocked"
-        : draftMoves.count === 0
-          ? "done"
-          : "pending"
-    const tbStatus: StepStatus =
-      !fiscalConfigured || !hasTargetPeriod ? "blocked" : trialBalanceReady ? "done" : "pending"
-    const vatStatus: StepStatus =
-      !fiscalConfigured || !hasTargetPeriod ? "blocked" : vatReady ? "done" : "pending"
+    const bankStatus: StepStatus = !fiscalConfigured || !hasTargetPeriod || !bankLines.available
+      ? "blocked"
+      : bankLines.count === 0
+        ? "done"
+        : "pending"
+    const draftStatus: StepStatus = !fiscalConfigured || !hasTargetPeriod || !draftMoves.available
+      ? "blocked"
+      : draftMoves.count === 0
+        ? "done"
+        : "pending"
+    const tbStatus: StepStatus = !fiscalConfigured || !hasTargetPeriod || reportsSource.status !== "ready"
+      ? "blocked"
+      : trialBalanceReady
+        ? "done"
+        : "pending"
+    const vatStatus: StepStatus = !fiscalConfigured || !hasTargetPeriod || reportsSource.status !== "ready"
+      ? "blocked"
+      : vatReady
+        ? "done"
+        : "pending"
     const closeStatus: StepStatus =
       !fiscalConfigured || !hasTargetPeriod
         ? "blocked"
         : targetPeriodState === "Closed"
           ? "done"
-          : !draftMoves.available || !bankLines.available || draftMoves.count > 0 || bankLines.count > 0
+          : !draftMoves.available || !bankLines.available || draftMoves.count > 0 || bankLines.count > 0 ||
+              (requiredReports.includes("trial-balance") && !trialBalanceReady) ||
+              (requiredReports.includes("vat-report") && !vatReady)
             ? "blocked"
             : targetPeriodState === "Open"
               ? "pending"
@@ -412,6 +449,7 @@ export function PeriodCloseChecklist({
         status: fiscalStatus,
         tabId: "fiscal-years",
         icon: <Calendar className="h-5 w-5" />,
+        sourceState: fiscalSource,
       },
       {
         id: "bank-recon",
@@ -426,6 +464,7 @@ export function PeriodCloseChecklist({
         status: bankStatus,
         tabId: "bank-statements",
         icon: <Landmark className="h-5 w-5" />,
+        sourceState: bankSource,
       },
       {
         id: "draft-moves",
@@ -440,22 +479,25 @@ export function PeriodCloseChecklist({
         status: draftStatus,
         tabId: "journal-entries",
         icon: <FileText className="h-5 w-5" />,
+        sourceState: movesSource,
       },
       {
         id: "trial-balance",
         title: t("accounting.periodClose.steps.trialBalance.title"),
         description: t("accounting.periodClose.steps.trialBalance.description"),
         status: tbStatus,
-        href: "/reports?tab=trial-balance",
+        href: organizationId && targetRange && targetPeriod ? periodReportHref({ organizationId: String(organizationId), companyId: String(companyId), periodId: String(targetPeriod.id), dateFrom: stbTimestampToExactIso(targetPeriod.dateFrom ?? targetPeriod.date_from)!, dateTo: stbTimestampToExactIso(targetPeriod.dateTo ?? targetPeriod.date_to)!, reportType: "trial-balance" }) : "/reports?tab=trial-balance",
         icon: <FileText className="h-5 w-5" />,
+        sourceState: reportsSource,
       },
       {
         id: "vat-report",
         title: t("accounting.periodClose.steps.vatReport.title"),
         description: t("accounting.periodClose.steps.vatReport.description"),
         status: vatStatus,
-        href: "/reports?tab=reports",
+        href: organizationId && targetRange && targetPeriod ? periodReportHref({ organizationId: String(organizationId), companyId: String(companyId), periodId: String(targetPeriod.id), dateFrom: stbTimestampToExactIso(targetPeriod.dateFrom ?? targetPeriod.date_from)!, dateTo: stbTimestampToExactIso(targetPeriod.dateTo ?? targetPeriod.date_to)!, reportType: "vat-report" }) : "/reports?tab=reports",
         icon: <Receipt className="h-5 w-5" />,
+        sourceState: reportsSource,
       },
       {
         id: "close-period",
@@ -483,6 +525,13 @@ export function PeriodCloseChecklist({
     targetOpenPeriodCount,
     targetPeriodState,
     t,
+    fiscalSource,
+    movesSource,
+    bankSource,
+    reportsSource,
+    requiredReports,
+    organizationId,
+    companyId,
   ])
 
   const doneCount = steps.filter((s) => s.status === "done").length
@@ -492,6 +541,7 @@ export function PeriodCloseChecklist({
     : "—"
   const canClose =
     targetPeriodState === "Open" &&
+    steps.find((step) => step.id === "close-period")?.status === "pending" &&
     targetRange != null &&
     dataState.status === "ready" &&
     parseStrictU64(targetPeriod?.id) != null &&
@@ -559,7 +609,7 @@ export function PeriodCloseChecklist({
             defaultValue: "Confirmed draft journal entries",
           })}
         </dt>
-        <dd>{dataState.status === "ready" ? draftMoves.count : "—"}</dd>
+        <dd>{dataState.status === "ready" && movesSource.status === "ready" ? draftMoves.count : "—"}</dd>
       </div>
       <div>
         <dt className="text-muted-foreground">
@@ -567,7 +617,7 @@ export function PeriodCloseChecklist({
             defaultValue: "Confirmed unreconciled bank lines",
           })}
         </dt>
-        <dd>{dataState.status === "ready" ? bankLines.count : "—"}</dd>
+        <dd>{dataState.status === "ready" && bankSource.status === "ready" ? bankLines.count : "—"}</dd>
       </div>
     </dl>
   )
@@ -589,7 +639,8 @@ export function PeriodCloseChecklist({
           })}
         </label>
         <Select
-          value={targetPeriodId}
+          value={selectionCompany === companyId ? targetPeriodId : ""}
+          disabled={fiscalSource.status !== "ready"}
           onValueChange={(value) => {
             setTargetPeriodId(value)
             setReviewPeriodId(null)
@@ -615,6 +666,7 @@ export function PeriodCloseChecklist({
             ))}
           </SelectContent>
         </Select>
+        {targetRange ? <p className="mt-2 text-sm text-muted-foreground" data-testid="period-close-range">{t("accounting.periodClose.exactPeriod", { defaultValue: "Reviewing company {{company}} · {{from}} to {{to}}. Report evidence must cover these exact dates.", company: String(companyId), from: targetRange.dateFrom.toISOString().slice(0, 10), to: targetRange.dateTo.toISOString().slice(0, 10) })}</p> : null}
       </div>
 
       {targetPeriod && targetRange ? (
@@ -678,6 +730,7 @@ export function PeriodCloseChecklist({
               </div>
             </CardHeader>
             <CardContent className="pt-0">
+              {step.sourceState && step.sourceState.status !== "ready" ? <div className="mb-3">{step.sourceState.status === "loading" ? <p role="status" className="text-sm text-muted-foreground">{t("accounting.periodClose.sourceLoading", { defaultValue: "Loading the source records needed for this check." })}</p> : <ModuleDataNotice state={step.sourceState} />}</div> : null}
               {step.href ? (
                 <a href={step.href} className={buttonVariants({ variant: "outline", size: "sm" })}>
                   {t("accounting.periodClose.goToStep")}

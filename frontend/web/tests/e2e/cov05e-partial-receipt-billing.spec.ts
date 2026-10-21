@@ -94,7 +94,7 @@ async function receiveViaForm(
   await chooseSelectOptionByLabel(page, "lineId", label)
   await fillField(page, "qty", String(qty))
   const responsePromise = page.waitForResponse(
-    (response) => matchesOperationResponse(response, "receive_po_line"),
+    (response) => matchesOperationResponse(response, "erp.receive_po_line_once"),
     { timeout: 30_000 },
   )
   await submitForm(page, RECEIVE_FORM)
@@ -118,6 +118,7 @@ async function expectBillFocus(page: Page, billId: number) {
     url.searchParams.getAll("filter").length === 1 &&
     url.searchParams.get("filter") === `id:${billId}`,
   )
+  await expect(page.getByTestId("module-tab-accounting-journal-entries")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("module-tab-accounting-journal-entries"))
     .toHaveAttribute("aria-selected", "true")
   const table = activeTabEntityTable(page)
@@ -158,8 +159,8 @@ test.describe(
       // lines. account-move-lines omits product_id/quantity; native domain
       // tests own exact bill-line quantities 4/6. Full quantitative browser
       // readback for COV-05e/f requires a canonical projection release.
-      // P2P-06 first-partial replay is explicitly excluded: receive_po_line
-      // has no idempotency key; repeating 4 while 6 remains is a new receipt.
+      // P2P-06 first-partial replay is explicitly excluded because this proof
+      // captures and replays only the terminal receipt operation.
       // Seed prerequisites: first-org admin/purchasing/reader, Globex Corp,
       // stocked untracked Lumiere Dev Laptop, pricelist, expense/payable
       // accounts, and an eligible vendor-bill journal (current COV fixtures).
@@ -329,7 +330,7 @@ test.describe(
         await expectBillFocus(operator, bill2.billId)
         await assertEffects()
 
-        // Preserve the exact terminal stock effects on rejection. Do not equate
+        // Preserve the exact terminal stock effects across replay and rejection. Do not equate
         // PO-UOM quantities to stock delta: quants use the current product base
         // UOM, which may differ from the fixture form's selected PO UOM.
         // Run this proof with one worker, isolated from other laptop mutations.
@@ -340,12 +341,14 @@ test.describe(
           expect(await exactRow(page, "stock-moves", residual.id)).toEqual(terminalResidual)
           expect(await destinationQuants(page, sourceMove)).toEqual(terminalQuants)
         }
-        // Supplementary negative API checks replay only the terminal residual 6,
-        // never the unsafe first partial 4. Repeat to prove rejection is stable.
+        // The durable receipt operation returns its recorded success for the
+        // same key and input without applying stock effects again.
         for (let attempt = 0; attempt < 2; attempt += 1) {
-          expect((await replayAs(operator, terminalReceipt)).status()).toBe(422)
+          expect((await replayAs(operator, terminalReceipt)).status()).toBe(200)
           await assertRejectedEffects()
         }
+        // Vendor-bill creation has no replay key, so the completed PO rejects
+        // a repeated request and leaves all terminal effects unchanged.
         expect((await replayAs(operator, bill2.request)).status()).toBe(422)
         await assertRejectedEffects()
         const readerContext = await browser.newContext({

@@ -17,12 +17,14 @@ afterEach(cleanup)
 const props = {
   open: true,
   companyId: 10n,
-  companyLabel: "Example company",
-  currencyOptions: [{ value: "4", label: "EUR" }],
+  currencyOptions: [{ value: "4", label: "Euro", code: "EUR" }],
   journalOptions: [{ value: "35", label: "Sales journal", currencyId: "4" }],
   partnerOptions: [{ value: "223", label: "Example customer" }],
   counterpartAccountOptions: [{ value: "1200", label: "Receivables" }],
   lineAccountOptions: [{ value: "4000", label: "Consulting revenue" }],
+  profile: { logoUrl: "", accent: "teal" as const, email: "", phone: "", website: "", notice: "", terms: "", paymentInstructions: "", footer: "" },
+  seller: { name: "Example company", address: [], taxId: "", registrationNumber: "", email: "", phone: "", website: "" },
+  personalizationState: { status: "ready" as const },
   onClose: () => {},
   onCheckStatus: async () => null,
 }
@@ -35,28 +37,28 @@ describe("manual invoice document preview", () => {
     fireEvent.click(await screen.findByRole("option", { name: "Example customer" }))
     fireEvent.change(screen.getByTestId("create-invoice-line-description"), { target: { value: "Consulting work" } })
     fireEvent.change(screen.getByTestId("create-invoice-line-unit-price"), { target: { value: "100" } })
-    fireEvent.change(screen.getByLabelText("Qty"), { target: { value: "1.5" } })
-    fireEvent.click(screen.getByRole("tab", { name: "Document preview" }))
+    fireEvent.change(screen.getByLabelText("Item 1 quantity"), { target: { value: "1.5" } })
+    fireEvent.click(screen.getByTestId("create-invoice-preview-toggle"))
 
-    const preview = within(await screen.findByTestId("invoice-document-preview"))
-    expect(preview.getByText("Unsaved draft")).toBeTruthy()
-    expect(preview.getByText("Example company · EUR")).toBeTruthy()
+    const preview = within(await screen.findByTestId("invoice-document"))
+    expect(preview.getByText("Draft document")).toBeTruthy()
+    expect(preview.getByText("Example company")).toBeTruthy()
     expect(preview.getByText("Example customer")).toBeTruthy()
     expect(preview.getByText("Consulting work")).toBeTruthy()
-    expect(preview.getByRole("cell", { name: "150" })).toBeTruthy()
-    expect(preview.getByText(/Saving creates a draft, not a posted entry/)).toBeTruthy()
+    expect(preview.getByRole("cell", { name: /EUR\s150\.00/ })).toBeTruthy()
+    expect(preview.getByText(/Draft preview. Review and confirm totals before posting/)).toBeTruthy()
     expect(onSave).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole("tab", { name: "Edit document" }))
+    fireEvent.click(screen.getByRole("button", { name: "Edit details" }))
     expect((await screen.findByTestId("create-invoice-line-description") as HTMLInputElement).value).toBe("Consulting work")
     expect((screen.getByTestId("create-invoice-line-unit-price") as HTMLInputElement).value).toBe("100")
   })
 
   it("uses bill wording and does not claim a missing partner has been selected", async () => {
     render(<CreateInvoiceModal {...props} kind="bill" onSave={vi.fn()} />)
-    fireEvent.click(screen.getByRole("tab", { name: "Document preview" }))
-    const preview = within(await screen.findByTestId("invoice-document-preview"))
-    expect(preview.getByText("Bill")).toBeTruthy()
+    fireEvent.click(screen.getByTestId("create-invoice-preview-toggle"))
+    const preview = within(await screen.findByTestId("invoice-document"))
+    expect(preview.getByText("Vendor bill")).toBeTruthy()
     expect(preview.getByText("Vendor")).toBeTruthy()
     expect(preview.queryByText("Example customer")).toBeNull()
   })

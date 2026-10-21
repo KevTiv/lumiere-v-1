@@ -44,6 +44,8 @@ fn run_core_chatter_post_message_test(ctx: &ReducerContext) -> Result<(), String
 
 #[spacetimedb::reducer]
 pub fn run_core_sod_test(ctx: &ReducerContext) -> Result<(), String> {
+    access_lifecycle_test::test_canonical_duties_and_explicit_payment_capabilities(ctx)
+        .map_err(|error| format!("canonical_duty_policy: {error}"))?;
     access_lifecycle_test::test_effective_access_and_atomic_updates(ctx)
         .map_err(|e| format!("atomic_member_access: {e}"))?;
     access_lifecycle_test::test_invitation_acceptance_retries_do_not_regrant(ctx)
@@ -61,7 +63,9 @@ pub fn run_core_sod_test(ctx: &ReducerContext) -> Result<(), String> {
     sod_test::test_opportunity_field_write_policy(ctx)
         .map_err(|e| format!("opp_field_write: {e}"))?;
     sod_test::test_role_assign_revoke_rejects_replay(ctx)
-        .map_err(|e| format!("role_assign_revoke_replay: {e}"))
+        .map_err(|e| format!("role_assign_revoke_replay: {e}"))?;
+    sod_test::test_supplemental_role_authority_filters_stale_assignments(ctx)
+        .map_err(|e| format!("supplemental_role_authority: {e}"))
 }
 
 #[spacetimedb::reducer]

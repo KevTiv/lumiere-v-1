@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   callReducerBffResult,
   expectNoAppError,
@@ -29,10 +30,7 @@ test.describe("documents wave A lifecycle", () => {
       await expect(page.locator('input[type="file"]').first()).toBeVisible({ timeout: 15_000 })
     } else {
       // Tab create action
-      const docsTab = page.getByRole("tab", { name: /^documents$/i }).first()
-      if (await docsTab.isVisible().catch(() => false)) {
-        await docsTab.click()
-      }
+      await selectModuleTab(page, "documents", "documents")
       const createBtn = page.getByRole("button", { name: /upload|create|new/i }).first()
       await createBtn.click()
       await expect(page.locator('input[type="file"]').first()).toBeVisible({ timeout: 15_000 })
@@ -166,7 +164,8 @@ test.describe("DOC-009 document upload → attach → legal hold", { tag: "@p0" 
     expect(deleteAttempt.error ?? "").toMatch(/legal hold/i)
 
     await gotoModule(page, "/documents", "documents")
-    await page.getByTestId("module-tab-documents-documents").click()
+    await selectModuleTab(page, "documents", "documents")
+    await page.getByTestId("module-view-table-documents").click()
     await selectEntityRowByText(page, docName)
 
     await expectNoAppError(page)

@@ -27,6 +27,7 @@ import {
 import type { AiFormAssistConfig, FormConfig, FormPreviewRenderer } from "../lib/form-types"
 import { showSemanticOperationOutcome } from "../lib/semantic-operation-outcome"
 import { cn } from "../lib/utils"
+import { workspaceStyles } from "../lib/workspace-styles"
 import { ModularForm } from "./modular-form"
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard"
 
@@ -176,12 +177,13 @@ export function FormModal({
         data-testid={`form-modal-${config.id}`}
         className={cn(
           maxW,
+          workspaceStyles.surface,
+          "flex max-h-[86dvh] min-h-0 flex-col gap-0 overflow-hidden p-0",
           "sm:has-[[data-form-preview]]:max-w-[min(1200px,calc(100vw-2rem))]",
-          "flex max-h-[86dvh] min-h-0 flex-col gap-0 overflow-hidden border-border bg-card p-0 shadow-2xl",
           className
         )}
       >
-        <DialogHeader className="shrink-0 border-b border-border/70 bg-card/95 px-6 py-5 backdrop-blur">
+        <DialogHeader className={cn(workspaceStyles.pageHeader, "sticky top-0 z-10 min-w-0 flex-shrink-0 bg-card/95 px-4 py-4 pr-12 backdrop-blur sm:px-6 sm:py-5 sm:pr-12")}>
           <div className="flex items-center gap-3">
             {HeaderIcon && (
               <div className={cn(
@@ -192,11 +194,11 @@ export function FormModal({
               </div>
             )}
             <div className="min-w-0">
-              <DialogTitle className="text-base font-semibold leading-tight tracking-[-0.01em]" data-testid="form-modal-title">
+              <DialogTitle className={cn(workspaceStyles.sectionTitle, "[overflow-wrap:anywhere]")} data-testid="form-modal-title">
                 {config.title}
               </DialogTitle>
               {config.description && (
-                <DialogDescription className="mt-1 text-sm leading-5">
+                <DialogDescription className={cn(workspaceStyles.sectionDescription, "mt-1")}>
                   {config.description}
                 </DialogDescription>
               )}

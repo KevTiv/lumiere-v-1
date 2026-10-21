@@ -42,7 +42,8 @@ export async function exact(page: Page, resource: string, recordId: number): Pro
 // Unrelated parallel creates do not participate in fixture readback.
 export async function create<K extends StdbBffNamedReducerKey>(page: Page, resource: string, operation: K, input: StdbBffCommandInput<K>, matchesFixture: (row: Row) => boolean, observe: () => Promise<Row[]> = () => rows(page, resource)): Promise<Row> {
   expect((await observe()).filter(matchesFixture), `${resource} fixture key must be unused`).toHaveLength(0)
-  expect((await command(page, operation, input)).ok()).toBe(true)
+  const response = await command(page, operation, input)
+  expect(response.ok(), `${operation}: ${await response.text()}`).toBe(true)
   let created: Row | undefined
   await expect.poll(async () => {
     const matches = (await observe()).filter(matchesFixture)
@@ -67,7 +68,7 @@ export async function product(page: Page): Promise<Row> {
   }, row => value(row, "defaultCode", "default_code") === fixtureCode &&
     id(row, "organizationId", "organization_id") === id(category, "organizationId", "organization_id"))
 }
-export async function location(page: Page, companyId: number, scrapLocation = false): Promise<Row> {
+export async function location(page: Page, companyId: number, scrapLocation = false, usage: "internal" | "customer" = "internal"): Promise<Row> {
   const fixtureBarcode = `cov-location-${randomUUID()}`
   const organizationId = await fetchSessionOrganizationId(page)
   // Supplemental setup observer only: barcode is persisted but omitted by the BFF projection.
@@ -117,7 +118,7 @@ export async function location(page: Page, companyId: number, scrapLocation = fa
   return create(page, "stock-locations", "create_company_stock_location", {
     companyId,
     params: stdbParamsToJson({
-      name: smokeName("cov-location"), usage: "internal", locationCategory: "internal",
+      name: smokeName("cov-location"), usage, locationCategory: "internal",
       parentPath: "/", childLeft: 0, childRight: 1, scrapLocation, returnLocation: false,
       active: true, posx: 0, posy: 0, posz: 0, cyclicInventoryFrequency: 0,
       locationId: null, completeName: null, valuationInAccountId: null,
@@ -172,6 +173,7 @@ export async function prepareOutput(page: Page, companyId: number, moId: number)
 }
 export async function openRow(page: Page, tab: "orders" | "boms", recordId: number) {
   await gotoModule(page, `/manufacturing?tab=${tab}&filter=id:${recordId}`, "manufacturing")
+  await expect(page.getByTestId(`module-tab-manufacturing-${tab}`)).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId(`module-tab-manufacturing-${tab}`)).toHaveAttribute("aria-selected", "true")
   const panel = page.locator('[role="tabpanel"]:visible')
   await panel.getByTestId(`entity-row-${recordId}`).click()

@@ -12,10 +12,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import type { ModuleConfig } from "../lib/module-types"
 import { chooseSelectValue } from "../components/select-test-utils"
 
-const route = vi.hoisted(() => ({ query: "tab=fixed-assets&filter=id%3A7", replace: vi.fn() }))
+const route = vi.hoisted(() => ({ query: "tab=fixed-assets&filter=id%3A7", push: vi.fn(), replace: vi.fn() }))
 vi.mock("next/navigation", () => ({
   usePathname: () => "/accounting",
-  useRouter: () => ({ replace: route.replace }),
+  useRouter: () => ({ push: route.push, replace: route.replace }),
   useSearchParams: () => new URLSearchParams(route.query),
 }))
 vi.mock("@lumiere/i18n", () => ({
@@ -82,6 +82,7 @@ beforeAll(() => {
 })
 beforeEach(() => {
   route.query = "tab=fixed-assets&filter=id%3A7"
+  route.push.mockReset()
   route.replace.mockReset()
 })
 afterEach(cleanup)
@@ -110,7 +111,7 @@ describe("module task-area navigation", () => {
       "credit-control",
     ])
     expect(screen.queryByTestId("module-tab-accounting-fixed-assets")).toBeNull()
-    expect(route.replace).toHaveBeenCalledWith("/accounting?tab=invoices", { scroll: false })
+    expect(route.push).toHaveBeenCalledWith("/accounting?tab=invoices", { scroll: false })
   })
 
   it("keeps arrow, Home, and End focus within the two mounted area tabs", async () => {
@@ -132,8 +133,8 @@ describe("module task-area navigation", () => {
     route.query = "tab=fixed-assets&filter=id%3A7&filter=state%3AOpen&search=keep"
     render(<ControlledView />)
     chooseSelectValue(screen.getByTestId("module-area-accounting"), "invoices")
-    expect(route.replace).toHaveBeenCalledTimes(1)
-    const url = new URL(route.replace.mock.calls[0]![0], "https://example.test")
+    expect(route.push).toHaveBeenCalledTimes(1)
+    const url = new URL(route.push.mock.calls[0]![0], "https://example.test")
     expect(url.pathname).toBe("/accounting")
     expect(url.searchParams.get("tab")).toBe("invoices")
     expect(url.searchParams.getAll("filter")).toEqual([])
@@ -148,9 +149,9 @@ describe("module task-area navigation", () => {
       ),
     )
     act(() => hook.result.current.setActiveTab("fixed-assets"))
-    expect(route.replace).toHaveBeenCalledWith("/accounting?tab=fixed-assets&filter=id%3A7", {
-      scroll: false,
-    })
+    expect(route.push).not.toHaveBeenCalled()
+    expect(route.replace).not.toHaveBeenCalled()
+    expect(new URLSearchParams(route.query).getAll("filter")).toEqual(["id:7"])
   })
 
   it("clears tab and record filters when the canonical URL setter selects the default tab", () => {
@@ -161,6 +162,6 @@ describe("module task-area navigation", () => {
       ),
     )
     act(() => hook.result.current.setActiveTab("dashboard"))
-    expect(route.replace).toHaveBeenCalledWith("/accounting", { scroll: false })
+    expect(route.push).toHaveBeenCalledWith("/accounting", { scroll: false })
   })
 })

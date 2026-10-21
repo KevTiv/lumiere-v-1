@@ -280,7 +280,7 @@ async fn read_resource_query_for_company(
             .await;
         }
         "roles" => {
-            return read_roles(client, fa).await;
+            return read_roles(client, organization_id, fa).await;
         }
         "user-roles" => {
             return read_user_roles(client, identity_hex, fa).await;
@@ -569,13 +569,18 @@ async fn read_resource_query_for_company(
         rows.retain(|row| row_company_matches(row, company_id, false));
     }
     if let Some(company_id) = accounting_company_id {
-        rows.retain(|row| {
-            row_company_matches(
-                row,
-                company_id,
-                optional_company_accounting_resource(resource),
-            )
-        });
+        // saved-reports is company-filtered in SQL, but its current restricted
+        // projection intentionally omits company_id. Other accounting resources
+        // retain the defense-in-depth row check because they project the field.
+        if resource != "saved-reports" {
+            rows.retain(|row| {
+                row_company_matches(
+                    row,
+                    company_id,
+                    optional_company_accounting_resource(resource),
+                )
+            });
+        }
     }
     if let Some(company_id) = iot_company_id {
         rows.retain(|row| row_company_matches(row, company_id, false));
@@ -1205,6 +1210,7 @@ mod tests {
             "payment-reconciliations",
             "payment-reversals",
             "payment-transactions",
+            "saved-reports",
             "tax-deadlines",
             "tax-groups",
             "tax-schedules",

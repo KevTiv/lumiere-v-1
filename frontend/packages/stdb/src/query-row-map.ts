@@ -249,7 +249,9 @@ import type {
   PurchaseBlanketRelease,
   PurchaseContract,
   PurchaseOrder,
+  PurchaseOrderCreationOperation,
   PurchaseOrderLine,
+  PurchaseReceiptOperation,
   PurchaseRequisition,
   PurchaseRequisitionLine,
   PurchaseReturn,
@@ -609,11 +611,13 @@ export interface QueryRowMap {
   "purchase-blanket-orders": PurchaseBlanketOrder
   "purchase-blanket-releases": PurchaseBlanketRelease
   "purchase-contracts": PurchaseContract
+  "purchase-order-creations": PurchaseOrderCreationOperation
   "purchase-order-lines": PurchaseOrderLine
   "purchase-order-lines-over-billed": PurchaseOrderLine
   "purchase-orders": PurchaseOrder
   "purchase-orders-partial-receipt": PurchaseOrder
   "purchase-orders-to-approve": PurchaseOrder
+  "purchase-receipt-operations": PurchaseReceiptOperation
   "purchase-requisition-lines": PurchaseRequisitionLine
   "purchase-requisitions": PurchaseRequisition
   "purchase-return-lines": PurchaseReturnLine

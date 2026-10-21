@@ -1463,7 +1463,9 @@ function ProjectsClientLoaded({
               setLifecycleError(null)
             }
           }}
-          config={lifecycleModal.form}
+          // Billing references may finish after this modal opens; retain the
+          // draft while resolving its options from the current query results.
+          config={lifecycleModal.type === "billTimesheets" ? billTimesheetsFormConfig : lifecycleModal.form}
           isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={lifecycleError}

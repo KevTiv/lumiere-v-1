@@ -41,6 +41,7 @@ export default async function ModulesLayout({
   const firstOrgProfile = isFirstTestOrganization(session.organizationId)
   if (firstOrgProfile) {
     const pathname = headersList.get('x-lumiere-pathname')
+    if (pathname === '/overview') redirect('/accounting')
     if (!pathname || !isFirstOrgPathAdmitted(pathname, sessionIsOrganizationAdmin(session))) {
       redirect('/first-org-unavailable')
     }

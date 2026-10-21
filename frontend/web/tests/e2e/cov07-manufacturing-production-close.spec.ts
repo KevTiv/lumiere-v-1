@@ -14,6 +14,7 @@ import {
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import {
+  selectModuleTab,
   fetchDefaultCompanyId,
   fetchFirstWarehouseId,
   gotoModule,
@@ -23,11 +24,11 @@ import {
   submitForm,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
-import { stockedComponentSource } from "./cov-scheduler-manufacturing-fixtures"
+import { product as createFixtureProduct, location as createFixtureLocation, id as fixtureId } from "./cov-scheduler-manufacturing-fixtures"
+import { createStockQuantFixture } from "./inventory-quant-fixtures"
 
 const PERSONA_PASSWORD =
   process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
-
 
 type BomRow = { id?: unknown }
 
@@ -57,8 +58,15 @@ async function queryRows<T>(page: Page, resource: string): Promise<T[]> {
   return ((await response.json()) as { data?: T[] }).data ?? []
 }
 
+async function fetchUntrackedProduct(page: Page): Promise<{
+  id: number
+  uomId: number
+}> {
+  const product = await createFixtureProduct(page)
+  return { id: fixtureId(product), uomId: fixtureId(product, "uomId", "uom_id") }
+}
 
-async function fetchFirstStockPicking(page: Page): Promise<{
+async function fetchFirstStockPicking(page: Page, companyId: number, productId: number): Promise<{
   pickingTypeId: number
   locationSrcId: number
   locationDestId: number
@@ -97,7 +105,12 @@ async function fetchFirstStockPicking(page: Page): Promise<{
   if (pickingTypeId == null || locationSrcId == null || locationDestId == null) {
     throw new Error("no stock picking with complete manufacturing locations")
   }
-  return { pickingTypeId, locationSrcId, locationDestId }
+  // Costing requires exactly one untracked source quant. Never combine the
+  // first seed product with an unrelated picking's locations or shared stock.
+  const source = await createFixtureLocation(page, companyId)
+  const destination = await createFixtureLocation(page, companyId)
+  await createStockQuantFixture(page, companyId, productId, fixtureId(source), smokeName("manufacturing-source"), 20)
+  return { pickingTypeId, locationSrcId: fixtureId(source), locationDestId: fixtureId(destination) }
 }
 
 async function postPreparedCommand(
@@ -162,7 +175,7 @@ async function createSetupBom(
       params: stdbParamsToJson(params, "CreateBomParams"),
     }),
   )
-  expect(response.ok()).toBe(true)
+  expect(response.ok(), await response.text()).toBe(true)
 
   let createdId: number | undefined
   await expect
@@ -277,7 +290,7 @@ async function runSetupCommand(
       moId: BigInt(moId),
     }),
   )
-  expect(response.ok()).toBe(true)
+  expect(response.ok(), await response.text()).toBe(true)
 }
 
 async function fetchExactMo(
@@ -361,7 +374,7 @@ async function runMoActionViaUi(
   produceQty?: number,
 ) {
   await gotoModule(page, "/manufacturing", "manufacturing")
-  await page.getByTestId("module-tab-manufacturing-orders").click()
+  await selectModuleTab(page, "manufacturing", "orders")
   const panel = page.locator('[role="tabpanel"]:visible')
   await panel.getByLabel("Search records").fill(origin)
   const row = panel.getByTestId(`entity-row-${moId}`)
@@ -403,9 +416,8 @@ test.describe(
       await signIn(page)
       const companyId = await fetchDefaultCompanyId(page)
       const warehouseId = await fetchFirstWarehouseId(page)
-      const source = await stockedComponentSource(page, companyId, 1)
-      const product = { id: source.productId, uomId: source.uomId }
-      const picking = { ...(await fetchFirstStockPicking(page)), locationSrcId: source.locationId }
+      const product = await fetchUntrackedProduct(page)
+      const picking = await fetchFirstStockPicking(page, companyId, product.id)
       const bomId = await createSetupBom(
         page,
         companyId,

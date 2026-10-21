@@ -58,7 +58,16 @@ test.describe("Parity phase 5 — chatter mutations", { tag: ["@dev-fixture", "@
       bodyContains: noteBody,
     })
 
-    await expect(page.getByTestId("record-chatter-dialog").getByText(noteBody, { exact: true })).toBeVisible({
+    const dialog = page.getByTestId("record-chatter-dialog")
+    // The rich-text composer mirrors its draft in an aria-hidden textarea.
+    // Posting is complete only after the composer clears and the persisted
+    // message appears exactly once in the timeline, outside the editor.
+    await expect(dialog.getByTestId("record-chatter-note")).toHaveValue("")
+    const postedNote = dialog.getByRole("listitem").filter({
+      has: page.getByText(noteBody, { exact: true }),
+    })
+    await expect(postedNote).toHaveCount(1)
+    await expect(postedNote.getByText(noteBody, { exact: true })).toBeVisible({
       timeout: 15_000,
     })
 

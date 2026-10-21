@@ -52,6 +52,69 @@ function stepStatus(id: string): string | null {
 }
 
 describe("PeriodCloseChecklist", () => {
+  it("blocks close checks on partial or denied sources and retries the failed read", () => {
+    const retry = vi.fn()
+    const { rerender } = render(<PeriodCloseChecklist {...props({ sourceStates: { moves: { status: "partial", onRetry: retry }, financialReports: { status: "denied" } } })} />)
+    selectTargetPeriod()
+    expect(stepStatus("draft-moves")).toBe("blocked")
+    expect(stepStatus("trial-balance")).toBe("blocked")
+    expect(stepStatus("vat-report")).toBe("blocked")
+    expect(stepStatus("close-period")).toBe("blocked")
+    fireEvent.click(within(screen.getByTestId("period-close-step-draft-moves")).getByRole("button", { name: "Retry" }))
+    expect(retry).toHaveBeenCalledTimes(1)
+    rerender(<PeriodCloseChecklist {...props()} />)
+    expect(stepStatus("draft-moves")).toBe("done")
+    expect(stepStatus("close-period")).toBe("pending")
+  })
+
+  it("does not carry selected period evidence into another company", () => {
+    const { rerender } = render(<PeriodCloseChecklist {...props()} />)
+    selectTargetPeriod()
+    expect(stepStatus("draft-moves")).toBe("done")
+    rerender(<PeriodCloseChecklist {...props({ companyId: 2n, fiscalYears: [{ id: 2n, companyId: 2n }], accountPeriods: [{ ...period, companyId: 2n }] })} />)
+    expect(screen.getByTestId("period-close-target").getAttribute("data-placeholder")).not.toBeNull()
+    expect(stepStatus("close-period")).toBe("blocked")
+  })
+
+  it("hides cached calendar evidence when fiscal sources are denied", () => {
+    render(<PeriodCloseChecklist {...props({ sourceStates: { accountPeriods: { status: "denied" } } })} />)
+    expect(screen.queryByRole("option", { name: "January 2026" })).toBeNull()
+    expect((screen.getByTestId("period-close-target") as HTMLSelectElement).disabled).toBe(true)
+    expect(stepStatus("fiscal-calendar")).toBe("blocked")
+  })
+
+  it("carries exact source context to Reports and rejects a report one microsecond short", () => {
+    const exactEnd = { microsSinceUnixEpoch: BigInt(Date.parse("2026-01-31T23:59:59.999Z")) * 1000n + 999n }
+    render(<PeriodCloseChecklist {...props({ organizationId: 9n, accountPeriods: [{ ...period, dateTo: exactEnd }], financialReports: [{ companyId: 1n, reportType: { tag: "TrialBalance" }, state: { tag: "Generated" }, dateFrom: period.dateFrom, dateTo: { microsSinceUnixEpoch: exactEnd.microsSinceUnixEpoch - 1n } }] })} />)
+    selectTargetPeriod()
+    expect(stepStatus("trial-balance")).toBe("pending")
+    const href = within(screen.getByTestId("period-close-step-trial-balance")).getByRole("link").getAttribute("href")!
+    const context = new URL(href, "https://example.test").searchParams
+    expect(context.get("organizationId")).toBe("9")
+    expect(context.get("companyId")).toBe("1")
+    expect(context.get("periodId")).toBe("10")
+    expect(context.get("dateTo")).toBe("2026-01-31T23:59:59.999999Z")
+  })
+
+  it("honors only explicitly applicable report requirements", () => {
+    const { rerender } = render(<PeriodCloseChecklist {...props({ requiredReports: ["trial-balance"] })} />)
+    selectTargetPeriod()
+    expect(stepStatus("close-period")).toBe("blocked")
+    rerender(<PeriodCloseChecklist {...props({ requiredReports: ["trial-balance"], financialReports: [{ companyId: 1n, reportType: { trial_balance: [] }, state: { generated: [] }, dateFrom: period.dateFrom, dateTo: period.dateTo }] })} />)
+    expect(stepStatus("trial-balance")).toBe("done")
+    expect(stepStatus("vat-report")).toBe("pending")
+    expect(stepStatus("close-period")).toBe("pending")
+    rerender(<PeriodCloseChecklist {...props({ requiredReports: ["trial-balance", "vat-report"], financialReports: [{ companyId: 1n, reportType: { trial_balance: [] }, state: { generated: [] }, dateFrom: period.dateFrom, dateTo: period.dateTo }] })} />)
+    expect(stepStatus("close-period")).toBe("blocked")
+  })
+
+  it("counts draft bills from HTTP sum-enum projections as unfinished work", () => {
+    render(<PeriodCloseChecklist {...props({ moves: [{ id: 90n, companyId: 1n, date: timestamp("2026-01-15"), state: { draft: [] }, moveType: { in_invoice: [] } }] })} />)
+    selectTargetPeriod()
+    expect(stepStatus("draft-moves")).toBe("pending")
+    expect(stepStatus("close-period")).toBe("blocked")
+  })
+
   it("keeps missing saved states and duplicate identities out of exact record counts", () => {
     render(
       <PeriodCloseChecklist
@@ -239,6 +302,33 @@ describe("PeriodCloseChecklist", () => {
       screen.getByRole("button", { name: "Close selected period" }).hasAttribute("disabled"),
     ).toBe(true)
   })
+  it("keeps the close action disabled until source readiness and applicable reports are verified", () => {
+    const close = vi.fn()
+    const { rerender } = render(<PeriodCloseChecklist {...props({ onClosePeriod: close, sourceStates: { moves: { status: "partial" } } })} />)
+    selectTargetPeriod()
+    fireEvent.click(screen.getByRole("button", { name: "Review close consequences" }))
+    const closeButton = () => within(screen.getByRole("dialog")).getByRole("button", { name: "Close selected period" })
+    expect(closeButton().hasAttribute("disabled")).toBe(true)
+    fireEvent.click(closeButton())
+    expect(close).not.toHaveBeenCalled()
+    rerender(<PeriodCloseChecklist {...props({ onClosePeriod: close, requiredReports: ["trial-balance"] })} />)
+    expect(closeButton().hasAttribute("disabled")).toBe(true)
+    rerender(<PeriodCloseChecklist {...props({ onClosePeriod: close, requiredReports: ["trial-balance"], financialReports: [{ companyId: 1n, reportType: { trial_balance: [] }, state: { generated: [] }, dateFrom: period.dateFrom, dateTo: period.dateTo }] })} />)
+    expect(closeButton().hasAttribute("disabled")).toBe(false)
+    expect(close).not.toHaveBeenCalled()
+  })
+
+  it("dismisses an open close review when the selected company changes", () => {
+    const close = vi.fn()
+    const { rerender } = render(<PeriodCloseChecklist {...props({ onClosePeriod: close })} />)
+    selectTargetPeriod()
+    fireEvent.click(screen.getByRole("button", { name: "Review close consequences" }))
+    expect(screen.getByRole("dialog")).toBeTruthy()
+    rerender(<PeriodCloseChecklist {...props({ companyId: 2n, fiscalYears: [{ id: 2n, companyId: 2n }], accountPeriods: [{ ...period, companyId: 2n }], onClosePeriod: close })} />)
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(close).not.toHaveBeenCalled()
+  })
+
   it("requires a concrete company period before evaluating scoped readiness", () => {
     render(<PeriodCloseChecklist {...props()} />)
 

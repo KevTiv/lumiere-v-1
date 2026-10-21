@@ -11,7 +11,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../components/sheet"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/tabs"
+import { Tabs, TabsContent } from "../components/tabs"
+import { ContextTabsList, ContextTabsTrigger } from "../components/context-tabs"
 import { useErpSession } from "@lumiere/erp-session"
 import { RecordChatter } from "../crm-components/crm-record-chatter"
 import { EntityDetail } from "./entity-detail"
@@ -91,24 +92,24 @@ export function EntityRecordSheet({
               )}
 
               <Tabs defaultValue="overview" className="flex flex-col">
-                <TabsList variant="default" className="w-full flex flex-wrap justify-start gap-2">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                <ContextTabsList aria-label="Record views">
+                  <ContextTabsTrigger value="overview">Overview</ContextTabsTrigger>
                   {config.customTabs?.map((tab) => (
-                    <TabsTrigger
+                    <ContextTabsTrigger
                       key={tab.id}
                       value={tab.id}
                       data-testid={`entity-record-sheet-tab-${tab.id}`}
                     >
                       {tab.label}
-                    </TabsTrigger>
+                    </ContextTabsTrigger>
                   ))}
                   {showDiscussion && (
-                    <TabsTrigger value="discussion" data-testid="entity-record-sheet-tab-discussion">
+                    <ContextTabsTrigger value="discussion" data-testid="entity-record-sheet-tab-discussion">
                       Discussion
-                    </TabsTrigger>
+                    </ContextTabsTrigger>
                   )}
-                  <TabsTrigger value="audit">Audit</TabsTrigger>
-                </TabsList>
+                  <ContextTabsTrigger value="audit">Audit</ContextTabsTrigger>
+                </ContextTabsList>
 
                 <TabsContent value="overview" className="mt-4">
                   {config.overviewContent ? config.overviewContent(record) : <EntityDetail config={config.detailConfig} data={record} />}

@@ -76,7 +76,7 @@ test.describe("CRM phone identities and roles", { tag: ["@p1", "@contacts", "@ui
 
     await recordSheet.getByRole("button", { name: "End role" }).click()
     const endRoleDialog = page.getByTestId("form-modal-end-contact-role")
-    await endRoleDialog.getByTestId("form-field-reason").fill("test correction")
+    await fillField(endRoleDialog, "reason", "test correction")
     await Promise.all([
       page.waitForResponse(
         (response) => matchesOperationResponse(response, "end_contact_role") && response.ok(),
