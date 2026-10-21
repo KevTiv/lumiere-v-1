@@ -4164,30 +4164,6 @@ function InventoryClientLoaded({
                 {
                   id: 'schedule-replenishment-run',
                   label: t('inventory.replenishmentActions.scheduleRun'),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  isApplicable: (rows) => rows.every((row) => row.active === true),
-                  successMessage: t('common.actionCompleted', { action: t('inventory.replenishmentActions.scheduleRun') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null)
-                      await scheduleReplenishmentRun.mutateAsync(id);
-                  },
-                },
-                {
-                  id: 'cancel-replenishment-run',
-                  label: t('inventory.replenishmentActions.cancelSchedule'),
-                  icon: ListChecks,
-                  requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('inventory.replenishmentActions.cancelSchedule') }),
-                  onClick: async (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await cancelReplenishmentRun.mutateAsync(id);
-                  },
-                },
-                {
-                  id: 'schedule-replenishment-run',
-                  label: t('inventory.replenishmentActions.scheduleRun'),
                   icon: Play,
                   requiresSelection: true,
                   isApplicable: (rows) => {
