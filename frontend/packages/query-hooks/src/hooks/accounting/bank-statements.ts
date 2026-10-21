@@ -352,9 +352,7 @@ export function useStageBankStatementImport(organizationId: number) {
       currencyId: bigint
       params: StageBankStatementImportParams
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("stage_bank_statement_import", { companyId: args.companyId, journalId: args.journalId, currencyId: args.currencyId, params: stdbParamsToJson(args.params as object, "StageBankStatementImportParams") })
-      const response = await apiFetch(urlPath, init)
-      if (!response.ok) throw new Error(await parseCallError(response))
+      await dispatchNamedOperation("stage_bank_statement_import", { companyId: args.companyId, journalId: args.journalId, currencyId: args.currencyId, params: stdbParamsToJson(args.params as object, "StageBankStatementImportParams") }, "Unable to stage the statement import")
     },
     onSuccess: () => invalidateBankStatementQueries(qc, organizationId),
   })

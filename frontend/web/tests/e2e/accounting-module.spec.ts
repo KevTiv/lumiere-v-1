@@ -164,15 +164,20 @@ async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {
 
 test.describe("Accounting module e2e", () => {
   test("renders accounting shell and each tab without errors", { tag: "@p0" }, async ({ page }) => {
-    // Exercise every preserved deep link; each is a full navigation with fresh scoped reads.
+    // Exercise every canonical destination through its task area and scoped reads.
     test.setTimeout(240_000)
-    await test.step("Open Accounting and validate workspace navigation", async () => {
+    await test.step("Open Accounting and validate task-area navigation", async () => {
       await gotoModule(page, "/accounting", "accounting")
-      await expect(page.getByRole("navigation", { name: "Accounting workspaces" }).getByRole("link")).toHaveCount(7)
-      await expect(page.getByRole("button", { name: "Advanced / Configuration" })).toBeVisible()
+      const areaTrigger = page.getByTestId("module-area-accounting")
+      await expect(areaTrigger).toBeVisible()
+      await expect(areaTrigger).toHaveAttribute("role", "combobox")
+      const areas = JSON.parse(await areaTrigger.getAttribute("data-tab-areas") ?? "{}") as Record<string, string>
+      // Task areas mount only their own triggers; the map must still preserve
+      // every canonical destination covered by the business assertions below.
+      expect(Object.keys(areas).sort()).toEqual([...ACCOUNTING_TAB_IDS].sort())
     }, { timeout: 30_000 })
     for (const tabId of ACCOUNTING_TAB_IDS) {
-      await test.step(`Accounting workspace: ${tabId}`, async () => {
+      await test.step(`Accounting destination: ${tabId}`, async () => {
         await assertAccountingTabRenders(page, tabId)
       }, { timeout: 30_000 })
     }
@@ -311,7 +316,7 @@ test.describe("Accounting module e2e", () => {
     await expectNoAppError(page)
   })
 
-  test("overview and configuration actions open journal entry, bill, and tax forms", async ({ page }) => {
+  test("overview and task-area actions open journal entry, bill, and tax forms", async ({ page }) => {
     await gotoModule(page, "/accounting", "accounting")
     await openAccountingTab(page, "dashboard")
 
@@ -329,8 +334,7 @@ test.describe("Accounting module e2e", () => {
     await billModal.getByRole("button", { name: /^cancel$/i }).click()
     await expect(billModal).toBeHidden()
 
-    await page.getByTestId("module-workspace-accounting-overflow").click()
-    await page.getByTestId("module-workspace-item-accounting-taxes").click()
+    await openAccountingTab(page, "taxes")
     await expect(page.getByTestId("module-tab-accounting-taxes")).toHaveAttribute("aria-selected", "true")
     await page.getByTestId("module-create-accounting-taxes").click()
     const taxModal = page.getByTestId("form-modal-new-tax")

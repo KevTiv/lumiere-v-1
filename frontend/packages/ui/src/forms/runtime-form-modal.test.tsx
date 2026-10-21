@@ -58,7 +58,9 @@ describe("RuntimeFormModal runtime dependency failure", () => {
       />,
     )
     expect(screen.getByText("Runtime draft")).toBeTruthy()
-    expect((screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
   })
 
   it("shows the dependency error and blocks submission by default", () => {
@@ -101,5 +103,42 @@ describe("RuntimeFormModal runtime dependency failure", () => {
     expect((submit as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(submit)
     expect(onSubmit).toHaveBeenCalledWith({ name: "test" })
+  })
+})
+
+describe("RuntimeFormModal reviewed submission", () => {
+  it("combines caller blocking with a healthy runtime configuration", () => {
+    runtimeState.error = null
+    render(
+      <RuntimeFormModal
+        open
+        onOpenChange={vi.fn()}
+        staticConfig={staticConfig}
+        moduleId="accounting"
+        organizationId={1}
+        submissionDisabled
+        onSubmit={vi.fn()}
+      />,
+    )
+    expect((screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+  })
+
+  it("caller permission cannot override a failed runtime dependency", () => {
+    render(
+      <RuntimeFormModal
+        open
+        onOpenChange={vi.fn()}
+        staticConfig={staticConfig}
+        moduleId="accounting"
+        organizationId={1}
+        submissionDisabled={false}
+        onSubmit={vi.fn()}
+      />,
+    )
+    expect((screen.getByRole("button", { name: "Submit" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
   })
 })
