@@ -9,6 +9,13 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@lumi
 import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   ONBOARDING_TIMEZONES,
   DEFAULT_FISCAL_YEAR_END_MONTH,
   DEFAULT_FISCAL_YEAR_END_DAY,
@@ -164,39 +171,45 @@ export default function OnboardingPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="timezone">{t("auth.onboarding.timezone")}</Label>
-              <select
-                id="timezone"
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                {ONBOARDING_TIMEZONES.map((tz) => (
-                  <option key={tz} value={tz}>
-                    {tz}
-                  </option>
-                ))}
-              </select>
+              <Select value={timezone} onValueChange={setTimezone}>
+                <SelectTrigger id="timezone">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ONBOARDING_TIMEZONES.map((tz) => (
+                    <SelectItem key={tz} value={tz}>
+                      {tz}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="currency">{t("auth.onboarding.currency")}</Label>
-              <select
-                id="currency"
+              <Select
                 value={currencyCode}
-                onChange={(e) => {
-                  const selected = currencies.find((currency) => currency.code === e.target.value)
-                  setCurrencyCode(e.target.value)
-                  setCurrencyId(String(selected?.id ?? 0))
+                onValueChange={(code) => {
+                  const selected = currencies.find((currency) => currency.code === code)
+                  // Form-associated selects can emit an empty value while their
+                  // options initialize. It is not a supported currency choice.
+                  if (!selected) return
+                  setCurrencyCode(selected.code)
+                  setCurrencyId(String(selected.id))
                 }}
                 disabled={currenciesLoading || currencies.length === 0}
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                {currencies.map((currency) => (
-                  <option key={currency.code} value={currency.code}>
-                    {currency.code} — {currency.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="currency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {currencies.map((currency) => (
+                    <SelectItem key={currency.code} value={currency.code}>
+                      {currency.code} — {currency.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

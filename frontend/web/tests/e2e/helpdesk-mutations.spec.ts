@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test"
 import { encodeIdentity } from "@lumiere/stdb/stdb-params-json"
 
 import {
+  selectModuleTab,
   callReducerBff,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
@@ -183,7 +184,7 @@ test.describe("Helpdesk update mutations", { tag: "@phase-6" }, () => {
     const updatedName = `${ticketName}-updated`
 
     await gotoModule(page, "/helpdesk", "helpdesk")
-    await page.getByTestId("module-tab-helpdesk-tickets").click()
+    await selectModuleTab(page, "helpdesk", "tickets")
     await waitForBffQueryMinRows(page, "/api/query/helpdesk-teams")
     await waitForBffQueryMinRows(page, "/api/query/helpdesk-stages")
     await page.getByTestId("module-create-helpdesk-tickets").click()
@@ -245,7 +246,7 @@ test.describe("Helpdesk ticket assign and close", { tag: "@p0" }, () => {
 
     // ── Step 1: navigate and create the ticket via UI ──────────────────────
     await gotoModule(page, "/helpdesk", "helpdesk")
-    await page.getByTestId("module-tab-helpdesk-tickets").click()
+    await selectModuleTab(page, "helpdesk", "tickets")
     await waitForBffQueryMinRows(page, "/api/query/helpdesk-teams")
     await waitForBffQueryMinRows(page, "/api/query/helpdesk-stages")
     await page.getByTestId("module-create-helpdesk-tickets").click()
@@ -299,7 +300,7 @@ test.describe("Helpdesk ticket assign and close", { tag: "@p0" }, () => {
     // Reload the tickets tab to pick up the updated row, select it,
     // then trigger the close action.
     await gotoModule(page, "/helpdesk", "helpdesk")
-    await page.getByTestId("module-tab-helpdesk-tickets").click()
+    await selectModuleTab(page, "helpdesk", "tickets")
     await expect(page.getByText(ticketName).first()).toBeVisible({ timeout: 30_000 })
 
     await selectEntityRowByText(page, ticketName)

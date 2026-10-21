@@ -4,7 +4,9 @@ use spacetimedb::{ReducerContext, Table};
 use crate::core::organization::company;
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::inventory::product::{create_product, product, CreateProductParams};
-use crate::inventory::stock::{resolve_warehouse_stock_location, stock_move, stock_picking, stock_quant};
+use crate::inventory::stock::{
+    resolve_warehouse_stock_location, stock_move, stock_picking, stock_quant,
+};
 use crate::inventory::tracking::{
     create_stock_production_lot, stock_production_lot, CreateStockProductionLotParams,
 };

@@ -39,6 +39,10 @@ import {
 } from "@lumiere/erp-workflows"
 
 import { stockPickingsQueryOptions } from "./inventory/stock-operations"
+import { executeCommandWithAppliedRecovery } from "./canonical-command-recovery"
+import { fetchQueryList } from "../http"
+import type { HumanTaskRow } from "./approvals"
+import { resolveSaleOrderApprovalTask } from "./sales-approval-task"
 import {
   acceptSaleOrderQuotationCommand,
   cancelSaleOrderCommand,
@@ -95,35 +99,69 @@ export function useSaleOrderWorkflow(
   )
 
   const confirmSpec = useMemo<TransitionSpec<string>>(
-    () => ({
-      id: "sales.order.confirm",
-      command: (orderId) => confirmSaleOrderCommand(companyId, orderId),
-      affects: CONFIRM_SALE_ORDER_AFFECTS,
-      observe: async (orderId) => {
+    () => {
+      const observe = async (orderId: string) => {
         const [orders, pickings] = await Promise.all([
           qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 }),
           qc.fetchQuery({ ...stockPickingsQueryOptions(organizationId), staleTime: 0 }),
         ])
+        const orderRows = orders as unknown as RowValueMap[]
+        const pickingRows = pickings as unknown as RowValueMap[]
+        const confirmed = observeConfirmedOrder(orderId, orderRows, pickingRows)
+        if (confirmed.outcome === "applied") return confirmed
+        const tasks = await fetchQueryList(
+          "/api/query/workflow-human-tasks-inbox",
+          "Failed to read sale-order approval task",
+        )
+        const approvalTask =
+          companyId == null || companyId === 0n
+            ? null
+            : resolveSaleOrderApprovalTask(
+                tasks as HumanTaskRow[],
+                { organizationId, companyId },
+                BigInt(orderId),
+              )
         return observeConfirmedOrder(
           orderId,
-          orders as unknown as RowValueMap[],
-          pickings as unknown as RowValueMap[],
+          orderRows,
+          pickingRows,
+          approvalTask
+            ? { resource: approvalTask.resource, id: approvalTask.id, module: "approvals" }
+            : undefined,
         )
-      },
-    }),
+      }
+      return {
+        id: "sales.order.confirm",
+        command: (orderId) =>
+          executeCommandWithAppliedRecovery(
+            () => confirmSaleOrderCommand(companyId, orderId),
+            () => observe(orderId),
+            ["applied", "approval_pending"],
+          ),
+        affects: CONFIRM_SALE_ORDER_AFFECTS,
+        observe,
+      }
+    },
     [qc, organizationId, companyId],
   )
 
   const createInvoiceSpec = useMemo<TransitionSpec<InvoiceRunInput>>(
-    () => ({
-      id: "sales.order.create-invoice",
-      command: ({ orderId, params }) => createInvoiceFromSaleOrderCommand({ orderId, params }),
-      affects: CREATE_INVOICE_FROM_SALE_ORDER_AFFECTS,
-      observe: async ({ orderId, invoiceIdsBefore }) => {
+    () => {
+      const observe = async ({ orderId, invoiceIdsBefore }: InvoiceRunInput) => {
         const orders = await qc.fetchQuery({ ...saleOrdersQueryOptions(organizationId), staleTime: 0 })
         return observeCreatedInvoice(orderId, invoiceIdsBefore, orders as unknown as RowValueMap[])
-      },
-    }),
+      }
+      return {
+        id: "sales.order.create-invoice",
+        command: (input) =>
+          executeCommandWithAppliedRecovery(
+            () => createInvoiceFromSaleOrderCommand({ orderId: input.orderId, params: input.params }),
+            () => observe(input),
+          ),
+        affects: CREATE_INVOICE_FROM_SALE_ORDER_AFFECTS,
+        observe,
+      }
+    },
     [qc, organizationId],
   )
 

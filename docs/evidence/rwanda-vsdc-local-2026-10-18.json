@@ -1,0 +1,346 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-18T14:15:03.654114+00:00",
+  "scope": "local RRA/VSDC foundation and alpha release preparation",
+  "source": {
+    "base_commit": "513f78a3abccf194458d24253b8224a8825e6b2b",
+    "source_tree_digest": "c2037970c4621150ce3d9be4eeb6a96bed429ded3bd8a1226d9379c4e3db5927",
+    "files": {
+      ".env.docker.example": "b77fc315cc6af604141cd83875cef00fac6ff0af9d487b8c6fb5d1e1d908fa86",
+      "api-server/src/bin/storage-migrate.rs": "9f295e091c22e32ec35e983ca9dbcd59dd05296845578e9bf3bafa10151ca832",
+      "api-server/src/cold_tier/migrate.rs": "620232069d88afcd21e72c098090dafe8eb3332e6ac56b269c928104e58159eb",
+      "api-server/src/cold_tier/migration_audit.rs": "32986a016f1090d168e15a362535f2cd2b71dbcf1585c13901e540211f0ef761",
+      "api-server/src/lib.rs": "6688f060b8c6a8f3f0f27d43242e1d35a432adcdf7df1d809f661f84a2f7ae23",
+      "api-server/src/routes/mod.rs": "f4f5907459336ca7f14d07001a639cfad5391108f44dea16cfeb492095448017",
+      "api-server/src/routes/rwanda_statutory_readiness.rs": "571f102e0cce2b8c2e36f9d6003700f10e50c9541e3f2f5acfcf5fd9786a4d68",
+      "api-server/src/rwanda_vsdc/client.rs": "0705adaf3727110e8fbe5bf0b07ea79dbf2a8a5ee7a8b92195894b10af835ea4",
+      "api-server/src/rwanda_vsdc/mod.rs": "aeea3f0613e573034f97e08bbc764c239f18d3d5b1568a521e2ef07e915a9139",
+      "api-server/src/rwanda_vsdc/protocol.rs": "ebf29a4f9fdd04f2107b48695935670c70a177ad55c6f04bd20873ebae3b73f1",
+      "api-server/src/rwanda_vsdc/tests.rs": "dde5bed3a19fab45124be23c6b36d7101f8053d2acf739bcb82dd30a020f655b",
+      "api-server/src/rwanda_vsdc/values.rs": "265e3448dced1a03c113fbce301b45e6e75b3d8cf13fedad54d42dfbb6fcb867",
+      "api-server/src/rwanda_vsdc/wire.rs": "f8c4f18481a6699defcbf810e714e1920195aa87dd0ddfef0237f26cfcf8054b",
+      "docker-compose.yml": "6012daaa32ebc6c5f7013ca0a05c1335e549d9ce9e7aee754fff81dd8dd96ccc",
+      "infra/railway/production-eu-services.json": "6dcfd360e90228c2c7484219605b77573f8608dd79265f2c2744bcdd96cba44d",
+      "release-compatibility-manifest.json": "c052ef3ca32571066ba7f8a5a9b839c55b0271e14b4c9b4efc773a261b3e2bc1",
+      "scripts/railway-bootstrap-service-identities.mjs": "364b4c63848410d79defc71757994080d34aeebcc4278ceb6181fe4cfcbb91c4",
+      "scripts/railway-production-preflight.sh": "f80d70a91c793fcdb3dcece8632a8e30788a37ca8ec55aa0f8e50cd21827c05b",
+      "scripts/tests/test-railway-bootstrap-service-identities.mjs": "b90ad0487502dd47632fad6aad12c66042b8814cadfa7b92a260658d79153e99",
+      "scripts/tests/test-railway-production-preflight.sh": "cf8b0812d633d24181beca32c6b022ced1bed5dd96b3950d867df79537bf273f",
+      "scripts/tests/test_railway_stack_workflow.py": "a9ed2d966505c883f4d620b0c9d028b91bb56e8a39107320cb050ff37c062ad0",
+      "spacetimedb/src/documents/documents.rs": "836015c6e46ff6a7d2a2321d57940a2341c216ea3592d481e6e5d468c8cc0f69",
+      "spacetimedb/src/documents/pack_locale.rs": "4cf9e5f43708524a76eff767e64024e72baf84b284cef87bcd99f51f74d81ae9",
+      "spacetimedb/tests/platform/country_pack_test.rs": "b16c7c02129c4864741468520d7301cf4c8c126f5f952b3acda0a8ae933252e7",
+      "spacetimedb/tests/platform/mod.rs": "312f5ae69ff812e2ae4f09be15386f334d30e222c5249322bce346a7a9f45f76",
+      "spacetimedb/tests/platform/tenant_isolation_test.rs": "92ad2a46f975fb962ef1d4d2a548d9ca38baf8686ee0ed6069a2f93b7b81a8a6"
+    }
+  },
+  "contracts": {
+    "package": "lumiere-contracts",
+    "version": "0.3.122",
+    "tag": "v0.3.122",
+    "revision": "b2c43fd99b5e0938da3f9a33908d0029cabb9163",
+    "repository": "ssh://git@github.com/KevTiv/lumiere-contracts.git"
+  },
+  "deployment_config_generation": 6,
+  "validation": {
+    "api_library": {
+      "passed": 606,
+      "failed": 0,
+      "ignored_existing": 3,
+      "rwanda_vsdc_tests": 16,
+      "invoice_readiness_tests": 7,
+      "migration_audit_tests": 5
+    },
+    "storage_cli_tests": {
+      "passed": 1,
+      "failed": 0
+    },
+    "postgresql_audit": {
+      "database": "disposable-local-postgresql-18",
+      "role": "audit_reader",
+      "default_transaction_read_only": true,
+      "business_schema_applied": false,
+      "cases": [
+        {
+          "case": "empty canonical history",
+          "mode": "--audit",
+          "status": "uninitialized",
+          "exit_code": 0,
+          "history_unchanged": true
+        },
+        {
+          "case": "empty history cannot verify",
+          "mode": "--verify",
+          "status": "uninitialized",
+          "exit_code": 1,
+          "history_unchanged": true
+        },
+        {
+          "case": "matching prefix",
+          "mode": "--audit",
+          "status": "pending",
+          "exit_code": 0,
+          "history_unchanged": true
+        },
+        {
+          "case": "pending history cannot verify",
+          "mode": "--verify",
+          "status": "pending",
+          "exit_code": 1,
+          "history_unchanged": true
+        },
+        {
+          "case": "incompatible platform-at-17 lineage",
+          "mode": "--audit",
+          "status": "conflicting",
+          "exit_code": 1,
+          "history_unchanged": true
+        },
+        {
+          "case": "matching canonical catalog",
+          "mode": "--verify",
+          "status": "matching",
+          "exit_code": 0,
+          "history_unchanged": true
+        },
+        {
+          "case": "legacy history inspected without adoption",
+          "mode": "--audit",
+          "status": "matching",
+          "exit_code": 0,
+          "history_unchanged": true
+        },
+        {
+          "case": "legacy history cannot verify current schema",
+          "mode": "--verify",
+          "status": "matching",
+          "exit_code": 1,
+          "history_unchanged": true
+        },
+        {
+          "case": "ambiguous current and legacy histories",
+          "mode": "--audit",
+          "status": "conflicting",
+          "exit_code": 1,
+          "history_unchanged": true
+        },
+        {
+          "case": "unreviewed future history",
+          "mode": "--audit",
+          "status": "conflicting",
+          "exit_code": 1,
+          "history_unchanged": true
+        }
+      ],
+      "all_passed": true,
+      "binary_sha256": "e36d3879e9661088b2a6a42b4809937525184306a4209ba652b8658c03d7effa"
+    },
+    "reviewed_mail_bootstrap_tests": {
+      "passed": 13,
+      "failed": 0
+    },
+    "railway_workflow_tests": {
+      "passed": 13,
+      "failed": 0
+    },
+    "release_manifest_tests": {
+      "passed": 12,
+      "failed": 0
+    },
+    "railway_preflight_and_release_scripts": "pass",
+    "compose_readiness": "pass",
+    "changed_rust_formatting": "pass",
+    "diff_check": "pass",
+    "module": {
+      "settings": {
+        "target": "wasm32-unknown-unknown",
+        "profile": "ci-contracts",
+        "features": "default (dev-module)",
+        "offline": true,
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_PROFILE_CI_CONTRACTS_OPT_LEVEL": "0",
+        "LUMIERE_ENABLE_DEV_REDUCERS": "1",
+        "purpose": "isolated local runtime tests only; not a production or contracts artifact",
+        "source_patch_sha256": "90754e01692d7c122b8437c12d38213f2df6fdb62d670b36af38d1694db23d0a",
+        "artifact_path": "/tmp/lumiere-rra-document-pack-final2.wasm",
+        "artifact_sha256": "8ecc4c6ec1d417c0253bfdb293dd8ef7a34c9030968e56fef664b88b87e7d2db",
+        "source_head": "513f78a3abccf194458d24253b8224a8825e6b2b",
+        "module": "lumiere-rra-doc-guards-final2",
+        "server": "http://127.0.0.1:3036"
+      },
+      "runs": [
+        {
+          "runner": "run_country_pack_test",
+          "exit_code": 0,
+          "seconds": 0.719,
+          "log": "/tmp/lumiere-rra-document-pack-final2-run_country_pack_test.log",
+          "log_sha256": "9b39ac9a2abfb167455933d236c626d13b2744c3ec2992ced708227f16a6905a"
+        },
+        {
+          "runner": "run_documents_folder_test",
+          "exit_code": 0,
+          "seconds": 0.213,
+          "log": "/tmp/lumiere-rra-document-pack-final2-run_documents_folder_test.log",
+          "log_sha256": "9b39ac9a2abfb167455933d236c626d13b2744c3ec2992ced708227f16a6905a"
+        },
+        {
+          "runner": "run_documents_wave_a_tests",
+          "exit_code": 0,
+          "seconds": 0.293,
+          "log": "/tmp/lumiere-rra-document-pack-final2-run_documents_wave_a_tests.log",
+          "log_sha256": "9b39ac9a2abfb167455933d236c626d13b2744c3ec2992ced708227f16a6905a"
+        },
+        {
+          "runner": "run_documents_wave_b_tests",
+          "exit_code": 0,
+          "seconds": 0.233,
+          "log": "/tmp/lumiere-rra-document-pack-final2-run_documents_wave_b_tests.log",
+          "log_sha256": "9b39ac9a2abfb167455933d236c626d13b2744c3ec2992ced708227f16a6905a"
+        },
+        {
+          "runner": "run_documents_wave_c_tests",
+          "exit_code": 0,
+          "seconds": 0.254,
+          "log": "/tmp/lumiere-rra-document-pack-final2-run_documents_wave_c_tests.log",
+          "log_sha256": "9b39ac9a2abfb167455933d236c626d13b2744c3ec2992ced708227f16a6905a"
+        },
+        {
+          "runner": "run_documents_wave_d_tests",
+          "exit_code": 0,
+          "seconds": 0.246,
+          "log": "/tmp/lumiere-rra-document-pack-final2-run_documents_wave_d_tests.log",
+          "log_sha256": "9b39ac9a2abfb167455933d236c626d13b2744c3ec2992ced708227f16a6905a"
+        },
+        {
+          "runner": "run_documents_wave_e_tests",
+          "exit_code": 0,
+          "seconds": 0.292,
+          "log": "/tmp/lumiere-rra-document-pack-final2-run_documents_wave_e_tests.log",
+          "log_sha256": "9b39ac9a2abfb167455933d236c626d13b2744c3ec2992ced708227f16a6905a"
+        },
+        {
+          "runner": "run_all_platform_tests",
+          "exit_code": 0,
+          "seconds": 4.384,
+          "log": "/tmp/lumiere-rra-document-pack-final2-run_all_platform_tests.log",
+          "log_sha256": "9b39ac9a2abfb167455933d236c626d13b2744c3ec2992ced708227f16a6905a"
+        }
+      ],
+      "log_summary": {
+        "records": 666,
+        "errors": [],
+        "unexpected_errors": 0,
+        "module": "lumiere-rra-doc-guards-final2"
+      },
+      "integrity_assertions": {
+        "positive_document_rows": 12,
+        "restore_folders_with_two_documents": 2,
+        "rejected_document_rows": 0,
+        "pass": true
+      }
+    },
+    "schema_compatibility": {
+      "reference": "/tmp/lumiere-0.3.122-bootstrap-schema.json",
+      "reference_raw_sha256": "874471105e26338cf5f18ffc4aac4a255211c9492cb67b391e063a6f544f01d5",
+      "observed": "/tmp/lumiere-rra-document-pack-raw-schema-final2.json",
+      "observed_raw_sha256": "5c4789561e23495ff59b045a4c1b4ca4dbf0f7dec0bdbc66a19ecadc5a0ef7a2",
+      "normalization": "sort only misc_exports by json.dumps(record, sort_keys=True)",
+      "equal_after_normalization": true,
+      "normalized_sha256": "db9bdab0ece275882d43327b2f897df76ac4c9903790514d55cfc842003d652b",
+      "counts": {
+        "tables": 515,
+        "reducers": 1452,
+        "types": 1398,
+        "misc_exports": 18
+      }
+    }
+  },
+  "logs": [
+    {
+      "path": "/tmp/lumiere-vsdc-api-tests.log",
+      "sha256": "0b569fa7375cdd24ccd8c9d9d9e94f7e7d9cb7eb50c65aaadb71ecc14d44fc1a",
+      "bytes": 61328
+    },
+    {
+      "path": "/tmp/lumiere-vsdc-storage-audit-build.log",
+      "sha256": "d79ad8c34283ce4d106dd84fd98bc2fad9ae2db84a2e59999ac81851a79913e6",
+      "bytes": 2153
+    },
+    {
+      "path": "/tmp/lumiere-vsdc-migration-audit-integration-results.json",
+      "sha256": "6a162ca11bce851d9fba19343c940aa5f4be75699ef1f098a20ecf8e85b5173e",
+      "bytes": 1983
+    },
+    {
+      "path": "/tmp/lumiere-vsdc-release-manifest-tests.log",
+      "sha256": "9d25dcb2db59e7bbf4ff7fcdf528cb170f89e6069df0c3b84b9a564529e22097",
+      "bytes": 111
+    },
+    {
+      "path": "/tmp/lumiere-railway-preflight-config-tests.log",
+      "sha256": "87f5c442c92100fed4f8664dbb5df49a69167c339c0229f6710f729e433a3bcf",
+      "bytes": 2713
+    },
+    {
+      "path": "/tmp/lumiere-railway-release-config-tests.log",
+      "sha256": "d3ac55e80f25632dc22fb4c3beecec1a1d81363d20151d1484ce7ded31ceed25",
+      "bytes": 1005
+    },
+    {
+      "path": "/tmp/lumiere-compose-readiness-config-tests.log",
+      "sha256": "456bf8a70b2b4b6a08954d664762beefd894e789545a3365587bcac2e5b72967",
+      "bytes": 67
+    },
+    {
+      "path": "/tmp/lumiere-vsdc-changed-rustfmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/lumiere-rra-document-pack-wasm-build-final2.log",
+      "sha256": "b0e89f3350b23ec2c4f77846eef60d07761e6076e65916f12cb9fe5610002a65",
+      "bytes": 4499
+    },
+    {
+      "path": "/tmp/lumiere-rra-document-pack-integrity-final2.json",
+      "sha256": "de0b4a58b468a3b487554c988baec7b89f7ff1c0fccfaa24f15d43d166c0ec1b",
+      "bytes": 3597
+    }
+  ],
+  "resolved_setup_failures": [
+    {
+      "failure": "initial development module lacked the existing fixture admission flag",
+      "resolution": "rebuilt with dev-module plus LUMIERE_ENABLE_DEV_REDUCERS=1; production admission unchanged"
+    },
+    {
+      "failure": "broader platform fixture tried to remove the sole administrator and expected an obsolete inactive-membership message",
+      "resolution": "test first verifies last-admin refusal/no writes, creates a real backup administrator, then verifies actual revocation/no writes under current policy"
+    }
+  ],
+  "release_state": {
+    "application_source_published": false,
+    "production_config_changed": false,
+    "production_deployed": false,
+    "target_database_lineage_audited": false,
+    "external_vsdc_requests": false,
+    "statutory_submission_enabled": false,
+    "rra_certification_obtained": false
+  },
+  "remaining_implementation": [
+    "controlled reviewed country-pack publication/versioning",
+    "policy-authorized canonical fiscal snapshot and reviewed item/tax/payment/operator mappings",
+    "dedicated durable fiscal intents, number reservation, service identity and uncertain-outcome recovery",
+    "verified receipt archive and approved CIS conformance scope"
+  ],
+  "remaining_release_inputs": [
+    "approved enrolled sandbox/device and installed protocol/dialect",
+    "tax/legal review and RRA certification",
+    "provider credentials/service bindings/storage and backup verification",
+    "consistent deployment, target migration lineage transition if needed, hosted-persona acceptance and production restore evidence"
+  ],
+  "notes": [
+    "All module evidence uses an explicitly opted-in development artifact; it is not a production or contracts release artifact.",
+    "Read-only PostgreSQL cases use synthetic migration metadata in a disposable local PostgreSQL18 database; matching history does not prove business DDL.",
+    "Logs under /tmp are temporary; hashes and bounded results are retained in this repository record."
+  ]
+}

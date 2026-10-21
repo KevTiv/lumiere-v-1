@@ -104,6 +104,7 @@ test("finished effect resolves only the MO-owned move and exact destination quan
       id: "5",
       companyId: "7",
       finishedMoveId: "88",
+      finishedMoveIds: ["88"],
       destinationQuantId: "101",
     },
   )
@@ -235,6 +236,7 @@ test("finish resolves zero, one and multiple legitimate MO-owned byproducts", ()
       {
         resource: "mrp-productions", id: "5", companyId: "7",
         finishedMoveId: "88", destinationQuantId: "101",
+        finishedMoveIds: moves.map(move => String(move.id)),
       },
     )
   }

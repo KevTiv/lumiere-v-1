@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { ProjectPageClient } from "./project-page-client"
 
 const SSR_RESOURCES = ["projects", "tasks", "timesheets", "pricelists"] as const
@@ -15,7 +15,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     return <ProjectPageClient projectId={id} />
   }
 
-  const [projects, tasks, timesheets, pricelists] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [projects, tasks, timesheets, pricelists] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <ProjectPageClient

@@ -23,6 +23,12 @@ flowchart LR
 3. api-server resolves the session (cookie `stdb_token` or `Authorization: Bearer`), scopes queries by organization, and calls SpacetimeDB HTTP SQL or reducers.
 4. Optional direct gateway: set `NEXT_PUBLIC_API_GATEWAY_URL` to api-server origin (used by Kong in Docker compose) — see [`frontend/web/lib/api-url.ts`](../frontend/web/lib/api-url.ts).
 
+### Frontend contracts compatibility
+
+- Frontend packages pin the generated `@lumiere/contracts` release to a vendored tarball under `frontend/vendor/`.
+- The container build verifies that every frontend consumer uses the same tarball, that its filename and package metadata versions agree, and that the frozen lockfile records the pin.
+- Runtime services therefore do not depend on a contracts HTTP endpoint; contract drift fails the immutable application build instead of production startup.
+
 ### Realtime
 
 - Browser WebSocket: same-origin `/v1/realtime/ws` (Kong) or `ws://127.0.0.1:8082/v1/realtime/ws` in local dev.

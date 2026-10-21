@@ -7,6 +7,7 @@
 /// The Vec<u64> fields on parent tables remain for backwards-compat but are not maintained.
 use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
 
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::types::MailMessageType;
 
@@ -361,8 +362,6 @@ pub fn mark_mail_message_delivered(
     message_id: u64,
     delivery_metadata: Option<String>,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "mail_message", "write")?;
-
     let message = ctx
         .db
         .mail_message()
@@ -374,20 +373,44 @@ pub fn mark_mail_message_delivered(
         return Err("mail message does not belong to this organization".to_string());
     }
 
-    let metadata = delivery_metadata.or_else(|| {
-        Some(
-            serde_json::json!({
-                "delivery": "sent",
-                "sent_at": ctx.timestamp.to_duration_since_unix_epoch().unwrap_or_default().as_micros(),
-            })
-            .to_string(),
-        )
-    });
+    if validate_reviewed_delivery_receipt(
+        message.metadata.as_deref(),
+        delivery_metadata.as_deref(),
+    )? {
+        crate::core::cold_tier_identity::require_active_service_identity(
+            ctx,
+            organization_id,
+            crate::core::cold_tier_identity::REVIEWED_MAIL_DISPATCHER_SERVICE,
+        )?;
+    } else {
+        check_permission(ctx, organization_id, "mail_message", "write")?;
+    }
+    let metadata = Some(delivered_metadata(
+        message.metadata.as_deref(),
+        delivery_metadata.as_deref(),
+        ctx.timestamp
+            .to_duration_since_unix_epoch()
+            .unwrap_or_default()
+            .as_micros(),
+    ));
 
-    ctx.db.mail_message().id().update(MailMessage {
+    let updated = ctx.db.mail_message().id().update(MailMessage {
         metadata,
         ..message
     });
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.mark_mail_message_delivered".into(),
+            correlation_id: format!("mail:{message_id}:provider-accepted"),
+            changes: vec![RowChange::upsert_stdb_row(
+                "mail_message",
+                serde_json::json!({"id":message_id}),
+                &updated,
+            )?],
+        },
+    )?;
 
     write_audit_log_v2(
         ctx,
@@ -405,6 +428,123 @@ pub fn mark_mail_message_delivered(
     );
 
     Ok(())
+}
+
+/// A reviewed invoice may only become sent after its exact durable provider claim.
+fn validate_reviewed_delivery_receipt(
+    existing: Option<&str>,
+    provided: Option<&str>,
+) -> Result<bool, String> {
+    let Some(metadata) = metadata_object(existing) else {
+        return validate_legacy_delivery_metadata(provided).map(|()| false);
+    };
+    let Some(context) = metadata
+        .get("context_json")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return validate_legacy_delivery_metadata(provided).map(|()| false);
+    };
+    let context: serde_json::Value = match serde_json::from_str(context) {
+        Ok(value) => value,
+        Err(_) if context.contains("invoiceReview") => {
+            return Err("reviewed delivery context is malformed".into())
+        }
+        Err(_) => return validate_legacy_delivery_metadata(provided).map(|()| false),
+    };
+    if context.get("invoiceReview").is_none() {
+        return validate_legacy_delivery_metadata(provided).map(|()| false);
+    }
+    let receipt =
+        metadata_object(provided).ok_or("reviewed delivery requires its exact provider receipt")?;
+    let review_id = context
+        .get("invoiceReview")
+        .and_then(|value| value.get("reviewId"))
+        .and_then(serde_json::Value::as_str)
+        .ok_or("reviewed delivery ID is unavailable")?;
+    if !matches!(
+        metadata.get("delivery").and_then(serde_json::Value::as_str),
+        Some("dispatching" | "sent")
+    ) || metadata
+        .get("dispatch_review_id")
+        .and_then(serde_json::Value::as_str)
+        != Some(review_id)
+        || receipt
+            .get("dispatch_review_id")
+            .and_then(serde_json::Value::as_str)
+            != Some(review_id)
+        || metadata
+            .get("dispatch_request_digest")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| value.len() == 64)
+            .is_none()
+        || receipt.get("dispatch_request_digest") != metadata.get("dispatch_request_digest")
+    {
+        return Err("reviewed delivery receipt does not match the claimed request".into());
+    }
+    Ok(true)
+}
+
+/// Provider extras cannot promote legacy chatter into reviewed dispatch evidence.
+/// Only the queue/claim reducers may establish the review and dispatch namespace.
+fn validate_legacy_delivery_metadata(provided: Option<&str>) -> Result<(), String> {
+    let has_review_context = |value: &serde_json::Value| {
+        value.get("invoiceReview").is_some()
+            || value.as_str().is_some_and(|raw| {
+                raw.contains("invoiceReview")
+                    || serde_json::from_str::<serde_json::Value>(raw)
+                        .ok()
+                        .is_some_and(|context| context.get("invoiceReview").is_some())
+            })
+    };
+    let reserved = match metadata_object(provided) {
+        Some(extra) => {
+            extra
+                .keys()
+                .any(|key| key == "invoiceReview" || key.starts_with("dispatch_"))
+                || extra.get("context_json").is_some_and(has_review_context)
+        }
+        None => {
+            provided.is_some_and(|raw| raw.contains("invoiceReview") || raw.contains("dispatch_"))
+        }
+    };
+    if reserved {
+        return Err(
+            "legacy delivery metadata cannot introduce invoice review or dispatch claim evidence"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+/// Preserve queue-review evidence across delivery, including legacy malformed metadata.
+/// Provider extras may add keys but cannot rewrite the original reviewed message.
+fn delivered_metadata(existing: Option<&str>, provided: Option<&str>, sent_at: u128) -> String {
+    let mut object = metadata_object(existing).unwrap_or_default();
+    if object.is_empty() && metadata_object(existing).is_none() {
+        if let Some(raw) = existing {
+            object.insert(
+                "legacyMetadata".into(),
+                serde_json::Value::String(raw.into()),
+            );
+        }
+    }
+    match metadata_object(provided) {
+        Some(extra) => {
+            for (key, value) in extra {
+                object.entry(key).or_insert(value);
+            }
+        }
+        None => {
+            if let Some(raw) = provided {
+                object
+                    .entry("deliveryMetadataLegacy".to_string())
+                    .or_insert_with(|| serde_json::Value::String(raw.into()));
+            }
+        }
+    }
+    object.insert("delivery".into(), serde_json::json!("sent"));
+    object.insert("sent_at".into(), serde_json::json!(sent_at));
+    serde_json::Value::Object(object).to_string()
 }
 
 // ── Notification read state ───────────────────────────────────────────────────
@@ -461,7 +601,11 @@ pub fn mark_notification_read(
     organization_id: u64,
     message_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "mail_message", "write")?;
+    // Reading a notification is a caller-owned acknowledgement, not a mutation
+    // of another user's message content. The recipient check below is the
+    // write boundary; requiring `mail_message:write` would deny read-only users
+    // access to their own notification state.
+    check_permission(ctx, organization_id, "mail_message", "read")?;
 
     let message = ctx
         .db
@@ -503,7 +647,7 @@ pub fn mark_all_notifications_read(
     ctx: &ReducerContext,
     organization_id: u64,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "mail_message", "write")?;
+    check_permission(ctx, organization_id, "mail_message", "read")?;
 
     let sender_hex = ctx.sender().to_hex().to_string();
     let mut unread: Vec<MailMessage> = ctx
@@ -530,4 +674,95 @@ pub fn mark_all_notifications_read(
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod delivery_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_receipts_cannot_introduce_review_or_dispatch_evidence() {
+        let review = serde_json::json!({"invoiceReview":{"reviewId":"forged-review"}});
+        for extra in [
+            serde_json::json!({"context_json":review.to_string(),"dispatch_review_id":"forged-review","dispatch_request_digest":"a".repeat(64)}),
+            serde_json::json!({"context_json":review.to_string()}),
+            serde_json::json!({"context_json":review}),
+            serde_json::json!({"context_json":r#"{"\u0069nvoiceReview":{}}"#}),
+            serde_json::json!({"invoiceReview":{}}),
+            serde_json::json!({"dispatch_review_id":"forged-review"}),
+            serde_json::json!({"dispatch_request_digest":"a".repeat(64)}),
+            serde_json::json!({"dispatch_claimed_at":123}),
+        ] {
+            for existing in [
+                None,
+                Some(r#"{"idempotency_key":"legacy-comment"}"#),
+                Some("legacy raw"),
+            ] {
+                assert!(
+                    validate_reviewed_delivery_receipt(existing, Some(&extra.to_string())).is_err(),
+                    "{extra}"
+                );
+            }
+        }
+        assert!(validate_reviewed_delivery_receipt(
+            None,
+            Some(r#"{"context_json":"{\"invoiceReview\":malformed"#)
+        )
+        .is_err());
+        assert_eq!(
+            validate_reviewed_delivery_receipt(
+                None,
+                Some(r#"{"provider_id":"legacy-provider-id"}"#)
+            )
+            .expect("legacy receipt"),
+            false
+        );
+        let context = serde_json::json!({"invoiceReview":{"reviewId":"review-1"}}).to_string();
+        let claimed = serde_json::json!({"context_json":context,"delivery":"dispatching","dispatch_review_id":"review-1","dispatch_request_digest":"a".repeat(64)}).to_string();
+        let receipt = serde_json::json!({"dispatch_review_id":"review-1","dispatch_request_digest":"a".repeat(64)}).to_string();
+        assert!(
+            validate_reviewed_delivery_receipt(Some(&claimed), Some(&receipt))
+                .expect("exact claimed receipt")
+        );
+    }
+
+    #[test]
+    fn delivery_preserves_exact_review_evidence_and_updates_status() {
+        let original = r#"{"delivery":"queued","context_json":"{\"reviewId\":\"unique\"}","mail_template_id":17,"to":"buyer@example.test","subject":"Reviewed subject","html":"Reviewed body","attach_document":false}"#;
+        let result: serde_json::Value = serde_json::from_str(&delivered_metadata(Some(original), Some(r#"{"provider_id":"message17","to":"changed@example.test","subject":"Changed","delivery":"failed","sent_at":0}"#), 123)).expect("metadata");
+        let original: serde_json::Value = serde_json::from_str(original).expect("original");
+        for key in [
+            "context_json",
+            "mail_template_id",
+            "to",
+            "subject",
+            "html",
+            "attach_document",
+        ] {
+            assert_eq!(result[key], original[key]);
+        }
+        assert_eq!(result["delivery"], "sent");
+        assert_eq!(result["sent_at"], 123);
+        assert_eq!(result["provider_id"], "message17");
+    }
+
+    #[test]
+    fn malformed_delivery_metadata_is_preserved_not_interpreted_as_queue_evidence() {
+        for raw in ["legacy raw", "[]", "{bad", "null"] {
+            let result: serde_json::Value = serde_json::from_str(&delivered_metadata(
+                Some(raw),
+                Some("bad provider data"),
+                456,
+            ))
+            .expect("metadata");
+            assert_eq!(result["legacyMetadata"], raw);
+            assert_eq!(result["deliveryMetadataLegacy"], "bad provider data");
+            assert_eq!(result["delivery"], "sent");
+            assert_eq!(result["sent_at"], 456);
+            assert!(result.get("context_json").is_none());
+        }
+        let result: serde_json::Value =
+            serde_json::from_str(&delivered_metadata(None, None, 789)).expect("metadata");
+        assert_eq!(result, serde_json::json!({"delivery":"sent","sent_at":789}));
+    }
 }

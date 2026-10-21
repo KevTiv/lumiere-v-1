@@ -8,6 +8,7 @@ import type { ReducerCommandContractMeta } from "./types";
  */
 export const AUTH_BFF_REDUCERS = [
   "assign_role",
+  "set_member_access",
   "create_audit_rule",
   "create_role",
   "create_sod_conflict_rule",
@@ -33,6 +34,7 @@ export type AuthBffReducerKey = (typeof AUTH_BFF_REDUCERS)[number];
 
 const AUTH_HINT_OVERRIDES: Partial<Record<AuthBffReducerKey, readonly string[]>> = {
   assign_role: ["auth", "user-roles", "roles"],
+  set_member_access: ["auth", "user-roles", "user-organization", "users", "policy-snapshots"],
   create_audit_rule: ["audit-rules"],
   create_role: ["auth", "roles"],
   create_sod_conflict_rule: ["auth", "roles", "sod-conflict-rules"],

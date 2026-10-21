@@ -68,6 +68,19 @@ export interface ModuleTab {
   recordSheet?: EntityRecordSheetConfig
   /** For type='custom': arbitrary content rendered inside the tab panel */
   customContent?: ReactNode
+  /**
+   * For type='entity': another presentation of the tab's records (e.g. a file browser), shown
+   * by default with a toggle back to the table. Route filters always open the table.
+   */
+  entityAltView?: ModuleTabAltView
+}
+
+export interface ModuleTabAltView {
+  /** Toggle label of the alternate view. */
+  label: string
+  /** Toggle label of the table. */
+  tableLabel: string
+  content: ReactNode
 }
 
 export interface ModuleConfig {
@@ -77,10 +90,26 @@ export interface ModuleConfig {
   defaultTab?: string
   tabs: ModuleTab[]
   /**
-   * Optional labelled groups for the tab row. Tabs not listed keep their place:
-   * those before the first grouped tab lead the row, the rest trail it.
+   * Optional workspace groups used by the shared navigation fallback. Tabs not
+   * listed remain individual workspaces; large sets move into the overflow menu.
    */
   tabGroups?: ModuleTabGroup[]
+  /** Curated job-oriented groups; all modules use the same WorkspaceNav renderer. */
+  workspaceNav?: ModuleWorkspaceNav
+}
+
+export interface ModuleWorkspace {
+  id: string
+  label: string
+  /** The first available tab is the workspace's landing destination. */
+  tabIds: readonly string[]
+}
+
+export interface ModuleWorkspaceNav {
+  label?: string
+  workspaces: readonly ModuleWorkspace[]
+  overflow?: readonly ModuleWorkspace[]
+  overflowLabel?: string
 }
 
 export interface ModuleTabGroup {

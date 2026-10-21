@@ -3,12 +3,30 @@
 /// Every import reducer creates an ImportJob at the start, logs row-level
 /// errors into ImportJobError, records created row IDs into ImportJobRecord,
 /// and calls finish_import_job at the end.
-use sha2::{Digest, Sha256};
-use spacetimedb::{reducer, Identity, ReducerContext, Table, Timestamp};
+use std::collections::HashSet;
 
+use sha2::{Digest, Sha256};
+use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
+
+use crate::core::organization::require_company_in_organization;
+use crate::core::users::user_organization;
 use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::{product, Product};
+use crate::{
+    accounting::journal_entries::{account_move, account_move_line},
+    types::{AccountMoveState, PaymentState},
+};
+
+pub const ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: &str = "account_move_bundle_rollback";
+const ABANDONED_DRAFT_CLEANUP_METADATA_KEY: &str = "abandoned_account_move_draft_cleanup";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AccountMoveBundleJobMetadata {
+    pub role: String,
+    pub token: String,
+    pub parent_job_id: Option<u64>,
+}
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -105,8 +123,25 @@ pub fn import_content_sha256(csv_data: &str) -> String {
     hex::encode(Sha256::digest(csv_data.as_bytes()))
 }
 
-fn import_hash_metadata(sha256: &str) -> String {
-    serde_json::json!({ "sha256": sha256 }).to_string()
+fn metadata_has_sha256(metadata: Option<&str>, sha256: &str) -> bool {
+    metadata
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .and_then(|value| {
+            value
+                .get("sha256")
+                .and_then(|hash| hash.as_str())
+                .map(str::to_owned)
+        })
+        .is_some_and(|hash| hash == sha256)
+}
+
+fn merge_import_sha256(metadata: Option<&str>, sha256: &str) -> String {
+    let mut value = metadata
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .filter(serde_json::Value::is_object)
+        .unwrap_or_else(|| serde_json::json!({}));
+    value["sha256"] = serde_json::json!(sha256);
+    value.to_string()
 }
 
 /// Reject a replay of a file already committed for this organization and entity.
@@ -117,7 +152,6 @@ pub fn reject_committed_import_replay(
     table_name: &str,
     sha256: &str,
 ) -> Result<(), String> {
-    let metadata = import_hash_metadata(sha256);
     let replayed = ctx
         .db
         .import_job()
@@ -126,7 +160,7 @@ pub fn reject_committed_import_replay(
         .find(|job| {
             job.table_name == table_name
                 && matches!(job.status.as_str(), "success" | "partial")
-                && job.metadata.as_deref() == Some(metadata.as_str())
+                && metadata_has_sha256(job.metadata.as_deref(), sha256)
         });
     match replayed {
         Some(job) => Err(format!(
@@ -140,7 +174,68 @@ pub fn reject_committed_import_replay(
 /// Stamp a freshly begun job with its file identity so later replays are detected.
 pub fn stamp_import_sha256(ctx: &ReducerContext, job: ImportJob, sha256: &str) -> ImportJob {
     ctx.db.import_job().id().update(ImportJob {
-        metadata: Some(import_hash_metadata(sha256)),
+        metadata: Some(merge_import_sha256(job.metadata.as_deref(), sha256)),
+        ..job
+    })
+}
+
+pub fn account_move_bundle_job_metadata(
+    metadata: Option<&str>,
+) -> Option<AccountMoveBundleJobMetadata> {
+    let value: serde_json::Value = serde_json::from_str(metadata?).ok()?;
+    let marker = value.get(ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY)?;
+    if marker.get("version")?.as_u64()? != 1 {
+        return None;
+    }
+    let role = marker.get("role")?.as_str()?.to_string();
+    if !matches!(role.as_str(), "parent" | "complete") {
+        return None;
+    }
+    let token = marker.get("token")?.as_str()?.trim().to_string();
+    if token.is_empty() {
+        return None;
+    }
+    let parent_job_id = marker
+        .get("parent_job_id")
+        .and_then(|value| value.as_u64())
+        .filter(|id| *id > 0);
+    if (role == "complete") != parent_job_id.is_some() {
+        return None;
+    }
+    Some(AccountMoveBundleJobMetadata {
+        role,
+        token,
+        parent_job_id,
+    })
+}
+
+pub fn stamp_account_move_bundle_job(
+    job: ImportJob,
+    role: &str,
+    token: &str,
+    parent_job_id: Option<u64>,
+) -> Result<ImportJob, String> {
+    if !matches!(role, "parent" | "complete")
+        || token.trim().is_empty()
+        || ((role == "complete") != parent_job_id.is_some())
+        || parent_job_id == Some(0)
+    {
+        return Err("invalid account move bundle rollback metadata".to_string());
+    }
+    let mut metadata = job
+        .metadata
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .filter(serde_json::Value::is_object)
+        .unwrap_or_else(|| serde_json::json!({}));
+    metadata[ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY] = serde_json::json!({
+        "version": 1,
+        "role": role,
+        "token": token,
+        "parent_job_id": parent_job_id,
+    });
+    Ok(ImportJob {
+        metadata: Some(metadata.to_string()),
         ..job
     })
 }
@@ -282,7 +377,1051 @@ fn rollback_delete_record(
     }
 }
 
+fn rollback_account_move_bundle(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line_job: &ImportJob,
+    marker: &AccountMoveBundleJobMetadata,
+) -> Result<(u32, u64), String> {
+    if line_job.table_name != "account_move_line" || line_job.status != "success" {
+        return Err("Only a completed account move bundle can be rolled back".to_string());
+    }
+    let parent_job_id = marker
+        .parent_job_id
+        .ok_or("Account move bundle parent job is missing")?;
+    let parent_job = ctx
+        .db
+        .import_job()
+        .id()
+        .find(&parent_job_id)
+        .ok_or("Account move bundle parent job not found")?;
+    let parent_marker = account_move_bundle_job_metadata(parent_job.metadata.as_deref())
+        .ok_or("Account move bundle parent provenance is missing")?;
+    if parent_job.organization_id != organization_id
+        || parent_job.table_name != "account_move"
+        || parent_job.status != "success"
+        || parent_job.create_uid != line_job.create_uid
+        || parent_marker.role != "parent"
+        || parent_marker.token != marker.token
+    {
+        return Err("Account move bundle parent provenance does not match".to_string());
+    }
+
+    let line_records: Vec<_> = ctx
+        .db
+        .import_job_record()
+        .import_record_by_job()
+        .filter(&line_job.id)
+        .collect();
+    let parent_records: Vec<_> = ctx
+        .db
+        .import_job_record()
+        .import_record_by_job()
+        .filter(&parent_job_id)
+        .collect();
+    if line_records.is_empty() || parent_records.is_empty() {
+        return Err("Account move bundle rollback records are incomplete".to_string());
+    }
+    if line_records.iter().any(|record| {
+        record.organization_id != organization_id || record.table_name != "account_move_line"
+    }) || parent_records.iter().any(|record| {
+        record.organization_id != organization_id || record.table_name != "account_move"
+    }) {
+        return Err("Account move bundle rollback records do not match their jobs".to_string());
+    }
+
+    let line_ids: HashSet<u64> = line_records.iter().map(|record| record.record_id).collect();
+    let move_ids: HashSet<u64> = parent_records
+        .iter()
+        .map(|record| record.record_id)
+        .collect();
+    if line_ids.len() != line_records.len() || move_ids.len() != parent_records.len() {
+        return Err("Account move bundle rollback records contain duplicates".to_string());
+    }
+
+    for move_id in &move_ids {
+        let move_row = ctx
+            .db
+            .account_move()
+            .id()
+            .find(move_id)
+            .ok_or_else(|| format!("Imported account move {move_id} no longer exists"))?;
+        if move_row.organization_id != organization_id
+            || move_row.state != AccountMoveState::Draft
+            || move_row.create_uid != Some(parent_job.create_uid)
+            || move_row.create_date != Some(parent_job.started_at)
+            || move_row.write_uid != Some(line_job.create_uid)
+            || move_row.write_date != Some(line_job.started_at)
+            || move_row.posted_before
+            || move_row.secure_sequence_number.is_some()
+            || move_row.invoice_has_outstanding
+            || move_row.payment_state != PaymentState::NotPaid
+        {
+            return Err(format!(
+                "Imported account move {move_id} was posted, edited, or gained downstream state"
+            ));
+        }
+        let actual_line_ids: HashSet<u64> = ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(move_id)
+            .map(|line| line.id)
+            .collect();
+        let tracked_line_ids: HashSet<u64> = line_records
+            .iter()
+            .filter_map(|record| {
+                ctx.db
+                    .account_move_line()
+                    .id()
+                    .find(&record.record_id)
+                    .filter(|line| line.move_id == *move_id)
+                    .map(|line| line.id)
+            })
+            .collect();
+        if actual_line_ids != tracked_line_ids || actual_line_ids.is_empty() {
+            return Err(format!(
+                "Imported account move {move_id} has missing, added, or foreign lines"
+            ));
+        }
+    }
+
+    for line_id in &line_ids {
+        let line = ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(line_id)
+            .ok_or_else(|| format!("Imported account move line {line_id} no longer exists"))?;
+        if line.organization_id != organization_id
+            || !move_ids.contains(&line.move_id)
+            || line.parent_state != AccountMoveState::Draft
+            || line.create_uid != Some(line_job.create_uid)
+            || line.create_date != Some(line_job.started_at)
+            || line.write_uid != Some(line_job.create_uid)
+            || line.write_date != Some(line_job.started_at)
+            || line.payment_id.is_some()
+            || line.statement_line_id.is_some()
+            || line.reconcile_model_id.is_some()
+            || line.is_matching
+            || line.matching_number.is_some()
+            || line.matching_label.is_some()
+        {
+            return Err(format!(
+                "Imported account move line {line_id} was edited or gained downstream state"
+            ));
+        }
+    }
+
+    for line_id in &line_ids {
+        ctx.db.account_move_line().id().delete(line_id);
+    }
+    for move_id in &move_ids {
+        ctx.db.account_move().id().delete(move_id);
+    }
+    for record in line_records.iter().chain(parent_records.iter()) {
+        ctx.db.import_job_record().id().delete(&record.id);
+    }
+    ctx.db.import_job().id().update(ImportJob {
+        status: "rolled_back".to_string(),
+        ..parent_job
+    });
+    Ok(((line_ids.len() + move_ids.len()) as u32, parent_job_id))
+}
+
+fn abandoned_draft_cleanup_company_id(metadata: Option<&str>) -> Option<u64> {
+    let value: serde_json::Value = serde_json::from_str(metadata?).ok()?;
+    let marker = value.get(ABANDONED_DRAFT_CLEANUP_METADATA_KEY)?;
+    if marker.get("version")?.as_u64()? != 1 {
+        return None;
+    }
+    marker
+        .get("company_id")?
+        .as_u64()
+        .filter(|company_id| *company_id > 0)
+}
+
+fn stamp_abandoned_draft_cleanup(
+    job: ImportJob,
+    company_id: u64,
+    deleted_count: usize,
+) -> ImportJob {
+    let mut metadata = job
+        .metadata
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .filter(serde_json::Value::is_object)
+        .unwrap_or_else(|| serde_json::json!({}));
+    metadata[ABANDONED_DRAFT_CLEANUP_METADATA_KEY] = serde_json::json!({
+        "version": 1,
+        "company_id": company_id,
+        "deleted_count": deleted_count,
+    });
+    ImportJob {
+        metadata: Some(metadata.to_string()),
+        ..job
+    }
+}
+
+fn validate_abandoned_account_move_draft(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    parent_job: &ImportJob,
+    bundle_token: &str,
+    move_id: u64,
+) -> Result<(), String> {
+    let move_row = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_id)
+        .ok_or_else(|| format!("Imported account move {move_id} no longer exists"))?;
+    if move_row.organization_id != organization_id || move_row.company_id != company_id {
+        return Err(format!(
+            "Imported account move {move_id} is outside the cleanup organization or company"
+        ));
+    }
+    if move_row.state != AccountMoveState::Draft
+        || move_row.create_uid != Some(parent_job.create_uid)
+        || move_row.create_date != Some(parent_job.started_at)
+        || move_row.write_uid != Some(parent_job.create_uid)
+        || move_row.write_date != Some(parent_job.started_at)
+        || move_row.posted_before
+        || move_row.secure_sequence_number.is_some()
+        || move_row.invoice_has_outstanding
+        || move_row.payment_state != PaymentState::NotPaid
+    {
+        return Err(format!(
+            "Imported account move {move_id} was posted, edited, or gained downstream state"
+        ));
+    }
+    let marker_token = crate::data_ops::accounting_imports::account_move_bundle_token(
+        move_row.metadata.as_deref(),
+    )
+    .ok_or_else(|| {
+        format!("Imported account move {move_id} no longer has valid bundle provenance")
+    })?;
+    if marker_token != bundle_token {
+        return Err(format!(
+            "Imported account move {move_id} bundle provenance does not match its import job"
+        ));
+    }
+    if crate::data_ops::accounting_imports::account_move_bundle_fingerprint(
+        move_row.metadata.as_deref(),
+    )
+    .is_none()
+    {
+        return Err(format!(
+            "Imported account move {move_id} no longer has parent-row bundle provenance"
+        ));
+    }
+    if ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .next()
+        .is_some()
+    {
+        return Err(format!(
+            "Imported account move {move_id} is not empty; use the completed bundle rollback when eligible"
+        ));
+    }
+    Ok(())
+}
+
+// ── Tracked CSV submission protocol ───────────────────────────────────────────
+
+/// User data for an exactly correlated CSV submission. Reuse `request_id` only
+/// when retrying the exact same payload; a corrected upload needs a new ID.
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct ImportCsvTrackedParams {
+    pub request_id: String,
+    /// Canonical ImportJob table name, not a UI route alias.
+    pub entity: String,
+    pub csv_data: String,
+    pub file_name: Option<String>,
+    pub currency_id: Option<u64>,
+}
+
+fn validate_import_request_id(request_id: &str) -> Result<(), String> {
+    if request_id.len() != 32
+        || !request_id
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err("request_id must be 32 lowercase hexadecimal characters".to_string());
+    }
+    Ok(())
+}
+
+/// Compare identity membership, never ID magnitude or timestamps. The snapshot
+/// and dispatch run in one reducer transaction, so concurrent submissions cannot
+/// contribute jobs to this difference. An invariant failure rolls everything back.
+fn exact_new_import_job_id(
+    previous: &HashSet<u64>,
+    current: impl IntoIterator<Item = u64>,
+) -> Result<u64, String> {
+    let mut created = current.into_iter().filter(|id| !previous.contains(id));
+    let id = created.next().ok_or("import did not create a job")?;
+    if created.next().is_some() {
+        return Err("import created more than one job".to_string());
+    }
+    Ok(id)
+}
+
+fn authorize_tracked_import_company(
+    membership_company_id: Option<u64>,
+    selected_company_id: Option<u64>,
+) -> Result<(), String> {
+    if selected_company_id == Some(0) {
+        return Err("company_id must be non-zero".to_string());
+    }
+    if membership_company_id.is_some() && membership_company_id != selected_company_id {
+        return Err("company_id is outside the caller membership scope".to_string());
+    }
+    Ok(())
+}
+
+fn tracked_import_metadata(
+    request_id: &str,
+    sha256: &str,
+    company_id: Option<u64>,
+    currency_id: Option<u64>,
+) -> serde_json::Value {
+    serde_json::json!({
+        "correlation_version": 1,
+        "request_id": request_id,
+        "sha256": sha256,
+        "company_id": company_id,
+        "currency_id": currency_id,
+    })
+}
+
+fn metadata_request_id(metadata: Option<&str>) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(metadata?).ok()?;
+    value.get("request_id")?.as_str().map(str::to_owned)
+}
+
+fn matches_tracked_import_metadata(metadata: Option<&str>, expected: &serde_json::Value) -> bool {
+    let Some(value) = metadata.and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+    else {
+        return false;
+    };
+    let Some(expected) = expected.as_object() else {
+        return false;
+    };
+    expected
+        .iter()
+        .all(|(key, expected_value)| value.get(key) == Some(expected_value))
+}
+
+// Keep the permission resource distinct from the tracked table: payroll import
+// reducers authorize against hr_payroll while writing three different tables.
+fn tracked_import_permission(entity: &str) -> Result<&str, String> {
+    match entity {
+        "account_account" => Ok("account_account"),
+        "account_tax" => Ok("account_tax"),
+        "account_move" => Ok("account_move"),
+        "account_move_line" => Ok("account_move_line"),
+        "crossovered_budget" => Ok("crossovered_budget"),
+        "crossovered_budget_lines" => Ok("crossovered_budget_lines"),
+        "account_analytic_account" => Ok("account_analytic_account"),
+        "ai_agent" => Ok("ai_agent"),
+        "report_template" => Ok("report_template"),
+        "analytics_metric" => Ok("analytics_metric"),
+        "country" => Ok("country"),
+        "currency" => Ok("currency"),
+        "currency_rate" => Ok("currency_rate"),
+        "uom_category" => Ok("uom_category"),
+        "uom" => Ok("uom"),
+        "company" => Ok("company"),
+        "role" => Ok("role"),
+        "contact" => Ok("contact"),
+        "lead" => Ok("lead"),
+        "opportunity" => Ok("opportunity"),
+        "knowledge_article_category" => Ok("knowledge_article_category"),
+        "knowledge_article" => Ok("knowledge_article"),
+        "hr_expense" => Ok("hr_expense"),
+        "hr_expense_sheet" => Ok("hr_expense_sheet"),
+        "helpdesk_team" => Ok("helpdesk_team"),
+        "helpdesk_stage" => Ok("helpdesk_stage"),
+        "helpdesk_sla" => Ok("helpdesk_sla"),
+        "helpdesk_ticket" => Ok("helpdesk_ticket"),
+        "hr_resource" => Ok("hr_resource"),
+        "hr_department" => Ok("hr_department"),
+        "hr_job_position" => Ok("hr_job_position"),
+        "hr_employee" => Ok("hr_employee"),
+        "hr_contract" => Ok("hr_contract"),
+        "hr_leave_type" => Ok("hr_leave_type"),
+        "hr_leave" => Ok("hr_leave"),
+        "hr_payroll_structure" => Ok("hr_payroll"),
+        "hr_salary_rule" => Ok("hr_payroll"),
+        "hr_payslip" => Ok("hr_payroll"),
+        "product_category" => Ok("product_category"),
+        "product" => Ok("product"),
+        "product_variant" => Ok("product_variant"),
+        "warehouse" => Ok("warehouse"),
+        "stock_location" => Ok("stock_location"),
+        "stock_quant" => Ok("stock_quant"),
+        "stock_production_lot" => Ok("stock_production_lot"),
+        "mrp_workcenter" => Ok("mrp_workcenter"),
+        "mrp_bom" => Ok("mrp_bom"),
+        "mrp_bom_line" => Ok("mrp_bom_line"),
+        "mrp_production" => Ok("mrp_production"),
+        "project_project" => Ok("project_project"),
+        "project_task" => Ok("project_task"),
+        "project_timesheet" => Ok("project_timesheet"),
+        "purchase_order" => Ok("purchase_order"),
+        "purchase_order_line" => Ok("purchase_order_line"),
+        "product_supplier_info" => Ok("product_supplier_info"),
+        "sale_order" => Ok("sale_order"),
+        "sale_order_line" => Ok("sale_order_line"),
+        "subscription_plan" => Ok("subscription_plan"),
+        "subscription" => Ok("subscription"),
+        "workflow" => Ok("workflow"),
+        _ => Err("unsupported CSV import entity".to_string()),
+    }
+}
+
+fn tracked_import_requires_company(entity: &str) -> bool {
+    matches!(
+        entity,
+        "account_account"
+            | "account_tax"
+            | "account_move"
+            | "account_move_line"
+            | "crossovered_budget"
+            | "crossovered_budget_lines"
+            | "account_analytic_account"
+            | "warehouse"
+            | "stock_location"
+            | "stock_quant"
+            | "stock_production_lot"
+            | "mrp_workcenter"
+            | "mrp_bom"
+            | "mrp_bom_line"
+            | "mrp_production"
+            | "project_project"
+            | "project_task"
+            | "project_timesheet"
+            | "purchase_order"
+            | "purchase_order_line"
+            | "sale_order"
+            | "sale_order_line"
+            | "subscription_plan"
+            | "subscription"
+    )
+}
+
+fn dispatch_tracked_import(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: Option<u64>,
+    currency_id: Option<u64>,
+    params: ImportCsvTrackedParams,
+) -> Result<(), String> {
+    // Validate scope before entering a legacy reducer; retain every legacy
+    // permission check, CSV parser, row isolation, and content replay policy.
+    let company = || company_id.ok_or_else(|| "company_id is required for this import".to_string());
+    let currency =
+        || currency_id.ok_or_else(|| "currency_id is required for this import".to_string());
+    match params.entity.as_str() {
+        "account_account" => crate::data_ops::accounting_imports::import_account_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "account_tax" => crate::data_ops::accounting_imports::import_tax_rate_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "account_move" => crate::data_ops::accounting_imports::import_account_move_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "account_move_line" => crate::data_ops::accounting_imports::import_account_move_line_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "crossovered_budget" => crate::data_ops::accounting_imports::import_budget_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "crossovered_budget_lines" => crate::data_ops::accounting_imports::import_budget_line_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "account_analytic_account" => {
+            crate::data_ops::accounting_imports::import_analytic_account_csv(
+                ctx,
+                organization_id,
+                company()?,
+                params.csv_data,
+            )
+        }
+        "ai_agent" => {
+            crate::data_ops::ai_imports::import_ai_agent_csv(ctx, organization_id, params.csv_data)
+        }
+        "report_template" => crate::data_ops::analytics_imports::import_report_template_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "analytics_metric" => crate::data_ops::analytics_imports::import_analytics_metric_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "country" => {
+            crate::data_ops::core_imports::import_country_csv(ctx, organization_id, params.csv_data)
+        }
+        "currency" => crate::data_ops::core_imports::import_currency_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "currency_rate" => crate::data_ops::core_imports::import_currency_rate_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "uom_category" => crate::data_ops::core_imports::import_uom_category_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "uom" => {
+            crate::data_ops::core_imports::import_uom_csv(ctx, organization_id, params.csv_data)
+        }
+        "company" => {
+            crate::data_ops::core_imports::import_company_csv(ctx, organization_id, params.csv_data)
+        }
+        "role" => {
+            crate::data_ops::core_imports::import_role_csv(ctx, organization_id, params.csv_data)
+        }
+        "contact" => {
+            crate::data_ops::crm_imports::import_contact_csv(ctx, organization_id, params.csv_data)
+        }
+        "lead" => {
+            crate::data_ops::crm_imports::import_lead_csv(ctx, organization_id, params.csv_data)
+        }
+        "opportunity" => crate::data_ops::crm_imports::import_opportunity_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "knowledge_article_category" => {
+            crate::data_ops::document_imports::import_knowledge_category_csv(
+                ctx,
+                organization_id,
+                params.csv_data,
+            )
+        }
+        "knowledge_article" => crate::data_ops::document_imports::import_knowledge_article_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_expense" => crate::data_ops::expenses_imports::import_expense_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_expense_sheet" => crate::data_ops::expenses_imports::import_expense_sheet_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "helpdesk_team" => crate::data_ops::helpdesk_imports::import_helpdesk_team_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "helpdesk_stage" => crate::data_ops::helpdesk_imports::import_helpdesk_stage_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "helpdesk_sla" => crate::data_ops::helpdesk_imports::import_helpdesk_sla_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "helpdesk_ticket" => crate::data_ops::helpdesk_imports::import_helpdesk_ticket_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_resource" => crate::data_ops::hr_imports::import_hr_resource_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_department" => crate::data_ops::hr_imports::import_hr_department_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_job_position" => crate::data_ops::hr_imports::import_hr_job_position_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_employee" => crate::data_ops::hr_imports::import_hr_employee_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_contract" => crate::data_ops::hr_imports::import_hr_contract_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_leave_type" => crate::data_ops::hr_imports::import_hr_leave_type_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_leave" => {
+            crate::data_ops::hr_imports::import_hr_leave_csv(ctx, organization_id, params.csv_data)
+        }
+        "hr_payroll_structure" => crate::data_ops::hr_imports::import_hr_payroll_structure_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_salary_rule" => crate::data_ops::hr_imports::import_hr_salary_rule_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "hr_payslip" => crate::data_ops::hr_imports::import_hr_payslip_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "product_category" => crate::data_ops::inventory_imports::import_product_category_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "product" => crate::data_ops::inventory_imports::import_product_csv(
+            ctx,
+            organization_id,
+            currency()?,
+            params.csv_data,
+        ),
+        "product_variant" => crate::data_ops::inventory_imports::import_product_variant_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "warehouse" => crate::data_ops::inventory_imports::import_warehouse_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "stock_location" => crate::data_ops::inventory_imports::import_stock_location_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "stock_quant" => crate::data_ops::inventory_imports::import_stock_quant_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "stock_production_lot" => crate::data_ops::inventory_imports::import_lot_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "mrp_workcenter" => crate::data_ops::manufacturing_imports::import_workcenter_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "mrp_bom" => crate::data_ops::manufacturing_imports::import_bom_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "mrp_bom_line" => crate::data_ops::manufacturing_imports::import_bom_line_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "mrp_production" => crate::data_ops::manufacturing_imports::import_manufacturing_order_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "project_project" => crate::data_ops::project_imports::import_project_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "project_task" => crate::data_ops::project_imports::import_task_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "project_timesheet" => crate::data_ops::project_imports::import_timesheet_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "purchase_order" => crate::data_ops::purchasing_imports::import_purchase_order_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "purchase_order_line" => {
+            crate::data_ops::purchasing_imports::import_purchase_order_line_csv(
+                ctx,
+                organization_id,
+                company()?,
+                params.csv_data,
+            )
+        }
+        "product_supplier_info" => crate::data_ops::purchasing_imports::import_supplier_info_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        "sale_order" => crate::data_ops::sales_imports::import_sale_order_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "sale_order_line" => crate::data_ops::sales_imports::import_sale_order_line_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "subscription_plan" => crate::data_ops::subscription_imports::import_subscription_plan_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "subscription" => crate::data_ops::subscription_imports::import_subscription_csv(
+            ctx,
+            organization_id,
+            company()?,
+            params.csv_data,
+        ),
+        "workflow" => crate::data_ops::workflow_imports::import_workflow_csv(
+            ctx,
+            organization_id,
+            params.csv_data,
+        ),
+        _ => Err("unsupported CSV import entity".to_string()),
+    }
+}
+
+/// Submit a CSV and commit its request ID on the exact job created in this
+/// transaction. Reducers return no row data; clients resolve the receipt from
+/// ImportJob by organization + authenticated create_uid + request_id.
+///
+/// Optional company scope records the initiating workspace for organization-wide
+/// imports; it does not change those imports into company-owned row mutations.
+///
+/// Exact retries reuse the existing receipt without importing rows again,
+/// including failed and rolled-back receipts. Changed payloads must use a new
+/// request ID. Legacy direct imports remain supported.
+#[reducer]
+pub fn import_csv_tracked(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: Option<u64>,
+    params: ImportCsvTrackedParams,
+) -> Result<(), String> {
+    let currency_id = params.currency_id;
+    validate_import_request_id(&params.request_id)?;
+    let permission = tracked_import_permission(&params.entity)?;
+    check_permission(ctx, organization_id, permission, "create")?;
+    // Use the same active organization membership as check_permission, and
+    // enforce its company restriction before either replay or fresh dispatch.
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == organization_id && row.is_active)
+        .ok_or("not a member of this organization")?;
+    authorize_tracked_import_company(membership.company_id, company_id)?;
+    if let Some(company_id) = company_id {
+        require_company_in_organization(ctx, organization_id, company_id)?;
+    }
+    if tracked_import_requires_company(&params.entity) && company_id.is_none() {
+        return Err("company_id is required for this import".to_string());
+    }
+    if params.entity == "product" && currency_id.is_none() {
+        return Err("currency_id is required for this import".to_string());
+    }
+    if params.entity != "product" && currency_id.is_some() {
+        return Err("currency_id is not used by this import".to_string());
+    }
+    let sha256 = import_content_sha256(&params.csv_data);
+    let expected = tracked_import_metadata(&params.request_id, &sha256, company_id, currency_id);
+    let mut previous = HashSet::new();
+    let mut retry = None;
+    for job in ctx
+        .db
+        .import_job()
+        .import_job_by_org()
+        .filter(&organization_id)
+    {
+        previous.insert(job.id);
+        if job.create_uid == ctx.sender()
+            && metadata_request_id(job.metadata.as_deref()).as_deref()
+                == Some(params.request_id.as_str())
+        {
+            if retry.is_some() {
+                return Err("ambiguous import request receipt".to_string());
+            }
+            if job.table_name != params.entity
+                || job.file_name != params.file_name
+                || !matches_tracked_import_metadata(job.metadata.as_deref(), &expected)
+                || !matches!(
+                    job.status.as_str(),
+                    "success" | "partial" | "failed" | "rolled_back"
+                )
+            {
+                return Err("request_id was already used for a different import".to_string());
+            }
+            retry = Some(job.id);
+        }
+    }
+    let job_id = if let Some(job_id) = retry {
+        job_id
+    } else {
+        let entity = params.entity.clone();
+        let file_name = params.file_name.clone();
+        dispatch_tracked_import(ctx, organization_id, company_id, currency_id, params)?;
+        let job_id = exact_new_import_job_id(
+            &previous,
+            ctx.db
+                .import_job()
+                .import_job_by_org()
+                .filter(&organization_id)
+                .map(|job| job.id),
+        )?;
+        let job = ctx
+            .db
+            .import_job()
+            .id()
+            .find(&job_id)
+            .ok_or("import job not found")?;
+        if job.organization_id != organization_id
+            || job.create_uid != ctx.sender()
+            || job.table_name != entity
+            || job.completed_at.is_none()
+            || !matches!(job.status.as_str(), "success" | "partial" | "failed")
+        {
+            return Err("import produced an unexpected job".to_string());
+        }
+        let mut metadata = job
+            .metadata
+            .as_deref()
+            .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+            .filter(serde_json::Value::is_object)
+            .unwrap_or_else(|| serde_json::json!({}));
+        let expected_fields = expected
+            .as_object()
+            .ok_or("invalid tracked import metadata")?;
+        for (key, value) in expected_fields {
+            metadata[key.as_str()] = value.clone();
+        }
+        ctx.db.import_job().id().update(ImportJob {
+            file_name,
+            metadata: Some(metadata.to_string()),
+            ..job
+        });
+        job_id
+    };
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id,
+            table_name: "import_job",
+            record_id: job_id,
+            action: if retry.is_some() {
+                "IMPORT_RETRY"
+            } else {
+                "IMPORT_SUBMIT"
+            },
+            old_values: None,
+            new_values: None,
+            changed_fields: if retry.is_some() {
+                Vec::new()
+            } else {
+                vec!["metadata".to_string(), "file_name".to_string()]
+            },
+            metadata: Some(expected.to_string()),
+        },
+    );
+    Ok(())
+}
+
 // ── Reducers ──────────────────────────────────────────────────────────────────
+
+/// Remove parent drafts left behind when an atomic account-move import stops
+/// before its line phase. This intentionally accepts only the recorded parent
+/// import job, never arbitrary move IDs. Every move is validated before any is
+/// deleted, so one edited or accounting-effective row refuses the whole cleanup.
+#[reducer]
+pub fn cleanup_abandoned_account_move_import(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    parent_job_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "delete")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+
+    let parent_job = ctx
+        .db
+        .import_job()
+        .id()
+        .find(&parent_job_id)
+        .ok_or("Account move parent import job not found")?;
+    if parent_job.organization_id != organization_id {
+        return Err("Account move parent import job does not belong to this organization".into());
+    }
+    if parent_job.table_name != "account_move" {
+        return Err("Cleanup requires an account_move parent import job".into());
+    }
+    let marker = account_move_bundle_job_metadata(parent_job.metadata.as_deref())
+        .filter(|marker| marker.role == "parent")
+        .ok_or("Account move parent import provenance is missing")?;
+
+    if parent_job.status == "rolled_back" {
+        return match abandoned_draft_cleanup_company_id(parent_job.metadata.as_deref()) {
+            Some(cleaned_company_id) if cleaned_company_id == company_id => Ok(()),
+            _ => Err(
+                "Account move parent import was rolled back by a different operation".to_string(),
+            ),
+        };
+    }
+    if parent_job.status != "success" {
+        return Err(
+            "Only a successful abandoned account move parent import can be cleaned up".into(),
+        );
+    }
+
+    let completed_child_exists = ctx
+        .db
+        .import_job()
+        .import_job_by_org()
+        .filter(&organization_id)
+        .any(|job| {
+            account_move_bundle_job_metadata(job.metadata.as_deref()).is_some_and(|child| {
+                child.role == "complete" && child.parent_job_id == Some(parent_job_id)
+            })
+        });
+    if completed_child_exists {
+        return Err(
+            "Account move import has a completed line bundle; use import rollback when eligible"
+                .into(),
+        );
+    }
+
+    let records: Vec<_> = ctx
+        .db
+        .import_job_record()
+        .import_record_by_job()
+        .filter(&parent_job_id)
+        .collect();
+    if records.is_empty() {
+        return Err("Account move parent import has no tracked drafts".into());
+    }
+    if records.iter().any(|record| {
+        record.organization_id != organization_id || record.table_name != "account_move"
+    }) {
+        return Err("Account move parent import records do not match their job".into());
+    }
+    let move_ids: std::collections::BTreeSet<u64> =
+        records.iter().map(|record| record.record_id).collect();
+    if move_ids.len() != records.len() {
+        return Err("Account move parent import records contain duplicates".into());
+    }
+
+    for move_id in &move_ids {
+        validate_abandoned_account_move_draft(
+            ctx,
+            organization_id,
+            company_id,
+            &parent_job,
+            &marker.token,
+            *move_id,
+        )?;
+    }
+
+    for move_id in &move_ids {
+        ctx.db.account_move().id().delete(move_id);
+    }
+    for record in &records {
+        ctx.db.import_job_record().id().delete(&record.id);
+    }
+    let updated_job = stamp_abandoned_draft_cleanup(parent_job, company_id, move_ids.len());
+    ctx.db.import_job().id().update(ImportJob {
+        status: "rolled_back".to_string(),
+        ..updated_job
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "import_job",
+            record_id: parent_job_id,
+            action: "ABANDONED_DRAFT_CLEANUP",
+            old_values: Some(serde_json::json!({ "status": "success" }).to_string()),
+            new_values: Some(serde_json::json!({ "status": "rolled_back" }).to_string()),
+            changed_fields: vec!["status".to_string()],
+            metadata: Some(
+                serde_json::json!({
+                    "parent_job_id": parent_job_id,
+                    "deleted_count": move_ids.len(),
+                    "move_ids": move_ids,
+                })
+                .to_string(),
+            ),
+        },
+    );
+    Ok(())
+}
 
 #[reducer]
 pub fn rollback_import_job(
@@ -309,29 +1448,58 @@ pub fn rollback_import_job(
         return Err("Import job has already been rolled back".to_string());
     }
 
+    if !matches!(job.status.as_str(), "success" | "partial") {
+        return Err("Import job is not eligible for rollback".to_string());
+    }
+
+    let bundle_marker = account_move_bundle_job_metadata(job.metadata.as_deref())
+        .filter(|marker| marker.role == "complete");
+    if !matches!(
+        job.table_name.as_str(),
+        "contact" | "product" | "account_move_line"
+    ) {
+        return Err(format!(
+            "Rollback not supported for table: {}",
+            job.table_name
+        ));
+    }
+    if job.table_name == "account_move_line" && bundle_marker.is_none() {
+        return Err(
+            "Rollback is supported only for a completed atomic account move bundle".to_string(),
+        );
+    }
+
     check_permission(ctx, organization_id, &job.table_name, "delete")?;
 
-    let records: Vec<ImportJobRecord> = ctx
-        .db
-        .import_job_record()
-        .import_record_by_job()
-        .filter(&job_id)
-        .collect();
-
-    if records.is_empty() {
-        return Err("No import records found for this job".to_string());
-    }
-
     let table_name = job.table_name.clone();
-    let mut deleted_count = 0u32;
-    for record in &records {
-        if record.organization_id != job.organization_id {
-            return Err("Import record does not belong to the import job organization".to_string());
+    let (deleted_count, parent_job_id) = if let Some(marker) = bundle_marker.as_ref() {
+        check_permission(ctx, organization_id, "account_move", "delete")?;
+        let (deleted_count, parent_job_id) =
+            rollback_account_move_bundle(ctx, organization_id, &job, marker)?;
+        (deleted_count, Some(parent_job_id))
+    } else {
+        let records: Vec<ImportJobRecord> = ctx
+            .db
+            .import_job_record()
+            .import_record_by_job()
+            .filter(&job_id)
+            .collect();
+        if records.is_empty() {
+            return Err("No import records found for this job".to_string());
         }
-        rollback_delete_record(ctx, organization_id, &record.table_name, record.record_id)?;
-        ctx.db.import_job_record().id().delete(&record.id);
-        deleted_count += 1;
-    }
+        let mut deleted_count = 0u32;
+        for record in &records {
+            if record.organization_id != job.organization_id {
+                return Err(
+                    "Import record does not belong to the import job organization".to_string(),
+                );
+            }
+            rollback_delete_record(ctx, organization_id, &record.table_name, record.record_id)?;
+            ctx.db.import_job_record().id().delete(&record.id);
+            deleted_count += 1;
+        }
+        (deleted_count, None)
+    };
 
     ctx.db.import_job().id().update(ImportJob {
         status: "rolled_back".to_string(),
@@ -358,6 +1526,7 @@ pub fn rollback_import_job(
             metadata: Some(
                 serde_json::json!({
                     "job_id": job_id,
+                    "parent_job_id": parent_job_id,
                     "deleted_count": deleted_count,
                 })
                 .to_string(),
@@ -373,4 +1542,204 @@ pub fn rollback_import_job(
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tracked_import_tests {
+    use super::*;
+
+    const REQUEST: &str = "0123456789abcdef0123456789abcdef";
+
+    #[test]
+    fn request_ids_are_exact_lowercase_hex_not_sql_fragments() {
+        assert!(validate_import_request_id(REQUEST).is_ok());
+        for invalid in [
+            "",
+            "0123456789abcdef",
+            "0123456789abcdef0123456789abcdeF",
+            "0123456789abcdef0123456789abcde'",
+            "0123456789abcdef0123456789abcdef0",
+        ] {
+            assert!(validate_import_request_id(invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn exact_new_job_is_membership_not_id_order() {
+        let previous = HashSet::from([90, 400]);
+        assert_eq!(exact_new_import_job_id(&previous, [400, 2, 90]), Ok(2));
+    }
+
+    #[test]
+    fn missing_or_multiple_new_jobs_fail_closed() {
+        let previous = HashSet::from([90]);
+        assert!(exact_new_import_job_id(&previous, [90]).is_err());
+        assert!(exact_new_import_job_id(&previous, [90, 2, 3]).is_err());
+    }
+
+    #[test]
+    fn every_transaction_snapshot_resolves_only_its_own_submission() {
+        let before_first = HashSet::from([90]);
+        assert_eq!(exact_new_import_job_id(&before_first, [90, 2]), Ok(2));
+        let before_second = HashSet::from([90, 2]);
+        assert_eq!(exact_new_import_job_id(&before_second, [90, 2, 1]), Ok(1));
+    }
+
+    #[test]
+    fn exact_metadata_retry_preserves_scope_and_content() {
+        let expected = tracked_import_metadata(REQUEST, "hash", Some(7), Some(8));
+        assert!(matches_tracked_import_metadata(
+            Some(&expected.to_string()),
+            &expected
+        ));
+        for different in [
+            tracked_import_metadata("11111111111111111111111111111111", "hash", Some(7), Some(8)),
+            tracked_import_metadata(REQUEST, "different", Some(7), Some(8)),
+            tracked_import_metadata(REQUEST, "hash", Some(9), Some(8)),
+            tracked_import_metadata(REQUEST, "hash", Some(7), Some(9)),
+            tracked_import_metadata(REQUEST, "hash", None, Some(8)),
+        ] {
+            assert!(!matches_tracked_import_metadata(
+                Some(&different.to_string()),
+                &expected
+            ));
+        }
+    }
+
+    #[test]
+    fn malformed_or_unversioned_receipts_are_not_exact_retries() {
+        let expected = tracked_import_metadata(REQUEST, "hash", None, None);
+        for invalid in [None, Some("{}"), Some("null"), Some("not json")] {
+            assert!(!matches_tracked_import_metadata(invalid, &expected));
+            assert_eq!(metadata_request_id(invalid), None);
+        }
+        let mut unversioned = expected.clone();
+        unversioned
+            .as_object_mut()
+            .unwrap()
+            .remove("correlation_version");
+        assert!(!matches_tracked_import_metadata(
+            Some(&unversioned.to_string()),
+            &expected
+        ));
+    }
+
+    #[test]
+    fn receipt_metadata_can_keep_unrelated_job_metadata() {
+        let expected = tracked_import_metadata(REQUEST, "hash", Some(7), None);
+        let mut extended = expected.clone();
+        extended["other"] = serde_json::json!({"retained": true});
+        assert!(matches_tracked_import_metadata(
+            Some(&extended.to_string()),
+            &expected
+        ));
+        assert_eq!(
+            metadata_request_id(Some(&extended.to_string())),
+            Some(REQUEST.to_string())
+        );
+    }
+
+    #[test]
+    fn committed_content_replay_survives_correlation_metadata() {
+        let tracked = tracked_import_metadata(REQUEST, "hash", Some(7), None).to_string();
+        assert!(metadata_has_sha256(Some(&tracked), "hash"));
+        assert!(metadata_has_sha256(Some(r#"{"sha256":"hash"}"#), "hash"));
+        assert!(!metadata_has_sha256(Some(&tracked), "other"));
+        assert!(!metadata_has_sha256(Some(r#"{"sha256":123}"#), "hash"));
+    }
+
+    #[test]
+    fn accounting_bundle_rollback_metadata_is_strict_and_versioned() {
+        let complete = serde_json::json!({
+            ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1,
+                "role": "complete",
+                "token": "bundle-1",
+                "parent_job_id": 41,
+            }
+        });
+        assert_eq!(
+            account_move_bundle_job_metadata(Some(&complete.to_string())),
+            Some(AccountMoveBundleJobMetadata {
+                role: "complete".to_string(),
+                token: "bundle-1".to_string(),
+                parent_job_id: Some(41),
+            })
+        );
+
+        for invalid in [
+            serde_json::json!({}),
+            serde_json::json!({ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 2, "role": "complete", "token": "bundle-1", "parent_job_id": 41,
+            }}),
+            serde_json::json!({ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1, "role": "parent", "token": "bundle-1", "parent_job_id": 41,
+            }}),
+            serde_json::json!({ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1, "role": "complete", "token": "", "parent_job_id": 41,
+            }}),
+            serde_json::json!({ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1, "role": "complete", "token": "bundle-1", "parent_job_id": 0,
+            }}),
+        ] {
+            assert_eq!(
+                account_move_bundle_job_metadata(Some(&invalid.to_string())),
+                None
+            );
+        }
+    }
+
+    #[test]
+    fn stamp_hash_keeps_existing_correlation_fields() {
+        let original = tracked_import_metadata(REQUEST, "old", Some(7), None).to_string();
+        let stamped = merge_import_sha256(Some(&original), "new");
+        assert!(metadata_has_sha256(Some(&stamped), "new"));
+        assert_eq!(
+            metadata_request_id(Some(&stamped)),
+            Some(REQUEST.to_string())
+        );
+    }
+
+    #[test]
+    fn sha256_is_exact_csv_bytes() {
+        assert_eq!(
+            import_content_sha256(""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_ne!(
+            import_content_sha256("name\nAlice\n"),
+            import_content_sha256("name\r\nAlice\r\n")
+        );
+    }
+
+    #[test]
+    fn payroll_permission_names_are_not_guessed_from_receipt_tables() {
+        for entity in ["hr_payroll_structure", "hr_salary_rule", "hr_payslip"] {
+            assert_eq!(tracked_import_permission(entity), Ok("hr_payroll"));
+        }
+        assert_eq!(
+            tracked_import_permission("account_account"),
+            Ok("account_account")
+        );
+        assert!(tracked_import_permission("account").is_err());
+        assert!(tracked_import_permission("unsupported").is_err());
+    }
+
+    #[test]
+    fn restricted_company_membership_cannot_be_bypassed_with_missing_context() {
+        assert!(authorize_tracked_import_company(Some(7), Some(7)).is_ok());
+        assert!(authorize_tracked_import_company(Some(7), Some(8)).is_err());
+        assert!(authorize_tracked_import_company(Some(7), None).is_err());
+        assert!(authorize_tracked_import_company(None, Some(7)).is_ok());
+        assert!(authorize_tracked_import_company(None, None).is_ok());
+        assert!(authorize_tracked_import_company(None, Some(0)).is_err());
+    }
+
+    #[test]
+    fn company_requirements_match_legacy_import_signatures() {
+        assert!(tracked_import_requires_company("mrp_bom"));
+        assert!(tracked_import_requires_company("account_account"));
+        assert!(!tracked_import_requires_company("contact"));
+        assert!(!tracked_import_requires_company("hr_payslip"));
+    }
 }

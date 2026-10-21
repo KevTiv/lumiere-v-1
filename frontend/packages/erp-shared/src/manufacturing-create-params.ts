@@ -169,28 +169,29 @@ export function toBomLineInput(entry: BomLineFormEntry): BomLineInput {
   }
 }
 
-function parseBomLines(raw: unknown, defaultUomId: bigint): BomLineInput[] {
+function parseBomLines(raw: unknown): BomLineInput[] | null {
   if (raw == null || raw === "") return []
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw
-    if (!Array.isArray(parsed)) return []
-    return parsed.flatMap((entry: Record<string, unknown>, idx: number): BomLineInput[] => {
+    if (!Array.isArray(parsed)) return null
+    const lines: BomLineInput[] = []
+    for (const [idx, entry] of parsed.entries()) {
+      if (entry == null || typeof entry !== "object" || Array.isArray(entry)) return null
       const productId = optionalBigIntU64(entry.productId ?? entry.product_id)
-      const productUomId =
-        optionalBigIntU64(entry.productUomId ?? entry.product_uom_id) ?? defaultUomId
-      if (!productId) return []
-      return [
-        toBomLineInput({
+      const productUomId = optionalBigIntU64(entry.productUomId ?? entry.product_uom_id)
+      const productQty = num(entry.productQty ?? entry.product_qty, 0)
+      if (!productId || !productUomId || productQty <= 0) return null
+      lines.push(toBomLineInput({
           productId,
-          productQty: num(entry.productQty ?? entry.product_qty, 1),
+          productQty,
           productUomId,
           sequence: Math.trunc(num(entry.sequence, (idx + 1) * 10)),
           operationId: optionalBigIntU64(entry.operationId ?? entry.operation_id),
-        }),
-      ]
-    })
+        }))
+    }
+    return lines
   } catch {
-    return []
+    return null
   }
 }
 
@@ -200,6 +201,8 @@ export function toCreateBomParams(
 ): CreateBomParams | null {
   const productTmplId = requiredBigIntU64(field(formData, "productTmplId", "product_tmpl_id"))
   if (productTmplId === null) return null
+  const lines = parseBomLines(field(formData, "bomLines", "bom_lines"))
+  if (lines === null) return null
 
   return {
     companyId: context.companyId,
@@ -210,7 +213,7 @@ export function toCreateBomParams(
     readyToProduce: String(field(formData, "readyToProduce", "ready_to_produce") ?? "asap"),
     consumption: String(field(formData, "consumption", "consumption") ?? "flexible"),
     sequence: Math.trunc(num(field(formData, "sequence", "sequence"), 1)),
-    lines: parseBomLines(field(formData, "bomLines", "bom_lines"), context.productUomId),
+    lines,
     pickingTypeId: optionalBigIntU64(field(formData, "pickingTypeId", "picking_type_id")),
     locationSrcId: optionalBigIntU64(field(formData, "locationSrcId", "location_src_id")),
     locationDestId: optionalBigIntU64(field(formData, "locationDestId", "location_dest_id")),

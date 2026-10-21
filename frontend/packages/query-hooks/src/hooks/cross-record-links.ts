@@ -35,7 +35,13 @@ interface BillingRunRow extends ScopedRow {
   readonly invoiceMoveId?: Raw
   readonly invoice_move_id?: Raw
 }
+interface InvoiceRow extends ScopedRow {
+  readonly moveType?: Raw
+  readonly move_type?: Raw
+  readonly state?: Raw
+}
 interface PaymentRow extends ScopedRow {
+  readonly state?: Raw
   readonly reconciledInvoiceIds?: Raw
   readonly reconciled_invoice_ids?: Raw
 }
@@ -105,7 +111,7 @@ export function proposalOrderLinks(parent: ProposalRow, scope: OrderToCashScope,
 }
 
 /** Billing runs expose the exact invoice relation; subscriptions' default projection does not. */
-export function subscriptionRecordLinks(parent: ScopedRow, scope: OrderToCashScope, runs: readonly BillingRunRow[], moves: readonly ScopedRow[], payments: readonly PaymentRow[] | undefined): CrossRecordLinks {
+export function subscriptionRecordLinks(parent: ScopedRow, scope: OrderToCashScope, runs: readonly BillingRunRow[], moves: readonly InvoiceRow[], payments: readonly PaymentRow[] | undefined): CrossRecordLinks {
   if (!scoped(parent, scope)) return unavailable("Subscription is outside the current scope")
   const subscriptionId = parseStrictU64(parent.id)
   if (subscriptionId == null) return invariant("Subscription has no canonical ID")
@@ -113,7 +119,19 @@ export function subscriptionRecordLinks(parent: ScopedRow, scope: OrderToCashSco
     parseStrictU64(run.subscriptionId ?? run.subscription_id) === subscriptionId)
   const invoiceIds = ids(relatedRuns.map((run) => run.invoiceMoveId ?? run.invoice_move_id))
   if (invoiceIds == null) return unavailable("Billing run invoice relation is unavailable")
-  const invoices = targets(invoiceIds, moves, scope, "invoice", accountMoveHref)
+  // Several exact billing runs may name the same invoice; target rows must still be unique.
+  const uniqueInvoiceIds = [...new Set(invoiceIds)]
+  const resolvedInvoiceIds: bigint[] = []
+  for (const id of uniqueInvoiceIds) {
+    const matches = moves.filter((move) => scoped(move, scope) && parseStrictU64(move.id) === id)
+    if (matches.length > 1) return invariant(`Multiple canonical records for invoice #${id}`)
+    const move = matches[0]
+    if (!move || stateName(move.moveType ?? move.move_type) !== "outinvoice") {
+      return unavailable(`Canonical invoice #${id} is not available in this scope`)
+    }
+    if (!["cancel", "cancelled"].includes(stateName(move.state))) resolvedInvoiceIds.push(id)
+  }
+  const invoices = targets(resolvedInvoiceIds, moves, scope, "invoice", accountMoveHref)
   if (invoices.status !== "ready") return invoices
   const paymentUnavailable = (reason: string): CrossRecordLinks => ({
     ...invoices, paymentNotice: { status: "unavailable", reason },
@@ -126,7 +144,7 @@ export function subscriptionRecordLinks(parent: ScopedRow, scope: OrderToCashSco
     if (new Set(reconciled.map(String)).size !== reconciled.length) {
       return { ...invoices, paymentNotice: { status: "invariant_failure", reason: "Duplicate payment invoice relation IDs" } }
     }
-    if (reconciled.some((id) => invoiceIds.includes(id))) relatedPayments.push(row)
+    if (stateName(row.state) === "paid" && reconciled.some((id) => resolvedInvoiceIds.includes(id))) relatedPayments.push(row)
   }
   const paymentIds = ids(relatedPayments.map((row) => row.id))
   const paymentLinks = paymentIds == null

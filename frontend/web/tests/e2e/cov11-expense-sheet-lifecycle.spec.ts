@@ -1,11 +1,12 @@
+import { createHash } from "node:crypto"
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
-  callReducerBff,
+  selectModuleTab,
+  chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   fetchAccountIdByCode,
   fetchAccountSelectLabelByInternalType,
-  fetchCurrencyIdByCode,
   fetchSessionOrganizationId,
   fillField,
   gotoModule,
@@ -115,6 +116,8 @@ async function sheetSnapshot(page: Page, sheetId: number) {
     ),
     companyId: scalarQueryId(row.companyId ?? row.company_id),
     state: stateTag(row.state),
+    submittedBy: identityHex(row.submittedBy ?? row.submitted_by),
+    approverId: identityHex(row.approverId ?? row.approver_id),
     accountMoveId:
       scalarQueryId(row.accountMoveId ?? row.account_move_id) ?? null,
     reimbursementMoveId:
@@ -145,7 +148,7 @@ async function openSheetAction(
   actionId: string,
 ) {
   await gotoModule(page, "/expenses", "expenses")
-  await page.getByTestId("module-tab-expenses-expense-sheets").click()
+  await selectModuleTab(page, "expenses", "expense-sheets")
   await selectEntityRowById(page, sheetId)
   const action = page.getByTestId(`entity-action-${actionId}`)
   await expect(action).toBeVisible()
@@ -163,54 +166,38 @@ test.describe(
       test.setTimeout(300_000)
       await gotoModule(page, "/expenses", "expenses")
       const organizationId = await fetchSessionOrganizationId(page)
-      const currencyId = await fetchCurrencyIdByCode(page, "USD")
-
-      const employees = await page.request.get("/api/query/employees")
-      const employeeId = Number(
-        (
-          (await employees.json()) as {
-            data?: Array<{ id?: number }>
-          }
-        ).data?.[0]?.id,
-      )
-      expect(employeeId).toBeGreaterThan(0)
 
       const sheetName = smokeName("cov11-sheet")
       const expenseName = smokeName("cov11-line")
-      const receiptKey = smokeName("cov11-receipt")
-
-      await callReducerBff(page, "create_expense_receipt", [
-        organizationId,
-        {
-          company_id: none,
-          employee_id: employeeId,
-          file_name: some("cov11.pdf"),
-          mime_type: some("application/pdf"),
-          storage_key: `e2e:${receiptKey}`,
-          content_hash: none,
-          client_request_id: some(receiptKey),
-        },
-      ])
-      const receiptId = scalarQueryId(
-        (await rows(page, "expense-receipts")).find(
-          (row) =>
-            String(row.clientRequestId ?? row.client_request_id ?? "") ===
-            receiptKey,
-        )?.id,
+      const receiptFileName = `${smokeName("cov11-receipt")}.pdf`
+      const receiptBytes = Buffer.from(
+        `%PDF-1.4\nCOV-11 receipt ${expenseName}\n%%EOF\n`,
+        "utf8",
       )
-      if (receiptId == null) throw new Error("created expense receipt not found")
+      const receiptHash = createHash("sha256").update(receiptBytes).digest("hex")
+      // Repeated runs share a seed employee/date. Keep the positive fixture
+      // distinct under the amount/day/merchant duplicate detector too.
+      const existingAmounts = (await rows(page, "expenses")).map(
+        (row) => Number(row.totalAmount ?? row.total_amount),
+      )
+      let expenseAmount = 73.17
+      while (existingAmounts.some((amount) => Math.abs(amount - expenseAmount) < 0.02)) expenseAmount += 1
 
-      await callReducerBff(page, "create_expense_sheet", [
-        organizationId,
-        {
-          company_id: none,
-          employee_id: employeeId,
-          name: sheetName,
-          currency_id: currencyId,
-          notes: none,
-          accounting_date: none,
-        },
+      // Create the report through the operator form so lookup and company scope
+      // are exercised before the lifecycle actions begin.
+      await selectModuleTab(page, "expenses", "expense-sheets")
+      await page.getByTestId("module-create-expenses-expense-sheets").click()
+      await fillField(page, "name", sheetName)
+      await chooseFirstEnabledOption(page, "pricelistId")
+      await chooseFirstEnabledOption(page, "employeeId")
+      const [sheetCreated] = await Promise.all([
+        page.waitForResponse(
+          (response) => matchesOperationResponse(response, "create_expense_sheet"),
+          { timeout: 45_000 },
+        ),
+        submitForm(page, "new-expense-sheet"),
       ])
+      expect(sheetCreated.ok(), await sheetCreated.text()).toBe(true)
       const sheet = (await rows(page, "expense-sheets")).find(
         (row) => row.name === sheetName,
       )
@@ -219,48 +206,82 @@ test.describe(
       if (sheetId == null) throw new Error("created expense sheet not found")
       if (companyId == null) throw new Error("created expense sheet has no company")
 
-      await callReducerBff(page, "create_expense", [
-        organizationId,
-        {
-          company_id: none,
-          employee_id: employeeId,
-          name: expenseName,
-          date: {
-            __timestamp_micros_since_unix_epoch__: Date.now() * 1000,
-          },
-          // Guarded-action snapshots use exact currency scale 2.
-          unit_amount: 73.17,
-          quantity: 1,
-          currency_id: currencyId,
-          product_id: none,
-          description: none,
-          tax_ids: [],
-          account_id: none,
-          analytic_account_id: none,
-          project_id: none,
-          line_kind: { standard: [] },
-          mileage_distance: none,
-          mileage_rate_id: none,
-          per_diem_days: none,
-          per_diem_rate_id: none,
-          attachment_ids: [receiptId],
-          client_request_id: some(smokeName("cov11-expense")),
-          payment_mode: { outOfPocket: [] },
-          merchant_key: some(smokeName("cov11-merchant")),
-          policy_exception_reason: none,
-        },
+      // Upload real bytes through presign -> object store -> complete, then let
+      // the expense form register and attach the resulting receipt row.
+      await selectModuleTab(page, "expenses", "expenses")
+      await page.getByTestId("module-create-expenses-expenses").click()
+      await fillField(page, "name", expenseName)
+      await fillField(page, "totalAmount", expenseAmount.toFixed(2))
+      await fillField(page, "date", isoDate(-test.info().retry))
+      await chooseFirstEnabledOption(page, "pricelistId")
+      await chooseFirstEnabledOption(page, "employeeId")
+      await page.getByTestId("form-field-receiptFile").setInputFiles({
+        name: receiptFileName,
+        mimeType: "application/pdf",
+        buffer: receiptBytes,
+      })
+      const [blobCompleted, receiptRegistered, expenseCreated] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url().includes("/api/documents/blobs/complete") && response.ok(),
+          { timeout: 45_000 },
+        ),
+        page.waitForResponse(
+          (response) => matchesOperationResponse(response, "create_expense_receipt"),
+          { timeout: 45_000 },
+        ),
+        page.waitForResponse(
+          (response) => matchesOperationResponse(response, "create_expense"),
+          { timeout: 45_000 },
+        ),
+        submitForm(page, "new-expense"),
       ])
-      const expenseId = scalarQueryId(
-        (await rows(page, "expenses")).find(
-          (row) => row.name === expenseName,
-        )?.id,
+      expect(blobCompleted.ok()).toBe(true)
+      expect(receiptRegistered.ok(), await receiptRegistered.text()).toBe(true)
+      expect(expenseCreated.ok(), await expenseCreated.text()).toBe(true)
+      const expense = (await rows(page, "expenses")).find(
+        (row) => row.name === expenseName,
       )
+      const expenseId = scalarQueryId(expense?.id)
       if (expenseId == null) throw new Error("created expense line not found")
-      await callReducerBff(page, "submit_expense", [
-        organizationId,
-        expenseId,
-        sheetId,
+      expect(Number(expense?.totalAmount ?? expense?.total_amount)).toBe(Number(expenseAmount.toFixed(2)))
+      const receipt = (await rows(page, "expense-receipts")).find(
+        (row) => String(row.fileName ?? row.file_name ?? "") === receiptFileName,
+      )
+      const receiptId = scalarQueryId(receipt?.id)
+      if (receiptId == null) throw new Error("uploaded expense receipt not found")
+      expect(String(receipt?.contentHash ?? receipt?.content_hash ?? "")).toBe(receiptHash)
+      expect(String(receipt?.storageKey ?? receipt?.storage_key ?? "")).not.toMatch(/^e2e:/)
+
+      // The create command carries a client_request_id; replaying the exact
+      // request must resolve to the same line and receipt, never a duplicate.
+      const duplicateReceipt = await replay(page, receiptRegistered.request())
+      const duplicateCreate = await replay(page, expenseCreated.request())
+      expect(duplicateReceipt.ok(), await duplicateReceipt.text()).toBe(true)
+      expect(duplicateCreate.ok(), await duplicateCreate.text()).toBe(true)
+      expect(
+        (await rows(page, "expenses")).filter((row) => row.name === expenseName),
+      ).toHaveLength(1)
+      expect(
+        (await rows(page, "expense-receipts")).filter(
+          (row) => String(row.fileName ?? row.file_name ?? "") === receiptFileName,
+        ),
+      ).toHaveLength(1)
+
+      // Link the draft line to its report through the row action form.
+      await page.getByTestId(`entity-row-${expenseId}`).click()
+      const addToReport = page.getByRole("button", { name: /Add to report/i })
+      await expect(addToReport).toBeVisible()
+      await addToReport.click()
+      await chooseSelectOptionByLabel(page, "sheetId", sheetName)
+      const [lineSubmitted] = await Promise.all([
+        page.waitForResponse(
+          (response) => matchesOperationResponse(response, "submit_expense"),
+          { timeout: 45_000 },
+        ),
+        submitForm(page, "add-expense-to-report"),
       ])
+      expect(lineSubmitted.ok(), await lineSubmitted.text()).toBe(true)
 
       const submitAction = await openSheetAction(
         page,
@@ -275,7 +296,7 @@ test.describe(
         ),
         submitAction.click(),
       ])
-      expect(submitted.ok()).toBe(true)
+      expect(submitted.ok(), await submitted.text()).toBe(true)
       await expect
         .poll(() => sheetSnapshot(page, sheetId))
         .toMatchObject({ state: "Submitted" })
@@ -309,14 +330,14 @@ test.describe(
         )
         if (!existingFinanceEmployee) {
           const financeEmployeeName = smokeName("cov11-finance-approver")
-          await callReducerBff(page, "create_employee", [
+          await callOwnerRaw("create_employee", [
             organizationId,
             {
               company_id: some(companyId),
               name: financeEmployeeName,
               job_id: none,
               department_id: none,
-              employment_type: { tag: "FullTime" },
+              employment_type: { fullTime: [] },
               work_email: some("fixture.finance@example.test"),
               employee_number: none,
               job_title: some("Expense approver"),
@@ -368,6 +389,7 @@ test.describe(
             },
           ])
         }
+        expect(await sheetSnapshot(financePage, sheetId)).toMatchObject({ state: "Submitted" })
         const approveAction = await openSheetAction(
           financePage,
           sheetId,
@@ -388,6 +410,9 @@ test.describe(
           .poll(() => sheetSnapshot(page, sheetId))
           .toMatchObject({ state: "Approved" })
         const approvedEffect = await sheetSnapshot(page, sheetId)
+        expect(approvedEffect.submittedBy).toMatch(/^[0-9a-f]{64}$/)
+        expect(approvedEffect.approverId).toMatch(/^[0-9a-f]{64}$/)
+        expect(approvedEffect.approverId).not.toBe(approvedEffect.submittedBy)
         const staleApprove = await replay(financePage, approved.request())
         expect(staleApprove.status()).toBe(422)
         expect(await sheetSnapshot(page, sheetId)).toEqual(approvedEffect)

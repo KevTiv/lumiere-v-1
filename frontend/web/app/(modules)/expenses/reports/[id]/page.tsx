@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { ExpenseReportPageClient } from "./report-page-client"
 
 const SSR_RESOURCES = ["expenses", "expense-sheets"] as const
@@ -15,7 +15,7 @@ export default async function ExpenseReportPage({ params }: ExpenseReportPagePro
     return <ExpenseReportPageClient sheetId={id} />
   }
 
-  const [expenses, sheets] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [expenses, sheets] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <ExpenseReportPageClient

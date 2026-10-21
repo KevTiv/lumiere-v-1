@@ -91,6 +91,13 @@ export const manufacturingOrdersTableConfig = (t: TFunction): EntityViewConfig =
       { key: "origin", label: t("manufacturing.manufacturingOrders.columns.origin"), width: "min-w-24" },
     ],
     emptyMessage: t("manufacturing.manufacturingOrders.emptyMessage"),
+    emptyState: {
+      title: t("manufacturing.manufacturingOrders.emptyMessage"),
+      description: t("manufacturing.manufacturingOrders.emptyState.description", { defaultValue: "Manufacturing orders consume components and produce finished goods, keeping stock and costs in step with the shop floor." }),
+      permission: { resource: "mrp_production", action: "create" },
+      secondaryActionId: "csv-mo",
+      learnHint: t("manufacturing.manufacturingOrders.emptyState.hint", { defaultValue: "Define a bill of materials first so orders know what to consume." }),
+    },
   },
 })
 
@@ -156,6 +163,25 @@ export const bomLinesTableConfig = (t: TFunction): EntityViewConfig => ({
 })
 
 // ── Work Orders ───────────────────────────────────────────────────────────────
+export const bomByproductsTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "bom-byproducts-table",
+  title: "BOM Byproducts",
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["bomId", "productId"],
+    columns: [
+      { key: "id", label: "ID" },
+      { key: "bomId", label: t("manufacturing.bomLines.columns.bomId") },
+      { key: "productId", label: t("manufacturing.bomLines.columns.productId") },
+      { key: "productQty", label: t("manufacturing.bomLines.columns.productQty"), type: "number", align: "right" },
+      { key: "productUomId", label: t("manufacturing.bomLines.columns.productUomId") },
+      { key: "costShare", label: t("manufacturing.rowActions.form.byproductCostShare"), type: "number", align: "right" },
+    ],
+  },
+})
+
 export const workordersTableConfig = (t: TFunction): EntityViewConfig => ({
   id: "workorders-table",
   title: t("manufacturing.workOrders.title"),
@@ -259,6 +285,7 @@ export const manufacturingEntityConfigs = (t: TFunction): Record<string, EntityV
   "manufacturing-orders-table": manufacturingOrdersTableConfig(t),
   "boms-table": bomsTableConfig(t),
   "bom-lines-table": bomLinesTableConfig(t),
+  "bom-byproducts-table": bomByproductsTableConfig(t),
   "workorders-table": workordersTableConfig(t),
   "workcenters-table": workcentersTableConfig(t),
   "routing-operations-table": routingOperationsTableConfig(t),

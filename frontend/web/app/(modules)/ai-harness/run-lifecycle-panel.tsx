@@ -3,6 +3,7 @@
 import type { JsonObject } from "@lumiere/api-client/json-object"
 
 import { type FormEvent, useMemo, useRef, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { AlertCircle, GitCompareArrows, MessagesSquare, PauseCircle, PlayCircle } from "lucide-react"
 import { Button } from "@lumiere/ui"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
@@ -23,6 +24,7 @@ import {
 } from "./run-lifecycle"
 import { mapRunObservation, type RunObservationView } from "./run-observation"
 import { RunHistoryPanel } from "./run-history-panel"
+import { eventKindLabel, questionStatusLabel, runStatusLabel } from "./enum-labels"
 
 interface RunLifecyclePanelProps {
   companies: JsonObject[]
@@ -42,6 +44,7 @@ type ObservationState =
   | { status: "success"; data: RunObservationView }
 
 export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
+  const { t } = useTranslation()
   const companyOptions = useMemo(() => companyRowsToSelectOptions(companies), [companies])
   const [companyId, setCompanyId] = useState(() => companyOptions[0]?.value ?? "")
   const [runId, setRunId] = useState("")
@@ -66,20 +69,20 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
         setObservation({
           status: "unavailable",
           message: response.status === 401 || response.status === 403
-            ? "The current session is not authorized to inspect this run's transcript."
+            ? t("aiHarness.runLifecycle.errors.transcriptUnauthorized")
             : response.status === 404
-              ? "No governed tool transcript was found for this lifecycle run."
-              : "The governed tool transcript is temporarily unavailable.",
+              ? t("aiHarness.runLifecycle.errors.transcriptNotFound")
+              : t("aiHarness.runLifecycle.errors.transcriptUnavailable"),
         })
         return
       }
       const mapped = mapRunObservation(payload)
       setObservation(mapped && mapped.runId === selectedRunId
         ? { status: "success", data: mapped }
-        : { status: "unavailable", message: "The governed tool transcript response was incomplete." })
+        : { status: "unavailable", message: t("aiHarness.runLifecycle.errors.transcriptIncomplete") })
     } catch {
       if (requestId === observationRequest.current) {
-        setObservation({ status: "unavailable", message: "The governed tool transcript is temporarily unavailable." })
+        setObservation({ status: "unavailable", message: t("aiHarness.runLifecycle.errors.transcriptUnavailable") })
       }
     }
   }
@@ -89,7 +92,7 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
     observationRequest.current += 1
     const parsedCompanyId = Number(companyId)
     if (!Number.isSafeInteger(parsedCompanyId) || parsedCompanyId <= 0) {
-      setRequest({ status: "error", message: "Choose a company first." })
+      setRequest({ status: "error", message: t("aiHarness.runLifecycle.errors.chooseCompany") })
       return
     }
     setRequest({ status: "loading" })
@@ -102,19 +105,19 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
       const payload = await response.json().catch(() => ({})) as JsonObject
       if (requestId !== lifecycleRequestId.current) return
       if (response.status === 401 || response.status === 403) {
-        setRequest({ status: "denied", message: "This run is unavailable to the current session." })
+        setRequest({ status: "denied", message: t("aiHarness.runLifecycle.errors.runDenied") })
         return
       }
       if (!response.ok) {
         setRequest({
           status: "error",
-          message: response.status === 404 ? "No authorized run was found." : "The run operation could not be completed.",
+          message: response.status === 404 ? t("aiHarness.runLifecycle.errors.runNotFound") : t("aiHarness.runLifecycle.errors.operationFailed"),
         })
         return
       }
       const mapped = mapRunLifecycle(payload)
       if (!mapped) {
-        setRequest({ status: "error", message: "The lifecycle response was incomplete." })
+        setRequest({ status: "error", message: t("aiHarness.runLifecycle.errors.responseIncomplete") })
         setObservation({ status: "idle" })
         return
       }
@@ -122,7 +125,7 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
       await loadObservation(parsedCompanyId, mapped.runId)
     } catch {
       if (requestId !== lifecycleRequestId.current) return
-      setRequest({ status: "error", message: "The lifecycle service is unavailable." })
+      setRequest({ status: "error", message: t("aiHarness.runLifecycle.errors.serviceUnavailable") })
       setObservation({ status: "idle" })
     }
   }
@@ -131,7 +134,7 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
     event.preventDefault()
     const parsedRunId = Number(runId)
     if (!Number.isSafeInteger(parsedRunId) || parsedRunId <= 0) {
-      setRequest({ status: "error", message: "Enter a positive run ID." })
+      setRequest({ status: "error", message: t("aiHarness.runLifecycle.errors.positiveRunId") })
       return
     }
     void submit({ kind: "inspect", runId: parsedRunId })
@@ -155,44 +158,45 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <MessagesSquare />
-          <h2 className="text-xl font-semibold tracking-tight">Run lifecycle</h2>
-          <Badge variant="outline">Authenticated session</Badge>
+          <h2 className="text-xl font-semibold tracking-tight">{t("aiHarness.runLifecycle.title")}</h2>
+          <Badge variant="outline">{t("aiHarness.runLifecycle.authenticatedSession")}</Badge>
         </div>
-        <p className="text-sm text-muted-foreground">Inspect and steer durable AI runs without supplying organization, identity, or credentials.</p>
+        <p className="text-sm text-muted-foreground">{t("aiHarness.runLifecycle.description")}</p>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Inspect a run</CardTitle><CardDescription>Company access and run ownership are rechecked on the server.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t("aiHarness.runLifecycle.inspectTitle")}</CardTitle><CardDescription>{t("aiHarness.runLifecycle.inspectDescription")}</CardDescription></CardHeader>
         <CardContent>
           <form className="flex flex-col gap-4 md:flex-row md:items-end" onSubmit={inspect}>
             <Field className="flex-1">
-              <FieldLabel>Company</FieldLabel>
+              <FieldLabel>{t("aiHarness.runLifecycle.company")}</FieldLabel>
               <Select value={companyId} onValueChange={(value) => changeRun(() => setCompanyId(value))} disabled={loading || companyOptions.length === 0}>
-                <SelectTrigger><SelectValue placeholder="Select company…" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t("aiHarness.runLifecycle.companyPlaceholder")} /></SelectTrigger>
                 <SelectContent>{companyOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
               </Select>
             </Field>
             <Field className="flex-1">
-              <FieldLabel htmlFor="lifecycle-run-id">Run ID</FieldLabel>
+              <FieldLabel htmlFor="lifecycle-run-id">{t("aiHarness.runLifecycle.runId")}</FieldLabel>
               <Input id="lifecycle-run-id" inputMode="numeric" pattern="[0-9]*" value={runId} disabled={loading} onChange={(event) => changeRun(() => setRunId(event.target.value))} />
             </Field>
-            <Button type="submit" disabled={loading || !companyId || !runId}>Inspect</Button>
+            <Button type="submit" disabled={loading || !companyId || !runId}>{t("aiHarness.runLifecycle.inspect")}</Button>
           </form>
         </CardContent>
       </Card>
 
       <RunHistoryPanel key={companyId} companyId={Number(companyId) || null} onInspect={inspectHistoryRun} />
 
-      {request.status === "idle" ? <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Inspect an authorized run to view questions, events, and available controls.</CardContent></Card> : null}
+      {request.status === "idle" ? <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">{t("aiHarness.runLifecycle.idle")}</CardContent></Card> : null}
       {request.status === "loading" ? <div className="flex flex-col gap-3"><Skeleton className="h-28 w-full" /><Skeleton className="h-52 w-full" /></div> : null}
-      {request.status === "denied" ? <Alert variant="destructive"><AlertCircle /><AlertTitle>Access denied</AlertTitle><AlertDescription>{request.message}</AlertDescription></Alert> : null}
-      {request.status === "error" ? <Alert variant="destructive"><AlertCircle /><AlertTitle>Lifecycle unavailable</AlertTitle><AlertDescription>{request.message}</AlertDescription></Alert> : null}
+      {request.status === "denied" ? <Alert variant="destructive"><AlertCircle /><AlertTitle>{t("aiHarness.runLifecycle.accessDenied")}</AlertTitle><AlertDescription>{request.message}</AlertDescription></Alert> : null}
+      {request.status === "error" ? <Alert variant="destructive"><AlertCircle /><AlertTitle>{t("aiHarness.runLifecycle.unavailable")}</AlertTitle><AlertDescription>{request.message}</AlertDescription></Alert> : null}
       {request.status === "success" ? <LifecycleResult data={request.data} observation={observation} loading={loading} submit={submit} /> : null}
     </div>
   )
 }
 
 function LifecycleResult({ data, observation, loading, submit }: { data: RunLifecycleView; observation: ObservationState; loading: boolean; submit: (intent: LifecycleIntent) => Promise<void> }) {
+  const { t } = useTranslation()
   const [command, setCommand] = useState<CommandKind>("resume")
   const [primary, setPrimary] = useState("")
   const [secondary, setSecondary] = useState("")
@@ -202,6 +206,15 @@ function LifecycleResult({ data, observation, loading, submit }: { data: RunLife
   const [rightCursor, setRightCursor] = useState("")
   const [rightVersion, setRightVersion] = useState("")
   const continuation = data.continuation
+  const commandLabels = {
+    ask: t("aiHarness.runLifecycle.commands.ask"),
+    compare: t("aiHarness.runLifecycle.commands.compare"),
+    fork: t("aiHarness.runLifecycle.commands.fork"),
+    interrupt: t("aiHarness.runLifecycle.commands.interrupt"),
+    reply: t("aiHarness.runLifecycle.commands.reply"),
+    resume: t("aiHarness.runLifecycle.commands.resume"),
+    steer: t("aiHarness.runLifecycle.commands.steer"),
+  } satisfies Record<CommandKind, string>
 
   const execute = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -227,30 +240,30 @@ function LifecycleResult({ data, observation, loading, submit }: { data: RunLife
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <CardHeader><div className="flex flex-wrap items-center gap-2"><CardTitle className="text-base">Run #{data.runId}</CardTitle><Badge>{data.state}</Badge>{continuation ? <Badge variant="outline">cursor {continuation.cursor}</Badge> : <Badge variant="destructive">No continuation</Badge>}{data.truncated ? <Badge variant="outline">Bounded view</Badge> : null}</div></CardHeader>
+        <CardHeader><div className="flex flex-wrap items-center gap-2"><CardTitle className="text-base">{t("aiHarness.runLifecycle.runNumber", { id: data.runId })}</CardTitle><Badge>{runStatusLabel(t, data.state)}</Badge>{continuation ? <Badge variant="outline">{t("aiHarness.runLifecycle.cursor", { cursor: continuation.cursor })}</Badge> : <Badge variant="destructive">{t("aiHarness.runLifecycle.noContinuation")}</Badge>}</div></CardHeader>
       </Card>
 
       <RunObservation observation={observation} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base">Questions</CardTitle><CardDescription>Answer contents are intentionally not displayed.</CardDescription></CardHeader>
-          <CardContent>{data.questions.length === 0 ? <p className="text-sm text-muted-foreground">No questions.</p> : <ul className="flex flex-col gap-3">{data.questions.map((question) => <li key={question.id} className="rounded-md border p-3 text-sm"><div className="flex gap-2"><span className="font-medium">{question.prompt}</span>{question.required ? <Badge variant="destructive">Required</Badge> : null}</div><p className="text-muted-foreground">{question.status} · revision {question.revision}{question.answered ? " · answered" : ""}</p></li>)}</ul>}</CardContent>
+          <CardHeader><CardTitle className="text-base">{t("aiHarness.runLifecycle.questions")}</CardTitle><CardDescription>{t("aiHarness.runLifecycle.answersHidden")}</CardDescription></CardHeader>
+          <CardContent>{data.questions.length === 0 ? <p className="text-sm text-muted-foreground">{t("aiHarness.runLifecycle.noQuestions")}</p> : <ul className="flex flex-col gap-3">{data.questions.map((question) => <li key={question.id} className="rounded-md border p-3 text-sm"><div className="flex gap-2"><span className="font-medium">{question.prompt}</span>{question.required ? <Badge variant="destructive">{t("aiHarness.runLifecycle.required")}</Badge> : null}</div><p className="text-muted-foreground">{t("aiHarness.runLifecycle.questionStatus", { status: questionStatusLabel(t, question.status), revision: question.revision, answered: question.answered ? t("aiHarness.runLifecycle.answeredSuffix") : "" })}</p></li>)}</ul>}</CardContent>
         </Card>
         <Card>
-          <CardHeader><CardTitle className="text-base">Events</CardTitle></CardHeader>
-          <CardContent>{data.events.length === 0 ? <p className="text-sm text-muted-foreground">No observable events.</p> : <ul className="flex flex-col gap-3">{data.events.map((event) => <li key={event.id} className="text-sm"><p className="font-medium">{event.eventKind}</p><p>{event.summary}</p><p className="text-xs text-muted-foreground">{event.createdAt}</p></li>)}</ul>}</CardContent>
+          <CardHeader><CardTitle className="text-base">{t("aiHarness.runLifecycle.events")}</CardTitle></CardHeader>
+          <CardContent>{data.events.length === 0 ? <p className="text-sm text-muted-foreground">{t("aiHarness.runLifecycle.noEvents")}</p> : <ul className="flex flex-col gap-3">{data.events.map((event) => <li key={event.id} className="text-sm"><p className="font-medium">{eventKindLabel(t, event.eventKind)}</p><p>{event.summary}</p><p className="text-xs text-muted-foreground">{event.createdAt}</p></li>)}</ul>}</CardContent>
         </Card>
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Run control</CardTitle><CardDescription>Every command uses the latest returned continuation token.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t("aiHarness.runLifecycle.controlTitle")}</CardTitle><CardDescription>{t("aiHarness.runLifecycle.controlDescription")}</CardDescription></CardHeader>
         <CardContent>
-          {!continuation ? <Alert><AlertCircle /><AlertTitle>Controls unavailable</AlertTitle><AlertDescription>This response has no valid continuation.</AlertDescription></Alert> : (
+          {!continuation ? <Alert><AlertCircle /><AlertTitle>{t("aiHarness.runLifecycle.controlsUnavailable")}</AlertTitle><AlertDescription>{t("aiHarness.runLifecycle.noValidContinuation")}</AlertDescription></Alert> : (
             <form className="flex flex-col gap-4" onSubmit={execute}>
-              <Field><FieldLabel>Command</FieldLabel><Select value={command} onValueChange={(value) => setCommand(value as CommandKind)} disabled={loading}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ask">Ask question</SelectItem><SelectItem value="reply">Reply</SelectItem><SelectItem value="steer">Steer</SelectItem><SelectItem value="interrupt">Interrupt</SelectItem><SelectItem value="resume">Resume</SelectItem><SelectItem value="fork">Fork</SelectItem><SelectItem value="compare">Compare</SelectItem></SelectContent></Select></Field>
+              <Field><FieldLabel>{t("aiHarness.runLifecycle.command")}</FieldLabel><Select value={command} onValueChange={(value) => setCommand(value as CommandKind)} disabled={loading}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="ask">{t("aiHarness.runLifecycle.commands.ask")}</SelectItem><SelectItem value="reply">{t("aiHarness.runLifecycle.commands.reply")}</SelectItem><SelectItem value="steer">{t("aiHarness.runLifecycle.commands.steer")}</SelectItem><SelectItem value="interrupt">{t("aiHarness.runLifecycle.commands.interrupt")}</SelectItem><SelectItem value="resume">{t("aiHarness.runLifecycle.commands.resume")}</SelectItem><SelectItem value="fork">{t("aiHarness.runLifecycle.commands.fork")}</SelectItem><SelectItem value="compare">{t("aiHarness.runLifecycle.commands.compare")}</SelectItem></SelectContent></Select></Field>
               <CommandFields command={command} questions={data.questions} primary={primary} secondary={secondary} setPrimary={setPrimary} setSecondary={setSecondary} selectedQuestion={selectedQuestion} setSelectedQuestion={setSelectedQuestion} right={{ runId: rightRunId, hash: rightHash, cursor: rightCursor, version: rightVersion }} setRight={{ runId: setRightRunId, hash: setRightHash, cursor: setRightCursor, version: setRightVersion }} />
-              <Button type="submit" disabled={loading}>{command === "interrupt" ? <PauseCircle /> : command === "compare" ? <GitCompareArrows /> : <PlayCircle />} Execute {command}</Button>
+              <Button type="submit" disabled={loading}>{command === "interrupt" ? <PauseCircle /> : command === "compare" ? <GitCompareArrows /> : <PlayCircle />} {t("aiHarness.runLifecycle.executeCommand", { command: commandLabels[command] })}</Button>
             </form>
           )}
         </CardContent>
@@ -278,10 +291,11 @@ function LifecycleResult({ data, observation, loading, submit }: { data: RunLife
 }
 
 function RunObservation({ observation }: { observation: ObservationState }) {
+  const { t } = useTranslation()
   if (observation.status === "idle") return null
   if (observation.status === "loading") return <Skeleton className="h-48 w-full" />
   if (observation.status === "unavailable") {
-    return <Alert><AlertCircle /><AlertTitle>Transcript unavailable</AlertTitle><AlertDescription>{observation.message}</AlertDescription></Alert>
+    return <Alert><AlertCircle /><AlertTitle>{t("aiHarness.runLifecycle.transcriptUnavailable")}</AlertTitle><AlertDescription>{observation.message}</AlertDescription></Alert>
   }
 
   const run = observation.data
@@ -290,13 +304,13 @@ function RunObservation({ observation }: { observation: ObservationState }) {
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base">Governed tool transcript</CardTitle>
-            <CardDescription>Ordered persisted steps; raw arguments, results, answers, and error messages are not exposed.</CardDescription>
+            <CardTitle className="text-base">{t("aiHarness.runLifecycle.transcriptTitle")}</CardTitle>
+            <CardDescription>{t("aiHarness.runLifecycle.transcriptDescription")}</CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline">{run.status}</Badge>
-            <Badge variant="outline">{run.stepCount} step{run.stepCount === 1 ? "" : "s"}</Badge>
-            <Badge variant="outline">{run.tokensUsed.toLocaleString()} tokens</Badge>
+            <Badge variant="outline">{runStatusLabel(t, run.status)}</Badge>
+            <Badge variant="outline">{t("aiHarness.runLifecycle.stepCount", { count: run.stepCount })}</Badge>
+            <Badge variant="outline">{t("aiHarness.runLifecycle.tokenCount", { count: run.tokensUsed })}</Badge>
           </div>
         </div>
       </CardHeader>
@@ -316,22 +330,22 @@ function RunObservation({ observation }: { observation: ObservationState }) {
           </div>
         ) : null}
         {run.transcript.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No observable tool steps were returned.</p>
+          <p className="text-sm text-muted-foreground">{t("aiHarness.runLifecycle.noToolSteps")}</p>
         ) : (
           <ol className="flex flex-col gap-3">
             {run.transcript.map((step) => (
               <li key={step.id} className="rounded-md border p-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">Step {step.stepNo}</Badge>
+                    <Badge variant="outline">{t("aiHarness.runLifecycle.stepNumber", { number: step.stepNo })}</Badge>
                     <span className="font-medium">{step.toolName}</span>
-                    {step.error ? <Badge variant="destructive">Failed</Badge> : <Badge variant="outline">Completed</Badge>}
+                    {step.error ? <Badge variant="destructive">{t("aiHarness.runLifecycle.failed")}</Badge> : <Badge variant="outline">{t("aiHarness.runLifecycle.completed")}</Badge>}
                   </div>
-                  <span className="text-xs text-muted-foreground">{step.durationMs.toLocaleString()} ms</span>
+                  <span className="text-xs text-muted-foreground">{t("aiHarness.runLifecycle.durationMs", { duration: step.durationMs.toLocaleString() })}</span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span>{step.resultSummary}</span>
-                  {step.inputHash ? <span title={step.inputHash}>input hash {step.inputHash.slice(0, 12)}…</span> : null}
+                  {step.inputHash ? <span title={step.inputHash}>{t("aiHarness.runLifecycle.inputHash", { hash: `${step.inputHash.slice(0, 12)}…` })}</span> : null}
                 </div>
               </li>
             ))}
@@ -354,10 +368,11 @@ function CommandFields({ command, questions, primary, secondary, setPrimary, set
   right: { runId: string; hash: string; cursor: string; version: string }
   setRight: { runId: (value: string) => void; hash: (value: string) => void; cursor: (value: string) => void; version: (value: string) => void }
 }) {
+  const { t } = useTranslation()
   if (command === "resume") return null
-  if (command === "compare") return <FieldGroup className="grid grid-cols-1 gap-3 md:grid-cols-2"><Field><FieldLabel>Other run ID</FieldLabel><Input inputMode="numeric" value={right.runId} onChange={(event) => setRight.runId(event.target.value)} /></Field><Field><FieldLabel>Other checkpoint hash</FieldLabel><Input value={right.hash} maxLength={64} onChange={(event) => setRight.hash(event.target.value)} /></Field><Field><FieldLabel>Other cursor</FieldLabel><Input inputMode="numeric" value={right.cursor} onChange={(event) => setRight.cursor(event.target.value)} /></Field><Field><FieldLabel>Other concurrency version</FieldLabel><Input inputMode="numeric" value={right.version} onChange={(event) => setRight.version(event.target.value)} /></Field></FieldGroup>
-  if (command === "reply") return <FieldGroup className="grid grid-cols-1 gap-3 md:grid-cols-2"><Field><FieldLabel>Question</FieldLabel><Select value={selectedQuestion} onValueChange={setSelectedQuestion}><SelectTrigger><SelectValue placeholder="Select question…" /></SelectTrigger><SelectContent>{questions.map((question) => <SelectItem key={question.id} value={String(question.id)}>{question.questionKey || `Question ${question.id}`}</SelectItem>)}</SelectContent></Select></Field><Field><FieldLabel>Answer</FieldLabel><Input value={primary} maxLength={2_000} onChange={(event) => setPrimary(event.target.value)} /></Field></FieldGroup>
-  if (command === "ask") return <FieldGroup className="grid grid-cols-1 gap-3 md:grid-cols-2"><Field><FieldLabel>Question key</FieldLabel><Input value={primary} maxLength={128} onChange={(event) => setPrimary(event.target.value)} /></Field><Field><FieldLabel>Prompt</FieldLabel><Input value={secondary} maxLength={2_000} onChange={(event) => setSecondary(event.target.value)} /></Field></FieldGroup>
-  if (command === "fork") return <FieldGroup className="grid grid-cols-1 gap-3 md:grid-cols-2"><Field><FieldLabel>Fork key</FieldLabel><Input value={primary} maxLength={128} onChange={(event) => setPrimary(event.target.value)} /></Field><Field><FieldLabel>Child run key</FieldLabel><Input value={secondary} maxLength={128} onChange={(event) => setSecondary(event.target.value)} /></Field></FieldGroup>
-  return <Field><FieldLabel>{command === "interrupt" ? "Reason" : "Instruction"}</FieldLabel><Input value={primary} maxLength={2_000} onChange={(event) => setPrimary(event.target.value)} /></Field>
+  if (command === "compare") return <FieldGroup className="grid grid-cols-1 gap-3 md:grid-cols-2"><Field><FieldLabel>{t("aiHarness.runLifecycle.fields.otherRunId")}</FieldLabel><Input inputMode="numeric" value={right.runId} onChange={(event) => setRight.runId(event.target.value)} /></Field><Field><FieldLabel>{t("aiHarness.runLifecycle.fields.otherCheckpointHash")}</FieldLabel><Input value={right.hash} maxLength={64} onChange={(event) => setRight.hash(event.target.value)} /></Field><Field><FieldLabel>{t("aiHarness.runLifecycle.fields.otherCursor")}</FieldLabel><Input inputMode="numeric" value={right.cursor} onChange={(event) => setRight.cursor(event.target.value)} /></Field><Field><FieldLabel>{t("aiHarness.runLifecycle.fields.otherConcurrencyVersion")}</FieldLabel><Input inputMode="numeric" value={right.version} onChange={(event) => setRight.version(event.target.value)} /></Field></FieldGroup>
+  if (command === "reply") return <FieldGroup className="grid grid-cols-1 gap-3 md:grid-cols-2"><Field><FieldLabel>{t("aiHarness.runLifecycle.fields.question")}</FieldLabel><Select value={selectedQuestion} onValueChange={setSelectedQuestion}><SelectTrigger><SelectValue placeholder={t("aiHarness.runLifecycle.fields.questionPlaceholder")} /></SelectTrigger><SelectContent>{questions.map((question) => <SelectItem key={question.id} value={String(question.id)}>{question.questionKey || t("aiHarness.runLifecycle.questionNumber", { id: question.id })}</SelectItem>)}</SelectContent></Select></Field><Field><FieldLabel>{t("aiHarness.runLifecycle.fields.answer")}</FieldLabel><Input value={primary} maxLength={2_000} onChange={(event) => setPrimary(event.target.value)} /></Field></FieldGroup>
+  if (command === "ask") return <FieldGroup className="grid grid-cols-1 gap-3 md:grid-cols-2"><Field><FieldLabel>{t("aiHarness.runLifecycle.fields.questionKey")}</FieldLabel><Input value={primary} maxLength={128} onChange={(event) => setPrimary(event.target.value)} /></Field><Field><FieldLabel>{t("aiHarness.runLifecycle.fields.prompt")}</FieldLabel><Input value={secondary} maxLength={2_000} onChange={(event) => setSecondary(event.target.value)} /></Field></FieldGroup>
+  if (command === "fork") return <FieldGroup className="grid grid-cols-1 gap-3 md:grid-cols-2"><Field><FieldLabel>{t("aiHarness.runLifecycle.fields.forkKey")}</FieldLabel><Input value={primary} maxLength={128} onChange={(event) => setPrimary(event.target.value)} /></Field><Field><FieldLabel>{t("aiHarness.runLifecycle.fields.childRunKey")}</FieldLabel><Input value={secondary} maxLength={128} onChange={(event) => setSecondary(event.target.value)} /></Field></FieldGroup>
+  return <Field><FieldLabel>{command === "interrupt" ? t("aiHarness.runLifecycle.fields.reason") : t("aiHarness.runLifecycle.fields.instruction")}</FieldLabel><Input value={primary} maxLength={2_000} onChange={(event) => setPrimary(event.target.value)} /></Field>
 }

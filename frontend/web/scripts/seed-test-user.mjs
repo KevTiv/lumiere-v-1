@@ -11,6 +11,7 @@
  * Usage (from repo root or frontend/web):
  *   pnpm --dir frontend/web run seed-test-user
  *   pnpm --dir frontend/web run seed-first-org-personas
+ *   pnpm --dir frontend/web exec node scripts/seed-test-user.mjs --all-personas --skip-dev-promotion
  *   # or: make seed-test-user
  *
  * Org selection is fail-closed: the exact manifest organization name+code and company code must exist.
@@ -533,8 +534,12 @@ async function main() {
   const moduleName = getRequiredModuleName('seed-test-user')
   const adminToken = resolveStdbToken(host)
 
-  await callStdbReducer(host, moduleName, adminToken, 'dev_promote_caller_superuser', [])
-  console.log('[seed-test-user] dev_promote_caller_superuser OK (HTTP token identity is superuser).')
+  if (process.argv.includes('--skip-dev-promotion')) {
+    console.log('[seed-test-user] Skipping dev promotion; the supplied owner identity must already be a superuser.')
+  } else {
+    await callStdbReducer(host, moduleName, adminToken, 'dev_promote_caller_superuser', [])
+    console.log('[seed-test-user] dev_promote_caller_superuser OK (HTTP token identity is superuser).')
+  }
 
   const orgId = await resolveTargetOrg(host, moduleName, adminToken, manifest)
   await callStdbReducer(host, moduleName, adminToken, 'seed_organization_form_configs', [orgId])

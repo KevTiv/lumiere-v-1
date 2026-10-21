@@ -1,0 +1,23 @@
+{
+  "base_sha": "98b51190ccfa2c7a7238f9e80c4049550defcbbe",
+  "scope": "Integrated COV-05d production/test source; not a Git commit or whole-repository checksum",
+  "manifest_sha256": "f9a31bc456139b064208639aa4c7e9950b9dfc7960ac539f155d2cd772e4d70f",
+  "algorithm": "SHA-256 of UTF-8 json.dumps(files_sha256, sort_keys=True, separators=(',', ':'))",
+  "files_sha256": {
+    "frontend/packages/erp-workflows/src/core/errors.ts": "7cad26b2c89785aea10e3b6972695a27908a1e1f49e812187430f5504b720c58",
+    "frontend/packages/erp-workflows/src/core/errors.test.ts": "aaf3616a8a2f707c5c97c669719d55a3a271531380d8df9b11dfdfb2161110c4",
+    "frontend/packages/erp-workflows/src/core/result.ts": "b8b09028539cd31bba487a62c5ea467c3b7985338b0901bc34a2806c3736cc5c",
+    "frontend/packages/erp-workflows/src/core/transition.ts": "876ad38b2d28059031d0d0b762b315137c81a9f78dba8f7109d8d0ed53b0b9c4",
+    "frontend/packages/erp-workflows/src/core/ambiguous-dispatch.test.ts": "c7eeebded4062fcf33f66eec01e058df31666a93701203a6bc35564407e233b2",
+    "frontend/packages/erp-workflows/src/purchasing/procure-to-pay.ts": "532e0af18af0303cbf947639a0772104730f6aca517babfb95faa7b2c45d1ed4",
+    "frontend/packages/erp-workflows/src/purchasing/procure-to-pay.test.ts": "989e2b55e7e6edaa18f2e735e34336e54f77d35a68f818980101d91b1ab277f8",
+    "frontend/packages/query-hooks/src/hooks/purchasing-workflow.ts": "00bec2c603f32b5d01a45200c78ff7c30f75f1bccc98a3fa15a13d708bfe0d56",
+    "frontend/packages/query-hooks/src/hooks/purchasing-receipt-effect.ts": "b7a169563cd0fd05d6a58205085a084ce5233b40511a109decb4c7899dce932c",
+    "frontend/packages/query-hooks/src/hooks/purchasing-receipt-effect.test.ts": "d832e1400c1c39a1eb03c87a4349ceaffcf680694297bd601d5be8fe5a1f9123",
+    "frontend/packages/query-hooks/src/hooks/sales-order-commands.test.ts": "0eea74c36a564708700265ea6c11d3750c00f17b38223d9b2abf56a05f99fe2e",
+    "frontend/web/tests/e2e/cov05-purchase-order-confirmation.spec.ts": "0522f76fd7aab0e601611e717d14f08ff6cbe5fb8fe5cb7a55ad723ae3f33483",
+    "frontend/web/tests/e2e/cov05b-purchase-receipt.spec.ts": "3f45bb1bd1bfceb4949834800e38a5a5e15cb62c8f0dc6403ffc9c6750405c11",
+    "frontend/web/tests/e2e/cov05c-vendor-bill.spec.ts": "e6ed3569925bdf2ad8b99fd1fa91acf5267a47ef32a8263e8037ad589bfeeae3",
+    "frontend/web/tests/e2e/cov05d-purchase-receipt-recovery.spec.ts": "425c5cd2d9af4ac16aa8f417f1298b7ae9e8c0d33ac757facfedd17ad3590803"
+  }
+}

@@ -62,14 +62,30 @@ export function PivotExplorer({
   const updateSavedReport = useUpdateSavedReport(organizationId, companyId)
   const deleteSavedReport = useDeleteSavedReport(organizationId, companyId)
 
+  const scopedSavedReports = useMemo(
+    () =>
+      savedReports.filter((report) => {
+        if (companyId == null || companyId <= 0n) return true
+        const reportCompanyId = report.companyId ?? report.company_id
+        // The BFF scopes saved reports to the selected company. Some restricted
+        // projections omit company_id, so absence here means server-scoped rather
+        // than organization-wide.
+        return reportCompanyId == null || String(reportCompanyId) === companyId.toString()
+      }),
+    [savedReports, companyId],
+  )
+
   const generatedReports = useMemo(
     () =>
       financialReports.filter(
         (r) =>
-          String(r.state ?? "").toLowerCase() === "generated" ||
-          String(r.state ?? "").toLowerCase() === "exported",
+          (String(r.state ?? "").toLowerCase() === "generated" ||
+            String(r.state ?? "").toLowerCase() === "exported") &&
+          (companyId == null ||
+            companyId <= 0n ||
+            String(r.companyId ?? r.company_id ?? "") === companyId.toString()),
       ),
-    [financialReports],
+    [financialReports, companyId],
   )
 
   const [reportId, setReportId] = useState<string>("")
@@ -81,8 +97,8 @@ export function PivotExplorer({
   const [measureOp, setMeasureOp] = useState("sum")
 
   const activeSaved = useMemo(
-    () => savedReports.find((r) => String(r.id) === savedReportId),
-    [savedReports, savedReportId],
+    () => scopedSavedReports.find((r) => String(r.id) === savedReportId),
+    [scopedSavedReports, savedReportId],
   )
 
   const sourceRows = useMemo(() => {
@@ -171,7 +187,7 @@ export function PivotExplorer({
   }, [pivot.tableHeaders, pivot.tableRows.length, t])
 
   const loadSaved = (id: string) => {
-    const row = savedReports.find((r) => String(r.id) === id)
+    const row = scopedSavedReports.find((r) => String(r.id) === id)
     if (!row) return
     setSavedReportId(id)
     setName(String(row.name ?? ""))
@@ -218,7 +234,7 @@ export function PivotExplorer({
               <SelectValue placeholder={t("reports.pivot.savedDefinitionPlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              {savedReports.map((r) => (
+              {scopedSavedReports.map((r) => (
                 <SelectItem key={String(r.id)} value={String(r.id)}>
                   {String(r.name ?? r.id)}
                 </SelectItem>
@@ -239,7 +255,13 @@ export function PivotExplorer({
 
         <div className="space-y-2">
           <Label>{t("reports.pivot.rowDimension")}</Label>
-          <Select value={rowDimension} onValueChange={setRowDimension}>
+          <Select
+            value={rowDimension}
+            onValueChange={(value) => {
+              setRowDimension(value)
+              if (columnDimension === value) setColumnDimension("")
+            }}
+          >
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {["accountCode", "accountName", "accountType"].map((opt) => (
@@ -255,7 +277,7 @@ export function PivotExplorer({
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="__none__">{t("reports.pivot.none")}</SelectItem>
-              {["accountType", "accountCode"].map((opt) => (
+              {["accountType", "accountCode"].filter((opt) => opt !== rowDimension).map((opt) => (
                 <SelectItem key={opt} value={opt}>{opt}</SelectItem>
               ))}
             </SelectContent>
@@ -334,6 +356,7 @@ export function PivotExplorer({
               name || "pivot",
               pivot.exportHeaders,
               pivot.exportRows,
+              `report-${reportId}-definition-${savedReportId || "unsaved"}.xlsx`,
             ).catch(() => undefined)
           }
         >
@@ -341,6 +364,12 @@ export function PivotExplorer({
           {t("reports.pivot.exportXlsx")}
         </Button>
       </div>
+
+      {reportId ? (
+        <p className="text-xs text-muted-foreground" data-testid="pivot-provenance">
+          {`Source report #${reportId} · definition ${savedReportId ? `#${savedReportId}` : "unsaved"} · company ${companyId?.toString() ?? "all permitted"}`}
+        </p>
+      ) : null}
 
       <EntityTable config={tableConfig} data={pivot.tableRows} />
     </div>

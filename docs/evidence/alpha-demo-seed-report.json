@@ -1,0 +1,3035 @@
+{
+  "fixtureKey": "alpha-demo-v1",
+  "organizationId": 1,
+  "generatedAt": "2026-10-14T19:03:30.654Z",
+  "adminVerified": true,
+  "fixtureCount": 143,
+  "populatedFixtures": 141,
+  "outcomes": [
+    {
+      "key": "countryNL",
+      "table": "country",
+      "status": "gap",
+      "error": "HTTP 422 Only superusers can manage organization reference data"
+    },
+    {
+      "key": "customer",
+      "table": "contact",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "customer2",
+      "table": "contact",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "vendor",
+      "table": "contact",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "vendor2",
+      "table": "contact",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "stage0",
+      "table": "opp_stage",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "stage1",
+      "table": "opp_stage",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "stage2",
+      "table": "opp_stage",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "stage3",
+      "table": "opp_stage",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "lead0",
+      "table": "lead",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "opportunity0",
+      "table": "opportunity",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "lead1",
+      "table": "lead",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "opportunity1",
+      "table": "opportunity",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "lead2",
+      "table": "lead",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "opportunity2",
+      "table": "opportunity",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "lead3",
+      "table": "lead",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "opportunity3",
+      "table": "opportunity",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "uomCategory",
+      "table": "uom_cat",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "unit",
+      "table": "uom",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "hoursCategory",
+      "table": "uom_cat",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "hour",
+      "table": "uom",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "productCategory",
+      "table": "product_category",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "stock",
+      "table": "stock_location",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "input",
+      "table": "stock_location",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "output",
+      "table": "stock_location",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "production",
+      "table": "stock_location",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "supplier",
+      "table": "stock_location",
+      "id": 5,
+      "status": "existing"
+    },
+    {
+      "key": "customerLocation",
+      "table": "stock_location",
+      "id": 6,
+      "status": "existing"
+    },
+    {
+      "key": "warehouse",
+      "table": "warehouse",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "laptop",
+      "table": "product",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "quant-laptop",
+      "table": "stock_quant",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "monitor",
+      "table": "product",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "quant-monitor",
+      "table": "stock_quant",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "component",
+      "table": "product",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "quant-component",
+      "table": "stock_quant",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "kit",
+      "table": "product",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "quant-kit",
+      "table": "stock_quant",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "service",
+      "table": "product",
+      "id": 5,
+      "status": "existing"
+    },
+    {
+      "key": "pricelist",
+      "table": "product_pricelist",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "sale0",
+      "table": "sale_order",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "sale0-line0",
+      "table": "sale_order_line",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "sale0-line1",
+      "table": "sale_order_line",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "sale1",
+      "table": "sale_order",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "sale1-line0",
+      "table": "sale_order_line",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "sale1-line1",
+      "table": "sale_order_line",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "sale2",
+      "table": "sale_order",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "sale2-line0",
+      "table": "sale_order_line",
+      "id": 5,
+      "status": "existing"
+    },
+    {
+      "key": "sale2-line1",
+      "table": "sale_order_line",
+      "id": 6,
+      "status": "existing"
+    },
+    {
+      "key": "purchase0",
+      "table": "purchase_order",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "purchase0-line",
+      "table": "purchase_order_line",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "purchase1",
+      "table": "purchase_order",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "purchase1-line",
+      "table": "purchase_order_line",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "workcenter",
+      "table": "mrp_workcenter",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "bom",
+      "table": "mrp_bom",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "manufacturing",
+      "table": "mrp_production",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "operations",
+      "table": "hr_department",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "finance",
+      "table": "hr_department",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "engineering",
+      "table": "hr_department",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "job",
+      "table": "hr_job_position",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "employee0",
+      "table": "hr_employee",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "employee1",
+      "table": "hr_employee",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "employee2",
+      "table": "hr_employee",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "employee3",
+      "table": "hr_employee",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "leaveType",
+      "table": "hr_leave_type",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "leave",
+      "table": "hr_leave",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "contract",
+      "table": "hr_contract",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "payrollStructure",
+      "table": "hr_payroll_structure",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "salaryRule",
+      "table": "hr_salary_rule",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "payslip",
+      "table": "hr_payslip",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "project0",
+      "table": "project_project",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "task0-0",
+      "table": "project_task",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "task0-1",
+      "table": "project_task",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "task0-2",
+      "table": "project_task",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "timesheet0",
+      "table": "project_timesheet",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "milestone0",
+      "table": "project_milestone",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "project1",
+      "table": "project_project",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "task1-0",
+      "table": "project_task",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "task1-1",
+      "table": "project_task",
+      "id": 5,
+      "status": "existing"
+    },
+    {
+      "key": "task1-2",
+      "table": "project_task",
+      "id": 6,
+      "status": "existing"
+    },
+    {
+      "key": "timesheet1",
+      "table": "project_timesheet",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "milestone1",
+      "table": "project_milestone",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "expenseSheet",
+      "table": "expense_sheet",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "expense0",
+      "table": "hr_expense",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "expense1",
+      "table": "hr_expense",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "expense2",
+      "table": "hr_expense",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "assetType",
+      "table": "account_account_type",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "incomeType",
+      "table": "account_account_type",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "expenseType",
+      "table": "account_account_type",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "payableType",
+      "table": "account_account_type",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "receivable",
+      "table": "account_account",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "income",
+      "table": "account_account",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "expenseAccount",
+      "table": "account_account",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "payable",
+      "table": "account_account",
+      "id": 4,
+      "status": "existing"
+    },
+    {
+      "key": "salesJournal",
+      "table": "account_journal",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "purchaseJournal",
+      "table": "account_journal",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "analytic",
+      "table": "account_analytic_account",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "paymentTerm",
+      "table": "account_payment_term",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "invoice",
+      "table": "account_move",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "invoiceLine",
+      "table": "account_move_line",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "bill",
+      "table": "account_move",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "billLine",
+      "table": "account_move_line",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "helpdeskTeam",
+      "table": "helpdesk_team",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "helpdeskStage",
+      "table": "helpdesk_stage",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "ticket0",
+      "table": "helpdesk_ticket",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "ticket1",
+      "table": "helpdesk_ticket",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "knowledge",
+      "table": "knowledge_article",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "calendar",
+      "table": "calendar_event",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "vehicle",
+      "table": "fleet_vehicle",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "subscriptionPlan",
+      "table": "subscription_plan",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "contactTag",
+      "table": "contact_tag",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "contactCategory",
+      "table": "contact_category",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "qualityTeam",
+      "table": "quality_team",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "qualityReason",
+      "table": "quality_alert_reason",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "trackedComponent",
+      "table": "product",
+      "id": 6,
+      "status": "existing"
+    },
+    {
+      "key": "lot",
+      "table": "stock_production_lot",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "stockInventory",
+      "table": "stock_inventory",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "stockInventoryLine",
+      "table": "stock_inventory_line",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "routing",
+      "table": "mrp_routing_workcenter",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "workorder",
+      "table": "mrp_workorder",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "applicant",
+      "table": "hr_applicant",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "onboardingTemplate",
+      "table": "hr_onboarding_template",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "performanceCycle",
+      "table": "hr_performance_cycle",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "documentFolder",
+      "table": "doc_folder",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "knowledgeCategory",
+      "table": "kb_category",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "guideDocument",
+      "table": "document",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "importExample",
+      "table": "document",
+      "id": 2,
+      "status": "existing"
+    },
+    {
+      "key": "workflow",
+      "table": "workflow",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "dashboard",
+      "table": "dashboard",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "widget",
+      "table": "dashboard_widget",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "reportTemplate",
+      "table": "report_template",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "financialReport",
+      "table": "financial_report",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "savedReport",
+      "table": "saved_report",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "posConfig",
+      "table": "pos_config",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "taxGroup",
+      "table": "account_tax_group",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "salesTax",
+      "table": "account_tax",
+      "status": "gap",
+      "error": "HTTP 422 country not found"
+    },
+    {
+      "key": "fiscalYear",
+      "table": "account_fiscal_year",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "period",
+      "table": "account_period",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "paymentTermLine",
+      "table": "account_payment_term_line",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "cashType",
+      "table": "account_account_type",
+      "id": 5,
+      "status": "existing"
+    },
+    {
+      "key": "bankAccount",
+      "table": "account_account",
+      "id": 5,
+      "status": "existing"
+    },
+    {
+      "key": "bankJournal",
+      "table": "account_journal",
+      "id": 3,
+      "status": "existing"
+    },
+    {
+      "key": "bankStatement",
+      "table": "account_bank_statement",
+      "id": 1,
+      "status": "existing"
+    },
+    {
+      "key": "bankStatementLine",
+      "table": "account_bank_statement_line",
+      "id": 1,
+      "status": "existing"
+    }
+  ],
+  "coverage": [
+    {
+      "table": "account_account",
+      "status": "populated"
+    },
+    {
+      "table": "account_account_type",
+      "status": "populated"
+    },
+    {
+      "table": "account_analytic_account",
+      "status": "populated"
+    },
+    {
+      "table": "account_analytic_distribution_model",
+      "status": "empty"
+    },
+    {
+      "table": "account_analytic_line",
+      "status": "empty"
+    },
+    {
+      "table": "account_asset_depreciation_line",
+      "status": "empty"
+    },
+    {
+      "table": "account_asset",
+      "status": "empty"
+    },
+    {
+      "table": "account_bank_statement_line",
+      "status": "populated"
+    },
+    {
+      "table": "account_bank_statement",
+      "status": "populated"
+    },
+    {
+      "table": "account_fiscal_position",
+      "status": "empty"
+    },
+    {
+      "table": "account_fiscal_position_tax",
+      "status": "empty"
+    },
+    {
+      "table": "account_fiscal_year",
+      "status": "populated"
+    },
+    {
+      "table": "account_group",
+      "status": "empty"
+    },
+    {
+      "table": "account_incoterm",
+      "status": "empty"
+    },
+    {
+      "table": "account_journal",
+      "status": "populated"
+    },
+    {
+      "table": "account_move_line",
+      "status": "populated"
+    },
+    {
+      "table": "account_move",
+      "status": "populated"
+    },
+    {
+      "table": "account_payment",
+      "status": "empty"
+    },
+    {
+      "table": "account_payment_term_line",
+      "status": "populated"
+    },
+    {
+      "table": "account_payment_term",
+      "status": "populated"
+    },
+    {
+      "table": "account_period",
+      "status": "populated"
+    },
+    {
+      "table": "account_reconciliation_widget",
+      "status": "empty"
+    },
+    {
+      "table": "account_tax_group",
+      "status": "populated"
+    },
+    {
+      "table": "account_tax",
+      "status": "empty"
+    },
+    {
+      "table": "accounting_operation_receipt",
+      "status": "populated"
+    },
+    {
+      "table": "accounting_ownership_backfill_issue",
+      "status": "empty"
+    },
+    {
+      "table": "accounting_ownership_backfill_run",
+      "status": "empty"
+    },
+    {
+      "table": "activity",
+      "status": "empty"
+    },
+    {
+      "table": "activity_type",
+      "status": "populated"
+    },
+    {
+      "table": "adjustment_reason",
+      "status": "empty"
+    },
+    {
+      "table": "ai_action_draft_request_read",
+      "status": "empty"
+    },
+    {
+      "table": "ai_action_draft_request",
+      "status": "empty"
+    },
+    {
+      "table": "ai_action_draft",
+      "status": "empty"
+    },
+    {
+      "table": "ai_agent_run_policy_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "ai_agent_run_step",
+      "status": "empty"
+    },
+    {
+      "table": "ai_agent_run",
+      "status": "empty"
+    },
+    {
+      "table": "ai_agent",
+      "status": "empty"
+    },
+    {
+      "table": "ai_artifact_component",
+      "status": "empty"
+    },
+    {
+      "table": "ai_calibration_profile",
+      "status": "empty"
+    },
+    {
+      "table": "ai_capability_execution",
+      "status": "empty"
+    },
+    {
+      "table": "ai_capability_role_grant",
+      "status": "populated"
+    },
+    {
+      "table": "ai_chat_message",
+      "status": "empty"
+    },
+    {
+      "table": "ai_chat_session",
+      "status": "empty"
+    },
+    {
+      "table": "ai_decision_case",
+      "status": "empty"
+    },
+    {
+      "table": "ai_decision_pattern",
+      "status": "empty"
+    },
+    {
+      "table": "ai_decision_type_definition",
+      "status": "empty"
+    },
+    {
+      "table": "ai_document_processing_job",
+      "status": "empty"
+    },
+    {
+      "table": "ai_evidence_claim",
+      "status": "empty"
+    },
+    {
+      "table": "ai_evidence_contribution",
+      "status": "empty"
+    },
+    {
+      "table": "ai_evidence_decision",
+      "status": "empty"
+    },
+    {
+      "table": "ai_evidence_dependency",
+      "status": "empty"
+    },
+    {
+      "table": "ai_evidence_passage",
+      "status": "empty"
+    },
+    {
+      "table": "ai_evidence_source_change",
+      "status": "empty"
+    },
+    {
+      "table": "ai_evidence_source",
+      "status": "empty"
+    },
+    {
+      "table": "ai_evidence_source_version",
+      "status": "empty"
+    },
+    {
+      "table": "ai_insight",
+      "status": "empty"
+    },
+    {
+      "table": "ai_intelligence_event",
+      "status": "empty"
+    },
+    {
+      "table": "ai_intelligence_policy",
+      "status": "empty"
+    },
+    {
+      "table": "ai_knowledge_entry",
+      "status": "empty"
+    },
+    {
+      "table": "ai_knowledge_entry_version",
+      "status": "empty"
+    },
+    {
+      "table": "ai_knowledge_review",
+      "status": "empty"
+    },
+    {
+      "table": "ai_knowledge_skill_promotion",
+      "status": "empty"
+    },
+    {
+      "table": "ai_model_profile",
+      "status": "empty"
+    },
+    {
+      "table": "ai_price_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "ai_provider_attempt_read",
+      "status": "empty"
+    },
+    {
+      "table": "ai_provider_attempt",
+      "status": "empty"
+    },
+    {
+      "table": "ai_reducer_allowlist",
+      "status": "empty"
+    },
+    {
+      "table": "ai_run_effect",
+      "status": "empty"
+    },
+    {
+      "table": "ai_run_lifecycle_event",
+      "status": "empty"
+    },
+    {
+      "table": "ai_run_lifecycle_state",
+      "status": "empty"
+    },
+    {
+      "table": "ai_run_question",
+      "status": "empty"
+    },
+    {
+      "table": "ai_run_review",
+      "status": "empty"
+    },
+    {
+      "table": "ai_skill_certification_environment",
+      "status": "empty"
+    },
+    {
+      "table": "ai_skill_certification_evidence",
+      "status": "empty"
+    },
+    {
+      "table": "ai_skill_certification_request",
+      "status": "empty"
+    },
+    {
+      "table": "ai_skill_certification_runtime_profile",
+      "status": "empty"
+    },
+    {
+      "table": "ai_skill_config",
+      "status": "empty"
+    },
+    {
+      "table": "ai_skill_fixture",
+      "status": "empty"
+    },
+    {
+      "table": "ai_skill_release",
+      "status": "empty"
+    },
+    {
+      "table": "ai_skill",
+      "status": "empty"
+    },
+    {
+      "table": "ai_skill_test_run",
+      "status": "empty"
+    },
+    {
+      "table": "ai_skill_version",
+      "status": "empty"
+    },
+    {
+      "table": "ai_spend_budget_read",
+      "status": "empty"
+    },
+    {
+      "table": "ai_spend_budget",
+      "status": "empty"
+    },
+    {
+      "table": "ai_spend_price_snapshot_read",
+      "status": "empty"
+    },
+    {
+      "table": "ai_spend_reservation_read",
+      "status": "empty"
+    },
+    {
+      "table": "ai_spend_reservation",
+      "status": "empty"
+    },
+    {
+      "table": "ai_team_member_skill",
+      "status": "empty"
+    },
+    {
+      "table": "ai_team_member",
+      "status": "empty"
+    },
+    {
+      "table": "ai_workflow_generation",
+      "status": "empty"
+    },
+    {
+      "table": "ai_workflow_node_provenance",
+      "status": "empty"
+    },
+    {
+      "table": "amortization_line",
+      "status": "empty"
+    },
+    {
+      "table": "amortization_schedule",
+      "status": "empty"
+    },
+    {
+      "table": "analytics_metric",
+      "status": "empty"
+    },
+    {
+      "table": "assignment_rule",
+      "status": "empty"
+    },
+    {
+      "table": "audit_log",
+      "status": "populated"
+    },
+    {
+      "table": "audit_rule",
+      "status": "empty"
+    },
+    {
+      "table": "balance_sheet_line",
+      "status": "empty"
+    },
+    {
+      "table": "bank_match_candidate",
+      "status": "empty"
+    },
+    {
+      "table": "bank_statement_import_line",
+      "status": "empty"
+    },
+    {
+      "table": "bank_statement_import",
+      "status": "empty"
+    },
+    {
+      "table": "barcode_nomenclature",
+      "status": "empty"
+    },
+    {
+      "table": "barcode_rule",
+      "status": "empty"
+    },
+    {
+      "table": "barcode_scan",
+      "status": "empty"
+    },
+    {
+      "table": "billing_account",
+      "status": "empty"
+    },
+    {
+      "table": "bom_explosion_result",
+      "status": "empty"
+    },
+    {
+      "table": "budget_post",
+      "status": "empty"
+    },
+    {
+      "table": "calendar_event",
+      "status": "populated"
+    },
+    {
+      "table": "capacity_forecast_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "cartonization_result",
+      "status": "empty"
+    },
+    {
+      "table": "cash_flow_line",
+      "status": "empty"
+    },
+    {
+      "table": "cold_tier_service_identity",
+      "status": "empty"
+    },
+    {
+      "table": "commodity_price_index",
+      "status": "empty"
+    },
+    {
+      "table": "company_country_pack",
+      "status": "empty"
+    },
+    {
+      "table": "company",
+      "status": "populated"
+    },
+    {
+      "table": "company_vertical_pack",
+      "status": "empty"
+    },
+    {
+      "table": "consignment_agreement",
+      "status": "empty"
+    },
+    {
+      "table": "consolidation_account",
+      "status": "empty"
+    },
+    {
+      "table": "consolidation_company_rate",
+      "status": "empty"
+    },
+    {
+      "table": "consolidation_elimination_entry",
+      "status": "empty"
+    },
+    {
+      "table": "consolidation_journal",
+      "status": "empty"
+    },
+    {
+      "table": "contact_category_assignment",
+      "status": "empty"
+    },
+    {
+      "table": "contact_category",
+      "status": "populated"
+    },
+    {
+      "table": "contact_communication_preference",
+      "status": "empty"
+    },
+    {
+      "table": "contact_duplicate_candidate",
+      "status": "empty"
+    },
+    {
+      "table": "contact_identity_verification_authority",
+      "status": "empty"
+    },
+    {
+      "table": "contact_identity_verification_proof",
+      "status": "empty"
+    },
+    {
+      "table": "contact_phone_identity",
+      "status": "empty"
+    },
+    {
+      "table": "contact_relationship_insight",
+      "status": "empty"
+    },
+    {
+      "table": "contact_relationship",
+      "status": "empty"
+    },
+    {
+      "table": "contact_role_assignment",
+      "status": "empty"
+    },
+    {
+      "table": "contact_segment_rule",
+      "status": "empty"
+    },
+    {
+      "table": "contact_segment",
+      "status": "empty"
+    },
+    {
+      "table": "contact",
+      "status": "populated"
+    },
+    {
+      "table": "contact_tag_assignment",
+      "status": "empty"
+    },
+    {
+      "table": "contact_tag",
+      "status": "populated"
+    },
+    {
+      "table": "country_pack_definition",
+      "status": "populated"
+    },
+    {
+      "table": "country_pack_tax_rule",
+      "status": "populated"
+    },
+    {
+      "table": "country",
+      "status": "empty"
+    },
+    {
+      "table": "crm_conversation_message",
+      "status": "empty"
+    },
+    {
+      "table": "crm_conversation",
+      "status": "empty"
+    },
+    {
+      "table": "crm_forecast_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "crm_provider_event_receipt",
+      "status": "empty"
+    },
+    {
+      "table": "crm_provider_principal",
+      "status": "empty"
+    },
+    {
+      "table": "crm_team",
+      "status": "empty"
+    },
+    {
+      "table": "crossovered_budget_lines",
+      "status": "empty"
+    },
+    {
+      "table": "crossovered_budget",
+      "status": "empty"
+    },
+    {
+      "table": "currency_rate",
+      "status": "empty"
+    },
+    {
+      "table": "currency",
+      "status": "populated"
+    },
+    {
+      "table": "dashboard",
+      "status": "populated"
+    },
+    {
+      "table": "dashboard_widget",
+      "status": "populated"
+    },
+    {
+      "table": "data_classification_rule",
+      "status": "empty"
+    },
+    {
+      "table": "data_classification",
+      "status": "empty"
+    },
+    {
+      "table": "deferred_revenue_line",
+      "status": "empty"
+    },
+    {
+      "table": "deferred_revenue_schedule",
+      "status": "empty"
+    },
+    {
+      "table": "delegated_admin_scope",
+      "status": "empty"
+    },
+    {
+      "table": "delivery_carrier",
+      "status": "empty"
+    },
+    {
+      "table": "delivery_price_rule",
+      "status": "empty"
+    },
+    {
+      "table": "doc_folder",
+      "status": "populated"
+    },
+    {
+      "table": "document_external_ref",
+      "status": "empty"
+    },
+    {
+      "table": "document_legal_hold",
+      "status": "empty"
+    },
+    {
+      "table": "document_presence",
+      "status": "empty"
+    },
+    {
+      "table": "document_retention_purge_job",
+      "status": "empty"
+    },
+    {
+      "table": "document_sequence",
+      "status": "populated"
+    },
+    {
+      "table": "document_signature_request",
+      "status": "empty"
+    },
+    {
+      "table": "document",
+      "status": "populated"
+    },
+    {
+      "table": "document_template",
+      "status": "empty"
+    },
+    {
+      "table": "document_version",
+      "status": "populated"
+    },
+    {
+      "table": "expense_card_statement_line",
+      "status": "empty"
+    },
+    {
+      "table": "expense_integration_intent",
+      "status": "empty"
+    },
+    {
+      "table": "expense_sheet",
+      "status": "populated"
+    },
+    {
+      "table": "field_permission",
+      "status": "empty"
+    },
+    {
+      "table": "financial_report",
+      "status": "populated"
+    },
+    {
+      "table": "fleet_inspection",
+      "status": "empty"
+    },
+    {
+      "table": "fleet_service_record",
+      "status": "empty"
+    },
+    {
+      "table": "fleet_vehicle_service_type",
+      "status": "empty"
+    },
+    {
+      "table": "fleet_vehicle",
+      "status": "populated"
+    },
+    {
+      "table": "form_config_field",
+      "status": "populated"
+    },
+    {
+      "table": "form_config",
+      "status": "populated"
+    },
+    {
+      "table": "form_field_label",
+      "status": "empty"
+    },
+    {
+      "table": "form_role_config",
+      "status": "populated"
+    },
+    {
+      "table": "fx_revaluation_run",
+      "status": "empty"
+    },
+    {
+      "table": "generated_owner_report",
+      "status": "empty"
+    },
+    {
+      "table": "google_drive_connection",
+      "status": "empty"
+    },
+    {
+      "table": "guarded_action_receipt",
+      "status": "empty"
+    },
+    {
+      "table": "helpdesk_related_record_read",
+      "status": "empty"
+    },
+    {
+      "table": "helpdesk_sla_check_job",
+      "status": "empty"
+    },
+    {
+      "table": "helpdesk_sla",
+      "status": "empty"
+    },
+    {
+      "table": "helpdesk_stage",
+      "status": "populated"
+    },
+    {
+      "table": "helpdesk_team_member",
+      "status": "empty"
+    },
+    {
+      "table": "helpdesk_team",
+      "status": "populated"
+    },
+    {
+      "table": "helpdesk_ticket_related_record",
+      "status": "empty"
+    },
+    {
+      "table": "helpdesk_ticket",
+      "status": "populated"
+    },
+    {
+      "table": "hr_applicant",
+      "status": "populated"
+    },
+    {
+      "table": "hr_attendance",
+      "status": "empty"
+    },
+    {
+      "table": "hr_benefit_enrollment",
+      "status": "empty"
+    },
+    {
+      "table": "hr_benefit_plan",
+      "status": "empty"
+    },
+    {
+      "table": "hr_capacity_forecast",
+      "status": "empty"
+    },
+    {
+      "table": "hr_compensation_event",
+      "status": "empty"
+    },
+    {
+      "table": "hr_contract",
+      "status": "populated"
+    },
+    {
+      "table": "hr_country_pack_leave_default",
+      "status": "populated"
+    },
+    {
+      "table": "hr_department",
+      "status": "populated"
+    },
+    {
+      "table": "hr_employee_document",
+      "status": "empty"
+    },
+    {
+      "table": "hr_employee_skill",
+      "status": "empty"
+    },
+    {
+      "table": "hr_employee",
+      "status": "populated"
+    },
+    {
+      "table": "hr_expense_advance_application",
+      "status": "empty"
+    },
+    {
+      "table": "hr_expense_advance",
+      "status": "empty"
+    },
+    {
+      "table": "hr_expense_allocation",
+      "status": "empty"
+    },
+    {
+      "table": "hr_expense_mileage_rate",
+      "status": "empty"
+    },
+    {
+      "table": "hr_expense_per_diem_rate",
+      "status": "empty"
+    },
+    {
+      "table": "hr_expense_policy_exception",
+      "status": "empty"
+    },
+    {
+      "table": "hr_expense_policy",
+      "status": "empty"
+    },
+    {
+      "table": "hr_expense_receipt",
+      "status": "empty"
+    },
+    {
+      "table": "hr_expense",
+      "status": "populated"
+    },
+    {
+      "table": "hr_global_assignment",
+      "status": "empty"
+    },
+    {
+      "table": "hr_integration_intent",
+      "status": "empty"
+    },
+    {
+      "table": "hr_job_position",
+      "status": "populated"
+    },
+    {
+      "table": "hr_labor_cost_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "hr_leave_allocation",
+      "status": "empty"
+    },
+    {
+      "table": "hr_leave",
+      "status": "populated"
+    },
+    {
+      "table": "hr_leave_type",
+      "status": "populated"
+    },
+    {
+      "table": "hr_offboarding_checklist",
+      "status": "empty"
+    },
+    {
+      "table": "hr_onboarding_progress",
+      "status": "empty"
+    },
+    {
+      "table": "hr_onboarding_template_item",
+      "status": "populated"
+    },
+    {
+      "table": "hr_onboarding_template",
+      "status": "populated"
+    },
+    {
+      "table": "hr_payroll_export_intent",
+      "status": "empty"
+    },
+    {
+      "table": "hr_payroll_structure",
+      "status": "populated"
+    },
+    {
+      "table": "hr_payslip",
+      "status": "populated"
+    },
+    {
+      "table": "hr_performance_cycle",
+      "status": "populated"
+    },
+    {
+      "table": "hr_performance_goal",
+      "status": "empty"
+    },
+    {
+      "table": "hr_performance_review",
+      "status": "empty"
+    },
+    {
+      "table": "hr_pii_access_log",
+      "status": "populated"
+    },
+    {
+      "table": "hr_resource",
+      "status": "populated"
+    },
+    {
+      "table": "hr_salary_rule",
+      "status": "populated"
+    },
+    {
+      "table": "hr_shift_opt_job",
+      "status": "empty"
+    },
+    {
+      "table": "hr_skill",
+      "status": "empty"
+    },
+    {
+      "table": "hr_statutory_id",
+      "status": "empty"
+    },
+    {
+      "table": "hr_work_schedule",
+      "status": "empty"
+    },
+    {
+      "table": "import_job_error",
+      "status": "empty"
+    },
+    {
+      "table": "import_job_record",
+      "status": "empty"
+    },
+    {
+      "table": "import_job",
+      "status": "empty"
+    },
+    {
+      "table": "import_mapping_template",
+      "status": "empty"
+    },
+    {
+      "table": "intercompany_rule",
+      "status": "empty"
+    },
+    {
+      "table": "intercompany_transaction",
+      "status": "empty"
+    },
+    {
+      "table": "inventory_adjustment",
+      "status": "empty"
+    },
+    {
+      "table": "inventory_audit_run",
+      "status": "empty"
+    },
+    {
+      "table": "inventory_audit_violation",
+      "status": "empty"
+    },
+    {
+      "table": "inventory_close_line",
+      "status": "empty"
+    },
+    {
+      "table": "inventory_close",
+      "status": "empty"
+    },
+    {
+      "table": "inventory_exception",
+      "status": "empty"
+    },
+    {
+      "table": "inventory_integration_intent",
+      "status": "empty"
+    },
+    {
+      "table": "inventory_valuation",
+      "status": "empty"
+    },
+    {
+      "table": "iot_action",
+      "status": "empty"
+    },
+    {
+      "table": "iot_alert",
+      "status": "empty"
+    },
+    {
+      "table": "iot_device",
+      "status": "empty"
+    },
+    {
+      "table": "iot_hub",
+      "status": "empty"
+    },
+    {
+      "table": "iot_pairing_token",
+      "status": "empty"
+    },
+    {
+      "table": "iot_telemetry",
+      "status": "empty"
+    },
+    {
+      "table": "iot_threshold",
+      "status": "empty"
+    },
+    {
+      "table": "kb_category",
+      "status": "populated"
+    },
+    {
+      "table": "knowledge_article_presence",
+      "status": "empty"
+    },
+    {
+      "table": "knowledge_article",
+      "status": "populated"
+    },
+    {
+      "table": "lead_lost_reason",
+      "status": "empty"
+    },
+    {
+      "table": "lead_score_factor",
+      "status": "empty"
+    },
+    {
+      "table": "lead_score",
+      "status": "empty"
+    },
+    {
+      "table": "lead_source",
+      "status": "empty"
+    },
+    {
+      "table": "lead",
+      "status": "populated"
+    },
+    {
+      "table": "mail_follower",
+      "status": "empty"
+    },
+    {
+      "table": "mail_message",
+      "status": "empty"
+    },
+    {
+      "table": "mail_template",
+      "status": "empty"
+    },
+    {
+      "table": "message_batch",
+      "status": "empty"
+    },
+    {
+      "table": "message_template",
+      "status": "empty"
+    },
+    {
+      "table": "mrp_bom_byproduct",
+      "status": "empty"
+    },
+    {
+      "table": "mrp_bom_line",
+      "status": "populated"
+    },
+    {
+      "table": "mrp_bom",
+      "status": "populated"
+    },
+    {
+      "table": "mrp_loss_category",
+      "status": "empty"
+    },
+    {
+      "table": "mrp_production_cost",
+      "status": "empty"
+    },
+    {
+      "table": "mrp_production",
+      "status": "populated"
+    },
+    {
+      "table": "mrp_productivity_cost",
+      "status": "empty"
+    },
+    {
+      "table": "mrp_routing_workcenter",
+      "status": "populated"
+    },
+    {
+      "table": "mrp_valuation_config",
+      "status": "empty"
+    },
+    {
+      "table": "mrp_workcenter_cost_rate",
+      "status": "empty"
+    },
+    {
+      "table": "mrp_workcenter_productivity",
+      "status": "empty"
+    },
+    {
+      "table": "mrp_workcenter",
+      "status": "populated"
+    },
+    {
+      "table": "mrp_workorder",
+      "status": "populated"
+    },
+    {
+      "table": "operational_message",
+      "status": "empty"
+    },
+    {
+      "table": "opp_stage",
+      "status": "populated"
+    },
+    {
+      "table": "opportunity_line",
+      "status": "empty"
+    },
+    {
+      "table": "opportunity_presence",
+      "status": "empty"
+    },
+    {
+      "table": "opportunity",
+      "status": "populated"
+    },
+    {
+      "table": "org_permission",
+      "status": "empty"
+    },
+    {
+      "table": "org_schema_migration",
+      "status": "empty"
+    },
+    {
+      "table": "organization_commit_cursor",
+      "status": "populated"
+    },
+    {
+      "table": "organization_commit",
+      "status": "populated"
+    },
+    {
+      "table": "organization_reconstruction_batch_receipt",
+      "status": "empty"
+    },
+    {
+      "table": "organization_reconstruction_fence",
+      "status": "empty"
+    },
+    {
+      "table": "organization_row_change",
+      "status": "populated"
+    },
+    {
+      "table": "organization_settings",
+      "status": "populated"
+    },
+    {
+      "table": "organization",
+      "status": "populated"
+    },
+    {
+      "table": "packaging_material",
+      "status": "empty"
+    },
+    {
+      "table": "partner_credit_control",
+      "status": "empty"
+    },
+    {
+      "table": "password_reset_token",
+      "status": "empty"
+    },
+    {
+      "table": "payment_account",
+      "status": "empty"
+    },
+    {
+      "table": "payment_fee",
+      "status": "empty"
+    },
+    {
+      "table": "payment_reconciliation",
+      "status": "empty"
+    },
+    {
+      "table": "payment_reversal",
+      "status": "empty"
+    },
+    {
+      "table": "payment_transaction",
+      "status": "empty"
+    },
+    {
+      "table": "picking_wave",
+      "status": "empty"
+    },
+    {
+      "table": "policy_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "pos_config",
+      "status": "populated"
+    },
+    {
+      "table": "pos_loyalty_card",
+      "status": "empty"
+    },
+    {
+      "table": "pos_loyalty_program",
+      "status": "empty"
+    },
+    {
+      "table": "pos_order_line",
+      "status": "empty"
+    },
+    {
+      "table": "pos_order",
+      "status": "empty"
+    },
+    {
+      "table": "pos_payment_method",
+      "status": "empty"
+    },
+    {
+      "table": "pos_payment",
+      "status": "empty"
+    },
+    {
+      "table": "pos_session",
+      "status": "empty"
+    },
+    {
+      "table": "pos_terminal",
+      "status": "empty"
+    },
+    {
+      "table": "presentation_module",
+      "status": "empty"
+    },
+    {
+      "table": "presentation_module_version",
+      "status": "empty"
+    },
+    {
+      "table": "privacy_consent",
+      "status": "empty"
+    },
+    {
+      "table": "product_attribute_line",
+      "status": "empty"
+    },
+    {
+      "table": "product_attribute",
+      "status": "empty"
+    },
+    {
+      "table": "product_attribute_value",
+      "status": "empty"
+    },
+    {
+      "table": "product_category",
+      "status": "populated"
+    },
+    {
+      "table": "product_packaging",
+      "status": "empty"
+    },
+    {
+      "table": "product_pricelist_item",
+      "status": "empty"
+    },
+    {
+      "table": "product_pricelist",
+      "status": "populated"
+    },
+    {
+      "table": "product_supplier_info",
+      "status": "empty"
+    },
+    {
+      "table": "product",
+      "status": "populated"
+    },
+    {
+      "table": "product_variant",
+      "status": "empty"
+    },
+    {
+      "table": "profit_loss_line",
+      "status": "empty"
+    },
+    {
+      "table": "project_baseline",
+      "status": "empty"
+    },
+    {
+      "table": "project_change_order",
+      "status": "empty"
+    },
+    {
+      "table": "project_earned_value_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "project_integration_intent",
+      "status": "empty"
+    },
+    {
+      "table": "project_margin_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "project_milestone",
+      "status": "populated"
+    },
+    {
+      "table": "project_project",
+      "status": "populated"
+    },
+    {
+      "table": "project_rate_card_line",
+      "status": "empty"
+    },
+    {
+      "table": "project_rate_card",
+      "status": "empty"
+    },
+    {
+      "table": "project_revenue_line",
+      "status": "empty"
+    },
+    {
+      "table": "project_revenue_schedule",
+      "status": "empty"
+    },
+    {
+      "table": "project_subcontractor_cost",
+      "status": "empty"
+    },
+    {
+      "table": "project_task_stage",
+      "status": "empty"
+    },
+    {
+      "table": "project_task",
+      "status": "populated"
+    },
+    {
+      "table": "project_timesheet_approval",
+      "status": "empty"
+    },
+    {
+      "table": "project_timesheet",
+      "status": "populated"
+    },
+    {
+      "table": "proposal_analysis",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_bid_decision",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_clarification",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_clause",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_comment",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_compliance_requirement",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_integration_intent",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_line_item",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_presence",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_procurement_score",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_section",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_source_doc",
+      "status": "empty"
+    },
+    {
+      "table": "proposal",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_template",
+      "status": "empty"
+    },
+    {
+      "table": "proposal_version",
+      "status": "empty"
+    },
+    {
+      "table": "public_holiday",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_approval_delegate",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_blanket_order_line",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_blanket_order",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_blanket_release",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_contract",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_order_line",
+      "status": "populated"
+    },
+    {
+      "table": "purchase_order",
+      "status": "populated"
+    },
+    {
+      "table": "purchase_requisition_line",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_requisition",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_return_line",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_return",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_rfq_bid",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_rfq_line",
+      "status": "empty"
+    },
+    {
+      "table": "purchase_rfq",
+      "status": "empty"
+    },
+    {
+      "table": "purchasing_integration_intent",
+      "status": "empty"
+    },
+    {
+      "table": "quality_alert_reason",
+      "status": "populated"
+    },
+    {
+      "table": "quality_alert",
+      "status": "empty"
+    },
+    {
+      "table": "quality_check",
+      "status": "empty"
+    },
+    {
+      "table": "quality_point",
+      "status": "empty"
+    },
+    {
+      "table": "quality_team",
+      "status": "populated"
+    },
+    {
+      "table": "queue_attempt",
+      "status": "empty"
+    },
+    {
+      "table": "queue_effect_receipt",
+      "status": "empty"
+    },
+    {
+      "table": "queue_job",
+      "status": "empty"
+    },
+    {
+      "table": "queue_worker",
+      "status": "empty"
+    },
+    {
+      "table": "record_custom_field_value",
+      "status": "empty"
+    },
+    {
+      "table": "replenishment_rule",
+      "status": "empty"
+    },
+    {
+      "table": "replenishment_run_job",
+      "status": "empty"
+    },
+    {
+      "table": "report_template",
+      "status": "populated"
+    },
+    {
+      "table": "res_partner_bank",
+      "status": "empty"
+    },
+    {
+      "table": "resource_allocation",
+      "status": "empty"
+    },
+    {
+      "table": "resource_capacity_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "resource_utilisation_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "return_order_creation",
+      "status": "empty"
+    },
+    {
+      "table": "return_order_line",
+      "status": "empty"
+    },
+    {
+      "table": "return_order",
+      "status": "empty"
+    },
+    {
+      "table": "revenue_recognition_rule",
+      "status": "empty"
+    },
+    {
+      "table": "role",
+      "status": "populated"
+    },
+    {
+      "table": "sale_commission_plan_split",
+      "status": "empty"
+    },
+    {
+      "table": "sale_commission_plan",
+      "status": "empty"
+    },
+    {
+      "table": "sale_commission",
+      "status": "empty"
+    },
+    {
+      "table": "sale_contract",
+      "status": "empty"
+    },
+    {
+      "table": "sale_cpq_constraint",
+      "status": "empty"
+    },
+    {
+      "table": "sale_order_line",
+      "status": "populated"
+    },
+    {
+      "table": "sale_order_option",
+      "status": "empty"
+    },
+    {
+      "table": "sale_order",
+      "status": "populated"
+    },
+    {
+      "table": "sale_promotion",
+      "status": "empty"
+    },
+    {
+      "table": "sales_integration_intent",
+      "status": "empty"
+    },
+    {
+      "table": "sales_sla_escalation_job",
+      "status": "empty"
+    },
+    {
+      "table": "saved_report",
+      "status": "populated"
+    },
+    {
+      "table": "scheduled_report_run",
+      "status": "empty"
+    },
+    {
+      "table": "scheduled_report",
+      "status": "empty"
+    },
+    {
+      "table": "schema_migration",
+      "status": "empty"
+    },
+    {
+      "table": "search_embedding",
+      "status": "empty"
+    },
+    {
+      "table": "segment_member",
+      "status": "empty"
+    },
+    {
+      "table": "serial_lot_traceability",
+      "status": "empty"
+    },
+    {
+      "table": "shipping_method",
+      "status": "empty"
+    },
+    {
+      "table": "sod_conflict_rule",
+      "status": "empty"
+    },
+    {
+      "table": "stock_count_sheet",
+      "status": "empty"
+    },
+    {
+      "table": "stock_cycle_count",
+      "status": "empty"
+    },
+    {
+      "table": "stock_inventory_line",
+      "status": "populated"
+    },
+    {
+      "table": "stock_inventory",
+      "status": "populated"
+    },
+    {
+      "table": "stock_landed_cost_allocation",
+      "status": "empty"
+    },
+    {
+      "table": "stock_landed_cost_application",
+      "status": "empty"
+    },
+    {
+      "table": "stock_landed_cost_lines",
+      "status": "empty"
+    },
+    {
+      "table": "stock_landed_cost",
+      "status": "empty"
+    },
+    {
+      "table": "stock_location",
+      "status": "populated"
+    },
+    {
+      "table": "stock_move_line",
+      "status": "empty"
+    },
+    {
+      "table": "stock_move",
+      "status": "empty"
+    },
+    {
+      "table": "stock_package",
+      "status": "empty"
+    },
+    {
+      "table": "stock_picking_batch",
+      "status": "empty"
+    },
+    {
+      "table": "stock_picking",
+      "status": "empty"
+    },
+    {
+      "table": "stock_production_lot",
+      "status": "populated"
+    },
+    {
+      "table": "stock_production_serial",
+      "status": "empty"
+    },
+    {
+      "table": "stock_quant",
+      "status": "populated"
+    },
+    {
+      "table": "stock_reorder_group",
+      "status": "empty"
+    },
+    {
+      "table": "stock_route",
+      "status": "empty"
+    },
+    {
+      "table": "stock_rule",
+      "status": "empty"
+    },
+    {
+      "table": "stock_traceability_report",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_amendment",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_billing_run",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_bundle_item",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_bundle",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_collection",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_commitment",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_entitlement",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_line",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_payment_intent",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_plan",
+      "status": "populated"
+    },
+    {
+      "table": "subscription_price_index",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_price_tier",
+      "status": "empty"
+    },
+    {
+      "table": "subscription",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_tax_settle_intent",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_usage_charge",
+      "status": "empty"
+    },
+    {
+      "table": "subscription_usage_event",
+      "status": "empty"
+    },
+    {
+      "table": "supplier_intake_request",
+      "status": "empty"
+    },
+    {
+      "table": "tax_deadline_reminder",
+      "status": "empty"
+    },
+    {
+      "table": "tax_deadline_status_job",
+      "status": "empty"
+    },
+    {
+      "table": "tax_deadline",
+      "status": "empty"
+    },
+    {
+      "table": "tax_jurisdiction",
+      "status": "empty"
+    },
+    {
+      "table": "tax_schedule",
+      "status": "empty"
+    },
+    {
+      "table": "trial_balance",
+      "status": "empty"
+    },
+    {
+      "table": "uom_cat",
+      "status": "populated"
+    },
+    {
+      "table": "uom_conversion",
+      "status": "empty"
+    },
+    {
+      "table": "uom",
+      "status": "populated"
+    },
+    {
+      "table": "user_credential",
+      "status": "empty"
+    },
+    {
+      "table": "user_custom_field",
+      "status": "empty"
+    },
+    {
+      "table": "user_invite",
+      "status": "empty"
+    },
+    {
+      "table": "user_organization",
+      "status": "populated"
+    },
+    {
+      "table": "user_profile",
+      "status": "populated"
+    },
+    {
+      "table": "user_role_assignment",
+      "status": "populated"
+    },
+    {
+      "table": "user_session",
+      "status": "empty"
+    },
+    {
+      "table": "utm_campaign",
+      "status": "empty"
+    },
+    {
+      "table": "utm_medium",
+      "status": "empty"
+    },
+    {
+      "table": "utm_source",
+      "status": "empty"
+    },
+    {
+      "table": "vendor_risk_flag",
+      "status": "empty"
+    },
+    {
+      "table": "vendor_scorecard",
+      "status": "empty"
+    },
+    {
+      "table": "warehouse_3_d_zone",
+      "status": "empty"
+    },
+    {
+      "table": "warehouse_geo",
+      "status": "empty"
+    },
+    {
+      "table": "warehouse_sync_intent",
+      "status": "empty"
+    },
+    {
+      "table": "warehouse",
+      "status": "populated"
+    },
+    {
+      "table": "warehouse_task",
+      "status": "empty"
+    },
+    {
+      "table": "whatsapp_business_account",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_calendar_exception",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_calendar",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_calendar_version",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_candidate_group_member",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_command_receipt",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_decision_event",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_delegation",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_delivery_attempt",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_delivery_receipt",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_edge",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_fork",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_human_task_candidate",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_human_task_event",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_human_task_receipt",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_human_task",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_instance",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_join_arrival",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_migration_instance_result",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_migration_plan",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_migration_preflight",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_node",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_outbox",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_simulation_result",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_simulation_step",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_subject_snapshot",
+      "status": "empty"
+    },
+    {
+      "table": "workflow",
+      "status": "populated"
+    },
+    {
+      "table": "workflow_timer",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_token",
+      "status": "empty"
+    },
+    {
+      "table": "workflow_version",
+      "status": "populated"
+    },
+    {
+      "table": "working_calendar",
+      "status": "empty"
+    }
+  ],
+  "uiPages": [
+    {
+      "path": "/overview",
+      "status": 200
+    },
+    {
+      "path": "/crm",
+      "status": 200
+    },
+    {
+      "path": "/sales",
+      "status": 200
+    },
+    {
+      "path": "/purchasing",
+      "status": 200
+    },
+    {
+      "path": "/inventory",
+      "status": 200
+    },
+    {
+      "path": "/manufacturing",
+      "status": 200
+    },
+    {
+      "path": "/accounting",
+      "status": 200
+    },
+    {
+      "path": "/hr",
+      "status": 200
+    },
+    {
+      "path": "/projects",
+      "status": 200
+    },
+    {
+      "path": "/expenses",
+      "status": 200
+    },
+    {
+      "path": "/reports",
+      "status": 200
+    },
+    {
+      "path": "/documents",
+      "status": 200
+    },
+    {
+      "path": "/workflows",
+      "status": 200
+    },
+    {
+      "path": "/settings",
+      "status": 200
+    },
+    {
+      "path": "/helpdesk",
+      "status": 200
+    },
+    {
+      "path": "/fleet",
+      "status": 200
+    },
+    {
+      "path": "/pos",
+      "status": 200
+    },
+    {
+      "path": "/subscriptions",
+      "status": 200
+    },
+    {
+      "path": "/demo-readiness",
+      "status": 200
+    }
+  ],
+  "documentDownloads": [
+    {
+      "key": "guideDocument",
+      "verified": true
+    },
+    {
+      "key": "importExample",
+      "verified": true
+    }
+  ],
+  "anonymousDiagnosticsStatus": 307,
+  "verificationKind": "Private-network authenticated HTTP and canonical tenant readback; not an interactive browser certification",
+  "interpretation": {
+    "scope": "Alpha org synthetic business fixture coverage, not U5 certification",
+    "repeatRunCreatedRows": 0,
+    "notAllTablesAreSeedTargets": "Runtime queues, provider attempts, credentials, payment executions and audit/security control tables are not populated with fake records.",
+    "remainingEmptyTables": "Some empty tables are deferred/lifecycle state; others are still business seed coverage gaps. Empty is not automatically a product defect.",
+    "platformBoundary": "Country reference creation is platform-superuser-only. The Alpha owner was not escalated, and the dependent country-specific tax seed remains blocked."
+  },
+  "coverageSummary": {
+    "populated": 104,
+    "empty": 412
+  }
+}

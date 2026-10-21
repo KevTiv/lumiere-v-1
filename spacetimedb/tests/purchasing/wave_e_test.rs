@@ -1,11 +1,11 @@
 //! Wave E purchasing gap-fix domain tests.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
 use crate::accounting::journal_entries::{
-    account_move_line, create_bill_from_purchase_order, post_invoice, AccountMoveLine,
+    account_move, account_move_line, create_bill_from_purchase_order, post_invoice,
     AddAccountMoveLineParams, CreateBillFromPurchaseOrderParams,
 };
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
@@ -21,7 +21,7 @@ use crate::types::JournalType;
 
 use super::gap_fixes_test::seed_vendor_po;
 
-fn empty_move_line(account_id: u64) -> AddAccountMoveLineParams {
+pub(super) fn empty_move_line(account_id: u64) -> AddAccountMoveLineParams {
     AddAccountMoveLineParams {
         account_id,
         name: String::new(),
@@ -60,7 +60,7 @@ fn empty_move_line(account_id: u64) -> AddAccountMoveLineParams {
     }
 }
 
-fn expense_and_ap(fixture: &OrgFixture) -> Result<(u64, u64), String> {
+pub(super) fn expense_and_ap(fixture: &OrgFixture) -> Result<(u64, u64), String> {
     let ap_id = *fixture
         .chart_account_ids
         .get(chart_keys::AP)
@@ -179,18 +179,67 @@ pub fn test_requisition_convert_copies_lines(ctx: &ReducerContext) -> Result<(),
     }
 
     submit_purchase_requisition(ctx, org_id, requisition.id)?;
+    let self_approval = approve_purchase_requisition(ctx, org_id, requisition.id)
+        .err()
+        .ok_or("requester self-approved purchase requisition")?;
+    if !self_approval.contains("Requester cannot approve") {
+        return Err(format!("unexpected self-approval error: {self_approval}"));
+    }
+    let independent_requester = Identity::from_byte_array([0x5a; 32]);
+    ctx.db.purchase_requisition().id().update(
+        crate::purchasing::purchase_orders::PurchaseRequisition {
+            user_id: independent_requester,
+            ..ctx
+                .db
+                .purchase_requisition()
+                .id()
+                .find(&requisition.id)
+                .ok_or("submitted requisition missing")?
+        },
+    );
     approve_purchase_requisition(ctx, org_id, requisition.id)?;
+    let approved = ctx
+        .db
+        .purchase_requisition()
+        .id()
+        .find(&requisition.id)
+        .ok_or("approved requisition missing")?;
+    if approved.write_uid != ctx.sender() || approved.user_id != independent_requester {
+        return Err("purchase requisition did not record the independent approver".into());
+    }
+    let company_mismatch = convert_purchase_requisition_to_po(
+        ctx,
+        org_id,
+        company_id.saturating_add(9_999),
+        requisition.id,
+    )
+    .err()
+    .ok_or("cross-company requisition conversion was accepted")?;
+    if !company_mismatch.contains("requested company") {
+        return Err(format!(
+            "unexpected company mismatch error: {company_mismatch}"
+        ));
+    }
+    convert_purchase_requisition_to_po(ctx, org_id, company_id, requisition.id)?;
+    // Same-request/lost-response retry resolves to the already-related PO.
     convert_purchase_requisition_to_po(ctx, org_id, company_id, requisition.id)?;
 
-    let po = ctx
+    let matching_pos: Vec<_> = ctx
         .db
         .purchase_order()
         .iter()
-        .find(|o| {
+        .filter(|o| {
             o.organization_id == org_id
                 && o.origin.as_deref() == Some(&format!("requisition:{}", requisition.id))
         })
-        .ok_or("converted PO missing")?;
+        .collect();
+    if matching_pos.len() != 1 {
+        return Err(format!(
+            "expected one converted PO after replay, got {}",
+            matching_pos.len()
+        ));
+    }
+    let po = &matching_pos[0];
 
     let lines: Vec<_> = ctx
         .db
@@ -464,14 +513,168 @@ pub fn test_price_match_blocks_post_invoice(ctx: &ReducerContext) -> Result<(), 
         .find(&line_id)
         .map(|l| l.price_unit)
         .ok_or("po line")?;
-    ctx.db.account_move_line().id().update(AccountMoveLine {
-        price_unit: po_price + 5.0,
-        ..product_line
-    });
-
-    match post_invoice(ctx, org_id, bill_id, expense_id, expense_id) {
-        Err(e) if e.contains("three-way match failed") && e.contains("bill price") => Ok(()),
-        Err(e) => Err(format!("expected price match error, got: {e}")),
-        Ok(()) => Err("price match should have blocked post_invoice".into()),
+    let correction = |qty, price, expected_qty, expected_price| {
+        crate::accounting::journal_entries::UpdateAccountMoveLineParams {
+            company_id: Some(fixture.company_id),
+            name: None,
+            debit: None,
+            credit: None,
+            partner_id: None,
+            analytic_account_id: None,
+            metadata: None,
+            quantity: Some(qty),
+            price_unit: Some(price),
+            expected_quantity: Some(expected_qty),
+            expected_price_unit: Some(expected_price),
+        }
+    };
+    let update = crate::accounting::journal_entries::update_account_move_line;
+    update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(
+            3.0,
+            po_price + 5.0,
+            product_line.quantity,
+            product_line.price_unit,
+        ),
+    )?;
+    let altered = ctx
+        .db
+        .account_move_line()
+        .id()
+        .find(&product_line.id)
+        .ok_or("corrected line")?;
+    let payable_after_price = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&bill_id)
+        .find(|line| {
+            line.account_internal_type
+                .as_deref()
+                .is_some_and(|value| value.eq_ignore_ascii_case("payable"))
+        })
+        .ok_or("corrected payable line")?;
+    let bill_before = ctx.db.account_move().id().find(&bill_id).ok_or("bill")?;
+    if (altered.debit - 3.0 * (po_price + 5.0)).abs() > 1e-8
+        || (bill_before.amount_total - altered.debit).abs() > 1e-8
+        || (payable_after_price.credit - altered.debit).abs() > 1e-8
+        || (payable_after_price.balance + altered.debit).abs() > 1e-8
+    {
+        return Err("correction did not rebalance expense, payable, and bill economics".into());
     }
+    match post_invoice(ctx, org_id, bill_id, expense_id, expense_id) {
+        Err(e) if e.contains("three-way match failed") && e.contains("bill price") => {}
+        Err(e) => return Err(format!("expected price match error, got: {e}")),
+        Ok(()) => return Err("price match should have blocked post_invoice".into()),
+    }
+    if update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(
+            3.0,
+            po_price,
+            product_line.quantity,
+            product_line.price_unit,
+        ),
+    )
+    .is_ok()
+    {
+        return Err("stale reviewed price was accepted".into());
+    }
+    if update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(f64::NAN, po_price, 3.0, po_price + 5.0),
+    )
+    .is_ok()
+    {
+        return Err("non-finite correction was accepted".into());
+    }
+    if update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(4.0, po_price, 3.0, po_price + 5.0),
+    )
+    .is_ok()
+    {
+        return Err("over-received correction was accepted".into());
+    }
+    let rejected = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&bill_id)
+        .ok_or("rejected bill")?;
+    let rejected_line = ctx
+        .db
+        .account_move_line()
+        .id()
+        .find(&product_line.id)
+        .ok_or("rejected correction line")?;
+    let rejected_source = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&line_id)
+        .ok_or("rejected correction source")?;
+    if rejected.state != crate::types::AccountMoveState::Draft
+        || rejected.amount_total != bill_before.amount_total
+        || rejected_line.quantity != altered.quantity
+        || rejected_line.price_unit != altered.price_unit
+        || rejected_source.qty_invoiced != 3.0
+    {
+        return Err("rejection changed bill, line, or PO quantities".into());
+    }
+    update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(2.0, po_price, 3.0, po_price + 5.0),
+    )?;
+    let source = ctx
+        .db
+        .purchase_order_line()
+        .id()
+        .find(&line_id)
+        .ok_or("source")?;
+    if source.qty_invoiced != 2.0
+        || source.qty_to_invoice != 1.0
+        || source.match_state != "under_billed"
+        || source
+            .metadata
+            .as_deref()
+            .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+            .and_then(|metadata| metadata.get("match_state").cloned())
+            .and_then(|value| value.as_str().map(str::to_owned))
+            .as_deref()
+            != Some("under_billed")
+    {
+        return Err(
+            "quantity correction did not refresh source quantities and match metadata".into(),
+        );
+    }
+    update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(3.0, po_price, 2.0, po_price),
+    )?;
+    post_invoice(ctx, org_id, bill_id, expense_id, expense_id)?;
+    if update(
+        ctx,
+        org_id,
+        product_line.id,
+        correction(3.0, po_price, 3.0, po_price),
+    )
+    .is_ok()
+    {
+        return Err("posted bill accepted correction".into());
+    }
+    Ok(())
 }

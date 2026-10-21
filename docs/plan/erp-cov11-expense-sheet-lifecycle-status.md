@@ -17,9 +17,10 @@ The bounded lifecycle is:
 3. Approved → Posted through `post_expense_sheet`;
 4. Posted → Done through `create_expense_reimbursement_payment`.
 
-The setup creates a registered expense receipt and one attached expense line.
-Document blob/version lifecycle remains owned by COV-18; COV-11 only requires the
-existing canonical expense-receipt relation to prove the sheet workflow.
+The browser path now creates the sheet and expense through their operator forms.
+It uploads real PDF bytes through the authenticated presign → object-store PUT →
+complete flow, verifies the persisted receipt checksum/storage identity, and
+links the draft expense to the sheet through the visible row-action form.
 
 ## Exact effect contract
 
@@ -66,7 +67,7 @@ identity, organization/company scope and state required by readback.
 | --- | --- | --- |
 | D | `test_expense_lifecycle_posts_move` now proves submit and approve stale rejection, same-key post idempotency without move duplication, changed-key post rejection, full reimbursement, and reimbursement replay preservation. Existing Wave A/F/G coverage retains receipt, SoD, company isolation and locked-period invariants. | `run_all_expenses_tests` passes. |
 | A | Existing generated operations retain `hr_expense_sheet` update/approve/post and `account_move:create` permissions plus organization/company guards. Browser proof uses admin as submitter, `fixture.finance@example.test` as distinct approver, and requires `fixture.reader@example.test` to receive 403 for every captured lifecycle request. | Authorized personas succeed; reader denial preserves exact effects. |
-| O | `cov11-expense-sheet-lifecycle.spec.ts` drives Submit, Approve, Post and Reimburse through the visible `/expenses` Expense sheets toolbar/forms. Setup calls are limited to receipt/line/sheet fixture preparation. | Focused Playwright proof passes. |
+| O | `cov11-expense-sheet-lifecycle.spec.ts` drives receipt upload, sheet creation, expense creation/linking, Submit, Approve, Post and Reimburse through visible `/expenses` forms and actions. Only conditional finance-employee identity linkage remains trusted fixture preparation. | Focused Playwright proof passes. |
 | E | `expenses-lifecycle-effect.test.ts` covers exact state/scope/identity, post source-move relation, reimbursement source/payment move relations and ambiguity. Browser proof preserves exact sheet and move snapshots across stale/idempotent/denied requests. | Query-hook unit, native and browser proofs green on one head. |
 
 ## Acceptance
@@ -86,9 +87,35 @@ This bounded acceptance does not award U4/U5 or enable first-org launch admissio
 On `80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4`, the clean local P0 suite passed
 `cov11-expense-sheet-lifecycle.spec.ts` as part of 130 passes, 5 annotated
 capability skips and 0 failures. This closes the local runtime condition for the
-selected submit/approve/post/reimburse transitions. Receipt, sheet and expense
-line creation remain fixture-assisted. On final review head
+selected submit/approve/post/reimburse transitions. In that historical run,
+receipt, sheet and expense line creation were fixture-assisted. On final review head
 `e23bac1c0420ae2c15b190a678f2198285fb5df6`, GitHub Actions targeted run
 `37116733371` included this spec and passed with 54 passes, 17 annotated
 capability skips and 0 failures. Human usability/accessibility review remains
 open, and the owning COV-11 row therefore remains below U4/U5 and at `review`.
+
+## Wave 2 operator/runtime closure
+
+`codex/cov-u5-closure-wave2` removes the fixture-assisted receipt/sheet/line
+setup from the focused browser proof. The test now additionally asserts:
+
+- the receipt bytes complete through the real blob API and persist their exact
+  SHA-256 checksum, MIME/file name and non-synthetic storage key;
+- replaying the exact receipt-create and expense-create HTTP requests leaves
+  exactly one receipt and one expense;
+- the persisted submitter and approver identities are both canonical and
+  distinct before accounting posting is allowed;
+- post remains same-key idempotent while stale submit/approve/reimbursement and
+  reader-persona requests preserve the exact sheet and move identities.
+
+Focused verification commands:
+
+```text
+node --import tsx --test lib/expenses-create-params.test.ts
+playwright test --config playwright.config.ts tests/e2e/cov11-expense-sheet-lifecycle.spec.ts --list
+```
+
+The browser spec is runtime-ready but still requires the standard authenticated
+E2E stack, object-storage credentials and first-org persona fixture for live
+execution. This document does not claim a new runtime pass until that command is
+executed against one immutable head.

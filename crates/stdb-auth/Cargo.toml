@@ -5,6 +5,7 @@ edition.workspace = true
 description = "Session field-access context and SQL column RBAC (port of field-policy.ts)"
 
 [dependencies]
+lumiere-policy-core = { path = "../policy-core" }
 lumiere-contracts = { workspace = true }
 once_cell = { workspace = true }
 serde.workspace = true

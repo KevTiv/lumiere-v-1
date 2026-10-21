@@ -1,5 +1,7 @@
 "use client";
 
+import { readPreference, writePreference } from "../lib/theme-storage";
+
 import {
   createContext,
   useCallback,
@@ -14,6 +16,7 @@ export type Theme = "light" | "dark" | "system";
 export type PaletteId = "default" | "ocean";
 
 export type ShellId = "default" | "css-art";
+export type Density = "comfortable" | "compact";
 
 export interface ThemeContextValue {
   theme: Theme;
@@ -23,6 +26,8 @@ export interface ThemeContextValue {
   setPalette: (palette: PaletteId) => void;
   shell: ShellId;
   setShell: (shell: ShellId) => void;
+  density: Density;
+  setDensity: (density: Density) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -30,6 +35,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 const STORAGE_KEY = "lumiere-theme";
 const PALETTE_STORAGE_KEY = "lumiere-palette";
 const SHELL_STORAGE_KEY = "lumiere-shell";
+const DENSITY_STORAGE_KEY = "lumiere-density";
 
 
 
@@ -81,17 +87,22 @@ export function ThemeProvider({
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
   const [palette, setPaletteState] = useState<PaletteId>(defaultPalette);
   const [shell, setShellState] = useState<ShellId>(defaultShell);
+  const [density, setDensityState] = useState<Density>("comfortable");
   const [systemTheme, setSystemTheme] = useState<"light" | "dark">("light");
 
   const resolvedTheme: "light" | "dark" = theme === "system" ? systemTheme : theme;
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem(storageKey) as Theme | null;
+    const storedTheme = readPreference(storageKey) as Theme | null;
     if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system") {
       setThemeState(storedTheme);
     }
-    setPaletteState(parsePalette(localStorage.getItem(paletteStorageKey)));
-    setShellState(parseShell(localStorage.getItem(shellStorageKey)));
+    const storedPalette = readPreference(paletteStorageKey);
+    if (storedPalette !== null) setPaletteState(parsePalette(storedPalette));
+    const storedShell = readPreference(shellStorageKey);
+    if (storedShell !== null) setShellState(parseShell(storedShell));
+    const storedDensity = readPreference(DENSITY_STORAGE_KEY);
+    if (storedDensity === "compact" || storedDensity === "comfortable") setDensityState(storedDensity);
   }, [storageKey, paletteStorageKey, shellStorageKey]);
 
   useEffect(() => {
@@ -107,6 +118,10 @@ export function ThemeProvider({
   }, [shell]);
 
   useEffect(() => {
+    document.documentElement.dataset.density = density;
+  }, [density]);
+
+  useEffect(() => {
     if (theme !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const updateSystemTheme = () => setSystemTheme(mq.matches ? "dark" : "light");
@@ -117,7 +132,7 @@ export function ThemeProvider({
 
   const setTheme = useCallback(
     (next: Theme) => {
-      localStorage.setItem(storageKey, next);
+      writePreference(storageKey, next);
       setThemeState(next);
     },
     [storageKey],
@@ -125,7 +140,7 @@ export function ThemeProvider({
 
   const setPalette = useCallback(
     (next: PaletteId) => {
-      localStorage.setItem(paletteStorageKey, next);
+      writePreference(paletteStorageKey, next);
       setPaletteState(next);
     },
     [paletteStorageKey],
@@ -133,11 +148,16 @@ export function ThemeProvider({
 
   const setShell = useCallback(
     (next: ShellId) => {
-      localStorage.setItem(shellStorageKey, next);
+      writePreference(shellStorageKey, next);
       setShellState(next);
     },
     [shellStorageKey],
   );
+
+  const setDensity = useCallback((next: Density) => {
+    writePreference(DENSITY_STORAGE_KEY, next);
+    setDensityState(next);
+  }, []);
 
   return (
     <ThemeContext
@@ -149,6 +169,8 @@ export function ThemeProvider({
         setPalette,
         shell,
         setShell,
+        density,
+        setDensity,
       }}
     >
       {children}

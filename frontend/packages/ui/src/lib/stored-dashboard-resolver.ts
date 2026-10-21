@@ -1,4 +1,8 @@
-import type { DashboardWidget, GridWidth } from "./dashboard-types"
+import type { DashboardWidget, DiagnosticWidget, GridWidth } from "./dashboard-types"
+import {
+  resolveStoredDashboardDrillTarget,
+  type StoredDashboardDrillTarget,
+} from "./stored-dashboard-drill-target"
 
 type DashboardRecord = { [key: string]: unknown }
 
@@ -24,6 +28,7 @@ export interface StoredDashboardResolverOptions {
   startMs?: number
   endMs?: number
   sourceStates?: StoredDashboardSourceStates
+  onDrillTarget?: (target: StoredDashboardDrillTarget) => void
 }
 
 export type StoredDashboardResolutionState =
@@ -88,7 +93,15 @@ function isRecord(value: unknown): value is DashboardRecord {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-type ParseResult<T> = { ok: true; value: T } | { ok: false; message: string }
+type DiagnosticCode = DiagnosticWidget["data"]["code"]
+interface ResolutionFailure {
+  code: DiagnosticCode
+  message: string
+  rejectedRows?: number
+}
+type ParseResult<T> =
+  | { ok: true; value: T }
+  | ({ ok: false } & ResolutionFailure)
 
 const DOMAIN_OPERATORS = new Set(["$in", "$ne", "$gte", "$lte", "$gt", "$lt"])
 
@@ -102,25 +115,35 @@ function applyDomain(
   try {
     parsed = JSON.parse(domain)
   } catch {
-    return { ok: false, message: "The widget filter is not valid JSON." }
+    return { ok: false, code: "invalid-filter", message: "This widget has an invalid persisted filter definition." }
   }
   if (!isRecord(parsed)) {
-    return { ok: false, message: "The widget filter must be a JSON object." }
+    return { ok: false, code: "invalid-filter", message: "This widget has an invalid persisted filter definition." }
   }
 
   for (const [field, expected] of Object.entries(parsed)) {
-    if (!field.trim()) return { ok: false, message: "The widget filter contains an empty field." }
+    if (!field.trim()) return { ok: false, code: "invalid-filter", message: "This widget has an invalid persisted filter definition." }
     if (!isRecord(expected)) continue
     const entries = Object.entries(expected)
     if (entries.length === 0) {
-      return { ok: false, message: `The filter for ${field} has no operator.` }
+      return { ok: false, code: "invalid-filter", message: `The filter for ${field} has no operator.` }
     }
     for (const [operator, operand] of entries) {
       if (!DOMAIN_OPERATORS.has(operator)) {
-        return { ok: false, message: `The filter operator ${operator} is not supported.` }
+        return { ok: false, code: "invalid-operator", message: `This widget uses an unsupported filter operator: ${operator}.` }
       }
       if (operator === "$in" && !Array.isArray(operand)) {
-        return { ok: false, message: `The $in filter for ${field} must use an array.` }
+        return { ok: false, code: "invalid-filter", message: `The $in filter for ${field} must use an array.` }
+      }
+      if (
+        ["$gte", "$lte", "$gt", "$lt"].includes(operator) &&
+        !Number.isFinite(Number(operand))
+      ) {
+        return {
+          ok: false,
+          code: "invalid-filter",
+          message: `This widget has a non-numeric operand for ${operator}.`,
+        }
       }
     }
   }
@@ -153,6 +176,47 @@ function applyDomain(
   }
 }
 
+interface StoredDashboardBindingV1 {
+  version: 1
+  timeField: string | null
+  measureField: string | null
+  missingTimestampPolicy: "reject"
+  missingMeasurePolicy: "reject"
+}
+
+function parseBinding(raw: unknown): ParseResult<StoredDashboardBindingV1 | null> {
+  const encoded = scalarField(raw).trim()
+  if (!encoded) return { ok: true, value: null }
+  try {
+    const parsed = JSON.parse(encoded) as Partial<StoredDashboardBindingV1>
+    if (
+      parsed.version !== 1 ||
+      (parsed.timeField != null && typeof parsed.timeField !== "string") ||
+      (parsed.measureField != null && typeof parsed.measureField !== "string") ||
+      parsed.missingTimestampPolicy !== "reject" ||
+      parsed.missingMeasurePolicy !== "reject"
+    ) {
+      throw new Error("invalid binding")
+    }
+    return {
+      ok: true,
+      value: {
+        version: 1,
+        timeField: parsed.timeField?.trim() || null,
+        measureField: parsed.measureField?.trim() || null,
+        missingTimestampPolicy: "reject",
+        missingMeasurePolicy: "reject",
+      },
+    }
+  } catch {
+    return {
+      ok: false,
+      code: "invalid-binding",
+      message: "This widget has an invalid time or measure binding.",
+    }
+  }
+}
+
 interface SortOrder {
   field: string
   direction: "asc" | "desc"
@@ -161,21 +225,21 @@ interface SortOrder {
 function parseSortOrder(raw: unknown): ParseResult<SortOrder | null> {
   if (raw == null || raw === "") return { ok: true, value: null }
   if (typeof raw !== "string" || !raw.trim()) {
-    return { ok: false, message: "The widget sort order must be a JSON string." }
+    return { ok: false, code: "invalid-sort", message: "The widget sort order must be a JSON string." }
   }
   try {
     const parsed = JSON.parse(raw) as unknown
     if (!isRecord(parsed) || Object.keys(parsed).length !== 1) {
-      return { ok: false, message: "The widget sort order must contain one field." }
+      return { ok: false, code: "invalid-sort", message: "The widget sort order must contain one field." }
     }
     const [field, direction] = Object.entries(parsed)[0]!
     const normalized = String(direction).toLowerCase()
     if (!field.trim() || (normalized !== "asc" && normalized !== "desc")) {
-      return { ok: false, message: "The widget sort direction must be asc or desc." }
+      return { ok: false, code: "invalid-sort", message: "The widget sort direction must be asc or desc." }
     }
     return { ok: true, value: { field, direction: normalized } }
   } catch {
-    return { ok: false, message: "The widget sort order is not valid JSON." }
+    return { ok: false, code: "invalid-sort", message: "The widget sort order is not valid JSON." }
   }
 }
 
@@ -195,8 +259,6 @@ function sortRowsByField(
     return sortOrder.direction === "asc" ? comparison : -comparison
   })
 }
-
-const TIMESTAMP_FIELDS = ["date_order", "date", "create_date"]
 
 function timestampToMs(raw: unknown): number | null {
   if (raw == null) return null
@@ -219,39 +281,48 @@ function timestampToMs(raw: unknown): number | null {
     }
     return null
   }
+  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}(?:T|$)/.test(raw)) {
+    const parsed = Date.parse(raw)
+    return Number.isFinite(parsed) ? parsed : null
+  }
   const value = Number(raw)
   if (!Number.isFinite(value) || value <= 0) return null
   return value > 1e15 ? value / 1000 : value
 }
 
-interface CompletenessResult {
-  rows: Record<string, unknown>[]
-  rejectedRows: number
-}
-
 function applyTimeRange(
   rows: Record<string, unknown>[],
+  timeField: string | null,
   startMs?: number,
   endMs?: number,
-): CompletenessResult {
-  if (startMs == null && endMs == null) return { rows, rejectedRows: 0 }
-  const included: Record<string, unknown>[] = []
-  let rejectedRows = 0
-  for (const row of rows) {
-    let timestamp: number | null = null
-    for (const field of TIMESTAMP_FIELDS) {
-      timestamp = timestampToMs(rowField(row, field))
-      if (timestamp != null) break
+): ParseResult<Record<string, unknown>[]> {
+  if (startMs == null && endMs == null) return { ok: true, value: rows }
+  if (!timeField) {
+    return {
+      ok: false,
+      code: "missing-time-field",
+      message: "This widget does not declare a time field for the selected date range.",
     }
-    if (timestamp == null) {
-      rejectedRows += 1
-      continue
-    }
-    if (startMs != null && timestamp < startMs) continue
-    if (endMs != null && timestamp > endMs) continue
-    included.push(row)
   }
-  return { rows: included, rejectedRows }
+  const timestamps = rows.map((row) => timestampToMs(rowField(row, timeField)))
+  const rejectedRows = timestamps.filter((value) => value == null).length
+  if (rejectedRows > 0) {
+    return {
+      ok: false,
+      code: "invalid-timestamp",
+      message: `This widget has incomplete timestamp data in ${timeField}.`,
+      rejectedRows,
+    }
+  }
+  return {
+    ok: true,
+    value: rows.filter((_row, index) => {
+      const timestamp = timestamps[index]!
+      if (startMs != null && timestamp < startMs) return false
+      if (endMs != null && timestamp > endMs) return false
+      return true
+    }),
+  }
 }
 
 const AGGREGATIONS = new Set(["count", "sum", "average", "avg", "min", "max"])
@@ -260,21 +331,36 @@ function normalizeAggregation(raw: unknown): ParseResult<string> {
   const aggregation = String(raw ?? "count").toLowerCase()
   return AGGREGATIONS.has(aggregation)
     ? { ok: true, value: aggregation }
-    : { ok: false, message: `The aggregation ${aggregation} is not supported.` }
+    : { ok: false, code: "invalid-aggregation", message: `The aggregation ${aggregation} is not supported.` }
 }
 
 function applyMeasureCompleteness(
   rows: Record<string, unknown>[],
   field: string,
   aggregation: string,
-): CompletenessResult {
-  if (aggregation === "count") return { rows, rejectedRows: 0 }
-  const complete = rows.filter((row) => {
-    const raw = rowField(row, field)
-    const scalar = scalarField(raw)
-    return raw !== null && raw !== undefined && scalar !== "" && Number.isFinite(Number(scalar))
-  })
-  return { rows: complete, rejectedRows: rows.length - complete.length }
+  binding: StoredDashboardBindingV1 | null,
+): ParseResult<Record<string, unknown>[]> {
+  if (aggregation === "count") return { ok: true, value: rows }
+  if (!binding?.measureField || binding.measureField !== field) {
+    return {
+      ok: false,
+      code: "missing-measure",
+      message: "This widget does not declare the measure used by its aggregation.",
+    }
+  }
+  const rejectedRows = rows.filter((row) => {
+    const encoded = scalarField(rowField(row, field)).trim()
+    return encoded === "" || !Number.isFinite(Number(encoded))
+  }).length
+  if (rejectedRows > 0) {
+    return {
+      ok: false,
+      code: "missing-measure",
+      message: `This widget has incomplete numeric data in ${field}.`,
+      rejectedRows,
+    }
+  }
+  return { ok: true, value: rows }
 }
 
 function aggregateValue(
@@ -311,12 +397,42 @@ function widgetTypeTag(value: unknown): string {
 
 const CHART_COLORS = ["#6366f1", "#8b5cf6", "#22c55e", "#f59e0b", "#ef4444", "#06b6d4"]
 
-function invalidDefinitionIssue(
+function diagnosticWidget(
+  widgetId: string,
+  title: string,
+  width: GridWidth,
+  failure: ResolutionFailure,
+): DiagnosticWidget {
+  return {
+    id: widgetId,
+    type: "diagnostic",
+    title,
+    width,
+    data: {
+      code: failure.code,
+      message: failure.message,
+      ...(failure.rejectedRows == null ? {} : { rejectedRows: failure.rejectedRows }),
+    },
+  }
+}
+
+function failureIssue(
   widgetId: string,
   model: string,
-  message: string,
+  failure: ResolutionFailure,
 ): StoredDashboardResolutionIssue {
-  return { kind: "invalid-definition", widgetId, model, message }
+  const kind = failure.code === "invalid-timestamp"
+    ? "missing-timestamp"
+    : failure.code === "missing-measure"
+      ? "missing-measure"
+      : "invalid-definition"
+  return {
+    kind,
+    widgetId,
+    model,
+    message: failure.message,
+    ...(failure.rejectedRows == null ? {} : { rejectedRows: failure.rejectedRows }),
+  }
 }
 
 function sourceIssue(
@@ -387,8 +503,18 @@ export function resolveStoredDashboard(
   storedWidgets.forEach((row, index) => {
     const widgetId = String(row.id ?? index)
     const model = String(row.model ?? "").trim()
+    const title = String(row.name ?? "Widget")
+    const width = gridWidthFromColumns(Number(row.width ?? 6))
+    const pushDiagnostic = (failure: ResolutionFailure) => {
+      widgets.push(diagnosticWidget(widgetId, title, width, failure))
+      issues.push(failureIssue(widgetId, model, failure))
+    }
+
     if (!model) {
-      issues.push(invalidDefinitionIssue(widgetId, model, "The widget has no data source."))
+      pushDiagnostic({
+        code: "missing-model",
+        message: "The widget has no data source.",
+      })
       return
     }
 
@@ -403,26 +529,33 @@ export function resolveStoredDashboard(
     if (currentSourceIssue) issues.push(currentSourceIssue)
     if (state.status === "loading" || state.status === "denied" || state.status === "unavailable") return
 
+    const bindingResult = parseBinding(row.configuration)
+    if (!bindingResult.ok) {
+      pushDiagnostic(bindingResult)
+      return
+    }
+    const binding = bindingResult.value
+
     const domainResult = applyDomain(rawRows, (row.domain as string | null | undefined) ?? null)
     if (!domainResult.ok) {
-      issues.push(invalidDefinitionIssue(widgetId, model, domainResult.message))
+      pushDiagnostic(domainResult)
       return
     }
 
-    const timeResult = applyTimeRange(domainResult.value, options?.startMs, options?.endMs)
-    if (timeResult.rejectedRows > 0) {
-      issues.push({
-        kind: "missing-timestamp",
-        widgetId,
-        model,
-        rejectedRows: timeResult.rejectedRows,
-        message: `${timeResult.rejectedRows} row(s) were excluded because the selected period requires a timestamp.`,
-      })
+    const timeResult = applyTimeRange(
+      domainResult.value,
+      binding?.timeField ?? null,
+      options?.startMs,
+      options?.endMs,
+    )
+    if (!timeResult.ok) {
+      pushDiagnostic(timeResult)
+      return
     }
 
     const sortResult = parseSortOrder(row.sortOrder ?? row.sort_order)
     if (!sortResult.ok) {
-      issues.push(invalidDefinitionIssue(widgetId, model, sortResult.message))
+      pushDiagnostic(sortResult)
       return
     }
 
@@ -431,29 +564,23 @@ export function resolveStoredDashboard(
     const groupBy = String(row.groupBy ?? row.group_by ?? "")
     const aggregationResult = normalizeAggregation(row.aggregation)
     if (!aggregationResult.ok) {
-      issues.push(invalidDefinitionIssue(widgetId, model, aggregationResult.message))
+      pushDiagnostic(aggregationResult)
       return
     }
     const measureResult = applyMeasureCompleteness(
-      timeResult.rows,
+      timeResult.value,
       primaryField,
       aggregationResult.value,
+      binding,
     )
-    if (measureResult.rejectedRows > 0) {
-      issues.push({
-        kind: "missing-measure",
-        widgetId,
-        model,
-        rejectedRows: measureResult.rejectedRows,
-        message: `${measureResult.rejectedRows} row(s) were excluded because ${primaryField} is not a complete numeric measure.`,
-      })
+    if (!measureResult.ok) {
+      pushDiagnostic(measureResult)
+      return
     }
 
-    const sourceRows = measureResult.rows
+    const sourceRows = measureResult.value
     const chartType = String(row.chartType ?? row.chart_type ?? "bar").toLowerCase()
     const widgetType = widgetTypeTag(row.widgetType ?? row.widget_type)
-    const title = String(row.name ?? "Widget")
-    const width = gridWidthFromColumns(Number(row.width ?? 6))
 
     if (widgetType === "Kpi") {
       const value = aggregateValue(sourceRows, primaryField, aggregationResult.value)
@@ -473,12 +600,19 @@ export function resolveStoredDashboard(
 
     if (widgetType === "Chart") {
       if (!groupBy) {
-        issues.push(invalidDefinitionIssue(widgetId, model, "A chart widget requires a group-by field."))
+        pushDiagnostic({
+          code: "missing-group-by",
+          message: "A chart widget requires a group-by field.",
+        })
         return
       }
       const groups = new Map<string, Record<string, unknown>[]>()
       for (const sourceRow of sourceRows) {
-        const key = scalarField(rowField(sourceRow, groupBy)) || "—"
+        const rawKey = rowField(sourceRow, groupBy)
+        const timestamp = binding?.timeField === groupBy ? timestampToMs(rawKey) : null
+        const key = timestamp == null
+          ? scalarField(rawKey) || "—"
+          : new Date(timestamp).toISOString().slice(0, 10)
         const bucket = groups.get(key) ?? []
         bucket.push(sourceRow)
         groups.set(key, bucket)
@@ -501,6 +635,15 @@ export function resolveStoredDashboard(
         groupedValues.sort((a, b) => b.value - a.value)
       }
       const entries = groupedValues.slice(0, Number(row.limit ?? 12))
+      const admittedDrillTarget = entries.some((entry) =>
+        resolveStoredDashboardDrillTarget(model, groupBy, entry.name) !== null,
+      )
+      const onDrill = admittedDrillTarget && options?.onDrillTarget
+        ? (value: string) => {
+            const target = resolveStoredDashboardDrillTarget(model, groupBy, value)
+            if (target) options.onDrillTarget?.(target)
+          }
+        : undefined
 
       if (chartType === "pie" || chartType === "donut") {
         widgets.push({
@@ -514,6 +657,7 @@ export function resolveStoredDashboard(
               value: entry.value,
               color: CHART_COLORS[colorIndex % CHART_COLORS.length],
             })),
+            onSegmentClick: onDrill,
           },
         })
         return
@@ -533,7 +677,10 @@ export function resolveStoredDashboard(
         return
       }
       if (chartType !== "bar") {
-        issues.push(invalidDefinitionIssue(widgetId, model, `The chart type ${chartType} is not supported.`))
+        pushDiagnostic({
+          code: "invalid-chart-type",
+          message: `The chart type ${chartType} is not supported.`,
+        })
         return
       }
       widgets.push({
@@ -546,6 +693,7 @@ export function resolveStoredDashboard(
           layout: "horizontal",
           series: [{ name: "Value", color: CHART_COLORS[0] }],
           values: entries.map((entry) => ({ category: entry.name, Value: entry.value })),
+          onCategoryClick: onDrill,
         },
       })
       return
@@ -554,7 +702,7 @@ export function resolveStoredDashboard(
     if (widgetType === "Table" || widgetType === "List") {
       const limit = Number(row.limit ?? 10)
       const displayFields = fields.length > 0 ? fields : ["name"]
-      const orderedRows = sortResult.value ? sortRowsByField(timeResult.rows, sortResult.value) : timeResult.rows
+      const orderedRows = sortResult.value ? sortRowsByField(sourceRows, sortResult.value) : sourceRows
       widgets.push({
         id: widgetId,
         type: "table",
@@ -575,7 +723,10 @@ export function resolveStoredDashboard(
       return
     }
 
-    issues.push(invalidDefinitionIssue(widgetId, model, `The widget type ${widgetType || "(empty)"} is not supported.`))
+    pushDiagnostic({
+      code: "invalid-widget-type",
+      message: `The widget type ${widgetType || "(empty)"} is not supported.`,
+    })
   })
 
   return {
@@ -586,18 +737,14 @@ export function resolveStoredDashboard(
   }
 }
 
-/**
- * Compatibility helper for callers that only consume valid widget definitions.
- * Invalid definitions fail closed with no rendered widgets.
- */
+/** Compatibility helper that preserves safe diagnostic cards. */
 export function resolveStoredDashboardWidgets(
   widgetRows: Record<string, unknown>[],
   widgetIds: Array<bigint | number>,
   dataSources: StoredDashboardDataSources,
   options?: StoredDashboardResolverOptions,
 ): DashboardWidget[] {
-  const resolution = resolveStoredDashboard(widgetRows, widgetIds, dataSources, options)
-  return resolution.state === "invalid-definition" ? [] : resolution.widgets
+  return resolveStoredDashboard(widgetRows, widgetIds, dataSources, options).widgets
 }
 
 export function storedDashboardExportGate(

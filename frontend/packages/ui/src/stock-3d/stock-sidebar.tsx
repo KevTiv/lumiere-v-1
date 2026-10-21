@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from '@lumiere/i18n'
 import { cn } from '../lib/utils'
 import { Badge } from '../components/badge'
 import { Button } from '../components/button'
@@ -7,26 +8,33 @@ import { ScrollArea } from '../components/scroll-area'
 import { Separator } from '../components/separator'
 import { Package, AlertTriangle, Grid3X3, ChevronRight } from 'lucide-react'
 import { useWarehouse3DContext } from './warehouse-3d-context'
-import { CATEGORY_COLORS, type StockCategory } from './types'
+import { CATEGORY_COLORS, type StockCategory, type ZoneType } from './types'
 
 interface StockSidebarProps {
   className?: string
 }
 
-const categoryLabels: Record<StockCategory, string> = {
-  electronics: 'Electronics',
-  clothing: 'Clothing',
-  food: 'Food & Beverage',
-  furniture: 'Furniture',
-  tools: 'Tools',
-  packaging: 'Packaging',
-  'raw-materials': 'Raw Materials',
-  'finished-goods': 'Finished Goods',
-}
-
 export function StockSidebar({ className }: StockSidebarProps) {
+  const { t } = useTranslation()
   const { items, slots, viewMode, filterCategory, setViewMode, setFilterCategory, zoneStats } =
     useWarehouse3DContext()
+  const categoryLabels: Record<StockCategory, string> = {
+    electronics: t('ui.stock3d.categories.electronics'),
+    clothing: t('ui.stock3d.categories.clothing'),
+    food: t('ui.stock3d.categories.food'),
+    furniture: t('ui.stock3d.categories.furniture'),
+    tools: t('ui.stock3d.categories.tools'),
+    packaging: t('ui.stock3d.categories.packaging'),
+    'raw-materials': t('ui.stock3d.categories.rawMaterials'),
+    'finished-goods': t('ui.stock3d.categories.finishedGoods'),
+  }
+  const zoneTypeLabels: Record<ZoneType, string> = {
+    rack: t('ui.stock3d.zoneTypes.rack'),
+    shelf: t('ui.stock3d.zoneTypes.shelf'),
+    floor: t('ui.stock3d.zoneTypes.floor'),
+    'cold-storage': t('ui.stock3d.zoneTypes.coldStorage'),
+    bin: t('ui.stock3d.zoneTypes.bin'),
+  }
 
   const totalItems = items.length
   const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0)
@@ -48,8 +56,8 @@ export function StockSidebar({ className }: StockSidebarProps) {
   return (
     <div className={cn('flex flex-col bg-card border-r border-border', className)}>
       <div className="p-4 border-b border-border">
-        <h2 className="font-semibold text-foreground">Stock Overview</h2>
-        <p className="text-sm text-muted-foreground">3D Warehouse Visualization</p>
+        <h2 className="font-semibold text-foreground">{t('ui.stock3d.sidebar.title')}</h2>
+        <p className="text-sm text-muted-foreground">{t('ui.stock3d.sidebar.subtitle')}</p>
       </div>
 
       <ScrollArea className="flex-1">
@@ -59,19 +67,23 @@ export function StockSidebar({ className }: StockSidebarProps) {
             <div className="p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <Package className="h-4 w-4" />
-                <span className="text-xs">Total Items</span>
+                <span className="text-xs">{t('ui.stock3d.sidebar.totalItems')}</span>
               </div>
               <p className="text-2xl font-bold text-foreground">{totalItems}</p>
-              <p className="text-xs text-muted-foreground">{totalQuantity} units</p>
+              <p className="text-xs text-muted-foreground">
+                {t('ui.stock3d.sidebar.units', { count: totalQuantity })}
+              </p>
             </div>
 
             <div className="p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <Grid3X3 className="h-4 w-4" />
-                <span className="text-xs">Utilization</span>
+                <span className="text-xs">{t('ui.stock3d.sidebar.utilization')}</span>
               </div>
               <p className="text-2xl font-bold text-foreground">{utilizationPercent}%</p>
-              <p className="text-xs text-muted-foreground">{emptySlots.length} empty</p>
+              <p className="text-xs text-muted-foreground">
+                {t('ui.stock3d.sidebar.emptySlots', { count: emptySlots.length })}
+              </p>
             </div>
           </div>
 
@@ -80,11 +92,10 @@ export function StockSidebar({ className }: StockSidebarProps) {
             <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
               <div className="flex items-center gap-2 text-destructive mb-2">
                 <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm font-medium">Low Stock Alert</span>
+                <span className="text-sm font-medium">{t('ui.stock3d.sidebar.lowStockAlert')}</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''} below minimum
-                stock level
+                {t('ui.stock3d.sidebar.belowMinimum', { count: lowStockItems.length })}
               </p>
               <Button
                 variant="ghost"
@@ -92,7 +103,7 @@ export function StockSidebar({ className }: StockSidebarProps) {
                 className="mt-2 h-7 text-xs text-destructive hover:text-destructive"
                 onClick={() => setViewMode('low-stock')}
               >
-                View Low Stock <ChevronRight className="h-3 w-3 ml-1" />
+                {t('ui.stock3d.sidebar.viewLowStock')} <ChevronRight className="h-3 w-3 ml-1" />
               </Button>
             </div>
           )}
@@ -101,13 +112,13 @@ export function StockSidebar({ className }: StockSidebarProps) {
 
           {/* View mode */}
           <div>
-            <h3 className="text-sm font-medium text-foreground mb-3">View Mode</h3>
+            <h3 className="text-sm font-medium text-foreground mb-3">{t('ui.stock3d.sidebar.viewMode')}</h3>
             <div className="space-y-1">
               {(
                 [
-                  { mode: 'all', label: 'All Items', icon: Package },
-                  { mode: 'low-stock', label: 'Low Stock Only', icon: AlertTriangle },
-                  { mode: 'empty-slots', label: 'Empty Slots', icon: Grid3X3 },
+                  { mode: 'all', label: t('ui.stock3d.sidebar.viewModes.all'), icon: Package },
+                  { mode: 'low-stock', label: t('ui.stock3d.sidebar.viewModes.lowStock'), icon: AlertTriangle },
+                  { mode: 'empty-slots', label: t('ui.stock3d.sidebar.viewModes.emptySlots'), icon: Grid3X3 },
                 ] as const
               ).map(({ mode, label, icon: Icon }) => (
                 <button
@@ -134,7 +145,7 @@ export function StockSidebar({ className }: StockSidebarProps) {
 
           {/* Categories */}
           <div>
-            <h3 className="text-sm font-medium text-foreground mb-3">Categories</h3>
+            <h3 className="text-sm font-medium text-foreground mb-3">{t('ui.stock3d.sidebar.categories')}</h3>
             <div className="space-y-1">
               {categoryStats.map(([category, count]) => (
                 <button
@@ -171,14 +182,14 @@ export function StockSidebar({ className }: StockSidebarProps) {
 
           {/* Zones */}
           <div>
-            <h3 className="text-sm font-medium text-foreground mb-3">Zones</h3>
+            <h3 className="text-sm font-medium text-foreground mb-3">{t('ui.stock3d.sidebar.zones')}</h3>
             <div className="space-y-2">
               {zoneStats.map(({ zone, totalSlots, occupiedSlots, utilizationPercent: pct }) => (
                 <div key={zone.id} className="p-3 rounded-lg bg-muted/30 border border-border">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-foreground">{zone.name}</span>
                     <Badge variant="outline" className="text-xs">
-                      {zone.type}
+                      {zoneTypeLabels[zone.type]}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2">
@@ -201,7 +212,7 @@ export function StockSidebar({ className }: StockSidebarProps) {
 
           {/* Color legend */}
           <div>
-            <h3 className="text-sm font-medium text-foreground mb-3">Color Legend</h3>
+            <h3 className="text-sm font-medium text-foreground mb-3">{t('ui.stock3d.sidebar.colorLegend')}</h3>
             <div className="grid grid-cols-2 gap-2">
               {Object.entries(CATEGORY_COLORS).map(([category, color]) => (
                 <div key={category} className="flex items-center gap-2">
@@ -214,7 +225,7 @@ export function StockSidebar({ className }: StockSidebarProps) {
             </div>
             <div className="mt-3 flex items-center gap-2">
               <div className="w-3 h-3 rounded-sm bg-destructive" />
-              <span className="text-xs text-muted-foreground">Low Stock</span>
+              <span className="text-xs text-muted-foreground">{t('ui.stock3d.lowStock')}</span>
             </div>
           </div>
         </div>

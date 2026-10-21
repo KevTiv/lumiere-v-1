@@ -48,6 +48,7 @@ import type { ReportComposerResult } from "@lumiere/erp-shared/ai-report-compose
 import { companyRowsToSelectOptions } from "@/lib/form-lookup"
 
 import { HarnessAuditTrailCard } from "./harness-audit-trail-card"
+import { policyOutcomeLabel, riskClassLabel } from "./enum-labels"
 
 interface ReportComposerPanelProps {
   organizationId: bigint
@@ -280,10 +281,10 @@ function ReportComposerResultView({ result }: { result: ReportComposerResult }) 
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={decisionBadgeVariant(decision.outcome)}>
-              {decision.outcome}
+              {policyOutcomeLabel(t, decision.outcome)}
             </Badge>
             {decision.risk && (
-              <Badge variant="outline">{decision.risk}</Badge>
+              <Badge variant="outline">{riskClassLabel(t, decision.risk)}</Badge>
             )}
             {result.decision.privacy && (
               <Badge variant="outline">

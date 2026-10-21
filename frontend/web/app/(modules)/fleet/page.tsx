@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { FleetClient } from "./fleet-client"
 
 const SSR_RESOURCES = ["fleet-vehicles"] as const
@@ -10,7 +10,7 @@ export default async function FleetPage() {
     return <FleetClient />
   }
 
-  const [vehicles] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [vehicles] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <FleetClient

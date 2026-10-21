@@ -26,7 +26,7 @@ export async function performSignOut(): Promise<void> {
 
     // Some browsers use opaque redirects; we can't read Location.
     if (res.type === "opaqueredirect") {
-      assignLocation("/sign-in")
+      assignLocation("/api/auth/signout")
       return
     }
 

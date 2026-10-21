@@ -9,6 +9,10 @@ use spacetimedb::ReducerContext;
 pub fn run_hr_wave_a_test(ctx: &ReducerContext) -> Result<(), String> {
     wave_a_test::test_company_isolation_on_leave_and_payslip(ctx)
         .map_err(|e| format!("company_isolation: {e}"))?;
+    wave_a_test::test_payslip_approval_rejects_self_approval(ctx)
+        .map_err(|e| format!("payslip_approval_sod: {e}"))?;
+    wave_a_test::test_statutory_integration_requires_canonical_provider_result(ctx)
+        .map_err(|e| format!("statutory_provider_result: {e}"))?;
     wave_a_test::test_leave_approve_consumes_balance(ctx)
         .map_err(|e| format!("leave_balance: {e}"))?;
     wave_a_test::test_leave_must_be_submitted_before_approve(ctx)

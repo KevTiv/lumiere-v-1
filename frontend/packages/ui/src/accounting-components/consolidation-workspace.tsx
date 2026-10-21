@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { FormModal } from "@/components/forms/form-modal"
 import { Button } from "@/components/ui/button"
@@ -80,6 +80,8 @@ export interface ConsolidationWorkspaceProps {
   currencySelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
   consolidationJournalSelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
   consolidationAccountSelectOptions?: Array<{ value: string; label: string; disabled?: boolean }>
+  /** Read-only section for per-company consolidation exchange rates (rendered after eliminations). */
+  companyRatesSection?: ReactNode
 }
 
 export function ConsolidationWorkspace({
@@ -104,6 +106,7 @@ export function ConsolidationWorkspace({
   currencySelectOptions = [],
   consolidationJournalSelectOptions = [],
   consolidationAccountSelectOptions = [],
+  companyRatesSection,
 }: ConsolidationWorkspaceProps) {
   const { t } = useTranslation()
 
@@ -493,6 +496,8 @@ export function ConsolidationWorkspace({
           )}
         </CardContent>
       </Card>
+
+      {companyRatesSection ? <Card><CardContent className="pt-6">{companyRatesSection}</CardContent></Card> : null}
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
       <FormModal

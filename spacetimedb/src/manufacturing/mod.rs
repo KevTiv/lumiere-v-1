@@ -11,6 +11,8 @@
 /// | **MrpWorkcenter** | Work center definitions |
 /// | **MrpWorkcenterProductivity** | Work center productivity tracking |
 pub mod bill_of_materials;
+pub mod costing;
+pub(crate) mod effects;
 pub mod manufacturing_orders;
 pub mod relations;
 pub mod work_centers;
