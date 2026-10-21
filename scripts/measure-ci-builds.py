@@ -284,6 +284,10 @@ def main():
         (args.output / name).write_text(json.dumps(value, indent=2) + "\n")
     (args.output / "report.md").write_text(markdown(result))
     print(f"Measured {result['runs']} runs and {result['jobs']} jobs; report: {args.output / 'report.md'}")
+    if args.inventory_only:
+        # Keep inert aggregate/ref sizes visible in job logs as well as the
+        # artifact. No raw cache keys, credentials or job logs are printed.
+        print(json.dumps(result["cache_inventory"], indent=2))
 
 
 if __name__ == "__main__":

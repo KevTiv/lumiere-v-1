@@ -167,3 +167,8 @@ inventory access returned `Forbidden`; current retention/eviction remains pendin
 this hosted job. Full runtime Docker validation and actual production speed
 comparison require the hosted image build: the local workspace had under 3 GiB
 free, insufficient for a Rust base image and full release compilation.
+
+Preparing a recipe from the actual repository also succeeded. Mutating only API,
+gateway and build-script bodies kept it byte-identical; changing the root release
+profile changed it. Materializing that recipe into a clean directory yielded a
+valid locked Cargo workspace containing all selected runtime targets.
