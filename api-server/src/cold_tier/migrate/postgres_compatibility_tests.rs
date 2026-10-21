@@ -636,3 +636,74 @@ async fn drop_database(pool: &Pool, database: &str) -> Result<()> {
         .await
         .context("drop disposable C4 PostgreSQL database")
 }
+
+#[tokio::test]
+async fn postgres_migration_19_adds_replenishment_schedule_readback_20() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!(
+            "skipping postgres_migration_19_adds_replenishment_schedule_readback_20 (set C4_TEST_PG=1 to run)"
+        );
+        return Ok(());
+    }
+
+    let base_config = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin_pool = admin_pool(&base_config)?;
+    create_database(&admin_pool, &database, &base_config.user).await?;
+
+    let mut test_config = base_config.clone();
+    test_config.database.clone_from(&database);
+    let test_pool = pg_pool::build_pool(&test_config)?;
+    let test_result = exercise_replenishment_schedule_readback_upgrade(&test_pool).await;
+    drop(test_pool);
+    let cleanup_result = drop_database(&admin_pool, &database).await;
+
+    test_result?;
+    cleanup_result?;
+    Ok(())
+}
+
+async fn exercise_replenishment_schedule_readback_upgrade(pool: &Pool) -> Result<()> {
+    let migration_20_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.version == 20)
+        .context("migration 20 is missing from the catalog")?;
+    let frozen_migration_20 = include_str!(
+        "../../../../lumiere-codegen/pg-migration-ledger/0020_durable_projection_delta.sql"
+    );
+    ensure!(MIGRATIONS[migration_20_index].name == "replenishment_schedule_readback");
+    ensure!(MIGRATIONS[migration_20_index].sql == frozen_migration_20);
+
+    apply_migration_prefix(pool, migration_20_index).await?;
+    let previous_history = applied_migration_history(pool).await?;
+    let columns = ["scheduled_run_job_id"];
+    for column in columns {
+        ensure!(!column_exists(pool, "replenishment_rule", column).await?);
+    }
+
+    ensure_schema(pool).await?;
+
+    ensure!(
+        applied_migration_history(pool).await?[..migration_20_index] == previous_history,
+        "AI recovery migration changed prior migration history"
+    );
+    ensure!(applied_checksum(pool, 20).await? == migration_checksum(frozen_migration_20));
+    for column in columns {
+        ensure!(column_exists(pool, "replenishment_rule", column).await?);
+    }
+
+    ensure_schema(pool).await?;
+    ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
+    Ok(())
+}
+
+async fn column_exists(pool: &Pool, table: &str, column: &str) -> Result<bool> {
+    let client = pool.get().await?;
+    Ok(client
+        .query_one(
+            "select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = $1 and column_name = $2)",
+            &[&table, &column],
+        )
+        .await?
+        .get(0))
+}

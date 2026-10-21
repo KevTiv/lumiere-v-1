@@ -117,8 +117,15 @@ function DetailPreview({
       <CardHeader><CardTitle className={workspaceStyles.sectionTitle}>{nodeTitle(node)} · {node.id}</CardTitle></CardHeader>
       <CardContent className="min-w-0">
         {!values ? <p className="text-sm text-muted-foreground">Select a record to inspect it.</p> : (
-          <dl className="grid min-w-0 grid-cols-1 gap-3 [overflow-wrap:anywhere] sm:grid-cols-2">
-            {node.fields.map((field) => <div key={field}><dt className="text-xs text-muted-foreground">{field}</dt><dd className="text-sm" data-testid={`composed-detail-value-${node.id}-${field}`}>{values.get(field) ?? "—"}</dd></div>)}
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {node.fields.map((field) => (
+              <div key={field} className="min-w-0 [overflow-wrap:anywhere]">
+                <dt className="text-xs text-muted-foreground">{field}</dt>
+                <dd className="text-sm" data-testid={`composed-detail-value-${node.id}-${field}`}>
+                  {values.get(field) ?? "—"}
+                </dd>
+              </div>
+            ))}
           </dl>
         )}
       </CardContent>

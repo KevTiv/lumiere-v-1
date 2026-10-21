@@ -788,7 +788,7 @@ function ReadyAccountingWorklist({
                                 )}
                                 {canRead && onDownload && (
                                   <DropdownMenuItem className="min-h-11" onClick={(event) => { event.stopPropagation(); onDownload(move) }}>
-                                    {t("accounting.invoices.invoiceActions.downloadPdf")}
+                                    {t("accounting.invoices.invoiceActions.downloadPDF")}
                                   </DropdownMenuItem>
                                 )}
                                 {canRecalculate && (

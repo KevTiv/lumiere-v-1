@@ -128,7 +128,8 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	local-start local-stop local-publish local-reset local-test local-logs \
 	stack-init stack-up stack-up-iot stack-down \
 	codegen-all codegen-check api-run \
-	cloud-wasm cloud-publish cloud-reset cloud-test cloud-logs
+	cloud-wasm cloud-publish cloud-reset cloud-test cloud-logs \
+	identity-bootstrap-plan identity-bootstrap-apply identity-rotate-apply
 
 help-legacy:
 	@echo "Usage: make <target>"
@@ -228,8 +229,20 @@ help:
 	$(call print-command,cloud-reset,DESTRUCTIVE: clear the Maincloud database and republish.)
 	$(call print-command,cloud-test,Run core reducer tests against Maincloud.)
 	$(call print-command,cloud-logs,Tail Maincloud module logs.)
+	$(call print-command,identity-bootstrap-plan,Validate and print the redacted production identity plan.)
+	$(call print-command,identity-bootstrap-apply,Mint and publish initial production service identities.)
+	$(call print-command,identity-rotate-apply,Rotate drained production service identities.)
 	@printf "\nCompatibility aliases: check, build, start, stop, publish, publish-clear, test, logs,\n"
 	@printf "generate-stdb-ts-sdk, generate-stdb-rust-sdk, init-stack, docker-dev, and publish-cloud.\n"
+
+identity-bootstrap-plan:
+	node scripts/bootstrap-production-identities.mjs --mode bootstrap
+
+identity-bootstrap-apply:
+	node scripts/bootstrap-production-identities.mjs --apply --mode bootstrap
+
+identity-rotate-apply:
+	node scripts/bootstrap-production-identities.mjs --apply --mode rotate
 
 help-e2e:
 	@printf "E2E commands (all use local SpacetimeDB and write logs under .tmp/e2e):\n"
@@ -405,6 +418,9 @@ e2e-smoke-setup:
 					fi; \
 				done; \
 				echo "[e2e] Domain reducer tests passed."; \
+				if [ "$${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
+					spacetime call "$(E2E_DB)" run_all_inventory_tests --server local --no-config || exit 1; \
+				fi; \
 				if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 					for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
 						echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
@@ -949,6 +965,9 @@ e2e-smoke:
 				fi; \
 			done; \
 			echo "[e2e] Domain reducer tests passed."; \
+			if [ "$${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
+				spacetime call "$(E2E_DB)" run_all_inventory_tests --server local --no-config || exit 1; \
+			fi; \
 			if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
 					echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
