@@ -126,9 +126,7 @@ function RichTextarea({
   // Associate an external `<label for={id}>` with the editable surface.
   React.useEffect(() => {
     if (!id || ariaLabel || ariaLabelledBy) return
-    const label = document.querySelector<HTMLLabelElement>(
-      `label[for="${CSS.escape(id)}"]`
-    )
+    const label = textareaRef.current?.labels?.[0]
     if (!label) return
     setLabelledBy(label.textContent?.trim() ? `${label.textContent.trim()} rich text editor` : undefined)
   }, [ariaLabel, ariaLabelledBy, id, surfaceId])
