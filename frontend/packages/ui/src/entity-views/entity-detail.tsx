@@ -30,11 +30,11 @@ function formatDetailValue(
 }
 
 const widthClasses: Record<string, string> = {
-  full: "col-span-12",
-  "2/3": "col-span-12 md:col-span-8",
-  "1/2": "col-span-12 md:col-span-6",
-  "1/3": "col-span-12 md:col-span-4",
-  "1/4": "col-span-12 md:col-span-3",
+  full: "col-span-full",
+  "2/3": "col-span-full @md/entity-detail:col-span-8",
+  "1/2": "col-span-full @md/entity-detail:col-span-6",
+  "1/3": "col-span-full @md/entity-detail:col-span-4",
+  "1/4": "col-span-full @md/entity-detail:col-span-3",
 }
 
 export function EntityDetail({ config, data, className }: EntityDetailProps) {
@@ -54,7 +54,13 @@ export function EntityDetail({ config, data, className }: EntityDetailProps) {
   return (
     // Shared cell formatting can render tooltips (e.g. relative dates).
     <TooltipProvider>
-    <div className={cn("space-y-8", className)}>
+    <div
+      className={cn(
+        "@container/entity-detail min-w-0 space-y-8",
+        "[&_[data-slot=badge]]:h-auto [&_[data-slot=badge]]:max-w-full [&_[data-slot=badge]]:whitespace-normal",
+        className
+      )}
+    >
       {sections.map((section, sectionIndex) => (
         <div key={section.id}>
           {sectionIndex > 0 && <Separator className="mb-8" />}
@@ -70,12 +76,15 @@ export function EntityDetail({ config, data, className }: EntityDetailProps) {
               )}
             </div>
           )}
-          <div className="grid grid-cols-12 gap-x-6 gap-y-5">
+          <div className="grid grid-cols-1 gap-y-5 @md/entity-detail:grid-cols-12 @md/entity-detail:gap-x-6">
             {section.fields.map((field) => {
               const width = field.width ?? "1/2"
               const value = data[field.key]
               return (
-                <div key={field.key} className={widthClasses[width]}>
+                <div
+                  key={field.key}
+                  className={cn("min-w-0 [overflow-wrap:anywhere]", widthClasses[width])}
+                >
                   <dt className="text-xs font-medium text-muted-foreground mb-1">
                     {field.label}
                   </dt>
