@@ -4,7 +4,6 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { GeneratedQuotationDocument, QuotationDocumentPreview } from "@lumiere/query-hooks/hooks/quotations"
 import {
-  callReducerBff,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   gotoModule,
@@ -14,6 +13,7 @@ import {
   smokeName,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
+import { postGeneratedOperationOk } from "./generated-operation"
 import { provisionActor, withActor } from "./pretenant-support"
 import { addLaptopLine, createDraftSaleOrder } from "./sales-order-fixtures"
 
@@ -78,7 +78,7 @@ test.describe("Visual quotation document output", { tag: ["@p0", "@document-stud
     const companyId = await fetchDefaultCompanyId(page)
     const orderId = await createDraftSaleOrder(page, smokeName("Studio quotation"))
     await addLaptopLine(page, orderId, "2")
-    await callReducerBff(page, "compute_so_totals", [orderId])
+    await postGeneratedOperationOk(page, "compute_so_totals", { orderId: BigInt(orderId) })
 
     const name = smokeName("Quotation layout")
     await gotoModule(page, "/documents?tab=document-templates", "documents")
