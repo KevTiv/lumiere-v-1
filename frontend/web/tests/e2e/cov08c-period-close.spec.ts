@@ -11,6 +11,7 @@ import {
   smokeName,
 } from "./helpers"
 import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
+import { stdbTimestampToDate } from "@lumiere/erp-shared/timestamp-values"
 import { matchesOperationResponse } from "./operation-response"
 
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -53,8 +54,10 @@ test.describe("COV-08c exact period close", { tag: ["@p0", "@cov08", "@cov08c"] 
     // range instead of rolling a timestamp into the same small date window.
     let year = 2150
     while (year <= 2254 && fiscalYears.some((row) => {
-      const from = kpiDate(row.dateFrom ?? row.date_from)
-      const to = kpiDate(row.dateTo ?? row.date_to)
+      const fromRaw = row.dateFrom ?? row.date_from
+      const toRaw = row.dateTo ?? row.date_to
+      const from = stdbTimestampToDate(fromRaw) ?? kpiDate(fromRaw)
+      const to = stdbTimestampToDate(toRaw) ?? kpiDate(toRaw)
       if (!from || !to) throw new Error("Cannot verify existing fiscal-year ranges for fixture setup")
       return from.getTime() <= Date.parse(`${year}-12-31T23:59:59Z`)
         && to.getTime() >= Date.parse(`${year}-01-01T00:00:00Z`)
