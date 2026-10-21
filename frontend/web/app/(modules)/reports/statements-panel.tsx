@@ -25,6 +25,13 @@ import {
   journalItemsHref,
   type StatementDisplayRow,
 } from "./statement-tree"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 type StatementsPanelProps = {
   organizationId: bigint
@@ -113,18 +120,18 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
           <label htmlFor="statement-report" className="text-sm font-medium">
             {t("reports.statements.report", { defaultValue: "Report" })}
           </label>
-          <select
-            id="statement-report"
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            value={selected?.id ?? ""}
-            onChange={(e) => setSelectedId(e.target.value)}
-          >
-            {statementReports.map((r) => (
-              <option key={r.id} value={r.id}>
-                {typeof r.row.name === "string" && r.row.name !== "" ? r.row.name : `#${r.id}`}
-              </option>
-            ))}
-          </select>
+          <Select value={selected?.id ?? ""} onValueChange={setSelectedId}>
+            <SelectTrigger id="statement-report">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {statementReports.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {typeof r.row.name === "string" && r.row.name !== "" ? r.row.name : `#${r.id}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Button
           type="button"

@@ -6,6 +6,10 @@
     "canonicalization": "json_sorted_keys_semantic_type_refs"
   },
   "operations": {
+    "erp.abandon_bank_statement_settlement": {
+      "name": "abandon_bank_statement_settlement",
+      "shape_fingerprint": "sha256:01cb3a679329c7de8714ca3e2ee5f5d9d637719676b9d7c0fdcdc80b18daf730"
+    },
     "erp.accept_ai_provider_attempt": {
       "name": "accept_ai_provider_attempt",
       "shape_fingerprint": "sha256:f5c4e3ec4296678bad9058f8b830257c7ba900edd4acd31fdd7f0db20d64e10f"
@@ -13,6 +17,10 @@
     "erp.accept_sale_order_quotation": {
       "name": "accept_sale_order_quotation",
       "shape_fingerprint": "sha256:01824a849506b81f964c47a068a49724441a458904555204642e87e3b9960a5a"
+    },
+    "erp.accept_user_invite": {
+      "name": "accept_user_invite",
+      "shape_fingerprint": "sha256:6fa6d6c167a24015f34951d847cd09242bec46039ea704863e8c3b0b91200e38"
     },
     "erp.accrue_sale_commission": {
       "name": "accrue_sale_commission",
@@ -140,7 +148,7 @@
     },
     "erp.add_workflow_human_task_comment": {
       "name": "add_workflow_human_task_comment",
-      "shape_fingerprint": "sha256:7fe2eb4d4c384b9d26f86997d4161c070f33a3299212a1df165e3864543084b6"
+      "shape_fingerprint": "sha256:816db1a3020cd054faaad6b169d05a205eba114048a9973f44c2020a6f93f563"
     },
     "erp.advance_ai_run_checkpoint": {
       "name": "advance_ai_run_checkpoint",
@@ -209,6 +217,10 @@
     "erp.apply_global_migrations": {
       "name": "apply_global_migrations",
       "shape_fingerprint": "sha256:b63c76350efcb363d4bc6bea459be76a792871a8d32d217da072fd6b3818f0ca"
+    },
+    "erp.apply_historical_payment_allocations": {
+      "name": "apply_historical_payment_allocations",
+      "shape_fingerprint": "sha256:50e80a3e94220b39b5285a8cd4534087f6041437fedcb45bb88af0ab50b156e5"
     },
     "erp.apply_hr_integration_intent": {
       "name": "apply_hr_integration_intent",
@@ -520,7 +532,7 @@
     },
     "erp.cancel_payment": {
       "name": "cancel_payment",
-      "shape_fingerprint": "sha256:a720b173c46b904dd80480a36f942be642cff1eaa7278a46f12222e8ba921559"
+      "shape_fingerprint": "sha256:310174089d41a0d60322df27be65c12ce91868868b4182f89f5b28b08db8d848"
     },
     "erp.cancel_payslip": {
       "name": "cancel_payslip",
@@ -580,7 +592,7 @@
     },
     "erp.cancel_workflow": {
       "name": "cancel_workflow",
-      "shape_fingerprint": "sha256:9e06e80c5e17ef2d38c1bd1b31743a5618647f62a0a9b679a49d41d31f087f7b"
+      "shape_fingerprint": "sha256:6870c12529fe19c7aaafe368222913e3f63ebcb824d8a60435f53484ed904967"
     },
     "erp.cancel_workflow_outbox": {
       "name": "cancel_workflow_outbox",
@@ -610,9 +622,17 @@
       "name": "claim_queue_job",
       "shape_fingerprint": "sha256:0a2536500c7b9a96fb8e4f2f37f32920c5afb4935bd2d8472e00cc529b67769d"
     },
+    "erp.claim_reviewed_mail_delivery": {
+      "name": "claim_reviewed_mail_delivery",
+      "shape_fingerprint": "sha256:cc6ab7d782d9fdece65d1c9137b801946d6da655f0b8cb27c3e19f990cb94eec"
+    },
     "erp.claim_workflow_human_task": {
       "name": "claim_workflow_human_task",
-      "shape_fingerprint": "sha256:45865da0d02caf4813495a4fc64591435c7439605747517092022d5b45ea386a"
+      "shape_fingerprint": "sha256:b3a266de4d278fe33d4b294d36e2d273f03730bde1e87996b35c2fb18e81776a"
+    },
+    "erp.cleanup_abandoned_account_move_import": {
+      "name": "cleanup_abandoned_account_move_import",
+      "shape_fingerprint": "sha256:1b61fd65e22b570aca77945cad7f09abff59e2752d69729d60ba794d846385fa"
     },
     "erp.cleanup_stale_proposal_presence": {
       "name": "cleanup_stale_proposal_presence",
@@ -1422,6 +1442,14 @@
       "name": "create_mail_template",
       "shape_fingerprint": "sha256:d8a71dd5523d9a65db72ca8fdb8b33c225929b45447aa86a0e5dd2fac8d10a75"
     },
+    "erp.create_manual_account_invoice": {
+      "name": "create_manual_account_invoice",
+      "shape_fingerprint": "sha256:9ad91b5f01e10604918487f90022b00943758ca8a2a473b84eab28ad81f07a76"
+    },
+    "erp.create_manual_invoice": {
+      "name": "create_manual_invoice",
+      "shape_fingerprint": "sha256:763f3fd6a98dda39289cfb7a0d861f454493ffcb43c77eb201e5f5a6198933f9"
+    },
     "erp.create_manufacturing_order": {
       "name": "create_manufacturing_order",
       "shape_fingerprint": "sha256:fa0e9a3807b2f80d0ec7a6d8ce911ff8e2134ac228e3eefefe90b7f4f2ea3c06"
@@ -1629,6 +1657,10 @@
     "erp.create_purchase_order": {
       "name": "create_purchase_order",
       "shape_fingerprint": "sha256:72c3563be3fe13e2bee2c88145886ed73fcbd6d74dbedb53e034be598ec72d62"
+    },
+    "erp.create_purchase_order_once": {
+      "name": "create_purchase_order_once",
+      "shape_fingerprint": "sha256:fe8389e742aa0a34165a1c65d1e803551480847ff58ec6a7de42004d4e5d7d16"
     },
     "erp.create_purchase_requisition": {
       "name": "create_purchase_requisition",
@@ -1960,7 +1992,7 @@
     },
     "erp.decide_workflow_human_task": {
       "name": "decide_workflow_human_task",
-      "shape_fingerprint": "sha256:9f3fa51a349c856103443065c9025592ea8020dd6af70627a6ed64b43d04520c"
+      "shape_fingerprint": "sha256:66a0e0ca04598edcc244ea06304f9dd9fdeceae7f037903331e3ddede86a1214"
     },
     "erp.delete_account_asset": {
       "name": "delete_account_asset",
@@ -2728,7 +2760,7 @@
     },
     "erp.invalidate_workflow_human_task": {
       "name": "invalidate_workflow_human_task",
-      "shape_fingerprint": "sha256:37a5918e8e9b7e74dab1849e07441e86953e549331f6235e2e2e98e06916d076"
+      "shape_fingerprint": "sha256:6b63a9516126ca0784a934f09ec4b49b874507459dd89d58eb3cf09db22a7bdd"
     },
     "erp.invoice_po_line": {
       "name": "invoice_po_line",
@@ -2936,7 +2968,7 @@
     },
     "erp.post_payment": {
       "name": "post_payment",
-      "shape_fingerprint": "sha256:d3c6ecef2d8ae78d0829d74ebb25dff6383be8c47586825d2ff9e1edff5d5f04"
+      "shape_fingerprint": "sha256:d090258bc3bbfd02b7139c5e70654b7255dd721c61c5fdecfbd6a7339feffc88"
     },
     "erp.post_payment_transaction": {
       "name": "post_payment_transaction",
@@ -3042,6 +3074,10 @@
       "name": "receive_po_line",
       "shape_fingerprint": "sha256:273ab43f8c5af8e01ae9a4cfa555a52a01986f81bfe8d40032f2942fe8896d63"
     },
+    "erp.receive_po_line_once": {
+      "name": "receive_po_line_once",
+      "shape_fingerprint": "sha256:ed72f39907b8dbea680b43eaaea086c17504aa180cd0908b0d04141ba565f92f"
+    },
     "erp.recognize_amortization_line": {
       "name": "recognize_amortization_line",
       "shape_fingerprint": "sha256:89504b28b03f27217a65d50652c76e18c53767999e9092b6013408e54dac4815"
@@ -3068,7 +3104,7 @@
     },
     "erp.reconcile_account_bank_statement_line": {
       "name": "reconcile_account_bank_statement_line",
-      "shape_fingerprint": "sha256:208d7e38dd6533e0ba35f6c91a0192b4f0c46a112099faa38a01888f34986dbb"
+      "shape_fingerprint": "sha256:54966591ab3c66badf5ae08bfe59c0dd9430490e1a581a1f00a75ced60eb345b"
     },
     "erp.reconcile_ai_provider_attempt": {
       "name": "reconcile_ai_provider_attempt",
@@ -3526,6 +3562,10 @@
       "name": "restore_proposal_version",
       "shape_fingerprint": "sha256:4b2ba3d523146b998bec4f4f4684235362fe48818e901a867fca3a37773c1c73"
     },
+    "erp.resubmit_bank_statement_settlement": {
+      "name": "resubmit_bank_statement_settlement",
+      "shape_fingerprint": "sha256:db3b7e46c443e56bb313a3a5c3fe96d7620365d15fae05bfcc9808554cc937ff"
+    },
     "erp.resume_ai_run_checked": {
       "name": "resume_ai_run_checked",
       "shape_fingerprint": "sha256:5301f7bb2eb84963c29c8dc58f4a3a76041738b24a725a3b6c28945ccdebbc32"
@@ -3549,6 +3589,10 @@
     "erp.retry_iot_action": {
       "name": "retry_iot_action",
       "shape_fingerprint": "sha256:57cb86858927a671d4692c164c7fe6f35a96f595da1011507cecc782a59fe408"
+    },
+    "erp.reverse_bank_statement_settlement": {
+      "name": "reverse_bank_statement_settlement",
+      "shape_fingerprint": "sha256:aec70c6436d7b86260786d0333bf7ad7ab04e3b976d6451843e64ee8a57b2b1d"
     },
     "erp.reverse_payment_transaction": {
       "name": "reverse_payment_transaction",
@@ -4310,6 +4354,10 @@
       "name": "run_purchasing_incoming_picking_test",
       "shape_fingerprint": "sha256:de820769ab54df2a59e8ccfc7ffe0df69eb932d9088e2576ce269457b5ace895"
     },
+    "erp.run_purchasing_keyed_operations_test": {
+      "name": "run_purchasing_keyed_operations_test",
+      "shape_fingerprint": "sha256:3acfce83782bbb15815aba0ebd2dd32de0e241e9b2527a330a0b7321c3da390e"
+    },
     "erp.run_purchasing_lot_receive_test": {
       "name": "run_purchasing_lot_receive_test",
       "shape_fingerprint": "sha256:f6e5e19810c35000b8028e4d34db39a0f4fc7d6b829ff631d7ed46797b9f5ec9"
@@ -4757,6 +4805,10 @@
     "erp.set_iot_threshold": {
       "name": "set_iot_threshold",
       "shape_fingerprint": "sha256:948544db0bf9912c3019590c6daf9fe3614b28986e17dba4477912f5e4d9535b"
+    },
+    "erp.set_member_access": {
+      "name": "set_member_access",
+      "shape_fingerprint": "sha256:f71c62a02309ec8fa82c1eacabdd7610a51727c5835782ba64cfeb85bb2948af"
     },
     "erp.set_project_active": {
       "name": "set_project_active",
@@ -5996,6 +6048,46 @@
       "current_operations_fingerprint": "sha256:b0256ff3294362745bfe373602729ce1f504236aad8f433ba883dec107a20339",
       "operation_count": 1445,
       "reason": "release on top of v0.3.105: add denied internal unregister_payment_allocations; update convert_purchase_requisition_to_po for the scheduled replenishment source path"
+    },
+    {
+      "previous_release": "v0.3.106",
+      "previous_ir_sha256": "sha256:1464375a45eac53de135f8c588e9349d61d1b895290856d3928726b3a3090a3d",
+      "previous_operations_fingerprint": "sha256:b0256ff3294362745bfe373602729ce1f504236aad8f433ba883dec107a20339",
+      "current_operations_fingerprint": "sha256:a7671fb5a29419595c45acfeb4591a7df1b091c69486e427cf8d0da9d5d55a5c",
+      "operation_count": 1446,
+      "reason": "COV-08 atomic manual accounting invoice creation and exact payment reversal identity"
+    },
+    {
+      "previous_release": "v0.3.107",
+      "previous_ir_sha256": "sha256:d429d78cadb3a4f36c1777345f9d49dfd947dccd924611911e259bb8ed246e89",
+      "previous_operations_fingerprint": "sha256:a7671fb5a29419595c45acfeb4591a7df1b091c69486e427cf8d0da9d5d55a5c",
+      "current_operations_fingerprint": "sha256:b812cdb909e5802f273497136f93b6027c54cf4a3a49e083ba20617c2b5dfa18",
+      "operation_count": 1448,
+      "reason": "release on top of v0.3.107: add apply_historical_payment_allocations, create_manual_invoice; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.108",
+      "previous_ir_sha256": "sha256:649f4668f4a2e70f68483202e9fe1cf643c100e2aa30eb5a91404eee140c44b9",
+      "previous_operations_fingerprint": "sha256:b812cdb909e5802f273497136f93b6027c54cf4a3a49e083ba20617c2b5dfa18",
+      "current_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
+      "operation_count": 1449,
+      "reason": "release on top of v0.3.108: add cleanup_abandoned_account_move_import; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.109",
+      "previous_ir_sha256": "sha256:7cc56b148646660b0c43d4b3332cb1855c273c84e09ef36eafad1ee5913a2152",
+      "previous_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
+      "current_operations_fingerprint": "sha256:c6c1a33c18c0d7619085bf68d32900965f112a9b94564182a92a0f7fcc189bbb",
+      "operation_count": 1451,
+      "reason": "Complete hosted WorkOS identity and access lifecycle: atomic invitation acceptance, member access updates, editable role metadata and matching source contracts."
+    },
+    {
+      "previous_release": "v0.3.128",
+      "previous_ir_sha256": "sha256:430df27068c8e27a6c6d85499236689809e5ed256a790c2839fcc68f6ff80112",
+      "previous_operations_fingerprint": "sha256:c6c1a33c18c0d7619085bf68d32900965f112a9b94564182a92a0f7fcc189bbb",
+      "current_operations_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
+      "operation_count": 1458,
+      "reason": "release on top of v0.3.128: add abandon_bank_statement_settlement, claim_reviewed_mail_delivery, create_purchase_order_once, receive_po_line_once, resubmit_bank_statement_settlement, reverse_bank_statement_settlement, run_purchasing_keyed_operations_test; change the shape of add_workflow_human_task_comment, cancel_workflow, claim_workflow_human_task, decide_workflow_human_task, invalidate_workflow_human_task, post_payment, reconcile_account_bank_statement_line"
     }
   ]
 }

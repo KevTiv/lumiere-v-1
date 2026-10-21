@@ -1,10 +1,9 @@
-import fs from "node:fs"
-import os from "node:os"
-import path from "node:path"
+import { randomUUID } from "node:crypto"
 
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
+  selectModuleTab,
   expectNoAppError,
   fetchSessionOrganizationId,
   gotoModule,
@@ -131,35 +130,48 @@ test.describe("COV-22 form publish and idempotent import commit", { tag: ["@cov2
   }) => {
     test.setTimeout(180_000)
     await gotoModule(page, "/hr", "hr")
-    await page.getByTestId("module-tab-hr-payslips").click()
+    await selectModuleTab(page, "hr", "payslips")
     const organizationId = await fetchSessionOrganizationId(page)
     const employeeId = await firstId(page, "employees")
     const structId = await firstId(page, "payroll-structures")
     const name = smokeName("cov22-payslip")
-    const csvPath = path.join(os.tmpdir(), `lumiere-cov22-${Date.now()}.csv`)
-    fs.writeFileSync(csvPath, `employee_id,struct_id,name,basic_wage\n${employeeId},${structId},${name},1234\n`, "utf8")
+    const csv = `employee_id,struct_id,name,basic_wage\n${employeeId},${structId},${name},1234\n`
 
     const before = await payslipImportSnapshot(page, organizationId, name)
     await page.getByTestId("entity-action-csv-payslip").click()
-    const modal = page.getByTestId("form-modal-hr-csv-import-payslip")
+    const modal = page.getByRole("dialog", { name: "Import payslips (CSV)", exact: true })
     await expect(modal).toBeVisible()
-    await modal.locator('input[type="file"]').setInputFiles(csvPath)
+    await modal.locator('input[type="file"]').setInputFiles({
+      name: `${name}.csv`, mimeType: "text/csv", buffer: Buffer.from(csv),
+    })
     const [imported] = await Promise.all([
-      page.waitForResponse((res) => matchesOperationResponse(res, "import_hr_payslip_csv"), {
+      page.waitForResponse((res) => new URL(res.url()).pathname === "/api/import/hr_payslip" && res.request().method() === "POST", {
         timeout: 60_000,
       }),
-      page.getByTestId("form-submit-hr-csv-import-payslip").click(),
+      modal.getByRole("button", { name: /^import$/i }).click(),
     ])
-    expect(imported.ok()).toBe(true)
+    expect(imported.ok(), await imported.text()).toBe(true)
+    const receipt = await imported.json() as { jobId: string; requestId: string }
+    expect(receipt).toMatchObject({ entity: "hr_payslip", status: "success", totalRows: 1, rowsImported: 1, errorRows: 0 })
+    expect(receipt.requestId).toMatch(/^[a-f0-9]{32}$/)
+    expect(receipt.jobId).toMatch(/^[1-9]\d*$/)
 
     await expect
       .poll(() => payslipImportSnapshot(page, organizationId, name))
       .toEqual({ payslips: before.payslips + 1, jobs: before.jobs + 1 })
     const accepted = await payslipImportSnapshot(page, organizationId, name)
 
-    // The identical file is the same import identity: rejected, nothing created.
+    // Recovering the identical tracked request returns its original receipt.
     const replayed = await replay(page, imported.request())
-    expect(replayed.status()).toBe(422)
+    expect(replayed.ok(), await replayed.text()).toBe(true)
+    expect(await replayed.json()).toMatchObject({ jobId: receipt.jobId, requestId: receipt.requestId, status: "success" })
+    expect(await payslipImportSnapshot(page, organizationId, name)).toEqual(accepted)
+
+    // A new submission of the same committed file is still rejected by hash.
+    const duplicateFile = await replay(page, imported.request(), (body) => {
+      body.requestId = randomUUID().replaceAll("-", "")
+    })
+    expect(duplicateFile.status()).toBe(422)
     expect(await payslipImportSnapshot(page, organizationId, name)).toEqual(accepted)
 
     const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })

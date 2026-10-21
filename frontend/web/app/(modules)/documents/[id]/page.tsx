@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { DocumentPageClient } from "./document-page-client"
 
 const SSR_RESOURCES = ["documents", "documents-deleted", "document-versions"] as const
@@ -15,7 +15,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
     return <DocumentPageClient documentId={id} />
   }
 
-  const [documents, deleted, versions] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [documents, deleted, versions] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <DocumentPageClient

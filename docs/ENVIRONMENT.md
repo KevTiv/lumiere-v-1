@@ -11,6 +11,8 @@ This doc summarizes how **SpacetimeDB**, **Next.js**, **api-server**, and **gate
 | `NEXT_PUBLIC_STDB_HOST` / `NEXT_PUBLIC_STDB_MODULE` | Browser bundle (inlined at build) | Client-side SDK connection; must match server for the same database. |
 | `STDB_SERVER_TOKEN` | Next server, api-server | JWT for HTTP SQL and admin reducer calls. |
 | `STDB_FINALIZATION_TOKEN` | projection-worker | Dedicated JWT registered as `projection_worker`; used only for finalizer reducer calls and must differ from `STDB_SERVER_TOKEN`. |
+| `WORKOS_CLIENT_ID` | Web and API | Enables hosted authentication; values must match. Requires `WORKOS_API_KEY` on both services, `WORKOS_COOKIE_PASSWORD` and `WORKOS_REDIRECT_URI` on web, plus `WORKOS_ISSUER` and `LUMIERE_WORKOS_ALPHA_ADMISSIONS` on API. See [alpha setup](PRODUCTION_DEPLOY.md#workos-alpha-admission). |
+| `LUMIERE_ALPHA_FOUNDER_IDENTITIES` | Module compiler / production build repository variable | Exact bounded founder identity list compiled into the module; absent or malformed policy denies new tenant creation. Runtime changes do not affect a built artifact. |
 | `LUMIERE_API_SERVER_URL` | Next `lib/api-server-forward.ts` | Internal base URL of the Rust api-server for Next routes that still perform local side effects before proxying (e.g. `http://api-server:8082`). In development, defaults to `http://127.0.0.1:8082` if unset. |
 | `LUMIERE_REDUCER_ALLOWLIST` | api-server | `strict` (production default) blocks bootstrap/test/import reducers on `POST /v1/call/{reducer}`; `off` disables filtering (local dev / e2e). |
 | `AI_GATEWAY_URL` | api-server | Internal AI gateway base URL. Required in production; must not be `localhost`. |

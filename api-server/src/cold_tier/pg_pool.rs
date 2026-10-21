@@ -6,10 +6,15 @@
 //! |------|------|---------|
 //! | `Disable` | Development only | `NoTls` — no encryption. Fails closed in production. |
 //! | `Require` | Production | `tokio-postgres-rustls` with native root certificates. |
+//! | `PrivateNetwork` | Railway production only | `NoTls` to a `*.railway.internal` host. |
 //!
 //! In production (`NODE_ENV=production`), the pool builder fails closed if
-//! `PG_TLS_MODE` is not `require` or if the TLS connector cannot be
-//! initialised.
+//! `PG_TLS_MODE` is neither `require` nor the narrowly-scoped
+//! `private-network` mode, or if the TLS connector cannot be initialised.
+//! `private-network` deliberately trades transport TLS for Railway's private
+//! service network and is accepted only when the process is in production and
+//! `PG_HOST` ends exactly in `.railway.internal`. It must not be used for a
+//! public Railway TCP proxy or any other provider/network.
 //!
 //! ## Environment variables
 //!
@@ -20,7 +25,7 @@
 //! | `PG_DATABASE` | `lumiere` | yes |
 //! | `PG_USER` | `lumiere` | yes |
 //! | `PG_PASSWORD` | _(empty)_ | yes |
-//! | `PG_TLS_MODE` | `disable` | must be `require` |
+//! | `PG_TLS_MODE` | `disable` | `require`, or `private-network` for Railway private DNS only |
 //! | `PG_POOL_MAX` | `10` | no |
 //! | `PG_CONNECT_TIMEOUT_SECS` | `10` | no |
 
@@ -39,6 +44,8 @@ pub enum PgTlsMode {
     Disable,
     /// Require TLS with native root certificates — production.
     Require,
+    /// No TLS inside Railway's production-only private service network.
+    PrivateNetwork,
 }
 
 /// Runtime role used to separate durable-store responsibilities.
@@ -73,10 +80,33 @@ impl PgTlsMode {
         match s.trim().to_lowercase().as_str() {
             "disable" | "" => Ok(Self::Disable),
             "require" | "tls" | "true" => Ok(Self::Require),
+            "private-network" => Ok(Self::PrivateNetwork),
             other => {
-                anyhow::bail!("PG_TLS_MODE: unknown value '{other}' (expected: disable | require)")
+                anyhow::bail!(
+                    "PG_TLS_MODE: unknown value '{other}' (expected: disable | require | private-network)"
+                )
             }
         }
+    }
+}
+
+fn validate_tls_policy(tls_mode: PgTlsMode, host: &str, production: bool) -> Result<()> {
+    match (production, tls_mode) {
+        (true, PgTlsMode::Require) | (false, PgTlsMode::Require | PgTlsMode::Disable) => Ok(()),
+        (true, PgTlsMode::PrivateNetwork)
+            if host.to_ascii_lowercase().ends_with(".railway.internal") =>
+        {
+            Ok(())
+        }
+        (true, PgTlsMode::PrivateNetwork) => anyhow::bail!(
+            "PG_TLS_MODE='private-network' requires PG_HOST to end with '.railway.internal' (got '{host}')"
+        ),
+        (false, PgTlsMode::PrivateNetwork) => anyhow::bail!(
+            "PG_TLS_MODE='private-network' is only allowed when NODE_ENV or LUMIERE_ENV is production"
+        ),
+        (true, PgTlsMode::Disable) => anyhow::bail!(
+            "PG_TLS_MODE must be 'require' in production, or 'private-network' for a Railway private host"
+        ),
     }
 }
 
@@ -110,8 +140,9 @@ impl PgConfig {
 
     /// Read PG config from the environment.
     ///
-    /// In production, fails if `PG_TLS_MODE` is not `require` or if required
-    /// connection fields are missing.
+    /// In production, fails if `PG_TLS_MODE` is not `require` (or the guarded
+    /// Railway `private-network` mode) or if required connection fields are
+    /// missing.
     pub fn from_env() -> Result<Self> {
         let prod = runtime_is_production();
 
@@ -136,13 +167,9 @@ impl PgConfig {
         let tls_mode = PgTlsMode::parse(&tls_mode_str)
             .with_context(|| format!("parse PG_TLS_MODE='{}'", tls_mode_str))?;
 
+        validate_tls_policy(tls_mode, &host, prod)?;
+
         if prod {
-            if tls_mode != PgTlsMode::Require {
-                anyhow::bail!(
-                    "PG_TLS_MODE must be 'require' in production (got '{}')",
-                    tls_mode_str
-                );
-            }
             if password.is_empty() {
                 anyhow::bail!("PG_PASSWORD must be set in production");
             }
@@ -295,8 +322,11 @@ fn quote_identifier(value: &str) -> Result<String> {
 
 /// Build a `deadpool_postgres::Pool` from [`PgConfig`].
 ///
-/// Uses `NoTls` in dev mode and `tokio-postgres-rustls` in production.
+/// Uses `NoTls` only for development or the validated Railway private-network
+/// mode. All other production connections use `tokio-postgres-rustls`.
 pub fn build_pool(config: &PgConfig) -> Result<Pool> {
+    validate_tls_policy(config.tls_mode, &config.host, runtime_is_production())?;
+
     let mut deadpool_cfg = DeadpoolConfig::new();
     deadpool_cfg.host = Some(config.host.clone());
     deadpool_cfg.port = Some(config.port);
@@ -312,8 +342,8 @@ pub fn build_pool(config: &PgConfig) -> Result<Pool> {
     deadpool_cfg.pool = Some(pool_config);
 
     match config.tls_mode {
-        PgTlsMode::Disable => {
-            // Development: no TLS.
+        PgTlsMode::Disable | PgTlsMode::PrivateNetwork => {
+            // Development, or a validated Railway private service connection.
             deadpool_cfg
                 .create_pool(Some(Runtime::Tokio1), NoTls)
                 .context("create deadpool-postgres pool (NoTls)")
@@ -511,7 +541,49 @@ mod tests {
         assert_eq!(PgTlsMode::parse("require").unwrap(), PgTlsMode::Require);
         assert_eq!(PgTlsMode::parse("REQUIRE").unwrap(), PgTlsMode::Require);
         assert_eq!(PgTlsMode::parse("tls").unwrap(), PgTlsMode::Require);
+        assert_eq!(
+            PgTlsMode::parse("private-network").unwrap(),
+            PgTlsMode::PrivateNetwork
+        );
         assert!(PgTlsMode::parse("invalid").is_err());
+    }
+
+    #[test]
+    fn railway_private_network_requires_production_and_private_dns() {
+        assert!(
+            validate_tls_policy(PgTlsMode::PrivateNetwork, "postgres.railway.internal", true)
+                .is_ok()
+        );
+        assert!(
+            validate_tls_policy(PgTlsMode::PrivateNetwork, "POSTGRES.RAILWAY.INTERNAL", true)
+                .is_ok()
+        );
+
+        for host in [
+            "railway.internal",
+            "postgres.proxy.rlwy.net",
+            "postgres.railway.internal.example.com",
+            "evilrailway.internal",
+            "localhost",
+        ] {
+            assert!(
+                validate_tls_policy(PgTlsMode::PrivateNetwork, host, true).is_err(),
+                "unexpectedly accepted {host}"
+            );
+        }
+
+        assert!(validate_tls_policy(
+            PgTlsMode::PrivateNetwork,
+            "postgres.railway.internal",
+            false
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn production_tls_policy_rejects_disable_and_accepts_require() {
+        assert!(validate_tls_policy(PgTlsMode::Disable, "postgres.example.com", true).is_err());
+        assert!(validate_tls_policy(PgTlsMode::Require, "postgres.example.com", true).is_ok());
     }
 
     #[test]

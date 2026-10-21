@@ -61,6 +61,14 @@ test("stdbTimestampToDate handles micros_since_unix_epoch (snake_case)", () => {
   assert.equal(d!.toISOString(), "2024-09-05T00:00:00.000Z")
 })
 
+test("stdbTimestampToDate handles the canonical HTTP SATS timestamp key", () => {
+  const d = stdbTimestampToDate({
+    __timestamp_micros_since_unix_epoch__: "1725494400000000",
+  })
+  assert.ok(d)
+  assert.equal(d!.toISOString(), "2024-09-05T00:00:00.000Z")
+})
+
 test("stdbTimestampToDate passes through Date objects", () => {
   const date = new Date("2024-09-05T00:00:00.000Z")
   const d = stdbTimestampToDate(date)

@@ -79,6 +79,17 @@ export interface ApproveSupplierIntakeInput {
   partnerId: string
 }
 
+/** Approval is complete only when the exact intake links the selected vendor. */
+export function observeApprovedSupplierIntake(
+  input: ApproveSupplierIntakeInput,
+  intakes: readonly RowValueMap[],
+): ObservedTransition {
+  const intake = intakes.find((row) => rowId(row) === input.intakeId)
+  if (!intake || !isOneOf(intake, "Approved") ||
+    String(firstNonNullKey(intake, "partnerId", "partner_id") ?? "") !== input.partnerId) return {}
+  return { outcome: "applied" }
+}
+
 export interface SupplierIntakeReasonInput {
   intakeId: string
   reason: string
@@ -106,12 +117,8 @@ export function approveSupplierIntakeAction(options: {
   return {
     id: "purchasing.supplier-intake.approve",
     label: options.label,
-    kind: "immediate",
+    kind: "form",
     canPresent: isIntakeApprovable,
-    prepare: (row) => ({
-      intakeId: rowId(row),
-      partnerId: String(firstNonNullKey(row, "partnerId", "partner_id") ?? ""),
-    }),
     execute: options.execute,
   }
 }

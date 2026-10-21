@@ -49,6 +49,7 @@ anyhow.workspace = true
 aes-gcm.workspace = true
 axum = { workspace = true, features = ["macros", "ws"] }
 bcrypt.workspace = true
+jsonwebtoken = "9.3"
 reqwest.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 chrono-tz = "0.10"
@@ -60,6 +61,7 @@ rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+s3 = { package = "rust-s3", version = "0.38.0", default-features = false, features = ["tokio-rustls-tls"] }
 stdb-config.workspace = true
 stdb-auth.workspace = true
 stdb-client.workspace = true
@@ -84,7 +86,9 @@ spacetimedb-sdk = "2.0.1"
 spacetimedb-sats = "=2.8.2"
 
 [dev-dependencies]
+rsa = { version = "0.9", features = ["pem"] }
 base64.workspace = true
+openssl = "=0.10.76"
 tokio.workspace = true
 tower.workspace = true
 

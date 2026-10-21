@@ -17,6 +17,9 @@ mod tests;
 
 /// Child reads inherit the document permission, not a separately provisioned child grant.
 pub(super) fn has_document_read_permission(field_access: Option<&FieldAccessContext>) -> bool {
+    if field_access.is_some_and(|access| stdb_auth::resource_read_denied(access, "documents")) {
+        return false;
+    }
     has_resource_read_permission(field_access, "documents")
         || field_access.is_some_and(|access| {
             access.role_permissions.iter().any(|permission| {

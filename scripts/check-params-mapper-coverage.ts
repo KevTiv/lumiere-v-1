@@ -18,6 +18,7 @@ const RUST_SRC = join(REPO_ROOT, 'spacetimedb/src')
 const TS_DIRS = [
   join(REPO_ROOT, 'frontend/web/lib'),
   join(REPO_ROOT, 'frontend/packages/erp-shared/src'),
+  join(REPO_ROOT, 'frontend/packages/query-hooks/src'),
 ]
 
 const SKIP_DIRS = new Set([

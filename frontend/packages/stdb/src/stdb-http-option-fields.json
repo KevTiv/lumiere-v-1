@@ -257,6 +257,7 @@
   "AccountPayment": [
     "name",
     "move_id",
+    "reversal_move_id",
     "ref",
     "memo"
   ],
@@ -771,6 +772,9 @@
   "ApplyExpenseAdvanceParams": [
     "metadata"
   ],
+  "ApplyHistoricalPaymentAllocationsParams": [
+    "metadata"
+  ],
   "ApplyOmnichannelAllocationParams": [
     "preferred_route_id",
     "channel",
@@ -841,6 +845,13 @@
   "BankMatchCandidate": [
     "rule_id"
   ],
+  "BankSettlementInvoiceSnapshot": [
+    "sale_order_id"
+  ],
+  "BankSettlementLineSnapshot": [
+    "matching_number_before",
+    "matching_label_before"
+  ],
   "BankStatementImport": [
     "file_name",
     "approved_statement_id",
@@ -854,6 +865,16 @@
     "description",
     "validation_error",
     "created_statement_line_id"
+  ],
+  "BankStatementSettlementAttempt": [
+    "previous_payment_id",
+    "recovery_key",
+    "recovery_reason",
+    "reversal_request_id",
+    "closed_at"
+  ],
+  "BankStatementSettlementReversal": [
+    "reversal_move_id"
   ],
   "BarcodeNomenclature": [
     "description",
@@ -1179,9 +1200,13 @@
     "metadata"
   ],
   "CountryPackDefinition": [
+    "effective_from",
+    "effective_to",
     "metadata"
   ],
   "CountryPackTaxRule": [
+    "effective_from",
+    "effective_to",
     "metadata"
   ],
   "CreateAccountAccountParams": [
@@ -2001,6 +2026,18 @@
     "document_template_id",
     "metadata"
   ],
+  "CreateManualAccountInvoiceParams": [
+    "invoice_date_due",
+    "invoice_payment_term_id",
+    "ref",
+    "payment_reference",
+    "metadata"
+  ],
+  "CreateManualInvoiceParams": [
+    "invoice_date_due",
+    "ref",
+    "metadata"
+  ],
   "CreateMessageBatchParams": [
     "company_id",
     "subject_query",
@@ -2350,6 +2387,18 @@
   "CreatePurchaseContractParams": [
     "date_start",
     "date_end",
+    "metadata"
+  ],
+  "CreatePurchaseOrderOnceParams": [
+    "origin",
+    "partner_ref",
+    "notes",
+    "date_planned",
+    "payment_term_id",
+    "fiscal_position_id",
+    "incoterm_id",
+    "incoterm_location",
+    "is_quantity_copy",
     "metadata"
   ],
   "CreatePurchaseOrderParams": [
@@ -3827,6 +3876,9 @@
     "document_template_id",
     "metadata"
   ],
+  "ManualAccountInvoiceLineInput": [
+    "product_id"
+  ],
   "ManufacturingByproductTracking": [
     "lot_id",
     "serial_id"
@@ -4529,6 +4581,13 @@
     "lot_id",
     "metadata"
   ],
+  "PurchaseReceiptOperation": [
+    "lot_id",
+    "move_id",
+    "picking_id",
+    "continuation_move_id",
+    "continuation_picking_id"
+  ],
   "PurchaseRequisition": [
     "origin",
     "ordering_date",
@@ -4684,6 +4743,11 @@
     "location_id",
     "lot_id",
     "metadata"
+  ],
+  "ReceivePoLineOnceParams": [
+    "lot_id",
+    "expected_move_id",
+    "expected_picking_id"
   ],
   "RecognizeAmortizationLineParams": [
     "reference",
@@ -5245,6 +5309,9 @@
   ],
   "SetHelpdeskRelatedRecordParams": [
     "target"
+  ],
+  "SetMemberAccessParams": [
+    "job_title"
   ],
   "SetPurchaseApprovalDelegateParams": [
     "metadata"
@@ -5843,6 +5910,10 @@
     "metadata"
   ],
   "UpdateAccountMoveLineParams": [
+    "quantity",
+    "price_unit",
+    "expected_quantity",
+    "expected_price_unit",
     "company_id",
     "name",
     "debit",
@@ -6762,7 +6833,8 @@
     "name",
     "description",
     "permissions",
-    "is_active"
+    "is_active",
+    "metadata"
   ],
   "UpdateSaleOrderLineParams": [
     "product_id",

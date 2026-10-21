@@ -31,7 +31,6 @@ runs:
         chmod 600 ~/.ssh/id_ed25519
         echo 'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' >> ~/.ssh/known_hosts
         chmod 600 ~/.ssh/known_hosts
-        git config --global url."git@github.com:".insteadOf "https://github.com/"
         eval "$(ssh-agent -s)"
         ssh-add ~/.ssh/id_ed25519
         echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"

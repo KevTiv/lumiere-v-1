@@ -9,6 +9,7 @@ import { expect, test, type Page } from "@playwright/test"
 /** @dev-fixture — excluded from E2E_SUITE=p0; requires seed_dev_data fixture rows. */
 
 import {
+  selectModuleTab,
   activeTabEntityTable,
   callReducerBff,
   expectNoAppError,
@@ -41,7 +42,7 @@ const PURCHASING_TAB_IDS = [
 ] as const
 
 async function openPurchasingTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-purchasing-${tabId}`).click()
+  await selectModuleTab(page, "purchasing", tabId)
 }
 
 async function assertPurchasingTabRenders(page: Page, tabId: string) {
@@ -107,7 +108,7 @@ test.describe("Purchasing module e2e", { tag: "@dev-fixture" }, () => {
 
   test("RFQ award action opens a typed selection dialog", async ({ page }) => {
     await gotoModule(page, "/purchasing", "purchasing")
-    await openPurchasingTab(page, "dashboard")
+    await openPurchasingTab(page, "operations")
 
     await page.getByTestId("purchasing-ops-award-rfq-bid").click()
     const dialog = page.getByRole("dialog", { name: "Award RFQ bid" })
@@ -379,7 +380,7 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
     ])
 
     await gotoModule(page, "/purchasing", "purchasing")
-    await page.getByTestId("module-tab-purchasing-orders").click()
+    await selectModuleTab(page, "purchasing", "orders")
     await expect(
       page
         .locator('[role="tabpanel"]:visible [data-testid="entity-table"]')
@@ -387,7 +388,7 @@ test.describe("PUR-007: PO → Receipt → Landed Cost flow", { tag: "@p0" }, ()
         .getByTestId(`entity-row-${orderId}`),
     ).toBeVisible({ timeout: 30_000 })
 
-    await page.getByTestId("module-tab-purchasing-landed-costs").click()
+    await selectModuleTab(page, "purchasing", "landed-costs")
     await expect(
       page
         .locator('[role="tabpanel"]:visible [data-testid="entity-table"]')

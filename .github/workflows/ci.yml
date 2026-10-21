@@ -34,6 +34,10 @@ jobs:
         run: node scripts/tests/test-compose-readiness.mjs
       - name: Test production identity bootstrap
         run: node --test scripts/tests/test_production_identity_bootstrap.mjs
+      - name: Test ordered Railway release orchestration
+        run: |
+          bash scripts/tests/test-railway-stack-release.sh
+          bash scripts/tests/test-railway-production-preflight.sh
 
   stdb-check:
     name: SpacetimeDB check
@@ -42,11 +46,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check standalone module formatting
+        env:
+          RUSTFMT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bash scripts/check-changed-rustfmt.sh spacetimedb
+
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: spacetimedb
           cache-on-failure: true
+
       - name: Check standalone module and tests
         working-directory: spacetimedb
         run: cargo check --locked --tests
@@ -72,8 +86,17 @@ jobs:
           --health-retries=5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check workspace formatting
+        env:
+          RUSTFMT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bash scripts/check-changed-rustfmt.sh workspace
 
       - uses: ./.github/actions/prepare-contracts
 
@@ -94,6 +117,9 @@ jobs:
 
       - name: Workspace members (api-server, ai-gateway, lumiere-codegen, stdb-auth)
         run: cargo check --locked -p api-server -p ai-gateway -p lumiere-codegen -p stdb-auth
+
+      - name: Query authorization and field projection tests
+        run: cargo test --locked -p stdb-auth --lib
 
       - name: Presentation contracts and draft validator
         run: cargo test --locked -p lumiere-presentation-core
@@ -283,6 +309,9 @@ jobs:
       - name: Unit tests (query-hooks params)
         run: pnpm --dir packages/query-hooks test
 
+      - name: Unit tests (stdb query policies and transport)
+        run: pnpm --dir packages/stdb test
+
       - name: Unit tests (ui)
         run: pnpm --dir packages/ui test
 
@@ -291,6 +320,9 @@ jobs:
 
       - name: Unit tests (web BFF helpers)
         run: pnpm --dir web test:unit
+
+      - name: Unit tests (accounting and cross-module overview models)
+        run: pnpm --dir web test:accounting-ui:models
 
       - name: Verify vendored frontend contracts pin
         run: pnpm contracts:verify-vendored
@@ -356,7 +388,7 @@ jobs:
       - name: Start trusted Chromium renderer
         run: docker run -d --name chromium-worker -p 8090:8090 lumiere-chromium-worker
       - name: Validate Chromium readiness helper
-        run: node --test chromium-worker/src/readiness.test.mjs
+        run: node --test chromium-worker/src/readiness.test.mjs chromium-worker/src/print-assets.test.mjs
       - name: Install PDF text extractor
         run: sudo apt-get update && sudo apt-get install -y poppler-utils
       - name: Validate deterministic report fixtures

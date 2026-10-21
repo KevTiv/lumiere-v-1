@@ -11,9 +11,10 @@ import { Input } from "@lumiere/ui/components/input"
 import { Label } from "@lumiere/ui/components/label"
 import { redirectToWorkOsSignInForPasswordReset } from "@/app/actions/workos-auth"
 
-const useWorkOsAuth = Boolean(process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI)
+import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 
 export default function ResetPasswordPage() {
+  const useWorkOsAuth = useWorkOsAuthMode()
   const { t } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()

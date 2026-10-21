@@ -54,7 +54,13 @@ describe("resolveReconciliationEffect", () => {
 
 describe("resolveRegisteredPaymentEffect", () => {
   const input = { paymentId: 81n, invoiceIds: [91n, 92n], isBill: false }
-  const payment = { id: "81", companyId: "5", state: { tag: "Paid" } }
+  const payment = {
+    id: "81",
+    companyId: "5",
+    state: { tag: "Paid" },
+    reconciledInvoiceIds: [91n, 92n],
+    reconciledBillIds: [93n, 94n],
+  }
   const paidInvoice = {
     id: 91n,
     companyId: 5n,
@@ -106,6 +112,33 @@ describe("resolveRegisteredPaymentEffect", () => {
         ...input,
         invoiceIds: [],
       }),
+      null,
+    )
+  })
+
+  it("requires the payment's exact canonical allocation relation", () => {
+    assert.equal(
+      resolveRegisteredPaymentEffect(
+        [{ ...payment, reconciledInvoiceIds: [91n] }],
+        [paidInvoice, partialRefund],
+        input,
+      ),
+      null,
+    )
+    assert.equal(
+      resolveRegisteredPaymentEffect(
+        [{ ...payment, reconciledInvoiceIds: undefined }],
+        [paidInvoice, partialRefund],
+        input,
+      ),
+      null,
+    )
+    assert.equal(
+      resolveRegisteredPaymentEffect(
+        [{ ...payment, reconciledInvoiceIds: [91n, "not-an-id"] }],
+        [paidInvoice, partialRefund],
+        input,
+      ),
       null,
     )
   })

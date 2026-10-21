@@ -4,7 +4,6 @@ services:
       context: .
       dockerfile: infra/kong/Dockerfile
     depends_on:
-      - redis
       - web
       - api-server
     environment:
@@ -20,21 +19,10 @@ services:
       WEB_UPSTREAM_PORT: 3000
       API_SERVER_UPSTREAM_HOST: api-server
       API_SERVER_UPSTREAM_PORT: 8082
-      REDIS_UPSTREAM_HOST: redis
-      REDIS_UPSTREAM_PORT: 6379
-      REDIS_UPSTREAM_USERNAME: ""
-      REDIS_UPSTREAM_PASSWORD: ""
       CORS_ORIGIN: ${NEXT_PUBLIC_APP_URL:-http://localhost:8000}
     ports:
       - "8000:8000"
       - "127.0.0.1:8001:8001"
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "127.0.0.1:6379:6379"
     restart: unless-stopped
 
   web:
@@ -57,6 +45,8 @@ services:
       WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
       WORKOS_API_KEY: ${WORKOS_API_KEY:-}
       WORKOS_COOKIE_PASSWORD: ${WORKOS_COOKIE_PASSWORD:-}
+      NEXT_PUBLIC_WORKOS_REDIRECT_URI: ${NEXT_PUBLIC_WORKOS_REDIRECT_URI:-}
+      WORKOS_REDIRECT_URI: ${WORKOS_REDIRECT_URI:-}
       POSTHOG_KEY: ${POSTHOG_KEY:-}
       NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
     expose:
@@ -90,13 +80,19 @@ services:
       STDB_CREDENTIAL_ENCRYPTION_KEY: ${STDB_CREDENTIAL_ENCRYPTION_KEY:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@lumiere-erp.com}
+      LUMIERE_REVIEWED_MAIL_STDB_TOKEN: ${LUMIERE_REVIEWED_MAIL_STDB_TOKEN:-}
       WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:-}
+      WORKOS_API_KEY: ${WORKOS_API_KEY:-}
+      WORKOS_ISSUER: ${WORKOS_ISSUER:-}
+      LUMIERE_WORKOS_ALPHA_ADMISSIONS: ${LUMIERE_WORKOS_ALPHA_ADMISSIONS:-}
       LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports
+      LUMIERE_DOCUMENT_BLOB_DIR: /var/lib/lumiere/document-blobs
       # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). Readiness and
       # PG-backed reads fail closed when this durable store is unavailable.
-      # Point at the managed Postgres instance; PG_TLS_MODE
-      # must be "require" here since NODE_ENV=production fails closed otherwise.
+      # Point at the managed Postgres instance. Use PG_TLS_MODE=require unless
+      # this process and Postgres share Railway's private service network; that
+      # narrow case may use private-network with a *.railway.internal PG_HOST.
       PG_HOST: ${PG_HOST:-}
       PG_PORT: ${PG_PORT:-5432}
       PG_DATABASE: ${PG_DATABASE:-lumiere}
@@ -105,6 +101,7 @@ services:
       PG_TLS_MODE: ${PG_TLS_MODE:-require}
     volumes:
       - owner-report-artifacts:/var/lib/lumiere/owner-reports
+      - document-blobs:/var/lib/lumiere/document-blobs
     expose:
       - "8082"
     restart: unless-stopped
@@ -265,3 +262,4 @@ services:
 volumes:
   qdrant-data:
   owner-report-artifacts:
+  document-blobs:

@@ -8,20 +8,23 @@ FROM dopplerhq/cli:3.75.1@sha256:f2ffb55128ed895ca3ee7a64a394661e89aa16cf9f9e05c
 FROM chef AS builder
 ARG BIN
 ARG CARGO_BUILD_JOBS=1
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 \
+  && rm -rf /var/lib/apt/lists/*
+# Keep verified contracts independent of application-source cache invalidation.
+COPY release-compatibility-manifest.json ./
+COPY scripts/prepare-vendored-contracts-rust.sh ./scripts/prepare-vendored-contracts-rust.sh
+COPY scripts/sync-directory.py ./scripts/sync-directory.py
+COPY vendor ./vendor
+RUN scripts/prepare-vendored-contracts-rust.sh
 COPY Cargo.toml Cargo.lock ./
 COPY Makefile ./
-COPY release-compatibility-manifest.json ./
 COPY scripts ./scripts
-COPY vendor ./vendor
 COPY api-server ./api-server
 COPY ai-gateway ./ai-gateway
 COPY iot-gateway ./iot-gateway
 COPY lumiere-codegen ./lumiere-codegen
 COPY crates ./crates
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 \
-  && rm -rf /var/lib/apt/lists/*
-RUN scripts/prepare-vendored-contracts-rust.sh
 RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" --bin "${BIN}"
 
 FROM debian:bookworm-slim AS runtime

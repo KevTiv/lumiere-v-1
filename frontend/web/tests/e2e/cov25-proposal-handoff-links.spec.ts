@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 import {
+  selectModuleTab,
   callReducerBff, callReducerOwner, fetchContactIdByName, fetchDefaultCompanyId, fetchProductIdByName,
   fetchSessionOrganizationId, gotoModule, scalarQueryId, selectEntityRowById, signIn, smokeName, submitForm,
 } from "./helpers"
@@ -50,7 +51,7 @@ test.describe("COV-25 proposal sale order link", { tag: ["@p0", "@cov25", "@unau
     await callReducerBff(page, "record_proposal_bid_decision", [organizationId, companyId, proposalId, { decision: "bid", rationale: "COV25 source fixture" }])
     await callReducerBff(page, "update_proposal_status", [organizationId, companyId, proposalId, "submitted"])
     await gotoModule(page, "/proposals", "proposals")
-    await page.getByTestId("module-tab-proposals-proposals").click()
+    await selectModuleTab(page, "proposals", "proposals")
     await selectEntityRowById(page, proposalId)
     const statusResponse = page.waitForResponse((candidate) => matchesOperationResponse(candidate, "update_proposal_status"))
     const [awarded] = await Promise.all([
@@ -60,7 +61,7 @@ test.describe("COV-25 proposal sale order link", { tag: ["@p0", "@cov25", "@unau
     expect(awarded.ok()).toBe(true)
     expect((await statusResponse).ok()).toBe(true)
     await gotoModule(page, "/proposals", "proposals")
-    await page.getByTestId("module-tab-proposals-proposals").click()
+    await selectModuleTab(page, "proposals", "proposals")
     await selectEntityRowById(page, proposalId)
     await page.getByTestId("entity-action-convert-proposal-order").click()
     await expect(page.getByTestId("form-modal-convert-proposal-order")).toBeVisible()

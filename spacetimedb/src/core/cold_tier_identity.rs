@@ -34,6 +34,8 @@ pub(crate) const HR_INTEGRATION_WORKER_SERVICE: &str = "hr_integration_worker";
 pub(crate) const PROJECT_INTEGRATION_WORKER_SERVICE: &str = "project_integration_worker";
 pub(crate) const OWNER_REPORT_WORKER_SERVICE: &str = "owner_report_worker";
 pub(crate) const WORKFLOW_WORKER_SERVICE: &str = "workflow_worker";
+/// Dedicated receipt writer for explicitly reviewed invoice email dispatches.
+pub(crate) const REVIEWED_MAIL_DISPATCHER_SERVICE: &str = "reviewed_mail_dispatcher";
 /// Dedicated identity used by the IoT gateway after a hub proves its opaque
 /// post-pair credential.
 pub(crate) const IOT_GATEWAY_SERVICE: &str = "iot_gateway";

@@ -1,0 +1,22 @@
+# The production web build only accepts an https redirect URI, so the app is
+# reached through scripts/local-https-proxy.mjs on https://localhost:3443.
+# WorkOS-mode overlay for COV-23 acceptance. Layered after docker-compose.e2e.yml
+# by scripts/workos-docker-stack.sh; never start by hand. The values come from the
+# calling shell (.env.workos.local plus .tmp/workos/env.sh), not from this file.
+services:
+  api-server:
+    environment:
+      WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:?run through scripts/workos-docker-stack.sh}
+      WORKOS_API_KEY: ${WORKOS_API_KEY:?run through scripts/workos-docker-stack.sh}
+      WORKOS_ISSUER: ${WORKOS_ISSUER:?run through scripts/workos-docker-stack.sh}
+      LUMIERE_WORKOS_ALPHA_ADMISSIONS: ${LUMIERE_WORKOS_ALPHA_ADMISSIONS:?run through scripts/workos-docker-stack.sh}
+      NEXT_PUBLIC_APP_URL: https://localhost:3443
+      CORS_ORIGINS: https://localhost:3443,http://127.0.0.1:3001,http://localhost:3001
+
+  web:
+    environment:
+      WORKOS_CLIENT_ID: ${WORKOS_CLIENT_ID:?run through scripts/workos-docker-stack.sh}
+      WORKOS_API_KEY: ${WORKOS_API_KEY:?run through scripts/workos-docker-stack.sh}
+      WORKOS_COOKIE_PASSWORD: ${WORKOS_COOKIE_PASSWORD:?run through scripts/workos-docker-stack.sh}
+      WORKOS_REDIRECT_URI: https://localhost:3443/auth/callback
+      NEXT_PUBLIC_WORKOS_REDIRECT_URI: https://localhost:3443/auth/callback

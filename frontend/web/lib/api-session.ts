@@ -8,6 +8,7 @@
  * Phase 1 of API Gateway Refactor Plan
  */
 
+import { isWorkOsEnabled } from '@/lib/auth-mode'
 import { cookies } from 'next/headers'
 import type { FieldAccessContext, StdbHttpOptions } from '@lumiere/stdb/server'
 import { resolveApiServerBaseUrl } from '@/lib/api-server-forward'
@@ -105,17 +106,24 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
   // Web: If no bearer credentials were supplied, try the browser session.
   if (!credentialsPresented) {
     try {
-      const store = await cookies()
-      const tokenCookie = store.get('stdb_token')
-      credentialsPresented = tokenCookie !== undefined
-      token = tokenCookie?.value.trim()
+      if (isWorkOsEnabled()) {
+        const { withAuth } = await import('@workos-inc/authkit-nextjs')
+        const session = await withAuth()
+        credentialsPresented = true
+        token = session.accessToken
+      } else {
+        const store = await cookies()
+        const tokenCookie = store.get('stdb_token')
+        credentialsPresented = tokenCookie !== undefined
+        token = tokenCookie?.value.trim()
+      }
     } catch {
       // Cookies() throws outside a request context.
     }
   }
 
   // Anonymous local development only: never replace an explicit caller's credentials.
-  if (!credentialsPresented && !runtimeIsProduction() && process.env['DEV_MOCK_ORG_ID']) {
+  if (!isWorkOsEnabled() && !credentialsPresented && !runtimeIsProduction() && process.env['DEV_MOCK_ORG_ID']) {
     token = process.env['STDB_SERVER_TOKEN']?.trim()
   }
 
@@ -125,6 +133,7 @@ export async function resolveApiSession(req?: Request): Promise<ApiSession | nul
   const opts: StdbHttpOptions = { token }
 
   if (
+    !isWorkOsEnabled() &&
     !runtimeIsProduction() &&
     DEV_ADMIN_ENABLED &&
     DEV_ADMIN_AUTO_ORG &&

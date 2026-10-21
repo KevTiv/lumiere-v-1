@@ -120,6 +120,21 @@ pub(crate) fn apply_generated_reconstruction_row(
 }
 
 fn emit_arm(table: &Table, source: &SourceTable) -> String {
+    let compatibility_normalization = match table.table.as_str() {
+        "company_country_pack" | "country_pack_definition" | "country_pack_tax_rule" => {
+            format!(
+                r#"            let normalized_row_json =
+                crate::core::country_pack::normalize_country_pack_reconstruction_row_json(
+                    {table_name:?},
+                    row_json,
+                )?;
+            let row_json = normalized_row_json.as_str();
+"#,
+                table_name = table.table,
+            )
+        }
+        _ => String::new(),
+    };
     let insert = if source.primary_key_auto_inc {
         format!(
             r#"                let desired_id = row.{primary_key};
@@ -153,7 +168,7 @@ fn emit_arm(table: &Table, source: &SourceTable) -> String {
     format!(
         r#"        {table_name:?} => {{
             use crate::{rust_path}::{{{accessor} as _, {rust_type}}};
-            let spacetimedb_sats::serde::SerdeWrapper(row) =
+{compatibility_normalization}            let spacetimedb_sats::serde::SerdeWrapper(row) =
                 serde_json::from_str::<spacetimedb_sats::serde::SerdeWrapper<{rust_type}>>(row_json)
                     .map_err(|error| format!("invalid canonical row JSON for {table_name}: {{error}}"))?;
             if row.{organization_column} != organization_id {{
@@ -185,6 +200,7 @@ fn emit_arm(table: &Table, source: &SourceTable) -> String {
         rust_type = source.rust_type,
         organization_column = table.organization_column,
         primary_key = table.primary_key,
+        compatibility_normalization = compatibility_normalization,
         insert = insert,
     )
 }
@@ -380,6 +396,26 @@ mod tests {
         assert!(output.contains("SerdeWrapper(candidate)"));
         assert!(output.contains("id: 0,"));
         assert!(output.contains("rows.id().delete(&generated_id);"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn emits_country_pack_legacy_row_normalization() {
+        let root = std::env::temp_dir().join(format!(
+            "lumiere-reconstruction-country-pack-{}",
+            std::process::id()
+        ));
+        let module = root.join("core");
+        fs::create_dir_all(&module).unwrap();
+        fs::write(
+            module.join("country_pack.rs"),
+            "#[spacetimedb::table(accessor = country_pack_definition)]\npub struct CountryPackDefinition { #[primary_key] pub organization_pack_key: String, pub organization_id: u64 }",
+        )
+        .unwrap();
+        let manifest = r#"{"version":1,"tables":[{"table":"country_pack_definition","rust_type":"CountryPackDefinition","stdb_table_accessor":"country_pack_definition","organization_column":"organization_id","primary_key":"organization_pack_key","restore_order":1}]}"#;
+        let output = emit_reconstruction_apply(manifest, &root).unwrap();
+        assert!(output.contains("normalize_country_pack_reconstruction_row_json"));
+        assert!(output.contains("let row_json = normalized_row_json.as_str();"));
         let _ = fs::remove_dir_all(root);
     }
 }

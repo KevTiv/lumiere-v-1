@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises"
 import { test } from "node:test"
 
 import { SESSION_OPERATION_DESCRIPTORS } from "@lumiere/contracts/generated/operation-descriptors"
+import { HttpResponseError } from "@lumiere/api-client/response-error"
 
 import { createStdbSdk } from "./sdk"
 
@@ -18,6 +19,27 @@ test("application SDK owns the domain facade over generated contract facts", asy
   assert.match(source, /settings:\s*\{\s*readonly integrations:/)
   assert.doesNotMatch(source, /@lumiere\/contracts\/generated\/sdk/)
   assert.doesNotMatch(source, /createGeneratedStdbSdk/)
+})
+
+test("accounting SDK query failures preserve HTTP status", async () => {
+  for (const status of [401, 403, 503]) {
+    const sdk = createStdbSdk(async () =>
+      new Response(JSON.stringify({ error: `accounts failed with ${status}` }), {
+        status,
+        headers: { "content-type": "application/json" },
+      }),
+    )
+
+    await assert.rejects(
+      sdk.forCompany(42n).accounting.accounts.list(),
+      (error: unknown) => {
+        assert.ok(error instanceof HttpResponseError)
+        assert.equal(error.status, status)
+        assert.equal(error.message, `accounts failed with ${status}`)
+        return true
+      },
+    )
+  }
 })
 
 test("accounting SDK targets the immutable typed operation and selected company", async () => {

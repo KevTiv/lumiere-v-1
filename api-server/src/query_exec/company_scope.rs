@@ -180,7 +180,10 @@ async fn has_organization_wide_company_access(
     let role_sql = format!(
         "SELECT id, name, permissions, is_active FROM role WHERE organization_id = {organization_id}"
     );
-    let roles = client.query_sql(&role_sql).await.map_err(ApiError::internal)?;
+    let roles = client
+        .query_sql(&role_sql)
+        .await
+        .map_err(ApiError::internal)?;
     let role_ids = current_company_scope_role_ids(
         &memberships,
         &assignments,
@@ -197,18 +200,6 @@ async fn has_organization_wide_company_access(
         if !active || !id.is_some_and(|id| role_ids.contains(&id)) {
             return false;
         }
-        let name = role
-            .get("name")
-            .and_then(|value| value.as_str())
-            .unwrap_or("")
-            .trim()
-            .to_lowercase()
-            .replace(' ', "-")
-            .replace('_', "-");
-        let named_admin = matches!(
-            name.as_str(),
-            "admin" | "administrator" | "organization-admin" | "owner"
-        );
         let wildcard = role
             .get("permissions")
             .and_then(|value| value.as_array())
@@ -217,7 +208,7 @@ async fn has_organization_wide_company_access(
                     .iter()
                     .any(|value| value.as_str() == Some("*:*"))
             });
-        named_admin || wildcard
+        wildcard
     }))
 }
 
@@ -576,6 +567,7 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "payment-reversals"
             | "payment-transactions"
             | "profit-loss-lines"
+            | "saved-reports"
             | "tax-deadlines"
             | "tax-groups"
             | "tax-schedules"

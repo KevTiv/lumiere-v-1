@@ -13,6 +13,20 @@ use crate::core::users::user_organization;
 use crate::crm::contacts::{contact, Contact};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::{product, Product};
+use crate::{
+    accounting::journal_entries::{account_move, account_move_line},
+    types::{AccountMoveState, PaymentState},
+};
+
+pub const ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: &str = "account_move_bundle_rollback";
+const ABANDONED_DRAFT_CLEANUP_METADATA_KEY: &str = "abandoned_account_move_draft_cleanup";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AccountMoveBundleJobMetadata {
+    pub role: String,
+    pub token: String,
+    pub parent_job_id: Option<u64>,
+}
 
 // ── Tables ────────────────────────────────────────────────────────────────────
 
@@ -165,6 +179,67 @@ pub fn stamp_import_sha256(ctx: &ReducerContext, job: ImportJob, sha256: &str) -
     })
 }
 
+pub fn account_move_bundle_job_metadata(
+    metadata: Option<&str>,
+) -> Option<AccountMoveBundleJobMetadata> {
+    let value: serde_json::Value = serde_json::from_str(metadata?).ok()?;
+    let marker = value.get(ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY)?;
+    if marker.get("version")?.as_u64()? != 1 {
+        return None;
+    }
+    let role = marker.get("role")?.as_str()?.to_string();
+    if !matches!(role.as_str(), "parent" | "complete") {
+        return None;
+    }
+    let token = marker.get("token")?.as_str()?.trim().to_string();
+    if token.is_empty() {
+        return None;
+    }
+    let parent_job_id = marker
+        .get("parent_job_id")
+        .and_then(|value| value.as_u64())
+        .filter(|id| *id > 0);
+    if (role == "complete") != parent_job_id.is_some() {
+        return None;
+    }
+    Some(AccountMoveBundleJobMetadata {
+        role,
+        token,
+        parent_job_id,
+    })
+}
+
+pub fn stamp_account_move_bundle_job(
+    job: ImportJob,
+    role: &str,
+    token: &str,
+    parent_job_id: Option<u64>,
+) -> Result<ImportJob, String> {
+    if !matches!(role, "parent" | "complete")
+        || token.trim().is_empty()
+        || ((role == "complete") != parent_job_id.is_some())
+        || parent_job_id == Some(0)
+    {
+        return Err("invalid account move bundle rollback metadata".to_string());
+    }
+    let mut metadata = job
+        .metadata
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .filter(serde_json::Value::is_object)
+        .unwrap_or_else(|| serde_json::json!({}));
+    metadata[ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY] = serde_json::json!({
+        "version": 1,
+        "role": role,
+        "token": token,
+        "parent_job_id": parent_job_id,
+    });
+    Ok(ImportJob {
+        metadata: Some(metadata.to_string()),
+        ..job
+    })
+}
+
 /// Record a single row-level error into ImportJobError.
 pub fn record_import_error(
     ctx: &ReducerContext,
@@ -300,6 +375,260 @@ fn rollback_delete_record(
         }
         other => Err(format!("Rollback not supported for table: {other}")),
     }
+}
+
+fn rollback_account_move_bundle(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    line_job: &ImportJob,
+    marker: &AccountMoveBundleJobMetadata,
+) -> Result<(u32, u64), String> {
+    if line_job.table_name != "account_move_line" || line_job.status != "success" {
+        return Err("Only a completed account move bundle can be rolled back".to_string());
+    }
+    let parent_job_id = marker
+        .parent_job_id
+        .ok_or("Account move bundle parent job is missing")?;
+    let parent_job = ctx
+        .db
+        .import_job()
+        .id()
+        .find(&parent_job_id)
+        .ok_or("Account move bundle parent job not found")?;
+    let parent_marker = account_move_bundle_job_metadata(parent_job.metadata.as_deref())
+        .ok_or("Account move bundle parent provenance is missing")?;
+    if parent_job.organization_id != organization_id
+        || parent_job.table_name != "account_move"
+        || parent_job.status != "success"
+        || parent_job.create_uid != line_job.create_uid
+        || parent_marker.role != "parent"
+        || parent_marker.token != marker.token
+    {
+        return Err("Account move bundle parent provenance does not match".to_string());
+    }
+
+    let line_records: Vec<_> = ctx
+        .db
+        .import_job_record()
+        .import_record_by_job()
+        .filter(&line_job.id)
+        .collect();
+    let parent_records: Vec<_> = ctx
+        .db
+        .import_job_record()
+        .import_record_by_job()
+        .filter(&parent_job_id)
+        .collect();
+    if line_records.is_empty() || parent_records.is_empty() {
+        return Err("Account move bundle rollback records are incomplete".to_string());
+    }
+    if line_records.iter().any(|record| {
+        record.organization_id != organization_id || record.table_name != "account_move_line"
+    }) || parent_records.iter().any(|record| {
+        record.organization_id != organization_id || record.table_name != "account_move"
+    }) {
+        return Err("Account move bundle rollback records do not match their jobs".to_string());
+    }
+
+    let line_ids: HashSet<u64> = line_records.iter().map(|record| record.record_id).collect();
+    let move_ids: HashSet<u64> = parent_records
+        .iter()
+        .map(|record| record.record_id)
+        .collect();
+    if line_ids.len() != line_records.len() || move_ids.len() != parent_records.len() {
+        return Err("Account move bundle rollback records contain duplicates".to_string());
+    }
+
+    for move_id in &move_ids {
+        let move_row = ctx
+            .db
+            .account_move()
+            .id()
+            .find(move_id)
+            .ok_or_else(|| format!("Imported account move {move_id} no longer exists"))?;
+        if move_row.organization_id != organization_id
+            || move_row.state != AccountMoveState::Draft
+            || move_row.create_uid != Some(parent_job.create_uid)
+            || move_row.create_date != Some(parent_job.started_at)
+            || move_row.write_uid != Some(line_job.create_uid)
+            || move_row.write_date != Some(line_job.started_at)
+            || move_row.posted_before
+            || move_row.secure_sequence_number.is_some()
+            || move_row.invoice_has_outstanding
+            || move_row.payment_state != PaymentState::NotPaid
+        {
+            return Err(format!(
+                "Imported account move {move_id} was posted, edited, or gained downstream state"
+            ));
+        }
+        let actual_line_ids: HashSet<u64> = ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(move_id)
+            .map(|line| line.id)
+            .collect();
+        let tracked_line_ids: HashSet<u64> = line_records
+            .iter()
+            .filter_map(|record| {
+                ctx.db
+                    .account_move_line()
+                    .id()
+                    .find(&record.record_id)
+                    .filter(|line| line.move_id == *move_id)
+                    .map(|line| line.id)
+            })
+            .collect();
+        if actual_line_ids != tracked_line_ids || actual_line_ids.is_empty() {
+            return Err(format!(
+                "Imported account move {move_id} has missing, added, or foreign lines"
+            ));
+        }
+    }
+
+    for line_id in &line_ids {
+        let line = ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(line_id)
+            .ok_or_else(|| format!("Imported account move line {line_id} no longer exists"))?;
+        if line.organization_id != organization_id
+            || !move_ids.contains(&line.move_id)
+            || line.parent_state != AccountMoveState::Draft
+            || line.create_uid != Some(line_job.create_uid)
+            || line.create_date != Some(line_job.started_at)
+            || line.write_uid != Some(line_job.create_uid)
+            || line.write_date != Some(line_job.started_at)
+            || line.payment_id.is_some()
+            || line.statement_line_id.is_some()
+            || line.reconcile_model_id.is_some()
+            || line.is_matching
+            || line.matching_number.is_some()
+            || line.matching_label.is_some()
+        {
+            return Err(format!(
+                "Imported account move line {line_id} was edited or gained downstream state"
+            ));
+        }
+    }
+
+    for line_id in &line_ids {
+        ctx.db.account_move_line().id().delete(line_id);
+    }
+    for move_id in &move_ids {
+        ctx.db.account_move().id().delete(move_id);
+    }
+    for record in line_records.iter().chain(parent_records.iter()) {
+        ctx.db.import_job_record().id().delete(&record.id);
+    }
+    ctx.db.import_job().id().update(ImportJob {
+        status: "rolled_back".to_string(),
+        ..parent_job
+    });
+    Ok(((line_ids.len() + move_ids.len()) as u32, parent_job_id))
+}
+
+fn abandoned_draft_cleanup_company_id(metadata: Option<&str>) -> Option<u64> {
+    let value: serde_json::Value = serde_json::from_str(metadata?).ok()?;
+    let marker = value.get(ABANDONED_DRAFT_CLEANUP_METADATA_KEY)?;
+    if marker.get("version")?.as_u64()? != 1 {
+        return None;
+    }
+    marker
+        .get("company_id")?
+        .as_u64()
+        .filter(|company_id| *company_id > 0)
+}
+
+fn stamp_abandoned_draft_cleanup(
+    job: ImportJob,
+    company_id: u64,
+    deleted_count: usize,
+) -> ImportJob {
+    let mut metadata = job
+        .metadata
+        .as_deref()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .filter(serde_json::Value::is_object)
+        .unwrap_or_else(|| serde_json::json!({}));
+    metadata[ABANDONED_DRAFT_CLEANUP_METADATA_KEY] = serde_json::json!({
+        "version": 1,
+        "company_id": company_id,
+        "deleted_count": deleted_count,
+    });
+    ImportJob {
+        metadata: Some(metadata.to_string()),
+        ..job
+    }
+}
+
+fn validate_abandoned_account_move_draft(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    parent_job: &ImportJob,
+    bundle_token: &str,
+    move_id: u64,
+) -> Result<(), String> {
+    let move_row = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_id)
+        .ok_or_else(|| format!("Imported account move {move_id} no longer exists"))?;
+    if move_row.organization_id != organization_id || move_row.company_id != company_id {
+        return Err(format!(
+            "Imported account move {move_id} is outside the cleanup organization or company"
+        ));
+    }
+    if move_row.state != AccountMoveState::Draft
+        || move_row.create_uid != Some(parent_job.create_uid)
+        || move_row.create_date != Some(parent_job.started_at)
+        || move_row.write_uid != Some(parent_job.create_uid)
+        || move_row.write_date != Some(parent_job.started_at)
+        || move_row.posted_before
+        || move_row.secure_sequence_number.is_some()
+        || move_row.invoice_has_outstanding
+        || move_row.payment_state != PaymentState::NotPaid
+    {
+        return Err(format!(
+            "Imported account move {move_id} was posted, edited, or gained downstream state"
+        ));
+    }
+    let marker_token = crate::data_ops::accounting_imports::account_move_bundle_token(
+        move_row.metadata.as_deref(),
+    )
+    .ok_or_else(|| {
+        format!("Imported account move {move_id} no longer has valid bundle provenance")
+    })?;
+    if marker_token != bundle_token {
+        return Err(format!(
+            "Imported account move {move_id} bundle provenance does not match its import job"
+        ));
+    }
+    if crate::data_ops::accounting_imports::account_move_bundle_fingerprint(
+        move_row.metadata.as_deref(),
+    )
+    .is_none()
+    {
+        return Err(format!(
+            "Imported account move {move_id} no longer has parent-row bundle provenance"
+        ));
+    }
+    if ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .next()
+        .is_some()
+    {
+        return Err(format!(
+            "Imported account move {move_id} is not empty; use the completed bundle rollback when eligible"
+        ));
+    }
+    Ok(())
 }
 
 // ── Tracked CSV submission protocol ───────────────────────────────────────────
@@ -966,6 +1295,134 @@ pub fn import_csv_tracked(
 
 // ── Reducers ──────────────────────────────────────────────────────────────────
 
+/// Remove parent drafts left behind when an atomic account-move import stops
+/// before its line phase. This intentionally accepts only the recorded parent
+/// import job, never arbitrary move IDs. Every move is validated before any is
+/// deleted, so one edited or accounting-effective row refuses the whole cleanup.
+#[reducer]
+pub fn cleanup_abandoned_account_move_import(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    parent_job_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "account_move", "delete")?;
+    require_company_in_organization(ctx, organization_id, company_id)?;
+
+    let parent_job = ctx
+        .db
+        .import_job()
+        .id()
+        .find(&parent_job_id)
+        .ok_or("Account move parent import job not found")?;
+    if parent_job.organization_id != organization_id {
+        return Err("Account move parent import job does not belong to this organization".into());
+    }
+    if parent_job.table_name != "account_move" {
+        return Err("Cleanup requires an account_move parent import job".into());
+    }
+    let marker = account_move_bundle_job_metadata(parent_job.metadata.as_deref())
+        .filter(|marker| marker.role == "parent")
+        .ok_or("Account move parent import provenance is missing")?;
+
+    if parent_job.status == "rolled_back" {
+        return match abandoned_draft_cleanup_company_id(parent_job.metadata.as_deref()) {
+            Some(cleaned_company_id) if cleaned_company_id == company_id => Ok(()),
+            _ => Err(
+                "Account move parent import was rolled back by a different operation".to_string(),
+            ),
+        };
+    }
+    if parent_job.status != "success" {
+        return Err(
+            "Only a successful abandoned account move parent import can be cleaned up".into(),
+        );
+    }
+
+    let completed_child_exists = ctx
+        .db
+        .import_job()
+        .import_job_by_org()
+        .filter(&organization_id)
+        .any(|job| {
+            account_move_bundle_job_metadata(job.metadata.as_deref()).is_some_and(|child| {
+                child.role == "complete" && child.parent_job_id == Some(parent_job_id)
+            })
+        });
+    if completed_child_exists {
+        return Err(
+            "Account move import has a completed line bundle; use import rollback when eligible"
+                .into(),
+        );
+    }
+
+    let records: Vec<_> = ctx
+        .db
+        .import_job_record()
+        .import_record_by_job()
+        .filter(&parent_job_id)
+        .collect();
+    if records.is_empty() {
+        return Err("Account move parent import has no tracked drafts".into());
+    }
+    if records.iter().any(|record| {
+        record.organization_id != organization_id || record.table_name != "account_move"
+    }) {
+        return Err("Account move parent import records do not match their job".into());
+    }
+    let move_ids: std::collections::BTreeSet<u64> =
+        records.iter().map(|record| record.record_id).collect();
+    if move_ids.len() != records.len() {
+        return Err("Account move parent import records contain duplicates".into());
+    }
+
+    for move_id in &move_ids {
+        validate_abandoned_account_move_draft(
+            ctx,
+            organization_id,
+            company_id,
+            &parent_job,
+            &marker.token,
+            *move_id,
+        )?;
+    }
+
+    for move_id in &move_ids {
+        ctx.db.account_move().id().delete(move_id);
+    }
+    for record in &records {
+        ctx.db.import_job_record().id().delete(&record.id);
+    }
+    let updated_job = stamp_abandoned_draft_cleanup(parent_job, company_id, move_ids.len());
+    ctx.db.import_job().id().update(ImportJob {
+        status: "rolled_back".to_string(),
+        ..updated_job
+    });
+
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(company_id),
+            table_name: "import_job",
+            record_id: parent_job_id,
+            action: "ABANDONED_DRAFT_CLEANUP",
+            old_values: Some(serde_json::json!({ "status": "success" }).to_string()),
+            new_values: Some(serde_json::json!({ "status": "rolled_back" }).to_string()),
+            changed_fields: vec!["status".to_string()],
+            metadata: Some(
+                serde_json::json!({
+                    "parent_job_id": parent_job_id,
+                    "deleted_count": move_ids.len(),
+                    "move_ids": move_ids,
+                })
+                .to_string(),
+            ),
+        },
+    );
+    Ok(())
+}
+
 #[reducer]
 pub fn rollback_import_job(
     ctx: &ReducerContext,
@@ -991,29 +1448,58 @@ pub fn rollback_import_job(
         return Err("Import job has already been rolled back".to_string());
     }
 
+    if !matches!(job.status.as_str(), "success" | "partial") {
+        return Err("Import job is not eligible for rollback".to_string());
+    }
+
+    let bundle_marker = account_move_bundle_job_metadata(job.metadata.as_deref())
+        .filter(|marker| marker.role == "complete");
+    if !matches!(
+        job.table_name.as_str(),
+        "contact" | "product" | "account_move_line"
+    ) {
+        return Err(format!(
+            "Rollback not supported for table: {}",
+            job.table_name
+        ));
+    }
+    if job.table_name == "account_move_line" && bundle_marker.is_none() {
+        return Err(
+            "Rollback is supported only for a completed atomic account move bundle".to_string(),
+        );
+    }
+
     check_permission(ctx, organization_id, &job.table_name, "delete")?;
 
-    let records: Vec<ImportJobRecord> = ctx
-        .db
-        .import_job_record()
-        .import_record_by_job()
-        .filter(&job_id)
-        .collect();
-
-    if records.is_empty() {
-        return Err("No import records found for this job".to_string());
-    }
-
     let table_name = job.table_name.clone();
-    let mut deleted_count = 0u32;
-    for record in &records {
-        if record.organization_id != job.organization_id {
-            return Err("Import record does not belong to the import job organization".to_string());
+    let (deleted_count, parent_job_id) = if let Some(marker) = bundle_marker.as_ref() {
+        check_permission(ctx, organization_id, "account_move", "delete")?;
+        let (deleted_count, parent_job_id) =
+            rollback_account_move_bundle(ctx, organization_id, &job, marker)?;
+        (deleted_count, Some(parent_job_id))
+    } else {
+        let records: Vec<ImportJobRecord> = ctx
+            .db
+            .import_job_record()
+            .import_record_by_job()
+            .filter(&job_id)
+            .collect();
+        if records.is_empty() {
+            return Err("No import records found for this job".to_string());
         }
-        rollback_delete_record(ctx, organization_id, &record.table_name, record.record_id)?;
-        ctx.db.import_job_record().id().delete(&record.id);
-        deleted_count += 1;
-    }
+        let mut deleted_count = 0u32;
+        for record in &records {
+            if record.organization_id != job.organization_id {
+                return Err(
+                    "Import record does not belong to the import job organization".to_string(),
+                );
+            }
+            rollback_delete_record(ctx, organization_id, &record.table_name, record.record_id)?;
+            ctx.db.import_job_record().id().delete(&record.id);
+            deleted_count += 1;
+        }
+        (deleted_count, None)
+    };
 
     ctx.db.import_job().id().update(ImportJob {
         status: "rolled_back".to_string(),
@@ -1040,6 +1526,7 @@ pub fn rollback_import_job(
             metadata: Some(
                 serde_json::json!({
                     "job_id": job_id,
+                    "parent_job_id": parent_job_id,
                     "deleted_count": deleted_count,
                 })
                 .to_string(),
@@ -1159,6 +1646,47 @@ mod tracked_import_tests {
         assert!(metadata_has_sha256(Some(r#"{"sha256":"hash"}"#), "hash"));
         assert!(!metadata_has_sha256(Some(&tracked), "other"));
         assert!(!metadata_has_sha256(Some(r#"{"sha256":123}"#), "hash"));
+    }
+
+    #[test]
+    fn accounting_bundle_rollback_metadata_is_strict_and_versioned() {
+        let complete = serde_json::json!({
+            ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1,
+                "role": "complete",
+                "token": "bundle-1",
+                "parent_job_id": 41,
+            }
+        });
+        assert_eq!(
+            account_move_bundle_job_metadata(Some(&complete.to_string())),
+            Some(AccountMoveBundleJobMetadata {
+                role: "complete".to_string(),
+                token: "bundle-1".to_string(),
+                parent_job_id: Some(41),
+            })
+        );
+
+        for invalid in [
+            serde_json::json!({}),
+            serde_json::json!({ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 2, "role": "complete", "token": "bundle-1", "parent_job_id": 41,
+            }}),
+            serde_json::json!({ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1, "role": "parent", "token": "bundle-1", "parent_job_id": 41,
+            }}),
+            serde_json::json!({ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1, "role": "complete", "token": "", "parent_job_id": 41,
+            }}),
+            serde_json::json!({ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1, "role": "complete", "token": "bundle-1", "parent_job_id": 0,
+            }}),
+        ] {
+            assert_eq!(
+                account_move_bundle_job_metadata(Some(&invalid.to_string())),
+                None
+            );
+        }
     }
 
     #[test]

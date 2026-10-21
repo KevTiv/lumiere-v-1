@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { describe, it } from "vitest"
-import { canUseModuleData, moduleQueryState } from "./module-data-state"
+import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState } from "./module-data-state"
 
 describe("module query status", () => {
   it("distinguishes a failed empty read from successful empty results", () => {
@@ -31,4 +31,28 @@ it("blocks unavailable cached rows from dialog and join consumers while retainin
   assert.equal(canUseModuleData({ status: "error" }), false)
   assert.equal(canUseModuleData({ status: "partial" }), true)
   assert.equal(canUseModuleData({ status: "ready" }), true)
+})
+
+describe("module collection helpers", () => {
+  it("returns rows only while the collection is usable", () => {
+    const query = { isLoading: false, isError: false, data: [1, 2], refetch() {} }
+    assert.deepEqual(moduleCollection(query).rows, [1, 2])
+    assert.deepEqual(moduleCollection({ ...query, isError: true, error: { status: 403 } }).rows, [])
+    assert.deepEqual(moduleCollection({ ...query, isError: true }).rows, [])
+    assert.equal(moduleCollection({ ...query, isError: true }).rows, moduleCollection({ ...query, isError: true }).rows)
+    const partial = moduleCollection({ ...query, isError: true, error: { status: 503 } })
+    assert.equal(partial.state.status, "partial")
+    assert.deepEqual(partial.rows, [1, 2])
+  })
+  it("merges composed views: denial wins, failures retry every failed read", () => {
+    let retries = 0
+    const retry = () => { retries++ }
+    assert.equal(mergeModuleStates([{ status: "ready" }, { status: "denied" }, { status: "error", onRetry: retry }]).status, "denied")
+    const failed = mergeModuleStates([{ status: "partial", onRetry: retry }, { status: "loading" }, { status: "error", onRetry: retry }])
+    assert.equal(failed.status, "error")
+    if ("onRetry" in failed) failed.onRetry?.()
+    assert.equal(retries, 2)
+    assert.equal(mergeModuleStates([{ status: "ready" }, { status: "loading" }]).status, "loading")
+    assert.equal(mergeModuleStates([]).status, "ready")
+  })
 })

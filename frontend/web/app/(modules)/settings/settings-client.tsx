@@ -1,5 +1,7 @@
 "use client"
 
+import { useWorkOsAuthMode } from "@/lib/auth-mode-context"
+
 import { useMemo, useState } from "react"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useTranslation, i18n } from "@lumiere/i18n"
@@ -47,10 +49,6 @@ import {
 import type {
   CreateDataClassificationParams,
   CreateDataClassificationRuleParams,
-  UpdateCompanyAddressParams,
-  UpdateCompanyBusinessParams,
-  UpdateCompanyHierarchyParams,
-  UpdateCompanyParams,
 } from "@lumiere/stdb/types"
 import { GuidedImportWizard } from "@/lib/guided-import-wizard"
 import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -59,6 +57,15 @@ import { currencyOptionsFromRows } from "@/lib/form-lookup"
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { uploadDocumentBlob } from "@/lib/document-blob-upload"
+
+async function uploadInvoiceLogo(file: File, companyId: string | null): Promise<string> {
+  if (companyId !== null && (!/^[1-9]\d*$/.test(companyId) || !Number.isSafeInteger(Number(companyId)))) {
+    throw new Error("This company identifier cannot be safely used for logo upload")
+  }
+  const uploaded = await uploadDocumentBlob({ file, companyId: companyId === null ? undefined : BigInt(companyId) })
+  return `${uploaded.url}?sha256=${uploaded.checksum}`
+}
 
 type SettingsAction =
   | "createAuditRule"
@@ -403,7 +410,7 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
         fields: [
           { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
           { id: "code", type: "text", name: "code", label: "Code", required: true, width: "1/2" },
-          { id: "currency", type: "number", name: "currencyId", label: "Currency ID", width: "1/2" },
+          { id: "currency", type: "number", name: "currencyId", label: "Currency", required: true, width: "1/2" },
           { id: "country", type: "text", name: "addressCountryCode", label: "Country code", width: "1/2" },
         ],
       },
@@ -626,10 +633,110 @@ function optionalTimestamp(value: unknown): { microsSinceUnixEpoch: bigint } | n
   return { microsSinceUnixEpoch: BigInt(millis) * 1000n }
 }
 
-export function SettingsClient({ organizationId }: { organizationId?: number }) {
+export function SettingsClient({
+  organizationId,
+  firstOrgProfile = false,
+  financeSetup = false,
+}: {
+  organizationId?: number
+  firstOrgProfile?: boolean
+  financeSetup?: boolean
+}) {
   const { t } = useTranslation()
   if (!hasValidOrganizationId(organizationId)) return <MissingOrganization />
+  if (firstOrgProfile && financeSetup) {
+    return (
+      <FinanceAlphaSetup
+        organizationId={organizationId}
+        title={t("settings.page.title")}
+        description={t("settings.page.description")}
+      />
+    )
+  }
+  if (firstOrgProfile) {
+    return (
+      <div className="space-y-6">
+        <DashboardHeader title={t("settings.page.title")} description={t("settings.page.description")} />
+        <SettingsModule firstOrgProfile />
+      </div>
+    )
+  }
   return <SettingsLoaded organizationId={organizationId} title={t("settings.page.title")} description={t("settings.page.description")} />
+}
+
+function FinanceAlphaSetup({
+  organizationId,
+  title,
+  description,
+}: {
+  organizationId: number
+  title: string
+  description: string
+}) {
+  const [formOpen, setFormOpen] = useState(true)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const { data: currencyRows = [] } = useCurrencies()
+  const companiesQuery = useCompanies(organizationId, true)
+  const createCompany = useCreateCompany(organizationId)
+  const form = useMemo(
+    () =>
+      withLinkedPickers(settingsActionForms.createCompany, {
+        currencyId: currencyOptionsFromRows(currencyRows),
+      }),
+    [currencyRows],
+  )
+
+  return (
+    <div className="space-y-6">
+      <DashboardHeader title={title} description={description} />
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h2 className="text-base font-semibold">Complete Finance setup</h2>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Create an operating company and choose its base currency before creating invoices,
+          bills, or historical accounting imports.
+        </p>
+        <button
+          type="button"
+          className="mt-4 inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+          onClick={() => setFormOpen(true)}
+        >
+          Create operating company
+        </button>
+      </section>
+      <FormModal
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        config={form}
+        isPending={createCompany.isPending}
+        closeOnSubmit={false}
+        submitError={submitError}
+        onSubmit={async (formData) => {
+          setSubmitError(null)
+          try {
+            const currentCompanies = await companiesQuery.refetch()
+            const existingIds = new Set(
+              (currentCompanies.data ?? []).map((company) => String(company.id)),
+            )
+            const params = toCreateCompanyParams(formData)
+            if (!params) throw new Error(i18n.t("common.paramsMapper.invalidCompany"))
+            await createCompany.mutateAsync(params)
+            const refreshed = await companiesQuery.refetch()
+            const createdCompany = refreshed.data?.find(
+              (company) => !existingIds.has(String(company.id)),
+            )
+            const createdCompanyId = Number(createdCompany?.id)
+            window.location.assign(
+              Number.isSafeInteger(createdCompanyId) && createdCompanyId > 0
+                ? `/accounting?companyId=${createdCompanyId}`
+                : "/accounting",
+            )
+          } catch (error) {
+            setSubmitError(error instanceof Error ? error.message : String(error))
+          }
+        }}
+      />
+    </div>
+  )
 }
 
 function SettingsLoaded({
@@ -644,6 +751,7 @@ function SettingsLoaded({
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   useSettingsModuleSubscription()
   const { orgId } = orgBigInts(organizationId)
+  const hostedAuth = useWorkOsAuthMode()
   const [activeAction, setActiveAction] = useState<SettingsAction | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -967,7 +1075,7 @@ function SettingsLoaded({
     INTEGRATION_SETTINGS_ACTIONS.includes(action.id),
   )
   const adminActions = actions.filter(
-    (action) => !INTEGRATION_SETTINGS_ACTIONS.includes(action.id),
+    (action) => !INTEGRATION_SETTINGS_ACTIONS.includes(action.id) && !(hostedAuth && action.id === "updateEmail"),
   )
 
   const openAction = (id: SettingsAction) => {
@@ -979,7 +1087,7 @@ function SettingsLoaded({
   return (
     <div className="space-y-6">
       <DashboardHeader title={title} description={description} />
-      <SettingsModule />
+      <SettingsModule uploadInvoiceLogo={uploadInvoiceLogo} />
 
       <section className="rounded-xl border border-border bg-card p-4">
         <GuidedImportWizard organizationId={organizationId} />

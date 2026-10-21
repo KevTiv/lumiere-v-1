@@ -96,6 +96,32 @@ async fn postgres_migration_13_adds_manufacturing_cost_projection_14() -> Result
     Ok(())
 }
 
+#[tokio::test]
+async fn postgres_migration_14_adds_account_payment_reversal_identity_15() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!(
+            "skipping postgres_migration_14_adds_account_payment_reversal_identity_15 (set C4_TEST_PG=1 to run)"
+        );
+        return Ok(());
+    }
+
+    let base_config = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin_pool = admin_pool(&base_config)?;
+    create_database(&admin_pool, &database, &base_config.user).await?;
+
+    let mut test_config = base_config.clone();
+    test_config.database.clone_from(&database);
+    let test_pool = pg_pool::build_pool(&test_config)?;
+    let test_result = exercise_account_payment_reversal_identity_upgrade(&test_pool).await;
+    drop(test_pool);
+    let cleanup_result = drop_database(&admin_pool, &database).await;
+
+    test_result?;
+    cleanup_result?;
+    Ok(())
+}
+
 async fn exercise_durable_projection_upgrade(pool: &Pool) -> Result<()> {
     let migration_11_index = "cold_tier_service_identity_identity";
     let frozen_migration_1 =
@@ -142,16 +168,22 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     ensure!(migration_count(pool).await? == prefix_length as i64);
     let previous_history = applied_migration_history(pool).await?;
     let previous_tables = public_table_names(pool).await?;
-    let expected_cost_tables = [
+    // Startup upgrades the frozen v13 prefix through the whole current catalog.
+    let expected_new_tables = [
+        "bank_statement_settlement_attempt",
+        "bank_statement_settlement_reversal",
         "mrp_production_cost",
         "mrp_productivity_cost",
         "mrp_valuation_config",
         "mrp_workcenter_cost_rate",
+        "purchase_order_creation_operation",
+        "purchase_receipt_operation",
+        "user_invite_acceptance",
     ];
-    for table in expected_cost_tables {
+    for table in expected_new_tables {
         ensure!(
             !relation_exists(pool, table).await?,
-            "cost table {table} predates migration 14"
+            "table {table} predates its catalog migration"
         );
     }
 
@@ -170,13 +202,165 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
         .filter(|table| !previous_tables.contains(table))
         .collect();
     ensure!(
-        added_tables == expected_cost_tables,
+        added_tables == expected_new_tables,
         "migration 13 upgrade produced unexpected new tables: {added_tables:?}"
     );
 
     // Startup replay must preserve both the released history and its application timestamps.
     ensure_schema(pool).await?;
     ensure!(applied_migration_history(pool).await? == current_history);
+    Ok(())
+}
+
+async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Result<()> {
+    let migration_15_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.version == 15)
+        .context("migration 15 is missing from the catalog")?;
+    let frozen_migration_15 = include_str!(
+        "../../../../lumiere-codegen/pg-migration-ledger/0015_durable_projection_delta.sql"
+    );
+    ensure!(MIGRATIONS[migration_15_index].name == "account_payment_reversal_identity");
+    ensure!(MIGRATIONS[migration_15_index].sql == frozen_migration_15);
+
+    apply_migration_prefix(pool, migration_15_index).await?;
+    let client = pool.get().await?;
+    let column_before: bool = client
+        .query_one(
+            "select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'account_payment' and column_name = 'reversal_move_id')",
+            &[],
+        )
+        .await?
+        .get(0);
+    ensure!(!column_before, "reversal identity predates migration 15");
+    drop(client);
+
+    let previous_history = applied_migration_history(pool).await?;
+    ensure_schema(pool).await?;
+    ensure!(applied_checksum(pool, 15).await? == migration_checksum(frozen_migration_15));
+
+    let client = pool.get().await?;
+    let column = client
+        .query_one(
+            "select is_nullable, column_default, data_type, numeric_precision, numeric_scale from information_schema.columns where table_schema = 'public' and table_name = 'account_payment' and column_name = 'reversal_move_id'",
+            &[],
+        )
+        .await?;
+    let nullable: String = column.get(0);
+    let default_value: Option<String> = column.get(1);
+    let data_type: String = column.get(2);
+    let precision: Option<i32> = column.get(3);
+    let scale: Option<i32> = column.get(4);
+    ensure!(nullable == "YES");
+    ensure!(default_value.is_none());
+    ensure!(data_type == "numeric");
+    ensure!(precision == Some(20));
+    ensure!(scale == Some(0));
+
+    let index = client
+        .query_one(
+            "select index_definition.indisunique, pg_get_expr(index_definition.indpred, index_definition.indrelid) from pg_catalog.pg_class index_relation join pg_catalog.pg_index index_definition on index_definition.indexrelid = index_relation.oid where index_relation.oid = to_regclass('account_payment_reversal_move_id')",
+            &[],
+        )
+        .await?;
+    let unique: bool = index.get(0);
+    let predicate: Option<String> = index.get(1);
+    ensure!(unique);
+    ensure!(predicate
+        .as_deref()
+        .is_some_and(|value| value.contains("reversal_move_id IS NOT NULL")));
+    drop(client);
+
+    ensure!(applied_migration_history(pool).await?[..migration_15_index] == previous_history);
+    ensure_schema(pool).await?;
+    ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
+    Ok(())
+}
+
+#[tokio::test]
+async fn postgres_main_18_upgrades_financial_alpha_without_rewriting_history() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!("skipping financial alpha migration proof (set C4_TEST_PG=1 to run)");
+        return Ok(());
+    }
+    let base_config = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin_pool = admin_pool(&base_config)?;
+    create_database(&admin_pool, &database, &base_config.user).await?;
+    let mut test_config = base_config.clone();
+    test_config.database.clone_from(&database);
+    let test_pool = pg_pool::build_pool(&test_config)?;
+    let result = exercise_financial_alpha_upgrade(&test_pool).await;
+    drop(test_pool);
+    let cleanup = drop_database(&admin_pool, &database).await;
+    result?;
+    cleanup?;
+    Ok(())
+}
+
+async fn exercise_financial_alpha_upgrade(pool: &Pool) -> Result<()> {
+    let finance_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.name == "financial_alpha_operations")
+        .context("financial alpha migration is missing")?;
+    ensure!(MIGRATIONS[finance_index].version == 19 && finance_index == 18);
+    apply_migration_prefix(pool, finance_index).await?;
+    let previous_history = applied_migration_history(pool).await?;
+    let audit = super::audit_schema(pool).await?;
+    audit.require_compatible()?;
+    ensure!(audit.require_current().is_err());
+
+    // The earlier accounting branch used purchasing at 17. A mismatched
+    // lineage must fail before any financial schema or history is committed.
+    let client = pool.get().await?;
+    client
+        .batch_execute("update lumiere_platform.schema_migration set name = 'purchasing_keyed_operations' where version = 17")
+        .await?;
+    drop(client);
+    ensure!(super::audit_schema(pool)
+        .await?
+        .require_compatible()
+        .is_err());
+    ensure!(ensure_schema(pool).await.is_err());
+    ensure!(migration_count(pool).await? == 18);
+    ensure!(!relation_exists(pool, "purchase_order_creation_operation").await?);
+    let client = pool.get().await?;
+    client
+        .batch_execute("update lumiere_platform.schema_migration set name = 'platform_identity_lifecycle' where version = 17")
+        .await?;
+    drop(client);
+
+    ensure_schema(pool).await?;
+    super::audit_schema(pool).await?.require_current()?;
+    ensure!(applied_migration_history(pool).await?[..finance_index] == previous_history);
+    for table in [
+        "purchase_order_creation_operation",
+        "purchase_receipt_operation",
+        "bank_statement_settlement_attempt",
+        "bank_statement_settlement_reversal",
+    ] {
+        ensure!(relation_exists(pool, table).await?, "missing {table}");
+    }
+    let client = pool.get().await?;
+    client.batch_execute(
+        "insert into purchase_order_creation_operation \
+         (id, organization_id, company_id, operation_key, purchase_order_id, payload_hash, created_by, created_at) \
+         values ('migration-proof', 1, 1, 'migration-proof', 123, 'proof', decode(repeat('ab', 32), 'hex'), 0)",
+    ).await?;
+    drop(client);
+    let applied = applied_migration_history(pool).await?;
+    ensure_schema(pool).await?;
+    ensure!(applied_migration_history(pool).await? == applied);
+    let count: i64 = pool
+        .get()
+        .await?
+        .query_one(
+            "select count(*) from purchase_order_creation_operation where id = 'migration-proof'",
+            &[],
+        )
+        .await?
+        .get(0);
+    ensure!(count == 1);
     Ok(())
 }
 

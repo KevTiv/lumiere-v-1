@@ -1,3 +1,4 @@
+import { bootstrapFixtureAccountSession } from './fixture-account'
 import { expect, request as playwrightRequest, test, type Browser, type Page } from "@playwright/test"
 
 import {
@@ -16,6 +17,7 @@ import {
   grantPermissionViaSettings,
   revokePermissionViaSettings,
   scalarQueryId,
+  scalarQueryString,
   signIn,
   smokeName,
   waitForMovePosted,
@@ -81,18 +83,7 @@ async function signupIdentityHex(email: string, password: string): Promise<strin
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100"
   const isolated = await playwrightRequest.newContext({ baseURL })
   try {
-    const signup = await isolated.post("/api/auth/signup", {
-      data: { email, password },
-    })
-    if (!signup.ok()) {
-      const body = await signup.text().catch(() => "")
-      throw new Error(`signup failed (${signup.status()}): ${body}`)
-    }
-    const state = await isolated.storageState()
-    const identityCookie = state.cookies.find((c) => c.name === "stdb_identity")
-    const raw = identityCookie?.value
-    if (!raw) throw new Error("signup did not set stdb_identity cookie")
-    return raw.replace(/^0x/i, "")
+    return await bootstrapFixtureAccountSession(isolated, email, password)
   } finally {
     await isolated.dispose()
   }
@@ -431,8 +422,7 @@ async function adminPrepareAssignedPicking(page: Page): Promise<number> {
         warehouse_id: warehouseId,
         order_lines: [],
         origin: orderOrigin,
-        // `origin` is not in the governed sale-orders read projection;
-        // `client_order_ref` is, so it carries the exact readback key.
+        // `client_order_ref` carries the exact customer-facing readback key.
         client_order_ref: orderOrigin,
       },
     ],
@@ -589,8 +579,9 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
 
     await withLimitedUserSession(browser, async (limitedPage) => {
       await callReducerBff(limitedPage, "post_account_move", args)
-      await waitForMovePosted(limitedPage, moveId)
     })
+    // A write grant does not grant read access. Observe the effect as admin.
+    await waitForMovePosted(page, moveId)
 
     permissionId = await fetchOrgPermissionId(page, "account_move", {
       roleId: limitedRoleId,
@@ -621,18 +612,25 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
         secondaryPickingId = await adminPrepareAssignedPicking(page)
         return [orgId, secondaryPickingId, { company_id: companyId }]
       },
+      // The grant is Write-only, so the limited actor still cannot read pickings;
+      // the administrator observes the validated effect.
       assertSuccess: async (limitedPage, args) => {
         const pickingId = Number(args[1])
+        // Write permission is not read permission: prove the limited actor
+        // cannot inspect pickings, then use the admin's authorized readback to
+        // certify the exact mutation effect.
+        const deniedRead = await limitedPage.request.get("/api/query/stock-pickings")
+        expect(deniedRead.status()).toBe(403)
         await expect
           .poll(
             async () => {
-              const res = await limitedPage.request.get("/api/query/stock-pickings")
-              if (!res.ok()) return ""
+              const res = await page.request.get("/api/query/stock-pickings")
+              expect(res.ok(), `admin stock-pickings read: ${res.status()}`).toBe(true)
               const json = (await res.json()) as {
                 data?: Array<{ id?: unknown; state?: unknown }>
               }
               const row = (json.data ?? []).find((p) => scalarQueryId(p.id) === pickingId)
-              return String(row?.state ?? "").toLowerCase()
+              return scalarQueryString(row?.state).toLowerCase()
             },
             { timeout: 30_000 },
           )
@@ -663,9 +661,11 @@ test.describe("Auth permission enforcement", { tag: ["@p0", "@auth-hardening"] }
         secondaryPaymentId = await adminCreateDraftPayment(page)
         return [orgId, secondaryPaymentId]
       },
-      assertSuccess: async (limitedPage, args) => {
+      // The actor holds post only, not account_payment read; the administrator
+      // observes the posted payment.
+      assertSuccess: async (_limitedPage, args) => {
         const paymentId = Number(args[1])
-        await waitForPaymentPosted(limitedPage, paymentId)
+        await waitForPaymentPosted(page, paymentId)
       },
     })
   })
