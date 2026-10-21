@@ -1315,8 +1315,12 @@ pub fn test_seed_payment_ledger_and_partial_report_balance(
         .account_move_line()
         .move_line_by_move()
         .filter(&invoice_id)
-        .find(|line| line.account_internal_type.as_deref() == Some("receivable"))
+        .find(|line| line.account_id == ar_account_id)
         .ok_or("partial owner invoice has no AR line")?;
+    assert!(invoice_line
+        .account_internal_type
+        .as_deref()
+        .is_some_and(|kind| kind.eq_ignore_ascii_case("receivable")));
     allocate_payment_transaction(
         ctx,
         fixture.organization_id,
@@ -1360,12 +1364,16 @@ pub fn test_seed_payment_ledger_and_partial_report_balance(
         8_750.0
     );
     for (payment, expected) in payments.iter().zip([0.0, 15_000.0, 0.0, 2_500.0]) {
-        let remaining: f64 = ctx
+        let clearing_lines: Vec<_> = ctx
             .db
             .account_move_line()
             .move_line_by_move()
             .filter(&payment.move_id.ok_or("seed payment move absent")?)
-            .filter(|line| line.account_internal_type.as_deref() == Some("receivable"))
+            .filter(|line| line.account_id == ar_account_id)
+            .collect();
+        assert_eq!(clearing_lines.len(), 1);
+        let remaining: f64 = clearing_lines
+            .iter()
             .map(|line| line.amount_residual.abs())
             .sum();
         assert_eq!(remaining, expected);
