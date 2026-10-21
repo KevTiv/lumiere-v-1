@@ -777,11 +777,7 @@ fn rule_run_job_exists(ctx: &ReducerContext, rule_id: u64) -> bool {
         .is_some()
 }
 
-fn replacement_run_job_exists(
-    ctx: &ReducerContext,
-    rule_id: u64,
-    fired_scheduled_id: u64,
-) -> bool {
+fn replacement_run_job_exists(ctx: &ReducerContext, rule_id: u64, fired_scheduled_id: u64) -> bool {
     ctx.db
         .replenishment_run_job()
         .replenishment_run_job_by_rule()
@@ -885,7 +881,10 @@ pub fn cancel_replenishment_run(
         .map(|job| job.scheduled_id)
         .collect();
     for scheduled_id in jobs {
-        ctx.db.replenishment_run_job().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .replenishment_run_job()
+            .scheduled_id()
+            .delete(&scheduled_id);
     }
     if rule.scheduled_run_job_id.is_some() {
         ctx.db.replenishment_rule().id().update(ReplenishmentRule {
