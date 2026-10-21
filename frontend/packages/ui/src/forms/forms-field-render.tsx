@@ -24,7 +24,7 @@ import {
 } from "./utils/radix-select-empty-value"
 
 const inputBase =
-  "bg-background border-input focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:border-ring transition-[border-color,box-shadow,background-color] duration-150"
+  "bg-background border-input focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-ring transition-[border-color,box-shadow,background-color] duration-150"
 
 function autoCompleteForField(field: FormField): string | undefined {
   if (field.autoComplete) return field.autoComplete
@@ -162,6 +162,7 @@ export function FormFieldRenderer({
             disabled={field.disabled}
           >
             <SelectTrigger
+              id={field.id}
               data-testid={`form-field-${field.name}`}
               className={cn(
                 "w-full",

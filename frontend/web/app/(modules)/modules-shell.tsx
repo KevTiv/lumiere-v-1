@@ -3,12 +3,12 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react"
 import {
   DashboardSidebar,
+  DashboardWorkspace,
   ErpCommandPalette,
   AIChatPanel,
   NotebookPanel,
   JournalPanel,
   ChatterUploaderProvider,
-  HeaderTrailingProvider,
   NotificationBell,
   recentNotifications,
 } from "@lumiere/ui"
@@ -563,6 +563,7 @@ function ModulesContent({
   const [isAIChatDocked, setIsAIChatDocked] = useState(false)
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const { organizationId } = useErpSession()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
@@ -585,55 +586,62 @@ function ModulesContent({
 
   return (
     <ErpAiChatControllerProvider open={openAiChat}>
-      <HeaderTrailingProvider value={orgReady ? <HeaderNotificationBell organizationId={orgId} /> : null}>
-      <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
-        <DashboardSidebar
-          firstOrgProfile={firstOrgProfile}
-          forceCollapsed={isAIChatDocked || isNotebookOpen}
-          navBadges={navBadges}
-          onOpenJournal={() => setIsJournalOpen(true)}
-          onOpenNotebook={() => setIsNotebookOpen(true)}
-          onOpenAIChat={openAiChat}
-          onSignOut={() => void performSignOut()}
-          userProfile={currentUserProfile.data}
-        />
-        <main className="flex-1 overflow-auto scroll-smooth">
-          <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</div>
-        </main>
+      <DashboardWorkspace
+        forceCollapsed={isAIChatDocked || isNotebookOpen}
+        onOpenSearch={() => setIsSearchOpen(true)}
+        notifications={orgReady ? <HeaderNotificationBell organizationId={orgId} /> : null}
+        sidebar={
+          <DashboardSidebar
+            firstOrgProfile={firstOrgProfile}
+            forceCollapsed={isAIChatDocked || isNotebookOpen}
+            navBadges={navBadges}
+            onOpenJournal={() => setIsJournalOpen(true)}
+            onOpenNotebook={() => setIsNotebookOpen(true)}
+            onOpenAIChat={openAiChat}
+            onSignOut={() => void performSignOut()}
+            userProfile={currentUserProfile.data}
+          />
+        }
+        overlays={
+          <>
+            <ErpAiChatPanel
+              open={isAIChatOpen}
+              onClose={() => {
+                setIsAIChatOpen(false)
+                setIsAIChatDocked(false)
+              }}
+              docked={isAIChatDocked}
+              onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
+              config={{
+                title: "ERP Assistant",
+                welcomeMessage: "Ask questions about your data or use @ commands for quick actions.",
+                placeholder: "Ask anything... Type @ for commands",
+              }}
+            />
 
-        <ErpAiChatPanel
-          open={isAIChatOpen}
-          onClose={() => {
-            setIsAIChatOpen(false)
-            setIsAIChatDocked(false)
-          }}
-          docked={isAIChatDocked}
-          onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
-          config={{
-            title: "ERP Assistant",
-            welcomeMessage: "Ask questions about your data or use @ commands for quick actions.",
-            placeholder: "Ask anything... Type @ for commands",
-          }}
-        />
+            <NotebookPanel
+              open={isNotebookOpen}
+              onClose={() => setIsNotebookOpen(false)}
+              onAIChat={openAiChat}
+              dataContext={{}}
+            />
 
-        <NotebookPanel
-          open={isNotebookOpen}
-          onClose={() => setIsNotebookOpen(false)}
-          onAIChat={openAiChat}
-          dataContext={{}}
-        />
+            <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
 
-        <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
-
-        <ErpCommandPalette
-          firstOrgProfile={firstOrgProfile}
-          recordHref={recordPageHref}
-          onOpenAIChat={openAiChat}
-          onOpenNotebook={() => setIsNotebookOpen(true)}
-          onOpenJournal={() => setIsJournalOpen(true)}
-        />
-      </div>
-      </HeaderTrailingProvider>
+            <ErpCommandPalette
+              open={isSearchOpen}
+              onOpenChange={setIsSearchOpen}
+              firstOrgProfile={firstOrgProfile}
+              recordHref={recordPageHref}
+              onOpenAIChat={openAiChat}
+              onOpenNotebook={() => setIsNotebookOpen(true)}
+              onOpenJournal={() => setIsJournalOpen(true)}
+            />
+          </>
+        }
+      >
+        {children}
+      </DashboardWorkspace>
     </ErpAiChatControllerProvider>
   )
 }

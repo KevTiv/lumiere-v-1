@@ -143,3 +143,67 @@ describe("FormModal unsaved-changes guard", () => {
     await waitFor(() => expect(count(remove)).toBeGreaterThan(0))
   })
 })
+
+describe("FormModal authoring preview", () => {
+  it("prevents example inputs from implicitly submitting the record", () => {
+    const onSubmit = vi.fn()
+    render(
+      <FormModal
+        open
+        onOpenChange={vi.fn()}
+        config={config}
+        onSubmit={onSubmit}
+        renderPreview={() => <input aria-label="Sample amount" defaultValue="100" />}
+      />,
+    )
+    expect(fireEvent.keyDown(screen.getByLabelText("Sample amount"), { key: "Enter" })).toBe(false)
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it("uses the submitted form state for defaults, edits, and reset", async () => {
+    const onSubmit = vi.fn()
+    render(
+      <FormModal
+        open
+        onOpenChange={vi.fn()}
+        config={{ ...config, showReset: true }}
+        onSubmit={onSubmit}
+        showSubmitSuccessToast={false}
+        renderPreview={(values) => <output data-testid="draft-preview">{String(values.title)}</output>}
+      />,
+    )
+    expect(screen.getByTestId("draft-preview").textContent).toBe("Draft")
+    edit("New invoice")
+    expect(screen.getByTestId("draft-preview").textContent).toBe("New invoice")
+    fireEvent.click(screen.getByRole("button", { name: /reset/i }))
+    expect(screen.getByTestId("draft-preview").textContent).toBe("Draft")
+    edit("Reviewed invoice")
+    fireEvent.click(screen.getByTestId("form-submit-new-note"))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ title: "Reviewed invoice" }))
+  })
+
+  it("keeps a rejected draft and its preview available for correction", async () => {
+    const onOpenChange = vi.fn()
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    render(
+      <FormModal
+        open
+        onOpenChange={onOpenChange}
+        config={config}
+        onSubmit={async () => { throw new Error("Posting is unavailable") }}
+        renderPreview={(values) => <output data-testid="draft-preview">{String(values.title)}</output>}
+      />,
+    )
+    edit("Unsaved entry")
+    fireEvent.click(screen.getByTestId("form-submit-new-note"))
+    await waitFor(() => expect(screen.getByTestId("form-submit-new-note").hasAttribute("disabled")).toBe(false))
+    expect(screen.getByTestId("draft-preview").textContent).toBe("Unsaved entry")
+    expect(onOpenChange).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+
+  it("does not create a preview region for forms without an authoring tool", () => {
+    setup()
+    expect(screen.queryByTestId("form-preview-new-note")).toBeNull()
+  })
+})

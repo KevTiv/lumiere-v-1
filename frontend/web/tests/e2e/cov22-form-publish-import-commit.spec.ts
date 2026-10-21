@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
+  selectModuleTab,
   expectNoAppError,
   fetchSessionOrganizationId,
   gotoModule,
@@ -129,7 +130,7 @@ test.describe("COV-22 form publish and idempotent import commit", { tag: ["@cov2
   }) => {
     test.setTimeout(180_000)
     await gotoModule(page, "/hr", "hr")
-    await page.getByTestId("module-tab-hr-payslips").click()
+    await selectModuleTab(page, "hr", "payslips")
     const organizationId = await fetchSessionOrganizationId(page)
     const employeeId = await firstId(page, "employees")
     const structId = await firstId(page, "payroll-structures")

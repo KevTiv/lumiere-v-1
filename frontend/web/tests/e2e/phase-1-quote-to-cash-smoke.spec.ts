@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   expectNoAppError,
   fillField,
   gotoModule,
@@ -12,7 +13,7 @@ import {
 test.describe("ERP phase-1 quote-to-cash gaps smoke @phase-1", () => {
   test("CRM contact-tags tab renders", async ({ page }) => {
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-contact-tags").click()
+    await selectModuleTab(page, "crm", "contact-tags")
     await expect(page.getByTestId("module-create-crm-contact-tags")).toBeVisible()
     await expect(page.getByTestId("entity-table")).toBeVisible()
     await expectNoAppError(page)
@@ -20,7 +21,7 @@ test.describe("ERP phase-1 quote-to-cash gaps smoke @phase-1", () => {
 
   test("CRM contact-segments tab renders", async ({ page }) => {
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-contact-segments").click()
+    await selectModuleTab(page, "crm", "contact-segments")
     await expect(page.getByTestId("module-create-crm-contact-segments")).toBeVisible()
     await expect(page.getByTestId("entity-table")).toBeVisible()
     await expectNoAppError(page)

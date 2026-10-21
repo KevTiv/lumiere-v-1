@@ -2,7 +2,7 @@
 
 import { apiFetch } from '@/lib/api-fetch'
 import { useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui"
@@ -21,7 +21,6 @@ import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 export default function SignInPage() {
   const useWorkOsAuth = useWorkOsAuthMode()
   const { t } = useTranslation()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = safeAuthReturnTo(searchParams.get("callbackUrl"))
 
@@ -54,7 +53,12 @@ export default function SignInPage() {
       }
       phIdentify(email)
       phCapture("user_signed_in", { method: "email" })
-      router.push(data.redirectTo === "/overview" ? callbackUrl : (data.redirectTo ?? callbackUrl))
+      const redirectTo = data.redirectTo === "/overview" ? callbackUrl : (data.redirectTo ?? callbackUrl)
+      // Authentication changes the cookie-backed identity, organization, and
+      // effective roles supplied by the root server layout. A client-side
+      // transition preserves the anonymous root providers from `/sign-in`, so
+      // the newly signed-in user can retain stale RBAC state until a reload.
+      window.location.assign(redirectTo)
     } catch (err) {
       phCaptureException(err)
       setError(t("auth.errors.generic"))

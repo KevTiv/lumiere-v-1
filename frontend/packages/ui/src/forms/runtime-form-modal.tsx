@@ -36,6 +36,7 @@ export interface RuntimeFormModalProps {
    */
   runtimeConfigFailureMode?: "block" | "use-static"
   aiAssist?: React.ComponentProps<typeof FormModal>["aiAssist"]
+  renderPreview?: React.ComponentProps<typeof FormModal>["renderPreview"]
 }
 
 export function RuntimeFormModal({

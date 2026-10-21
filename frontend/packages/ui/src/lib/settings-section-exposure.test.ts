@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import {
   SETTINGS_SECTION_EXPOSURE,
   isSettingsSectionAdmitted,
+  isSettingsSectionVisibleForProfile,
   settingsSections,
 } from "./rbac-defaults"
 
@@ -19,11 +20,19 @@ describe("first-organization Settings exposure", () => {
     }
   })
 
-  it("keeps internal AI settings hidden and admin settings role-gated", () => {
-    expect(isSettingsSectionAdmitted("ai", true)).toBe(false)
+  it("admits only AI configuration for finance alpha administrators", () => {
+    expect(isSettingsSectionVisibleForProfile("ai", true, true)).toBe(true)
+    expect(isSettingsSectionVisibleForProfile("ai", false, true)).toBe(false)
     expect(isSettingsSectionAdmitted("users", false)).toBe(false)
-    expect(isSettingsSectionAdmitted("users", true)).toBe(true)
-    expect(isSettingsSectionAdmitted("profile", false)).toBe(true)
+    expect(isSettingsSectionVisibleForProfile("users", true, true)).toBe(false)
+    expect(isSettingsSectionVisibleForProfile("profile", false, true)).toBe(false)
     expect(isSettingsSectionAdmitted("unclassified-future-setting", true)).toBe(false)
+  })
+
+  it("leaves settings unchanged outside the configured alpha organization", () => {
+    expect(isSettingsSectionVisibleForProfile("profile", false, false)).toBe(true)
+    expect(isSettingsSectionVisibleForProfile("users", true, false)).toBe(true)
+    expect(isSettingsSectionVisibleForProfile("ai", true, false)).toBe(false)
+    expect(isSettingsSectionVisibleForProfile("profile", true, true)).toBe(false)
   })
 })

@@ -619,7 +619,9 @@ fn find_effective_delegation(
                 && at < delegation.valid_until
                 && delegation
                     .role_id
-                    .is_none_or(|role_id| eligible_role_ids.contains(&role_id))
+                    .map_or(!eligible_role_ids.is_empty(), |role_id| {
+                        eligible_role_ids.contains(&role_id)
+                    })
         })
         .min_by_key(|delegation| delegation.id)
 }

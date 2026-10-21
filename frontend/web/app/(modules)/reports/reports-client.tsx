@@ -1,8 +1,11 @@
 "use client"
+import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { applyPeriodReportFormContext, periodReportContextState, periodReportFormDefaults, readPeriodReportContext, reportMatchesPeriodContext } from "@lumiere/ui/lib/period-report-context"
+import { ModuleInsights } from "../../../components/module-insights"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useMemo, useState, useRef, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useMemo, useState, useRef, useCallback } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -48,6 +51,7 @@ import {
   csvImportForm,
 } from "@lumiere/ui"
 import type { EntityTableConfig, EntityViewConfig, FormConfig } from "@lumiere/ui"
+import type { FormValues } from "@lumiere/ui/lib/form-types"
 import { reportsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useReportsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -102,7 +106,18 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
-import { useAccountAccounts } from "@lumiere/query-hooks/hooks/accounting"
+import {
+  useAccountAccounts,
+  useAccountMoveLines,
+  useAccountMoves,
+  useAccountPayments,
+} from "@lumiere/query-hooks/hooks/accounting"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import { type ChartValueFormat } from "@lumiere/ui/lib/chart-format"
+import { variantTag } from "@lumiere/erp-workflows"
+import { singleCurrencyId } from "../accounting/accounting-dashboard-charts"
+import { expenseBreakdown, profitAndLossByMonth } from "./finance-dashboard-charts"
+import { useAccountPeriods } from "@lumiere/query-hooks/hooks/accounting/fiscal-periods"
 import { useStoredDashboardDataSources } from "@/hooks/use-stored-dashboard-data-sources"
 import {
   companyRowsToSelectOptions,
@@ -142,6 +157,12 @@ import { VatReportPanel } from "./vat-report-panel"
 import { StatementsPanel } from "./statements-panel"
 import { QueryBuilder, type QueryBuilderStatus } from "./query-builder"
 import { OwnerReportsPanel } from "./owner-reports-panel"
+import { ReportPeriodNotice } from "./report-period-notice"
+import { useRBAC } from "@/lib/rbac-context"
+import { ReportAuthoringPreview } from "./report-authoring-preview"
+import { reportAuthoringKind, enhanceWidgetAuthoringForm } from "./report-authoring-model"
+import { enhanceMetricForm } from "./metric-authoring"
+import { MetricAuthoringPreview } from "./metric-authoring-preview"
 
 export { REPORTS_UI_REDUCERS } from "@/lib/reports-ui-reducers"
 
@@ -186,6 +207,10 @@ function ReportsClientLoaded({
   /** BigInt organization id for React Query keys (matches `@lumiere/query-hooks` `organizationId` param). */
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId)
+  const { currentUser, checkPermission, permissionsReady } = useRBAC()
+  const searchParams = useSearchParams()
+  const periodRequested = searchParams?.get("source") === "period-close"
+  const periodContext = useMemo(() => readPeriodReportContext(searchParams ?? new URLSearchParams()), [searchParams])
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [editTemplateOpen, setEditTemplateOpen] = useState(false)
@@ -195,6 +220,7 @@ function ReportsClientLoaded({
   const [recordRunOpen, setRecordRunOpen] = useState(false)
   const [recordRunScheduledId, setRecordRunScheduledId] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<"report_template" | "analytics_metric" | null>(null)
+  useEffect(() => { setSelectedReportId(null); setQuickActionForm(null) }, [orgId, operatingCompanyId, currentUser?.id, periodContext?.periodId, periodContext?.reportType, periodContext?.dateFrom, periodContext?.dateTo])
 
   // Dashboard modal states
   const [editReportOpen, setEditReportOpen] = useState(false)
@@ -216,28 +242,44 @@ function ReportsClientLoaded({
     [router],
   )
 
-  const { data: reportsRaw = [] } = useFinancialReports(orgId, initialReports)
-  const { data: trialBalances = [] } = useTrialBalances(orgId, initialBalances)
+  const reportsQuery = useFinancialReports(orgId, initialReports)
+  const { data: reportsRaw = [] } = reportsQuery
+  const trialBalancesQuery = useTrialBalances(orgId, initialBalances)
+  const { data: trialBalances = [] } = trialBalancesQuery
+  const periodsQuery = useAccountPeriods(orgId, { enabled: periodRequested })
   const { data: reportTemplates = [] } = useReportTemplates(orgId, initialReportTemplates)
   const { data: scheduledReports = [] } = useScheduledReports(orgId, initialScheduledReports)
   const { data: analyticsMetrics = [] } = useAnalyticsMetrics(orgId, initialAnalyticsMetrics)
   const { data: dashboards = [] } = useDashboards(orgId, initialDashboards)
   const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
-  const { data: accountAccounts = [] } = useAccountAccounts(orgId)
-  const { data: currencies = [] } = useCurrencies()
+  const accountAccountsQuery = useAccountAccounts(orgId)
+  const { data: accountAccounts = [] } = accountAccountsQuery
+  const currenciesQuery = useCurrencies()
+  const { data: currencies = [] } = currenciesQuery
+  const periodState = periodReportContextState(periodContext, { organizationId: orgId, companyId: operatingCompanyId, periods: periodsQuery.data ?? [], periodState: moduleQueryState(periodsQuery), reportState: moduleQueryState(reportsQuery) })
+  const validPeriodContext = periodRequested && periodState.status === "ready" ? periodContext : null
+  const accountMovesQuery = useAccountMoves(orgId, { enabled: organizationId > 0 })
+  const { data: accountMoves = [] } = accountMovesQuery
+  const accountMoveLinesQuery = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
+  const { data: accountMoveLines = [] } = accountMoveLinesQuery
+  const { data: accountPayments = [] } = useAccountPayments(orgId, { enabled: organizationId > 0 })
 
   const reports = useMemo(
     () =>
-      reportsRaw.map((r) => ({
+      reportsRaw.filter((report) => !periodRequested || Boolean(validPeriodContext && reportMatchesPeriodContext(report, validPeriodContext))).map((r) => ({
         ...r,
         state: reportStateTag((r as { state?: unknown }).state),
       })),
-    [reportsRaw],
+    [reportsRaw, periodRequested, validPeriodContext],
   )
 
   const createTrialBalanceEntry = useCreateTrialBalanceEntry(orgId, operatingCompanyId)
-  const createFinancialReportFlow = useCreateFinancialReportFlow(orgId, operatingCompanyId)
+  const reportActionScope = `${orgId}:${operatingCompanyId}:${currentUser?.id ?? ""}:${periodContext?.periodId ?? "all"}:${periodContext?.reportType ?? "all"}:${periodContext?.dateFrom ?? ""}:${periodContext?.dateTo ?? ""}`
+  const reportActionLive = useRef({ scope: reportActionScope, allowed: true })
+  useEffect(() => () => { reportActionLive.current.allowed = false }, [])
+  reportActionLive.current = { scope: reportActionScope, allowed: permissionsReady !== false && Boolean(currentUser?.id) && checkPermission("financial_report", "create").allowed && checkPermission("financial_report", "write").allowed && moduleQueryState(reportsQuery).status === "ready" && (!periodRequested || periodState.status === "ready") }
+  const createFinancialReportFlow = useCreateFinancialReportFlow(orgId, operatingCompanyId, { scopeKey: reportActionScope, mayDispatch: () => reportActionLive.current.scope === reportActionScope && reportActionLive.current.allowed })
   const generateFinancialReport = useGenerateFinancialReport(orgId, operatingCompanyId)
   const exportFinancialReport = useExportFinancialReport(orgId, operatingCompanyId)
   const archiveFinancialReport = useArchiveFinancialReport(orgId, operatingCompanyId)
@@ -403,11 +445,15 @@ function ReportsClientLoaded({
   )
 
   const financialReportFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(newFinancialReportForm(t), {
+    () => {
+      const form = mergeSelectOptionsForFields(newFinancialReportForm(t), {
         currencyId: currencySelectOptions,
-      }),
-    [t, currencySelectOptions],
+      })
+      if (!validPeriodContext) return form
+      const contextual = mergeFieldDefaultValues(form, periodReportFormDefaults(validPeriodContext))
+      return { ...contextual, sections: contextual.sections.map((section) => ({ ...section, fields: section.fields.map((field) => ["dateFrom", "dateTo", "reportType", "targetMove"].includes(field.name) ? { ...field, disabled: true } : field) })) }
+    },
+    [t, currencySelectOptions, validPeriodContext],
   )
 
   const reportTemplateFormConfig = useMemo(
@@ -423,12 +469,12 @@ function ReportsClientLoaded({
 
   const analyticsMetricFormConfig = useMemo(
     () =>
-      mergeFieldDefaultValues(
+      enhanceMetricForm(mergeFieldDefaultValues(
         mergeSelectOptionsForFields(newAnalyticsMetricForm(t), {
           companyId: companySelectOptions,
         }),
         { companyId: operatingCompanyId != null ? String(operatingCompanyId) : "" },
-      ),
+      ), t),
     [t, companySelectOptions, operatingCompanyId],
   )
 
@@ -445,12 +491,12 @@ function ReportsClientLoaded({
 
   const dashboardWidgetFormConfig = useMemo(
     () =>
-      mergeFieldDefaultValues(
+      enhanceWidgetAuthoringForm(mergeFieldDefaultValues(
         mergeSelectOptionsForFields(newDashboardWidgetForm(t), {
           companyId: companySelectOptions,
         }),
         { companyId: operatingCompanyId != null ? String(operatingCompanyId) : "" },
-      ),
+      ), t),
     [t, companySelectOptions, operatingCompanyId],
   )
 
@@ -465,9 +511,9 @@ function ReportsClientLoaded({
   )
 
   const filteredTrialBalances = useMemo(() => {
-    if (selectedReportId == null) return trialBalances
-    return trialBalances.filter((row) => String(row.reportId) === selectedReportId)
-  }, [trialBalances, selectedReportId])
+    const matchingReportIds = new Set(reports.map((report) => String(report.id)))
+    return trialBalances.filter((row) => (!periodRequested || matchingReportIds.has(String(row.reportId))) && (selectedReportId == null || String(row.reportId) === selectedReportId))
+  }, [trialBalances, selectedReportId, reports, periodRequested])
 
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null
@@ -812,7 +858,43 @@ function ReportsClientLoaded({
     const generated = reports.filter((r) => String(r.state) === "generated").length
     const exported = reports.filter((r) => String(r.state) === "exported").length
 
+    const now = new Date()
+    const chartSourceState = mergeModuleStates([moduleQueryState(accountAccountsQuery), moduleQueryState(accountMovesQuery), moduleQueryState(accountMoveLinesQuery), moduleQueryState(currenciesQuery)])
+    const chartAccounts = accountAccounts.filter((account) => account.companyId === operatingCompanyId)
+    const chartLines = accountMoveLines.filter((line) => line.companyId === operatingCompanyId)
+    const chartMoves = accountMoves.filter((move) => move.companyId === operatingCompanyId)
+    const accountsById = new Map(chartAccounts.map((account) => [String(account.id), account]))
+    const companyCurrencyId = singleCurrencyId(chartMoves.map((move) => ({ currencyId: move.companyCurrencyId })))
+    const companyCurrencyCode = companyCurrencyId ? currencyCodeMap(currencies).get(companyCurrencyId) : undefined
+    const money: ChartValueFormat = companyCurrencyCode ? { kind: "currency", currency: companyCurrencyCode } : { kind: "number" }
+    const ninetyDays = 90 * 86_400_000
+    const currentWindow = { startMs: now.getTime() - ninetyDays, endMs: now.getTime() }
+    const previousWindow = { startMs: now.getTime() - 2 * ninetyDays, endMs: now.getTime() - ninetyDays - 1 }
+
     return mapDashboardWidgets(moduleConfig, (w) => {
+        if (["rep-pl-trend", "rep-expense-breakdown"].includes(w.id) && (chartSourceState.status !== "ready" || !companyCurrencyCode)) {
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: chartSourceState.status !== "ready" ? "Financial source data is not ready. Refresh before interpreting this chart." : "Select a company with a known reporting currency to view this aggregate." } }
+        }
+        if (w.type === "combo-chart" && w.id === "rep-pl-trend") {
+          return {
+            ...w,
+            data: { ...w.data, values: profitAndLossByMonth(chartLines, accountsById, now), valueFormat: money },
+          }
+        }
+        if (w.id === "rep-cash-runway") {
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "Cash runway is unavailable until reconciled bank balances and verified cash-flow evidence are connected." } }
+        }
+        if (w.type === "ranked-bars" && w.id === "rep-expense-breakdown") {
+          return {
+            ...w,
+            data: {
+              ...w.data,
+              items: expenseBreakdown(chartLines, accountsById, currentWindow, previousWindow),
+              valueFormat: money,
+              changeLabel: "vs prior 90 days",
+            },
+          }
+        }
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -885,11 +967,21 @@ function ReportsClientLoaded({
           })
   }, [
     reports,
+    accountAccounts,
+    accountAccountsQuery,
+    accountMoves,
+    accountMovesQuery,
+    accountMoveLines,
+    accountMoveLinesQuery,
+    currenciesQuery,
+    accountPayments,
+    currencies,
     trialBalances,
     reportTemplates,
     scheduledReports,
     analyticsMetrics,
     moduleConfig,
+    operatingCompanyId,
     t,
     scheduledReportFormConfig,
     financialReportFormConfig,
@@ -901,7 +993,7 @@ function ReportsClientLoaded({
     () => ({
       ...moduleConfig,
       tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
-        if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig }
+        if (tab.id === "reports") return { ...tab, entityConfig: financialReportsEntityConfig, createForm: financialReportFormConfig }
         if (tab.id === "trial-balance") return { ...tab, entityConfig: trialBalanceEntityConfig, createForm: trialBalanceEntryFormConfig, createAction: "createTrialBalanceEntry", createLabel: t("reports.trialBalance.createEntryLabel") }
         if (tab.id === "report-templates") return { ...tab, entityConfig: reportTemplatesEntityConfig, createForm: reportTemplateFormConfig }
         if (tab.id === "analytics-metrics") return { ...tab, entityConfig: analyticsMetricsEntityConfig, createForm: analyticsMetricFormConfig }
@@ -912,8 +1004,8 @@ function ReportsClientLoaded({
             createForm: scheduledReportFormConfig,
           }
         }
-        if (tab.id === "dashboards") return { ...tab, entityConfig: dashboardsEntityConfig }
-        if (tab.id === "dashboard-widgets") return { ...tab, entityConfig: dashboardWidgetsEntityConfig }
+        if (tab.id === "dashboards") return { ...tab, entityConfig: dashboardsEntityConfig, createForm: dashboardFormConfig }
+        if (tab.id === "dashboard-widgets") return { ...tab, entityConfig: dashboardWidgetsEntityConfig, createForm: dashboardWidgetFormConfig }
         if (tab.id === "owner-reports") {
           return {
             ...tab,
@@ -963,9 +1055,12 @@ function ReportsClientLoaded({
             type: "custom" as const,
             customContent: (
               <VatReportPanel
+                key={validPeriodContext ? `${validPeriodContext.organizationId}:${validPeriodContext.companyId}:${validPeriodContext.periodId}` : `vat:${orgId}:${operatingCompanyId}`}
                 organizationId={orgId}
                 companyId={operatingCompanyId}
                 financialReports={reports as Record<string, unknown>[]}
+                periodContext={validPeriodContext ?? undefined}
+                sourceState={moduleQueryState(reportsQuery)}
               />
             ),
           }
@@ -992,6 +1087,9 @@ function ReportsClientLoaded({
       liveSections,
       moduleConfig,
       financialReportsEntityConfig,
+      financialReportFormConfig,
+      validPeriodContext,
+      reportsQuery,
       trialBalanceEntityConfig,
       trialBalanceEntryFormConfig,
       reportTemplatesEntityConfig,
@@ -999,6 +1097,8 @@ function ReportsClientLoaded({
       scheduledReportsEntityConfig,
       dashboardsEntityConfig,
       dashboardWidgetsEntityConfig,
+      dashboardFormConfig,
+      dashboardWidgetFormConfig,
       scheduledReportFormConfig,
       reportTemplateFormConfig,
       analyticsMetricFormConfig,
@@ -1012,6 +1112,12 @@ function ReportsClientLoaded({
       t
     ],
   )
+
+  const renderAuthoringPreview = (values: FormValues, formConfig: FormConfig) => {
+    if (formConfig.id === "new-analytics-metric") return <MetricAuthoringPreview values={values} config={formConfig} />
+    if (!reportAuthoringKind(formConfig.id)) return null
+    return <ReportAuthoringPreview values={values} config={formConfig} organizationId={orgId} companyLabel={companySelectOptions.find((option) => option.value === String(operatingCompanyId ?? ""))?.label} />
+  }
 
   const data = useMemo(
     () => ({
@@ -1032,7 +1138,8 @@ function ReportsClientLoaded({
     formData: Record<string, unknown>,
   ) => {
     if (action === "createReport" || action === "generateReport") {
-      await createFinancialReportFlow.mutateAsync(toCreateFinancialReportPayload(formData))
+      if (periodRequested && (!validPeriodContext || validPeriodContext.reportType !== "trial-balance")) throw new Error("The selected period report context is not ready for trial balance generation")
+      await createFinancialReportFlow.mutateAsync(toCreateFinancialReportPayload(validPeriodContext ? applyPeriodReportFormContext(formData, validPeriodContext) : formData))
     } else if (action === "createReportTemplate") {
       await createReportTemplate.mutateAsync(toCreateReportTemplatePayload(formData))
     } else if (action === "createScheduledReport") {
@@ -1077,12 +1184,19 @@ function ReportsClientLoaded({
     importReportTemplateCsv.isPending ||
     importAnalyticsMetricCsv.isPending
 
+  if (periodRequested && periodState.status !== "ready") return <ReportPeriodNotice state={periodState} context={periodContext} />
+
   return (
     <>
+      {validPeriodContext ? <ReportPeriodNotice state={periodState} context={validPeriodContext} /> : null}
       <ModuleView
+        key={reportActionScope}
         config={config}
+        dashboardContent={<ModuleInsights input={{ module: "reports", organizationId, companyId: operatingCompanyId ?? 0n, records: { rows: reportsRaw, state: moduleQueryState(reportsQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
+        dataState={{ reports: moduleQueryState(reportsQuery), "trial-balance": mergeModuleStates([moduleQueryState(reportsQuery), moduleQueryState(trialBalancesQuery)]), "vat-report": moduleQueryState(reportsQuery) }}
         onFormSubmit={handleFormSubmit}
+        renderCreatePreview={(_tabId, values, formConfig) => renderAuthoringPreview(values, formConfig)}
         isPending={isFormMutationPending}
         onRowClick={(tabId, row) => {
           if (tabId === "reports") {
@@ -1095,6 +1209,7 @@ function ReportsClientLoaded({
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? financialReportFormConfig}
+        renderPreview={(values) => renderAuthoringPreview(values, quickActionForm?.form ?? financialReportFormConfig)}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
@@ -1229,6 +1344,7 @@ function ReportsClientLoaded({
         open={createDashboardOpen}
         onOpenChange={(open) => !open && setCreateDashboardOpen(false)}
         config={dashboardFormConfig}
+        renderPreview={(values) => renderAuthoringPreview(values, dashboardFormConfig)}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           await handleFormSubmit("dashboard", "createDashboard", formData)
@@ -1240,6 +1356,7 @@ function ReportsClientLoaded({
         open={createWidgetOpen}
         onOpenChange={(open) => !open && setCreateWidgetOpen(false)}
         config={dashboardWidgetFormConfig}
+        renderPreview={(values) => renderAuthoringPreview(values, dashboardWidgetFormConfig)}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           await handleFormSubmit("dashboard", "createDashboardWidget", formData)
@@ -1341,8 +1458,8 @@ function ReportsClientLoaded({
         }}
       >
         <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-start justify-between gap-4">
+          <DialogHeader className="pr-10">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 space-y-1">
                 <DialogTitle>{String(viewDashboard?.name ?? t("reports.dashboards.title"))}</DialogTitle>
                 {viewDashboard?.description ? (
@@ -1350,7 +1467,7 @@ function ReportsClientLoaded({
                 ) : null}
               </div>
               {viewDashboard ? (
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Select
                     value={viewDashboardRange}
                     onValueChange={(value) =>
@@ -1377,6 +1494,7 @@ function ReportsClientLoaded({
                     variant="outline"
                     size="sm"
                     className="gap-2"
+                    data-testid="stored-dashboard-export"
                     onClick={() => void handleStoredDashboardExport()}
                     disabled={
                       storedDashboardLoading

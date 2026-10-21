@@ -1,9 +1,15 @@
-/** Synthetic RBAC role carrying the session's merged permissions; it has no persisted form role config. */
+/** Synthetic RBAC grants are not a persisted role for form-field visibility. */
 export const EFFECTIVE_ACCESS_ROLE_ID = "__effective_access__"
 
-/** The persisted role id runtime forms resolve their role configuration against. */
+export function resolveRuntimeFormRoleId(
+  roles: readonly string[] | null | undefined,
+): string | undefined {
+  return roles?.find((roleId) => roleId.length > 0 && roleId !== EFFECTIVE_ACCESS_ROLE_ID)
+}
+
+/** Retain the session-object API used by existing module forms. */
 export function runtimeFormRoleId(
   user: { readonly roles: readonly string[] } | null | undefined,
 ): string | undefined {
-  return user?.roles.find((roleId) => roleId !== EFFECTIVE_ACCESS_ROLE_ID)
+  return resolveRuntimeFormRoleId(user?.roles)
 }

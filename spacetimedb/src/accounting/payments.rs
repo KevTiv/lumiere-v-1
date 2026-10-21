@@ -9,8 +9,8 @@ use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line,
-    is_receivable_or_payable_line_type, reconcile_payment_with_invoice, AccountMove,
-    AccountMoveLine, AddAccountMoveLineParams,
+    is_receivable_or_payable_line_type, reconcile_payment_with_invoice_impl,
+    require_invoice_not_bank_payment, AccountMove, AccountMoveLine, AddAccountMoveLineParams,
 };
 use crate::accounting::relations::{
     require_active_account, require_active_currency_id, require_active_journal,
@@ -42,6 +42,7 @@ use crate::workflow::approval_gate::{
     index(accessor = payment_by_partner, btree(columns = [partner_id])),
     index(accessor = payment_by_state, btree(columns = [state]))
 )]
+#[derive(Clone)]
 pub struct AccountPayment {
     #[primary_key]
     #[auto_inc]
@@ -262,13 +263,17 @@ pub(crate) fn insert_balanced_payment_lines_and_post(
     let partner_id = payment.partner_id;
     let payment_id = payment.id;
     let liquidity_account_id = resolve_payment_liquidity_account(ctx, payment)?;
-    let preferred_clearing = preferred_clearing_account_for_partner(
-        ctx,
-        payment.organization_id,
-        payment.company_id,
-        partner_id,
-        &payment_type,
-    );
+    let preferred_clearing =
+        crate::accounting::bank_reconciliation::bank_payment_clearing_account(ctx, payment)?
+            .or_else(|| {
+                preferred_clearing_account_for_partner(
+                    ctx,
+                    payment.organization_id,
+                    payment.company_id,
+                    partner_id,
+                    &payment_type,
+                )
+            });
     let (clearing_account_id, clearing_label) = resolve_payment_clearing_account(
         ctx,
         payment.organization_id,
@@ -601,6 +606,7 @@ pub fn post_payment_impl(
         payment.partner_id,
         "payment partner",
     )?;
+    crate::accounting::bank_reconciliation::bank_payment_clearing_account(ctx, &payment)?;
 
     if !skip_approval_check {
         if matches!(
@@ -662,6 +668,7 @@ pub fn post_payment_impl(
                 metadata: None,
             },
         );
+        super::bank_settlement_lifecycle::payment_posted(ctx, payment_id)?;
         return Ok(());
     }
 
@@ -771,6 +778,7 @@ pub fn post_payment_impl(
             metadata: None,
         },
     );
+    super::bank_settlement_lifecycle::payment_posted(ctx, payment_id)?;
     Ok(())
 }
 
@@ -778,6 +786,15 @@ fn reverse_posted_payment_move(
     ctx: &ReducerContext,
     payment: &AccountPayment,
     original_move_id: u64,
+) -> Result<u64, String> {
+    reverse_posted_payment_move_at(ctx, payment, original_move_id, ctx.timestamp)
+}
+
+pub(super) fn reverse_posted_payment_move_at(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+    original_move_id: u64,
+    date: Timestamp,
 ) -> Result<u64, String> {
     let original = ctx
         .db
@@ -806,13 +823,13 @@ fn reverse_posted_payment_move(
         return Err("Payment journal move is not balanced".to_string());
     }
 
-    ensure_accounting_period_open_for_date(ctx, payment.company_id, ctx.timestamp)?;
+    ensure_accounting_period_open_for_date(ctx, payment.company_id, date)?;
     let reversal = ctx.db.account_move().insert(AccountMove {
         id: 0,
         name: next_doc_number(ctx, payment.organization_id, "PAYREV"),
         ref_: Some(format!("Reversal of payment move {original_move_id}")),
         state: AccountMoveState::Draft,
-        date: ctx.timestamp,
+        date,
         invoice_origin: Some(format!("account-payment:{}", payment.id)),
         posted_before: false,
         create_uid: Some(ctx.sender()),
@@ -1141,6 +1158,11 @@ pub fn unregister_payment_allocations(
     if payment.organization_id != organization_id {
         return Err("Payment belongs to a different organization".to_string());
     }
+    crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
+        ctx,
+        organization_id,
+        payment_id,
+    )?;
     unwind_payment_allocations(ctx, &payment)?;
     Ok(())
 }
@@ -1162,6 +1184,11 @@ pub fn cancel_payment(
     if payment.organization_id != organization_id {
         return Err("Payment belongs to a different organization".to_string());
     }
+    crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
+        ctx,
+        organization_id,
+        payment_id,
+    )?;
     if payment.state == PaymentState::Reversed {
         return Err("Payment is already cancelled".to_string());
     }
@@ -1222,6 +1249,41 @@ pub fn register_payment_on_invoice(
     is_bill: bool,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "payment", "reconcile")?;
+    crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
+        ctx,
+        organization_id,
+        payment_id,
+    )?;
+    register_payment_on_invoice_impl(ctx, organization_id, payment_id, invoice_ids, is_bill)
+}
+
+/// Only the bank workflow can allocate its posted payment, after rechecking the
+/// immutable receipt and the entire original statement selection.
+pub(super) fn register_bank_settlement_on_invoices(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment_id: u64,
+    invoice_ids: Vec<u64>,
+    is_bill: bool,
+) -> Result<(), String> {
+    crate::accounting::bank_reconciliation::validate_bank_settlement_registration(
+        ctx,
+        organization_id,
+        payment_id,
+        &invoice_ids,
+        is_bill,
+    )?;
+    register_payment_on_invoice_impl(ctx, organization_id, payment_id, invoice_ids, is_bill)
+}
+
+fn register_payment_on_invoice_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment_id: u64,
+    invoice_ids: Vec<u64>,
+    is_bill: bool,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "payment", "reconcile")?;
     let payment = ctx
         .db
         .account_payment()
@@ -1241,6 +1303,7 @@ pub fn register_payment_on_invoice(
 
     // Company/org guard before mutating residuals or reconciled_* lists.
     for inv_id in &invoice_ids {
+        require_invoice_not_bank_payment(ctx, organization_id, *inv_id)?;
         let invoice = ctx
             .db
             .account_move()
@@ -1284,7 +1347,7 @@ pub fn register_payment_on_invoice(
 
     // Settle residual in the same txn — register without reconcile left AR open.
     for inv_id in &invoice_ids {
-        reconcile_payment_with_invoice(ctx, organization_id, payment_move_id, *inv_id)?;
+        reconcile_payment_with_invoice_impl(ctx, organization_id, payment_move_id, *inv_id)?;
     }
 
     write_audit_log_v2(

@@ -202,14 +202,13 @@ test.describe(
         expect(await requisitionByOrigin(page, origin)).toEqual(approvedSnapshot)
 
         // A stale/foreign company reference cannot redirect the conversion.
-        expect(
-          (await requisitionRequest(
-            buyerPage,
-            "convert_purchase_requisition_to_po",
-            requisitionId,
-            companyId + 9_999,
-          )).status(),
-        ).toBe(422)
+        const foreignCompany = await requisitionRequest(
+          buyerPage, "convert_purchase_requisition_to_po", requisitionId, companyId + 9_999,
+        )
+        // The authenticated operation scope rejects forged companies before
+        // reducer dispatch, rather than returning a reducer validation error.
+        expect(foreignCompany.status()).toBe(403)
+        expect((await foreignCompany.json()).error).toMatch(/company/i)
         expect(
           (await requisitionByOrigin(page, origin))?.purchaseIds ??
             (await requisitionByOrigin(page, origin))?.purchase_ids ??

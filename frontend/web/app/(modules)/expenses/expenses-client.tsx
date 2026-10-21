@@ -2,6 +2,7 @@
 import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights } from "../../../components/module-insights"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import {
   inlineNumberAbove,
@@ -71,6 +72,12 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useEmployees, type HrEmployee } from "@lumiere/query-hooks/hooks/hr"
+import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import type { ChartValueFormat } from "@lumiere/ui/lib/chart-format"
+import type { TabbedTableRow } from "@lumiere/ui"
+import { approvalBacklog, monthlySpend, spendByCategory } from "./expenses-dashboard-charts"
 import {
   expenseQuantity,
   newExpenseClientRequestId,
@@ -189,6 +196,7 @@ function ExpensesClientLoaded({
 
   const expensesQuery = useExpenses(orgId, initialExpenses)
   const sheetsQuery = useExpenseSheets(orgId, initialSheets)
+  const currenciesQuery = useCurrencies()
   const expensesState = moduleQueryState(expensesQuery)
   const sheetsState = moduleQueryState(sheetsQuery)
   const expensesRaw = canUseModuleData(expensesState) ? expensesQuery.data ?? [] : []
@@ -203,6 +211,8 @@ function ExpensesClientLoaded({
   )
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: employees = [] } = useEmployees(orgId, initialEmployees)
+  const { data: products = [] } = useProducts(orgId)
+  const { data: currencies = [] } = useCurrencies()
   const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
   const { data: perDiemRates = [] } = useExpensePerDiemRates(orgId)
 
@@ -372,7 +382,74 @@ function ExpensesClientLoaded({
       return st === "Approved" || st === "Posted" || st === "Done"
     }).length
 
+    const now = new Date()
+    const nowMs = now.getTime()
+    const currencyCodeById = currencyCodeMap(currencies)
+    const productNames = new Map(products.map((product) => [String(product.id), String(product.name ?? "")]))
+    const employeeNames = new Map(employees.map((employee) => [String(employee.id), String(employee.name ?? "")]))
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
+    const chartExpenses = expensesRaw.filter((expense) => expense.companyId === operatingCompanyId)
+    const expenseCurrencies = new Set(chartExpenses.map((expense) => currencyCodeById.get(String(expense.currencyId)) ?? ""))
+    const money: ChartValueFormat =
+      expenseCurrencies.size === 1 && [...expenseCurrencies][0]
+        ? { kind: "currency", currency: [...expenseCurrencies][0]! }
+        : { kind: "number" }
+
     return mapDashboardWidgets(moduleConfig, (w) => {
+        if (["exp-monthly-spend", "exp-spend-by-category"].includes(w.id) && (expenseCurrencies.size !== 1 || expenseCurrencies.has(""))) {
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
+        }
+        if (w.type === "combo-chart" && w.id === "exp-monthly-spend") {
+          return { ...w, data: { ...w.data, values: monthlySpend(chartExpenses, now), valueFormat: money } }
+        }
+        if (w.type === "ranked-bars" && w.id === "exp-spend-by-category") {
+          return {
+            ...w,
+            data: {
+              ...w.data,
+              items: spendByCategory(
+                chartExpenses,
+                productNames,
+                { startMs: monthStart, endMs: nowMs },
+                { startMs: lastMonthStart, endMs: monthStart - 1 },
+              ),
+              valueFormat: money,
+              changeLabel: "vs last month",
+            },
+          }
+        }
+        if (w.type === "tabbed-table" && w.id === "exp-approval-backlog") {
+          return {
+            ...w,
+            data: {
+              tabs: [
+                { id: "all", label: "All" },
+                { id: "awaiting-approval", label: "Awaiting approval" },
+                { id: "awaiting-posting", label: "Awaiting posting" },
+              ],
+              columns: [
+                { key: "report", label: "Report" },
+                { key: "employee", label: "Employee" },
+                { key: "submitted", label: "Created" },
+                { key: "ageDays", label: "Age (days)", type: "number", align: "right" },
+                { key: "amount", label: "Amount", type: "currency", currencyKey: "currency", align: "right" },
+                {
+                  key: "status",
+                  label: "Status",
+                  type: "badge",
+                  badgeVariants: { "Awaiting approval": "warning", "Awaiting posting": "info" },
+                },
+              ],
+              rows: approvalBacklog(sheetsRaw, employeeNames, currencyCodeById, nowMs),
+              emptyMessage: "Nothing waiting — every expense report is handled.",
+              onRowClick: (row: TabbedTableRow) => {
+                const sheet = sheetsRaw.find((candidate) => String(candidate.id) === String(row.id))
+                if (sheet) setTimelineSheet(sheet)
+              },
+            },
+          }
+        }
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -410,6 +487,11 @@ function ExpensesClientLoaded({
   }, [
     expenses,
     sheets,
+    expensesRaw,
+    sheetsRaw,
+    products,
+    employees,
+    currencies,
     sheetsToApprove.length,
     missingReceipts.length,
     unmatchedCards.length,
@@ -855,6 +937,7 @@ function ExpensesClientLoaded({
       ) : null}
       <ModuleView
         config={config}
+        dashboardContent={<ModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataState={{ expenses: expensesState, "expense-sheets": sheetsState }}
         onFormSubmit={handleFormSubmit}

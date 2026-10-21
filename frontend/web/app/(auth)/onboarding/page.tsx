@@ -191,8 +191,11 @@ export default function OnboardingPage() {
                 value={currencyCode}
                 onValueChange={(code) => {
                   const selected = currencies.find((currency) => currency.code === code)
-                  setCurrencyCode(code)
-                  setCurrencyId(String(selected?.id ?? 0))
+                  // Form-associated selects can emit an empty value while their
+                  // options initialize. It is not a supported currency choice.
+                  if (!selected) return
+                  setCurrencyCode(selected.code)
+                  setCurrencyId(String(selected.id))
                 }}
                 disabled={currenciesLoading || currencies.length === 0}
               >

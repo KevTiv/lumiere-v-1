@@ -567,6 +567,7 @@ pub(crate) fn accounting_resource(resource: &str) -> bool {
             | "payment-reversals"
             | "payment-transactions"
             | "profit-loss-lines"
+            | "saved-reports"
             | "tax-deadlines"
             | "tax-groups"
             | "tax-schedules"

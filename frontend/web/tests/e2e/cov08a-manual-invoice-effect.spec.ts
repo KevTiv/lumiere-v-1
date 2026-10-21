@@ -31,7 +31,7 @@ async function openManualInvoice(page: Page): Promise<void> {
   // Setup readiness is evaluated from several reads after each navigation.
   // An early click shows a blocking toast; wait for the actual modal to open.
   await expect(async () => {
-    await page.getByTestId("quick-action-create_invoice").click()
+    await page.getByTestId("accountant-overview").getByRole("button", { name: "New invoice", exact: true }).click()
     await expect(page.getByTestId("create-invoice-modal")).toBeVisible({ timeout: 5_000 })
   }).toPass({ timeout: 60_000 })
 }

@@ -25,6 +25,22 @@ describe("stdbParamsToJson", () => {
     }
   })
 
+  it("encodes requisition line optional fields for typed commands and compat calls", () => {
+    const params = {
+      lines: [
+        { productId: 7n, productUom: 1n, productUomQty: 2, name: "Laptop", sequence: 10 },
+        { productId: 8n, productUom: 1n, productUomQty: 1 },
+      ],
+    }
+    const expected = [
+      { product_id: 7, product_uom: 1, product_uom_qty: 2, name: { some: "Laptop" }, sequence: { some: 10 } },
+      { product_id: 8, product_uom: 1, product_uom_qty: 1, name: { none: [] }, sequence: { none: [] } },
+    ]
+    assert.deepEqual(stdbParamsToJson(params, "CreatePurchaseRequisitionParams").lines, expected)
+    const encoded = encodeReducerCallArgs("create_purchase_requisition", [1, params])
+    assert.deepEqual((encoded[1] as Record<string, unknown>).lines, expected)
+  })
+
   it("preserves optional permission-list presence, including an explicit clear", () => {
     for (const permissions of [["contact:read"], []]) {
       assert.deepEqual(stdbParamsToJson({ permissions }, "UpdateRoleParams").permissions, { some: permissions })
@@ -365,6 +381,22 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.sale_order_id, { some: 8 })
     assert.deepEqual(params.return_reason, { some: "defective" })
     assert.deepEqual(line.sale_order_line_id, { none: [] })
+    assert.equal(line.product_id, 3)
+  })
+
+  it("stdbParamsToJson SATS-encodes nested purchase requisition line Option fields", () => {
+    const params = stdbParamsToJson({
+      lines: [{
+        productId: 3n,
+        productUom: 1n,
+        productUomQty: 2,
+        name: "Operator requisition",
+        sequence: 10,
+      }],
+    }, "CreatePurchaseRequisitionParams")
+    const line = (params.lines as Record<string, unknown>[])[0]
+    assert.deepEqual(line.name, { some: "Operator requisition" })
+    assert.deepEqual(line.sequence, { some: 10 })
     assert.equal(line.product_id, 3)
   })
 

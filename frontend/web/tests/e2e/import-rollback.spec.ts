@@ -6,6 +6,7 @@ import path from "node:path"
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   expectNoAppError,
   expectRecordAbsentFromQuery,
   fetchContactIdByName,
@@ -79,7 +80,7 @@ test.describe("Import rollback", { tag: ["@phase-4", "@import"] }, () => {
     await mockContactImportAssistantAi(page, contactName, email)
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-contacts").click()
+    await selectModuleTab(page, "crm", "contacts")
     await page.getByTestId("entity-action-csv-contacts").click()
 
     const dialog = page.getByRole("dialog")
@@ -160,7 +161,7 @@ test.describe("Import rollback", { tag: ["@phase-4", "@import"] }, () => {
     }])
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-contacts").click()
+    await selectModuleTab(page, "crm", "contacts")
     await page.getByTestId("entity-action-csv-contacts").click()
     const dialog = page.getByRole("dialog")
     await dialog.locator("#import-assistant-file").setInputFiles(csvPath)

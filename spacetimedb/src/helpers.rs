@@ -100,19 +100,9 @@ pub(crate) fn roles_allow_permission(
             allow: p.effect == PermissionEffect::Allow,
         })
         .collect();
-    let permissions: Vec<_> = effective_permission_strings(&roles)
-        .iter()
-        .map(|p| {
-            p.rsplit_once(':')
-                .map(|(r, a)| {
-                    format!(
-                        "{}:{a}",
-                        crate::core::permissions::canonical_policy_resource(r)
-                    )
-                })
-                .unwrap_or_else(|| p.clone())
-        })
-        .collect();
+    let permissions = crate::core::permissions::canonical_permission_strings(
+        &effective_permission_strings(roles),
+    );
     lumiere_policy_core::allows_in_module(
         is_superuser,
         &permissions,
@@ -143,7 +133,8 @@ pub(crate) fn permission_resource_module(resource: &str) -> Option<&'static str>
             })
             .collect()
     });
-    modules.get(&resource.replace('-', "_")).map(String::as_str)
+    lumiere_policy_core::operation_resource_module(resource)
+        .or_else(|| modules.get(&resource.replace('-', "_")).map(String::as_str))
 }
 
 /// Returns `Ok(())` when allowed, `Err(reason)` otherwise.

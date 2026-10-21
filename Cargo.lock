@@ -148,6 +148,7 @@ dependencies = [
  "jsonwebtoken",
  "lumiere-contracts",
  "lumiere-presentation-core",
+ "openssl",
  "printpdf",
  "rand 0.8.5",
  "reqwest",
@@ -2084,7 +2085,7 @@ dependencies = [
 
 [[package]]
 name = "lumiere-contracts"
-version = "0.3.128"
+version = "0.3.129"
 dependencies = [
  "serde_json",
  "sha2 0.10.9",
