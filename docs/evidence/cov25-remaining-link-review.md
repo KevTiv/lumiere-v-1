@@ -15,7 +15,7 @@ it proved only the first sales-order → delivery link and is not acceptance evi
 | Purchase order → receipt | `stock_picking.purchase_id = purchase_order.id`; same org/company, no returns/cancelled documents | 0..N; all exact children; repeated child PK is invariant failure | Inventory transfers, exact ID | New `purchaseOrderRecordSheet` handoffs tab; `cov25-purchase-handoff-links.spec.ts` clicks generated receipt |
 | Purchase order → vendor bill | `purchase_order.invoice_ids[] → account_move.id`; same org/company | 0..N; missing referenced row is unavailable, duplicate relation/target is invariant failure | Accounting journal entries, exact ID | Same sheet; purchase spec receives/bills through existing UI, then clicks exact bill |
 | Subscription → billing-run invoice | `subscription_billing_run.subscription_id = subscription.id`, then `invoice_move_id → account_move.id`; same org/company at both hops | 0..N; every run invoice linked, duplicate exact invoice relation is invariant failure | Accounting journal entries, exact ID | New subscription sheet; `cov25-subscription-handoff-links.spec.ts` generates two unique runs through UI and clicks both invoices |
-| Subscription → reconciled payment | Domain relation exists: exact run invoice IDs intersect `account_payment.reconciled_invoice_ids[]`; **operator query omits that relation** | 0..N resolver retained with strict missing-field guard; no guessed target | No currently provable operator link | **BLOCKED / governed query projection release dependency**; exact invoices stay clickable with payment-unavailable notice; browser asserts that limit, not payment success |
+| Subscription → reconciled payment | Exact resolved run invoice IDs intersect `account_payment.reconciled_invoice_ids[]`; payment state Paid; same org/company. The `account-payments` HTTP projection now includes the relation (PR #150, `crates/stdb-auth/src/field_policy.rs`) | 0..N; strict missing/malformed relation guard retained; duplicate relation or target is a payment invariant notice; no guessed target | Accounting payments, exact ID | Implemented — runtime acceptance pending; `cov25-subscription-handoff-links.spec.ts` now expects the real payment link |
 | Proposal → sale order | `proposal.sale_order_id → sale_order.id`; same org/company | 0..1; None shows no links; missing target is unavailable; >1 exact target suppresses link with invariant alert | `/sales?tab=orders&filter=id:N` | New proposal sheet; `cov25-proposal-handoff-links.spec.ts` awards/converts via UI, clicks exact order; duplicated-read adversarial browser assertion |
 | Ticket → related business record | **Absent.** `HelpdeskTicket` has customer/team/stage/agent/SLA refs, not related business-record model/ID | No safe identity to resolve | None invented | **BLOCKED / contract-release dependency**; no link or browser-success claim |
 
@@ -101,8 +101,8 @@ It is adversarial presentation coverage, not evidence that duplicate primary key
   by this handoff slice; they retain their existing independent browser-evidence limits.
 - New handoff copy follows the existing component's plain-English copy; translation expansion is deferred.
 
-Contract release required: **no** for the implemented PO/proposal/billing-run invoice links; **yes** for subscription payment
-operator linkage and ticket → related business record. Full historical subscription invoice coverage needs a governed
+Contract release required: **no** for the implemented PO/proposal/billing-run invoice links and subscription payment
+linkage (an HTTP projection inclusion, no contract delta; see the resolution section below); **yes** for ticket → related business record. Full historical subscription invoice coverage needs a governed
 query-field projection decision/release.
 
 Next bounded task: integrate and centrally typecheck/run these focused COV25 specs on one exact compatible runtime head.
@@ -128,7 +128,7 @@ checkbox defaults `incomeExcludeFromInvoiceTab=false`, `incomeBlocked=false`,
 `git --no-optional-locks diff --check` passes for these repairs. No worker build, installation, service change,
 or successful runtime rerun is claimed.
 
-## Payment projection runtime finding — supersedes registry-only availability
+## Payment projection runtime finding — superseded by the resolution section below
 
 The coordinator's live `account-payments` read returned `amount`, `companyId`, `currencyId`, `id`, `journalId`, `name`,
 `organizationId`, `partnerId`, `ref`, `state`, but **not** `reconciledInvoiceIds`. The local resource registry entry lists
@@ -140,7 +140,7 @@ queries use trusted `resolve_http_sql_columns`; no browser-authorized explicit p
 `payment-reconciliations` is a different payment-transaction allocation resource. Subscription payment posting calls
 `register_payment_on_invoice`, not the allocation transition that records `PaymentReconciliation`, so using that resource
 would not prove this exact subscription result. No owner SQL, payment reference, partner, paid-state, or newest-record
-fallback is introduced. The operator payment link is a true governed projection/release blocker.
+fallback is introduced. At the time, the operator payment link was blocked on the projection (resolved by PR #150 below).
 
 The existing query/presentation owners now separate independent run invoices from the payment relation:
 strict omitted/malformed payment-relation checks suppress all payment links, retain verified invoice links, and render
@@ -153,3 +153,23 @@ than being misrepresented as projection evidence.
 
 Next payment task: producer/release owner exposes a scoped canonical invoice-to-payment relation, verifies the actual
 operator HTTP read on the released contract, and then restores the true payment-action/link-click browser acceptance path.
+
+## Payment projection resolution — supersedes the blocker above
+
+PR #150 adds `account-payments` to the HTTP projection inclusion list for exactly `reconciled_invoice_ids` and
+`reconciled_bill_ids` (`crates/stdb-auth/src/field_policy.rs`). Explicit field grants still decide the selected
+columns, and unrelated `_ids` lists stay filtered; three Rust regressions (`payment_http_*`) cover this. No schema,
+operation or generated contract changes. The "true governed projection/release blocker" recorded above is therefore
+withdrawn for subscription payments once #150 lands.
+
+When #150 merged `main`, the subscription list record sheet kept #150's `subscriptionHandoffs` builder and
+`SubscriptionHandoffLinks` component: cancelled invoices are excluded, only `OutInvoice` moves resolve, and a payment links
+only when its state is Paid **and** its `reconciled_invoice_ids` exactly intersect the resolved invoice IDs (paid state is
+an additional filter, never a substitute for the relation). Main's duplicate rule was ported: a duplicated canonical
+relation (same invoice on two runs, two rows for one invoice or payment ID, repeated reconciliation IDs) is an invariant
+failure, not deduplicated; invoice-side duplicates withhold all links, payment-side duplicates withhold only payments.
+`subscription-handoffs.test.ts` covers each rule. The `/subscriptions/[id]` detail page uses the same builder and
+component, so both surfaces apply identical filters; `subscriptionRecordLinks` and its tests were removed.
+
+The focused subscription browser spec now pays one generated invoice through the visible action and expects a real
+`subscription-handoff-payment-{id}` link (clicked, reloaded, back) with no handoff alert. Runtime acceptance remains pending same-head CI.

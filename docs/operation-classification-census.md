@@ -8,21 +8,21 @@ This artifact classifies operation ownership and current disposition only. It do
 
 | Dimension | Count |
 | --- | ---: |
-| Total contract operations | 1445 |
-| Client-facing operations | 936 |
-| Non-client operations | 509 |
+| Total contract operations | 1450 |
+| Client-facing operations | 939 |
+| Non-client operations | 511 |
 | Unowned client-facing operations | 0 |
 | Review-required rows | 0 |
-| Reconciled Rust reducer rows | 1212 |
+| Reconciled Rust reducer rows | 1217 |
 | Contract-only operations | 233 |
 
 ### Dispositions
 
 | Disposition | Count |
 | --- | ---: |
-| `future-disabled` | 68 |
-| `horizontal` | 154 |
-| `internal-support` | 514 |
+| `future-disabled` | 70 |
+| `horizontal` | 155 |
+| `internal-support` | 516 |
 | `primary-workflow` | 709 |
 
 ### Owners
@@ -34,7 +34,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `COV-05` | 73 |
 | `COV-06` | 142 |
 | `COV-07` | 38 |
-| `COV-08` | 167 |
+| `COV-08` | 170 |
 | `COV-09` | 68 |
 | `COV-10` | 47 |
 | `COV-11` | 37 |
@@ -48,9 +48,9 @@ This artifact classifies operation ownership and current disposition only. It do
 | `COV-19` | 19 |
 | `COV-20` | 24 |
 | `COV-21` | 41 |
-| `COV-22` | 84 |
+| `COV-22` | 85 |
 | `COV-23` | 84 |
-| `GOV/CAP` | 134 |
+| `GOV/CAP` | 135 |
 | `INTERNAL` | 138 |
 
 ## Classification rules
@@ -116,6 +116,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `apply_expense_advance_to_sheet` | yes | `COV-11` | `primary-workflow` | `reachable-ui` | `expenses/expense_wave_d.rs` |
 | `apply_expense_integration_intent` | yes | `COV-11` | `primary-workflow` | `reachable-ui` | `expenses/expense_wave_d.rs` |
 | `apply_global_migrations` | no | `COV-23` | `internal-support` | `future-disabled` | `core/migrations.rs` |
+| `apply_historical_payment_allocations` | no | `COV-08` | `internal-support` | `backend-only` | `accounting/historical_payment_migration.rs` |
 | `apply_hr_integration_intent` | no | `COV-09` | `internal-support` | `command-only` | `hr/integrations.rs` |
 | `apply_index_linked_renewal` | no | `COV-12` | `internal-support` | `command-only` | `subscriptions/subscription_price_index.rs` |
 | `apply_landed_costs` | yes | `COV-05` | `primary-workflow` | `reachable-ui` | `purchasing/landed_costs.rs` |
@@ -217,6 +218,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `claim_hub_with_token` | no | `COV-16` | `internal-support` | `backend-only` | `iot/registry.rs` |
 | `claim_queue_job` | no | `INTERNAL` | `internal-support` | `backend-only` | `core/queue.rs` |
 | `claim_workflow_human_task` | yes | `COV-21` | `horizontal` | `reachable-ui` | `workflow/approvals.rs` |
+| `cleanup_abandoned_account_move_import` | yes | `COV-22` | `horizontal` | `command-only` | `data_ops/import_tracker.rs` |
 | `cleanup_stale_proposal_presence` | no | `COV-17` | `internal-support` | `command-only` | `proposals/proposals.rs` |
 | `clear_contact_categories` | yes | `COV-03` | `primary-workflow` | `reachable-ui` | `crm/contacts.rs` |
 | `clear_document_presence` | no | `COV-18` | `internal-support` | `command-only` | `documents/presence.rs` |
@@ -419,6 +421,8 @@ This artifact classifies operation ownership and current disposition only. It do
 | `create_loyalty_card` | yes | `COV-04` | `primary-workflow` | `reachable-ui` | `sales/pos_transactions.rs` |
 | `create_loyalty_program` | yes | `COV-04` | `primary-workflow` | `reachable-ui` | `sales/pos_config.rs` |
 | `create_mail_template` | yes | `COV-18` | `horizontal` | `reachable-ui` | `documents/templates.rs` |
+| `create_manual_account_invoice` | yes | `COV-08` | `future-disabled` | `backend-only` | `accounting/manual_invoices.rs` |
+| `create_manual_invoice` | yes | `COV-08` | `future-disabled` | `command-only` | `accounting/journal_entries.rs` |
 | `create_manufacturing_order` | yes | `COV-07` | `primary-workflow` | `reachable-ui` | `manufacturing/manufacturing_orders.rs` |
 | `create_message_batch` | yes | `COV-19` | `horizontal` | `reachable-ui` | `core/operational_messaging.rs` |
 | `create_message_template` | yes | `COV-19` | `horizontal` | `reachable-ui` | `core/operational_messaging.rs` |
@@ -655,6 +659,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `fail_subscription_payment_intent` | no | `COV-12` | `internal-support` | `command-only` | `subscriptions/subscription_payment.rs` |
 | `fail_warehouse_sync_intent` | yes | `COV-06` | `primary-workflow` | `reachable-ui` | `inventory/warehouse_sync.rs` |
 | `fail_workorder_quality_check` | yes | `COV-06` | `future-disabled` | `backend-only` | `inventory/quality.rs` |
+| `finalize_embedding_job` | no | `GOV/CAP` | `internal-support` | `backend-only` | `ai/intelligence.rs` |
 | `finalize_import_assistant_job` | yes | `COV-22` | `horizontal` | `reachable-ui` | `data_ops/import_mapping_templates.rs` |
 | `finalize_pos_order_archive` | no | `COV-04` | `internal-support` | `backend-only` | `sales/pos_transactions.rs` |
 | `find_duplicate_contacts` | yes | `COV-03` | `primary-workflow` | `reachable-ui` | `crm/duplicate.rs` |

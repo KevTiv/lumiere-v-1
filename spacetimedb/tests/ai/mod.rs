@@ -24,8 +24,12 @@ pub fn run_ai_document_processing_job_document_relation_test(
 
 #[spacetimedb::reducer]
 pub fn run_ai_embedding_org_isolation_test(ctx: &ReducerContext) -> Result<(), String> {
+    embedding_isolation_test::test_embedding_uses_canonical_passage_and_reference_only_job(ctx)
+        .map_err(|e| format!("embedding_canonical_passage: {e}"))?;
     embedding_isolation_test::test_search_embedding_org_isolation(ctx)
-        .map_err(|e| format!("search_embedding_org_isolation: {e}"))
+        .map_err(|e| format!("search_embedding_org_isolation: {e}"))?;
+    embedding_isolation_test::test_embedding_finalization_scrubs_payload_and_rebuilds(ctx)
+        .map_err(|e| format!("embedding_finalization_and_rebuild: {e}"))
 }
 
 #[spacetimedb::reducer]
@@ -104,8 +108,14 @@ pub fn run_ai_evidence_provenance_tests(ctx: &ReducerContext) -> Result<(), Stri
                 "sources_round_trip_and_unknowns_stay_unknown",
                 t::test_sources_round_trip_and_unknowns_stay_unknown,
             ),
-            ("recollected_source_stays_unverified", t::test_recollected_source_stays_unverified),
-            ("cross_scope_references_are_denied", t::test_cross_scope_references_are_denied),
+            (
+                "recollected_source_stays_unverified",
+                t::test_recollected_source_stays_unverified,
+            ),
+            (
+                "cross_scope_references_are_denied",
+                t::test_cross_scope_references_are_denied,
+            ),
             (
                 "lineage_reconstructs_after_edit_and_fork",
                 t::test_lineage_reconstructs_after_edit_and_fork,
@@ -151,8 +161,14 @@ pub fn run_workflow_provenance_tests(ctx: &ReducerContext) -> Result<(), String>
     use workflow_provenance_test as t;
     run_scenarios(
         &[
-            ("authority_is_server_resolved", t::test_authority_is_server_resolved),
-            ("generated_workflow_binds_every_step", t::test_generated_workflow_binds_every_step),
+            (
+                "authority_is_server_resolved",
+                t::test_authority_is_server_resolved,
+            ),
+            (
+                "generated_workflow_binds_every_step",
+                t::test_generated_workflow_binds_every_step,
+            ),
             (
                 "invalid_provenance_blocks_and_leaves_no_bindings",
                 t::test_invalid_provenance_blocks_and_leaves_no_bindings,

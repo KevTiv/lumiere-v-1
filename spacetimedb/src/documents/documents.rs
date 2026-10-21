@@ -13,8 +13,8 @@ use crate::core::organization::require_company_in_organization;
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
 use crate::documents::pack_locale::{
-    build_default_index_content, compute_purge_after, document_residency_region_for_company,
-    document_search_language_for_company, truncate_index_content, validate_fiscal_archive,
+    compute_purge_after, document_residency_region_for_company,
+    document_search_language_for_company, validate_fiscal_archive,
 };
 use crate::expenses::expenses::{expense_sheet, hr_expense};
 use crate::helpdesk::tickets::helpdesk_ticket;
@@ -96,7 +96,6 @@ pub struct Document {
     pub file_size: u64,
     pub mimetype: String,
     pub checksum: Option<String>,
-    pub index_content: Option<String>,
     /// Analyzer/locale hint for FTS (from country pack or explicit index).
     pub index_language: Option<String>,
     pub access_token: Option<String>,
@@ -681,12 +680,6 @@ pub fn create_document(
     }
 
     let checksum = params.checksum.trim().to_lowercase();
-    let index_content = Some(truncate_index_content(&build_default_index_content(
-        &params.name,
-        params.description.as_deref(),
-        &params.file_name,
-        None,
-    )));
     let index_language = document_search_language_for_company(ctx, organization_id, company_id);
     let residency_region = params
         .residency_region
@@ -702,7 +695,6 @@ pub fn create_document(
         file_size: params.file_size,
         mimetype: params.mimetype.clone(),
         checksum: Some(checksum.clone()),
-        index_content,
         index_language,
         access_token: None,
         url: Some(params.url.clone()),

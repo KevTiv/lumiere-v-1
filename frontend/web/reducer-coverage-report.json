@@ -1,6 +1,6 @@
 {
-  "totalRustReducers": 1212,
-  "productRustReducers": 1114,
+  "totalRustReducers": 1217,
+  "productRustReducers": 1119,
   "totalWebReducers": 867,
   "missingFromWeb": [
     "accept_ai_provider_attempt",
@@ -12,6 +12,7 @@
     "answer_proposal_clarification",
     "append_ai_agent_run_step",
     "apply_global_migrations",
+    "apply_historical_payment_allocations",
     "apply_hr_integration_intent",
     "apply_index_linked_renewal",
     "apply_org_migrations",
@@ -57,6 +58,7 @@
     "claim_ai_skill_certification",
     "claim_hub_with_token",
     "claim_queue_job",
+    "cleanup_abandoned_account_move_import",
     "cleanup_stale_proposal_presence",
     "clear_document_presence",
     "clear_inventory_audit_violations",
@@ -108,6 +110,8 @@
     "create_hr_skill",
     "create_incoterm",
     "create_loss_category",
+    "create_manual_account_invoice",
+    "create_manual_invoice",
     "create_operational_message",
     "create_project_revenue_line",
     "create_project_revenue_schedule",
@@ -152,6 +156,7 @@
     "fail_scheduled_owner_report_run",
     "fail_subscription_payment_intent",
     "fail_workorder_quality_check",
+    "finalize_embedding_job",
     "finalize_pos_order_archive",
     "finish_manufacturing_order_with_tracking",
     "fork_ai_run_checked",
@@ -351,15 +356,15 @@
   ],
   "coverageModel": "matrix-hook-ui",
   "matrixStatusSummary": {
-    "backend-only": 167,
+    "backend-only": 170,
     "reachable-ui": 862,
-    "command-only": 120,
+    "command-only": 122,
     "future-disabled": 33,
     "internal-intentional": 19,
     "api-only-intentional": 11
   },
   "matrixClassificationSummary": {
-    "user-facing": 1047,
+    "user-facing": 1052,
     "admin": 77,
     "internal/background": 20,
     "dev-only": 7,
@@ -455,6 +460,7 @@
         "run_fx_revaluation",
         "run_fx_revaluation_batch",
         "post_realized_fx_gain_loss",
+        "apply_historical_payment_allocations",
         "create_intercompany_rule",
         "update_intercompany_rule",
         "delete_intercompany_rule",
@@ -470,6 +476,7 @@
         "compute_invoice_totals",
         "post_invoice",
         "create_account_move",
+        "create_manual_invoice",
         "add_account_move_line",
         "post_account_move",
         "cancel_account_move",
@@ -481,6 +488,7 @@
         "create_credit_note_from_invoice",
         "reconcile_payment_with_invoice",
         "bill_project_milestone",
+        "create_manual_account_invoice",
         "run_accounting_ownership_backfill",
         "validate_accounting_ownership_backfill",
         "create_payment_account",
@@ -680,9 +688,12 @@
         "backfill_consolidation_organization_ownership",
         "backfill_fiscal_period_organization_ownership",
         "backfill_fixed_asset_organization_ownership",
+        "apply_historical_payment_allocations",
         "backfill_intercompany_organization_ownership",
+        "create_manual_invoice",
         "reset_account_move_to_draft",
         "bill_project_milestone",
+        "create_manual_account_invoice",
         "run_accounting_ownership_backfill",
         "validate_accounting_ownership_backfill",
         "update_payment_account",
@@ -699,7 +710,7 @@
         "create_subscription_tax_settle_intent",
         "apply_subscription_tax_settle_intent"
       ],
-      "coverage": 87,
+      "coverage": 85,
       "productReducers": [
         "create_amortization_schedule",
         "recognize_amortization_line",
@@ -788,6 +799,7 @@
         "run_fx_revaluation",
         "run_fx_revaluation_batch",
         "post_realized_fx_gain_loss",
+        "apply_historical_payment_allocations",
         "create_intercompany_rule",
         "update_intercompany_rule",
         "delete_intercompany_rule",
@@ -803,6 +815,7 @@
         "compute_invoice_totals",
         "post_invoice",
         "create_account_move",
+        "create_manual_invoice",
         "add_account_move_line",
         "post_account_move",
         "cancel_account_move",
@@ -814,6 +827,7 @@
         "create_credit_note_from_invoice",
         "reconcile_payment_with_invoice",
         "bill_project_milestone",
+        "create_manual_account_invoice",
         "run_accounting_ownership_backfill",
         "validate_accounting_ownership_backfill",
         "create_payment_account",
@@ -860,7 +874,7 @@
         "create_subscription_tax_settle_intent",
         "apply_subscription_tax_settle_intent"
       ],
-      "productCoverage": 87
+      "productCoverage": 85
     },
     "reports": {
       "rust": [
@@ -1165,6 +1179,7 @@
         "dismiss_insight",
         "upsert_search_embedding",
         "mark_embedding_synced",
+        "finalize_embedding_job",
         "delete_search_embedding",
         "request_embedding_job",
         "register_ai_model_profile",
@@ -1292,6 +1307,7 @@
         "set_ai_evidence_passage_status",
         "upsert_search_embedding",
         "mark_embedding_synced",
+        "finalize_embedding_job",
         "delete_search_embedding",
         "request_embedding_job",
         "register_ai_model_profile",
@@ -1388,6 +1404,7 @@
         "set_ai_evidence_passage_status",
         "create_ai_insight",
         "dismiss_insight",
+        "finalize_embedding_job",
         "register_ai_model_profile",
         "set_ai_model_profile_active",
         "register_ai_intelligence_policy",
@@ -1439,7 +1456,7 @@
         "begin_ai_workflow_generation",
         "stage_ai_workflow_node_provenance"
       ],
-      "productCoverage": 26
+      "productCoverage": 25
     },
     "auth": {
       "rust": [
@@ -2794,6 +2811,7 @@
         "delete_import_mapping_template",
         "finalize_import_assistant_job",
         "import_csv_tracked",
+        "cleanup_abandoned_account_move_import",
         "rollback_import_job",
         "import_lot_csv",
         "import_manufacturing_order_csv",
@@ -2844,16 +2862,18 @@
         "save_import_mapping_template"
       ],
       "missing": [
-        "import_csv_tracked"
+        "import_csv_tracked",
+        "cleanup_abandoned_account_move_import"
       ],
-      "coverage": 97,
+      "coverage": 95,
       "productReducers": [
         "save_import_mapping_template",
         "delete_import_mapping_template",
         "finalize_import_assistant_job",
+        "cleanup_abandoned_account_move_import",
         "rollback_import_job"
       ],
-      "productCoverage": 100
+      "productCoverage": 80
     },
     "helpdesk": {
       "rust": [

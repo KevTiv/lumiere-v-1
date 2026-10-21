@@ -579,9 +579,8 @@ async fn persist_document_evidence(
             json!([organization_id, company_id, {
                 "content_type": "ai_evidence_passage",
                 "content_id": passage_id,
-                "text": persisted_text,
-                "embedding": [],
-                "embedding_hash": content_hash,
+                "expected_fingerprint": content_hash,
+                "index_generation": "semantic-index-v1",
                 "metadata": json!({
                     "sourceKind": "document",
                     "sourceKey": format!("document:{document_id}"),
@@ -600,7 +599,8 @@ async fn persist_document_evidence(
                 company_id,
                 "ai_evidence_passage",
                 passage_id,
-                persisted_text
+                content_hash,
+                "semantic-index-v1"
             ]),
         )
         .await?;

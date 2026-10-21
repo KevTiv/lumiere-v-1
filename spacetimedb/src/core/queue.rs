@@ -12,6 +12,7 @@ use crate::types::{QueueAttemptOutcome, QueueCompletionOutcome, QueueJobStatus};
 
 const OWNER_REPORT_QUEUE: &str = "owner_report";
 const WORKFLOW_EXTERNAL_QUEUE: &str = "workflow-external";
+const COMPLETED_EMBEDDING_PAYLOAD: &str = "{}";
 
 const BASE_BACKOFF_SECS: u64 = 1;
 const MAX_BACKOFF_SECS: u64 = 60 * 60;
@@ -232,7 +233,7 @@ fn queue_service_name(queue_name: &str) -> Option<&'static str> {
     }
 }
 
-fn require_queue_job_worker_authority(
+pub(crate) fn require_queue_job_worker_authority(
     ctx: &ReducerContext,
     organization_id: u64,
     queue_name: &str,
@@ -671,6 +672,22 @@ pub fn complete_queue_job(
         .ok_or("queue job not found")?;
     require_job_scope(&job, organization_id)?;
     require_queue_job_worker_authority(ctx, organization_id, &job.queue_name)?;
+    complete_queue_job_inner(ctx, organization_id, job_id, params)
+}
+
+pub(crate) fn complete_queue_job_inner(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    job_id: u64,
+    params: CompleteQueueJobParams,
+) -> Result<(), String> {
+    let job = ctx
+        .db
+        .queue_job()
+        .id()
+        .find(&job_id)
+        .ok_or("queue job not found")?;
+    require_job_scope(&job, organization_id)?;
 
     if job.status == QueueJobStatus::Completed {
         let scope_key = receipt_scope_key(job.organization_id, job.company_id, &job.semantic_key);
@@ -739,6 +756,11 @@ pub fn complete_queue_job(
             );
             ctx.db.queue_job().id().update(QueueJob {
                 status: QueueJobStatus::Completed,
+                payload: if job.queue_name == "embedding" {
+                    COMPLETED_EMBEDDING_PAYLOAD.to_string()
+                } else {
+                    job.payload.clone()
+                },
                 revision: job.revision + 1,
                 lease_worker_id: None,
                 lease_token: None,
