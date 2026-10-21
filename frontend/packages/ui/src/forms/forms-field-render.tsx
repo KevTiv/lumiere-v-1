@@ -3,7 +3,7 @@
 import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
 import type { FormField, FormValues } from "../lib/form-types"
-import { fieldWidthClasses } from "../lib/form-types"
+import { fieldWidthClasses, isPlainTextareaField } from "../lib/form-types"
 import { Input } from "../components/input"
 import { Textarea } from "../components/textarea"
 import { Checkbox } from "../components/checkbox"
@@ -123,6 +123,7 @@ export function FormFieldRenderer({
       case "textarea":
         return (
           <Textarea
+            variant={isPlainTextareaField(field) ? "plain" : "rich"}
             id={field.id}
             name={field.name}
             data-testid={`form-field-${field.name}`}
