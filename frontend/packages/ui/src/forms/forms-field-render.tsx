@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
 import type { FormField } from "../lib/form-types"
 import { fieldWidthClasses } from "../lib/form-types"
@@ -23,7 +24,7 @@ import {
 } from "./utils/radix-select-empty-value"
 
 const inputBase =
-  "bg-background border-input focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:border-ring transition-[border-color,box-shadow,background-color] duration-150"
+  "bg-background border-input focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-ring transition-[border-color,box-shadow,background-color] duration-150"
 
 function autoCompleteForField(field: FormField): string | undefined {
   if (field.autoComplete) return field.autoComplete
@@ -60,6 +61,7 @@ export function FormFieldRenderer({
   error,
   aiSuggestion,
 }: FormFieldRendererProps) {
+  const { t } = useTranslation()
   const width = field.width || "full"
   const descriptionId = field.description ? `${field.id}-description` : undefined
   const errorId = error ? `${field.id}-error` : undefined
@@ -160,6 +162,7 @@ export function FormFieldRenderer({
             disabled={field.disabled}
           >
             <SelectTrigger
+              id={field.id}
               data-testid={`form-field-${field.name}`}
               className={cn(
                 "w-full",
@@ -183,6 +186,44 @@ export function FormFieldRenderer({
               ))}
             </SelectContent>
           </Select>
+        )
+
+      case "multiselect":
+        return (
+          <select
+            id={field.id}
+            name={field.name}
+            data-testid={`form-field-${field.name}`}
+            multiple
+            value={Array.isArray(value) ? value : []}
+            onChange={(event) => {
+              const selected = Array.from(event.target.selectedOptions, (option) => option.value)
+              // Disabled and no-longer-listed values cannot be edited here; keep them intact.
+              const retained = Array.isArray(value) ? value.filter((item) => {
+                const option = field.options.find((option) => option.value === item)
+                return !option || option.disabled
+              }) : []
+              onChange([...new Set([...retained, ...selected])])
+            }}
+            disabled={field.disabled}
+            required={field.required}
+            aria-invalid={!!error}
+            aria-describedby={describedBy}
+            className={cn("w-full rounded-md border p-2", inputBase, error && "border-destructive")}
+          >
+            {Array.isArray(value) ? value
+              .filter((selected) => !field.options.some((option) => option.value === selected))
+              .map((selected) => (
+                <option key={selected} value={selected} disabled>
+                  {t("common.form.unavailableSelection", { value: selected, defaultValue: "Unavailable selection: {{value}}" })}
+                </option>
+              )) : null}
+            {field.options.map((option) => (
+              <option key={option.value} value={option.value} disabled={option.disabled}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         )
 
       case "checkbox":

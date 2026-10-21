@@ -21,10 +21,19 @@ describe("recentNotifications", () => {
       note(3, 2000, { metadata: JSON.stringify({ recipient: "ffff" }) }),
       note(4, 4000, { messageType: { tag: "Comment" } }),
       note(5, 2000, { metadata: null }),
+      note(6, 5000, { metadata: JSON.stringify({ recipient: ME, read_at: 1234 }) }),
     ]
     expect(recentNotifications(rows, ME).map((n) => n.id)).toEqual(["2", "1"])
     expect(recentNotifications(rows, "0xAB12").length).toBe(2)
     expect(recentNotifications(rows, null)).toEqual([])
+  })
+
+  it("keeps a notification unread when read_at is absent or null", () => {
+    const rows = [
+      note(1, 1000, { metadata: JSON.stringify({ recipient: ME, read_at: null }) }),
+      note(2, 2000, { metadata: JSON.stringify({ recipient: ME, read_at: 0 }) }),
+    ]
+    expect(recentNotifications(rows, ME).map((n) => n.id)).toEqual(["1"])
   })
 
   it("caps at ten and strips markup", () => {

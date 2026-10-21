@@ -248,6 +248,9 @@ test("move-line typed read decodes default and mandatory-only projections", () =
         balance: 125.5,
         accountId: "1100",
         partnerId: null,
+        productId: "500",
+        quantity: 3,
+        priceUnit: 41.8333333333,
       },
       { id: 9, organizationId: "11" },
     ],
@@ -265,6 +268,9 @@ test("move-line typed read decodes default and mandatory-only projections", () =
     balance: 125.5,
     accountId: 1100n,
     partnerId: undefined,
+    productId: 500n,
+    quantity: 3,
+    priceUnit: 41.8333333333,
   })
   assert.deepEqual(rows[1], { id: 9n, organizationId: 11n })
 })

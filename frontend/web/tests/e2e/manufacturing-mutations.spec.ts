@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   chooseFirstOption,
   expectNoAppError,
@@ -135,7 +136,7 @@ test.describe("Manufacturing create mutations", { tag: ["@phase-4", "@manufactur
     test.setTimeout(120_000)
 
     await gotoModule(page, "/manufacturing", "manufacturing")
-    await page.getByTestId("module-tab-manufacturing-boms").click()
+    await selectModuleTab(page, "manufacturing", "boms")
     await waitForBffQueryMinRows(page, "/api/query/products")
 
     await page.getByTestId("module-create-manufacturing-boms").click()
@@ -162,7 +163,7 @@ test.describe("Manufacturing create mutations", { tag: ["@phase-4", "@manufactur
     test.setTimeout(180_000)
 
     await gotoModule(page, "/manufacturing", "manufacturing")
-    await page.getByTestId("module-tab-manufacturing-orders").click()
+    await selectModuleTab(page, "manufacturing", "orders")
     await waitForBffQueryMinRows(page, "/api/query/products")
     await waitForBffQueryMinRows(page, "/api/query/warehouses")
 
@@ -319,7 +320,7 @@ test.describe(
       await expect.poll(async () => fetchMoState(page, moId), { timeout: 30_000 }).toBe("Done")
 
       await gotoModule(page, "/manufacturing", "manufacturing")
-      await page.getByTestId("module-tab-manufacturing-orders").click()
+      await selectModuleTab(page, "manufacturing", "orders")
       await waitForBffQueryMinRows(page, "/api/query/mrp-productions")
       await expectNoAppError(page)
     })

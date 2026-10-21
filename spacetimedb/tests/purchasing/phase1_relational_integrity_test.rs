@@ -88,7 +88,37 @@ pub fn test_phase1_vendor_and_rfq_relations(ctx: &ReducerContext) -> Result<(), 
     if approve_supplier_intake(ctx, primary.organization_id, intake.id, foreign.vendor_id).is_ok() {
         return Err("foreign organization vendor was approved for supplier intake".to_string());
     }
+    if approve_supplier_intake(ctx, primary.organization_id, intake.id, primary.vendor_id).is_ok() {
+        return Err("submitter approved their own supplier intake".to_string());
+    }
+    let submitted = ctx
+        .db
+        .supplier_intake_request()
+        .id()
+        .find(&intake.id)
+        .ok_or("submitted intake missing")?;
+    if submitted.state != IntakeState::Submitted || submitted.partner_id.is_some() {
+        return Err("self-approval changed supplier intake".to_string());
+    }
+    // Seed the other principal in this single-context reducer harness;
+    // browser certification exercises actual separate authenticated users.
+    let requester = spacetimedb::Identity::from_byte_array(
+        if ctx.sender() == spacetimedb::Identity::from_byte_array([0xfa; 32]) {
+            [0xfb; 32]
+        } else {
+            [0xfa; 32]
+        },
+    );
+    ctx.db.supplier_intake_request().id().update(
+        crate::purchasing::vendor_management::SupplierIntakeRequest {
+            submitted_by: Some(requester),
+            ..submitted
+        },
+    );
     approve_supplier_intake(ctx, primary.organization_id, intake.id, primary.vendor_id)?;
+    if approve_supplier_intake(ctx, primary.organization_id, intake.id, primary.vendor_id).is_ok() {
+        return Err("approved supplier intake accepted a stale approval".to_string());
+    }
     let approved = ctx
         .db
         .supplier_intake_request()

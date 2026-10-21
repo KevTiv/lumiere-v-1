@@ -20,6 +20,8 @@ mod password_resets;
 mod profiles;
 mod schema;
 mod service_identities;
+mod workos;
+pub use workos::insert_workos_identity;
 
 pub use credentials::{
     attach_workos_subject, find_user_credential_by_email, find_user_credential_by_platform_id,
@@ -27,15 +29,17 @@ pub use credentials::{
     insert_user_credential, replace_password_hash,
 };
 pub use password_resets::{
-    consume_password_reset_token, find_password_reset_token, insert_password_reset_token,
+    complete_password_reset, consume_password_reset_token, find_password_reset_token,
+    insert_password_reset_token,
 };
 pub use profiles::{
-    find_user_profile_by_platform_id, find_user_profile_by_stdb_identity, update_user_email,
-    update_user_profile, upsert_user_profile,
+    find_user_profile_by_platform_id, find_user_profile_by_stdb_identity, save_profile_patch,
+    sync_workos_email, update_user_email, update_user_profile, upsert_user_profile,
 };
 pub use schema::{
-    ensure_schema, PLATFORM_CONTROL_DDL, PLATFORM_RESET_TOKEN_BINDING_DDL, PLATFORM_SCHEMA,
-    PLATFORM_SCHEMA_BOOTSTRAP_DDL, SCHEMA_MIGRATION_TABLE,
+    ensure_schema, PLATFORM_CONTROL_DDL, PLATFORM_IDENTITY_LIFECYCLE_DDL,
+    PLATFORM_RESET_TOKEN_BINDING_DDL, PLATFORM_SCHEMA, PLATFORM_SCHEMA_BOOTSTRAP_DDL,
+    SCHEMA_MIGRATION_TABLE,
 };
 pub use service_identities::{
     active_cold_tier_service_identity, register_cold_tier_service_identity,

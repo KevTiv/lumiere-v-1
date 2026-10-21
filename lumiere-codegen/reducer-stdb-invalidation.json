@@ -19,6 +19,17 @@
     "account-moves",
     "account-move-lines"
   ],
+  "cleanup_abandoned_account_move_import": [
+    "import-jobs",
+    "account-moves",
+    "account-move-lines"
+  ],
+  "cancel_payment": [
+    "account-payments",
+    "account-moves",
+    "account-move-lines",
+    "sale-orders"
+  ],
   "create_account_account": [
     "account-accounts"
   ],
@@ -36,6 +47,14 @@
     "account-journals"
   ],
   "create_account_move": [
+    "account-moves",
+    "account-move-lines"
+  ],
+  "create_manual_account_invoice": [
+    "account-moves",
+    "account-move-lines"
+  ],
+  "create_manual_invoice": [
     "account-moves",
     "account-move-lines"
   ],
@@ -309,5 +328,95 @@
   ],
   "update_stock_picking": [
     "stock-pickings"
+  ],
+  "reconcile_account_bank_statement_line": [
+    "bank-statements",
+    "bank-statement-lines",
+    "account-payments",
+    "account-moves",
+    "account-move-lines",
+    "sale-orders",
+    "audit-log"
+  ],
+  "claim_reviewed_mail_delivery": [
+    "mail-messages"
+  ],
+  "abandon_bank_statement_settlement": [
+    "bank-statements",
+    "bank-statement-lines",
+    "account-payments",
+    "account-moves",
+    "account-move-lines",
+    "sale-orders",
+    "workflow-instances",
+    "audit-log"
+  ],
+  "resubmit_bank_statement_settlement": [
+    "bank-statements",
+    "bank-statement-lines",
+    "account-payments",
+    "account-moves",
+    "account-move-lines",
+    "sale-orders",
+    "workflow-instances",
+    "audit-log"
+  ],
+  "reverse_bank_statement_settlement": [
+    "bank-statements",
+    "bank-statement-lines",
+    "account-payments",
+    "account-moves",
+    "account-move-lines",
+    "sale-orders",
+    "workflow-instances",
+    "audit-log"
+  ],
+  "decide_workflow_human_task": [
+    "bank-statements",
+    "bank-statement-lines",
+    "account-payments",
+    "workflow-instances",
+    "audit-log"
+  ],
+  "invalidate_workflow_human_task": [
+    "bank-statements",
+    "bank-statement-lines",
+    "account-payments",
+    "workflow-instances",
+    "audit-log"
+  ],
+  "cancel_workflow": [
+    "bank-statements",
+    "bank-statement-lines",
+    "account-payments",
+    "workflow-instances",
+    "audit-log"
+  ],
+  "post_payment": [
+    "account-payments",
+    "account-moves",
+    "account-move-lines",
+    "bank-statement-lines",
+    "workflow-instances",
+    "audit-log"
+  ],
+  "claim_workflow_human_task": [
+    "bank-statement-lines",
+    "workflow-instances",
+    "audit-log"
+  ],
+  "add_workflow_human_task_comment": [
+    "bank-statement-lines",
+    "workflow-instances",
+    "audit-log"
+  ],
+  "accept_user_invite": [
+    "user-organization",
+    "user-role-assignment"
+  ],
+  "set_member_access": [
+    "user-organization",
+    "user-role-assignment",
+    "user-roles"
   ]
 }

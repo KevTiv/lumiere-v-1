@@ -234,6 +234,15 @@ export function useStockMoves(
   });
 }
 
+/** Read-only list served by the authorized HTTP query path (`/api/query/stock-move-lines`). */
+export function useStockMoveLines(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['stock-move-lines', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/stock-move-lines', 'Failed to read stock move lines'),
+    staleTime: 30_000,
+  });
+}
+
 export function useStockRoutes(
   organizationId: bigint,
   initialData?: StockRoute[],

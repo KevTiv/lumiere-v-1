@@ -151,9 +151,148 @@ pub struct Dashboard {
     pub metadata: Option<String>,
 }
 
+const DASHBOARD_WIDGET_CREATION_KEY_PREFIX: &str = "lumiere.dashboard-widget.create/v1:";
+
+fn dashboard_widget_creation_key(metadata: Option<&str>) -> Result<Option<&str>, String> {
+    let Some(metadata) = metadata else {
+        return Ok(None);
+    };
+    let Some(request_id) = metadata.strip_prefix(DASHBOARD_WIDGET_CREATION_KEY_PREFIX) else {
+        return Ok(None);
+    };
+    if request_id.is_empty() || request_id.len() > 128 || request_id.contains(':') {
+        return Err("Invalid dashboard widget creation request id".to_string());
+    }
+    Ok(Some(request_id))
+}
+
+fn dashboard_widget_matches_create(
+    widget: &DashboardWidget,
+    company_id: Option<u64>,
+    params: &CreateDashboardWidgetParams,
+) -> bool {
+    widget.company_id == company_id
+        && widget.name == params.name
+        && widget.widget_type == params.widget_type
+        && widget.model == params.model
+        && widget.domain == params.domain
+        && widget.fields == params.fields
+        && widget.group_by == params.group_by
+        && widget.aggregation == params.aggregation
+        && widget.chart_type == params.chart_type
+        && widget.sort_order == params.sort_order
+        && widget.limit == params.limit
+        && widget.refresh_interval == params.refresh_interval
+        && widget.configuration == params.configuration
+        && widget.position_x == params.position_x
+        && widget.position_y == params.position_y
+        && widget.width == params.width
+        && widget.height == params.height
+        && widget.is_active == params.is_active
+        && widget.metadata == params.metadata
+}
+
 // ============================================================================
 // REDUCERS
 // ============================================================================
+
+/// Write-time validation of the stored widget definition. Mirrors the
+/// resolver's fail-closed parsing (domain, sort order, time/measure binding)
+/// so a malformed definition is rejected at write time, not at render time.
+pub(crate) fn validate_widget_definition(
+    domain: Option<&str>,
+    sort_order: Option<&str>,
+    configuration: Option<&str>,
+) -> Result<(), String> {
+    use serde_json::Value;
+
+    if let Some(domain) = domain.map(str::trim).filter(|d| !d.is_empty()) {
+        let parsed: Value = serde_json::from_str(domain)
+            .map_err(|_| "Widget filter definition is not valid JSON".to_string())?;
+        let Value::Object(filters) = parsed else {
+            return Err("Widget filter definition must be a JSON object".to_string());
+        };
+        for (field, expected) in &filters {
+            if field.trim().is_empty() {
+                return Err("Widget filter definition has an empty field name".to_string());
+            }
+            let Value::Object(operators) = expected else {
+                continue;
+            };
+            if operators.is_empty() {
+                return Err(format!("The filter for {field} has no operator"));
+            }
+            for (operator, operand) in operators {
+                match operator.as_str() {
+                    "$in" if !operand.is_array() => {
+                        return Err(format!("The $in filter for {field} must use an array"));
+                    }
+                    "$in" | "$ne" => {}
+                    "$gte" | "$lte" | "$gt" | "$lt" => {
+                        let numeric = match operand {
+                            Value::Number(_) => true,
+                            Value::String(text) => {
+                                text.trim().parse::<f64>().is_ok_and(f64::is_finite)
+                            }
+                            _ => false,
+                        };
+                        if !numeric {
+                            return Err(format!(
+                                "The {operator} filter for {field} needs a numeric operand"
+                            ));
+                        }
+                    }
+                    other => {
+                        return Err(format!("Unsupported widget filter operator: {other}"));
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(sort) = sort_order.map(str::trim).filter(|s| !s.is_empty()) {
+        let parsed: Value = serde_json::from_str(sort)
+            .map_err(|_| "Widget sort order is not valid JSON".to_string())?;
+        let Value::Object(fields) = parsed else {
+            return Err("Widget sort order must be a JSON object".to_string());
+        };
+        let mut entries = fields.iter();
+        match (entries.next(), entries.next()) {
+            (Some((field, direction)), None) => {
+                let direction = direction.as_str().unwrap_or("").to_ascii_lowercase();
+                if field.trim().is_empty() || (direction != "asc" && direction != "desc") {
+                    return Err("Widget sort direction must be asc or desc".to_string());
+                }
+            }
+            _ => return Err("Widget sort order must contain exactly one field".to_string()),
+        }
+    }
+
+    // The stored configuration is the widget's time/measure binding; the
+    // resolver fails closed on anything else, so reject it here as well.
+    if let Some(config) = configuration.map(str::trim).filter(|c| !c.is_empty()) {
+        let valid = match serde_json::from_str::<Value>(config) {
+            Ok(Value::Object(map)) => {
+                let optional_text = |key: &str| {
+                    matches!(
+                        map.get(key),
+                        None | Some(Value::Null) | Some(Value::String(_))
+                    )
+                };
+                map.get("version").and_then(Value::as_u64) == Some(1)
+                    && optional_text("timeField")
+                    && optional_text("measureField")
+                    && map.get("missingTimestampPolicy").and_then(Value::as_str) == Some("reject")
+                    && map.get("missingMeasurePolicy").and_then(Value::as_str) == Some("reject")
+            }
+            _ => false,
+        };
+        if !valid {
+            return Err("Widget time or measure binding is invalid".to_string());
+        }
+    }
+    Ok(())
+}
 
 /// Create a dashboard widget
 #[reducer]
@@ -164,6 +303,44 @@ pub fn create_dashboard_widget(
     params: CreateDashboardWidgetParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "dashboard_widget", "create")?;
+
+    validate_widget_definition(
+        params.domain.as_deref(),
+        params.sort_order.as_deref(),
+        params.configuration.as_deref(),
+    )?;
+
+    if let Some(cid) = company_id {
+        require_company_in_organization(ctx, organization_id, cid)?;
+    }
+
+    if dashboard_widget_creation_key(params.metadata.as_deref())?.is_some() {
+        let matches: Vec<_> = ctx
+            .db
+            .dashboard_widget()
+            .widget_by_org()
+            .filter(&organization_id)
+            .filter(|widget| widget.metadata == params.metadata)
+            .take(2)
+            .collect();
+        match matches.as_slice() {
+            [] => {}
+            [widget] if dashboard_widget_matches_create(widget, company_id, &params) => {
+                return Ok(())
+            }
+            [_] => {
+                return Err(
+                    "Dashboard widget creation request id was reused with different input"
+                        .to_string(),
+                )
+            }
+            _ => {
+                return Err(
+                    "Dashboard widget creation request id has multiple canonical rows".to_string(),
+                )
+            }
+        }
+    }
 
     let widget = ctx.db.dashboard_widget().insert(DashboardWidget {
         id: 0,

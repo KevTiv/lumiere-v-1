@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { Plus, Trash2 } from "lucide-react"
 
 import { Button } from "../components/button"
@@ -91,6 +92,7 @@ export function SaleOrderLineGrid({
   onDeleteLine,
   testIdPrefix = "sale-order-lines",
 }: SaleOrderLineGridProps) {
+  const { t } = useTranslation()
   const { sortedRows } = useEntityTable({
     columns: COLUMNS,
     data: lines as LineRow[],
@@ -132,12 +134,12 @@ export function SaleOrderLineGrid({
         <Table>
           <TableHeader className="bg-muted/25">
             <TableRow>
-              <TableHead>Product</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead className="text-right">Quantity</TableHead>
-              <TableHead className="text-right">Unit price</TableHead>
-              <TableHead className="text-right">Discount %</TableHead>
-              <TableHead className="text-right">Subtotal</TableHead>
+              <TableHead>{t("sales.orderLines.product")}</TableHead>
+              <TableHead>{t("sales.orderLines.columns.description")}</TableHead>
+              <TableHead className="text-right">{t("sales.orderLines.quantity")}</TableHead>
+              <TableHead className="text-right">{t("sales.orderLines.unitPrice")}</TableHead>
+              <TableHead className="text-right">{t("sales.orderLines.discountPercent")}</TableHead>
+              <TableHead className="text-right">{t("sales.orderLines.subtotal")}</TableHead>
               {editable ? <TableHead className="w-10" /> : null}
             </TableRow>
           </TableHeader>
@@ -145,14 +147,16 @@ export function SaleOrderLineGrid({
             {sortedRows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={editable ? 7 : 6} className="py-8 text-center text-sm text-muted-foreground">
-                  No lines yet
+                  {t("sales.orderLines.empty")}
                 </TableCell>
               </TableRow>
             ) : null}
             {sortedRows.map((line) => {
               const id = String(line.id)
               const product = productById.get(String(line.productId ?? line.product_id ?? ""))
-              const label = product?.label ?? String(line.name ?? `Product ${line.productId ?? ""}`)
+              const label = product?.label ?? String(
+                line.name ?? t("sales.orderLines.productFallback", { id: line.productId ?? "" }),
+              )
               const amounts = lineAmounts(line, drafts[id])
               return (
                 <TableRow key={id} data-testid={`${testIdPrefix}-row-${id}`}>
@@ -167,7 +171,7 @@ export function SaleOrderLineGrid({
                   </TableCell>
                   <TableCell className="text-right">
                     <EditableNumber
-                      aria-label={`Quantity of ${label}`}
+                      aria-label={t("sales.orderLines.quantityOf", { product: label })}
                       data-testid={`${testIdPrefix}-qty-${id}`}
                       value={num(line, "productUomQty", "product_uom_qty")}
                       min={0.0001}
@@ -179,7 +183,7 @@ export function SaleOrderLineGrid({
                   </TableCell>
                   <TableCell className="text-right">
                     <EditableNumber
-                      aria-label={`Unit price of ${label}`}
+                      aria-label={t("sales.orderLines.unitPriceOf", { product: label })}
                       data-testid={`${testIdPrefix}-price-${id}`}
                       value={num(line, "priceUnit", "price_unit")}
                       min={0}
@@ -191,7 +195,7 @@ export function SaleOrderLineGrid({
                   </TableCell>
                   <TableCell className="text-right">
                     <EditableNumber
-                      aria-label={`Discount of ${label}`}
+                      aria-label={t("sales.orderLines.discountOf", { product: label })}
                       data-testid={`${testIdPrefix}-discount-${id}`}
                       value={num(line, "discount")}
                       min={0}
@@ -211,7 +215,7 @@ export function SaleOrderLineGrid({
                         type="button"
                         variant="ghost"
                         size="icon-sm"
-                        aria-label={`Remove ${label}`}
+                        aria-label={t("sales.orderLines.removeProduct", { product: label })}
                         data-testid={`${testIdPrefix}-delete-${id}`}
                         onClick={() => setDeleting(line)}
                       >
@@ -224,10 +228,10 @@ export function SaleOrderLineGrid({
             })}
           </TableBody>
           <TableFooter>
-            <TotalRow label="Untaxed" value={totals.subtotal} testId={`${testIdPrefix}-untaxed`} editable={editable} />
-            <TotalRow label="Taxes" value={totals.tax} testId={`${testIdPrefix}-tax`} editable={editable} />
+            <TotalRow label={t("sales.orderLines.untaxed")} value={totals.subtotal} testId={`${testIdPrefix}-untaxed`} editable={editable} />
+            <TotalRow label={t("sales.orderLines.taxes")} value={totals.tax} testId={`${testIdPrefix}-tax`} editable={editable} />
             <TotalRow
-              label={totals.estimated ? "Total (estimated until saved)" : "Total"}
+              label={totals.estimated ? t("sales.orderLines.estimatedTotal") : t("sales.orderLines.total")}
               value={totals.total}
               testId={`${testIdPrefix}-total`}
               editable={editable}
@@ -242,13 +246,13 @@ export function SaleOrderLineGrid({
       <AlertDialog open={deleting != null} onOpenChange={(open) => !open && setDeleting(null)}>
         <AlertDialogContent data-testid={`${testIdPrefix}-delete-confirm`}>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove this line?</AlertDialogTitle>
+            <AlertDialogTitle>{t("sales.orderLines.removeTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              The order's totals are recalculated without it.
+              {t("sales.orderLines.removeDescription")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogCancel>{t("sales.orderLines.keep")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 const line = deleting
@@ -258,7 +262,7 @@ export function SaleOrderLineGrid({
                 onDeleteLine(id).catch((error) => setRowErrors((previous) => ({ ...previous, [id]: messageOf(error) })))
               }}
             >
-              Remove
+              {t("common.remove")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -303,6 +307,7 @@ function AddLineRow({
   onCreate: (line: NewLine) => Promise<void>
   testIdPrefix: string
 }) {
+  const { t } = useTranslation()
   const [productId, setProductId] = useState("")
   const [quantity, setQuantity] = useState("1")
   const [price, setPrice] = useState("")
@@ -316,15 +321,15 @@ function AddLineRow({
   const priceValue = price.trim() === "" ? undefined : Number(price)
   const problem =
     !product
-      ? "Pick a product"
+      ? t("sales.orderLines.validation.pickProduct")
       : !product.uomId
-        ? "This product has no unit of measure"
+        ? t("sales.orderLines.validation.missingUom")
         : !(quantityValue > 0)
-          ? "Quantity must be above zero"
+          ? t("sales.orderLines.validation.quantityAboveZero")
           : priceValue != null && !(priceValue >= 0)
-            ? "Price cannot be negative"
+            ? t("sales.orderLines.validation.nonNegativePrice")
             : !(discountValue >= 0 && discountValue <= 100)
-              ? "Discount is a percentage from 0 to 100"
+              ? t("sales.orderLines.validation.discountRange")
               : null
 
   const add = async () => {
@@ -354,21 +359,21 @@ function AddLineRow({
     <div className="space-y-2 rounded-xl border border-dashed border-border p-3" data-testid={`${testIdPrefix}-add`}>
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-56 flex-1 space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Product</label>
+          <label className="text-xs font-medium text-muted-foreground">{t("sales.orderLines.product")}</label>
           <RecordPicker
             value={productId}
             onChange={setProductId}
             options={products.map((candidate) => ({ value: candidate.id, label: candidate.label }))}
-            placeholder="Add a product…"
-            searchPlaceholder="Search products…"
-            emptyText="No products match"
+            placeholder={t("sales.orderLines.addProductPlaceholder")}
+            searchPlaceholder={t("sales.orderLines.searchProductsPlaceholder")}
+            emptyText={t("sales.orderLines.noProductMatches")}
             disabled={saving}
             data-testid={`${testIdPrefix}-add-product`}
           />
         </div>
         <div className="space-y-1">
           <label htmlFor={`${testIdPrefix}-add-qty`} className="text-xs font-medium text-muted-foreground">
-            Quantity
+            {t("sales.orderLines.quantity")}
           </label>
           <Input
             id={`${testIdPrefix}-add-qty`}
@@ -384,7 +389,7 @@ function AddLineRow({
         </div>
         <div className="space-y-1">
           <label htmlFor={`${testIdPrefix}-add-price`} className="text-xs font-medium text-muted-foreground">
-            Unit price
+            {t("sales.orderLines.unitPrice")}
           </label>
           <Input
             id={`${testIdPrefix}-add-price`}
@@ -394,7 +399,9 @@ function AddLineRow({
             value={price}
             disabled={saving}
             placeholder={
-              product?.listPrice != null ? `List ${money.format(product.listPrice)}` : "From pricelist"
+              product?.listPrice != null
+                ? t("sales.orderLines.listPrice", { price: money.format(product.listPrice) })
+                : t("sales.orderLines.fromPricelist")
             }
             className="h-8 w-32 text-right"
             data-testid={`${testIdPrefix}-add-price`}
@@ -403,7 +410,7 @@ function AddLineRow({
         </div>
         <div className="space-y-1">
           <label htmlFor={`${testIdPrefix}-add-discount`} className="text-xs font-medium text-muted-foreground">
-            Discount %
+            {t("sales.orderLines.discountPercent")}
           </label>
           <Input
             id={`${testIdPrefix}-add-discount`}
@@ -427,11 +434,11 @@ function AddLineRow({
           onClick={() => void add()}
         >
           <Plus className="mr-1 h-4 w-4" />
-          Add line
+          {t("sales.orderLines.addLine")}
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Leave the price empty to use the order's pricelist. Taxes are applied when the line is saved.
+        {t("sales.orderLines.priceHelp")}
       </p>
       {error ? (
         <p role="alert" className="text-xs text-destructive" data-testid={`${testIdPrefix}-add-error`}>

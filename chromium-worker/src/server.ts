@@ -1,15 +1,23 @@
 import http from "node:http";
 import puppeteer from "puppeteer-core";
 import { checkBrowserReady } from "./readiness.mjs";
+import { waitForPrintAssets } from "./print-assets.mjs";
 
 const PORT = Number(process.env.PORT ?? 8090);
 const EXECUTABLE_PATH =
   process.env.PUPPETEER_EXECUTABLE_PATH ??
   process.env.CHROME_EXECUTABLE_PATH ??
   undefined;
+const IDLE_TIMEOUT_MS = Number(process.env.CHROMIUM_IDLE_TIMEOUT_MS ?? 60_000);
+
+if (!Number.isFinite(IDLE_TIMEOUT_MS) || IDLE_TIMEOUT_MS < 0) {
+  throw new Error("CHROMIUM_IDLE_TIMEOUT_MS must be a non-negative number");
+}
 
 /** @type {Promise<import("puppeteer-core").Browser> | undefined} */
-let browserPromise: Promise<import("puppeteer-core").Browser>;
+let browserPromise: Promise<import("puppeteer-core").Browser> | undefined;
+let activeBrowserUsers = 0;
+let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
 async function launchBrowser() {
   if (!EXECUTABLE_PATH) {
@@ -31,9 +39,54 @@ async function launchBrowser() {
 
 async function getBrowser() {
   if (!browserPromise) {
-    browserPromise = launchBrowser();
+    const pending = launchBrowser();
+    browserPromise = pending;
+    pending
+      .then((browser) => {
+        browser.once("disconnected", () => {
+          if (browserPromise === pending) browserPromise = undefined;
+        });
+      })
+      .catch(() => {
+        if (browserPromise === pending) browserPromise = undefined;
+      });
   }
   return browserPromise;
+}
+
+async function closeIdleBrowser() {
+  if (activeBrowserUsers !== 0 || !browserPromise) return;
+  const pending = browserPromise;
+  browserPromise = undefined;
+  try {
+    const browser = await pending;
+    await browser.close();
+  } catch (error) {
+    console.error("chromium-worker failed to close idle browser", error);
+  }
+}
+
+function scheduleIdleBrowserClose() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    idleTimer = undefined;
+    void closeIdleBrowser();
+  }, IDLE_TIMEOUT_MS);
+  idleTimer.unref();
+}
+
+async function withBrowser<T>(operation: (browser: import("puppeteer-core").Browser) => Promise<T>) {
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = undefined;
+  }
+  activeBrowserUsers += 1;
+  try {
+    return await operation(await getBrowser());
+  } finally {
+    activeBrowserUsers -= 1;
+    if (activeBrowserUsers === 0) scheduleIdleBrowserClose();
+  }
 }
 
 /**
@@ -68,21 +121,23 @@ async function renderPdf(body: Body) {
   if (!html) {
     throw new Error("html is required");
   }
-  const browser = await getBrowser();
-  const page = await browser.newPage();
-  try {
-    await page.emulateMediaType(body.media === "screen" ? "screen" : "print");
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-    const pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true,
-      margin: { top: "16mm", right: "12mm", bottom: "16mm", left: "12mm" },
-    });
-    return Buffer.from(pdf);
-  } finally {
-    await page.close();
-  }
+  return withBrowser(async (browser) => {
+    const page = await browser.newPage();
+    try {
+      await page.emulateMediaType(body.media === "screen" ? "screen" : "print");
+      await page.setContent(html, { waitUntil: "domcontentloaded" });
+      await waitForPrintAssets(page);
+      const pdf = await page.pdf({
+        format: "A4",
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: { top: "16mm", right: "12mm", bottom: "16mm", left: "12mm" },
+      });
+      return Buffer.from(pdf);
+    } finally {
+      await page.close();
+    }
+  });
 }
 
 const server = http.createServer(async (req, res) => {
@@ -95,7 +150,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && req.url === "/health/ready") {
       try {
-        await checkBrowserReady(getBrowser);
+        await withBrowser((browser) => checkBrowserReady(async () => browser));
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ ok: true, service: "chromium-worker-v1", ready: true }));
       } catch {
@@ -132,9 +187,8 @@ server.listen(PORT, () => {
 });
 
 process.on("SIGTERM", async () => {
-  if (browserPromise) {
-    const browser = await browserPromise;
-    await browser.close();
-  }
+  if (idleTimer) clearTimeout(idleTimer);
+  activeBrowserUsers = 0;
+  await closeIdleBrowser();
   server.close(() => process.exit(0));
 });

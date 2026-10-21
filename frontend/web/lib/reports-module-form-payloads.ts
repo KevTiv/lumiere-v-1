@@ -101,10 +101,15 @@ export function toCreateDashboardPayload(formData: Record<string, unknown>): Rec
 }
 
 export function toCreateDashboardWidgetPayload(formData: Record<string, unknown>): Record<string, unknown> {
+  const companyId = String(formData.companyId ?? "").trim()
   return {
     name: formData.name,
     widgetType: formData.widgetType,
     dataSource: formData.dataSource,
+    aggregation: formData.aggregation,
+    groupBy: formData.groupBy,
+    chartType: formData.chartType,
+    domain: companyId ? JSON.stringify({ company_id: companyId }) : undefined,
     companyId: formData.companyId,
   }
 }

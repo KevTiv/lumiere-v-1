@@ -13,7 +13,7 @@ use crate::core::audit::audit_log;
 use crate::core::persistence::{
     organization_commit, organization_commit_cursor, organization_row_change,
 };
-use crate::core::users::remove_user_from_organization;
+use crate::core::users::{remove_user_from_organization, user_organization};
 use crate::presentation::{
     presentation_module, presentation_module_version, save_presentation_module, PresentationModule,
 };
@@ -484,7 +484,17 @@ pub fn test_presentation_module_rejects_inactive_cross_org_actor(
 ) -> Result<(), String> {
     let owner = OrgFixture::seed_minimal(ctx)?;
     let other = OrgFixture::seed_minimal(ctx)?;
+    other.seed_additional_admin(ctx)?;
     remove_user_from_organization(ctx, ctx.sender(), other.organization_id)?;
+    if ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .any(|row| row.organization_id == other.organization_id && row.is_active)
+    {
+        return Err("presentation isolation actor still has an active membership".into());
+    }
 
     let before = ctx.db.presentation_module().iter().count();
     let before_commits = ctx
@@ -508,7 +518,7 @@ pub fn test_presentation_module_rejects_inactive_cross_org_actor(
         Ok(()) => return Err("inactive cross-organization actor must be rejected".into()),
         Err(error) => error,
     };
-    if !error.contains("Not a member") {
+    if error != "Exactly one active organization membership is required" {
         return Err(format!("unexpected cross-org denial: {error}"));
     }
     if ctx.db.presentation_module().iter().count() != before {

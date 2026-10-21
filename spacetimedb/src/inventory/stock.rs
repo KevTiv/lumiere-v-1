@@ -890,7 +890,7 @@ pub(crate) fn ensure_lot_for_product(
     Ok(())
 }
 
-fn ensure_serial_usable(
+pub(crate) fn ensure_serial_usable(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -2537,7 +2537,30 @@ pub(crate) fn create_stock_move_internal(
     organization_id: u64,
     params: CreateStockMoveParams,
 ) -> Result<StockMove, String> {
-    check_permission(ctx, organization_id, "stock_move", "create")?;
+    create_stock_move_internal_impl(ctx, organization_id, params, true)
+}
+
+/// Scheduler-owned stock-move creation. The scheduled reducer has no user
+/// membership, so it cannot pass RBAC; its caller must already own and validate
+/// the organization/company rule that authorizes this exact move.
+pub(super) fn create_stock_move_system(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateStockMoveParams,
+) -> Result<StockMove, String> {
+    crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
+    create_stock_move_internal_impl(ctx, organization_id, params, false)
+}
+
+fn create_stock_move_internal_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateStockMoveParams,
+    enforce_user_permission: bool,
+) -> Result<StockMove, String> {
+    if enforce_user_permission {
+        check_permission(ctx, organization_id, "stock_move", "create")?;
+    }
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
@@ -2919,7 +2942,29 @@ pub fn create_stock_picking(
     organization_id: u64,
     params: CreateStockPickingParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "stock_picking", "create")?;
+    create_stock_picking_internal(ctx, organization_id, params, true).map(|_| ())
+}
+
+/// Scheduler-owned picking creation with all normal relation/company
+/// validation and write-fence enforcement, but without user RBAC.
+pub(super) fn create_stock_picking_system(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateStockPickingParams,
+) -> Result<StockPicking, String> {
+    crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
+    create_stock_picking_internal(ctx, organization_id, params, false)
+}
+
+fn create_stock_picking_internal(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateStockPickingParams,
+    enforce_user_permission: bool,
+) -> Result<StockPicking, String> {
+    if enforce_user_permission {
+        check_permission(ctx, organization_id, "stock_picking", "create")?;
+    }
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
 
@@ -3038,7 +3083,7 @@ pub fn create_stock_picking(
         },
     );
 
-    Ok(())
+    Ok(picking)
 }
 
 #[reducer]

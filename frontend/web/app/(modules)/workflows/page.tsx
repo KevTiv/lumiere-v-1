@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { WorkflowsClient } from "./workflows-client"
 
 const SSR_RESOURCES = ["workflows", "workflow-versions", "workflow-instances"] as const
@@ -10,7 +10,7 @@ export default async function WorkflowsPage() {
     return <WorkflowsClient />
   }
 
-  const [workflows, versions, instances] = await serverFetchQueryListsRequired(
+  const [workflows, versions, instances] = await serverPrefetchQueryLists(
     session,
     SSR_RESOURCES,
   )

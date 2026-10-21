@@ -1,5 +1,9 @@
 //! Manufacturing domain test suite — invoke via `run_all_manufacturing_tests` reducer.
+pub mod costing_test;
+pub mod domain_lifecycle_test;
 pub mod relational_integrity_test;
+pub mod routing_lifecycle_test;
+pub mod tracked_output_test;
 pub mod workcenter_test;
 
 use spacetimedb::ReducerContext;
@@ -21,10 +25,41 @@ pub fn run_all_manufacturing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_manufacturing_workorder_quality_gate_test(ctx)?;
     run_manufacturing_finished_output_scrap_exact_effect_test(ctx)?;
     run_manufacturing_bom_byproduct_output_exact_effect_test(ctx)?;
+    run_manufacturing_bom_to_close_domain_lifecycle_test(ctx)?;
+    run_manufacturing_bom_routing_lifecycle_test(ctx)?;
+    run_manufacturing_actual_cost_valuation_test(ctx)?;
+    run_manufacturing_cost_configuration_scope_test(ctx)?;
+    tracked_output_test::run_manufacturing_tracked_output_test(ctx)?;
     relational_integrity_test::test_update_manufacturing_order_draft_only(ctx)
         .map_err(|e| format!("update_manufacturing_order_draft_only: {e}"))?;
     log::info!("✅ run_all_manufacturing_tests complete");
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_manufacturing_bom_routing_lifecycle_test(ctx: &ReducerContext) -> Result<(), String> {
+    routing_lifecycle_test::test_bom_routing_lifecycle(ctx)
+        .map_err(|e| format!("bom_routing_lifecycle: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_manufacturing_actual_cost_valuation_test(ctx: &ReducerContext) -> Result<(), String> {
+    costing_test::test_actual_cost_and_posted_valuation(ctx)
+        .map_err(|e| format!("actual_cost_and_posted_valuation: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_manufacturing_cost_configuration_scope_test(ctx: &ReducerContext) -> Result<(), String> {
+    costing_test::test_configuration_scope_and_closed_period(ctx)
+        .map_err(|e| format!("configuration_scope_and_closed_period: {e}"))
+}
+
+#[spacetimedb::reducer]
+pub fn run_manufacturing_bom_to_close_domain_lifecycle_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    domain_lifecycle_test::test_bom_to_close_domain_lifecycle(ctx)
+        .map_err(|e| format!("bom_to_close_domain_lifecycle: {e}"))
 }
 
 #[spacetimedb::reducer]
@@ -82,13 +117,17 @@ pub fn run_manufacturing_workorder_quality_gate_test(ctx: &ReducerContext) -> Re
 }
 
 #[spacetimedb::reducer]
-pub fn run_manufacturing_finished_output_scrap_exact_effect_test(ctx: &ReducerContext) -> Result<(), String> {
+pub fn run_manufacturing_finished_output_scrap_exact_effect_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
     relational_integrity_test::test_finished_output_scrap_exact_effect(ctx)
         .map_err(|e| format!("finished_output_scrap_exact_effect: {e}"))
 }
 
 #[spacetimedb::reducer]
-pub fn run_manufacturing_bom_byproduct_output_exact_effect_test(ctx: &ReducerContext) -> Result<(), String> {
+pub fn run_manufacturing_bom_byproduct_output_exact_effect_test(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
     relational_integrity_test::test_bom_byproduct_output_exact_effect(ctx)
         .map_err(|e| format!("bom_byproduct_output_exact_effect: {e}"))
 }

@@ -65,7 +65,7 @@ export function createLumiereApiClient(config: LumiereApiClientConfig): LumiereA
 
   async function fetchQueryList(path: string, errorMessage: string): Promise<QueryRows> {
     const r = await apiFetch(path)
-    if (!r.ok) throw new Error(errorMessage)
+    if (!r.ok) throw Object.assign(new Error(errorMessage), { status: r.status })
     const json: unknown = await r.json()
     return parseQueryListResponse(json)
   }

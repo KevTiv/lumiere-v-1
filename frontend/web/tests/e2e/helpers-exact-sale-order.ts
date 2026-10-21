@@ -30,7 +30,9 @@ export async function fetchSaleOrderIdsByOpportunityId(
   opportunityId: number,
   companyId?: number,
 ): Promise<number[]> {
-  const response = await page.request.get("/api/query/sale-orders")
+  // Playwright retries only transport resets here, never 403s or failed HTTP responses.
+  // Canonical readback remains read-only, exact and idempotent.
+  const response = await page.request.get("/api/query/sale-orders", { maxRetries: 2 })
   if (!response.ok()) {
     throw new Error(`sale-orders query failed: ${response.status()}`)
   }

@@ -10,13 +10,15 @@
 //! 2. `storage_policy_manifest_emit` — validate the C1 all-table census
 //! 3. `archive_manifest_emit` — generate the cooling-eligible archive subset
 //!    from the storage-policy census and validate it against the schema IR
-//! 4. `pg_ddl_emit` — one cold-table `CREATE TABLE` per active candidate
-//! 5. `codec_emit` — STDB ↔ PG type-mapping manifests for archive candidates
+//! 4. `codec_emit` — STDB ↔ PG type-mapping manifests for archive candidates
 //!    and all projection tables
-//! 6. `hydration_manifest_emit` — reducers that may target archived rows
+//! 5. `hydration_manifest_emit` — reducers that may target archived rows
 //!    (validated against the schema manifest + active candidate set)
-//! 7. `reconstruction_manifest_emit` — reviewed aggregate relationships and
+//! 6. `reconstruction_manifest_emit` — reviewed aggregate relationships and
 //!    deterministic parent-before-child organization restore order
+//!
+//! PostgreSQL DDL is emitted only after the canonical v2 IR handoff by
+//! `durable_postgresql_ir`; this stage plans prerequisite manifests only.
 
 pub mod archive_manifest_emit;
 pub mod codec_emit;
@@ -151,16 +153,6 @@ pub fn run(paths: &Paths) -> Result<()> {
         .as_array()
         .context("generated archive-manifest.json: 'candidates' must be an array")?;
 
-    // ── 3. PG DDL: one SQL file per active archive candidate ───────────────
-
-    let ddl_file_count = emit_ddl(paths, &schema_manifest, candidates_arr)?;
-
-    for (file_name, ddl) in pg_ddl_emit::emit_commit_stream_ddl() {
-        let ddl_path = paths.cold_ddl_dir.join(file_name);
-        write_file(&ddl_path, &ddl)?;
-        println!("Wrote {}", ddl_path.display());
-    }
-
     // ── 4. Codec manifest: STDB ↔ PG type mapping per archive candidate ────
 
     let codec_manifest_json =
@@ -191,22 +183,9 @@ pub fn run(paths: &Paths) -> Result<()> {
         &ledger,
     )
     .context("generating durable PostgreSQL migrations")?;
-    for migration in &durable_migration.migrations {
-        let migration_path = paths
-            .durable_migration_dir
-            .join(format!("{}.sql", migration.name));
-        write_file(&migration_path, &migration.sql)?;
-        println!(
-            "Wrote {} ({}, checksum {})",
-            migration_path.display(),
-            if migration.released {
-                "released, frozen"
-            } else {
-                "pending"
-            },
-            migration.checksum
-        );
-    }
+    // Plan the schema for downstream hydration/read metadata, but emit no
+    // durable SQL before the canonical IR handoff. durable_postgresql_ir owns
+    // actual migration emission after contract_ir::run.
     write_file(
         &paths.durable_migration_manifest_out,
         &durable_migration.manifest,
@@ -280,9 +259,6 @@ pub fn run(paths: &Paths) -> Result<()> {
             })
             .unwrap_or_else(|| "ownership not verified (gate disabled)".to_string())
     );
-    println!(
-        "lumiere-codegen: {ddl_file_count} cold PG DDL file(s) from storage-policy-manifest.json"
-    );
     println!("Wrote {}", paths.schema_manifest_out.display());
     println!("Wrote {}", paths.archive_manifest_out.display());
 
@@ -344,12 +320,11 @@ mod tests {
     }
 }
 
-fn emit_ddl(
-    paths: &Paths,
+pub(crate) fn emit_archive_ddl(
     schema_manifest: &LumiereSchemaManifest,
     candidates_arr: &[Value],
-) -> Result<usize> {
-    let mut ddl_count = 0;
+) -> Result<Vec<(String, String)>> {
+    let mut artifacts = Vec::new();
     for (index, cand) in candidates_arr.iter().enumerate() {
         let table = cand["table"]
             .as_str()
@@ -388,10 +363,7 @@ fn emit_ddl(
         };
         let ddl = pg_ddl_emit::emit_cold_table_ddl(schema_manifest, &cfg)
             .with_context(|| format!("generating DDL for '{table}' → '{cold_table}'"))?;
-        let ddl_path = paths.cold_ddl_dir.join(format!("{cold_table}.sql"));
-        write_file(&ddl_path, &ddl)?;
-        println!("Wrote {}", ddl_path.display());
-        ddl_count += 1;
+        artifacts.push((format!("{cold_table}.sql"), ddl));
     }
-    Ok(ddl_count)
+    Ok(artifacts)
 }

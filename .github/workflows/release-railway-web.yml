@@ -1,0 +1,184 @@
+name: Release Railway web
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Full 40-character commit SHA to build and deploy
+        required: true
+        type: string
+concurrency:
+  group: railway-web-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  RAILWAY_PROJECT_ID: cc695d4b-030c-43e3-bbd6-a41095b09257
+  RAILWAY_ENVIRONMENT: production
+  RAILWAY_SERVICE_NAME: web
+  RAILWAY_CLI_VERSION: 5.67.1
+  RAILWAY_NO_AUTO_UPDATE: "1"
+
+jobs:
+  release:
+    name: Build and deploy production
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+    env:
+      # Configure this as an environment-scoped GitHub secret. Railway project
+      # tokens are scoped to one Railway environment as an additional guard.
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+    steps:
+      - name: Validate immutable release input
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "release_sha must be a full 40-character commit SHA" >&2
+            exit 1
+          fi
+
+      - name: Check out requested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+          fetch-depth: 1
+
+      - name: Verify checked-out commit
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${RELEASE_SHA,,}"
+          if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+            git fetch --no-tags --unshallow origin +refs/heads/main:refs/remotes/origin/main
+          else
+            git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          fi
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "Production releases must be the current main commit or an ancestor of main" >&2
+            exit 1
+          fi
+
+      - uses: ./.github/actions/setup-frontend
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Build standalone web server
+        working-directory: frontend
+        run: pnpm --filter ./web build
+
+      - name: Assemble copy-only Railway context
+        id: context
+        shell: bash
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          release_root="$RUNNER_TEMP/railway-web-$RELEASE_SHA"
+          runtime_root="$release_root/frontend/runtime"
+          dockerfile="$release_root/frontend/web/Dockerfile"
+
+          rm -rf "$release_root"
+          mkdir -p "$runtime_root" "$(dirname "$dockerfile")"
+          cp -a frontend/web/.next/standalone/. "$runtime_root/"
+          mkdir -p "$runtime_root/frontend/web/.next"
+          cp -a frontend/web/.next/static "$runtime_root/frontend/web/.next/static"
+          if [[ -d frontend/web/public ]]; then
+            cp -a frontend/web/public "$runtime_root/frontend/web/public"
+          fi
+
+          test -f "$runtime_root/frontend/web/server.js"
+          cp .github/railway/web-standalone.Dockerfile "$dockerfile"
+
+          # The service is configured with rootDirectory=/frontend and
+          # dockerfilePath=web/Dockerfile, so preserve that archive layout.
+          printf 'release_root=%s\n' "$release_root" >> "$GITHUB_OUTPUT"
+
+      - name: Verify release context contains no credentials
+        shell: bash
+        env:
+          RELEASE_ROOT: ${{ steps.context.outputs.release_root }}
+        run: |
+          set -euo pipefail
+          test ! -e "$RELEASE_ROOT/.git"
+          test ! -e "$RELEASE_ROOT/.ssh"
+          if find "$RELEASE_ROOT" -type f \( -name 'id_ed25519' -o -name '*.pem' \) -print -quit | grep -q .; then
+            echo "credential-like file found in Railway release context" >&2
+            exit 1
+          fi
+
+      - name: Install pinned Railway CLI
+        run: npm install --global "@railway/cli@$RAILWAY_CLI_VERSION"
+
+      - name: Deploy and verify terminal success
+        shell: bash
+        env:
+          RELEASE_ROOT: ${{ steps.context.outputs.release_root }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          : "${RAILWAY_TOKEN:?Configure RAILWAY_TOKEN on the selected GitHub Environment}"
+
+          services="$(railway service list \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --json)"
+          service_count="$(jq --arg name "$RAILWAY_SERVICE_NAME" \
+            '[.[] | select(.name == $name)] | length' <<<"$services")"
+          [[ "$service_count" == 1 ]] || {
+            echo "Expected exactly one production Railway service named $RAILWAY_SERVICE_NAME; found $service_count" >&2
+            exit 1
+          }
+          railway_service_id="$(jq -r --arg name "$RAILWAY_SERVICE_NAME" \
+            '.[] | select(.name == $name) | .id' <<<"$services")"
+
+          before_ids="$(railway deployment list --service "$railway_service_id" --environment "$RAILWAY_ENVIRONMENT" --limit 100 --json | jq -c 'map(.id)')"
+
+          railway up "$RELEASE_ROOT" \
+            --path-as-root \
+            --detach \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --service "$railway_service_id" \
+            --message "web release $RELEASE_SHA"
+
+          deployment_id=""
+          for attempt in {1..30}; do
+            deployments="$(railway deployment list --service "$railway_service_id" --environment "$RAILWAY_ENVIRONMENT" --limit 10 --json)"
+            deployment_id="$(jq -r --argjson before_ids "$before_ids" '[.[] | select(.id as $candidate | ($before_ids | index($candidate) | not))][0].id // empty' <<<"$deployments")"
+            [[ -n "$deployment_id" ]] && break
+            sleep 5
+          done
+          if [[ -z "$deployment_id" ]]; then
+            echo "Railway accepted the upload but no new deployment appeared" >&2
+            exit 1
+          fi
+
+          for attempt in {1..180}; do
+            deployments="$(railway deployment list --service "$railway_service_id" --environment "$RAILWAY_ENVIRONMENT" --limit 20 --json)"
+            status="$(jq -r --arg id "$deployment_id" '.[] | select(.id == $id) | .status' <<<"$deployments")"
+            echo "Railway deployment $deployment_id: ${status:-not-listed}"
+            case "$status" in
+              SUCCESS)
+                exit 0
+                ;;
+              FAILED|CRASHED|REMOVED|CANCELED|CANCELLED|SKIPPED|OOM_KILLED)
+                echo "Railway deployment ended in $status" >&2
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+
+          echo "Timed out waiting for Railway deployment $deployment_id" >&2
+          exit 1

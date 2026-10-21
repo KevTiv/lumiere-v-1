@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request, type Response } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
@@ -97,7 +98,7 @@ async function leaveSnapshot(page: Page, leaveId: number) {
 /** Select one leave in HR → Leaves and run a toolbar action; returns the operation response. */
 async function runLeaveAction(page: Page, leaveId: number, actionId: string, reducer: string): Promise<Response> {
   await gotoModule(page, "/hr", "hr")
-  await page.getByTestId("module-tab-hr-leaves").click()
+  await selectModuleTab(page, "hr", "leaves")
   const leaveRow = page.getByTestId(`entity-row-${leaveId}`)
   await expect(leaveRow).toBeVisible({ timeout: 30_000 })
   await leaveRow.click()

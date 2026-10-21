@@ -249,8 +249,8 @@ pub async fn find_invite_by_token_hash(
 pub struct StdbResetToken {
     pub platform_reset_token_id: String,
     pub platform_user_id: String,
-    pub expires_at: i64,
-    pub used_at: Option<i64>,
+    pub expires_at: SystemTime,
+    pub used_at: Option<SystemTime>,
 }
 
 fn parse_reset_token(row: &tokio_postgres::Row) -> Result<StdbResetToken, ApiError> {
@@ -270,20 +270,11 @@ fn parse_reset_token(row: &tokio_postgres::Row) -> Result<StdbResetToken, ApiErr
     let used_at: Option<std::time::SystemTime> = row
         .try_get("used_at")
         .map_err(|e| ApiError::Internal(format!("invalid reset token state: {e}")))?;
-    let expires_at = expires_at
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|e| ApiError::Internal(format!("invalid reset token expiry: {e}")))?
-        .as_secs() as i64;
     Ok(StdbResetToken {
         platform_reset_token_id,
         platform_user_id,
         expires_at,
-        used_at: used_at.map(|value| {
-            value
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|duration| duration.as_secs() as i64)
-                .unwrap_or_default()
-        }),
+        used_at,
     })
 }
 
@@ -304,7 +295,7 @@ pub async fn get_role_name_in_organization(
 ) -> Result<Option<String>, ApiError> {
     let client = admin_client(state)?;
     let sql = format!(
-        "SELECT name FROM role WHERE id = {role_id} AND organization_id = {organization_id}"
+        "SELECT name FROM role WHERE id = {role_id} AND organization_id = {organization_id} AND is_active = true"
     );
     let rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     Ok(rows
@@ -314,8 +305,10 @@ pub async fn get_role_name_in_organization(
         .map(|s| s.to_string()))
 }
 
-pub async fn user_has_organization_rows(state: &AppState, identity_hex: &str, token: &str) -> bool {
-    let client = state.client_with_token(token);
+pub async fn user_has_organization_rows(state: &AppState, identity_hex: &str) -> bool {
+    let Ok(client) = admin_client(state) else {
+        return false;
+    };
     let id = normalize_identity_hex_for_sql(identity_hex);
     let Ok(sql) = select_user_organization_for_identity_sql(&id, None) else {
         return false;
@@ -353,4 +346,130 @@ pub async fn send_resend_email(
         return Err(format!("Resend HTTP {status}: {txt}"));
     }
     Ok(())
+}
+
+/// Bound normalized addresses before storage, comparisons, or email delivery.
+pub fn normalized_auth_email(raw: &str) -> Result<String, ApiError> {
+    let email = raw.trim().to_ascii_lowercase();
+    if email.len() > 254
+        || email.is_empty()
+        || !email.is_ascii()
+        || email
+            .bytes()
+            .any(|b| b.is_ascii_whitespace() || b.is_ascii_control())
+        || email.split('@').count() != 2
+        || email.starts_with('@')
+        || email.ends_with('@')
+    {
+        return Err(ApiError::BadRequest("Invalid email address".into()));
+    }
+    Ok(email)
+}
+
+pub fn validate_native_password(password: &str) -> Result<(), ApiError> {
+    // bcrypt only authenticates the first 72 bytes. Never silently truncate.
+    if !(8..=72).contains(&password.len()) {
+        return Err(ApiError::BadRequest(
+            "Password must be 8 to 72 bytes".into(),
+        ));
+    }
+    Ok(())
+}
+
+static PASSWORD_WORK: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(4);
+
+pub async fn hash_native_password(password: String) -> Result<String, ApiError> {
+    validate_native_password(&password)?;
+    let permit = PASSWORD_WORK
+        .try_acquire()
+        .map_err(|_| ApiError::Unavailable("Authentication busy; retry shortly".into()))?;
+    tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        bcrypt::hash(password, bcrypt::DEFAULT_COST)
+    })
+    .await
+    .map_err(ApiError::internal)?
+    .map_err(ApiError::internal)
+}
+
+pub async fn verify_native_password(password: String, hash: String) -> Result<bool, ApiError> {
+    validate_native_password(&password)?;
+    let permit = PASSWORD_WORK
+        .try_acquire()
+        .map_err(|_| ApiError::Unavailable("Authentication busy; retry shortly".into()))?;
+    tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        bcrypt::verify(password, &hash)
+    })
+    .await
+    .map_err(ApiError::internal)?
+    .map_err(ApiError::internal)
+}
+
+/// An invitation proves admission to an organization, never account ownership.
+pub async fn authenticate_invite_credential(
+    credential: &StdbCredential,
+    password: String,
+    key: &[u8; 32],
+) -> Result<String, ApiError> {
+    let hash = credential
+        .password_hash
+        .as_ref()
+        .filter(|hash| !hash.is_empty())
+        .ok_or(ApiError::AccountUsesSso)?;
+    if !verify_native_password(password, hash.clone()).await? {
+        return Err(ApiError::InvalidEmailOrPassword);
+    }
+    decrypt_token(key, &credential.stdb_token_enc)
+}
+
+#[cfg(test)]
+mod native_input_tests {
+    use super::*;
+    #[test]
+    fn address_normalization_rejects_header_injection_and_oversized_input() {
+        assert_eq!(
+            normalized_auth_email(" Owner@Example.com ").unwrap(),
+            "owner@example.com"
+        );
+        for email in [
+            "a@example.com\r\nBcc:victim@example.com",
+            "a@@example.com",
+            "@example.com",
+        ] {
+            assert!(normalized_auth_email(email).is_err());
+        }
+        assert!(normalized_auth_email(&format!("{}@example.com", "a".repeat(255))).is_err());
+    }
+    #[tokio::test]
+    async fn invitation_does_not_release_existing_token_without_account_password() {
+        let key = [7; 32];
+        let mut credential = StdbCredential {
+            platform_user_id: "p_user".into(),
+            identity_hex: "binding".into(),
+            password_hash: Some(bcrypt::hash("correct password", 4).unwrap()),
+            stdb_token_enc: encrypt_token(&key, "private-stdb-token").unwrap(),
+        };
+        assert!(matches!(
+            authenticate_invite_credential(&credential, "wrong password".into(), &key).await,
+            Err(ApiError::InvalidEmailOrPassword)
+        ));
+        assert_eq!(
+            authenticate_invite_credential(&credential, "correct password".into(), &key)
+                .await
+                .unwrap(),
+            "private-stdb-token"
+        );
+        credential.password_hash = None;
+        assert!(matches!(
+            authenticate_invite_credential(&credential, "correct password".into(), &key).await,
+            Err(ApiError::AccountUsesSso)
+        ));
+    }
+    #[test]
+    fn passwords_cannot_exceed_bcrypt_authenticated_bytes() {
+        assert!(validate_native_password(&"a".repeat(72)).is_ok());
+        assert!(validate_native_password(&"a".repeat(73)).is_err());
+        assert!(validate_native_password("short").is_err());
+    }
 }

@@ -19,6 +19,7 @@ type FormValues = Record<string, unknown>
 export function useFormDialog(): {
   askForm: (request: FormDialogRequest) => Promise<FormValues | null>
   formDialog: ReactNode
+  cancelForm: () => void
 } {
   const [active, setActive] = useState<FormDialogRequest | null>(null)
   const resolverRef = useRef<((values: FormValues | null) => void) | null>(null)
@@ -51,7 +52,8 @@ export function useFormDialog(): {
     />
   ) : null
 
-  return { askForm, formDialog }
+  const cancelForm = useCallback(() => settle(null), [settle])
+  return { askForm, formDialog, cancelForm }
 }
 
 export interface FormDialogRequest {

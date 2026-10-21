@@ -76,6 +76,7 @@ pub mod projects; // Phase 11 — Projects, Tasks, Timesheets
 pub mod proposals; // Phase 21 — Sales Proposals & Tenders
 pub mod purchasing; // Phase 6 — Purchase Orders & Supply Chain
 pub mod sales; // Phase 5 — Quotations, POS, Delivery
+#[cfg(feature = "dev-module")]
 pub mod seed;
 pub mod subscriptions; // Phase 9 — Subscription & Advanced Billing
 pub mod workflow; // Phase 13 — Workflow Engine // Dev-only — seed_dev_data reducer for local development
@@ -83,94 +84,117 @@ pub mod workflow; // Phase 13 — Workflow Engine // Dev-only — seed_dev_data 
 /// Shared org/company/COA fixture for domain test reducers.
 /// Source lives in `tests/harness/mod.rs`.
 #[path = "../tests/harness/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod test_harness;
 
 /// Inventory domain tests — call `run_all_inventory_tests` reducer to execute.
 #[path = "../tests/inventory/tests/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod inventory_tests;
 
 /// Accounting domain tests — call `run_all_accounting_tests` reducer to execute.
 #[path = "../tests/accounting/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod accounting_tests;
 
 /// Sales domain tests — call `run_all_sales_tests` reducer to execute.
 #[path = "../tests/sales/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod sales_tests;
 
 /// CRM domain tests — call `run_all_crm_tests` reducer to execute.
 #[path = "../tests/crm/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod crm_tests;
 
 /// Purchasing domain tests — call `run_purchasing_bill_balanced_test` reducer to execute.
 #[path = "../tests/purchasing/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod purchasing_tests;
 
 /// Expenses domain tests — call `run_all_expenses_tests` reducer to execute.
 #[path = "../tests/expenses/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod expenses_tests;
 
 /// HR domain tests — call `run_all_hr_tests` reducer to execute.
 #[path = "../tests/hr/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod hr_tests;
 
 /// Subscriptions domain tests — call `run_all_subscriptions_tests` reducer to execute.
 #[path = "../tests/subscriptions/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod subscriptions_tests;
 
 /// Projects / PSA domain tests — call `run_all_projects_tests` reducer to execute.
 #[path = "../tests/projects/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod projects_tests;
 
 /// Fleet / field-assets domain tests — call `run_all_fleet_tests` reducer to execute.
 #[path = "../tests/fleet/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod fleet_tests;
 
 /// Proposals / tenders domain tests — call `run_all_proposals_tests` reducer to execute.
 #[path = "../tests/proposals/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod proposals_tests;
 
 /// Platform module smoke tests — helpdesk, HR, manufacturing, documents, workflow, subscriptions.
 #[path = "../tests/platform/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod platform_tests;
 
 /// Workflow definition, queue-adjacent, and calendar foundation tests.
 #[path = "../tests/workflow/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod workflow_tests;
 
 /// Core domain tests — call `run_all_core_tests` reducer to execute.
 #[path = "../tests/core/tests/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod core_tests;
 
 /// Manufacturing domain tests — call `run_all_manufacturing_tests` reducer to execute.
 #[path = "../tests/manufacturing/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod manufacturing_tests;
 
 /// AI domain tests — call `run_all_ai_tests` reducer to execute.
 #[path = "../tests/ai/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod ai_tests;
 
 /// Analytics domain tests — call `run_all_analytics_tests` reducer to execute.
 #[path = "../tests/analytics/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod analytics_tests;
 
 /// IoT domain tests — call `run_all_iot_tests` reducer to execute.
 #[path = "../tests/iot/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod iot_tests;
 
 /// Helpdesk domain tests — call `run_all_helpdesk_tests` reducer to execute.
 #[path = "../tests/helpdesk/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod helpdesk_tests;
 
 /// Integrations domain tests — call `run_all_integrations_tests` reducer to execute.
 #[path = "../tests/integrations/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod integrations_tests;
 
 /// Data-operations tests — call `run_data_ops_commit_test` reducer.
 #[path = "../tests/data_ops/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod data_ops_tests;
 
 /// Pre-tenant adversarial certification cases — invoked from existing domain test reducers.
 #[path = "../tests/pretenant/mod.rs"]
+#[cfg(feature = "dev-module")]
 pub mod pretenant_cert;
 
 use crate::core::migrations::apply_pending_global_migrations;
@@ -185,6 +209,7 @@ use crate::proposals::proposals::proposal_presence;
 /// Core tests run separately via `run_all_core_tests` (e2e-smoke Makefile).
 /// `spacetime call <db> run_all_domain_tests`
 #[spacetimedb::reducer]
+#[cfg(feature = "dev-module")]
 pub fn run_all_domain_tests(ctx: &ReducerContext) -> Result<(), String> {
     accounting_tests::run_all_accounting_tests(ctx).map_err(|e| format!("accounting: {e}"))?;
     inventory_tests::run_all_inventory_tests(ctx).map_err(|e| format!("inventory: {e}"))?;

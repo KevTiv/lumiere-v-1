@@ -1,4 +1,6 @@
 import type { TFunction } from "i18next"
+import { accountingWorkspaceNavigation } from "./accounting-workspace-navigation"
+import { businessWorkspaceNavigation } from "./business-workspace-navigation"
 import { chartAccountPrimaryLabel, contactPrimaryLabel, inventoryProductPrimaryLabel, proposalPrimaryLabel, saleOrderPrimaryLabel } from "@lumiere/stdb/read-models"
 import type { DashboardConfig, ModuleConfig } from "@lumiere/ui"
 import {
@@ -101,6 +103,7 @@ import {
   qualityChecksTableConfig,
   cycleCountsTableConfig,
   pickingWavesTableConfig,
+  stockPackagesTableConfig,
   warehouseTasksTableConfig,
   stockRoutesTableConfig,
   stockRulesTableConfig,
@@ -131,6 +134,7 @@ import {
   manufacturingOrdersTableConfig,
   bomsTableConfig,
   bomLinesTableConfig,
+  bomByproductsTableConfig,
   workordersTableConfig,
   workcentersTableConfig,
   routingOperationsTableConfig,
@@ -140,6 +144,7 @@ import {
   employeesTableConfig,
   departmentsTableConfig,
   leaveRequestsTableConfig,
+  leaveAllocationsTableConfig,
   contractsTableConfig,
   payslipsTableConfig,
   newEmployeeForm,
@@ -198,6 +203,7 @@ import {
   subscriptionPriceTiersTableConfig,
   subscriptionPastDueTableConfig,
   subscriptionDueToBillTableConfig,
+  subscriptionBundlesTableConfig,
   subscriptionEntitlementsTableConfig,
   subscriptionPaymentIntentsTableConfig,
   createSubscriptionPriceTierForm,
@@ -296,6 +302,77 @@ export const accountingDashboard: DashboardConfig = {
       ],
     },
     {
+      id: "accounting-trends",
+      widgets: [
+        {
+          id: "acc-revenue-expenses",
+          type: "combo-chart",
+          title: "Invoiced vs Billed",
+          width: "2/3",
+          data: {
+            xAxisKey: "month",
+            bars: [
+              { key: "revenue", label: "Invoiced", color: "hsl(var(--chart-1))" },
+              { key: "expenses", label: "Billed", color: "hsl(var(--chart-3))" },
+            ],
+            line: { key: "net", label: "Net", color: "hsl(var(--chart-2))" },
+            lineAxis: "left",
+            values: [],
+          },
+        },
+        {
+          id: "acc-collection-rate",
+          type: "radial-gauge",
+          title: "Collection Rate",
+          width: "1/3",
+          data: { value: 0, max: 0, label: "Collected", stats: [] },
+        },
+        {
+          id: "acc-aging-share",
+          type: "share-bar",
+          title: "Open invoices and bills by due date",
+          width: "1/2",
+          data: {
+            segments: [
+              { key: "Current", label: "Current", color: "hsl(var(--chart-2))" },
+              { key: "1-30", label: "1–30 days", color: "hsl(var(--chart-1))" },
+              { key: "31-60", label: "31–60 days", color: "hsl(var(--chart-3))" },
+              { key: "61-90", label: "61–90 days", color: "hsl(var(--chart-4))" },
+              { key: "90+", label: "90+ days", color: "hsl(var(--destructive))" },
+            ],
+            rows: [],
+            emptyLabel: "No open invoices or bills in this company.",
+          },
+        },
+        {
+          id: "acc-top-customers",
+          type: "ranked-bars",
+          title: "Top Customers",
+          width: "1/2",
+          data: { items: [], emptyLabel: "No posted invoices in this period." },
+        },
+        {
+          id: "acc-cash-movements",
+          type: "step-chart",
+          title: "Cash Movements (weekly net)",
+          width: "full",
+          data: {
+            xAxisKey: "week",
+            series: { key: "net", label: "Net cash", color: "hsl(var(--chart-1))" },
+            values: [],
+            reference: { value: 0, label: "0" },
+          },
+        },
+        {
+          id: "acc-recent-invoices",
+          type: "tabbed-table",
+          title: "Recent Invoices",
+          width: "full",
+          data: { tabs: [], columns: [], rows: [] },
+        },
+      ],
+    },
+    {
       id: "accounting-detail",
       widgets: [
         {
@@ -333,21 +410,6 @@ export const accountingDashboard: DashboardConfig = {
           width: "1/2",
           data: { deadlines: [] },
         },
-        {
-          id: "accounting-ar-ap-aging",
-          type: "bar-chart",
-          title: "AR/AP Aging",
-          width: "full",
-          data: {
-            categoryKey: "bucket",
-            series: [
-              { name: "AR", color: "#6366f1" },
-              { name: "AP", color: "#ef4444" },
-            ],
-            values: [],
-            stacked: false,
-          },
-        },
       ],
     },
   ],
@@ -358,14 +420,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "Accounting",
   description: "Financial overview — P&L, cash position, and budget tracking",
   defaultTab: "dashboard",
-  tabGroups: [
-    { label: t("modules.tabGroups.invoicing", { defaultValue: "Invoicing" }), tabIds: ["invoices", "bills", "payments", "payment-operations", "credit-control"] },
-    { label: t("modules.tabGroups.ledger", { defaultValue: "Ledger" }), tabIds: ["journal-entries", "move-lines", "accounts", "account-journals"] },
-    { label: t("modules.tabGroups.banking", { defaultValue: "Banking" }), tabIds: ["bank-statements", "reconciliation-widgets", "fx-revaluation"] },
-    { label: t("modules.tabGroups.planning", { defaultValue: "Planning" }), tabIds: ["budgets", "analytic", "analytic-lines", "analytic-distribution", "fixed-assets", "amortization"] },
-    { label: t("modules.tabGroups.close", { defaultValue: "Close" }), tabIds: ["period-close", "fiscal-years", "account-periods", "consolidation", "intercompany-rules", "intercompany-transactions"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["taxes", "payment-terms", "payment-term-lines"] },
-  ],
+  workspaceNav: accountingWorkspaceNavigation(t),
   tabs: [
     {
       id: "dashboard",
@@ -401,6 +456,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newInvoiceForm(t),
       createLabel: "New Invoice",
       createAction: "createInvoice",
+      createPermission: { resource: "account_move", action: "create" },
     },
     {
       id: "bills",
@@ -410,6 +466,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newBillForm(t),
       createLabel: "New Bill",
       createAction: "createBill",
+      createPermission: { resource: "account_move", action: "create" },
     },
     {
       id: "taxes",
@@ -433,6 +490,30 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
       id: "payment-operations",
       label: t("accounting.tabs.operationalPayments"),
       type: "custom",
+    },
+    {
+      id: "tax-groups",
+      label: t("accounting.tabs.taxGroups", { defaultValue: "Tax Groups" }),
+      type: "entity",
+      entityConfig: { id: "tax-groups-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
+    },
+    {
+      id: "tax-jurisdictions",
+      label: t("accounting.tabs.taxJurisdictions", { defaultValue: "Tax Jurisdictions" }),
+      type: "entity",
+      entityConfig: { id: "tax-jurisdictions-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
+    },
+    {
+      id: "tax-schedules",
+      label: t("accounting.tabs.taxSchedules", { defaultValue: "Tax Schedules" }),
+      type: "entity",
+      entityConfig: { id: "tax-schedules-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
+    },
+    {
+      id: "tax-deadlines",
+      label: t("accounting.tabs.taxDeadlines", { defaultValue: "Tax Deadlines" }),
+      type: "entity",
+      entityConfig: { id: "tax-deadlines-table", title: "", view: { mode: "table", rowKey: "id", columns: [] } },
     },
     {
       id: "payment-terms",
@@ -703,15 +784,10 @@ export const salesDashboard: DashboardConfig = {
 
 export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "sales",
+  workspaceNav: businessWorkspaceNavigation("sales", t),
   title: "Sales",
   description: "Revenue performance, pipeline health, and deal activity",
   defaultTab: "dashboard",
-  tabGroups: [
-    { label: t("modules.tabGroups.orders", { defaultValue: "Orders" }), tabIds: ["orders", "order-lines", "invoices", "returns"] },
-    { label: t("modules.tabGroups.fulfillment", { defaultValue: "Fulfillment" }), tabIds: ["deliveries", "fulfillment"] },
-    { label: t("modules.tabGroups.pricing", { defaultValue: "Pricing" }), tabIds: ["pricelists", "pricelist-items", "loyalty-programs", "loyalty-cards"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["delivery-price-rules", "delivery-carriers", "shipping-methods", "pos-payment-methods"] },
-  ],
   tabs: [
     {
       id: "dashboard",
@@ -734,6 +810,7 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newSaleOrderForm(t),
       createLabel: "New Order",
       createAction: "createSaleOrder",
+      createPermission: { resource: "sale_order", action: "create" },
     },
     {
       id: "order-lines",
@@ -780,6 +857,11 @@ export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
     {
       id: "invoices",
       label: t("sales.tabs.invoices"),
+      type: "custom" as const,
+    },
+    {
+      id: "commission-plans",
+      label: t("sales.tabs.commissionPlans", { defaultValue: "Commission plans" }),
       type: "custom" as const,
     },
     {
@@ -945,6 +1027,7 @@ export const crmDashboard: DashboardConfig = {
 
 export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "crm",
+  workspaceNav: businessWorkspaceNavigation("crm", t),
   title: "CRM",
   description: "Lead pipeline, customer lifecycle, and relationship health",
   defaultTab: "dashboard",
@@ -963,6 +1046,7 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newLeadForm(t),
       createLabel: "New Lead",
       createAction: "createLead",
+      createPermission: { resource: "lead", action: "create" },
     },
     {
       id: "opportunities",
@@ -972,6 +1056,7 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newOpportunityForm(t),
       createLabel: "New Opportunity",
       createAction: "createOpportunity",
+      createPermission: { resource: "opportunity", action: "create" },
     },
     {
       id: "opportunity-lines",
@@ -989,6 +1074,7 @@ export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newContactForm(t),
       createLabel: "New Contact",
       createAction: "createContact",
+      createPermission: { resource: "contact", action: "create" },
     },
     {
       id: "activities",
@@ -1155,7 +1241,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
   defaultTab: "dashboard",
   tabGroups: [
     { label: t("modules.tabGroups.stock", { defaultValue: "Stock" }), tabIds: ["products", "product-categories", "stock", "valuations", "lots", "serials"] },
-    { label: t("modules.tabGroups.movements", { defaultValue: "Movements" }), tabIds: ["transfers", "stock-moves", "adjustments", "picking-waves", "warehouse-tasks", "replenishment"] },
+    { label: t("modules.tabGroups.movements", { defaultValue: "Movements" }), tabIds: ["transfers", "stock-moves", "adjustments", "picking-waves", "stock-packages", "warehouse-tasks", "replenishment"] },
     { label: t("modules.tabGroups.warehouse", { defaultValue: "Warehouse" }), tabIds: ["warehouses", "locations", "location-tree", "3d-view", "routes", "rules"] },
     { label: t("modules.tabGroups.quality", { defaultValue: "Quality" }), tabIds: ["quality", "quality-alerts", "cycle-counts", "cycle-wizard", "traceability-records", "traceability-reports"] },
     { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["barcode-rules", "barcode-nomenclatures", "adjustment-reasons"] },
@@ -1182,6 +1268,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newProductForm(t),
       createLabel: "New Product",
       createAction: "createProduct",
+      createPermission: { resource: "product", action: "create" },
     },
     {
       id: "product-categories",
@@ -1209,6 +1296,7 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newTransferForm(t),
       createLabel: "New Transfer",
       createAction: "createStockPicking",
+      createPermission: { resource: "stock_picking", action: "create" },
     },
     {
       id: "stock-moves",
@@ -1272,6 +1360,12 @@ export const inventoryModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("inventory.pickingWaves.title"),
       type: "entity",
       entityConfig: pickingWavesTableConfig(t),
+    },
+    {
+      id: "stock-packages",
+      label: t("inventory.stockPackages.title", { defaultValue: "Packages" }),
+      type: "entity",
+      entityConfig: stockPackagesTableConfig(t),
     },
     {
       id: "warehouse-tasks",
@@ -1463,6 +1557,7 @@ export const purchasingDashboard: DashboardConfig = {
 
 export const purchasingModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "purchasing",
+  workspaceNav: businessWorkspaceNavigation("purchasing", t),
   title: "Purchasing",
   description: "Purchase orders, vendor performance, and spend analysis",
   defaultTab: "dashboard",
@@ -1481,6 +1576,7 @@ export const purchasingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newPurchaseOrderForm(t),
       createLabel: "New Order",
       createAction: "createPurchaseOrder",
+      createPermission: { resource: "purchase_order", action: "create" },
     },
     {
       id: "lines",
@@ -1628,7 +1724,7 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
   defaultTab: "dashboard",
   tabGroups: [
     { label: t("modules.tabGroups.people", { defaultValue: "People" }), tabIds: ["employees", "departments", "org-chart", "job-positions", "recruitment", "onboarding-templates", "performance"] },
-    { label: t("modules.tabGroups.timeoff", { defaultValue: "Time off" }), tabIds: ["leaves", "attendance", "leave-types"] },
+    { label: t("modules.tabGroups.timeoff", { defaultValue: "Time off" }), tabIds: ["leaves", "leave-allocations", "attendance", "leave-types"] },
     { label: t("modules.tabGroups.pay", { defaultValue: "Pay" }), tabIds: ["contracts", "payslips", "payroll-structures", "salary-rules", "benefits"] },
   ],
   tabs: [
@@ -1646,6 +1742,7 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newEmployeeForm(t),
       createLabel: "New Employee",
       createAction: "createEmployee",
+      createPermission: { resource: "hr_employee", action: "create" },
     },
     {
       id: "departments",
@@ -1661,6 +1758,12 @@ export const hrModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newLeaveRequestForm(t),
       createLabel: "New Request",
       createAction: "createLeaveRequest",
+    },
+    {
+      id: "leave-allocations",
+      label: t("hr.leaveAllocations.tab", { defaultValue: "Allocations" }),
+      type: "entity",
+      entityConfig: leaveAllocationsTableConfig(t),
     },
     {
       id: "attendance",
@@ -1864,6 +1967,7 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newManufacturingOrderForm(t),
       createLabel: "New Order",
       createAction: "createManufacturingOrder",
+      createPermission: { resource: "mrp_production", action: "create" },
     },
     {
       id: "boms",
@@ -1879,6 +1983,12 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
       label: t("manufacturing.bomLines.tabLabel"),
       type: "entity",
       entityConfig: bomLinesTableConfig(t),
+    },
+    {
+      id: "bom-byproducts",
+      label: "BOM Byproducts",
+      type: "entity",
+      entityConfig: bomByproductsTableConfig(t),
     },
     {
       id: "workorders",
@@ -1906,6 +2016,11 @@ export const manufacturingModuleConfig = (t: TFunction): ModuleConfig => ({
       label: "Quality Checks",
       type: "entity",
       entityConfig: qualityChecksTableConfig(t),
+    },
+    {
+      id: "cost-settings",
+      label: "Costing & Valuation",
+      type: "custom",
     },
   ],
 })
@@ -2028,6 +2143,7 @@ export const projectsModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newProjectForm(t),
       createLabel: "New Project",
       createAction: "createProject",
+      createPermission: { resource: "project_project", action: "create" },
     },
     {
       id: "tasks",
@@ -2443,6 +2559,7 @@ export const calendarModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "reports",
+  workspaceNav: businessWorkspaceNavigation("reports", t),
   title: t("reports.moduleTitle"),
   description: t("reports.moduleDescription"),
   defaultTab: "dashboard",
@@ -2526,6 +2643,41 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
             },
           ],
         },
+        {
+          id: "rep-finance",
+          widgets: [
+            {
+              id: "rep-pl-trend",
+              type: "combo-chart",
+              title: "Profit & Loss Trend",
+              width: "2/3",
+              data: {
+                xAxisKey: "month",
+                bars: [
+                  { key: "revenue", label: "Income", color: "hsl(var(--chart-1))" },
+                  { key: "expenses", label: "Expenses", color: "hsl(var(--chart-3))" },
+                ],
+                line: { key: "margin", label: "Net margin", color: "hsl(var(--chart-2))" },
+                lineFormat: { kind: "percent" },
+                values: [],
+              },
+            },
+            {
+              id: "rep-cash-runway",
+              type: "radial-gauge",
+              title: "Cash Runway",
+              width: "1/3",
+              data: { value: 0, max: 0, label: "months of runway", stats: [] },
+            },
+            {
+              id: "rep-expense-breakdown",
+              type: "ranked-bars",
+              title: "Expense Breakdown (last 90 days)",
+              width: "full",
+              data: { items: [], maxItems: 8, emptyLabel: "No posted expenses in the last 90 days." },
+            },
+          ],
+        },
       ],
     },
     {
@@ -2599,6 +2751,11 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
       type: "custom",
     },
     {
+      id: "statements",
+      label: t("reports.tabs.statements", { defaultValue: "Statements" }),
+      type: "custom",
+    },
+    {
       id: "vat-report",
       label: t("reports.tabs.vatReport"),
       type: "custom",
@@ -2619,7 +2776,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
   description: "Recurring revenue, plans, and subscription management",
   defaultTab: "dashboard",
   tabGroups: [
-    { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "entitlements"] },
+    { label: t("modules.tabGroups.subscriptions", { defaultValue: "Subscriptions" }), tabIds: ["subscriptions", "plans", "lines", "amendments", "bundles", "entitlements"] },
     { label: t("modules.tabGroups.billing", { defaultValue: "Billing" }), tabIds: ["usage-events", "usage-charges", "rating-backlog", "price-tiers", "due-to-bill", "past-due", "payment-intents"] },
     { label: t("modules.tabGroups.revenue", { defaultValue: "Revenue" }), tabIds: ["deferred-schedules", "deferred-lines", "recognition-rules"] },
   ],
@@ -2678,6 +2835,34 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
             },
           ],
         },
+        {
+          id: "sub-charts",
+          widgets: [
+            {
+              id: "sub-mrr-churn",
+              type: "combo-chart",
+              title: "MRR & churn estimate (current contract values)",
+              width: "2/3",
+              data: {
+                xAxisKey: "month",
+                bars: [
+                  { key: "mrr", label: "MRR", color: "hsl(var(--chart-1))" },
+                  { key: "newMrr", label: "New MRR", color: "hsl(var(--chart-2))" },
+                ],
+                line: { key: "churnRate", label: "Churn rate", color: "hsl(var(--destructive))" },
+                lineFormat: { kind: "percent" },
+                values: [],
+              },
+            },
+            {
+              id: "sub-plan-mix",
+              type: "share-bar",
+              title: "Plan Mix (active MRR)",
+              width: "1/3",
+              data: { segments: [], rows: [], emptyLabel: "No active paid subscriptions yet." },
+            },
+          ],
+        },
       ],
     },
     {
@@ -2688,6 +2873,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newSubscriptionForm(t),
       createLabel: "New Subscription",
       createAction: "createSubscription",
+      createPermission: { resource: "subscription", action: "create" },
     },
     {
       id: "plans",
@@ -2750,6 +2936,12 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
       entityConfig: subscriptionDueToBillTableConfig(t),
     },
     {
+      id: "bundles",
+      label: t("subscriptions.bundles.tabLabel", { defaultValue: "Bundles" }),
+      type: "entity",
+      entityConfig: subscriptionBundlesTableConfig(t),
+    },
+    {
       id: "entitlements",
       label: t("subscriptions.entitlements.tabLabel", { defaultValue: "Entitlements" }),
       type: "entity",
@@ -2792,6 +2984,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "expenses",
+  workspaceNav: businessWorkspaceNavigation("expenses", t),
   title: "Expenses",
   description: "Employee expense management and reimbursement",
   defaultTab: "dashboard",
@@ -2838,6 +3031,42 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
             },
           ],
         },
+        {
+          id: "exp-charts",
+          widgets: [
+            {
+              id: "exp-monthly-spend",
+              type: "combo-chart",
+              title: "Monthly Spend",
+              width: "2/3",
+              data: {
+                xAxisKey: "month",
+                bars: [
+                  { key: "outOfPocket", label: "Out of pocket", color: "hsl(var(--chart-1))" },
+                  { key: "corporateCard", label: "Corporate card", color: "hsl(var(--chart-4))" },
+                ],
+                line: { key: "count", label: "Expenses", color: "hsl(var(--chart-3))" },
+                lineFormat: { kind: "number" },
+                stacked: true,
+                values: [],
+              },
+            },
+            {
+              id: "exp-spend-by-category",
+              type: "ranked-bars",
+              title: "Spend by Category (this month)",
+              width: "1/3",
+              data: { items: [], emptyLabel: "No submitted expenses this month." },
+            },
+            {
+              id: "exp-approval-backlog",
+              type: "tabbed-table",
+              title: "Approval Backlog",
+              width: "full",
+              data: { tabs: [], columns: [], rows: [] },
+            },
+          ],
+        },
       ],
     },
     {
@@ -2848,6 +3077,7 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newExpenseForm(t),
       createLabel: "New Expense",
       createAction: "createExpense",
+      createPermission: { resource: "hr_expense", action: "create" },
     },
     {
       id: "expense-sheets",
@@ -2926,6 +3156,7 @@ export const helpdeskModuleConfig = (t: TFunction): ModuleConfig => ({
       createForm: newHelpdeskTicketForm(t),
       createLabel: "New Ticket",
       createAction: "createTicket",
+      createPermission: { resource: "helpdesk_ticket", action: "create" },
     },
     {
       id: "teams",

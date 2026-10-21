@@ -37,6 +37,7 @@ class ContractReleaseWorkflowTests(unittest.TestCase):
         self.assertNotIn("cargo build --manifest-path spacetimedb/Cargo.toml", release)
         self.assertNotIn("cargo build --manifest-path spacetimedb/Cargo.toml", ci)
         self.assertIn("make contracts-module-ci", shared)
+        self.assertIn("make contracts-module-production-ci", shared)
         self.assertIn("actions/upload-artifact@v4", shared)
 
     def test_release_uses_prepared_staging_and_cached_candidate_checks(self):
@@ -48,6 +49,16 @@ class ContractReleaseWorkflowTests(unittest.TestCase):
         self.assertIn("target/contracts-release/npm-cache", release)
         self.assertIn("cargo check --quiet --all-features", publisher)
         self.assertIn('--cache "$CONTRACTS_NPM_CACHE_DIR"', publisher)
+
+    def test_release_refreshes_the_vendored_rust_package_without_rewriting_cargo(self):
+        release = (ROOT / ".github/workflows/release-contracts.yml").read_text()
+        packager = (ROOT / "scripts/package-contracts-rust.sh").read_text()
+
+        self.assertIn("bash scripts/package-contracts-rust.sh", release)
+        self.assertIn("bash scripts/prepare-vendored-contracts-rust.sh", release)
+        self.assertNotIn('sed -i "s/tag =', release)
+        self.assertIn("--sort=name --mtime='UTC 1970-01-01'", packager)
+        self.assertIn('sha256sum "$ARCHIVE"', packager)
 
 
 if __name__ == "__main__":

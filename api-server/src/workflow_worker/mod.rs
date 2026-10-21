@@ -47,7 +47,7 @@ struct TimerOrganizationRow {
 
 /// Start the polling worker and its internal health endpoint.
 pub async fn serve() -> anyhow::Result<()> {
-    let config = Config::from_worker_env()?;
+    let config = Config::from_nonreporting_worker_env()?;
     let worker_token = config.require_dedicated_worker_token("STDB_WORKFLOW_WORKER_TOKEN")?;
     if config.stdb_server_token.is_none() {
         anyhow::bail!("STDB_SERVER_TOKEN is required for workflow worker private source reads");

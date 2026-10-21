@@ -10,6 +10,7 @@ import {
   activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
+  chooseSelectOptionByTriggerValue,
   fetchDefaultCompanyId,
   fetchFirstUomId,
   fillField,
@@ -576,7 +577,7 @@ export async function moveQuantViaInventoryUi(
   quantity: number,
 ): Promise<void> {
   await gotoModule(page, "/inventory", "inventory")
-  await page.getByTestId("module-tab-inventory-stock").click()
+  await selectModuleTab(page, "inventory", "stock")
   await selectEntityRowById(page, quantId)
   await page.getByTestId("entity-action-move-stock-quant").click()
   await expect(page.getByTestId("form-modal-move-stock-quant")).toBeVisible({
@@ -618,7 +619,7 @@ export async function runCycleCountToPostedViaWizardUi(
   await gotoModule(page, "/inventory", "inventory")
   await selectModuleTab(page, "inventory", "cycle-wizard")
 
-  await page.locator("#cc-loc").selectOption(String(params.locationId))
+  await chooseSelectOptionByTriggerValue(page, page.locator("#cc-loc"), params.locationId)
   await page.getByTestId("cycle-wizard-create-plan").click()
 
   await expect(page.getByTestId("cycle-wizard-start-session")).toBeEnabled({
@@ -627,10 +628,10 @@ export async function runCycleCountToPostedViaWizardUi(
   await page.getByTestId("cycle-wizard-start-session").click()
 
   await expect(page.locator("#cc-prod")).toBeVisible({ timeout: 30_000 })
-  await page.locator("#cc-prod").selectOption(String(params.productId))
-  await page.locator("#cc-rec-loc").selectOption(String(params.locationId))
+  await chooseSelectOptionByTriggerValue(page, page.locator("#cc-prod"), params.productId)
+  await chooseSelectOptionByTriggerValue(page, page.locator("#cc-rec-loc"), params.locationId)
   await page.locator("#cc-qty").fill(String(params.countedQty))
-  await page.locator("#cc-uom").selectOption(String(params.uomId))
+  await chooseSelectOptionByTriggerValue(page, page.locator("#cc-uom"), params.uomId)
   await page.getByTestId("cycle-wizard-record-line").click()
 
   await expect(page.getByTestId("cycle-wizard-validate")).toBeEnabled({

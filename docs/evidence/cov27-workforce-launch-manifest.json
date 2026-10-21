@@ -1,0 +1,53 @@
+{
+  "schema_version": 2,
+  "recorded_at": "2026-10-13",
+  "status": "certification-blocked",
+  "scope": "All COV-03 through COV-24 target modules from the accepted COV-00D lifecycle inventory",
+  "authoritative_sources": {
+    "module_inventory": "docs/evidence/cov-00d-lifecycle-evidence.json",
+    "operation_inventory": "docs/evidence/cov-00a-operation-census.json",
+    "exposure_catalog": "frontend/packages/ui/src/lib/product-surface-catalog.ts"
+  },
+  "ratchet": {
+    "validator": "scripts/validate-cov27-launch-manifest.py",
+    "enabled_operation_definition": "client_facing=true and coverage_status=reachable-ui",
+    "visible_stub_patterns": ["stp-stub-", "data-visible-stub", "VisibleStub", "coming soon", "not implemented", "STP unavailable"],
+    "admission_rule": "A module may be admitted only when COV-00D is U5 with complete D/A/O/E and every catalog surface is enabled or admin-only. Runtime-pending and evidence-incomplete are never admission."
+  },
+  "modules": [
+    {"id":"COV-03","surface":"CRM","surface_ids":["crm"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U3/review; same-head runtime certification and accepted U5 revision are pending"]},
+    {"id":"COV-04","surface":"Sales","surface_ids":["sales"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U3/review; complete operator lifecycle and same-head runtime acceptance are pending"]},
+    {"id":"COV-05","surface":"Purchasing","surface_ids":["purchasing"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U3/review; accepted U5 evidence is pending"]},
+    {"id":"COV-06","surface":"Inventory / WMS","surface_ids":["inventory"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; complete operator and exact-effect evidence is pending"]},
+    {"id":"COV-07","surface":"Manufacturing / Quality","surface_ids":["manufacturing"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; final-pin browser and projection acceptance are pending"]},
+    {"id":"COV-08","surface":"Accounting / Finance / Assets","surface_ids":["accounting"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U3/review; operator-complete payment/reconciliation evidence is pending"]},
+    {
+      "id":"COV-09",
+      "surface":"HR / Payroll",
+      "surface_ids":["hr"],
+      "launch_gate":"blocked-by-visible-stubs",
+      "visible_stub_markers":[{"path":"frontend/web/app/(modules)/hr/hr-client.tsx","needle":"STP unavailable"}],
+      "blockers":["The STP provider is fail-closed but remains a visible unavailable action; no operation is dispatched, native processing persists failed, and sent/applied requires a canonical provider reference","COV-00D remains U2/review"]
+    },
+    {"id":"COV-10","surface":"Projects / Tasks","surface_ids":["projects","tasks"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; complete operator-to-billing acceptance is pending"]},
+    {"id":"COV-11","surface":"Expenses","surface_ids":["expenses"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; receipt capture and direct accounting navigation acceptance are pending"]},
+    {"id":"COV-12","surface":"Subscriptions","surface_ids":["subscriptions"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; activation, amendment, and cancellation evidence is pending"]},
+    {"id":"COV-13","surface":"POS","surface_ids":["pos"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; accepted U5 evidence is pending"]},
+    {"id":"COV-14","surface":"Helpdesk","surface_ids":["helpdesk"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; accepted U5 evidence is pending"]},
+    {"id":"COV-15","surface":"Fleet","surface_ids":["fleet"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; accepted U5 evidence is pending"]},
+    {"id":"COV-16","surface":"IoT","surface_ids":["iot"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; accepted U5 evidence is pending"]},
+    {"id":"COV-17","surface":"Proposals","surface_ids":["proposals"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U3/review; accepted U5 evidence is pending"]},
+    {"id":"COV-18","surface":"Documents / Knowledge","surface_ids":["documents"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; accepted U5 evidence is pending"]},
+    {"id":"COV-19","surface":"Calendar + Messages / Communications","surface_ids":["calendar","messages"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; accepted U5 evidence is pending"]},
+    {"id":"COV-20","surface":"Reports / Analytics","surface_ids":["reports"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U3/review; same-head runtime and accepted U5 revision are pending"]},
+    {"id":"COV-21","surface":"Approvals / Workflow automation","surface_ids":["approvals","workflows"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; accepted U5 evidence is pending"]},
+    {"id":"COV-22","surface":"Imports / Data Ops + Forms / Templates","surface_ids":[],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; the horizontal surface has no independently admitted route and accepted U5 evidence is pending"]},
+    {"id":"COV-23","surface":"Organization / Company / Settings / Auth","surface_ids":["settings"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U3/review; administrator U5-equivalent acceptance is pending"]},
+    {"id":"COV-24","surface":"Distributor workspace","surface_ids":["distributor"],"launch_gate":"evidence-incomplete","blockers":["COV-00D remains U2/review; accepted U5 evidence is pending"]}
+  ],
+  "acceptance_limits": [
+    "This manifest records certification state; it does not promote any module or alter first-organization exposure",
+    "Every target remains fail-closed until its authoritative COV-00D row is U5 and its product catalog exposure is explicitly admitted",
+    "No generated contract artifacts were changed"
+  ]
+}

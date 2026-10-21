@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import {
+  selectModuleTab,
   chooseSelectOptionByLabel, fetchAccountSelectLabelByInternalType, fetchSalesInvoiceJournalLabel, fillField,
   gotoModule, isoDate, scalarQueryId, selectEntityRowById, signIn, smokeName, submitForm,
 } from "./helpers"
@@ -12,8 +13,8 @@ async function rows(page: Page, resource: string): Promise<Row[]> {
   expect(response.ok(), `${resource} must be readable`).toBe(true)
   return ((await response.json()) as { data: Row[] }).data
 }
-test.describe("COV-25 subscription invoices; payment projection BLOCKED", { tag: ["@p0", "@cov25", "@unauthenticated"] }, () => {
-  test("multiple exact run invoice links survive refresh/back while missing payment relation is explicit", async ({ page }) => {
+test.describe("COV-25 subscription invoices and canonical payment projection", { tag: ["@p0", "@cov25", "@unauthenticated"] }, () => {
+  test("multiple exact run invoice links survive refresh/back with payment relations available", async ({ page }) => {
     test.setTimeout(420_000)
     await signIn(page, "test@email.com", process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$")
     const subscriptions = (await rows(page, "subscriptions")).filter((row) => row.code === "SUB-ACME-001")
@@ -28,7 +29,7 @@ test.describe("COV-25 subscription invoices; payment projection BLOCKED", { tag:
     for (let index = 0; index < 2; index += 1) {
       const runKey = smokeName(`cov25-run-${index}`)
       await gotoModule(page, "/subscriptions", "subscriptions")
-      await page.getByTestId("module-tab-subscriptions-subscriptions").click()
+      await selectModuleTab(page, "subscriptions", "subscriptions")
       await selectEntityRowById(page, subscriptionId)
       await page.getByTestId("entity-action-gen-inv").click()
       await expect(page.getByTestId("form-modal-generate-subscription-invoice")).toBeVisible()
@@ -58,17 +59,19 @@ test.describe("COV-25 subscription invoices; payment projection BLOCKED", { tag:
     for (const invoiceId of invoiceIds) {
       await clickCanonicalHandoff(page, source, `subscription-handoff-invoice-${invoiceId}`, { module: "accounting", tab: "journal-entries", id: invoiceId })
     }
-    // Release dependency, not payment acceptance: the current operator projection omits the FK.
-    // No owner SQL, guessed payment, skipped assertion, or paid-state substitute is used.
+    // Payment completion and mounted-cache convergence are exercised by COV-12.
+    // This multi-run proof also verifies that the operator receives canonical relations.
     const scopedPayments = (await rows(page, "account-payments")).filter((row) =>
       scalarQueryId(row.organizationId ?? row.organization_id) === organizationId &&
       scalarQueryId(row.companyId ?? row.company_id) === companyId)
-    expect(scopedPayments.length, "fixture must expose payment rows to prove omitted relation handling").toBeGreaterThan(0)
-    expect(scopedPayments.some((row) => !Array.isArray(row.reconciledInvoiceIds ?? row.reconciled_invoice_ids))).toBe(true)
+    expect(scopedPayments.length, "fixture must expose payment rows").toBeGreaterThan(0)
+    for (const payment of scopedPayments) {
+      expect(Array.isArray(payment.reconciledInvoiceIds ?? payment.reconciled_invoice_ids)).toBe(true)
+      expect(Array.isArray(payment.reconciledBillIds ?? payment.reconciled_bill_ids)).toBe(true)
+    }
     const sheet = await openCanonicalHandoffs(page, source)
     await expect(sheet.getByTestId(`subscription-handoff-invoice-${invoiceIds[0]}`)).toBeVisible()
     await expect(sheet.getByTestId(`subscription-handoff-invoice-${invoiceIds[1]}`)).toBeVisible()
-    await expect(sheet.getByTestId("subscription-handoff-payment-unavailable")).toHaveText("Payment invoice relation is unavailable")
-    await expect(sheet.locator('a[data-testid^="subscription-handoff-payment-"]')).toHaveCount(0)
+    await expect(sheet.getByTestId("subscription-handoff-payment-unavailable")).toHaveCount(0)
   })
 })
