@@ -16,8 +16,9 @@ import type { DocumentDesignerSnapshot } from "../lib/document-template-designer
 
 // jsdom does not implement the iframe layout required by the canvas. Keep the
 // real GrapesJS model, parser, blocks and undo manager, and skip only rendering.
-const { editors } = vi.hoisted(() => ({
+const { editors, readiness } = vi.hoisted(() => ({
   editors: [] as import("grapesjs").Editor[],
+  readiness: { autoActivateSelection: true },
 }))
 vi.mock("grapesjs", async () => {
   const actual = await vi.importActual<typeof import("grapesjs")>("grapesjs")
@@ -29,6 +30,9 @@ vi.mock("grapesjs", async () => {
       editor.getModel().set("ready", true)
       editor.getModel().loadTriggered = true
       editor.trigger("load", editor)
+      // Headless mode has no canvas view to start the pointer-selection command.
+      if (readiness.autoActivateSelection)
+        editor.trigger("command:run:select-comp")
     })
     return editor
   })
@@ -52,10 +56,36 @@ beforeAll(async () => {
 afterEach(async () => {
   cleanup()
   editors.length = 0
+  readiness.autoActivateSelection = true
   await i18n.changeLanguage("en")
 })
 
 describe("DocumentTemplateDesigner", () => {
+  it("keeps the canvas busy until pointer selection is available", async () => {
+    readiness.autoActivateSelection = false
+    const changed = vi.fn()
+    render(<DocumentTemplateDesigner kind="rich-text" onChange={changed} />)
+    await waitFor(() => expect(changed).toHaveBeenCalled())
+    expect(screen.getByTestId("document-template-designer").dataset.ready).toBe(
+      "false",
+    )
+    expect(screen.getByText("Preparing your canvas…")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Paragraph" })).toHaveProperty(
+      "disabled",
+      true,
+    )
+
+    act(() => editors[0]!.trigger("command:run:select-comp"))
+    expect(screen.getByTestId("document-template-designer").dataset.ready).toBe(
+      "true",
+    )
+    expect(screen.queryByText("Preparing your canvas…")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Paragraph" }))
+    expect(editors[0]!.getSelected()?.toHTML()).toContain(
+      "Write your text here.",
+    )
+  })
+
   it("creates a table template with the real editor and reopens its saved project", async () => {
     const changed = vi.fn<(snapshot: DocumentDesignerSnapshot) => void>()
     const errors = vi.fn()

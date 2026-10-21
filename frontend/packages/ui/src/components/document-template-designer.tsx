@@ -691,6 +691,9 @@ export function DocumentTemplateDesigner({
     const updateZoom = () => {
       if (!disposed && editor) setZoom(Math.round(editor.Canvas.getZoom()))
     }
+    const markReady = () => {
+      if (!disposed) setReady(true)
+    }
     const publish = () => {
       if (disposed || !editor || callbacksRef.current.disabled) return
       try {
@@ -842,7 +845,19 @@ export function DocumentTemplateDesigner({
             defaultValue: "Template design canvas",
           }),
         )
-        setReady(true)
+        // The canvas load event precedes the core's deferred selection command.
+        // Keep the loading surface in place until pointer selection is enabled.
+        if (
+          editor.Commands.isActive("select-comp") ||
+          editor.Commands.isActive("core:component-select")
+        ) {
+          markReady()
+        } else {
+          editor.once(
+            "command:run:select-comp command:run:core:component-select",
+            markReady,
+          )
+        }
         updateSelection()
         publish()
         const resize = () => {
@@ -872,6 +887,10 @@ export function DocumentTemplateDesigner({
         updateSelection,
       )
       editor?.off("canvas:zoom", updateZoom)
+      editor?.off(
+        "command:run:select-comp command:run:core:component-select",
+        markReady,
+      )
       mount?.remove()
       const instance = editor
       const view = instance?.getEditing()?.getView()
@@ -1080,6 +1099,7 @@ export function DocumentTemplateDesigner({
       className="lumiere-template-studio"
       data-testid="document-template-designer"
       data-panel={panel}
+      data-ready={ready}
     >
       <div
         className="template-studio-toolbar"

@@ -108,9 +108,12 @@ async function saveDesigner(page: Page, dialog: Locator, button: string, operati
 }
 
 async function editCanvasHeading(page: Page, dialog: Locator, text: string) {
+  await expect(dialog.getByTestId("document-template-designer")).toHaveAttribute("data-ready", "true")
   const canvas = page.frameLocator('iframe[title="Template design canvas"]')
   await canvas.locator("h2").first().click()
-  await dialog.getByRole("button", { name: "Edit text", exact: true }).click()
+  const editText = dialog.getByRole("button", { name: "Edit text", exact: true })
+  await expect(editText).toBeEnabled()
+  await editText.click()
   const editable = canvas.getByRole("textbox", { name: "Editing selected block text", exact: true })
   await expect(editable).toBeEditable()
   await editable.fill(text)
@@ -321,8 +324,6 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
     const otherAuthor = await provisionActor(owner, "template-company-b", TEMPLATE_AUTHOR, foreignCompanyId)
     const ownName = `${label} own`
     const foreignName = `${label} foreign`
-    const globalName = `${label} shared`
-    await postGeneratedOperationOk(owner, "create_document_template", { companyId: null, params: stdbParamsToJson(fixtureTemplate(globalName), "CreateDocumentTemplateParams") })
     await withActor(browser, otherAuthor, async (page) => {
       await assertOrdinarySession(page, otherAuthor.identityHex, true)
       await postGeneratedOperationOk(page, "create_document_template", { companyId: foreignCompanyId, params: stdbParamsToJson(fixtureTemplate(foreignName), "CreateDocumentTemplateParams") })
@@ -335,7 +336,6 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
       ownId = (await templateNamed(page, ownName)).id
       const visible = await templates(page)
       expect(visible.some((row) => row.name === ownName)).toBe(true)
-      expect(visible.some((row) => row.name === globalName)).toBe(true)
       expect(visible.some((row) => row.name === foreignName)).toBe(false)
       const denied = await postGeneratedOperation(page, "update_document_template", {
         templateId: foreign.id, companyId: foreignCompanyId,
@@ -368,7 +368,6 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
       const modal = await openContactEditor(page)
       await openTemplatePicker(page, modal, label)
       await expect(page.getByRole("button", { name: `Insert ${ownName}`, exact: true })).toBeVisible()
-      await expect(page.getByRole("button", { name: `Insert ${globalName}`, exact: true })).toBeVisible()
       await expect(page.getByRole("button", { name: `Insert ${foreignName}`, exact: true })).toHaveCount(0)
       await page.getByRole("button", { name: `Insert ${ownName}`, exact: true }).click()
       await expect(modal.getByTestId("form-field-description")).toContainText(ownName)

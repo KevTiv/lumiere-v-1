@@ -307,8 +307,11 @@ async fn prepare(
         .ok_or_else(|| ApiError::Unprocessable("quotation customer is unavailable".into()))?;
     let currency_id = row_u64(&order, &["currencyId", "currency_id"])
         .ok_or_else(|| ApiError::Unprocessable("quotation currency is unavailable".into()))?;
+    // CRM tables are private. Match the authoritative customer endpoint's
+    // transport after membership validation; the reader still enforces the
+    // caller's permission, field projection, organization and company scope.
     let customer = execute_authorized_resource_record(
-        client,
+        &state.stdb,
         "contacts",
         org_id,
         company_id,
@@ -454,6 +457,186 @@ async fn render_pdf(state: &AppState, html: &str, order_id: u64) -> Result<Vec<u
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn quotation_private_customer_read_preserves_actor_scope_and_permissions() {
+        use axum::{http::StatusCode, routing::post, Router};
+        use std::sync::Mutex;
+
+        #[derive(Clone)]
+        struct MockSql {
+            customer: Arc<Mutex<Value>>,
+            requests: Arc<Mutex<Vec<(String, String)>>>,
+        }
+
+        async fn sql(
+            State(mock): State<MockSql>,
+            headers: HeaderMap,
+            query: String,
+        ) -> (StatusCode, String) {
+            let authorization = headers
+                .get("authorization")
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or_default()
+                .to_owned();
+            mock.requests
+                .lock()
+                .unwrap()
+                .push((authorization.clone(), query.clone()));
+            assert!(query.contains("organization_id = 7"), "{query}");
+            assert!(!query.contains("SELECT *"), "{query}");
+            let rows = if query.contains(" FROM contact ") {
+                if authorization != "Bearer owner-token" {
+                    return (StatusCode::BAD_REQUEST, "no such table: contact".into());
+                }
+                assert!(query.contains(" AND id = 4"), "{query}");
+                assert!(!query.contains("metadata"), "{query}");
+                vec![mock.customer.lock().unwrap().clone()]
+            } else {
+                assert_eq!(authorization, "Bearer actor-token");
+                if query.contains(" FROM user_organization ") {
+                    vec![
+                        json!({"id":1,"organization_id":7,"company_id":3,"role_id":9,"is_active":true}),
+                    ]
+                } else if query.contains(" FROM role ") {
+                    vec![
+                        json!({"id":9,"name":"staff","permissions":["contact:read"],"is_active":true}),
+                    ]
+                } else if query.contains(" FROM sale_order ") {
+                    assert!(query.contains("company_id = 3 AND id = 9"), "{query}");
+                    vec![
+                        json!({"id":9,"organization_id":7,"company_id":3,"partner_id":4,"currency_id":2}),
+                    ]
+                } else {
+                    assert!(
+                        query.contains(" FROM user_role_assignment ")
+                            || query.contains(" FROM document_template "),
+                        "unexpected query: {query}"
+                    );
+                    Vec::new()
+                }
+            };
+            let names = rows
+                .first()
+                .and_then(Value::as_object)
+                .map(|row| row.keys().cloned().collect::<Vec<_>>())
+                .unwrap_or_default();
+            (StatusCode::OK, json!([{
+                "schema":{"elements":names.iter().map(|name|json!({"name":{"some":name}})).collect::<Vec<_>>()},
+                "rows":rows.iter().map(|row|names.iter().map(|name|row[name].clone()).collect::<Vec<_>>()).collect::<Vec<_>>()
+            }]).to_string())
+        }
+
+        let mock = MockSql {
+            customer: Arc::new(Mutex::new(Value::Null)),
+            requests: Arc::new(Mutex::new(Vec::new())),
+        };
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = Router::new()
+            .route("/v1/database/test-module/sql", post(sql))
+            .with_state(mock.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let mut config = crate::session::test_support::test_config(Some("owner-token"));
+        config.stdb_host = format!("http://{address}");
+        let state = AppState::new(config);
+        for (case, company_id, customer_company, deleted, can_read, expected, owner_reads) in [
+            (
+                "authorized",
+                3,
+                3,
+                false,
+                true,
+                "quotation template not found",
+                1,
+            ),
+            (
+                "no customer permission",
+                3,
+                3,
+                false,
+                false,
+                "Authoritative resource not found",
+                0,
+            ),
+            (
+                "foreign company intent",
+                8,
+                3,
+                false,
+                true,
+                "quotation company scope mismatch",
+                0,
+            ),
+            (
+                "foreign customer",
+                3,
+                8,
+                false,
+                true,
+                "quotation customer not found",
+                1,
+            ),
+            (
+                "deleted customer",
+                3,
+                3,
+                true,
+                true,
+                "quotation customer not found",
+                1,
+            ),
+        ] {
+            *mock.customer.lock().unwrap() = json!({
+                "id":4,"organization_id":7,"company_id":customer_company,
+                "name":"Customer", "deleted_at":if deleted { json!(1) } else { Value::Null }
+            });
+            mock.requests.lock().unwrap().clear();
+            let mut permissions = vec!["sale_order:read".into(), "document_template:read".into()];
+            if can_read {
+                permissions.push("contact:read".into());
+            }
+            let session = ApiSession {
+                stdb_token: "actor-token".into(),
+                identity_hex: "ab".repeat(32),
+                organization_id: Some(7),
+                field_access: Some(stdb_auth::FieldAccessContext {
+                    organization_id: 7,
+                    role_id: 9,
+                    role_name: "staff".into(),
+                    is_superuser: false,
+                    role_permissions: permissions,
+                    identity_hex: "ab".repeat(32),
+                    field_permissions: Vec::new(),
+                    role_ids: Vec::new(),
+                    org_permissions: Vec::new(),
+                }),
+            };
+            // An empty template result deliberately stops this test immediately
+            // after the customer read; the renderer has independent fixtures.
+            let error = prepare(&state, &session, 9, company_id, 12)
+                .await
+                .err()
+                .expect("the fixture has no template");
+            assert!(
+                matches!(&error, ApiError::NotFound(message) | ApiError::Forbidden(message) if message == expected),
+                "{case}: {error}"
+            );
+            assert_eq!(
+                mock.requests
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|(token, _)| token == "Bearer owner-token")
+                    .count(),
+                owner_reads,
+                "{case}"
+            );
+        }
+        server.abort();
+    }
 
     #[test]
     fn input_ids_remain_exact_and_preview_revision_is_required() {
