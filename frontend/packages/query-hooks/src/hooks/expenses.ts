@@ -245,7 +245,7 @@ export function useCreateExpense(organizationId: bigint, companyId?: bigint) {
       })
       const { urlPath, init } = stdbBffCommandPost("create_expense", { params: stdbParamsToJson(finalized, "CreateExpenseParams") })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create expense')
+      await decodeOperationDispatch(r, "Failed to create expense")
     },
     onSuccess: () => {
       // Do not keep the create form open while the list refreshes. The command

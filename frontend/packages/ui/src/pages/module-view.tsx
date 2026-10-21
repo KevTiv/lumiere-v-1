@@ -5,14 +5,16 @@ import { canUseModuleData, type ModuleDataState } from "../lib/module-data-state
 
 import { useEffect, useRef, useState, useCallback, type ReactNode } from "react"
 import { useErpSession } from "@lumiere/erp-session"
-import { useTranslation } from "@lumiere/i18n"
 import { buildEntitySelection, resolveAiEntityType } from "@lumiere/query-hooks/ai-ui-context"
 import {
   useErpAiSelectionReporter,
   useErpAiSelectionState,
 } from "@lumiere/query-hooks/erp-ai-selection-context"
-import { Tabs, TabsContent } from "../components/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/tabs"
 import { Button } from "../components/button"
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "../components/select"
+import { Label } from "../components/label"
+import { useTranslation } from "@lumiere/i18n"
 import { LayoutGrid, Plus, Table as TableIcon } from "lucide-react"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -22,7 +24,7 @@ import { EntityView } from "../entity-views/entity-view"
 import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
 import { FormModal } from "../forms/form-modal"
 import { RuntimeFormModal } from "../forms/runtime-form-modal"
-import { type ModuleConfig, type ModuleTab } from "../lib/module-types"
+import { buildModuleNavigationAreas, type ModuleConfig, type ModuleTab } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import type { EntitySurfacePermission } from "../lib/entity-view-types"
 import type { FormConfig, FormValues } from "../lib/form-types"
@@ -141,6 +143,11 @@ export function ModuleView({
   }, [activeTabProp, routeTab, defaultTab])
   const [isHydrated, setIsHydrated] = useState(false)
   const activeTab = activeTabProp ?? internalTab
+  const navigationAreas = config.tabNavigation === "areas"
+    ? buildModuleNavigationAreas(config.tabs, config.tabGroups, t("common.moduleNavigation.overview", { defaultValue: "Overview" })) : []
+  const currentArea = navigationAreas.find((area) => area.tabIds.includes(activeTab)) ?? navigationAreas[0]
+  const tabAreas = Object.fromEntries(navigationAreas.flatMap((area) => area.tabIds.map((tabId) => [tabId, area.id])))
+  const visibleTabs = currentArea ? config.tabs.filter((tab) => currentArea.tabIds.includes(tab.id)) : config.tabs
   const prevActiveTabRef = useRef<string | null>(null)
   const setActiveTab = (v: string) => {
     onActiveTabChange?.(v)
@@ -244,14 +251,50 @@ export function ModuleView({
       />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-w-0 flex-col">
-        <WorkspaceNav
-          moduleId={config.id}
-          tabs={config.tabs}
-          config={workspaceNav}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          hrefForTab={(tabId) => moduleTabHref(pathname, searchParams?.toString() ?? "", tabId, defaultTab)}
-        />
+        {currentArea ? (
+          <>
+            <div className="flex flex-wrap items-center gap-3" data-testid={`module-navigation-${config.id}`}>
+              <Label htmlFor={`module-area-${config.id}`}>
+                {t("common.moduleNavigation.area", { defaultValue: "Task area" })}
+              </Label>
+              <Select value={currentArea.id} onValueChange={(id) => {
+                const area = navigationAreas.find((candidate) => candidate.id === id)
+                if (area?.tabIds[0]) setActiveTab(area.tabIds[0])
+              }}>
+                <SelectTrigger id={`module-area-${config.id}`} data-testid={`module-area-${config.id}`} data-tab-areas={JSON.stringify(tabAreas)} className="w-full sm:w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent><SelectGroup>
+                  {navigationAreas.map((area) => <SelectItem key={area.id} value={area.id}>{area.label}</SelectItem>)}
+                </SelectGroup></SelectContent>
+              </Select>
+            </div>
+            <div ref={tabListRef} className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]" data-testid={`module-tabs-${config.id}`}>
+              <TabsList variant="line" className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto">
+                {visibleTabs.map((tab) => (
+                  <TabsTrigger
+                    key={tab.id}
+                    className="-mb-px flex-none rounded-none border-0 border-b-2 border-transparent px-2.5 pb-2.5 pt-1.5 after:hidden data-active:border-foreground data-active:text-foreground"
+                    data-navigation-group={currentArea.id}
+                    value={tab.id}
+                    data-testid={`module-tab-${config.id}-${tab.id}`}
+                  >
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+          </>
+        ) : (
+          <WorkspaceNav
+            moduleId={config.id}
+            tabs={config.tabs}
+            config={workspaceNav}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            hrefForTab={(tabId) => moduleTabHref(pathname, searchParams?.toString() ?? "", tabId, defaultTab)}
+          />
+        )}
 
         {config.tabs.map((tab) => (
           <TabsContent

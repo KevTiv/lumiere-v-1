@@ -1,0 +1,182 @@
+import { expect, test, type Page } from "@playwright/test"
+import { stdbTimestampToDate } from "@lumiere/erp-shared/timestamp-values"
+import { statementImportIdempotencyKey } from "../../lib/statement-import-csv"
+import { callReducerBff, chooseSelectOptionByTriggerValue, fetchAccountIdByCode, fetchDefaultCompanyId, fetchSessionOrganizationId, gotoModule, smokeName } from "./helpers"
+import { matchesOperationResponse } from "./operation-response"
+import { createPostedReceivableLine, createTransaction, createWallet, enumTag, fetchJournalIdByCode, fetchPartnerId, fetchPrimaryWallet, field, idOf, numberOf, queryRows, waitForRow, type QueryRow } from "./payment-fixtures"
+
+async function importWorkspace(page: Page, companyId: number): Promise<{ imports: QueryRow[]; lines: QueryRow[] }> {
+  const response = await page.request.get(`/api/accounting/bank-statement-imports/${companyId}`)
+  expect(response.ok(), "Authorized statement import read failed").toBe(true)
+  return response.json()
+}
+
+function observeWrites(page: Page, operation: string) {
+  const requests: string[] = []
+  page.on("request", (request) => {
+    if (request.method() === "POST" && matchesOperationResponse(request, operation)) requests.push(request.postData() ?? "")
+  })
+  return requests
+}
+
+test.describe("Finance payment tools save workflows", { tag: "@dev-fixture" }, () => {
+  test("reviews the uploaded statement then stages exactly those rows through the UI", async ({ page }) => {
+    test.setTimeout(120_000)
+    const wallet = await fetchPrimaryWallet(page)
+    expect(await fetchDefaultCompanyId(page)).toBe(wallet.companyId)
+    const marker = smokeName("finance-reviewed-statement")
+    const fileName = `${marker}.csv`
+    const csv = `date,amount,reference,description\n2026-10-01,125.50,${marker}-credit,Customer transfer\n2026-10-02,-25.25,${marker}-debit,Bank debit`
+    const key = await statementImportIdempotencyKey(BigInt(wallet.companyId), BigInt(wallet.journalId), BigInt(wallet.currencyId), csv)
+    const matchingImports = async () => (await importWorkspace(page, wallet.companyId)).imports.filter((row) => field(row, "idempotencyKey", "idempotency_key") === key)
+    expect(await matchingImports()).toHaveLength(0)
+    const writes = observeWrites(page, "stage_bank_statement_import")
+
+    await gotoModule(page, "/accounting?tab=payment-operations", "accounting")
+    await page.getByRole("button", { name: "Import CSV", exact: true }).first().click()
+    const preview = page.getByTestId("statement-import-review")
+    const submit = page.getByTestId("form-submit-stage-bank-statement-import")
+    await expect(preview).toBeVisible()
+    await expect(submit).toBeDisabled()
+    await chooseSelectOptionByTriggerValue(page, page.getByTestId("form-field-journalId"), wallet.journalId)
+    await chooseSelectOptionByTriggerValue(page, page.getByTestId("form-field-currencyId"), wallet.currencyId)
+    await page.getByTestId("form-field-openingBalance").fill("10")
+    await page.getByTestId("form-field-csvFile").setInputFiles({ name: fileName, mimeType: "text/csv", buffer: Buffer.from(csv) })
+    await page.getByRole("button", { name: "Review CSV", exact: true }).click()
+    await expect(preview).toContainText("Local review · not staged")
+    await expect(preview).toContainText("2 rows · 2 pass local checks · 0 need review")
+    await expect(preview).toContainText(`${marker}-credit`)
+    await expect(preview).toContainText(`${marker}-debit`)
+    await expect(preview).toContainText("110.25")
+    await expect(submit).toBeEnabled()
+    expect(writes).toEqual([])
+    expect(await matchingImports()).toHaveLength(0)
+    await page.screenshot({ path: test.info().outputPath("statement-local-review.png"), fullPage: true })
+
+    const responsePromise = page.waitForResponse((response) => response.request().method() === "POST" && matchesOperationResponse(response, "stage_bank_statement_import"))
+    await submit.click()
+    expect((await responsePromise).ok()).toBe(true)
+    await expect(submit).toBeDisabled()
+    await expect(preview).toContainText("Submitted request")
+    await expect(preview).toContainText(key)
+    await expect.poll(matchingImports, { timeout: 30_000 }).toHaveLength(1)
+    const workspace = await importWorkspace(page, wallet.companyId)
+    const headers = workspace.imports.filter((row) => field(row, "idempotencyKey", "idempotency_key") === key)
+    expect(headers).toHaveLength(1)
+    const header = headers[0]
+    const importId = idOf(field(header, "id"))
+    expect(importId).toBeGreaterThan(0)
+    expect(idOf(field(header, "companyId", "company_id"))).toBe(wallet.companyId)
+    expect(idOf(field(header, "journalId", "journal_id"))).toBe(wallet.journalId)
+    expect(idOf(field(header, "currencyId", "currency_id"))).toBe(wallet.currencyId)
+    expect(field(header, "fileName", "file_name")).toBe(fileName)
+    expect(numberOf(field(header, "openingBalance", "opening_balance"))).toBe(10)
+    expect(numberOf(field(header, "totalRows", "total_rows"))).toBe(2)
+    expect(numberOf(field(header, "validRows", "valid_rows"))).toBe(2)
+    expect(numberOf(field(header, "invalidRows", "invalid_rows"))).toBe(0)
+    expect(field(header, "state")).toBe("staged")
+    const lines = workspace.lines.filter((row) => idOf(field(row, "importId", "import_id")) === importId).sort((a, b) => Number(field(a, "rowNumber", "row_number")) - Number(field(b, "rowNumber", "row_number")))
+    expect(lines).toHaveLength(2)
+    expect(new Set(lines.map((row) => String(field(row, "id")))).size).toBe(2)
+    for (const [index, expected] of [
+      { rowNumber: 2, date: "2026-10-01", amount: 125.5, reference: `${marker}-credit`, description: "Customer transfer" },
+      { rowNumber: 3, date: "2026-10-02", amount: -25.25, reference: `${marker}-debit`, description: "Bank debit" },
+    ].entries()) {
+      const line = lines[index]
+      expect(numberOf(field(line, "rowNumber", "row_number"))).toBe(expected.rowNumber)
+      expect(stdbTimestampToDate(field(line, "date"))?.toISOString().slice(0, 10)).toBe(expected.date)
+      expect(numberOf(field(line, "amount"))).toBe(expected.amount)
+      expect(field(line, "reference")).toBe(expected.reference)
+      expect(field(line, "description")).toBe(expected.description)
+      expect(field(line, "validationError", "validation_error")).toBeNull()
+    }
+    const check = preview.getByRole("button", { name: "Check request status", exact: true })
+    await expect(check).toBeEnabled()
+    await check.click()
+    await expect(preview).toContainText(`Confirmed server record #${importId}`)
+    expect(writes).toHaveLength(1)
+    // Stage remains distinct from approval: no statement lines were created by this UI action.
+    expect(field(header, "approvedStatementId", "approved_statement_id")).toBeNull()
+  })
+
+  test("allocates a payment to the exact posted open item through the UI", async ({ page }) => {
+    test.setTimeout(180_000)
+    const organizationId = await fetchSessionOrganizationId(page)
+    const wallet = await fetchPrimaryWallet(page)
+    expect(await fetchDefaultCompanyId(page)).toBe(wallet.companyId)
+    const customerId = await fetchPartnerId(page, "Acme Corporation", "customer")
+    const marker = smokeName("finance-allocation-tool")
+    const paymentAccountId = await createWallet(page, organizationId, wallet, `${marker}-wallet`)
+    const journalId = await fetchJournalIdByCode(page, "INV")
+    const receivableAccountId = await fetchAccountIdByCode(page, "1100")
+    const revenueAccountId = await fetchAccountIdByCode(page, "4000")
+    const target = await createPostedReceivableLine(page, { organizationId, companyId: wallet.companyId, partnerId: customerId, journalId, receivableAccountId, revenueAccountId, amount: 80, reference: `${marker}-invoice` })
+    const lineId = idOf(field(target, "id"))
+    const moveId = idOf(field(target, "moveId", "move_id"))
+    if (lineId == null || moveId == null) throw new Error("The exact fixture receivable line/move identity is missing")
+    const transactionId = await createTransaction(page, organizationId, { companyId: wallet.companyId, paymentAccountId, partnerId: customerId, partnerType: "Customer", direction: "Inbound", currencyId: wallet.currencyId, reference: marker, grossMinor: 10_000, settlementMinor: 10_000, netMinor: 10_000, marker })
+    await callReducerBff(page, "post_payment_transaction", [organizationId, transactionId])
+    await waitForRow(page, "payment-transactions", (row) => idOf(field(row, "id")) === transactionId && enumTag(field(row, "status")) === "Posted", "exact posted fixture transaction")
+    const targets = (await queryRows(page, "account-move-lines")).filter((row) => idOf(field(row, "id")) === lineId)
+    expect(targets).toHaveLength(1)
+    expect(numberOf(field(targets[0], "amountResidual", "amount_residual"))).toBe(80)
+    const moves = (await queryRows(page, "account-moves")).filter((row) => idOf(field(row, "id")) === moveId)
+    expect(moves).toHaveLength(1)
+    const invoiceName = String(field(moves[0], "name"))
+    const activeRelations = async () => (await queryRows(page, "payment-reconciliations")).filter((row) => idOf(field(row, "paymentTransactionId", "payment_transaction_id")) === transactionId && idOf(field(row, "allocatedMoveLineId", "allocated_move_line_id")) === lineId && field(row, "isReversal", "is_reversal") === false)
+    expect(await activeRelations()).toHaveLength(0)
+    const writes = observeWrites(page, "allocate_payment_transaction")
+
+    await gotoModule(page, "/accounting?tab=payment-operations", "accounting")
+    await page.getByTestId(`payment-operation-${transactionId}`).getByRole("button", { name: "Allocate", exact: true }).click()
+    const preview = page.getByTestId("payment-allocation-review")
+    await expect(preview).toContainText(marker)
+    await expect(preview).toContainText("Unsaved allocation")
+    await expect(page.getByTestId("form-field-allocatedMoveLineId")).toBeEnabled()
+    await page.getByTestId("form-field-allocatedMoveLineId").click()
+    const search = page.getByPlaceholder("Search...", { exact: true })
+    await expect(search).toBeVisible()
+    await search.fill(`#${lineId}`)
+    const option = page.locator(`[role="option"][data-value$=" #${lineId}"]`)
+    await expect(option).toHaveCount(1)
+    await option.click()
+    await page.getByTestId("form-field-allocatedAmount").fill("60")
+    await expect(preview).toContainText(invoiceName)
+    await expect(preview).toContainText(`#${lineId}`)
+    await expect(preview).toContainText("40")
+    await expect(preview).toContainText("20")
+    await expect(page.getByTestId("form-field-writeOffAmount")).toBeHidden()
+    await expect(page.getByTestId("form-field-writeOffAccountId")).toBeHidden()
+    expect(writes).toEqual([])
+    await page.screenshot({ path: test.info().outputPath("payment-allocation-review.png"), fullPage: true })
+
+    const responsePromise = page.waitForResponse((response) => response.request().method() === "POST" && matchesOperationResponse(response, "allocate_payment_transaction"))
+    await page.getByTestId("form-submit-allocate-operational-payment").click()
+    expect((await responsePromise).ok()).toBe(true)
+    await expect(page.getByTestId("form-submit-allocate-operational-payment")).toBeDisabled()
+    await expect(preview).toContainText("Submitted request")
+    await expect.poll(activeRelations, { timeout: 30_000 }).toHaveLength(1)
+    const relations = await activeRelations()
+    expect(relations).toHaveLength(1)
+    const reconciliation = relations[0]
+    const reconciliationId = idOf(field(reconciliation, "id"))
+    expect(reconciliationId).toBeGreaterThan(0)
+    expect(idOf(field(reconciliation, "organizationId", "organization_id"))).toBe(organizationId)
+    expect(idOf(field(reconciliation, "companyId", "company_id"))).toBe(wallet.companyId)
+    expect(idOf(field(reconciliation, "currencyId", "currency_id"))).toBe(wallet.currencyId)
+    expect(numberOf(field(reconciliation, "allocatedAmount", "allocated_amount"))).toBe(60)
+    expect(numberOf(field(reconciliation, "writeOffAmount", "write_off_amount"))).toBe(0)
+    expect(field(reconciliation, "writeOffAccountId", "write_off_account_id")).toBeNull()
+    expect(numberOf(field(reconciliation, "residualBefore", "residual_before"))).toBe(80)
+    expect(numberOf(field(reconciliation, "residualAfter", "residual_after"))).toBe(20)
+    expect(field(reconciliation, "reversedReconciliationId", "reversed_reconciliation_id")).toBeNull()
+    const refreshedTarget = (await queryRows(page, "account-move-lines")).filter((row) => idOf(field(row, "id")) === lineId)
+    expect(refreshedTarget).toHaveLength(1)
+    expect(numberOf(field(refreshedTarget[0], "amountResidual", "amount_residual"))).toBe(20)
+    const check = preview.getByRole("button", { name: "Check request status", exact: true })
+    await expect(check).toBeEnabled()
+    await check.click()
+    await expect(preview).toContainText(`Confirmed server record #${reconciliationId}`)
+    expect(writes).toHaveLength(1)
+  })
+})
