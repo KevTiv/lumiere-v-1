@@ -15,8 +15,8 @@ use crate::accounting::fixed_assets::{
     account_asset, account_asset_depreciation_line, backfill_fixed_asset_organization_ownership,
     compute_depreciation_board, confirm_account_asset, create_account_asset,
     create_depreciation_line, dispose_account_asset, set_asset_active, AccountAsset,
-    AccountAssetDepreciationLine, CreateAccountAssetParams,
-    CreateDepreciationLineParams, DisposeAccountAssetParams,
+    AccountAssetDepreciationLine, CreateAccountAssetParams, CreateDepreciationLineParams,
+    DisposeAccountAssetParams,
 };
 use crate::accounting::idempotency::accounting_operation_receipt;
 use crate::accounting::journal_entries::{account_move, account_move_line};
@@ -476,27 +476,18 @@ pub fn test_depreciation_board_and_disposal_are_single_exact_effect(
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let code = format!("COV08D2-ASSET-{}", fixture.company_id);
+    let base_params = asset_params(ctx, &fixture, code.clone(), None)?;
 
     create_account_asset(
         ctx,
         fixture.organization_id,
         fixture.company_id,
-        asset_params(ctx, &fixture, code.clone(), None)?,
+        base_params.clone(),
     )?;
     let asset = find_asset(ctx, &code)?;
-    confirm_account_asset(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        asset.id,
-    )?;
+    confirm_account_asset(ctx, fixture.organization_id, fixture.company_id, asset.id)?;
 
-    compute_depreciation_board(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        asset.id,
-    )?;
+    compute_depreciation_board(ctx, fixture.organization_id, fixture.company_id, asset.id)?;
 
     let computed_asset = find_asset(ctx, &code)?;
     let mut computed_lines: Vec<_> = ctx
@@ -524,7 +515,9 @@ pub fn test_depreciation_board_and_disposal_are_single_exact_effect(
             || line.asset_id != asset.id
             || line.sequence != (index as u32 + 1)
         {
-            return Err("depreciation board contains a mis-scoped or non-canonical line".to_string());
+            return Err(
+                "depreciation board contains a mis-scoped or non-canonical line".to_string(),
+            );
         }
     }
 
@@ -541,12 +534,7 @@ pub fn test_depreciation_board_and_disposal_are_single_exact_effect(
             )
         })
         .collect();
-    match compute_depreciation_board(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        asset.id,
-    ) {
+    match compute_depreciation_board(ctx, fixture.organization_id, fixture.company_id, asset.id) {
         Err(error) if error.contains("already computed") => {}
         Err(error) => {
             return Err(format!(
@@ -621,6 +609,73 @@ pub fn test_depreciation_board_and_disposal_are_single_exact_effect(
         || replayed_disposal.write_date != disposed.write_date
     {
         return Err("asset-disposal replay changed the canonical asset".to_string());
+    }
+
+    // Exercise the persisted owner output, including unequal method amounts and month-end dates.
+    for (index, method) in [
+        DepreciationMethod::Degressive,
+        DepreciationMethod::DegressiveThenLinear,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let first = chrono::DateTime::parse_from_rfc3339("2026-01-31T00:00:00Z")
+            .map_err(|error| format!("invalid test schedule date: {error}"))?;
+        let mut params = base_params.clone();
+        params.code = format!("{code}-METHOD-{index}");
+        params.idempotency_key = format!("fixed-assets-test:create:{}", params.code);
+        params.method = method;
+        params.method_number = 24;
+        params.method_period = 3;
+        params.method_progress_factor = 100.0;
+        params.acquisition_date =
+            spacetimedb::Timestamp::from_micros_since_unix_epoch(first.timestamp_micros());
+        params.first_depreciation_date = Some(params.acquisition_date);
+        let method_code = params.code.clone();
+        create_account_asset(ctx, fixture.organization_id, fixture.company_id, params)?;
+        let method_asset = find_asset(ctx, &method_code)?;
+        confirm_account_asset(
+            ctx,
+            fixture.organization_id,
+            fixture.company_id,
+            method_asset.id,
+        )?;
+        compute_depreciation_board(
+            ctx,
+            fixture.organization_id,
+            fixture.company_id,
+            method_asset.id,
+        )?;
+        let mut lines: Vec<_> = ctx
+            .db
+            .account_asset_depreciation_line()
+            .depreciation_line_by_asset()
+            .filter(&method_asset.id)
+            .collect();
+        lines.sort_by_key(|line| line.sequence);
+        if lines.len() < 3 || (lines[0].amount - lines[1].amount).abs() < 0.000_001 {
+            return Err("method test must produce unequal depreciation installments".to_string());
+        }
+        let mut cumulative = 0.0;
+        for (line_index, line) in lines.iter().enumerate() {
+            cumulative += line.amount;
+            let expected_date = first
+                .checked_add_months(chrono::Months::new(line_index as u32 * 3))
+                .ok_or("test schedule date is out of range")?;
+            if line.depreciation_date.to_micros_since_unix_epoch()
+                != expected_date.timestamp_micros()
+                || (line.depreciated_value - cumulative).abs() > 0.000_001
+                || (line.remaining_value
+                    - (method_asset.total_depreciable_amount - cumulative).max(0.0))
+                .abs()
+                    > 0.000_001
+            {
+                return Err(format!(
+                    "method {index} saved an incorrect date or cumulative balance at line {}",
+                    line.sequence
+                ));
+            }
+        }
     }
 
     Ok(())
