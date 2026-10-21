@@ -91,46 +91,63 @@ export async function reloadSettled(page: Page) {
   await expectAuthenticatedShell(page)
 }
 
-async function expectHydratedModule(page: Page, moduleId: string) {
+async function currentModuleView(page: Page, moduleId: string): Promise<Locator> {
   const moduleView = page.getByTestId(`module-view-${moduleId}`)
   // Next.js may briefly render streamed and client shells together.
   await expect(moduleView).toHaveCount(1, { timeout: 30_000 })
   await expect(moduleView).toBeVisible()
   await expect(moduleView).toHaveAttribute("data-hydrated", "true")
+  return moduleView
 }
 
 export async function gotoModule(page: Page, route: string, moduleId?: string) {
   await page.goto(route)
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
   await expectAuthenticatedShell(page)
-  if (moduleId) await expectHydratedModule(page, moduleId)
+  if (moduleId) await currentModuleView(page, moduleId)
 }
 
 /** Select a module tab and wait until its panel is the active interaction surface. */
 export async function selectModuleTab(page: Page, moduleId: string, tabId: string) {
-  const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
-  if (await tab.isVisible()) await tab.click()
-  else {
-    // Domain tests use canonical deep links for views outside the current
-    // workspace. Dedicated navigation tests cover workspace/menu interaction.
-    const target = new URL(`/${moduleId}`, page.url())
-    const current = new URL(page.url())
-    for (const [key, value] of current.searchParams) {
-      if (!["tab", "filter", "highlight"].includes(key)) target.searchParams.append(key, value)
+  const moduleView = await currentModuleView(page, moduleId)
+  const tab = moduleView.getByTestId(`module-tab-${moduleId}-${tabId}`)
+  if (!(await tab.isVisible())) {
+    const areaTrigger = moduleView.getByTestId(`module-area-${moduleId}`)
+    if (await areaTrigger.count()) {
+      // Other areas' triggers are unmounted. Read the complete map from the
+      // actual task-area picker, choose its area, then use the mounted tab.
+      const rawAreas = await areaTrigger.getAttribute("data-tab-areas")
+      const areas: unknown = rawAreas ? JSON.parse(rawAreas) : null
+      const area = areas != null && typeof areas === "object" && !Array.isArray(areas)
+        && tabId in areas ? (areas as Record<string, unknown>)[tabId] : undefined
+      if (typeof area !== "string") {
+        throw new Error(`Module ${moduleId} has no task area for tab ${tabId}`)
+      }
+      await chooseSelectOptionByTriggerValue(page, areaTrigger, area)
+    } else {
+      // Modules with workspace navigation retain canonical links for views
+      // outside the current workspace, preserving company and route scope.
+      const target = new URL(`/${moduleId}`, page.url())
+      const current = new URL(page.url())
+      for (const [key, value] of current.searchParams) {
+        if (!["tab", "filter", "highlight"].includes(key)) target.searchParams.append(key, value)
+      }
+      if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
+      await page.goto(target.toString())
+      await currentModuleView(page, moduleId)
     }
-    if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
-    await page.goto(target.toString())
-    await expectHydratedModule(page, moduleId)
   }
+  await tab.click()
   await expect(tab).toHaveAttribute("aria-selected", "true")
   await expectModuleTabSurface(page, moduleId, tabId)
 }
 
 /** Assert the selected workspace's actual interaction surface. */
 export async function expectModuleTabSurface(page: Page, moduleId: string, tabId: string) {
-  const panel = page.getByTestId(`module-panel-${moduleId}-${tabId}`)
+  const moduleView = await currentModuleView(page, moduleId)
+  const panel = moduleView.getByTestId(`module-panel-${moduleId}-${tabId}`)
   await expect(panel).toHaveCount(1)
-  const visiblePanels = page.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)
+  const visiblePanels = moduleView.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)
   if (moduleId === "accounting" && tabId === "payment-operations") {
     // The payment controller stays outside the empty module panel so switching
     // tabs cannot discard an in-flight allocation or its uncertain result.
@@ -157,7 +174,7 @@ export async function openEntityCreate(
 ) {
   await gotoModule(page, route, moduleId)
   await selectModuleTab(page, moduleId, tabId)
-  const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
+  const createBtn = (await currentModuleView(page, moduleId)).getByTestId(`module-create-${moduleId}-${tabId}`)
   await createBtn.scrollIntoViewIfNeeded()
   await createBtn.click()
   await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible()

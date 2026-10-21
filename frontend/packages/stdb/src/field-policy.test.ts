@@ -4,9 +4,11 @@ import { test } from 'node:test'
 import {
   RESOURCE_REGISTRY,
   resolveHttpSqlColumns,
+  selectCompanyScopedSql,
   sqlColumnListForGeneratedType,
   type FieldAccessContext,
 } from './field-policy'
+import { subscriptionQueriesForResource } from './queries/erp-subscriptions'
 
 function access(resource: string, fields?: string[]): FieldAccessContext {
   return {
@@ -57,4 +59,40 @@ test('bank readback inclusions never override explicit field masks', () => {
   assert.deepEqual(selected, ['id', 'organization_id', 'payment_ids', 'metadata'])
   const unrelated = resolveHttpSqlColumns('subscriptions', access('subscription', ['invoice_ids', 'metadata']))
   assert.deepEqual(unrelated, ['id', 'organization_id'])
+})
+
+const financeRelations = [
+  ['account-assets', 'account_asset', 'AccountAsset', ['depreciation_board_ids']],
+  ['expenses', 'hr_expense', 'HrExpense', ['attachment_ids', 'tax_ids']],
+] as const
+
+test('finance owner relations are schema backed and survive explicit grants', () => {
+  for (const [resource, alias, typeName, fields] of financeRelations) {
+    const generated = sqlColumnListForGeneratedType(typeName)
+    const columns = resolveHttpSqlColumns(resource, access(alias, [...fields]))
+    for (const field of fields) {
+      assert.ok(generated.includes(field), `unknown ${typeName} relation: ${field}`)
+      assert.ok(columns.includes(field), `missing authorized ${resource} relation: ${field}`)
+    }
+  }
+})
+
+test('finance relation exceptions honor masks and keep unrelated vectors excluded', () => {
+  for (const [resource, alias, , fields] of financeRelations) {
+    const masked = resolveHttpSqlColumns(resource, access(alias, ['name']))
+    assert.deepEqual(masked, [...RESOURCE_REGISTRY[resource].mandatory, 'name'])
+    const selected = resolveHttpSqlColumns(resource, access(alias, [...fields, 'metadata', 'message_ids', 'activity_ids']))
+    assert.deepEqual(selected, [...RESOURCE_REGISTRY[resource].mandatory, ...fields])
+  }
+  assert.deepEqual(resolveHttpSqlColumns('subscriptions', access('subscription', ['attachment_ids', 'tax_ids', 'depreciation_board_ids'])), ['id', 'organization_id'])
+})
+
+test('finance browser SQL retains tenant predicates while resolving owner relations', () => {
+  const fieldAccess = access('hr_expense', ['attachment_ids', 'tax_ids'])
+  const statements = subscriptionQueriesForResource('expenses', { organizationId: 7, fieldAccess })
+  assert.ok(statements?.length)
+  assert.match(statements[0]!, /attachment_ids, tax_ids FROM hr_expense WHERE organization_id = 7\b/)
+  assert.equal(subscriptionQueriesForResource('expenses', { fieldAccess }), null)
+  const asset = selectCompanyScopedSql('account-assets', 'account_asset', 33, access('account_asset', ['depreciation_board_ids']), '')
+  assert.match(asset, /id, company_id, depreciation_board_ids FROM account_asset WHERE company_id = 33$/)
 })

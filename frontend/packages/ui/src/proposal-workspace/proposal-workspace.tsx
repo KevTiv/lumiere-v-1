@@ -6,6 +6,12 @@ import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import type {
   AIAnalysis,
@@ -1327,26 +1333,25 @@ export function ProposalWorkspace({
               </Button>
             ) : null}
 
-            <div className="relative group">
-              <Button variant="outline" size="sm" className="gap-1">
-                {t("proposalWorkspace.status.label")}
-                <ChevronDown className="h-3.5 w-3.5" />
-              </Button>
-              <div className="absolute right-0 top-full mt-1 w-40 bg-popover border border-border rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  {t("proposalWorkspace.status.label")}
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
                 {getStatusOptions(t).map((opt) => (
-                  <button
+                  <DropdownMenuItem
                     key={opt.value}
-                    className={cn(
-                      "w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground first:rounded-t last:rounded-b",
-                      status === opt.value && "bg-accent"
-                    )}
+                    className={cn(status === opt.value && "bg-accent")}
                     onClick={() => handleStatusChange(opt.value)}
                   >
                     {opt.label}
-                  </button>
+                  </DropdownMenuItem>
                 ))}
-              </div>
-            </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <Button variant="default" size="sm" onClick={() => setAiPanelCollapsed((v) => !v)}>
               {aiPanelCollapsed ? t("proposalWorkspace.showAiPanel") : t("proposalWorkspace.hideAiPanel")}

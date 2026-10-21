@@ -343,3 +343,4 @@ export * from "./forms/navigation-guard-provider";
 export { useUnsavedChangesGuard } from "./forms/use-unsaved-changes-guard"
 
 export { DashboardWidgetRenderer } from "./pages/dashboard-widget-renderer"
+export * from "./accounting-components/asset-depreciation-schedule";

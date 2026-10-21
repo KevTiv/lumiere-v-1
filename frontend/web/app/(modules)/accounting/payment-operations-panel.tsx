@@ -23,6 +23,7 @@ import {
   usePaymentAllocationBalances,
   usePaymentFees,
   usePaymentReversals,
+  usePaymentReconciliations,
   usePaymentTransactions,
   usePostPaymentTransaction,
   useReversePaymentTransaction,
@@ -30,13 +31,10 @@ import {
 } from "@lumiere/query-hooks/hooks/accounting/payments"
 import { useApproveBankStatementImport, useStageBankStatementImport, useBankStatementImports } from "@lumiere/query-hooks/hooks/accounting/bank-statements"
 import type { PartnerType, PaymentDirection, PaymentFeeBearer, PaymentProviderCode } from "@lumiere/stdb/types"
+import type { FormConfig, FormField, FormValues } from "@lumiere/ui/lib/form-types"
 import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { paymentMinorUnitsText, paymentMoneyMinor } from "@lumiere/erp-shared/payment-allocation-projection"
-import {
-  statementImportIdempotencyKey,
-  statementImportRows,
-} from "@/lib/statement-import-csv"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -44,6 +42,8 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { HISTORICAL_ACCOUNTING_IMPORT_SOURCE } from "./historical-payment-import"
 import { allocationFailureIsDefinitive, preparePaymentAllocationAttempt, type PaymentAllocationAttempt } from "./payment-allocation-attempt"
+import { allocationReadback, allocationSource, paymentId, paymentInputAmount, prepareStatementImport, statementBalanceReview, statementImportReadback, statementReviewMatches, type PaymentLookupRow, type PreparedStatementImport, type WorkflowReadback } from "./payment-workflow-model"
+import { PaymentAllocationReview, StatementImportReview, type SubmittedAllocation } from "./payment-workflow-previews"
 
 type Row = Record<string, unknown>
 
@@ -95,6 +95,9 @@ export interface PaymentOperationsPanelProps {
   moveLines: Row[]
   scopeAvailable?: boolean
   onRecoveryLockChange?: (locked: boolean) => void
+  moves?: readonly PaymentLookupRow[]
+  glAccounts?: readonly PaymentLookupRow[]
+  lookupDataReady?: boolean
 }
 
 export function PaymentOperationsPanel({
@@ -108,15 +111,23 @@ export function PaymentOperationsPanel({
   moveLines,
   scopeAvailable = true,
   onRecoveryLockChange,
+  moves = [],
+  glAccounts = [],
+  lookupDataReady = false,
 }: PaymentOperationsPanelProps) {
   const { t } = useTranslation()
   const organization = BigInt(organizationId)
-  const { data: accounts = [], isLoading: accountsLoading } = usePaymentAccounts(organization)
-  const { data: transactions = [], isLoading: transactionsLoading } = usePaymentTransactions(organization)
+  const accountsRead = usePaymentAccounts(organization)
+  const { data: accounts = [], isLoading: accountsLoading } = accountsRead
+  const transactionsRead = usePaymentTransactions(organization)
+  const { data: transactions = [], isLoading: transactionsLoading } = transactionsRead
+  const reconciliationsRead = usePaymentReconciliations(organization)
+  const { data: reconciliations = [] } = reconciliationsRead
   const allocationBalances = usePaymentAllocationBalances(organization, companyId)
   const { data: reversals = [] } = usePaymentReversals(organization)
   const { data: fees = [] } = usePaymentFees(organization)
-  const { data: statementImportWorkspace = { imports: [], lines: [] }, isLoading: statementImportsLoading } = useBankStatementImports(organization, companyId)
+  const statementImportsRead = useBankStatementImports(organization, companyId)
+  const { data: statementImportWorkspace = { imports: [], lines: [] }, isLoading: statementImportsLoading } = statementImportsRead
   const createAccount = useCreatePaymentAccount(organization)
   const createTransaction = useCreatePaymentTransaction(organization)
   const postTransaction = usePostPaymentTransaction(organization)
@@ -131,6 +142,14 @@ export function PaymentOperationsPanel({
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false)
   const [statementImportDialogOpen, setStatementImportDialogOpen] = useState(false)
   const [allocatingTransaction, setAllocatingTransaction] = useState<Row | null>(null)
+  const [allocationDialogOpen, setAllocationDialogOpen] = useState(false)
+  const [submittedAllocation, setSubmittedAllocation] = useState<SubmittedAllocation | null>(null)
+  const [allocationRequestState, setAllocationRequestState] = useState<"accepted" | "unknown" | null>(null)
+  const [statementReview, setStatementReview] = useState<PreparedStatementImport | null>(null)
+  const [submittedStatement, setSubmittedStatement] = useState<PreparedStatementImport | null>(null)
+  const [statementRequestState, setStatementRequestState] = useState<"accepted" | "unknown" | null>(null)
+  const [statementPreparing, setStatementPreparing] = useState(false)
+  const statementValues = useRef<FormValues | null>(null)
   const [reversingTransaction, setReversingTransaction] = useState<Row | null>(null)
   const [feeTransaction, setFeeTransaction] = useState<Row | null>(null)
   const [voidingTransaction, setVoidingTransaction] = useState<Row | null>(null)
@@ -143,7 +162,7 @@ export function PaymentOperationsPanel({
   const balancesByTransaction = new Map(allocationBalances.rows.filter((balance) => balance.transactionId).map((balance) => [balance.transactionId!, balance]))
 
   const activeAccounts = useMemo(
-    () => (accounts as Row[]).filter((account) => asId(account.organizationId) === organization && asId(account.companyId) === companyId && optionValue(account.archivedAt) == null && account.active !== false),
+    () => (accounts as Row[]).filter((account) => paymentId(account.organizationId) === organization && paymentId(account.companyId) === companyId && optionValue(account.archivedAt) == null && account.active !== false),
     [accounts, organization, companyId],
   )
   const accountOptions = useMemo(
@@ -157,25 +176,23 @@ export function PaymentOperationsPanel({
     () => new Map(activeAccounts.map((account) => [String(account.id), account])),
     [activeAccounts],
   )
-  const moveLineOptions = useMemo(
-    () => moveLines
-      .filter((line) => {
-        if (allocatingTransaction == null) return false
-        const accountType = enumName(line.accountInternalType).toLowerCase()
-        return asId(line.organizationId) === organization
-          && asId(line.companyId) === companyId
-          && enumName(line.parentState).toLowerCase() === "posted"
-          && asId(line.partnerId) === asId(allocatingTransaction.partnerId)
-          && asId(line.currencyId) === asId(allocatingTransaction.currencyId)
-          && (accountType === "receivable" || accountType === "payable")
-          && Math.abs(numberValue(line.amountResidual ?? line.amountResidualCurrency)) > 0
-      })
-      .map((line) => ({
-        value: String(line.id ?? ""),
-        label: `${String(line.name ?? line.moveName ?? `Line ${line.id}`)} · ${numberValue(line.amountResidual ?? line.amountResidualCurrency).toLocaleString()}`,
-      })),
-    [allocatingTransaction, companyId, organization, moveLines],
-  )
+  const allocationData = useMemo(() => allocationSource({
+    transactionId: allocatingTransaction?.id, organizationId: organization, companyId,
+    ready: scopeAvailable && allocationBalances.state.status === "ready" && lookupDataReady && accountsRead.isSuccess && !accountsRead.isFetching && transactionsRead.isSuccess && !transactionsRead.isFetching && reconciliationsRead.isSuccess && !reconciliationsRead.isFetching,
+    transactions, paymentAccounts: accounts, reconciliations, lines: moveLines, moves, glAccounts,
+  }), [allocatingTransaction?.id, organization, companyId, scopeAvailable, allocationBalances.state.status, lookupDataReady, accountsRead.isSuccess, accountsRead.isFetching, transactionsRead.isSuccess, transactionsRead.isFetching, reconciliationsRead.isSuccess, reconciliationsRead.isFetching, transactions, accounts, reconciliations, moveLines, moves, glAccounts])
+  const allocationResult: WorkflowReadback = submittedAllocation && reconciliationsRead.isSuccess && !reconciliationsRead.isFetching
+    ? allocationReadback(submittedAllocation.params, reconciliations, organization) : { kind: "pending" }
+  const statementResult: WorkflowReadback = submittedStatement && statementImportsRead.isSuccess && !statementImportsRead.isFetching
+    ? statementImportReadback(submittedStatement, statementImportWorkspace.imports, statementImportWorkspace.lines) : { kind: "pending" }
+  const moveLineOptions = useMemo(() => {
+    const items = allocationData.kind === "ready" ? allocationData.items : []
+    const options = items.map((item) => ({ value: String(item.line.id), label: `${String(item.move.name ?? item.move.id)} · ${String(item.line.name ?? item.line.id)} · ${item.residual.toLocaleString()}` }))
+    if (submittedAllocation && !options.some((option) => option.value === String(submittedAllocation.params.allocatedMoveLineId))) {
+      options.push({ value: String(submittedAllocation.params.allocatedMoveLineId), label: String(submittedAllocation.item.line.name ?? submittedAllocation.item.line.id) })
+    }
+    return options
+  }, [allocationData, submittedAllocation])
   const reversedTransactionIds = useMemo(
     () => new Set((reversals as Row[]).filter((row) => asId(row.organizationId) === organization && asId(row.companyId) === companyId).map((reversal) => String(reversal.originalTransactionId ?? ""))),
     [reversals, organization, companyId],
@@ -210,11 +227,22 @@ export function PaymentOperationsPanel({
     [accountOptions, currencyOptions, defaultCurrencyId, partnerOptions, t],
   )
   const allocationForm = useMemo(
-    () => mergeFieldDefaultValues(mergeSelectOptionsForFields(allocateOperationalPaymentForm(t), {
-      allocatedMoveLineId: moveLineOptions,
-      writeOffAccountId: glAccountOptions,
-    }), { writeOffAmount: 0 }),
-    [glAccountOptions, moveLineOptions, t],
+    (): FormConfig => {
+      const form = mergeFieldDefaultValues(mergeSelectOptionsForFields(allocateOperationalPaymentForm(t), {
+        allocatedMoveLineId: moveLineOptions,
+        writeOffAccountId: allocationData.kind === "ready" ? allocationData.writeOffAccounts.map((account) => ({ value: String(account.id), label: String(account.name ?? account.id) })) : [],
+      }), { writeOffAmount: 0 })
+      return { ...form, size: "xl", sections: form.sections.map((section) => ({ ...section, fields: section.fields.flatMap<FormField>((field) => {
+        if (field.name === "allocatedMoveLineId" && field.type === "select") return [{ ...field, searchable: true }]
+        if (field.name === "writeOffAmount") return [
+          { id: "writeOffEnabled", name: "writeOffEnabled", type: "switch" as const, label: t("accounting.workflowTools.enableWriteOff", { defaultValue: "Add a separate write-off" }), defaultValue: false, width: "full" as const },
+          { ...field, visibleWhen: { field: "writeOffEnabled", equals: "true" }, validation: { custom: (value: unknown) => (paymentInputAmount(value) ?? 0) > 0 ? null : t("accounting.workflowTools.positiveWriteOff", { defaultValue: "Enter a positive write-off amount, or turn off the write-off." }) } },
+        ]
+        if (field.name === "writeOffAccountId") return [{ ...field, visibleWhen: { field: "writeOffEnabled", equals: "true" }, required: true }]
+        return [field]
+      }) })) }
+    },
+    [allocationData, moveLineOptions, t],
   )
   const paymentFeeForm = useMemo(
     () => mergeSelectOptionsForFields(newOperationalPaymentFeeForm(t), {
@@ -224,10 +252,11 @@ export function PaymentOperationsPanel({
     [glAccountOptions, t],
   )
   const statementImportForm = useMemo(
-    () => mergeFieldDefaultValues(mergeSelectOptionsForFields(stageBankStatementImportForm(t), {
+    () => ({ ...mergeFieldDefaultValues(mergeSelectOptionsForFields(stageBankStatementImportForm(t), {
       journalId: journalOptions,
       currencyId: currencyOptions,
-    }), { currencyId: String(defaultCurrencyId), openingBalance: 0 }),
+    }), { currencyId: String(defaultCurrencyId), openingBalance: 0 }), size: "xl" as const,
+    submitLabel: t("accounting.workflowTools.stageReviewed", { defaultValue: "Stage reviewed rows" }) }),
     [currencyOptions, defaultCurrencyId, journalOptions, t],
   )
 
@@ -302,47 +331,72 @@ export function PaymentOperationsPanel({
     }
   }
 
-  const saveAllocation = async (data: Row) => {
-    const transaction = allocatingTransaction
-    const transactionId = transaction == null ? null : rowId(transaction)
+  const openAllocation = (transaction: Row) => {
+    setFormError(null)
+    if (!submittedAllocation || allocationResult.kind === "confirmed") {
+      setAllocatingTransaction(transaction)
+      setSubmittedAllocation(null)
+      setAllocationRequestState(null)
+    }
+    setAllocationDialogOpen(true)
+  }
+
+  const closeAllocation = (open: boolean) => {
+    setAllocationDialogOpen(open)
+    if (!open && (!submittedAllocation || allocationResult.kind === "confirmed")) {
+      setAllocatingTransaction(null)
+      setSubmittedAllocation(null)
+      setAllocationRequestState(null)
+    }
+  }
+
+  const saveAllocation = async (data: FormValues) => {
+    if (submittedAllocation) return
     const previousOutcomeUnknown = allocationAttemptRef.current != null
+    let submitted = false
     try {
       setFormError(null)
       if (!scopeAvailable) throw new Error("Select the original company before allocating this payment.")
-      const allocatedMoveLineId = asId(data.allocatedMoveLineId)
-      const writeOffAmount = numberValue(data.writeOffAmount)
-      const writeOffAccountId = asId(data.writeOffAccountId)
-      if (transaction == null || transactionId == null || allocatedMoveLineId == null) throw new Error("Choose the invoice or bill line to allocate")
-      if (writeOffAmount > 0 && writeOffAccountId == null) throw new Error("Choose a write-off account")
-      if (!inScope(transaction)) throw new Error("The payment belongs to another organization or company.")
+      const source = allocationData
+      const allocatedMoveLineId = paymentId(data.allocatedMoveLineId)
+      const item = source.kind === "ready" ? source.items.find((candidate) => paymentId(candidate.line.id) === allocatedMoveLineId) : null
+      const allocatedAmount = paymentInputAmount(data.allocatedAmount)
+      const writeOffAmount = data.writeOffEnabled === true ? paymentInputAmount(data.writeOffAmount) : 0
+      const writeOffAccountId = data.writeOffEnabled === true ? paymentId(data.writeOffAccountId) : null
+      if (source.kind !== "ready" || !item || allocatedMoveLineId == null || allocatedAmount == null || allocatedAmount <= 0) {
+        throw new Error(t("accounting.workflowTools.invalidAllocation", { defaultValue: "Choose a current open item and enter a positive allocation amount." }))
+      }
+      if (writeOffAmount == null || writeOffAmount < 0 || (data.writeOffEnabled === true && (writeOffAmount <= 0 || !source.writeOffAccounts.some((account) => paymentId(account.id) === writeOffAccountId)))) {
+        throw new Error(t("accounting.workflowTools.invalidWriteOff", { defaultValue: "Enter a positive write-off and choose an allowed write-off account, or turn off the write-off." }))
+      }
+      const transactionId = paymentId(source.transaction.id)
+      const currencyId = paymentId(source.transaction.currencyId)
+      if (!transactionId || !currencyId) throw new Error(t("accounting.workflowTools.unavailableAllocation", { defaultValue: "The authorized payment or open-item data is unavailable. Refresh the data before allocating. Missing balances are not treated as zero." }))
       const balance = balancesByTransaction.get(String(transactionId))
       const amountMinor = balance ? paymentMoneyMinor(data.allocatedAmount, balance.decimalPlaces) : null
-      if (!allocationAttemptRef.current && (allocationBalances.state.status !== "ready" || !balance || amountMinor == null || amountMinor <= 0n || amountMinor > balance.remainingMinor)) {
+      if (allocationBalances.state.status !== "ready" || !balance || amountMinor == null || amountMinor <= 0n || amountMinor > balance.remainingMinor) {
         throw new Error("Enter a positive allocation within the payment's available balance. Refresh unavailable payment balances before continuing.")
       }
       const attempt = preparePaymentAllocationAttempt(allocationAttemptRef.current, organization, {
-        companyId,
-        paymentTransactionId: transactionId,
-        allocatedMoveLineId,
-        allocatedAmount: numberValue(data.allocatedAmount),
-        currencyId: asId(transaction.currencyId) ?? defaultCurrencyId,
-        writeOffAmount,
-        writeOffAccountId: writeOffAccountId ?? undefined,
-        metadata: undefined,
+        companyId, paymentTransactionId: transactionId, allocatedMoveLineId, allocatedAmount, currencyId,
+        writeOffAmount, writeOffAccountId: writeOffAccountId ?? undefined, metadata: undefined,
       }, () => `allocate-payment:${globalThis.crypto.randomUUID()}`)
       allocationAttemptRef.current = attempt
       setUnresolvedAllocation(attempt)
-      await allocateTransaction.mutateAsync(attempt.params)
-      allocationAttemptRef.current = null
-      setUnresolvedAllocation(null)
-      setAllocatingTransaction(null)
+      const request: SubmittedAllocation = { transaction: source.transaction, item, available: source.available, params: attempt.params }
+      setSubmittedAllocation(request)
+      setAllocationRequestState("unknown")
+      submitted = true
+      await allocateTransaction.mutateAsync(request.params)
+      setAllocationRequestState("accepted")
     } catch (cause) {
-      if (allocationFailureIsDefinitive(cause, previousOutcomeUnknown)) {
+      if (submitted && allocationFailureIsDefinitive(cause, previousOutcomeUnknown)) {
         allocationAttemptRef.current = null
         setUnresolvedAllocation(null)
+        setSubmittedAllocation(null)
+        setAllocationRequestState(null)
       }
-      const message = cause instanceof Error ? cause.message : "Unable to allocate the payment"
-      setFormError(message)
+      setFormError(cause instanceof Error ? cause.message : t("accounting.workflowTools.allocationFailed", { defaultValue: "Unable to allocate the payment" }))
       throw cause
     }
   }
@@ -352,10 +406,9 @@ export function PaymentOperationsPanel({
     if (!attempt || !scopeAvailable || attempt.organizationId !== organization || attempt.params.companyId !== companyId) return
     try {
       setActionError(null)
+      setAllocationDialogOpen(true)
       await allocateTransaction.mutateAsync(attempt.params)
-      allocationAttemptRef.current = null
-      setUnresolvedAllocation(null)
-      setAllocatingTransaction(null)
+      setAllocationRequestState("accepted")
     } catch (cause) {
       // A rejected retry cannot establish the earlier command's outcome.
       setActionError(cause instanceof Error ? cause.message : "The allocation response remains unresolved.")
@@ -426,37 +479,58 @@ export function PaymentOperationsPanel({
     }
   }
 
-  const saveStatementImport = async (data: Row) => {
+  const reviewStatementImport = async () => {
+    if (submittedStatement || statementPreparing) return
     try {
       setFormError(null)
       if (!scopeAvailable) throw new Error("Select a company before importing a statement.")
-      const journalId = asId(data.journalId)
-      const currencyId = asId(data.currencyId)
-      const uploadedFiles = data.csvFile
-      const csvFile = uploadedFiles instanceof FileList
-        ? uploadedFiles.item(0) ?? undefined
-        : Array.isArray(uploadedFiles)
-          ? uploadedFiles.find((file): file is File => file instanceof File)
-          : undefined
-      if (journalId == null || currencyId == null) throw new Error("Choose the statement journal and currency")
-      if (csvFile == null) throw new Error("Choose a CSV file to import")
-      const csvData = await csvFile.text()
-      const rows = statementImportRows(csvData)
-      await stageStatementImport.mutateAsync({
-        companyId,
-        journalId,
-        currencyId,
-        params: {
-          fileName: stringValue(data.fileName) || csvFile.name,
-          idempotencyKey: await statementImportIdempotencyKey(companyId, journalId, currencyId, csvData),
-          openingBalance: numberValue(data.openingBalance),
-          rows,
-        },
-      })
-      setStatementImportDialogOpen(false)
+      setStatementPreparing(true)
+      const values = statementValues.current
+      if (!values) throw new Error(t("accounting.workflowTools.reviewFirst", { defaultValue: "Choose a CSV file and statement setup, then select Review CSV. No rows are sent to the server during this review." }))
+      const review = await prepareStatementImport(values, companyId, t("accounting.workflowTools.importSetup", { defaultValue: "Choose a CSV file, journal, currency, and finite opening balance." }))
+      if (statementValues.current && statementReviewMatches(review, statementValues.current, companyId)) setStatementReview(review)
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Unable to stage the statement import"
-      setFormError(message)
+      setStatementReview(null)
+      setFormError(cause instanceof Error ? cause.message : t("accounting.workflowTools.reviewFailed", { defaultValue: "Unable to review the CSV" }))
+    } finally {
+      setStatementPreparing(false)
+    }
+  }
+
+  const closeStatementImport = (open: boolean) => {
+    setStatementImportDialogOpen(open)
+    if (!open && (!submittedStatement || statementResult.kind === "confirmed")) {
+      setStatementReview(null)
+      setSubmittedStatement(null)
+      setStatementRequestState(null)
+      statementValues.current = null
+    }
+  }
+
+  const saveStatementImport = async (data: FormValues) => {
+    if (submittedStatement) return
+    let submitted = false
+    try {
+      setFormError(null)
+      if (!scopeAvailable) throw new Error("Select the original company before importing a statement.")
+      const review = statementReview
+      if (!review || !statementReviewMatches(review, data, companyId) || !statementBalanceReview(review).withinEnvelope) {
+        throw new Error(t("accounting.workflowTools.reviewAgain", { defaultValue: "Review the current file and setup before staging." }))
+      }
+      const prior = statementImportReadback(review, statementImportWorkspace.imports, statementImportWorkspace.lines)
+      if (prior.kind === "ambiguous" || prior.kind === "conflict") throw new Error(t("accounting.workflowTools.importKeyConflict", { defaultValue: "An import with this file identity has different saved data. Review the saved import before continuing." }))
+      setSubmittedStatement(review)
+      setStatementRequestState(prior.kind === "confirmed" ? "accepted" : "unknown")
+      if (prior.kind === "confirmed") return
+      submitted = true
+      await stageStatementImport.mutateAsync({ companyId: review.companyId, journalId: review.journalId, currencyId: review.currencyId, params: review.params })
+      setStatementRequestState("accepted")
+    } catch (cause) {
+      if (submitted && allocationFailureIsDefinitive(cause)) {
+        setSubmittedStatement(null)
+        setStatementRequestState(null)
+      }
+      setFormError(cause instanceof Error ? cause.message : t("accounting.workflowTools.stageFailed", { defaultValue: "Unable to stage the statement import" }))
       throw cause
     }
   }
@@ -487,10 +561,17 @@ export function PaymentOperationsPanel({
 
   const mutationPending = createAccount.isPending || createTransaction.isPending || postTransaction.isPending || allocateTransaction.isPending || reverseTransaction.isPending || createFee.isPending || voidTransaction.isPending || stageStatementImport.isPending || approveStatementImport.isPending
   const mutationBusy = mutationPending || !scopeAvailable
-  const recoveryLocked = mutationPending || unresolvedAllocation != null
+  const recoveryLocked = mutationPending || unresolvedAllocation != null || (submittedStatement != null && statementResult.kind !== "confirmed")
   const allocationScopeMatches = unresolvedAllocation == null
     || (unresolvedAllocation.organizationId === organization && unresolvedAllocation.params.companyId === companyId)
   useEffect(() => { onRecoveryLockChange?.(recoveryLocked) }, [onRecoveryLockChange, recoveryLocked])
+  useEffect(() => {
+    // A transport acknowledgement does not establish the business outcome.
+    if (allocationScopeMatches && allocationResult.kind === "confirmed") {
+      allocationAttemptRef.current = null
+      setUnresolvedAllocation(null)
+    }
+  }, [allocationScopeMatches, allocationResult.kind])
 
   return (
     <div className="space-y-4">
@@ -520,7 +601,7 @@ export function PaymentOperationsPanel({
             <CardTitle>Bank statement imports</CardTitle>
             <CardDescription>Stage a CSV for validation first. Approval creates bank-statement lines for the existing manual matching workspace.</CardDescription>
           </div>
-          <CardAction><Button size="sm" onClick={() => { setFormError(null); setStatementImportDialogOpen(true) }}><FileUpIcon data-icon="inline-start" />Stage CSV</Button></CardAction>
+          <CardAction><Button size="sm" onClick={() => { setFormError(null); setStatementImportDialogOpen(true) }}><FileUpIcon data-icon="inline-start" />{t("accounting.workflowTools.importCsv", { defaultValue: "Import CSV" })}</Button></CardAction>
         </CardHeader>
         <CardContent className="space-y-3">
           {statementImports.length > 0 ? statementImports.map((statementImport) => {
@@ -540,7 +621,7 @@ export function PaymentOperationsPanel({
                 {canApprove ? <Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => void approveImport(statementImport)}><SendIcon data-icon="inline-start" />Approve to reconcile</Button> : null}
               </div>
             </div>
-          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><FileUpIcon /></EmptyMedia><EmptyTitle>{statementImportsLoading ? "Loading statement imports" : "No statement imports"}</EmptyTitle><EmptyDescription>Paste a bank CSV to validate every row before it enters reconciliation.</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setStatementImportDialogOpen(true)}><FileUpIcon data-icon="inline-start" />Stage CSV</Button></EmptyContent></Empty>}
+          }) : <Empty><EmptyHeader><EmptyMedia variant="icon"><FileUpIcon /></EmptyMedia><EmptyTitle>{statementImportsLoading ? "Loading statement imports" : "No statement imports"}</EmptyTitle><EmptyDescription>{t("accounting.workflowTools.importEmpty", { defaultValue: "Upload a bank CSV to review its rows and balances before staging." })}</EmptyDescription></EmptyHeader><EmptyContent><Button size="sm" onClick={() => setStatementImportDialogOpen(true)}><FileUpIcon data-icon="inline-start" />{t("accounting.workflowTools.importCsv", { defaultValue: "Import CSV" })}</Button></EmptyContent></Empty>}
         </CardContent>
       </Card>
 
@@ -559,7 +640,7 @@ export function PaymentOperationsPanel({
             const account = accountById.get(String(transaction.paymentAccountId))
             const correction = stringValue(optionValue(transaction.sourceEntity)) === "reversal"
             const canReverse = status === "Posted" && !correction && !reversedTransactionIds.has(String(transaction.id))
-            return <div key={String(transaction.id)} className="rounded-lg border p-3">
+            return <div key={String(transaction.id)} data-testid={`payment-operation-${String(transaction.id)}`} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2"><p className="font-medium">{String(optionValue(transaction.externalReference) ?? `Payment ${transaction.id}`)}</p><Badge variant={statusVariant(status)}>{status || "Draft"}</Badge></div>
@@ -571,7 +652,7 @@ export function PaymentOperationsPanel({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {status === "Draft" ? <><Button size="sm" variant="outline" disabled={mutationBusy} onClick={() => { setFormError(null); setFeeTransaction(transaction) }}><ReceiptTextIcon data-icon="inline-start" />Add fee</Button><Button size="sm" variant="outline" disabled={mutationBusy || id == null} onClick={() => void post(transaction)}><SendIcon data-icon="inline-start" />Post</Button><Button size="sm" variant="outline" disabled={mutationBusy || id == null} onClick={() => setVoidingTransaction(transaction)}><Trash2Icon data-icon="inline-start" />Void</Button></> : null}
-                  {status === "Posted" && !correction ? <Button size="sm" variant="outline" disabled={mutationBusy || unresolvedAllocation != null || allocationBalances.state.status !== "ready" || !balance || balance.remainingMinor <= 0n} onClick={() => { setFormError(null); setAllocatingTransaction(transaction) }}><ArrowLeftRightIcon data-icon="inline-start" />Allocate</Button> : null}
+                  {status === "Posted" && !correction ? <Button size="sm" variant="outline" disabled={mutationBusy || unresolvedAllocation != null || allocationBalances.state.status !== "ready" || !balance || balance.remainingMinor <= 0n} onClick={() => openAllocation(transaction)}><ArrowLeftRightIcon data-icon="inline-start" />Allocate</Button> : null}
                   {canReverse ? <Button size="sm" variant="outline" disabled={mutationBusy || unresolvedAllocation != null} onClick={() => { setFormError(null); setReversingTransaction(transaction) }}><RotateCcwIcon data-icon="inline-start" />Reverse</Button> : null}
                 </div>
               </div>
@@ -582,8 +663,36 @@ export function PaymentOperationsPanel({
 
       <RuntimeFormModal open={accountDialogOpen} onOpenChange={(open) => !open && setAccountDialogOpen(false)} staticConfig={paymentAccountForm} moduleId="accounting" organizationId={organizationId} isPending={createAccount.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveAccount} />
       <RuntimeFormModal open={transactionDialogOpen} onOpenChange={(open) => !open && setTransactionDialogOpen(false)} staticConfig={paymentTransactionForm} moduleId="accounting" organizationId={organizationId} isPending={createTransaction.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveTransaction} />
-      <RuntimeFormModal open={statementImportDialogOpen} onOpenChange={(open) => !open && setStatementImportDialogOpen(false)} staticConfig={statementImportForm} moduleId="accounting" organizationId={organizationId} isPending={stageStatementImport.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveStatementImport} />
-      <RuntimeFormModal key={allocatingTransaction ? `allocate-${String(allocatingTransaction.id)}` : "allocate-none"} open={allocatingTransaction != null} onOpenChange={(open) => !open && setAllocatingTransaction(null)} staticConfig={allocationForm} moduleId="accounting" organizationId={organizationId} isPending={allocateTransaction.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveAllocation} />
+      <RuntimeFormModal
+        open={statementImportDialogOpen} onOpenChange={closeStatementImport} staticConfig={statementImportForm}
+        moduleId="accounting" organizationId={organizationId} closeOnSubmit={false} submitError={formError}
+        isPending={stageStatementImport.isPending || statementPreparing}
+        submissionDisabled={!scopeAvailable || !statementReview || !statementBalanceReview(statementReview).withinEnvelope || submittedStatement != null}
+        transformConfig={(config) => ({ ...config, sections: config.sections.map((section) => ({ ...section, fields: section.fields.map((field) => ({ ...field, disabled: field.disabled || submittedStatement != null || statementPreparing })) })) })}
+        onValuesChange={(values) => { statementValues.current = values; if (!submittedStatement) setStatementReview(null) }}
+        formLeadingActions={<Button type="button" variant="outline" disabled={stageStatementImport.isPending || statementPreparing || submittedStatement != null} onClick={() => void reviewStatementImport()}>{t("accounting.workflowTools.reviewCsv", { defaultValue: "Review CSV" })}</Button>}
+        renderPreview={(values) => <StatementImportReview review={submittedStatement ?? (statementReview && statementReviewMatches(statementReview, values, companyId) ? statementReview : null)} submitted={submittedStatement != null} result={statementResult} requestState={statementRequestState}
+          onCheck={() => { void statementImportsRead.refetch() }} checking={statementImportsRead.isFetching}
+          journalLabel={journalOptions.find((option) => option.value === String((submittedStatement ?? statementReview)?.journalId))?.label ?? "—"}
+          currencyLabel={currencyOptions.find((option) => option.value === String((submittedStatement ?? statementReview)?.currencyId))?.label ?? "—"} />}
+        onSubmit={saveStatementImport}
+      />
+      <RuntimeFormModal
+        key={allocatingTransaction ? `allocate-${String(allocatingTransaction.id)}` : "allocate-none"}
+        open={allocationDialogOpen} onOpenChange={closeAllocation} staticConfig={allocationForm}
+        moduleId="accounting" organizationId={organizationId} isPending={allocateTransaction.isPending} closeOnSubmit={false}
+        submissionDisabled={!scopeAvailable || submittedAllocation != null || allocationData.kind !== "ready" || allocationData.items.length === 0}
+        transformConfig={(config) => ({ ...config, sections: config.sections.map((section) => ({ ...section, fields: section.fields.map((field) => ({
+          ...field,
+          ...((field.name === "writeOffAmount" || field.name === "writeOffAccountId") ? { visibleWhen: { field: "writeOffEnabled", equals: "true" } } : {}),
+          disabled: field.disabled || submittedAllocation != null,
+        })) })) })}
+        submitError={formError} onSubmit={saveAllocation}
+        renderPreview={(values) => <PaymentAllocationReview values={values} source={allocationData} submitted={submittedAllocation} result={allocationResult} requestState={allocationRequestState}
+          onCheck={() => { void reconciliationsRead.refetch() }} checking={reconciliationsRead.isFetching}
+          currencyLabel={currencyOptions.find((option) => option.value === String(submittedAllocation?.params.currencyId ?? (allocationData.kind === "ready" ? allocationData.transaction.currencyId : "")))?.label ?? "—"}
+          partnerLabel={partnerOptions.find((option) => option.value === String(submittedAllocation?.transaction.partnerId ?? (allocationData.kind === "ready" ? allocationData.transaction.partnerId : "")))?.label ?? "—"} />}
+      />
       <RuntimeFormModal key={reversingTransaction ? `reverse-${String(reversingTransaction.id)}` : "reverse-none"} open={reversingTransaction != null} onOpenChange={(open) => !open && setReversingTransaction(null)} staticConfig={reverseOperationalPaymentForm(t)} moduleId="accounting" organizationId={organizationId} isPending={reverseTransaction.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveReversal} />
       <RuntimeFormModal key={feeTransaction ? `fee-${String(feeTransaction.id)}` : "fee-none"} open={feeTransaction != null} onOpenChange={(open) => !open && setFeeTransaction(null)} staticConfig={paymentFeeForm} moduleId="accounting" organizationId={organizationId} isPending={createFee.isPending} closeOnSubmit={false} showSubmitSuccessToast submitError={formError} onSubmit={saveFee} />
       <AlertDialog open={voidingTransaction != null} onOpenChange={(open) => !open && setVoidingTransaction(null)}>

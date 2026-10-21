@@ -16,10 +16,10 @@ import {
 } from "@/components/ui/table"
 import {
   Dialog,
+  DialogFooter,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import {
   Search,
@@ -29,7 +29,6 @@ import {
   Clock,
   FileText,
   ArrowUpRight,
-  Trash2,
   Upload,
   Calculator,
   X,
@@ -50,14 +49,6 @@ function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v)
-
-interface EntryLine {
-  id: string
-  accountId: string
-  description: string
-  debit: number
-  credit: number
-}
 
 function moveStateStr(state: unknown): string {
   if (state != null && typeof state === 'object' && 'tag' in state) {
@@ -111,11 +102,6 @@ export function GeneralLedgerView({
   const clearUrlFilter = useClearModuleUrlFilter()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedMove, setSelectedMove] = useState<AccountMove | null>(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [newLines, setNewLines] = useState<EntryLine[]>([
-    { id: "1", accountId: "", description: "", debit: 0, credit: 0 },
-    { id: "2", accountId: "", description: "", debit: 0, credit: 0 },
-  ])
 
   const activeUrlFilters = Object.entries(urlFilters).filter(
     ([, value]) => value && value !== "__all__",
@@ -139,20 +125,6 @@ export function GeneralLedgerView({
     pending: moves.filter((m) => String(m.state) === "Draft").length,
     totalMovement: moves.reduce((s, m) => s + (m.amountTotal ?? 0), 0),
   }
-
-  const addLine = () =>
-    setNewLines((prev) => [...prev, { id: String(Date.now()), accountId: "", description: "", debit: 0, credit: 0 }])
-
-  const removeLine = (id: string) => {
-    if (newLines.length > 2) setNewLines((prev) => prev.filter((l) => l.id !== id))
-  }
-
-  const updateLine = (id: string, field: keyof EntryLine, value: string | number) =>
-    setNewLines((prev) => prev.map((l) => l.id === id ? { ...l, [field]: value } : l))
-
-  const totalDebits = newLines.reduce((s, l) => s + l.debit, 0)
-  const totalCredits = newLines.reduce((s, l) => s + l.credit, 0)
-  const isBalanced = totalDebits === totalCredits && totalDebits > 0
 
   const movesPager = usePagedRows(filtered)
   return (
@@ -220,10 +192,12 @@ export function GeneralLedgerView({
                   {t("accounting.csvImport.toolbarMoveLines")}
                 </Button>
               ) : null}
-              <Button onClick={() => setShowCreateModal(true)} className="gap-2">
-                <Plus className="h-4 w-4" />
-                {t("accounting.actions.newEntry")}
-              </Button>
+              {onCreate ? (
+                <Button onClick={() => onCreate({})} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  {t("accounting.actions.newEntry")}
+                </Button>
+              ) : null}
             </div>
           </div>
           {activeUrlFilters.length > 0 ? (
@@ -395,93 +369,6 @@ export function GeneralLedgerView({
         </DialogContent>
       </Dialog>
 
-      {/* Create Entry Dialog */}
-      <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader><DialogTitle>{t("accounting.forms.newJournalEntry.createTitle")}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>{t("accounting.journalEntries.date")}</Label>
-                <Input type="date" defaultValue={new Date().toISOString().split("T")[0]} />
-              </div>
-              <div className="space-y-2">
-                <Label>{t("accounting.forms.newJournalEntry.refOptional")}</Label>
-                <Input placeholder="e.g., INV-001" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>{t("accounting.forms.newJournalEntry.fields.notes")}</Label>
-              <Input placeholder={t("accounting.forms.newJournalEntry.descriptionPlaceholder")} />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label>{t("accounting.forms.newJournalEntry.entryLines")}</Label>
-                <Button variant="outline" size="sm" onClick={addLine} className="gap-2">
-                  <Plus className="h-4 w-4" />{t("accounting.forms.newJournalEntry.addLine")}
-                </Button>
-              </div>
-              <div className="border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t("accounting.forms.newJournalEntry.columns.description")}</TableHead>
-                      <TableHead className="w-32.5">{t("accounting.forms.newJournalEntry.columns.debit")}</TableHead>
-                      <TableHead className="w-32.5">{t("accounting.forms.newJournalEntry.columns.credit")}</TableHead>
-                      <TableHead className="w-12.5"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {newLines.map((line) => (
-                      <TableRow key={line.id}>
-                        <TableCell>
-                          <Input value={line.description} onChange={(e) => updateLine(line.id, "description", e.target.value)} placeholder={t("accounting.forms.newJournalEntry.linePlaceholder")} />
-                        </TableCell>
-                        <TableCell>
-                          <Input type="number" min={0} step={0.01} value={line.debit || ""}
-                            onChange={(e) => { updateLine(line.id, "debit", parseFloat(e.target.value) || 0); if (parseFloat(e.target.value) > 0) updateLine(line.id, "credit", 0) }}
-                            placeholder="0.00" />
-                        </TableCell>
-                        <TableCell>
-                          <Input type="number" min={0} step={0.01} value={line.credit || ""}
-                            onChange={(e) => { updateLine(line.id, "credit", parseFloat(e.target.value) || 0); if (parseFloat(e.target.value) > 0) updateLine(line.id, "debit", 0) }}
-                            placeholder="0.00" />
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="icon" onClick={() => removeLine(line.id)} disabled={newLines.length <= 2} className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <div className="flex justify-end gap-8 p-4 border-t bg-muted/30">
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">{t("accounting.forms.newJournalEntry.summary.totalDebits")}</p>
-                    <p className="text-lg font-bold text-success">{formatCurrency(totalDebits)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">{t("accounting.forms.newJournalEntry.summary.totalCredits")}</p>
-                    <p className="text-lg font-bold text-destructive">{formatCurrency(totalCredits)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">{t("accounting.forms.newJournalEntry.summary.difference")}</p>
-                    <Badge variant={isBalanced ? "default" : "destructive"}>
-                      {isBalanced ? t("accounting.forms.newJournalEntry.summary.balanced") : formatCurrency(Math.abs(totalDebits - totalCredits))}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateModal(false)}>{t("common.cancel")}</Button>
-            <Button variant="secondary" disabled={!isBalanced}>{t("accounting.forms.newJournalEntry.saveDraft")}</Button>
-            <Button disabled={!isBalanced} onClick={() => { onCreate?.({}); setShowCreateModal(false) }}>{t("accounting.forms.postMove.submitLabel")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
