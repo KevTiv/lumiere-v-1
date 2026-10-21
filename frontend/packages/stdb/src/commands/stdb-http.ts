@@ -15,6 +15,8 @@ type StdbBffReducerKey = SessionOperationName;
 export { STDB_BFF_REDUCERS, type StdbBffReducerKey };
 
 export type StdbBffNamedReducerKey = Extract<SessionOperationName, keyof OperationInputMap>;
+/** Exact generated operation inputs behind the stable package boundary. */
+export type StdbNamedOperationInput<K extends StdbBffNamedReducerKey> = OperationInputMap[K];
 
 type StdbWireField<T> =
   | T

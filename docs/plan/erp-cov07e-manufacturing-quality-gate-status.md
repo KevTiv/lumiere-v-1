@@ -1,8 +1,9 @@
 # COV-07e — manufacturing quality gate
 
-**Status:** BACKEND IMPLEMENTED — contract/UI certification and runtime acceptance pending  
+**Status:** ACCEPTED — bounded quality-gate path passed; owning module remains at `review`
 **Branch:** `codex/cov07e-manufacturing-quality-gate`  
 **Stack base:** COV-07d / `codex/cov07d-workorder-execution`
+**Current review base:** `e23bac1c0420ae2c15b190a678f2198285fb5df6`
 
 ## Bounded path
 
@@ -26,14 +27,30 @@ path. This gate is explicitly opted into by requiring a check.
 The persisted domain test exercises pending rejection, exact linkage, pass,
 failure exception, blocked completion, and creation/disposition replay.
 
-## Remaining before claiming COV-07e certification
+## Frontend/readback
 
-- Regenerate and publish the versioned IR/contract descriptors for the two new
-  reducers, then wire their BFF commands and the selected workorder's actions.
-- Add canonical exact-check readback with stale and read-only denial browser
-  assertions, following COV-07d's workflow pattern.
-- Run native persisted tests and browser acceptance in an environment with
-  Rust/SpacetimeDB and the pinned contracts. This workspace has no `cargo`.
+The workorder row action now creates, passes, or fails its one owned quality
+check. Each command resolves the exact `(organization, company, workorder)`
+check from `quality-checks`; duplicate matches fail closed and completion is
+only reported after the canonical disposition is visible.
+
+The existing manufacturing workorder browser path now drives the visible row
+actions for the warehouse operator to require and pass the exact in-process
+check. It verifies the canonical quality-check readback in the
+Manufacturing quality tab, proves pending quality blocks finish, rejects
+duplicate creation and disposition replay, and confirms a limited reader cannot
+create or disposition the check. The spec passed in the clean local P0 run on
+`80cbfd29f9c9f4a82a848cd3d873a89d06d01ce4` and in GitHub Actions targeted run
+`37116733371` on final review head
+`e23bac1c0420ae2c15b190a678f2198285fb5df6`. This supplies same-head operator
+runtime and branch-CI evidence, not production or full COV-07 lifecycle
+certification.
+
+The first-org warehouse/manufacturing persona now has the existing reducer's
+required `quality_check:create`, `quality_check:read`, and
+`quality_check:write` permissions. The limited reader remains denied. The
+operations are already present in the pinned contract, so this fixture and
+evidence change does not require a contract release.
 
 Scrap, byproducts, routing depth, and full manufacturing costing remain later
 bounded slices.

@@ -1,7 +1,7 @@
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { expect, type Page } from "@playwright/test"
+import { expect, type Locator, type Page } from "@playwright/test"
 import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
 import { matchesOperationResponse } from "./operation-response"
@@ -36,8 +36,7 @@ export async function signIn(
     .catch(() => false)
 
   if (!emailVisible) {
-    await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
-    await expectNoAppError(page)
+    await expectAuthenticatedShell(page)
     return
   }
 
@@ -46,36 +45,106 @@ export async function signIn(
   await page.getByRole("button", { name: /sign in/i }).click()
 
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
-  await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
-  await expectNoAppError(page)
+  await expectAuthenticatedShell(page)
 }
 
 export async function expectAuthenticatedShell(page: Page) {
-  await expect(page.getByTestId("dashboard-sidebar")).toBeVisible()
+  const mobile = await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches)
+  const navigationToggle = page.getByTestId("workspace-navigation-toggle")
+  let openedNavigation = false
+  if (mobile) {
+    // Mobile navigation is an unmounted drawer until opened. Prove that the
+    // actual authenticated navigation is keyboard reachable before inspecting it.
+    await expect(navigationToggle).toHaveCount(1, { timeout: 30_000 })
+    await expect(navigationToggle).toBeVisible()
+    if ((await navigationToggle.getAttribute("aria-expanded")) !== "true") {
+      await navigationToggle.focus()
+      await expect(navigationToggle).toBeFocused()
+      await navigationToggle.press("Enter")
+      await expect(navigationToggle).toHaveAttribute("aria-expanded", "true")
+      openedNavigation = true
+    }
+  }
+  // While a streamed page is still resolving, its server-rendered shell and the
+  // client shell can briefly coexist; wait for exactly one before asserting on it
+  // (a strict-mode violation is not retried).
+  await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
+  await expect(page.getByTestId("dashboard-sidebar").first()).toBeVisible()
   await expect(page.getByTestId("sidebar-user")).toBeVisible()
   await expect(page.getByTestId("sidebar-sign-out")).toBeVisible()
+  if (openedNavigation) {
+    await page.keyboard.press("Escape")
+    await expect(navigationToggle).toHaveAttribute("aria-expanded", "false")
+    await expect(page.getByTestId("dashboard-sidebar")).toBeHidden()
+    await expect(navigationToggle).toBeFocused()
+  }
   await expectNoAppError(page)
+}
+
+/**
+ * Reload and wait for the streamed page to settle on a single shell: right after
+ * DOMContentLoaded the Suspense fallback and the streamed content can coexist, so
+ * strict test-id locators would see duplicates.
+ */
+export async function reloadSettled(page: Page) {
+  await page.reload({ waitUntil: "domcontentloaded" })
+  await expectAuthenticatedShell(page)
+}
+
+async function expectHydratedModule(page: Page, moduleId: string) {
+  const moduleView = page.getByTestId(`module-view-${moduleId}`)
+  // Next.js may briefly render streamed and client shells together.
+  await expect(moduleView).toHaveCount(1, { timeout: 30_000 })
+  await expect(moduleView).toBeVisible()
+  await expect(moduleView).toHaveAttribute("data-hydrated", "true")
 }
 
 export async function gotoModule(page: Page, route: string, moduleId?: string) {
   await page.goto(route)
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
   await expectAuthenticatedShell(page)
-  if (moduleId) {
-    const moduleView = page.getByTestId(`module-view-${moduleId}`)
-    await expect(moduleView).toBeVisible()
-    await expect(moduleView).toHaveAttribute("data-hydrated", "true")
-  }
+  if (moduleId) await expectHydratedModule(page, moduleId)
 }
 
 /** Select a module tab and wait until its panel is the active interaction surface. */
 export async function selectModuleTab(page: Page, moduleId: string, tabId: string) {
   const tab = page.getByTestId(`module-tab-${moduleId}-${tabId}`)
-  await tab.click()
+  if (await tab.isVisible()) await tab.click()
+  else {
+    // Domain tests use canonical deep links for views outside the current
+    // workspace. Dedicated navigation tests cover workspace/menu interaction.
+    const target = new URL(`/${moduleId}`, page.url())
+    const current = new URL(page.url())
+    for (const [key, value] of current.searchParams) {
+      if (!["tab", "filter", "highlight"].includes(key)) target.searchParams.append(key, value)
+    }
+    if (tabId !== "dashboard") target.searchParams.set("tab", tabId)
+    await page.goto(target.toString())
+    await expectHydratedModule(page, moduleId)
+  }
   await expect(tab).toHaveAttribute("aria-selected", "true")
-  // Base UI may regenerate the tab/tabpanel ids during the state transition.
-  // The selected tab and the single visible panel are the stable behavior.
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1)
+  await expectModuleTabSurface(page, moduleId, tabId)
+}
+
+/** Assert the selected workspace's actual interaction surface. */
+export async function expectModuleTabSurface(page: Page, moduleId: string, tabId: string) {
+  const panel = page.getByTestId(`module-panel-${moduleId}-${tabId}`)
+  await expect(panel).toHaveCount(1)
+  const visiblePanels = page.locator(`[data-testid^="module-panel-${moduleId}-"]:visible`)
+  if (moduleId === "accounting" && tabId === "payment-operations") {
+    // The payment controller stays outside the empty module panel so switching
+    // tabs cannot discard an in-flight allocation or its uncertain result.
+    await expect(visiblePanels).toHaveCount(0)
+    const operations = page.getByRole("region", { name: "Payment operations", exact: true })
+    await expect(operations).toHaveCount(1)
+    await expect(operations).toBeVisible()
+    await expect(operations.getByText("Payment accounts", { exact: true })).toBeVisible()
+    await expect(operations.getByText("Transactions & reconciliation", { exact: true })).toBeVisible()
+    return
+  }
+  // Nested charts and unrelated workspaces can have their own active panels.
+  await expect(visiblePanels).toHaveCount(1)
+  await expect(panel).toBeVisible()
 }
 
 /** Open an entity tab’s create modal and wait for the form dialog. */
@@ -95,7 +164,8 @@ export async function openEntityCreate(
 }
 
 export async function openAccountingTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-accounting-${tabId}`).click()
+  await selectModuleTab(page, "accounting", tabId)
+  await expectNoAppError(page)
 }
 
 /** Click each module tab in order, assert no app error, optionally run per-tab checks. */
@@ -106,7 +176,7 @@ export async function assertModuleTabs(
   assertTab?: (page: Page, tabId: string) => Promise<void>,
 ) {
   for (const tabId of tabIds) {
-    await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+    await selectModuleTab(page, moduleId, tabId)
     await expectNoAppError(page)
     if (assertTab) {
       await assertTab(page, tabId)
@@ -119,9 +189,49 @@ export function activeTabEntityTable(page: Page) {
   return page.locator('[role="tabpanel"]:visible [data-testid="entity-table"]').first()
 }
 
+/**
+ * Row actions only render once a row is selected. Select the first row of the
+ * active table when there is one and expect the actions; with an empty table
+ * expect none to be offered.
+ */
+export async function expectRowActionsOffered(page: Page, actionIds: readonly string[]) {
+  const table = activeTabEntityTable(page)
+  await expect(table).toBeVisible()
+  const firstRow = table.locator('[data-testid^="entity-row-"]').first()
+  const hasRow = await firstRow
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false)
+  for (const actionId of actionIds) {
+    if (!hasRow) {
+      await expect(page.getByTestId(`entity-action-${actionId}`)).toHaveCount(0)
+    }
+  }
+  if (!hasRow) return
+  await firstRow.click()
+  for (const actionId of actionIds) {
+    await expect(page.getByTestId(`entity-action-${actionId}`)).toBeVisible()
+  }
+  // A row click may also open the record sheet; close it so the page stays usable.
+  const dialog = page.getByRole("dialog")
+  if (await dialog.isVisible().catch(() => false)) {
+    await page.keyboard.press("Escape")
+    await expect(dialog).toBeHidden()
+  }
+}
+
 /** Rows in a custom tab panel table (e.g. accounting InvoiceListView). */
 export function activeTabCustomTableRows(page: Page) {
   return page.locator('[role="tabpanel"]:visible table tbody tr')
+}
+
+/** Click an exact record in a custom tab table that exposes the canonical row id. */
+export async function selectCustomTableRowById(page: Page, id: number | string) {
+  const row = page
+    .locator('[role="tabpanel"]:visible')
+    .getByTestId(`entity-row-${id}`)
+  await expect(row).toBeVisible({ timeout: 30_000 })
+  await row.click()
 }
 
 /** Poll a BFF list query until at least `minRows` are returned. */
@@ -264,6 +374,9 @@ export async function dismissBlockingDialogs(page: Page) {
       async () => {
         if ((await overlay.count()) === 0) return true
         await page.keyboard.press("Escape")
+        // An edited form asks before closing; this helper's job is to clear the screen.
+        const discard = page.getByTestId("discard-changes-confirm")
+        if (await discard.isVisible().catch(() => false)) await discard.click()
         return (await overlay.count()) === 0
       },
       { timeout: 15_000 },
@@ -306,7 +419,7 @@ export async function expectSeededText(
     // the current route/tab, but reload once so its query cache is rebuilt from
     // the already-observed projected row.
     try {
-      await page.reload({ waitUntil: "domcontentloaded" })
+      await reloadSettled(page)
       await expect(page.getByText(text).first()).toBeVisible({ timeout: 30_000 })
       return
     } catch (refreshError) {
@@ -328,9 +441,11 @@ export async function openTabAndCancelCreate(
   tabId: string,
   formId: string,
 ) {
-  await page.getByTestId(`module-tab-${moduleId}-${tabId}`).click()
+  await selectModuleTab(page, moduleId, tabId)
+  // The tab switch also updates ?tab=, which can re-render the panel; click
+  // (unlike scrollIntoViewIfNeeded) re-resolves a replaced element.
   const createBtn = page.getByTestId(`module-create-${moduleId}-${tabId}`)
-  await createBtn.scrollIntoViewIfNeeded()
+  await expect(createBtn).toBeVisible()
   await createBtn.click()
   await expect(page.getByTestId(`form-modal-${formId}`)).toBeVisible()
   await page.getByTestId(`form-modal-${formId}`).getByRole("button", { name: /^cancel$/i }).click()
@@ -338,8 +453,20 @@ export async function openTabAndCancelCreate(
   await expectNoAppError(page)
 }
 
-export async function fillField(page: Page, name: string, value: string) {
-  const field = page.getByTestId(`form-field-${name}`)
+export async function fillField(scope: Page | Locator, name: string, value: string) {
+  const field = scope.getByTestId(`form-field-${name}`)
+  await expect(field, `Missing form field "${name}" in the active form`).toHaveCount(1, { timeout: 15_000 })
+  // Textarea retains its test id on the native form bridge. User input belongs
+  // in the visible editor inside that same panel, including within a dialog.
+  if (
+    await field.getAttribute("data-slot") === "textarea" &&
+    await field.getAttribute("aria-hidden") === "true"
+  ) {
+    const editor = field.locator("..").locator('[data-slot="rich-text-editor"]')
+    await editor.click()
+    await editor.fill(value)
+    return
+  }
   await field.click()
   await field.fill(value)
 }
@@ -488,11 +615,11 @@ function isCustomerInvoiceMoveType(value: unknown): boolean {
   return moveTypeTag(value).includes("out")
 }
 
-/** Newest purchase order id for a vendor partner id. */
-export async function fetchLatestPurchaseOrderIdByPartner(
+/** Exact purchase-order id for a unique vendor + origin business key. */
+export async function fetchPurchaseOrderIdByExactOrigin(
   page: Page,
   partnerId: number,
-  origin?: string,
+  origin: string,
 ): Promise<number> {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
@@ -509,18 +636,20 @@ export async function fetchLatestPurchaseOrderIdByPartner(
       const matches = (json.data ?? []).filter(
         (row) =>
           scalarQueryId(row.partnerId ?? row.partner_id) === partnerId &&
-          (origin === undefined || scalarQueryString(row.origin) === origin),
+          scalarQueryString(row.origin) === origin,
       )
-      const newest = [...matches].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(newest?.id)
+      if (matches.length > 1) {
+        throw new Error(
+          `expected one purchase order for partner ${partnerId} and origin ${origin}, found ${matches.length}`,
+        )
+      }
+      const id = scalarQueryId(matches[0]?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
   }
   throw new Error(
-    `purchase order not found for partner id ${partnerId}${origin === undefined ? "" : ` and origin ${origin}`}`,
+    `purchase order not found for partner id ${partnerId} and origin ${origin}`,
   )
 }
 
@@ -542,43 +671,56 @@ export async function waitForPurchaseOrderState(
   throw new Error(`purchase order ${orderId} did not reach state ${state}`)
 }
 
-/** Draft vendor bill move id for a partner display name (newest match). */
-export async function fetchDraftVendorBillMoveIdByPartner(
+/** Draft vendor bill move id owned by one purchase order. */
+export async function fetchDraftVendorBillMoveIdForPurchaseOrder(
   page: Page,
-  partnerName: string,
+  orderId: number,
 ): Promise<number> {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
-    const res = await page.request.get("/api/query/account-moves")
-    if (res.ok()) {
-      const json = (await res.json()) as {
-        data?: Array<{
-          id?: number | string
-          state?: unknown
-          moveType?: unknown
-          move_type?: unknown
-          invoicePartnerDisplayName?: string
-          partnerName?: string
-        }>
+    const ordersRes = await page.request.get("/api/query/purchase-orders")
+    if (ordersRes.ok()) {
+      const ordersJson = (await ordersRes.json()) as {
+        data?: Array<Record<string, unknown>>
       }
-      const matches = (json.data ?? []).filter((m) => {
-        const partner = String(m.invoicePartnerDisplayName ?? m.partnerName ?? "")
-        const isDraft = scalarQueryString(m.state).toLowerCase() === "draft"
-        return (
-          isVendorBillMoveType(m.moveType ?? m.move_type) &&
-          isDraft &&
-          partner.includes(partnerName)
+      const order = (ordersJson.data ?? []).find(
+        (row) => scalarQueryId(row.id) === orderId,
+      )
+      const rawInvoiceIds = order?.invoiceIds ?? order?.invoice_ids
+      const invoiceIds = Array.isArray(rawInvoiceIds)
+        ? rawInvoiceIds.flatMap((value) => {
+            const id = scalarQueryId(value)
+            return id == null ? [] : [id]
+          })
+        : []
+      if (invoiceIds.length > 1) {
+        throw new Error(
+          `expected one vendor bill owned by purchase order ${orderId}, found ${invoiceIds.length}`,
         )
-      })
-      const newest = [...matches].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(newest?.id)
-      if (id != null) return id
+      }
+      const [billId] = invoiceIds
+      if (billId != null) {
+        const movesRes = await page.request.get("/api/query/account-moves")
+        if (movesRes.ok()) {
+          const movesJson = (await movesRes.json()) as {
+            data?: Array<Record<string, unknown>>
+          }
+          const bill = (movesJson.data ?? []).find(
+            (row) => scalarQueryId(row.id) === billId,
+          )
+          if (
+            bill &&
+            isVendorBillMoveType(bill.moveType ?? bill.move_type) &&
+            scalarQueryString(bill.state).toLowerCase() === "draft"
+          ) {
+            return billId
+          }
+        }
+      }
     }
     await page.waitForTimeout(250)
   }
-  throw new Error(`draft vendor bill not found for partner: ${partnerName}`)
+  throw new Error(`draft vendor bill not found for purchase order ${orderId}`)
 }
 
 export async function fetchVendorPartnerIdByName(page: Page, name: string): Promise<number> {
@@ -657,11 +799,60 @@ export async function chooseSelectOptionByLabel(
   await expect
     .poll(
       async () => {
-        await field.click()
+        // Keep an open Radix selector open while its async options load.
+        // Clicking the trigger again closes the selector and can leave its
+        // overlay intercepting the next poll attempt.
+        if (!(await listbox.isVisible().catch(() => false))) {
+          await field.click()
+        }
         if (!(await listbox.isVisible().catch(() => false))) return 0
         return await option.count()
       },
       { timeout: optionTimeoutMs },
+    )
+    .toBeGreaterThan(0)
+
+  await option.click()
+}
+
+/** Pick a shared Select option by its value (`SelectItem` mirrors it as `data-value`). */
+export async function chooseSelectOptionByTriggerValue(
+  page: Page,
+  trigger: Locator,
+  value: string | number | bigint,
+) {
+  const listbox = page.locator('[role="listbox"]:visible')
+  const option = listbox.locator(`[role="option"][data-value="${String(value)}"]`)
+
+  await expect
+    .poll(
+      async () => {
+        if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
+        const count = await option.count()
+        if (count === 0) await page.keyboard.press("Escape")
+        return count
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+
+  await option.click()
+}
+
+/** Pick the first real option of a shared Select located by its trigger. */
+export async function chooseFirstSelectOptionByTrigger(page: Page, trigger: Locator) {
+  const listbox = page.locator('[role="listbox"]:visible')
+  const option = listbox.getByRole("option", { disabled: false }).first()
+
+  await expect
+    .poll(
+      async () => {
+        if (!(await listbox.isVisible().catch(() => false))) await trigger.click()
+        const count = await option.count()
+        if (count === 0) await page.keyboard.press("Escape")
+        return count
+      },
+      { timeout: 30_000 },
     )
     .toBeGreaterThan(0)
 
@@ -675,7 +866,7 @@ export async function submitForm(page: Page, formId: string) {
     await expect(modal).toBeHidden({ timeout: 15_000 })
   } catch {
     const fieldErrors = await modal.locator(".text-destructive, [role='alert']").allTextContents()
-    const toastErrors = await page.getByRole("status").allTextContents().catch(() => [] as string[])
+    const toastErrors = await page.locator('[role="status"], [data-sonner-toast]').allTextContents().catch(() => [] as string[])
     const detail = [...fieldErrors, ...toastErrors].filter(Boolean).join("; ")
     throw new Error(
       `Form "${formId}" did not close after submit${detail ? `: ${detail}` : ""}`,
@@ -759,11 +950,33 @@ export async function waitForEntityActionEnabled(page: Page, actionTestId: strin
   await expect(page.getByTestId(actionTestId)).toBeEnabled({ timeout: 30_000 })
 }
 
+/** Open a sale order's own page and wait for its header. */
+export async function openSaleOrderPage(page: Page, orderId: number | string) {
+  await page.goto(`/sales/orders/${orderId}`)
+  await expect(page.getByTestId("sale-order-title").first()).toBeVisible({ timeout: 30_000 })
+}
+
+/** Start "Create invoice" from a sale order's page and wait for its form. */
+export async function openCreateInvoiceFromOrder(page: Page, orderId: number | string) {
+  await openSaleOrderPage(page, orderId)
+  const action = page.getByTestId("record-workflow-action-sales.order.create-invoice").first()
+  await expect(action).toBeEnabled({ timeout: 30_000 })
+  await action.click()
+  await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible({ timeout: 15_000 })
+}
+
+/** Confirm the table's confirmation dialog, shown after clicking a confirm-gated row action. */
+export async function acceptEntityActionConfirm(page: Page) {
+  const dialog = page.getByTestId("entity-action-confirm")
+  await expect(dialog).toBeVisible({ timeout: 15_000 })
+  await dialog.getByRole("button", { name: "Confirm", exact: true }).click()
+}
+
 /** Click a toolbar action and wait for the matching reducer HTTP call. */
 export async function clickEntityActionAndWaitForReducer(
   page: Page,
   actionTestId: string,
-  reducerName: StdbBffReducerKey,
+  reducerName: StdbBffReducerKey | `erp.${string}`,
   options?: { timeoutMs?: number },
 ) {
   await waitForEntityActionEnabled(page, actionTestId)
@@ -1115,7 +1328,7 @@ export function scalarQueryString(value: unknown): string {
   return String(value)
 }
 
-/** Sale order id linked to a CRM opportunity (prefers opportunity_id in sale-orders query). */
+/** Sale order id linked to one CRM opportunity by the canonical relation. */
 export async function fetchSaleOrderIdByOpportunityId(
   page: Page,
   opportunityId: number,
@@ -1139,48 +1352,16 @@ export async function fetchSaleOrderIdByOpportunityId(
       const byOpportunity = (soJson.data ?? []).filter(
         (order) => scalarQueryId(order.opportunityId ?? order.opportunity_id) === opportunityId,
       )
-      if (byOpportunity.length > 0) {
-        const newest = [...byOpportunity].sort(
-          (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-        )[0]
-        const orderId = scalarQueryId(newest?.id)
+      if (byOpportunity.length > 1) {
+        throw new Error(
+          `expected one sale order for opportunity ${opportunityId}, found ${byOpportunity.length}`,
+        )
+      }
+      if (byOpportunity.length === 1) {
+        const orderId = scalarQueryId(byOpportunity[0]?.id)
         if (orderId != null) return orderId
       }
-
-      // Older projections do not expose opportunity_id. Fall back to the
-      // opportunity's partner, but keep polling because conversion and its
-      // denormalized sale-order row commit independently.
-      const oppRes = await page.request.get("/api/query/opportunities")
-      if (oppRes.ok()) {
-        const oppJson = (await oppRes.json()) as {
-          data?: Array<{
-            id?: number | string
-            partnerId?: unknown
-            partner_id?: unknown
-          }>
-        }
-        const opportunity = oppJson.data?.find(
-          (row) => scalarQueryId(row.id) === opportunityId,
-        )
-        const partnerId = scalarQueryId(opportunity?.partnerId ?? opportunity?.partner_id)
-        if (partnerId != null) {
-          const matches = (soJson.data ?? []).filter(
-            (order) => scalarQueryId(order.partnerId ?? order.partner_id) === partnerId,
-          )
-          const draftMatches = matches.filter(
-            (order) => scalarQueryString(order.state).toLowerCase() === "draft",
-          )
-          const pool = draftMatches.length > 0 ? draftMatches : matches
-          const newest = [...pool].sort(
-            (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-          )[0]
-          const orderId = scalarQueryId(newest?.id)
-          if (orderId != null) return orderId
-          lastError = `sale order not found for opportunity partner: ${partnerId}`
-        } else {
-          lastError = `opportunity ${opportunityId} has no partner_id in query projection`
-        }
-      }
+      lastError = `sale order not found for opportunity: ${opportunityId}`
     } else {
       lastError = `sale-orders query failed: ${soRes.status()}`
     }
@@ -1190,7 +1371,7 @@ export async function fetchSaleOrderIdByOpportunityId(
 }
 
 /** Label shown in sale order select options (reference, else `SO {id}`). */
-export async function fetchLatestPurchaseOrderLineIdByOrder(
+export async function fetchOnlyPurchaseOrderLineId(
   page: Page,
   orderId: number,
 ): Promise<number> {
@@ -1204,10 +1385,12 @@ export async function fetchLatestPurchaseOrderLineIdByOrder(
       const matches = (json.data ?? []).filter(
         (row) => scalarQueryId(row.orderId ?? row.order_id) === orderId,
       )
-      const newest = [...matches].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(newest?.id)
+      if (matches.length > 1) {
+        throw new Error(
+          `expected one purchase order line for order ${orderId}, found ${matches.length}`,
+        )
+      }
+      const id = scalarQueryId(matches[0]?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
@@ -1533,10 +1716,10 @@ export async function fetchProposalIdByTitle(page: Page, title: string): Promise
         data?: Array<{ id?: unknown; title?: string }>
       }
       const matches = (json.data ?? []).filter((row) => String(row.title ?? "") === title)
-      const newest = [...matches].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(newest?.id)
+      if (matches.length > 1) {
+        throw new Error(`expected one proposal titled ${title}, found ${matches.length}`)
+      }
+      const id = scalarQueryId(matches[0]?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
@@ -1597,10 +1780,11 @@ export async function fetchInvoiceMoveDetails(
   throw new Error(`invoice move ${moveId} not found or incomplete in query`)
 }
 
-/** Newest account payment id for a partner (optional state filter: NotPaid | Paid). */
-export async function fetchLatestPaymentIdByPartner(
+/** Exact account-payment id for a stable partner + reference business key. */
+export async function fetchPaymentIdByExactReference(
   page: Page,
   partnerId: number,
+  reference: string,
   options?: { state?: string },
 ): Promise<number> {
   const deadline = Date.now() + 30_000
@@ -1612,27 +1796,30 @@ export async function fetchLatestPaymentIdByPartner(
           id?: unknown
           partnerId?: unknown
           partner_id?: unknown
+          ref?: unknown
+          ref_?: unknown
           state?: unknown
         }>
       }
       const matches = (json.data ?? []).filter((p) => {
         if (scalarQueryId(p.partnerId ?? p.partner_id) !== partnerId) return false
+        if (scalarQueryString(p.ref ?? p.ref_) !== reference) return false
         if (options?.state) {
           return paymentStateFromQuery(p.state) === options.state
         }
         return true
       })
-      if (matches.length > 0) {
-        const newest = [...matches].sort(
-          (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-        )[0]
-        const id = scalarQueryId(newest?.id)
-        if (id != null) return id
+      if (matches.length > 1) {
+        throw new Error(
+          `expected one payment for partner ${partnerId} and reference ${reference}, found ${matches.length}`,
+        )
       }
+      const id = scalarQueryId(matches[0]?.id)
+      if (id != null) return id
     }
     await page.waitForTimeout(250)
   }
-  throw new Error(`payment not found for partner ${partnerId}`)
+  throw new Error(`payment not found for partner ${partnerId} and reference ${reference}`)
 }
 
 /** Poll until payment state is Paid (after post_payment). */
@@ -1652,10 +1839,10 @@ export async function waitForPaymentPosted(page: Page, paymentId: number) {
   throw new Error(`payment ${paymentId} was not posted`)
 }
 
-/** Draft customer invoice move id for a partner display name. */
-export async function fetchDraftInvoiceMoveIdByPartner(
+/** Draft customer invoice move id owned by one sale order. */
+export async function fetchDraftInvoiceMoveIdForSaleOrder(
   page: Page,
-  partnerName: string,
+  orderId: number,
 ): Promise<number> {
   const deadline = Date.now() + 30_000
   while (Date.now() < deadline) {
@@ -1666,28 +1853,29 @@ export async function fetchDraftInvoiceMoveIdByPartner(
           id?: number | string
           state?: string
           moveType?: string
-          invoicePartnerDisplayName?: string
-          partnerName?: string
+          saleOrderId?: unknown
+          sale_order_id?: unknown
         }>
       }
       const matches = (json.data ?? []).filter((m) => {
-        const partner = String(m.invoicePartnerDisplayName ?? m.partnerName ?? "")
         const isDraft = scalarQueryString(m.state).toLowerCase() === "draft"
         return (
           isCustomerInvoiceMoveType(m.moveType) &&
           isDraft &&
-          partner.includes(partnerName)
+          scalarQueryId(m.saleOrderId ?? m.sale_order_id) === orderId
         )
       })
-      const newest = [...matches].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(newest?.id)
+      if (matches.length > 1) {
+        throw new Error(
+          `expected one draft invoice owned by sale order ${orderId}, found ${matches.length}`,
+        )
+      }
+      const id = scalarQueryId(matches[0]?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
   }
-  throw new Error(`draft invoice not found for partner: ${partnerName}`)
+  throw new Error(`draft invoice not found for sale order ${orderId}`)
 }
 
 function unwrapQueryOptionValue(value: unknown): unknown {
@@ -1745,19 +1933,12 @@ export async function fetchDraftCreditNoteMoveIdForInvoice(
       const id = scalarQueryId(match?.id)
       if (id != null) return id
 
-      const fallback = [...(json.data ?? [])]
-        .filter((m) => {
-          const isDraft = scalarQueryString(m.state).toLowerCase() === "draft"
-          const isRefund = moveTypeTag(m.moveType).includes("refund")
-          return isDraft && isRefund
-        })
-        .sort((a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0))[0]
-      const fallbackId = scalarQueryId(fallback?.id)
-      if (fallbackId != null) return fallbackId
     }
     await page.waitForTimeout(250)
   }
-  throw new Error(`draft credit note not found for invoice: ${sourceInvoiceId}`)
+  throw new Error(
+    `draft credit note with exact reversed-entry relation not found for invoice: ${sourceInvoiceId}`,
+  )
 }
 
 /** Post a draft customer credit note (OutRefund) via BFF `post_invoice`. */
@@ -1777,7 +1958,7 @@ export async function postDraftCreditNoteMove(page: Page, creditNoteId: number):
 /** @deprecated Use {@link postDraftCreditNoteMove} — credit notes are not listed on journal entries. */
 export async function postDraftCreditNoteViaGl(page: Page, partnerName: string): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-invoices").click()
+  await openAccountingTab(page, "invoices")
   const rows = activeTabCustomTableRows(page).filter({ hasText: partnerName })
   await expect(rows.first()).toBeVisible({ timeout: 30_000 })
 
@@ -1896,53 +2077,42 @@ export async function openInvoiceDetailModalFromRecordSheet(page: Page): Promise
 }
 
 /** Open invoice detail and post draft via accounting invoices tab. */
-export async function postDraftInvoiceViaUi(page: Page, partnerName: string): Promise<number> {
-  const moveId = await fetchDraftInvoiceMoveIdByPartner(page, partnerName)
-
+export async function postDraftInvoiceViaUi(page: Page, moveId: number): Promise<number> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-invoices").click()
-  const invoiceRow = activeTabCustomTableRows(page).filter({ hasText: partnerName }).first()
-  await expect(invoiceRow).toBeVisible({ timeout: 30_000 })
-  await invoiceRow.click()
+  await openAccountingTab(page, "invoices")
+  await selectCustomTableRowById(page, moveId)
   await openInvoiceDetailModalFromRecordSheet(page)
+  await expect(page.getByTestId("invoice-detail-post-draft")).toBeEnabled({ timeout: 15_000 })
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
-      (res) => matchesOperationResponse(res, "post_invoice") && res.ok(),
+      (res) => matchesOperationResponse(res, "post_invoice"),
       { timeout: 30_000 },
     ),
     page.getByTestId("invoice-detail-post-draft").click(),
   ])
-  expect(postRes.ok()).toBe(true)
+  await expectReducerHttpResponseOk("post_invoice", postRes)
   await waitForMovePosted(page, moveId)
   return moveId
 }
 
-/** Open the newest draft vendor bill for a partner in the accounting Bills tab. */
-async function openDraftVendorBillModal(page: Page, vendorName: string): Promise<void> {
+/** Open one exact draft vendor bill in the accounting Bills tab. */
+async function openDraftVendorBillModal(page: Page, billId: number): Promise<void> {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-bills").click()
+  await openAccountingTab(page, "bills")
   // The bill projection is available through the API before the accounting
   // list's query cache necessarily sees it. Rebuild the page once after the
-  // tab is active so all three procure-to-pay row-visibility flows use fresh
-  // data before selecting the newest Draft row.
-  await page.reload({ waitUntil: "domcontentloaded" })
-  await page.getByTestId("module-tab-accounting-bills").click()
-  const billRow = activeTabCustomTableRows(page)
-    .filter({ hasText: vendorName })
-    .filter({ has: page.getByText("Draft", { exact: true }) })
-    .last()
-  await expect(billRow).toBeVisible({ timeout: 30_000 })
-  await billRow.click()
+  // tab is active so all procure-to-pay row-visibility flows use fresh data.
+  await reloadSettled(page)
+  await openAccountingTab(page, "bills")
+  await selectCustomTableRowById(page, billId)
   await openInvoiceDetailModalFromRecordSheet(page)
-  await expect(page.getByTestId("invoice-detail-post-draft")).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByTestId("invoice-detail-post-draft")).toBeEnabled({ timeout: 15_000 })
 }
 
 /** Open vendor bill detail and post draft via accounting bills tab. */
-export async function postDraftBillViaUi(page: Page, vendorName: string): Promise<number> {
-  const moveId = await fetchDraftVendorBillMoveIdByPartner(page, vendorName)
-
-  await openDraftVendorBillModal(page, vendorName)
+export async function postDraftBillViaUi(page: Page, moveId: number): Promise<number> {
+  await openDraftVendorBillModal(page, moveId)
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
@@ -1959,12 +2129,10 @@ export async function postDraftBillViaUi(page: Page, vendorName: string): Promis
 /** Open vendor bill detail and expect post to fail (e.g. three-way match guard). */
 export async function expectPostDraftBillRejected(
   page: Page,
-  vendorName: string,
+  billId: number,
   errorPattern?: RegExp,
 ): Promise<void> {
-  await fetchDraftVendorBillMoveIdByPartner(page, vendorName)
-
-  await openDraftVendorBillModal(page, vendorName)
+  await openDraftVendorBillModal(page, billId)
 
   const [postRes] = await Promise.all([
     page.waitForResponse(
@@ -2240,10 +2408,12 @@ export async function fetchOrgPermissionId(
               (r) => scalarQueryId(r.roleId ?? r.role_id) === options.roleId,
             )
           : matches
-      const row = scoped.sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(row?.id)
+      if (scoped.length > 1) {
+        throw new Error(
+          `expected one org permission for resource ${resource}, found ${scoped.length}`,
+        )
+      }
+      const id = scalarQueryId(scoped[0]?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
@@ -2280,9 +2450,6 @@ export async function waitForOrgPermissionAbsent(
 
 export async function revokePermissionViaSettings(page: Page, permissionId: number) {
   await gotoModule(page, "/settings")
-  page.once("dialog", (dialog) => {
-    void dialog.accept()
-  })
   await page.getByTestId("settings-admin-action-revokePermission").click()
   await expect(page.getByTestId("form-modal-settings-revoke-permission")).toBeVisible()
   await fillField(page, "permissionId", String(permissionId))
@@ -2291,7 +2458,14 @@ export async function revokePermissionViaSettings(page: Page, permissionId: numb
       (r) => matchesOperationResponse(r, "revoke_permission") && r.ok(),
       { timeout: 30_000 },
     ),
-    submitForm(page, "settings-revoke-permission"),
+    (async () => {
+      // The form stays open while the in-app confirmation is showing, so click through it
+      // before waiting for the form to close (submitForm would time out first).
+      await page.getByTestId("form-submit-settings-revoke-permission").click()
+      await page.getByTestId("confirm-dialog-confirm").click()
+      await expect(page.getByTestId("form-modal-settings-revoke-permission")).toBeHidden({ timeout: 15_000 })
+      await expectNoAppError(page)
+    })(),
   ])
   expect(res.ok()).toBe(true)
 }
@@ -2306,7 +2480,7 @@ export async function openFormConfigLeadForm(page: Page) {
 export async function fetchCrmNewLeadFormConfigId(page: Page): Promise<number | null> {
   const orgId = await fetchSessionOrganizationId(page)
   const res = await page.request.get(`/api/query/form-configs?organizationId=${orgId}`)
-  if (!res.ok()) return null
+  if (!res.ok()) throw new Error(`form configs query failed: ${res.status()}`)
   const json = (await res.json()) as { data?: Record<string, unknown>[] }
   const row = (json.data ?? []).find(
     (r) =>
@@ -2320,32 +2494,24 @@ export async function fetchCrmNewLeadFormConfigId(page: Page): Promise<number | 
 export async function ensureFormConfigDbFromRegistry(page: Page) {
   await openFormConfigLeadForm(page)
   const addField = page.getByTestId("form-config-add-field")
-  if (await addField.isEnabled({ timeout: 5_000 }).catch(() => false)) return
-
   const existingId = await fetchCrmNewLeadFormConfigId(page)
-  const pushBtn = page.getByTestId("form-config-push-registry")
-  if (existingId == null && (await pushBtn.isEnabled({ timeout: 10_000 }).catch(() => false))) {
-    await Promise.all([
+  if (existingId == null) {
+    const pushBtn = page.getByTestId("form-config-push-registry")
+    await expect(pushBtn).toBeEnabled({ timeout: 10_000 })
+    const [published] = await Promise.all([
       page.waitForResponse(
-        (r) =>
-          matchesOperationResponse(r, "create_form_configuration") ||
-          matchesOperationResponse(r, "add_form_field"),
-        { timeout: 90_000 },
+        (response) => matchesOperationResponse(response, "publish_form_configuration"),
+        { timeout: 30_000 },
       ),
       pushBtn.click(),
-    ]).catch(() => {})
+    ])
+    expect(published.ok(), `form publication failed: ${published.status()}`).toBe(true)
+    await expect
+      .poll(() => fetchCrmNewLeadFormConfigId(page), { timeout: 30_000 })
+      .not.toBeNull()
   }
 
-  await expect
-    .poll(
-      async () => {
-        await page.getByRole("button", { name: /refresh/i }).click().catch(() => {})
-        await page.waitForTimeout(300)
-        return addField.isEnabled()
-      },
-      { timeout: 60_000 },
-    )
-    .toBeTruthy()
+  await expect(addField).toBeEnabled({ timeout: 30_000 })
 }
 
 export async function addCustomFormFieldViaSettings(
@@ -2409,23 +2575,28 @@ export async function addCustomFormFieldViaSettings(
       const parsed = JSON.parse(String(value ?? "[]")) as unknown
       return Array.isArray(parsed) ? parsed.map(String) : []
     }
-    const enabledFields = stringArray(
-      adminRegistryConfig.enabledFieldsJson ?? adminRegistryConfig.enabled_fields_json,
-    )
-    await callReducerBff(page, "set_form_role_config", [
-      orgId,
-      configId,
-      {
-        role_id: String(adminRoleId),
-        enabled_fields: [...new Set([...enabledFields, fieldId])],
-        required_fields: stringArray(
-          adminRegistryConfig.requiredFieldsJson ?? adminRegistryConfig.required_fields_json,
-        ),
-        default_prompts: stringArray(
-          adminRegistryConfig.defaultPromptsJson ?? adminRegistryConfig.default_prompts_json,
-        ),
-      },
-    ])
+    // The runtime may use the registry role or its persisted numeric identity.
+    // Preserve each role's current visibility policy when adding a fixture field.
+    for (const roleId of new Set(["role-admin", String(adminRoleId)])) {
+      const current = (roleConfigsJson.data ?? []).find(
+        (row) =>
+          scalarQueryId(row.configurationId ?? row.configuration_id) === configId &&
+          String(row.roleId ?? row.role_id) === roleId,
+      ) ?? adminRegistryConfig
+      await callReducerBff(page, "set_form_role_config", [
+        orgId,
+        configId,
+        {
+          role_id: roleId,
+          enabled_fields: [...new Set([
+            ...stringArray(current.enabledFieldsJson ?? current.enabled_fields_json),
+            fieldId,
+          ])],
+          required_fields: stringArray(current.requiredFieldsJson ?? current.required_fields_json),
+          default_prompts: stringArray(current.defaultPromptsJson ?? current.default_prompts_json),
+        },
+      ])
+    }
     await openFormConfigLeadForm(page)
     await expect(page.getByTestId(`form-config-field-row-${fieldId}`)).toBeVisible({
       timeout: 30_000,
@@ -2533,14 +2704,14 @@ export async function expectMailMessageForRecord(
 
 export async function openFiscalSetupWizard(page: Page) {
   await gotoModule(page, "/accounting", "accounting")
-  await page.getByTestId("module-tab-accounting-fiscal-years").click()
+  await openAccountingTab(page, "fiscal-years")
   await page.getByTestId("entity-action-fy-setup-wizard").click()
   await expect(page.getByTestId("form-modal-fiscal-setup-wizard")).toBeVisible()
 }
 
 export async function savePivotReportViaUi(page: Page, name: string) {
   await gotoModule(page, "/reports", "reports")
-  await page.getByTestId("module-tab-reports-pivot-explorer").click()
+  await selectModuleTab(page, "reports", "pivot-explorer")
   await page.getByTestId("pivot-report-name").fill(name)
   const saveBtn = page.getByTestId("pivot-save-report")
   await expect(saveBtn).toBeEnabled({ timeout: 15_000 })
@@ -2605,14 +2776,12 @@ export async function fetchSavedReportIdByName(page: Page, name: string): Promis
     if (res.ok()) {
       const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
       const rows = json.data ?? []
-      const row = rows.find((r) => String(r.name ?? "").trim() === name.trim())
-      const id = scalarQueryId(row?.id)
+      const matches = rows.filter((r) => String(r.name ?? "").trim() === name.trim())
+      if (matches.length > 1) {
+        throw new Error(`expected one saved report named ${name}, found ${matches.length}`)
+      }
+      const id = scalarQueryId(matches[0]?.id)
       if (id != null) return id
-      const newest = [...rows].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const newestId = scalarQueryId(newest?.id)
-      if (newestId != null && String(newest?.name ?? "").trim() === name.trim()) return newestId
     }
     await page.waitForTimeout(250)
   }
@@ -2643,7 +2812,7 @@ export async function generateVatReportViaUi(
   options: { name: string; dateFrom: string; dateTo: string },
 ) {
   await gotoModule(page, "/reports", "reports")
-  await page.getByTestId("module-tab-reports-vat-report").click()
+  await selectModuleTab(page, "reports", "vat-report")
   await page.getByLabel(/name/i).first().fill(options.name)
   await page.locator('input[type="date"]').first().fill(options.dateFrom)
   await page.locator('input[type="date"]').nth(1).fill(options.dateTo)
@@ -2838,7 +3007,7 @@ export async function waitForWorkflowVersionStatus(
 /** Seed a minimal publishable linear draft (start → end) via BFF reducers. */
 export async function seedPublishableWorkflowDraft(
   page: Page,
-  options?: { workflowKey?: string; model?: string; name?: string },
+  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string; companyId?: number },
 ): Promise<{
   organizationId: number
   companyId: number
@@ -2848,7 +3017,7 @@ export async function seedPublishableWorkflowDraft(
   draftRevision: number
 }> {
   const organizationId = await fetchSessionOrganizationId(page)
-  const companyId = await fetchDefaultCompanyId(page)
+  const companyId = options?.companyId ?? await fetchDefaultCompanyId(page)
   const workflowKey = (options?.workflowKey ?? smokeName("wf")).toLowerCase().replace(/-/g, "_")
   const model = options?.model ?? "e2e.subject"
   const name = options?.name ?? `E2E ${workflowKey}`
@@ -2903,7 +3072,9 @@ export async function seedPublishableWorkflowDraft(
       fromNodeKey: "start",
       toNodeKey: "end",
       sequence: 1,
-      signalKey: WORKFLOW_NONE,
+      signalKey: options?.signalKey
+        ? WORKFLOW_SOME(options.signalKey)
+        : WORKFLOW_NONE,
       condition: WORKFLOW_NONE,
       metadata: WORKFLOW_NONE,
     },
@@ -2912,7 +3083,7 @@ export async function seedPublishableWorkflowDraft(
 
   // BFF seed bypasses React Query mutations — hard reload clears the 30s stale cache.
   await gotoModule(page, "/workflows", "workflows")
-  await page.reload({ waitUntil: "domcontentloaded" })
+  await reloadSettled(page)
   await expectAuthenticatedShell(page)
 
   return {
@@ -2944,14 +3115,16 @@ export async function seedPurchaseOrderApprovalWorkflow(
       kind: { tag: "HumanTask" },
       sequence: 2,
       action: WORKFLOW_NONE,
-      taskPolicy: { some: {
-        kind: { tag: "ApproveReject" },
-        assignment: { tag: "AnyCandidate" },
-        candidateRoleIds: [candidateRoleId],
-        candidateGroupIds: [],
-        candidateUnitIds: [],
-        requireCommentOnReject: true,
-      } },
+      taskPolicy: {
+        some: {
+          kind: { tag: "ApproveReject" },
+          assignment: { tag: "AnyCandidate" },
+          candidateRoleIds: [candidateRoleId],
+          candidateGroupIds: [],
+          candidateUnitIds: [],
+          requireCommentOnReject: true,
+        },
+      },
     },
     {
       nodeKey: "confirm",
@@ -3035,9 +3208,121 @@ export async function seedPurchaseOrderApprovalWorkflow(
   }
 }
 
+/** Publish a company-scoped approval workflow for the guarded Sales confirm action. */
+export async function seedSaleOrderApprovalWorkflow(
+  page: Page,
+  options: { workflowKey: string; name: string; companyId?: number },
+): Promise<{ organizationId: number; versionId: number; revision: number }> {
+  const seeded = await seedPublishableWorkflowDraft(page, {
+    ...options,
+    model: "sale_order",
+  })
+  const candidateRoleId = await fetchAdminRoleId(page)
+  let revision = seeded.draftRevision
+
+  for (const node of [
+    {
+      nodeKey: "approval",
+      name: "Approve sale order",
+      kind: { tag: "HumanTask" },
+      sequence: 2,
+      action: WORKFLOW_NONE,
+      taskPolicy: { some: {
+        kind: { tag: "ApproveReject" },
+        assignment: { tag: "AnyCandidate" },
+        candidateRoleIds: [candidateRoleId],
+        candidateGroupIds: [],
+        candidateUnitIds: [],
+        requireCommentOnReject: true,
+      } },
+    },
+    {
+      nodeKey: "confirm",
+      name: "Confirm sale order",
+      kind: { tag: "Action" },
+      sequence: 3,
+      action: {
+        some: {
+          actionKey: "confirm_sales_order",
+          inputSchemaVersion: 1,
+          input: [],
+        },
+      },
+      taskPolicy: WORKFLOW_NONE,
+    },
+  ]) {
+    await callReducerOwner("upsert_workflow_node", [
+      seeded.organizationId,
+      seeded.versionId,
+      revision,
+      {
+        ...node,
+        splitKind: { tag: "None" },
+        joinKind: { tag: "None" },
+        timerPolicy: WORKFLOW_NONE,
+        retryPolicy: WORKFLOW_NONE,
+        subflow: WORKFLOW_NONE,
+        metadata: WORKFLOW_NONE,
+      },
+    ])
+    revision += 1
+  }
+
+  for (const edge of [
+    {
+      edgeKey: "e_start_end",
+      fromNodeKey: "start",
+      toNodeKey: "approval",
+      sequence: 1,
+      signalKey: WORKFLOW_NONE,
+    },
+    {
+      edgeKey: "e_approval_confirm",
+      fromNodeKey: "approval",
+      toNodeKey: "confirm",
+      sequence: 2,
+      signalKey: { some: "approved" },
+    },
+    {
+      edgeKey: "e_approval_reject",
+      fromNodeKey: "approval",
+      toNodeKey: "end",
+      sequence: 3,
+      signalKey: { some: "rejected" },
+    },
+    {
+      edgeKey: "e_confirm_end",
+      fromNodeKey: "confirm",
+      toNodeKey: "end",
+      sequence: 4,
+      signalKey: WORKFLOW_NONE,
+    },
+  ]) {
+    await callReducerOwner("upsert_workflow_edge", [
+      seeded.organizationId,
+      seeded.versionId,
+      revision,
+      { ...edge, condition: WORKFLOW_NONE, metadata: WORKFLOW_NONE },
+    ])
+    revision += 1
+  }
+
+  await callReducerBff(page, "publish_workflow_version", [
+    seeded.organizationId,
+    seeded.versionId,
+    revision,
+  ])
+  await waitForWorkflowVersionStatus(page, seeded.versionId, "Published")
+  return {
+    organizationId: seeded.organizationId,
+    versionId: seeded.versionId,
+    revision,
+  }
+}
+
 export async function openWorkflowVersionRow(page: Page, versionId: number) {
   await gotoModule(page, "/workflows", "workflows")
-  await page.getByTestId("module-tab-workflows-versions").click()
+  await selectModuleTab(page, "workflows", "versions")
   const row = activeTabEntityTable(page).getByTestId(`entity-row-${versionId}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
   await row.click()

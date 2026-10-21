@@ -56,7 +56,7 @@ export type ColumnType =
   | "percent"
   | "custom"
 
-export type BadgeVariant = "default" | "secondary" | "destructive" | "outline"
+export type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info"
 
 // ─── Column (table view) ────────────────────────────────────────────────────
 
@@ -72,8 +72,28 @@ export interface EntityColumn extends EntityPermissioned {
   badgeVariants?: Record<string, string>
   /** Map raw value → display label for type="badge" */
   badgeLabels?: Record<string, string>
+  /**
+   * For `type: "currency"`: the row field holding the row's ISO 4217 code (e.g. "EUR"). The cell
+   * formats with that currency when the field is such a code and falls back to USD otherwise
+   * (numeric currency ids are not resolved here).
+   */
+  currencyKey?: string
+  /** Secret or masked values (e.g. statutory IDs): never written by the table's CSV export. */
+  sensitive?: boolean
   /** Override rendering entirely */
   render?: (value: unknown, row: EntityRow) => ReactNode
+  /** Makes the cell editable in place (double-click). The caller owns the write. */
+  inlineEdit?: EntityInlineEdit
+}
+
+export interface EntityInlineEdit {
+  kind: "text" | "number" | "select"
+  /** Choices for `kind: "select"`. */
+  options?: Array<{ value: string; label: string }>
+  /** Rows the cell may be edited on (e.g. only drafts). Defaults to every row. */
+  canEdit?: (row: EntityRow) => boolean
+  /** Persists the new value; a rejection puts the old value back and shows the error. */
+  save: (row: EntityRow, value: string | number) => Promise<unknown>
 }
 
 // ─── Filter ─────────────────────────────────────────────────────────────────
@@ -84,6 +104,11 @@ export interface EntityFilter {
   type: "select" | "text"
   options?: Array<{ value: string; label: string }>
   placeholder?: string
+  /**
+   * Shows the options as a multi-select facet (checkboxes with row counts) instead of a single
+   * select. Rows matching any ticked option pass.
+   */
+  faceted?: boolean
 }
 
 // ─── Action ─────────────────────────────────────────────────────────────────
@@ -100,14 +125,41 @@ export interface EntityAction extends EntityPermissioned {
    * disabled. Never a permission check — the server re-validates every command.
    */
   isApplicable?: (selectedRows: EntityRow[]) => boolean
+  /**
+   * Which selections the action accepts, for actions with `requiresSelection`. "single" (the
+   * default) is disabled while more than one row is selected, so an action that only reads the
+   * first row never silently ignores the rest; "multiple" receives every selected row.
+   */
+  selection?: "single" | "multiple"
   /** Ask before running: the table shows this dialog and only calls `onClick` on confirm. */
   confirm?: EntityActionConfirmation
-  onClick: (selectedRows: EntityRow[]) => void
+  /** Toast shown when `onClick` completes without throwing. */
+  successMessage?: string
+  /**
+   * Return the promise of the work: the table keeps the button pending until it settles and
+   * reports a rejection as an error toast. Actions that handle their own errors may swallow them.
+   */
+  onClick: (selectedRows: EntityRow[]) => void | Promise<unknown>
+}
+
+/** An entry of a row's "⋯" menu; it acts on that one row. */
+export interface EntityRowAction extends EntityPermissioned {
+  id: string
+  label: string
+  icon?: ComponentType<{ className?: string }>
+  /** Styles the item as destructive (delete, cancel). */
+  destructive?: boolean
+  /** Presentation-only: false disables the item for this row. */
+  isApplicable?: (row: EntityRow) => boolean
+  confirm?: EntityActionConfirmation
+  successMessage?: string
+  onClick: (row: EntityRow) => void | Promise<unknown>
 }
 
 export interface EntityActionConfirmation {
   title: string
-  description: string
+  /** Text, or a function of the selected rows for wording that depends on the selection. */
+  description: string | ((selectedRows: EntityRow[]) => string)
   confirmLabel: string
   cancelLabel: string
 }
@@ -121,6 +173,8 @@ export interface EntityTableConfig {
   rowKey?: string
   /** When set, filter UI state is persisted in localStorage under this key. */
   listViewKey?: string
+  /** Explicitly enable export for a reviewed list. Defaults to false. */
+  allowExport?: boolean
   searchable?: boolean
   searchPlaceholder?: string
   searchKeys?: string[]
@@ -132,6 +186,10 @@ export interface EntityTableConfig {
    * Set false when toolbar actions (e.g. import) should not hijack row clicks.
    */
   rowSelectionToggleOnClick?: boolean
+  /** Shows row checkboxes even without selection actions (e.g. to export the selection). */
+  selectable?: boolean
+  /** Per-row "⋯" menu in a trailing column. */
+  rowActions?: EntityRowAction[]
   emptyMessage?: string
   emptyState?: {
     title?: string
@@ -139,6 +197,16 @@ export interface EntityTableConfig {
     actionLabel?: string
     onAction?: () => void
     icon?: ReactNode
+    /** Gates `onAction`: without it the CTA is replaced by `readOnlyMessage`. */
+    permission?: EntitySurfacePermission
+    /** `id` of an `actions` entry used as the primary CTA; it reuses that action's permission and handler. */
+    primaryActionId?: string
+    /** `id` of an `actions` entry offered next to the primary CTA, e.g. a CSV import. */
+    secondaryActionId?: string
+    /** A short "why this matters" or "learn how" line under the CTAs. */
+    learnHint?: string
+    /** Shown instead of the CTA when the user may not create records. */
+    readOnlyMessage?: string
   }
 }
 
@@ -170,6 +238,8 @@ export interface EntityDetailConfig {
 
 export interface EntityBoardCardConfig {
   titleKey: string
+  /** Display title when the raw `titleKey` value is not what the table shows (e.g. a formatted name). */
+  title?: (row: EntityRow) => string
   fields?: EntityColumn[]
   footerFields?: EntityColumn[]
   render?: (row: EntityRow) => ReactNode
@@ -181,6 +251,35 @@ export interface EntityBoardConfig {
   rowKey?: string
   card: EntityBoardCardConfig
   emptyColumnMessage?: string
+  /** Title of the read-only board's catch-all column for rows whose state has no column. */
+  otherColumnLabel?: string
+  /** Placeholder of the read-only board's search box. */
+  searchPlaceholder?: string
+}
+
+// ─── Pivot view config ───────────────────────────────────────────────────────
+
+export interface EntityPivotConfig {
+  /** Keys to group by: filter keys with options, or columns with badge labels. */
+  groupKeys: string[]
+  /** Numeric column keys that are summed per group (the first one is graphed). */
+  measureKeys: string[]
+  /** Row field holding the row's currency; when present and mixed, a note is shown. */
+  currencyKey?: string
+  labels: {
+    groupBy: string
+    columnsBy: string
+    none: string
+    count: string
+    total: string
+    empty: string
+    noData: string
+    /** Receives the currencies found on the rows. */
+    mixedCurrencies: (currencies: string[]) => string
+    chartTitle: (measure: string) => string
+    /** Label of the CSV export button; defaults to "Export CSV". */
+    exportCsv?: string
+  }
 }
 
 // ─── Table + board hybrid ────────────────────────────────────────────────────
@@ -193,8 +292,12 @@ export interface EntityTableBoardViewConfig {
   viewToggleLabels?: {
     table: string
     board: string
+    /** Only needed when `pivot` is set. */
+    pivot?: string
     ariaLabel?: string
   }
+  /** Offers a third, summary (pivot) view in the toggle. */
+  pivot?: EntityPivotConfig
   /** Default surface when the tab opens */
   defaultView?: "table" | "board"
 }

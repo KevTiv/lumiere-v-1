@@ -16,13 +16,8 @@ import {
   defaultPolicies,
   actionsMatch,
   resourcesMatch,
-  isAdminRoleName,
   roleHasWildcardPermission,
 } from "./rbac-defaults"
-
-/** When true, UI RBAC checks always pass (pair with server `ensureDevAdmin` in alpha). */
-const DEV_ADMIN_RBAC_BYPASS =
-  typeof process !== "undefined" && process.env.NEXT_PUBLIC_DEV_ADMIN === "true"
 
 const RBACContext = createContext<RBACContextType | null>(null)
 
@@ -33,6 +28,8 @@ interface RBACProviderProps {
   initialPolicies?: PolicyRule[]
   /** Seed demo users/roles when props are omitted (storybook/dev only). Default false. */
   useDefaultFixtures?: boolean
+  /** Set false while roles/policies are loading from the backend. Defaults to true. */
+  permissionsReady?: boolean
 }
 
 export function RBACProvider({
@@ -41,6 +38,7 @@ export function RBACProvider({
   initialRoles,
   initialPolicies,
   useDefaultFixtures = false,
+  permissionsReady = true,
 }: RBACProviderProps) {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     if (initialUser !== undefined) return initialUser
@@ -79,8 +77,11 @@ export function RBACProvider({
     const userRoles = activeRoles.filter((r) => user.roles.includes(r.id))
     const rolePolicies = userRoles.flatMap((r) => r.permissions)
     
-    // Also get direct user policies
-    const directPolicies = policies.filter((p) => p.subject === user.id)
+    // Policies can target the user directly or any effective role assigned to
+    // the user (including supplemental role assignments).
+    const directPolicies = policies.filter(
+      (p) => p.subject === user.id || user.roles.includes(p.subject),
+    )
     
     return [...rolePolicies, ...directPolicies]
   }, [activeRoles, policies])
@@ -90,18 +91,11 @@ export function RBACProvider({
     resource: Resource, 
     action: Action
   ): PermissionCheckResult => {
-    if (DEV_ADMIN_RBAC_BYPASS) {
-      return { allowed: true, reason: "NEXT_PUBLIC_DEV_ADMIN" }
-    }
-
     if (!currentUser) {
       return { allowed: false, reason: "No user logged in" }
     }
 
-    const userRoles = activeRoles.filter((role) => currentUser.roles.includes(role.id))
-    if (userRoles.some((role) => isAdminRoleName(role.name))) {
-      return { allowed: true, reason: "Allowed by admin role" }
-    }
+    if (currentUser.isSuperuser) return { allowed: true, reason: "Platform superuser" }
 
     const applicablePolicies = getUserPolicies(currentUser)
     
@@ -144,14 +138,12 @@ export function RBACProvider({
   }, [currentUser])
 
   const isAdmin = useCallback((): boolean => {
-    if (DEV_ADMIN_RBAC_BYPASS) return true
     if (!currentUser) return false
 
     const userRoles = activeRoles.filter((role) => currentUser.roles.includes(role.id))
 
-    if (userRoles.some((role) => isAdminRoleName(role.name))) return true
+    if (currentUser.isSuperuser) return true
     if (userRoles.some((role) => roleHasWildcardPermission(role))) return true
-    if (currentUser.roles.includes("role-admin")) return true
 
     return false
   }, [currentUser, activeRoles])
@@ -163,7 +155,8 @@ export function RBACProvider({
     checkPermission,
     hasRole,
     isAdmin,
-  }), [currentUser, roles, policies, checkPermission, hasRole, isAdmin])
+    permissionsReady,
+  }), [currentUser, roles, policies, checkPermission, hasRole, isAdmin, permissionsReady])
 
   // Expose setters for admin components
   const extendedContext = useMemo(() => ({

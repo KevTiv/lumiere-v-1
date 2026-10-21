@@ -70,8 +70,8 @@ export function classifyHttpFailure(status: number, message: string): WorkflowEr
   // The API server reports reducer rejections as 422 (never 409), so "already done" wording is the
   // only signal that a replayed command had in fact been applied.
   if (status === 400 || status === 422) return ALREADY_APPLIED.test(message) ? "already_applied" : "validation"
-  // The server said the dependency is unavailable, so the write was not attempted.
-  if (status === 502 || status === 503 || status === 504) return "retryable_transport"
+  // A server failure is not proof that the upstream write was never attempted.
+  if (status >= 500 && status <= 599) return "outcome_unknown"
   return "server_failure"
 }
 
@@ -97,7 +97,13 @@ export function workflowErrorFromResponse(status: number, body: string, fallback
  * non-idempotent write's outcome is unknown; an idempotent one can simply be retried.
  */
 export function toWorkflowError(error: unknown, options?: { idempotent?: boolean }): WorkflowError {
-  if (error instanceof WorkflowError) return error
+  if (error instanceof WorkflowError) {
+    if (error.kind === "outcome_unknown" && options?.idempotent
+      && error.status !== undefined && error.status >= 500 && error.status <= 599) {
+      return new WorkflowError("retryable_transport", error.message, { status: error.status, cause: error })
+    }
+    return error
+  }
   const message = error instanceof Error ? error.message : String(error)
   if (error instanceof TypeError || (error instanceof Error && error.name === "AbortError")) {
     return new WorkflowError(options?.idempotent ? "retryable_transport" : "outcome_unknown", message, {

@@ -31,6 +31,7 @@ pub fn test_guarded_action_registry(ctx: &ReducerContext) -> Result<(), String> 
     replays_all_seven_actions_and_rejects_changed_revision(ctx)?;
     executes_payment_and_order_once(ctx)?;
     rejects_unbalanced_locked_and_cross_company_actions(ctx)?;
+    rejects_material_reference_mutations(ctx)?;
     Ok(())
 }
 
@@ -215,6 +216,7 @@ fn executes_payment_and_order_once(ctx: &ReducerContext) -> Result<(), String> {
         company_id: fixture.company_id,
         name: None,
         move_id: None,
+        reversal_move_id: None,
         payment_type: PaymentType::InBound,
         partner_type: PartnerType::Customer,
         partner_id: fixture.partner_id,
@@ -434,6 +436,156 @@ fn execution_params(
         idempotency_key: idempotency_key.to_string(),
         execution_reason: None,
     }
+}
+
+fn rejects_material_reference_mutations(ctx: &ReducerContext) -> Result<(), String> {
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let order = insert_draft_purchase_order(ctx, &fixture)?;
+    let action = GuardedActionKey::SendPurchaseOrder;
+    let input = GuardedActionInput::SendPurchaseOrder { order_id: order.id };
+    let original = snapshot_guarded_action(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        action.clone(),
+        GUARDED_ACTION_SCHEMA_VERSION,
+        input.clone(),
+    )?;
+    let receipt_count = ctx.db.guarded_action_receipt().iter().count();
+    for case in 0..6 {
+        let mut changed = ctx
+            .db
+            .purchase_order()
+            .id()
+            .find(&order.id)
+            .ok_or("order missing")?;
+        match case {
+            0 => changed.partner_id = order.partner_id + 10_000,
+            1 => changed.partner_ref = Some("changed supplier quote reference".to_string()),
+            2 => changed.payment_term_id = Some(10_000),
+            3 => changed.dest_address_id = Some(10_000),
+            4 => changed.partner_ref = Some("<null>".to_string()),
+            _ => changed.match_price_tolerance = Some(250.0),
+        }
+        ctx.db.purchase_order().id().update(changed);
+        let error = execute_guarded_action(
+            ctx,
+            execution_params(
+                &original,
+                action.clone(),
+                input.clone(),
+                &format!("changed-purchase-reference-{case}-{}", order.id),
+            ),
+        )
+        .err()
+        .ok_or("changed PO reference consumed an old approval")?;
+        if !error.contains("revision")
+            || ctx.db.guarded_action_receipt().iter().count() != receipt_count
+        {
+            return Err(format!(
+                "changed PO reference did not fail without an effect: {error}"
+            ));
+        }
+        let mut restored = ctx
+            .db
+            .purchase_order()
+            .id()
+            .find(&order.id)
+            .ok_or("order missing")?;
+        restored.partner_id = order.partner_id;
+        restored.partner_ref = order.partner_ref.clone();
+        restored.payment_term_id = order.payment_term_id;
+        restored.dest_address_id = order.dest_address_id;
+        restored.match_price_tolerance = order.match_price_tolerance;
+        ctx.db.purchase_order().id().update(restored);
+    }
+
+    let (bank_journal_id, _) = crate::accounting_tests::helpers::seed_bank_journal(ctx, &fixture)?;
+    let payment = ctx.db.account_payment().insert(AccountPayment {
+        id: 0,
+        organization_id: fixture.organization_id,
+        company_id: fixture.company_id,
+        name: None,
+        move_id: None,
+        reversal_move_id: None,
+        payment_type: PaymentType::OutBound,
+        partner_type: PartnerType::Supplier,
+        partner_id: order.partner_id,
+        amount: 123.0,
+        currency_id: order.currency_id,
+        date: ctx.timestamp,
+        journal_id: bank_journal_id,
+        ref_: Some("approved-reference".to_string()),
+        memo: Some("approved-memo".to_string()),
+        reconciled_invoice_ids: vec![],
+        reconciled_bill_ids: vec![],
+        state: PaymentState::NotPaid,
+        created_at: ctx.timestamp,
+        create_uid: ctx.sender(),
+    });
+    let action = GuardedActionKey::PostPayment;
+    let input = GuardedActionInput::PostPayment {
+        payment_id: payment.id,
+    };
+    let original = snapshot_guarded_action(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        action.clone(),
+        GUARDED_ACTION_SCHEMA_VERSION,
+        input.clone(),
+    )?;
+    for case in 0..3 {
+        let mut changed = ctx
+            .db
+            .account_payment()
+            .id()
+            .find(&payment.id)
+            .ok_or("payment missing")?;
+        match case {
+            0 => changed.ref_ = Some("replacement-payment-reference".to_string()),
+            1 => changed.memo = Some("replacement-bank-memo".to_string()),
+            _ => changed.partner_id = payment.partner_id + 10_000,
+        }
+        ctx.db.account_payment().id().update(changed);
+        let error = execute_guarded_action(
+            ctx,
+            execution_params(
+                &original,
+                action.clone(),
+                input.clone(),
+                &format!("changed-payment-reference-{case}-{}", payment.id),
+            ),
+        )
+        .err()
+        .ok_or("changed payment reference consumed an old approval")?;
+        let after = ctx
+            .db
+            .account_payment()
+            .id()
+            .find(&payment.id)
+            .ok_or("payment missing")?;
+        if !error.contains("revision")
+            || after.move_id.is_some()
+            || after.state != PaymentState::NotPaid
+            || ctx.db.guarded_action_receipt().iter().count() != receipt_count
+        {
+            return Err(format!(
+                "changed payment reference created an effect: {error}"
+            ));
+        }
+        let mut restored = ctx
+            .db
+            .account_payment()
+            .id()
+            .find(&payment.id)
+            .ok_or("payment missing")?;
+        restored.ref_ = payment.ref_.clone();
+        restored.memo = payment.memo.clone();
+        restored.partner_id = payment.partner_id;
+        ctx.db.account_payment().id().update(restored);
+    }
+    Ok(())
 }
 
 fn insert_draft_purchase_order(

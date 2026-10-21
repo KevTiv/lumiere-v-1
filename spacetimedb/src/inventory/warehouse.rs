@@ -516,14 +516,13 @@ pub fn update_warehouse(
     warehouse_id: u64,
     params: UpdateWarehouseParams,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "warehouse", "write")?;
     let warehouse = ctx
         .db
         .warehouse()
         .id()
         .find(&warehouse_id)
         .ok_or("Warehouse not found")?;
-
-    check_permission(ctx, organization_id, "warehouse", "write")?;
 
     if warehouse.company_id != company_id {
         return Err("Warehouse does not belong to this company".to_string());

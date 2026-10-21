@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from '@lumiere/i18n'
 import { cn } from '../lib/utils'
 import { Input } from '../components/input'
 import { Button } from '../components/button'
@@ -16,6 +17,7 @@ interface StockSearchBarProps {
 }
 
 export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarProps) {
+  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -61,7 +63,7 @@ export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarPr
         <Input
           ref={inputRef}
           type="text"
-          placeholder="Search items by name or SKU..."
+          placeholder={t('ui.stock3d.search.placeholder')}
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value)
@@ -76,6 +78,7 @@ export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarPr
             size="icon"
             className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
             onClick={handleClear}
+            aria-label={t('ui.stock3d.search.clear')}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -86,7 +89,7 @@ export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarPr
         <div className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden">
           <div className="px-3 py-2 border-b border-border bg-muted/50">
             <span className="text-xs text-muted-foreground">
-              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
+              {t('ui.stock3d.search.resultsFound', { count: searchResults.length })}
             </span>
           </div>
           <ScrollArea className="max-h-72">
@@ -118,20 +121,26 @@ export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarPr
                         </span>
                         {isLowStock && (
                           <Badge variant="destructive" className="h-5 text-[10px]">
-                            Low
+                            {t('ui.stock3d.search.lowBadge')}
                           </Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs text-muted-foreground">{item.sku}</span>
-                        <span className="text-xs text-muted-foreground">Qty: {item.quantity}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {t('ui.stock3d.quantityWithValue', { quantity: item.quantity })}
+                        </span>
                       </div>
                       {zone && slot && (
                         <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                           <MapPin className="h-3 w-3" />
                           <span>
-                            {zone.name} - Row {slot.row + 1}, Col {slot.column + 1}, Level{' '}
-                            {slot.level + 1}
+                            {t('ui.stock3d.search.resultLocation', {
+                              zone: zone.name,
+                              row: slot.row + 1,
+                              column: slot.column + 1,
+                              level: slot.level + 1,
+                            })}
                           </span>
                         </div>
                       )}
@@ -146,7 +155,9 @@ export function StockSearchBar({ className, onNavigateToItem }: StockSearchBarPr
 
       {isOpen && searchQuery && searchResults.length === 0 && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-lg shadow-lg z-50 p-4 text-center">
-          <p className="text-sm text-muted-foreground">No items found matching "{searchQuery}"</p>
+          <p className="text-sm text-muted-foreground">
+            {t('ui.stock3d.search.noResults', { query: searchQuery })}
+          </p>
         </div>
       )}
     </div>

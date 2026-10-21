@@ -20,12 +20,13 @@ import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
+import { dispatchNamedOperation } from "../operation-dispatch"
 import { invalidateResourceQueries } from "../subscription-query"
 import { toCreateAuditRuleParams } from "@lumiere/erp-shared/settings-create-params"
 import { encodeIdentity, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 import type { CanonicalRecordRef } from "./operation-effect"
-import { resolveActiveRoleAssignmentEffect, resolveRevokedRoleAssignmentEffect } from "./auth-role-assignment"
+import { resolveActiveRoleAssignmentEffect, resolveRevokedRoleAssignmentEffect, roleAssignmentIsCurrent } from "./auth-role-assignment"
 import type {
   AuditLog,
   AuditRule,
@@ -53,6 +54,30 @@ export function useAuditRules(organizationId: bigint, initialData?: AuditRule[])
     queryFn: () => fetchQueryList('/api/query/audit-rules', 'Failed to fetch audit rules'),
     staleTime: 30_000,
     initialData,
+  })
+}
+
+/** Signed-in user's canonical profile (platform-control), for shell display. */
+export interface CurrentUserProfile {
+  email: string
+  name: string
+  firstName: string | null
+  lastName: string | null
+  timezone?: string
+  language?: string
+}
+
+export function useCurrentUserProfile(enabled = true) {
+  return useQuery<CurrentUserProfile>({
+    queryKey: ['current-user-profile'],
+    queryFn: async () => {
+      const r = await apiFetch("/api/auth/profile")
+      if (!r.ok) throw new Error('Failed to fetch user profile')
+      const json = (await r.json()) as { data: CurrentUserProfile }
+      return json.data
+    },
+    enabled,
+    staleTime: 5 * 60_000,
   })
 }
 
@@ -84,6 +109,7 @@ function invalidateAuthModule(
     qc.invalidateQueries({ queryKey: ['audit-rules', org] }),
     qc.invalidateQueries({ queryKey: ['user-sessions', org] }),
     qc.invalidateQueries({ queryKey: ['user-invites', org] }),
+    qc.invalidateQueries({ queryKey: ['current-user-profile'] }),
     ...invalidateSettingsQueries(qc, organizationId),
   ])
 }
@@ -98,6 +124,7 @@ function invalidateSettingsQueries(
     qc.invalidateQueries({ queryKey: ['settings-users', org] }),
     qc.invalidateQueries({ queryKey: ['user-role-assignments', org] }),
     qc.invalidateQueries({ queryKey: ['user-organizations', org] }),
+    qc.invalidateQueries({ queryKey: ['auth-access'] }),
     qc.invalidateQueries({
       queryKey: ['api-gateway', org, 'GET', '/v1/settings/roles'],
     }),
@@ -244,6 +271,8 @@ export type SettingsUserRoleAssignment = {
 export type SettingsUserRecord = {
   id: string
   userOrgId: string | null
+  primaryRoleId: string
+  accessRevision?: string
   name: string
   email: string
   department?: string
@@ -311,7 +340,7 @@ function backendPermissionEquivalents(resource: string, action: string): string[
   }
 
   if (resource === 'admin:users') {
-    if (action === 'create') return ['user_role_assignment:create']
+    if (action === 'create') return ['user_organization:create', 'user_role_assignment:create']
     if (action === 'delete') return ['user_organization:delete', 'user_role_assignment:delete']
     if (action === 'manage') return ['user_organization:*', 'user_role_assignment:*']
     return [`user_organization:${writeAction}`]
@@ -338,9 +367,9 @@ export function mapApiRoleRow(row: Record<string, unknown>): SettingsRoleRecord 
   const id = scalarIdString(pickField(row, 'id'))
   const metadata = parseRoleMetadata(pickField(row, 'metadata'))
   const permissionsRaw = pickField<unknown>(row, 'permissions')
-  const permissionStrings = Array.isArray(permissionsRaw) && permissionsRaw.length > 0
+  const permissionStrings = Array.isArray(permissionsRaw)
     ? permissionsRaw.map((entry) => String(entry))
-    : metadata.uiPermissions ?? []
+    : []
   return {
     id,
     name: String(pickField(row, 'name') ?? ''),
@@ -384,8 +413,7 @@ export function mapSettingsUsers(
   for (const row of assignments) {
     const identity = normalizeIdentityHex(pickField(row, 'userIdentity', 'user_identity'))
     if (!identity) continue
-    const isActive = pickField<boolean>(row, 'isActive', 'is_active')
-    if (isActive === false) continue
+    if (!roleAssignmentIsCurrent(row)) continue
     const assignmentId = scalarIdString(pickField(row, 'id'))
     const roleId = scalarIdString(pickField(row, 'roleId', 'role_id'))
     if (!assignmentId || !roleId) continue
@@ -399,7 +427,8 @@ export function mapSettingsUsers(
     if (!identity) return []
     const membership = membershipByIdentity.get(identity)
     const roleAssignments = assignmentsByIdentity.get(identity) ?? []
-    const roles = [...new Set(roleAssignments.map((entry) => entry.roleId))]
+    const primaryRoleId = membership ? scalarIdString(pickField(membership, 'roleId', 'role_id')) : ''
+    const roles = [...new Set([primaryRoleId, ...roleAssignments.map((entry) => entry.roleId)].filter(Boolean))]
     const department = membership
       ? String(pickField(membership, 'jobTitle', 'job_title') ?? '').trim() || undefined
       : undefined
@@ -407,6 +436,9 @@ export function mapSettingsUsers(
     const record: SettingsUserRecord = {
       id: identity,
       userOrgId: userOrgIdRaw != null ? scalarIdString(userOrgIdRaw) : null,
+      primaryRoleId,
+      accessRevision: pickField(profile, 'accessRevision', 'access_revision') == null ? undefined
+        : scalarIdString(pickField(profile, 'accessRevision', 'access_revision')),
       name: String(pickField(profile, 'name') ?? ''),
       email: String(pickField(profile, 'email') ?? ''),
       department,
@@ -461,6 +493,18 @@ export function useUserOrganizations(organizationId: bigint) {
   })
 }
 
+type SettingsMembershipProjection = {
+  id?: unknown
+  userIdentity?: unknown
+  user_identity?: unknown
+  roleId?: unknown
+  role_id?: unknown
+  isActive?: unknown
+  is_active?: unknown
+  jobTitle?: unknown
+  job_title?: unknown
+}
+
 export function useSettingsUsers(organizationId: bigint, search?: string) {
   const searchTerm = search?.trim() ?? ''
   return useQuery<SettingsUserRecord[]>({
@@ -469,17 +513,11 @@ export function useSettingsUsers(organizationId: bigint, search?: string) {
       const searchQuery = searchTerm
         ? `&search=${encodeURIComponent(searchTerm)}`
         : ''
-      const [profiles, memberships, assignments] = await Promise.all([
-        fetchSettingsList(
-          `/api/settings/users?limit=100${searchQuery}`,
-          'Failed to fetch settings users',
-        ),
-        fetchQueryList('/api/query/user-organization', 'Failed to fetch user organizations'),
-        fetchQueryList(
-          '/api/query/user-role-assignment',
-          'Failed to fetch user role assignments',
-        ),
-      ])
+      const profiles = await collectSettingsRows((offset, limit) => fetchSettingsList(
+        `/api/settings/users?limit=${limit}&offset=${offset}${searchQuery}`, 'Failed to fetch settings users',
+      ))
+      const memberships = profiles.flatMap(row => row.membership && typeof row.membership === 'object' ? [row.membership as SettingsMembershipProjection] : [])
+      const assignments = profiles.flatMap(row => Array.isArray(row.roleAssignments) ? row.roleAssignments as QueryRows : [])
       return mapSettingsUsers(profiles, memberships, assignments)
     },
     enabled: organizationId > 0n,
@@ -506,7 +544,7 @@ export function useCreateRole(organizationId: bigint) {
             ? String(formData.metadata)
             : null,
       }
-      const { urlPath, init } = stdbBffCommandPost("create_role", { params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("create_role", { params: stdbParamsToJson(params, "CreateRoleParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create role')
     },
@@ -524,13 +562,42 @@ export function useUpdateRole(organizationId: bigint) {
     { roleId: string | number | bigint; params: Record<string, unknown> }
   >({
     mutationFn: async ({ roleId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_role", { roleId: toScalarU64(roleId), params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("update_role", { roleId: toScalarU64(roleId), params: stdbParamsToJson(params, "UpdateRoleParams") })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update role')
+      if (!r.ok) throw await authResponseError(r, 'Failed to update role')
     },
     onSuccess: async () => {
       await invalidateAuthModule(qc, organizationId)
     },
+  })
+}
+
+async function authResponseError(response: Response, fallback: string): Promise<Error> {
+  const result = await response.json().catch(() => null) as { error?: string | { message?: string } } | null
+  return new Error(typeof result?.error === 'string' ? result.error : result?.error?.message ?? fallback)
+}
+
+export function useSetMemberAccess(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, {
+    user: SettingsUserRecord; primaryRoleId: string; roleIds: string[]; isActive: boolean; jobTitle?: string
+  }>({
+    mutationFn: async ({ user, primaryRoleId, roleIds, isActive, jobTitle }) => {
+      if (user.accessRevision == null) throw new Error('Reload users before changing member access')
+      await dispatchNamedOperation('set_member_access', {
+        userIdentity: encodeIdentity(user.id),
+        params: stdbParamsToJson({
+          primary_role_id: toScalarU64(primaryRoleId),
+          additional_role_ids: roleIds.filter(id => id !== primaryRoleId).map(toScalarU64),
+          expected_primary_role_id: toScalarU64(user.primaryRoleId),
+          expected_role_ids: user.roles.map(toScalarU64),
+          expected_access_revision: toScalarU64(user.accessRevision),
+          expected_is_active: user.status === 'active', is_active: isActive,
+          job_title: jobTitle ?? null,
+        }, 'SetMemberAccessParams'),
+      }, 'Failed to update member access')
+    },
+    onSuccess: () => invalidateAuthModule(qc, organizationId),
   })
 }
 

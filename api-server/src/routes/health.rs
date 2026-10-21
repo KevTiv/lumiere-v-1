@@ -365,8 +365,23 @@ mod tests {
     fn release_manifest_matches_runtime_contract_and_migrations() {
         let release = release_metadata().expect("valid release metadata");
         assert_eq!(release.contract_version, "ir-v2");
-        assert_eq!(release.migration_version, 10);
-        assert_eq!(release.contract_release, "0.3.48");
+        assert_eq!(
+            release.migration_version,
+            crate::cold_tier::migrate::MIGRATIONS
+                .last()
+                .unwrap()
+                .version
+        );
+        // Cargo consumes the checksum-verified vendored release, not a git tag.
+        // Compare the manifest to the release materialized for this build.
+        let workspace = include_str!("../../../Cargo.toml");
+        assert!(workspace.contains(
+            "lumiere-contracts = { path = \"vendor/lumiere-contracts/crates/lumiere-contracts\""
+        ));
+        assert_eq!(
+            release.contract_release,
+            include_str!("../../../vendor/lumiere-contracts/CONTRACT_VERSION").trim()
+        );
     }
 
     #[test]

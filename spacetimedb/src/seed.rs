@@ -82,8 +82,9 @@ use crate::sales::pos_config::{
     PosPaymentMethod,
 };
 use crate::sales::pos_transactions::{
-    pos_loyalty_card, pos_order, pos_order_line, pos_payment, pos_session, PosLoyaltyCard,
-    PosOrder, PosOrderLine, PosPayment, PosSession,
+    pos_loyalty_card, pos_order, pos_order_line, pos_payment, pos_session,
+    record_pos_order_projection_commit, PosLoyaltyCard, PosOrder, PosOrderLine, PosPayment,
+    PosSession,
 };
 use crate::sales::pricelists::{product_pricelist, ProductPricelist};
 use crate::sales::sales_core::{sale_order, sale_order_line, SaleOrder, SaleOrderLine};
@@ -4840,6 +4841,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         company_id: company_id,
         name: Some("PAY-0001".to_string()),
         move_id: None,
+        reversal_move_id: None,
         payment_type: PaymentType::InBound,
         partner_type: PartnerType::Customer,
         partner_id: contact_acme.id,
@@ -4862,6 +4864,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         company_id: company_id,
         name: Some("PAY-0002".to_string()),
         move_id: None,
+        reversal_move_id: None,
         payment_type: PaymentType::OutBound,
         partner_type: PartnerType::Supplier,
         partner_id: contact_globex.id,
@@ -4908,6 +4911,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         company_id: company_id,
         name: Some("PAY-OWNER-0001".to_string()),
         move_id: None,
+        reversal_move_id: None,
         payment_type: PaymentType::InBound,
         partner_type: PartnerType::Customer,
         partner_id: contact_acme.id,
@@ -5003,6 +5007,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         company_id: company_id,
         name: Some("PAY-OWNER-0002".to_string()),
         move_id: None,
+        reversal_move_id: None,
         payment_type: PaymentType::InBound,
         partner_type: PartnerType::Customer,
         partner_id: contact_wayne.id,
@@ -7613,7 +7618,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         sort_order: None,
         limit: None,
         refresh_interval: Some(3600),
-        configuration: Some("{\"currency\":\"USD\"}".to_string()),
+        configuration: Some(r#"{"version":1,"timeField":null,"measureField":"amount_total","missingTimestampPolicy":"reject","missingMeasurePolicy":"reject"}"#.to_string()),
         position_x: 0,
         position_y: 0,
         width: 4,
@@ -7641,7 +7646,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         sort_order: Some("{\"probability\":\"desc\"}".to_string()),
         limit: Some(10),
         refresh_interval: Some(1800),
-        configuration: Some("{\"stacked\":true}".to_string()),
+        configuration: Some(r#"{"version":1,"timeField":null,"measureField":"expected_revenue","missingTimestampPolicy":"reject","missingMeasurePolicy":"reject"}"#.to_string()),
         position_x: 4,
         position_y: 0,
         width: 8,
@@ -7673,7 +7678,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         sort_order: Some("{\"priority\":\"desc\"}".to_string()),
         limit: Some(20),
         refresh_interval: Some(300),
-        configuration: Some("{\"pagination\":true}".to_string()),
+        configuration: None,
         position_x: 0,
         position_y: 3,
         width: 4,
@@ -7712,14 +7717,14 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     // =========================================================================
 
     // ── 14.1 AI Agent Configuration ───────────────────────────────────────────
-    let agent_mistral = ctx.db.ai_agent().insert(AiAgent {
+    let agent_ollama = ctx.db.ai_agent().insert(AiAgent {
         id: 0,
         organization_id: org_id,
-        name: "Mistral Assistant".to_string(),
-        description: Some("Mistral small model for general ERP assistance".to_string()),
-        model: "mistral-small-latest".to_string(),
-        provider: "Mistral".to_string(),
-        api_key_reference: Some("MISTRAL_API_KEY".to_string()),
+        name: "Ollama Assistant".to_string(),
+        description: Some("Local Ollama model for general ERP assistance".to_string()),
+        model: "gemma4:e2b-mlx".to_string(),
+        provider: "Ollama".to_string(),
+        api_key_reference: None,
         temperature: 0.3,
         max_tokens: 4096,
         top_p: 1.0,
@@ -7729,7 +7734,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         context_window: 128_000,
         is_active: true,
         is_default: true,
-        allowed_models: vec!["mistral-small-latest".to_string()],
+        allowed_models: vec!["gemma4:e2b-mlx".to_string()],
         allowed_actions: vec![
             "chat".to_string(),
             "live_read".to_string(),
@@ -7742,7 +7747,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
             "web_search".to_string(),
         ],
         rate_limit_per_minute: 60,
-        cost_per_1k_tokens: 0.003,
+        cost_per_1k_tokens: 0.0,
         monthly_budget: Some(500.0),
         monthly_spend: 0.0,
         company_id: Some(company_id),
@@ -7758,7 +7763,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         id: 0,
         organization_id: org_id,
         name: "Lumiere Assistant".to_string(),
-        ai_agent_id: agent_mistral.id,
+        ai_agent_id: agent_ollama.id,
         role: "Assistant".to_string(),
         responsibilities: vec![
             "Answer user questions about Lumiere ERP".to_string(),
@@ -9309,7 +9314,7 @@ Prioritize high-severity findings and cite related records."#,
         related_id: Some(proposal.id),
         confidence: 0.84,
         generated_at: ctx.timestamp,
-        generated_by: Some(agent_mistral.id),
+        generated_by: Some(agent_ollama.id),
         is_acknowledged: false,
         acknowledged_by: None,
         acknowledged_at: None,
@@ -9335,7 +9340,7 @@ Prioritize high-severity findings and cite related records."#,
             document_type: "contract".to_string(),
             job_type: "classification".to_string(),
             status: JobStatus::Completed,
-            ai_agent_id: Some(agent_mistral.id),
+            ai_agent_id: Some(agent_ollama.id),
             model_used: Some("claude-3-5-sonnet-20241022".to_string()),
             input_data: Some(format!("{{\"document_id\":{}}}", folder_contracts.id)),
             extracted_data: Some("{\"document_class\":\"msa\"}".to_string()),
@@ -9367,7 +9372,7 @@ Prioritize high-severity findings and cite related records."#,
         embedding_hash: Some("seed-embedding-hash".to_string()),
         sync_status: "synced".to_string(),
         vector_db_id: Some("seed-doc-1".to_string()),
-        embedding_model: Some("nomic-embed-text".to_string()),
+        embedding_model: Some("embeddinggemma:latest".to_string()),
         embedding_dim: Some(4),
         last_synced_at: Some(ctx.timestamp),
         sync_error: None,
@@ -9626,6 +9631,7 @@ Prioritize high-severity findings and cite related records."#,
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
+    let pos_loyalty_card_demo_id = pos_loyalty_card_demo.id;
     let pos_session_history = ctx.db.pos_session().insert(PosSession {
         id: 0,
         organization_id: org_id,
@@ -9665,6 +9671,7 @@ Prioritize high-severity findings and cite related records."#,
         write_date: ctx.timestamp,
         metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
     });
+    let pos_session_history_id = pos_session_history.id;
     let pos_order_line_demo = ctx.db.pos_order_line().insert(PosOrderLine {
         id: 0,
         organization_id: org_id,
@@ -9808,6 +9815,14 @@ Prioritize high-severity findings and cite related records."#,
         write_date: ctx.timestamp,
         ..pos_loyalty_card_demo
     });
+    record_pos_order_projection_commit(
+        ctx,
+        org_id,
+        pos_session_history_id,
+        pos_order_demo.id,
+        Some(pos_loyalty_card_demo_id),
+        &[],
+    )?;
 
     let _ = ctx.db.res_partner_bank().insert(ResPartnerBank {
         id: 0,

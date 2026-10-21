@@ -6,10 +6,15 @@
 //! |------|------|---------|
 //! | `Disable` | Development only | `NoTls` — no encryption. Fails closed in production. |
 //! | `Require` | Production | `tokio-postgres-rustls` with native root certificates. |
+//! | `PrivateNetwork` | Railway production only | `NoTls` to a `*.railway.internal` host. |
 //!
 //! In production (`NODE_ENV=production`), the pool builder fails closed if
-//! `PG_TLS_MODE` is not `require` or if the TLS connector cannot be
-//! initialised.
+//! `PG_TLS_MODE` is neither `require` nor the narrowly-scoped
+//! `private-network` mode, or if the TLS connector cannot be initialised.
+//! `private-network` deliberately trades transport TLS for Railway's private
+//! service network and is accepted only when the process is in production and
+//! `PG_HOST` ends exactly in `.railway.internal`. It must not be used for a
+//! public Railway TCP proxy or any other provider/network.
 //!
 //! ## Environment variables
 //!
@@ -20,7 +25,7 @@
 //! | `PG_DATABASE` | `lumiere` | yes |
 //! | `PG_USER` | `lumiere` | yes |
 //! | `PG_PASSWORD` | _(empty)_ | yes |
-//! | `PG_TLS_MODE` | `disable` | must be `require` |
+//! | `PG_TLS_MODE` | `disable` | `require`, or `private-network` for Railway private DNS only |
 //! | `PG_POOL_MAX` | `10` | no |
 //! | `PG_CONNECT_TIMEOUT_SECS` | `10` | no |
 
@@ -39,6 +44,8 @@ pub enum PgTlsMode {
     Disable,
     /// Require TLS with native root certificates — production.
     Require,
+    /// No TLS inside Railway's production-only private service network.
+    PrivateNetwork,
 }
 
 /// Runtime role used to separate durable-store responsibilities.
@@ -73,10 +80,33 @@ impl PgTlsMode {
         match s.trim().to_lowercase().as_str() {
             "disable" | "" => Ok(Self::Disable),
             "require" | "tls" | "true" => Ok(Self::Require),
+            "private-network" => Ok(Self::PrivateNetwork),
             other => {
-                anyhow::bail!("PG_TLS_MODE: unknown value '{other}' (expected: disable | require)")
+                anyhow::bail!(
+                    "PG_TLS_MODE: unknown value '{other}' (expected: disable | require | private-network)"
+                )
             }
         }
+    }
+}
+
+fn validate_tls_policy(tls_mode: PgTlsMode, host: &str, production: bool) -> Result<()> {
+    match (production, tls_mode) {
+        (true, PgTlsMode::Require) | (false, PgTlsMode::Require | PgTlsMode::Disable) => Ok(()),
+        (true, PgTlsMode::PrivateNetwork)
+            if host.to_ascii_lowercase().ends_with(".railway.internal") =>
+        {
+            Ok(())
+        }
+        (true, PgTlsMode::PrivateNetwork) => anyhow::bail!(
+            "PG_TLS_MODE='private-network' requires PG_HOST to end with '.railway.internal' (got '{host}')"
+        ),
+        (false, PgTlsMode::PrivateNetwork) => anyhow::bail!(
+            "PG_TLS_MODE='private-network' is only allowed when NODE_ENV or LUMIERE_ENV is production"
+        ),
+        (true, PgTlsMode::Disable) => anyhow::bail!(
+            "PG_TLS_MODE must be 'require' in production, or 'private-network' for a Railway private host"
+        ),
     }
 }
 
@@ -110,8 +140,9 @@ impl PgConfig {
 
     /// Read PG config from the environment.
     ///
-    /// In production, fails if `PG_TLS_MODE` is not `require` or if required
-    /// connection fields are missing.
+    /// In production, fails if `PG_TLS_MODE` is not `require` (or the guarded
+    /// Railway `private-network` mode) or if required connection fields are
+    /// missing.
     pub fn from_env() -> Result<Self> {
         let prod = runtime_is_production();
 
@@ -136,13 +167,9 @@ impl PgConfig {
         let tls_mode = PgTlsMode::parse(&tls_mode_str)
             .with_context(|| format!("parse PG_TLS_MODE='{}'", tls_mode_str))?;
 
+        validate_tls_policy(tls_mode, &host, prod)?;
+
         if prod {
-            if tls_mode != PgTlsMode::Require {
-                anyhow::bail!(
-                    "PG_TLS_MODE must be 'require' in production (got '{}')",
-                    tls_mode_str
-                );
-            }
             if password.is_empty() {
                 anyhow::bail!("PG_PASSWORD must be set in production");
             }
@@ -216,13 +243,15 @@ pub(crate) async fn ensure_runtime_role_grants(
     projection_user: &str,
     finalization_user: &str,
     reconstruction_user: &str,
-    finalization_tables: &[String],
+    finalization_read_tables: &[String],
+    finalization_write_tables: &[String],
 ) -> Result<()> {
     let sql = runtime_role_grants_sql(
         projection_user,
         finalization_user,
         reconstruction_user,
-        finalization_tables,
+        finalization_read_tables,
+        finalization_write_tables,
     )?;
     pool.get()
         .await
@@ -236,16 +265,31 @@ fn runtime_role_grants_sql(
     projection_user: &str,
     finalization_user: &str,
     reconstruction_user: &str,
-    finalization_tables: &[String],
+    finalization_read_tables: &[String],
+    finalization_write_tables: &[String],
 ) -> Result<String> {
     let projection = quote_identifier(projection_user)?;
     let finalization = quote_identifier(finalization_user)?;
     let reconstruction = quote_identifier(reconstruction_user)?;
-    let mut finalization_relations = vec!["organization_projection_watermark".to_string()];
-    finalization_relations.extend(finalization_tables.iter().cloned());
+    let mut finalization_relations = vec![
+        "archive_transfer".to_string(),
+        "organization_commit".to_string(),
+        "organization_projection_watermark".to_string(),
+        "organization_row_change".to_string(),
+    ];
+    finalization_relations.extend(finalization_read_tables.iter().cloned());
     finalization_relations.sort();
     finalization_relations.dedup();
     let finalization_relations = finalization_relations
+        .iter()
+        .map(|table| quote_identifier(table))
+        .collect::<Result<Vec<_>>>()?
+        .join(", ");
+    let mut finalization_write_relations = vec!["archive_transfer".to_string()];
+    finalization_write_relations.extend(finalization_write_tables.iter().cloned());
+    finalization_write_relations.sort();
+    finalization_write_relations.dedup();
+    let finalization_write_relations = finalization_write_relations
         .iter()
         .map(|table| quote_identifier(table))
         .collect::<Result<Vec<_>>>()?
@@ -258,6 +302,7 @@ fn runtime_role_grants_sql(
          GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO {projection};\n\
          GRANT SELECT ON ALL TABLES IN SCHEMA public TO {reconstruction};\n\
          GRANT SELECT ON TABLE {finalization_relations} TO {finalization};\n\
+         GRANT INSERT, UPDATE ON TABLE {finalization_write_relations} TO {finalization};\n\
          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {projection};\n\
          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO {projection};\n\
          ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {reconstruction};"
@@ -277,8 +322,11 @@ fn quote_identifier(value: &str) -> Result<String> {
 
 /// Build a `deadpool_postgres::Pool` from [`PgConfig`].
 ///
-/// Uses `NoTls` in dev mode and `tokio-postgres-rustls` in production.
+/// Uses `NoTls` only for development or the validated Railway private-network
+/// mode. All other production connections use `tokio-postgres-rustls`.
 pub fn build_pool(config: &PgConfig) -> Result<Pool> {
+    validate_tls_policy(config.tls_mode, &config.host, runtime_is_production())?;
+
     let mut deadpool_cfg = DeadpoolConfig::new();
     deadpool_cfg.host = Some(config.host.clone());
     deadpool_cfg.port = Some(config.port);
@@ -294,8 +342,8 @@ pub fn build_pool(config: &PgConfig) -> Result<Pool> {
     deadpool_cfg.pool = Some(pool_config);
 
     match config.tls_mode {
-        PgTlsMode::Disable => {
-            // Development: no TLS.
+        PgTlsMode::Disable | PgTlsMode::PrivateNetwork => {
+            // Development, or a validated Railway private service connection.
             deadpool_cfg
                 .create_pool(Some(Runtime::Tokio1), NoTls)
                 .context("create deadpool-postgres pool (NoTls)")
@@ -493,7 +541,49 @@ mod tests {
         assert_eq!(PgTlsMode::parse("require").unwrap(), PgTlsMode::Require);
         assert_eq!(PgTlsMode::parse("REQUIRE").unwrap(), PgTlsMode::Require);
         assert_eq!(PgTlsMode::parse("tls").unwrap(), PgTlsMode::Require);
+        assert_eq!(
+            PgTlsMode::parse("private-network").unwrap(),
+            PgTlsMode::PrivateNetwork
+        );
         assert!(PgTlsMode::parse("invalid").is_err());
+    }
+
+    #[test]
+    fn railway_private_network_requires_production_and_private_dns() {
+        assert!(
+            validate_tls_policy(PgTlsMode::PrivateNetwork, "postgres.railway.internal", true)
+                .is_ok()
+        );
+        assert!(
+            validate_tls_policy(PgTlsMode::PrivateNetwork, "POSTGRES.RAILWAY.INTERNAL", true)
+                .is_ok()
+        );
+
+        for host in [
+            "railway.internal",
+            "postgres.proxy.rlwy.net",
+            "postgres.railway.internal.example.com",
+            "evilrailway.internal",
+            "localhost",
+        ] {
+            assert!(
+                validate_tls_policy(PgTlsMode::PrivateNetwork, host, true).is_err(),
+                "unexpectedly accepted {host}"
+            );
+        }
+
+        assert!(validate_tls_policy(
+            PgTlsMode::PrivateNetwork,
+            "postgres.railway.internal",
+            false
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn production_tls_policy_rejects_disable_and_accepts_require() {
+        assert!(validate_tls_policy(PgTlsMode::Disable, "postgres.example.com", true).is_err());
+        assert!(validate_tls_policy(PgTlsMode::Require, "postgres.example.com", true).is_ok());
     }
 
     #[test]
@@ -547,16 +637,20 @@ mod tests {
             "projection_worker",
             "finalization_worker",
             "reconstruction_worker",
+            &["pos_order".to_string(), "cold_pos_order".to_string()],
             &["cold_pos_order".to_string()],
         )
         .expect("grant SQL");
         assert!(sql.contains(
-            "GRANT SELECT ON TABLE \"cold_pos_order\", \"organization_projection_watermark\" TO \"finalization_worker\""
+            "GRANT SELECT ON TABLE \"archive_transfer\", \"cold_pos_order\", \"organization_commit\", \"organization_projection_watermark\", \"organization_row_change\", \"pos_order\" TO \"finalization_worker\""
+        ));
+        assert!(sql.contains(
+            "GRANT INSERT, UPDATE ON TABLE \"archive_transfer\", \"cold_pos_order\" TO \"finalization_worker\""
         ));
         assert!(sql
             .contains("GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"reconstruction_worker\""));
         assert!(!sql.contains("DELETE ON ALL TABLES IN SCHEMA public TO \"finalization_worker\""));
         assert!(!sql.contains("DELETE ON ALL TABLES IN SCHEMA public TO \"reconstruction_worker\""));
-        assert!(runtime_role_grants_sql("bad-role", "finalizer", "reader", &[]).is_err());
+        assert!(runtime_role_grants_sql("bad-role", "finalizer", "reader", &[], &[]).is_err());
     }
 }

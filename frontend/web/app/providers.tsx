@@ -1,7 +1,9 @@
 "use client"
 
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query"
-import { Suspense, useMemo, useState } from "react"
+import { NavigationGuardProvider } from "@lumiere/ui"
+
+import { QueryClient, QueryClientProvider, useQueryClient, useQuery } from "@tanstack/react-query"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { I18nProvider } from "@lumiere/i18n"
 import {
   RBACProvider,
@@ -10,14 +12,11 @@ import {
   type User,
   type Role,
   type PolicyRule,
-  type BackendRoleRow,
   mapBackendRolesToRoles,
-  buildRbacUserFromServer,
 } from "@lumiere/ui"
 import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
 import { LumiereApiProvider } from "@lumiere/api-client"
-import { useStdbQuery, realtimeQueryKeysForResource } from "@lumiere/query-hooks/hooks/stdb"
-import { usePolicySnapshot } from "@/lib/use-policy-snapshot"
+import { useStdbReducer, realtimeQueryKeysForResource } from "@lumiere/query-hooks/hooks/stdb"
 import { useLumiereRealtime } from "@lumiere/query-hooks/hooks/realtime"
 import type { FieldAccessContext } from "@lumiere/stdb/field-policy"
 import {
@@ -26,52 +25,91 @@ import {
 } from "@lumiere/stdb/live"
 import { FULL_CLIENT_SUBSCRIPTION_RESOURCES } from "@lumiere/stdb/erp-subscriptions"
 import { useStdbConnection } from "@lumiere/stdb"
+import { useWorkOsAuthMode } from '@/lib/auth-mode-context'
 import { webApi } from "@/lib/lumiere-web-http"
 import { PostHogPageView } from "@/lib/posthog-pageview"
+import { apiFetch } from "@/lib/api-fetch"
+import { EFFECTIVE_ACCESS_ROLE_ID } from "@lumiere/ui/lib/runtime-form-role"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
 function RBACBridge({
   children,
   serverIdentity,
-  serverRoleNames,
   organizationId,
 }: {
   children: React.ReactNode
   serverIdentity?: string
-  serverRoleNames?: string[]
   organizationId?: number
 }) {
   const hasIdentity = Boolean(serverIdentity && serverIdentity !== "unknown")
-  const { data: rolesData = [] } = useStdbQuery("roles", 0, {
-    enabled: hasIdentity,
+  const accessQuery = useQuery({
+    queryKey: ['auth-access', organizationId, serverIdentity],
+    enabled: hasIdentity && Boolean(organizationId),
+    queryFn: async () => {
+      const response = await apiFetch('/api/session/field-access')
+      if (!response.ok) throw new Error('Unable to resolve current permissions')
+      const result = await response.json() as { identityHex: string; organizationId?: number; fieldAccess?: FieldAccessContext }
+      if (result.identityHex !== serverIdentity || result.organizationId !== organizationId || !result.fieldAccess) {
+        throw new Error('Session identity or organization changed')
+      }
+      return result.fieldAccess
+    },
+    staleTime: 0,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: 'always',
+    retry: false,
   })
-
-  const { orgPolicyRules } = usePolicySnapshot(organizationId, serverIdentity)
-
-  const rbacRoles = useMemo<Role[]>(() => {
-    return mapBackendRolesToRoles(rolesData as unknown as BackendRoleRow[])
-  }, [rolesData])
-
-  const rbacUser = useMemo<User | null>(() => {
-    return buildRbacUserFromServer(rbacRoles, serverRoleNames, serverIdentity)
-  }, [serverIdentity, serverRoleNames, rbacRoles])
-
-  const mergedPolicies = useMemo<PolicyRule[]>(() => {
-    const rolePolicies = rbacRoles.flatMap((role) =>
-      rbacUser?.roles.includes(role.id) ? role.permissions : [],
-    )
-    return [...rolePolicies, ...orgPolicyRules]
-  }, [rbacRoles, rbacUser, orgPolicyRules])
-
+  const access = accessQuery.isError ? undefined : accessQuery.data
+  const rbacRoles = useMemo<Role[]>(() => access ? mapBackendRolesToRoles([{
+    id: EFFECTIVE_ACCESS_ROLE_ID, name: 'Effective permissions', isActive: true,
+    permissions: [...access.rolePermissions],
+  }]) : [], [access])
+  const rbacUser = useMemo<User | null>(() => access && serverIdentity ? {
+    id: serverIdentity, email: '', name: '', roles: [EFFECTIVE_ACCESS_ROLE_ID, ...(access.roleIds ?? [access.roleId]).map(String)],
+    status: 'active', department: '', isSuperuser: access.isSuperuser,
+    lastLogin: '', createdAt: '', updatedAt: '',
+  } : null, [access, serverIdentity])
+  const policies = useMemo<PolicyRule[]>(() => (access?.orgPermissions ?? []).map((grant, index) => ({
+    id: `effective-grant-${index}`, subject: serverIdentity ?? '', resource: grant.resource,
+    action: (grant.action === 'all' ? '*' : grant.action) as PolicyRule['action'],
+    effect: grant.allow ? 'allow' : 'deny',
+  })), [access, serverIdentity])
   return (
-    <RBACProvider
-      initialUser={hasIdentity ? rbacUser : null}
-      initialRoles={hasIdentity ? rbacRoles : undefined}
-      initialPolicies={hasIdentity ? mergedPolicies : undefined}
-    >
+    <RBACProvider initialUser={rbacUser} initialRoles={rbacRoles} initialPolicies={policies}
+      permissionsReady={!hasIdentity || Boolean(access)}>
       {children}
     </RBACProvider>
   )
+}
+
+function AuthorityExpiryRefresh({
+  expiresAtMicros,
+  onUnavailable,
+}: {
+  expiresAtMicros?: number | null
+  onUnavailable: () => void
+}) {
+  const { mutate: refreshPolicySnapshot } = useStdbReducer("refresh_policy_snapshot")
+  useEffect(() => {
+    if (expiresAtMicros == null) return
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    const arm = () => {
+      const remainingMs = Math.ceil(expiresAtMicros / 1_000 - Date.now())
+      if (remainingMs <= 0) {
+        refreshPolicySnapshot({}, {
+          onSuccess: () => window.location.reload(),
+          onError: onUnavailable,
+        })
+        return
+      }
+      timeout = setTimeout(arm, Math.min(remainingMs, 2_147_000_000))
+    }
+    arm()
+    return () => {
+      if (timeout !== undefined) clearTimeout(timeout)
+    }
+  }, [expiresAtMicros, onUnavailable, refreshPolicySnapshot])
+  return null
 }
 
 /** api-server `/v1/realtime/ws` (browser connects directly) → invalidate `useStdbQuery` rows. */
@@ -81,6 +119,7 @@ function LumiereRealtimeBridge({
   organizationId?: number
 }) {
   const queryClient = useQueryClient()
+  const workOsEnabled = useWorkOsAuthMode()
   const { activeCompanyId, activeCompanyReady, companyIds } = useErpSession()
   const resources = useMemo(() => FULL_CLIENT_SUBSCRIPTION_RESOURCES, [])
   useLumiereRealtime({
@@ -90,6 +129,11 @@ function LumiereRealtimeBridge({
     activeCompanyId: activeCompanyReady ? activeCompanyId : null,
     resources,
     enabled: organizationId != null && organizationId > 0,
+    sameOrigin: workOsEnabled,
+    beforeConnect: workOsEnabled ? async () => {
+      const response = await fetch('/api/auth/realtime-session', { method: 'POST', credentials: 'same-origin' })
+      if (!response.ok) throw new Error('Realtime session unavailable')
+    } : undefined,
   })
   return null
 }
@@ -131,6 +175,7 @@ export function Providers({
   children,
   serverIdentity,
   serverRoleNames,
+  authorityExpiresAtMicros,
   organizationId,
   companyIds,
   fieldAccess,
@@ -138,11 +183,18 @@ export function Providers({
   children: React.ReactNode
   serverIdentity?: string
   serverRoleNames?: string[]
+  serverRoleIds?: readonly number[]
+  authorityExpiresAtMicros?: number | null
   organizationId?: number
   companyIds?: readonly number[]
   fieldAccess?: FieldAccessContext
 }) {
   const [queryClient] = useState(() => new QueryClient())
+  const [authorityUnavailable, setAuthorityUnavailable] = useState(false)
+  const markAuthorityUnavailable = useCallback(() => {
+    queryClient.clear()
+    setAuthorityUnavailable(true)
+  }, [queryClient])
 
   return (
     <I18nProvider>
@@ -153,29 +205,38 @@ export function Providers({
         </Suspense>
         <LumiereApiProvider client={webApi}>
           <QueryClientProvider client={queryClient}>
-            <StdbSubscriptionProvider
-              fieldAccess={fieldAccess}
-              organizationId={organizationId}
-              companyIds={companyIds}
-              serverIdentity={serverIdentity}
-              serverRoleNames={serverRoleNames}
-              keysFor={realtimeQueryKeysForResource}
-            >
-              <ErpSessionBridge
-                serverIdentity={serverIdentity}
+            {authorityUnavailable ? (
+              <main data-testid="authority-unavailable" role="alert">
+                Authorization state is unavailable. Reload to try again.
+              </main>
+            ) : (
+              <StdbSubscriptionProvider
+                fieldAccess={fieldAccess}
                 organizationId={organizationId}
                 companyIds={companyIds}
+                serverIdentity={serverIdentity}
+                serverRoleNames={serverRoleNames}
+                keysFor={realtimeQueryKeysForResource}
               >
-                <LumiereRealtimeBridge organizationId={organizationId} />
-                <RBACBridge
+                <ErpSessionBridge
                   serverIdentity={serverIdentity}
-                  serverRoleNames={serverRoleNames}
                   organizationId={organizationId}
+                  companyIds={companyIds}
                 >
-                  {children}
-                </RBACBridge>
-              </ErpSessionBridge>
-            </StdbSubscriptionProvider>
+                  <LumiereRealtimeBridge organizationId={organizationId} />
+                  <AuthorityExpiryRefresh
+                    expiresAtMicros={authorityExpiresAtMicros}
+                    onUnavailable={markAuthorityUnavailable}
+                  />
+                  <RBACBridge
+                    serverIdentity={serverIdentity}
+                    organizationId={organizationId}
+                  >
+                    <NavigationGuardProvider>{children}</NavigationGuardProvider>
+                  </RBACBridge>
+                </ErpSessionBridge>
+              </StdbSubscriptionProvider>
+            )}
           </QueryClientProvider>
         </LumiereApiProvider>
       </ThemeProvider>

@@ -10,13 +10,14 @@ use crate::data_ops::helpdesk_imports::{
 };
 use crate::data_ops::import_tracker::import_job;
 use crate::helpdesk::tickets::{
-    add_helpdesk_team_member, assign_ticket, create_helpdesk_sla, create_helpdesk_stage,
-    create_helpdesk_team, create_ticket, helpdesk_sla, helpdesk_stage, helpdesk_team,
-    helpdesk_ticket, run_helpdesk_sla_check, CreateHelpdeskSLAParams, CreateHelpdeskStageParams,
+    add_helpdesk_team_member, assign_ticket, close_ticket, create_helpdesk_sla,
+    create_helpdesk_stage, create_helpdesk_team, create_ticket, helpdesk_sla, helpdesk_stage,
+    helpdesk_team, helpdesk_ticket, reopen_ticket, run_helpdesk_sla_check,
+    CreateHelpdeskSLAParams, CreateHelpdeskStageParams,
     CreateHelpdeskTeamParams, CreateTicketParams, HelpdeskSlaCheckJob,
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
-use crate::types::TicketPriority;
+use crate::types::{HelpdeskTicketState, TicketPriority};
 
 fn new_identity(ctx: &ReducerContext) -> Identity {
     Identity::from_byte_array(ctx.rng().gen::<[u8; 32]>())
@@ -286,6 +287,141 @@ pub fn test_cross_team_assignment_rejected(ctx: &ReducerContext) -> Result<(), S
     if assigned.user_id != Some(agent) {
         return Err("same-team assignment did not persist".to_string());
     }
+    Ok(())
+}
+
+pub fn test_ticket_lifecycle_is_exact_and_replay_safe(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let foreign = OrgFixture::seed_minimal(ctx)?;
+    let team_id = seed_team(ctx, &fixture, "COV-14 Team")?;
+    let stage_id = seed_stage(ctx, &fixture, team_id, "COV-14 Stage")?;
+    let agent = seed_agent(ctx, &fixture, "cov14")?;
+    add_helpdesk_team_member(ctx, fixture.organization_id, team_id, agent)?;
+
+    create_ticket(
+        ctx,
+        fixture.organization_id,
+        CreateTicketParams {
+            team_id,
+            stage_id,
+            name: "COV-14 Lifecycle Ticket".to_string(),
+            description: None,
+            priority: TicketPriority::Normal,
+            partner_id: None,
+            partner_name: None,
+            partner_email: None,
+            sla_id: None,
+            sla_deadline: None,
+        },
+    )?;
+    let ticket_id = ctx
+        .db
+        .helpdesk_ticket()
+        .iter()
+        .find(|ticket| {
+            ticket.organization_id == fixture.organization_id
+                && ticket.name == "COV-14 Lifecycle Ticket"
+        })
+        .map(|ticket| ticket.id)
+        .ok_or("COV-14 ticket missing after create")?;
+
+    assign_ticket(ctx, fixture.organization_id, ticket_id, agent)?;
+    let assigned = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket_id)
+        .ok_or("ticket missing after assign")?;
+    if assigned.state != HelpdeskTicketState::InProgress || assigned.user_id != Some(agent) {
+        return Err("ticket assignment did not persist exact assignee/state".to_string());
+    }
+
+    match assign_ticket(ctx, fixture.organization_id, ticket_id, agent) {
+        Err(error) if error.contains("already assigned") => {}
+        Err(error) => return Err(format!("unexpected assignment replay error: {error}")),
+        Ok(()) => return Err("assignment replay unexpectedly succeeded".to_string()),
+    }
+    let after_assign_replay = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket_id)
+        .ok_or("ticket missing after assignment replay")?;
+    if after_assign_replay.user_id != Some(agent)
+        || after_assign_replay.state != HelpdeskTicketState::InProgress
+        || after_assign_replay.closed_at.is_some()
+    {
+        return Err("assignment replay changed the canonical ticket".to_string());
+    }
+
+    if close_ticket(ctx, foreign.organization_id, ticket_id).is_ok() {
+        return Err("cross-org ticket close unexpectedly succeeded".to_string());
+    }
+    close_ticket(ctx, fixture.organization_id, ticket_id)?;
+    let closed = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket_id)
+        .ok_or("ticket missing after close")?;
+    let closed_at = closed.closed_at.ok_or("closed ticket missing closed_at")?;
+    if closed.state != HelpdeskTicketState::Closed || closed.user_id != Some(agent) {
+        return Err("close changed assignee or failed to persist Closed state".to_string());
+    }
+
+    match close_ticket(ctx, fixture.organization_id, ticket_id) {
+        Err(error) if error.contains("already closed") => {}
+        Err(error) => return Err(format!("unexpected close replay error: {error}")),
+        Ok(()) => return Err("close replay unexpectedly succeeded".to_string()),
+    }
+    let after_close_replay = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket_id)
+        .ok_or("ticket missing after close replay")?;
+    if after_close_replay.state != HelpdeskTicketState::Closed
+        || after_close_replay.user_id != Some(agent)
+        || after_close_replay.closed_at != Some(closed_at)
+    {
+        return Err("close replay changed the canonical ticket".to_string());
+    }
+
+    reopen_ticket(ctx, fixture.organization_id, ticket_id)?;
+    let reopened = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket_id)
+        .ok_or("ticket missing after reopen")?;
+    if reopened.state != HelpdeskTicketState::InProgress
+        || reopened.user_id != Some(agent)
+        || reopened.closed_at.is_some()
+    {
+        return Err("reopen did not preserve assignee / clear closed_at".to_string());
+    }
+
+    match reopen_ticket(ctx, fixture.organization_id, ticket_id) {
+        Err(error) if error.contains("closed or cancelled") => {}
+        Err(error) => return Err(format!("unexpected reopen replay error: {error}")),
+        Ok(()) => return Err("reopen replay unexpectedly succeeded".to_string()),
+    }
+    let after_reopen_replay = ctx
+        .db
+        .helpdesk_ticket()
+        .id()
+        .find(&ticket_id)
+        .ok_or("ticket missing after reopen replay")?;
+    if after_reopen_replay.state != HelpdeskTicketState::InProgress
+        || after_reopen_replay.user_id != Some(agent)
+        || after_reopen_replay.closed_at.is_some()
+    {
+        return Err("reopen replay changed the canonical ticket".to_string());
+    }
+
     Ok(())
 }
 

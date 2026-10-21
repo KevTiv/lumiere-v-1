@@ -6,6 +6,8 @@ export * from "./components/input";
 export * from "./components/label";
 export * from "./components/theme-provider";
 export * from "./components/csv-import-modal";
+export * from "./lib/csv-import-preview";
+export * from "./lib/csv-import-columns";
 // form.tsx: exclude FormField (conflicts with lib/form-types FormField type)
 export { Form, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "./components/form";
 export * from "./components/toast";
@@ -27,12 +29,14 @@ export * from "./lib/kanban-board-types";
 export * from "./kanban/kanban-board";
 export * from "./kanban/kanban-column";
 export * from "./kanban/kanban-draggable-card";
+export * from "./kanban/kanban-card";
 export * from "./lib/entity-configs";
 
 // Modular forms
 export * from "./forms/modular-form";
 export * from "./forms/form-modal";
 export * from "./forms/runtime-form-modal";
+export * from "./forms/use-form-dialog";
 export * from "./lib/runtime-form-config";
 export * from "./lib/runtime-list-config";
 // form-types: exclude FieldWidth (already in entity-view-types), include everything else
@@ -79,12 +83,15 @@ export * from "./import-assistant/import-assistant-wizard";
 export * from "./import-assistant/import-mapping-table";
 export * from "./import-assistant/import-preview-grid";
 export * from "./import-assistant/import-job-status-panel";
+export * from "./import-assistant/abandoned-accounting-import-cleanup";
 export * from "./import-assistant/import-template-controls";
 export * from "./lib/hr-entity-configs";
 export * from "./lib/hr-form-configs";
 export * from "./lib/documents-entity-configs";
 export * from "./lib/documents-form-configs";
 export * from "./documents/record-attachments-panel";
+export * from "./documents/file-browser";
+export * from "./productivity/productivity-widgets";
 export * from "./lib/calendar-types";
 export * from "./lib/calendar-entity-configs";
 export * from "./lib/calendar-form-configs";
@@ -115,14 +122,27 @@ export * from "./lib/iot-form-configs";
 // Dashboard pages & widgets
 export * from "./pages/dashboard-grid";
 export * from "./pages/dashboard-header";
+export * from "./pages/notification-bell";
+export * from "./lib/notification-bell-model";
 export * from "./lib/dashboard-time-range";
 export * from "./components/trend-badge";
+export * from "./components/kpi-strip";
+export * from "./lib/kpi-tiles";
 export * from "./pages/dashboard-sidebar";
+export * from "./pages/dashboard-workspace";
 export * from "./pages/dashboard-widget-renderer";
 export * from "./pages/stored-dashboard-view";
 export * from "./lib/dashboard-types";
+export * from "./lib/chart-format";
+export * from "./charts/combo-trend-chart";
+export * from "./charts/step-anomaly-chart";
+export * from "./charts/ranked-bar-list";
+export * from "./charts/segmented-share-bar";
+export * from "./charts/radial-gauge";
 export * from "./lib/dashboard-config";
 export * from "./lib/dashboard-drill-down";
+export * from "./lib/stored-dashboard-drill-target";
+export * from "./lib/report-export-provenance";
 export * from "./lib/stored-dashboard-resolver";
 export * from "./lib/export-dashboard-png";
 export * from "./lib/export-csv";
@@ -220,6 +240,8 @@ export * from "./settings/field-permissions-editor";
 export * from "./settings/sso-settings";
 export * from "./settings/form-config-settings";
 export * from "./settings/user-custom-fields";
+export * from "./settings/country-pack-readiness";
+export * from "./settings/country-pack-readiness-panel";
 
 // Hooks
 export * from "./hooks/use-toast";
@@ -227,10 +249,26 @@ export * from "./hooks/use-toast";
 // Accounting components
 export * from "./accounting-components/invoice-list-view";
 export * from "./accounting-components/invoice-detail-modal";
+export * from "./accounting-components/invoice-composer";
+export * from "./accounting-components/invoice-preview";
+export * from "./accounting-components/invoice-preview-model";
+export * from "./accounting-components/invoice-math";
+export * from "./accounting-components/printable-invoice";
+export * from "./accounting-components/invoice-print";
 export * from "./accounting-components/create-invoice-modal";
 export * from "./accounting-components/bills-list-view";
+export * from "./accounting-components/bill-intake-review";
+export * from "./accounting-components/bill-source-documents";
+export * from "./accounting-components/accounting-worklist-model";
+export * from "./accounting-components/accounting-worklist-toolbar";
+export * from "./accounting-components/reconciliation-workbench";
+export * from "./accounting-components/reconciliation-workbench-model";
+export * from "./accounting-components/invoice-email-review-dialog";
+export * from "./accounting-components/invoice-email-review";
+export * from "./accounting-components/collections-workspace";
 export * from "./crm-components/crm-utm-settings";
 export * from "./crm-components/crm-record-chatter";
+export * from "./crm-components/chatter-attachments";
 export * from "./accounting-components/chart-of-accounts-view";
 export * from "./accounting-components/chart-structure-workspace";
 export * from "./accounting-components/general-ledger-view";
@@ -242,6 +280,8 @@ export * from "./accounting-components/consolidation-workspace";
 export * from "./accounting-components/fx-revaluation-panel";
 export * from "./accounting-components/partner-credit-control-panel";
 export * from "./accounting-components/amortization-panel";
+export * from "./accounting-components/accounting-setup-readiness";
+export * from "./accounting-components/accounting-setup-readiness-panel";
 
 // Calendar components
 export * from "./calendar-components/calendar-view";
@@ -258,6 +298,7 @@ export * from "./lib/map-pin-configs";
 
 // Proposal workspace
 export * from "./proposal-workspace/proposal-workspace";
+export * from "./proposal-workspace/project-conversion";
 export * from "./proposal-workspace/document-input-panel";
 export * from "./proposal-workspace/compliance-checklist";
 export * from "./proposal-workspace/version-history-bar";
@@ -276,8 +317,19 @@ export * from "./stock-3d/warehouse-3d-context";
 
 export * from "./entity-views/entity-record-sheet";
 export * from "./entity-views/record-workflow-actions";
+export * from "./entity-views/record-page";
+export * from "./entity-views/status-bar";
+export * from "./entity-views/smart-buttons";
+export * from "./entity-views/use-entity-table";
+export * from "./components/record-picker";
+export * from "./components/editable-number";
+export * from "./lib/sale-order-line-totals";
+export * from "./entity-views/sale-order-line-grid";
+export * from "./lib/entity-table-engine";
+export * from "./lib/entity-table-export";
 export * from "./lib/workflow-actions";
 export * from "./lib/workflow-toast";
+export * from "./lib/semantic-operation-outcome";
 export * from "./lib/module-url-filters";
 
 export * from "./pages/erp-command-palette";
@@ -286,3 +338,8 @@ export * from "./entity-views/record-audit-tab";
 export * from "./lib/audit-log-utils";
 export * from "./lib/identity-label";
 export * from "./hooks/use-identity-label-map";
+export * from "./forms/navigation-guard-provider";
+
+export { useUnsavedChangesGuard } from "./forms/use-unsaved-changes-guard"
+
+export { DashboardWidgetRenderer } from "./pages/dashboard-widget-renderer"

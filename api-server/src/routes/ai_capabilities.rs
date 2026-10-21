@@ -13,6 +13,7 @@ use axum::{
 };
 use serde::Serialize;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use stdb_auth::identity_sql_literal;
 
 use crate::{
@@ -88,6 +89,14 @@ async fn get_capability_grants(
             "Capability grant company scope mismatch",
         )
         .await?;
+        let policy_snapshot_hash = resolve_policy_snapshot_hash(
+            &state,
+            context.organization_id(),
+            context.actor_identity(),
+        )
+        .await?;
+        let placement_generation = context.placement_generation()?.get();
+        let capability_grants_hash = capability_grants_hash(&effective);
         let team_refs = resolve_knowledge_team_refs(
             &state,
             context.organization_id(),
@@ -95,12 +104,15 @@ async fn get_capability_grants(
             context.actor_identity(),
         )
         .await?;
-        Some((
-            context.organization_id(),
+        Some(CompanyGrantAuthority {
+            organization_id: context.organization_id(),
             company_id,
-            context.actor_identity(),
-            team_refs,
-        ))
+            actor_identity: context.actor_identity(),
+            knowledge_team_refs: team_refs,
+            placement_generation,
+            policy_snapshot_hash,
+            capability_grants_hash,
+        })
     } else {
         None
     };
@@ -109,20 +121,112 @@ async fn get_capability_grants(
 
 fn capability_response(
     grants: Vec<CapabilityGrant>,
-    authority: Option<(u64, u64, &str, Vec<String>)>,
+    authority: Option<CompanyGrantAuthority<'_>>,
 ) -> Value {
     match authority {
-        Some((organization_id, company_id, actor_identity, team_refs)) => json!({
-            "organizationId": organization_id,
-            "companyId": company_id,
-            "actorIdentity": actor_identity,
-            "knowledgeTeamRefs": team_refs,
+        Some(authority) => json!({
+            "organizationId": authority.organization_id,
+            "companyId": authority.company_id,
+            "actorIdentity": authority.actor_identity,
+            "knowledgeTeamRefs": authority.knowledge_team_refs,
+            "placementGeneration": authority.placement_generation,
+            "policySnapshotHash": authority.policy_snapshot_hash,
+            "capabilityGrantsHash": authority.capability_grants_hash,
             "grants": grants,
         }),
         // Preserve the established generated-read contract for callers that
         // do not request the AIH-16 company-bound authorization envelope.
         None => json!({ "grants": grants }),
     }
+}
+
+struct CompanyGrantAuthority<'a> {
+    organization_id: u64,
+    company_id: u64,
+    actor_identity: &'a str,
+    knowledge_team_refs: Vec<String>,
+    placement_generation: u64,
+    policy_snapshot_hash: String,
+    capability_grants_hash: String,
+}
+
+/// The policy snapshot is updated by canonical membership, role and permission
+/// reducers. Missing or ambiguous state cannot be replaced with a local counter.
+async fn resolve_policy_snapshot_hash(
+    state: &AppState,
+    organization_id: u64,
+    actor_identity: &str,
+) -> Result<String, ApiError> {
+    let identity = identity_sql_literal(actor_identity).map_err(ApiError::Internal)?;
+    let rows = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT version_hash, refreshed_at FROM policy_snapshot WHERE organization_id = {organization_id} \
+             AND user_identity = {identity} LIMIT 2"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    let [row] = rows.as_slice() else {
+        return Err(ApiError::Unavailable(
+            "current authorization generation is unavailable".into(),
+        ));
+    };
+    let refreshed_at = row
+        .get("refreshedAt")
+        .or_else(|| row.get("refreshed_at"))
+        .and_then(timestamp_micros)
+        .ok_or_else(|| {
+            ApiError::Unavailable("current authorization generation is unavailable".into())
+        })?;
+    let assignments = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT expires_at FROM user_role_assignment WHERE organization_id = {organization_id} \
+             AND user_identity = {identity} AND is_active = true"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    if policy_snapshot_expired(
+        refreshed_at,
+        &assignments,
+        chrono::Utc::now().timestamp_micros(),
+    ) {
+        return Err(ApiError::Unavailable(
+            "authorization generation expired and must be refreshed".into(),
+        ));
+    }
+    row.get("versionHash")
+        .or_else(|| row.get("version_hash"))
+        .and_then(Value::as_str)
+        .filter(|hash| !hash.is_empty() && hash.len() <= 128)
+        .map(str::to_string)
+        .ok_or_else(|| {
+            ApiError::Unavailable("current authorization generation is unavailable".into())
+        })
+}
+
+fn policy_snapshot_expired(refreshed_at: i64, assignments: &[Value], now_micros: i64) -> bool {
+    assignments.iter().any(|assignment| {
+        assignment
+            .get("expiresAt")
+            .or_else(|| assignment.get("expires_at"))
+            .and_then(timestamp_micros)
+            .is_some_and(|expires_at| expires_at > refreshed_at && expires_at <= now_micros)
+    })
+}
+
+/// Content generation for exact current AI grants. `effective_grants` is
+/// already sorted by capability key, so this encoding is stable.
+fn capability_grants_hash(grants: &[CapabilityGrant]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"lumiere-ai-capability-grants-v1\0");
+    for grant in grants {
+        hasher.update(grant.capability_key.as_bytes());
+        hasher.update([0]);
+        hasher.update(grant.max_rows.to_be_bytes());
+        hasher.update(grant.max_bytes.to_be_bytes());
+    }
+    format!("sha256:{:x}", hasher.finalize())
 }
 
 /// Resolve knowledge teams from the actor's one canonical active membership.
@@ -433,11 +537,51 @@ mod tests {
         );
         let bound = capability_response(
             Vec::new(),
-            Some((7, 9, "actor", vec!["department:42".into()])),
+            Some(CompanyGrantAuthority {
+                organization_id: 7,
+                company_id: 9,
+                actor_identity: "actor",
+                knowledge_team_refs: vec!["department:42".into()],
+                placement_generation: 3,
+                policy_snapshot_hash: "policy-v3".into(),
+                capability_grants_hash: format!("sha256:{}", "a".repeat(64)),
+            }),
         );
         assert_eq!(bound["organizationId"], 7);
         assert_eq!(bound["companyId"], 9);
         assert_eq!(bound["actorIdentity"], "actor");
         assert_eq!(bound["knowledgeTeamRefs"], json!(["department:42"]));
+        assert_eq!(bound["placementGeneration"], 3);
+        assert_eq!(bound["policySnapshotHash"], "policy-v3");
+        assert_eq!(
+            bound["capabilityGrantsHash"],
+            format!("sha256:{}", "a".repeat(64))
+        );
+    }
+
+    #[test]
+    fn capability_generation_changes_with_effective_authority() {
+        let first = capability_grants_hash(&[CapabilityGrant {
+            capability_key: "inventory.products.read".into(),
+            max_rows: 10,
+            max_bytes: 100,
+        }]);
+        let narrowed = capability_grants_hash(&[CapabilityGrant {
+            capability_key: "inventory.products.read".into(),
+            max_rows: 5,
+            max_bytes: 100,
+        }]);
+        assert_ne!(first, narrowed);
+        assert_eq!(first.len(), "sha256:".len() + 64);
+    }
+
+    #[test]
+    fn policy_snapshot_rejects_authority_that_expired_after_refresh() {
+        let assignments = vec![json!({
+            "expiresAt": { "__timestamp_micros_since_unix_epoch__": 150 }
+        })];
+        assert!(!policy_snapshot_expired(100, &assignments, 149));
+        assert!(policy_snapshot_expired(100, &assignments, 150));
+        assert!(!policy_snapshot_expired(200, &assignments, 250));
     }
 }

@@ -6,7 +6,7 @@ import { useTranslation } from "@lumiere/i18n"
 
 import { cn } from "@/lib/utils"
 import { useRBAC } from "@/lib/rbac-context"
-import { settingsSections } from "@/lib/rbac-defaults"
+import { isSettingsSectionVisibleForProfile, settingsSections } from "@/lib/rbac-defaults"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -74,15 +74,23 @@ type SettingsSectionItem = (typeof settingsSections)[number]
 
 interface SettingsModuleProps {
   className?: string
+  uploadInvoiceLogo?: (file: File, companyId: string | null) => Promise<string>
+  firstOrgProfile?: boolean
 }
 
-export function SettingsModule({ className }: SettingsModuleProps) {
+export function SettingsModule({
+  className,
+  uploadInvoiceLogo,
+  firstOrgProfile = false,
+}: SettingsModuleProps) {
   const { t } = useTranslation()
 
   const [activeSection, setActiveSection] = useState<string | null>(null)
   const { checkPermission, isAdmin } = useRBAC()
-  const accessibleSections = settingsSections.filter((section) =>
-    checkPermission(section.requiredPermission, section.requiredAction).allowed
+  const accessibleSections = settingsSections.filter(
+    (section) =>
+      isSettingsSectionVisibleForProfile(section.id, isAdmin(), firstOrgProfile) &&
+      checkPermission(section.requiredPermission, section.requiredAction).allowed,
   )
 
   const renderSectionContent = () => {
@@ -104,7 +112,7 @@ export function SettingsModule({ className }: SettingsModuleProps) {
       case "custom-fields":
         return <UserCustomFields />
       case "organization":
-        return <OrganizationSettings />
+        return <OrganizationSettings uploadInvoiceLogo={uploadInvoiceLogo} />
       case "ai":
         return <AiSettings />
       default:

@@ -1,13 +1,40 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import type { QueryClient, QueryKey } from "@tanstack/react-query"
-import { resolveAllowedActiveCompanyId } from "@lumiere/erp-session"
+import { QueryClient, type QueryKey } from "@tanstack/react-query"
+import {
+  resolveAllowedActiveCompanyId,
+  resolveRequestedActiveCompanyId,
+} from "@lumiere/erp-session"
+import { SUBSCRIPTIONS_WORKSPACE_RESOURCE_KEYS } from "@lumiere/stdb/subscriptions"
+import { HttpResponseError } from "@lumiere/api-client/response-error"
 
 import {
+  fetchTypedStdbQueryRows,
   invalidateStdbQueryResources,
   stdbQueryKey,
   typedStdbQueryKey,
 } from "./stdb"
+
+test("typed resource reads preserve HTTP status for read-state classification", async () => {
+  for (const status of [401, 403, 503]) {
+    await assert.rejects(
+      fetchTypedStdbQueryRows(
+        "account-journals",
+        42n,
+        async () => new Response(JSON.stringify({ detail: `journals failed with ${status}` }), {
+          status,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof HttpResponseError)
+        assert.equal(error.status, status)
+        assert.equal(error.message, `journals failed with ${status}`)
+        return true
+      },
+    )
+  }
+})
 
 test("typed resource keys are company-scoped and isolated from direct row cache keys", () => {
   assert.deepEqual(typedStdbQueryKey("account-journals", 7n, 42), [
@@ -27,6 +54,9 @@ test("a fresh session resolves its first authorized company for typed reads", ()
   assert.equal(resolveAllowedActiveCompanyId(null, [42]), 42)
   assert.equal(resolveAllowedActiveCompanyId(7, [42, 7]), 7)
   assert.equal(resolveAllowedActiveCompanyId(99, [42, 7]), 42)
+  assert.equal(resolveRequestedActiveCompanyId(7, [42, 7]), 7)
+  assert.equal(resolveRequestedActiveCompanyId(99, [42, 7]), null)
+  assert.equal(resolveRequestedActiveCompanyId(Number.NaN, [42, 7]), null)
 })
 
 test("resource invalidation always includes the typed HTTP namespace", () => {
@@ -41,4 +71,24 @@ test("resource invalidation always includes the typed HTTP namespace", () => {
   invalidateStdbQueryResources(queryClient, 7n, ["account-taxes"])
 
   assert.deepEqual(invalidated[0], ["typed-stdb", "account-taxes", "7"])
+})
+
+test("subscription handoffs subscribe to all canonical relation resources", () => {
+  for (const resource of ["subscription-billing-runs", "account-moves", "account-payments"] as const) {
+    assert.ok(SUBSCRIPTIONS_WORKSPACE_RESOURCE_KEYS.includes(resource))
+  }
+})
+
+test("payment invalidation reaches typed company caches without crossing organizations", () => {
+  const queryClient = new QueryClient()
+  const companyPaymentKey = typedStdbQueryKey("account-payments", 7n, 42)
+  const otherOrgPaymentKey = typedStdbQueryKey("account-payments", 8n, 42)
+  queryClient.setQueryData(companyPaymentKey, [])
+  queryClient.setQueryData(otherOrgPaymentKey, [])
+
+  invalidateStdbQueryResources(queryClient, 7n, ["account-payments"])
+
+  assert.equal(queryClient.getQueryState(companyPaymentKey)?.isInvalidated, true)
+  assert.equal(queryClient.getQueryState(otherOrgPaymentKey)?.isInvalidated, false)
+  queryClient.clear()
 })

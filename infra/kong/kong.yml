@@ -2,8 +2,64 @@ _format_version: "3.0"
 _transform: true
 
 services:
+  # Serve crawler instructions without waking Next.js or contacting a backend.
+  - name: robots
+    url: http://127.0.0.1:1
+    routes:
+      - name: robots
+        paths: ['~/robots\.txt$']
+    plugins:
+      - name: request-termination
+        config:
+          status_code: 200
+          content_type: text/plain
+          body: "User-agent: *\nDisallow: /\n"
+
+  # This is a private ERP, not a CMS. Reject scanner probes at the gateway.
+  - name: scanner-reject
+    url: http://127.0.0.1:1
+    routes:
+      - name: scanner-reject
+        paths: ['/.git', '/.env', '/wp-admin', '/wp-login.php', '/xmlrpc.php']
+    plugins:
+      - name: request-termination
+        config:
+          status_code: 404
+          content_type: application/json
+          body: '{"error":"Not found"}'
+
+  # Disabled features must not proxy to paid external ingestion or AI services.
+  - name: disabled-ingestion
+    url: http://127.0.0.1:1
+    routes:
+      - name: disabled-ingestion
+        paths: ['/ingest', '/_vercel/insights']
+    plugins:
+      - name: request-termination
+        config:
+          status_code: 404
+          content_type: application/json
+          body: '{"error":"Analytics ingestion is disabled"}'
+
+  # Railway probes this gateway-owned route. The request-termination plugin
+  # answers before proxying, so readiness never depends on web being deployed.
+  - name: gateway-health
+    url: http://127.0.0.1:1
+    routes:
+      - name: gateway-health
+        paths:
+          - /health/ready
+          - /health
+        strip_path: false
+    plugins:
+      - name: request-termination
+        config:
+          status_code: 200
+          content_type: application/json
+          body: '{"status":"ok","service":"api-gateway"}'
+
   - name: web
-    url: http://web:3000
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__
     routes:
       - name: web-root
         paths:
@@ -13,17 +69,16 @@ services:
       - name: rate-limiting
         config:
           minute: 600
-          policy: redis
-          redis:
-            host: redis
-            port: 6379
-            timeout: 2000
+          hour: 6000
+          limit_by: ip
+          fault_tolerant: false
+          policy: local
       - name: request-size-limiting
         config:
           allowed_payload_size: 20
 
   - name: api-query
-    url: http://api-server:8082/v1/query
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/query
     routes:
       - name: api-query
         paths:
@@ -33,14 +88,13 @@ services:
       - name: rate-limiting
         config:
           minute: 240
-          policy: redis
-          redis:
-            host: redis
-            port: 6379
-            timeout: 2000
+          hour: 3000
+          limit_by: ip
+          fault_tolerant: false
+          policy: local
 
   - name: api-call
-    url: http://api-server:8082/v1/call
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/call
     routes:
       - name: api-call
         paths:
@@ -50,17 +104,16 @@ services:
       - name: rate-limiting
         config:
           minute: 90
-          policy: redis
-          redis:
-            host: redis
-            port: 6379
-            timeout: 2000
+          hour: 1000
+          limit_by: ip
+          fault_tolerant: false
+          policy: local
       - name: request-size-limiting
         config:
           allowed_payload_size: 20
 
   - name: api-stdb
-    url: http://api-server:8082/v1/stdb
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/stdb
     routes:
       - name: api-stdb
         paths:
@@ -70,17 +123,16 @@ services:
       - name: rate-limiting
         config:
           minute: 240
-          policy: redis
-          redis:
-            host: redis
-            port: 6379
-            timeout: 2000
+          hour: 3000
+          limit_by: ip
+          fault_tolerant: false
+          policy: local
       - name: request-size-limiting
         config:
           allowed_payload_size: 32
 
   - name: api-auth-signin
-    url: http://api-server:8082/v1/auth/signin
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/auth/signin
     routes:
       - name: api-auth-signin
         paths:
@@ -89,15 +141,27 @@ services:
     plugins: &auth_plugins
       - name: rate-limiting
         config:
-          minute: 30
-          policy: redis
-          redis:
-            host: redis
-            port: 6379
-            timeout: 2000
+          minute: 10
+          hour: 100
+          limit_by: ip
+          fault_tolerant: false
+          policy: local
+
+  - name: api-auth-signup
+    url: http://127.0.0.1:1
+    routes:
+      - name: api-auth-signup
+        paths: ['/api/auth/signup']
+        strip_path: true
+    plugins:
+      - name: request-termination
+        config:
+          status_code: 403
+          content_type: application/json
+          body: '{"error":"This initial release is invite-only. Contact your administrator."}'
 
   - name: api-auth-invite
-    url: http://api-server:8082/v1/auth/invite
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/auth/invite
     routes:
       - name: api-auth-invite
         paths:
@@ -106,7 +170,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-auth-accept-invite
-    url: http://api-server:8082/v1/auth/accept-invite
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/auth/accept-invite
     routes:
       - name: api-auth-accept-invite
         paths:
@@ -115,7 +179,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-auth-forgot-password
-    url: http://api-server:8082/v1/auth/forgot-password
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/auth/forgot-password
     routes:
       - name: api-auth-forgot-password
         paths:
@@ -124,7 +188,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-auth-reset-password
-    url: http://api-server:8082/v1/auth/reset-password
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/auth/reset-password
     routes:
       - name: api-auth-reset-password
         paths:
@@ -133,7 +197,7 @@ services:
     plugins: *auth_plugins
 
   - name: api-crm
-    url: http://api-server:8082/v1/crm
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/crm
     routes:
       - name: api-crm
         paths:
@@ -143,17 +207,16 @@ services:
       - name: rate-limiting
         config:
           minute: 180
-          policy: redis
-          redis:
-            host: redis
-            port: 6379
-            timeout: 2000
+          hour: 2000
+          limit_by: ip
+          fault_tolerant: false
+          policy: local
       - name: request-size-limiting
         config:
           allowed_payload_size: 20
 
   - name: api-sales
-    url: http://api-server:8082/v1/sales
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/sales
     routes:
       - name: api-sales
         paths:
@@ -162,7 +225,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-accounting
-    url: http://api-server:8082/v1/accounting
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/accounting
     routes:
       - name: api-accounting
         paths:
@@ -171,7 +234,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-inventory
-    url: http://api-server:8082/v1/inventory
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/inventory
     routes:
       - name: api-inventory
         paths:
@@ -180,7 +243,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-settings
-    url: http://api-server:8082/v1/settings
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/settings
     routes:
       - name: api-settings
         paths:
@@ -189,7 +252,7 @@ services:
     plugins: *domain_plugins
 
   - name: api-proposals
-    url: http://api-server:8082/v1/proposals
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/proposals
     routes:
       - name: api-proposals
         paths:
@@ -197,8 +260,28 @@ services:
         strip_path: true
     plugins: *domain_plugins
 
+  # Generic ERP commands are Rust-owned. Route them here rather than relying on
+  # Next.js build-time rewrites, which may be absent in a standalone image.
+  - name: api-operations
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/operations
+    routes:
+      - name: api-operations
+        paths:
+          - /api/operations
+        strip_path: true
+    plugins: *domain_plugins
+
+  - name: api-compat-reducer
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__/api/compat/reducer
+    routes:
+      - name: api-compat-reducer
+        paths:
+          - /api/compat/reducer
+        strip_path: true
+    plugins: *domain_plugins
+
   - name: api-realtime
-    url: http://api-server:8082/v1/realtime
+    url: http://__API_SERVER_UPSTREAM_HOST__:__API_SERVER_UPSTREAM_PORT__/v1/realtime
     routes:
       - name: api-realtime
         paths:
@@ -211,38 +294,35 @@ services:
       - name: rate-limiting
         config:
           minute: 120
-          policy: redis
-          redis:
-            host: redis
-            port: 6379
-            timeout: 2000
+          hour: 1500
+          limit_by: ip
+          fault_tolerant: false
+          policy: local
 
   - name: web-ai
-    url: http://web:3000
+    url: http://127.0.0.1:1
     routes:
       - name: web-ai
         paths:
           - /api/ai
         strip_path: false
     plugins:
-      - name: rate-limiting
+      - name: request-termination
         config:
-          minute: 60
-          policy: redis
-          redis:
-            host: redis
-            port: 6379
-            timeout: 2000
-      - name: request-size-limiting
-        config:
-          allowed_payload_size: 20
+          status_code: 503
+          content_type: application/json
+          body: '{"error":"AI is disabled for the initial release"}'
 
 plugins:
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - 'X-Robots-Tag:noindex, nofollow, noarchive'
   - name: cors
     config:
       origins:
-        - http://localhost:8000
-        - http://127.0.0.1:8000
+        - '__CORS_ORIGIN__'
       credentials: true
       methods:
         - GET

@@ -21,7 +21,12 @@ function httpBaseToRealtimeWsUrl(baseHttp: string): string {
   return `${wsProto}//${u.host}/v1/realtime/ws`
 }
 
-function resolveRealtimeWsUrl(): string {
+export function resolveRealtimeWsUrl(sameOrigin = false): string {
+  if (sameOrigin) {
+    if (typeof window === 'undefined') return ''
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}/v1/realtime/ws`
+  }
   const explicit = process.env.NEXT_PUBLIC_REALTIME_WS_URL?.trim()
   if (explicit) {
     return explicit.replace(/\/$/, "")
@@ -58,6 +63,10 @@ export function useLumiereRealtime(options: {
   activeCompanyId?: number | null
   resources: readonly string[]
   enabled?: boolean
+  /** Hosted sessions use host-only handshake cookies and must stay on the current origin. */
+  sameOrigin?: boolean
+  /** Refresh an HTTP-only handshake credential before connecting. Never put bearer tokens in URLs. */
+  beforeConnect?: () => Promise<void>
 }) {
   const {
     queryClient,
@@ -66,7 +75,10 @@ export function useLumiereRealtime(options: {
     activeCompanyId,
     resources,
     enabled = true,
+    sameOrigin = false,
   } = options
+  const beforeConnectRef = useRef(options.beforeConnect)
+  beforeConnectRef.current = options.beforeConnect
   const resourcesRef = useRef(resources)
   resourcesRef.current = resources
 
@@ -92,11 +104,15 @@ export function useLumiereRealtime(options: {
       }, delay)
     }
 
-    const connect = () => {
+    const connect = async () => {
+      try { await beforeConnectRef.current?.() } catch {
+        scheduleReconnect()
+        return
+      }
       if (closed) {
         return
       }
-      const url = resolveRealtimeWsUrl()
+      const url = resolveRealtimeWsUrl(sameOrigin)
       if (!url) {
         return
       }
@@ -164,6 +180,7 @@ export function useLumiereRealtime(options: {
       ws?.close()
     }
   }, [
+    sameOrigin,
     queryClient,
     organizationId,
     enabled,

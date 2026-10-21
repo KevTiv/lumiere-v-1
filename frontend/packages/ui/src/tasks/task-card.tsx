@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -42,6 +43,8 @@ const priorityIcons: Record<TaskPriority, React.ReactNode> = {
 }
 
 export function TaskCardContent({ task }: { task: Task }) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.resolvedLanguage ?? i18n.language
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date()
 
   return (
@@ -82,7 +85,7 @@ export function TaskCardContent({ task }: { task: Task }) {
         <div className="flex items-center gap-2">
           {task.storyPoints ? (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 font-mono">
-              {task.storyPoints} SP
+              {t("tasks.card.storyPoints", { count: task.storyPoints })}
             </Badge>
           ) : null}
 
@@ -94,7 +97,7 @@ export function TaskCardContent({ task }: { task: Task }) {
               )}
             >
               <Calendar className="h-3 w-3" />
-              {new Date(task.dueDate).toLocaleDateString("en-US", {
+              {new Date(task.dueDate).toLocaleDateString(locale, {
                 month: "short",
                 day: "numeric",
               })}

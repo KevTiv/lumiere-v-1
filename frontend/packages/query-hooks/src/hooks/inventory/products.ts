@@ -126,6 +126,51 @@ export function useProducts(
   });
 }
 
+/** Read-only list served by the authorized HTTP query path (`/api/query/product-attributes`). */
+export function useProductAttributes(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['product-attributes', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/product-attributes', 'Failed to read product attributes'),
+    staleTime: 30_000,
+  });
+}
+
+/** Read-only list served by the authorized HTTP query path (`/api/query/product-attribute-values`). */
+export function useProductAttributeValues(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['product-attribute-values', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/product-attribute-values', 'Failed to read product attribute values'),
+    staleTime: 30_000,
+  });
+}
+
+/** Read-only list served by the authorized HTTP query path (`/api/query/product-attribute-lines`). */
+export function useProductAttributeLines(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['product-attribute-lines', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/product-attribute-lines', 'Failed to read product attribute lines'),
+    staleTime: 30_000,
+  });
+}
+
+/** Read-only list served by the authorized HTTP query path (`/api/query/product-supplier-infos`). */
+export function useProductSupplierInfos(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['product-supplier-infos', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/product-supplier-infos', 'Failed to read vendor prices'),
+    staleTime: 30_000,
+  });
+}
+
+/** Read-only list served by the authorized HTTP query path (`/api/query/product-packagings`). */
+export function useProductPackagings(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['product-packagings', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/product-packagings', 'Failed to read product packagings'),
+    staleTime: 30_000,
+  });
+}
+
 export function useProductCategories(
   organizationId: bigint,
   initialData?: ProductCategory[],

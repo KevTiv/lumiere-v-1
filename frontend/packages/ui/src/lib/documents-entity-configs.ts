@@ -22,6 +22,9 @@ export const documentsTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("documents.documents.description"),
   view: {
     mode: "table",
+    // Document names and filenames can contain confidential or personal information.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.documents.searchPlaceholder"),
@@ -45,8 +48,8 @@ export const documentsTableConfig = (t: TFunction): EntityViewConfig => ({
       },
     ],
     columns: [
-      { key: "name", label: t("documents.documents.columns.name"), width: "min-w-48" },
-      { key: "fileName", label: t("documents.documents.columns.fileName"), width: "min-w-36" },
+      { key: "name", sensitive: true, label: t("documents.documents.columns.name"), width: "min-w-48" },
+      { key: "fileName", sensitive: true, label: t("documents.documents.columns.fileName"), width: "min-w-36" },
       { key: "mimetype", label: t("documents.documents.columns.mimetype"), width: "min-w-24" },
       { key: "fileSize", label: t("documents.documents.columns.fileSize"), type: "number", align: "right" },
       { key: "fiscalKind", label: t("documents.documents.columns.fiscalKind"), width: "min-w-28" },
@@ -68,6 +71,9 @@ export const knowledgeArticlesTableConfig = (t: TFunction): EntityViewConfig => 
   description: t("documents.knowledgeBase.description"),
   view: {
     mode: "table",
+    // Article names and descriptions may contain unpublished confidential content.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.knowledgeBase.searchPlaceholder"),
@@ -84,8 +90,8 @@ export const knowledgeArticlesTableConfig = (t: TFunction): EntityViewConfig => 
       },
     ],
     columns: [
-      { key: "name", label: t("documents.knowledgeBase.columns.name"), width: "min-w-48" },
-      { key: "description", label: t("documents.knowledgeBase.columns.description"), width: "min-w-48" },
+      { key: "name", sensitive: true, label: t("documents.knowledgeBase.columns.name"), width: "min-w-48" },
+      { key: "description", sensitive: true, label: t("documents.knowledgeBase.columns.description"), width: "min-w-48" },
       { key: "isPublished", label: t("documents.knowledgeBase.columns.isPublished"), type: "boolean" },
       { key: "articleItemCount", label: t("documents.knowledgeBase.columns.articleItemCount"), type: "number", align: "right" },
       { key: "articleMemberCount", label: t("documents.knowledgeBase.columns.articleMemberCount"), type: "number", align: "right" },
@@ -101,6 +107,8 @@ export const knowledgeCategoriesTableConfig = (t: TFunction): EntityViewConfig =
   description: t("documents.knowledgeCategories.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.knowledgeCategories.searchPlaceholder"),
@@ -122,13 +130,15 @@ export const documentFoldersTableConfig = (t: TFunction): EntityViewConfig => ({
   description: t("documents.folders.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.folders.searchPlaceholder"),
     searchKeys: ["name", "description", "parentPath"],
     columns: [
-      { key: "name", label: t("documents.folders.columns.name"), width: "min-w-48" },
-      { key: "parentPath", label: t("documents.folders.columns.parentPath"), width: "min-w-36" },
+      { key: "name", sensitive: true, label: t("documents.folders.columns.name"), width: "min-w-48" },
+      { key: "parentPath", sensitive: true, label: t("documents.folders.columns.parentPath"), width: "min-w-36" },
       { key: "documentCount", label: t("documents.folders.columns.documentCount"), type: "number", align: "right" },
       { key: "isFavorite", label: t("documents.folders.columns.isFavorite"), type: "boolean" },
       { key: "isHidden", label: t("documents.folders.columns.isHidden"), type: "boolean" },
@@ -144,6 +154,8 @@ export const documentProcessingJobsTableConfig = (t: TFunction): EntityViewConfi
   description: t("documents.processing.description"),
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.processing.searchPlaceholder"),
@@ -192,6 +204,9 @@ export const documentAiInsightsTableConfig = (t: TFunction): EntityViewConfig =>
   description: t("documents.insights.description"),
   view: {
     mode: "table",
+    // Generated insight titles may reproduce confidential document content.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.insights.searchPlaceholder"),
@@ -217,7 +232,7 @@ export const documentAiInsightsTableConfig = (t: TFunction): EntityViewConfig =>
       },
     ],
     columns: [
-      { key: "title", label: t("documents.insights.columns.title"), width: "min-w-40" },
+      { key: "title", sensitive: true, label: t("documents.insights.columns.title"), width: "min-w-40" },
       {
         key: "severity",
         label: t("documents.insights.columns.severity"),
@@ -238,13 +253,16 @@ export const documentsRecycleBinTableConfig = (t: TFunction): EntityViewConfig =
   description: "Soft-deleted documents that can be restored.",
   view: {
     mode: "table",
+    // Deleted document names and filenames remain confidential.
+    // Generic CSV has no dedicated export authorization; keep this list in the app.
+    allowExport: false,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: t("documents.documents.searchPlaceholder"),
     searchKeys: ["name", "fileName"],
     columns: [
-      { key: "name", label: t("documents.documents.columns.name"), width: "min-w-48" },
-      { key: "fileName", label: t("documents.documents.columns.fileName"), width: "min-w-36" },
+      { key: "name", sensitive: true, label: t("documents.documents.columns.name"), width: "min-w-48" },
+      { key: "fileName", sensitive: true, label: t("documents.documents.columns.fileName"), width: "min-w-36" },
       { key: "deletedAt", label: "Deleted at", type: "date" },
       { key: "versionCount", label: t("documents.documents.columns.versionCount"), type: "number", align: "right" },
     ],
@@ -258,6 +276,8 @@ export const documentTemplatesTableConfig = (_t: TFunction): EntityViewConfig =>
   description: "PDF / HTML document layouts.",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search templates…",
@@ -279,6 +299,8 @@ export const mailTemplatesTableConfig = (_t: TFunction): EntityViewConfig => ({
   description: "Outbound email templates.",
   view: {
     mode: "table",
+    // Reviewed for generic CSV: sensitive columns are excluded from the file.
+    allowExport: true,
     rowKey: "id",
     searchable: true,
     searchPlaceholder: "Search mail templates…",
@@ -305,3 +327,4 @@ export const documentsEntityConfigs = (t: TFunction): Record<string, EntityViewC
   "document-templates-table": documentTemplatesTableConfig(t),
   "mail-templates-table": mailTemplatesTableConfig(t),
 })
+

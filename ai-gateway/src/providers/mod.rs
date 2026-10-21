@@ -184,6 +184,7 @@ mod readiness_tests {
         Config {
             port: 8080,
             internal_secret: None,
+            ai_execution_envelope_key: None,
             qdrant_url: "http://qdrant".into(),
             qdrant_api_key: None,
             qdrant_collection: "collection".into(),

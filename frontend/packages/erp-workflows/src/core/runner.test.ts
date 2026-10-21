@@ -10,6 +10,7 @@ function flaky(failures: Array<() => Error>) {
   let calls = 0
   const spec: TransitionSpec<string> = {
     id: "test.flaky",
+    noReadback: "test fixture",
     affects: ["sale-orders"],
     command: async () => {
       const next = failures[calls++]
@@ -72,6 +73,7 @@ test("every logged event carries the run key, and a double click issues one writ
   const gate = new Promise<void>((resolve) => (release = resolve))
   const spec: TransitionSpec<string> = {
     id: "test.slow",
+    noReadback: "test fixture",
     affects: ["sale-orders"],
     command: async () => {
       calls++

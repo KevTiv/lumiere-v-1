@@ -2,11 +2,27 @@
 
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { encodeIdentity, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import {
+  accountMoveHref,
+  accountPaymentHref,
+  expenseSheetHref,
+  purchaseOrderHref,
+  saleOrderHref,
+} from "@lumiere/erp-shared/record-links"
 import type { WorkflowHumanTaskDecision } from "@lumiere/stdb/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
+import type { CanonicalRecordRef } from "./operation-effect"
+import {
+  resolveHumanTaskClaimEffect,
+  resolveHumanTaskDecisionEffect,
+  type HumanTaskEffectProjection,
+} from "./human-task-effect"
+
+import { approvalSelection, requireUnchangedApproval, type ApprovalSelection } from "./approval-controls"
+import { workflowDelegationMetadata } from "@lumiere/erp-shared/workflow-delegation"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
 
@@ -47,6 +63,8 @@ export type HumanTaskRow = {
   require_comment_on_reject?: boolean
   requestedBy?: unknown
   requested_by?: unknown
+  actingForOptions?: Array<{ identityHex: string; label: string }>
+  directlyEligible?: boolean
   claimedBy?: unknown
   claimed_by?: unknown
   decision?: string | { tag?: string } | null
@@ -153,6 +171,14 @@ export function approvalInboxQueryKey(organizationId: number) {
   return humanTaskInboxQueryKey(organizationId, null)
 }
 
+/** Every-status task read (the inbox omits decided tasks) for exact effect readback. */
+async function fetchHumanTaskRows(): Promise<HumanTaskEffectProjection[]> {
+  const r = await apiFetch("/api/query/workflow-human-tasks")
+  if (!r.ok) throw new Error(await parseCallError(r))
+  const j = (await r.json()) as { data?: HumanTaskEffectProjection[] }
+  return j.data ?? []
+}
+
 export type ClaimHumanTaskInput = {
   companyId: number
   taskId: number
@@ -163,19 +189,27 @@ export type ClaimHumanTaskInput = {
 
 export function useClaimHumanTask(organizationId: number) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (input: ClaimHumanTaskInput) => {
+  return useMutation<CanonicalRecordRef, Error, ClaimHumanTaskInput>({
+    mutationFn: async (input) => {
       const params = {
         companyId: input.companyId,
         taskId: input.taskId,
         expectedRevision: input.expectedRevision,
-        actingFor: input.actingFor ?? null,
+        actingFor: typeof input.actingFor === "string" ? encodeIdentity(input.actingFor) : input.actingFor ?? null,
         idempotencyKey: newIdempotencyKey("claim"),
         correlationId: input.correlationId ?? newIdempotencyKey("corr"),
       }
       const { urlPath, init } = stdbBffCommandPost("claim_workflow_human_task", { params: stdbParamsToJson(params, "ClaimWorkflowHumanTaskParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
+      const effect = resolveHumanTaskClaimEffect(
+        await fetchHumanTaskRows(),
+        BigInt(organizationId),
+        BigInt(input.taskId),
+        input.expectedRevision,
+      )
+      if (!effect) throw new Error("Human task claim did not read back")
+      return effect
     },
     onSuccess: () => invalidateHumanTaskQueries(qc, organizationId),
   })
@@ -194,8 +228,8 @@ export type DecideHumanTaskInput = {
 
 export function useDecideHumanTask(organizationId: number) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (input: DecideHumanTaskInput) => {
+  return useMutation<CanonicalRecordRef, Error, DecideHumanTaskInput>({
+    mutationFn: async (input) => {
       const decision =
         typeof input.decision === "object" && input.decision && "tag" in input.decision
           ? input.decision
@@ -206,7 +240,7 @@ export function useDecideHumanTask(organizationId: number) {
         expectedTaskRevision: input.expectedTaskRevision,
         expectedInstanceRevision: input.expectedInstanceRevision,
         decision,
-        actingFor: input.actingFor ?? null,
+        actingFor: typeof input.actingFor === "string" ? encodeIdentity(input.actingFor) : input.actingFor ?? null,
         comment: input.comment ?? null,
         idempotencyKey: newIdempotencyKey("decide"),
         correlationId: input.correlationId ?? newIdempotencyKey("corr"),
@@ -215,6 +249,15 @@ export function useDecideHumanTask(organizationId: number) {
       const { urlPath, init } = stdbBffCommandPost("decide_workflow_human_task", { params: stdbParamsToJson(params, "DecideWorkflowHumanTaskParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
+      const effect = resolveHumanTaskDecisionEffect(
+        await fetchHumanTaskRows(),
+        BigInt(organizationId),
+        BigInt(input.taskId),
+        decision.tag as "Approve" | "Reject" | "Complete",
+        input.expectedTaskRevision,
+      )
+      if (!effect) throw new Error("Human task decision did not read back")
+      return effect
     },
     onSuccess: () => invalidateHumanTaskQueries(qc, organizationId),
   })
@@ -249,78 +292,71 @@ export function useCommentHumanTask(organizationId: number) {
 }
 
 /** Compatibility wrappers for sales/purchasing panels during cutover. */
-export function useApproveApprovalRequest(organizationId: number, _companyId: number) {
+export function useApproveApprovalRequest(organizationId: number, companyId: number) {
   const decide = useDecideHumanTask(organizationId)
-  const claim = useClaimHumanTask(organizationId)
-  const inbox = useHumanTaskInbox(organizationId, null, organizationId > 0)
+  const inbox = useHumanTaskInbox(organizationId, companyId, organizationId > 0 && companyId > 0)
   return useMutation({
-    mutationFn: async (taskId: number) => {
+    mutationFn: async (input: number | ApprovalSelection) => {
+      const taskId = typeof input === "number" ? input : input.requestId
       const row = (inbox.data ?? []).find((r) => Number(r.id) === taskId)
-      if (!row) throw new Error("Human task not found in inbox")
-      const companyId = humanTaskCompanyId(row)
-      const status = taskStatusTag(row)
-      if (status === "Open") {
-        await claim.mutateAsync({
-          companyId,
-          taskId,
-          expectedRevision: humanTaskRevision(row),
-        })
-        // Refresh expected revision after claim — claim bumps revision by 1.
-        await decide.mutateAsync({
-          companyId,
-          taskId,
-          expectedTaskRevision: humanTaskRevision(row) + 1,
-          expectedInstanceRevision: Number(
-            row.instanceRevision ?? row.instance_revision ?? 0,
-          ),
-          decision: { tag: "Approve" },
-        })
-        return
-      }
+      if (!row) throw new Error("Human task not found in this company's inbox")
+      const selected = typeof input === "number" ? approvalSelection(row, companyId) : input
+      if (selected.companyId !== companyId) throw new Error("Approval belongs to another company")
+      requireUnchangedApproval(selected, row)
+      // The reducer accepts an unclaimed task. A single revision-bound decision
+      // avoids claiming it with one request and guessing the next revision.
       await decide.mutateAsync({
         companyId,
         taskId,
-        expectedTaskRevision: humanTaskRevision(row),
-        expectedInstanceRevision: Number(
-          row.instanceRevision ?? row.instance_revision ?? 0,
-        ),
+        expectedTaskRevision: selected.expectedTaskRevision,
+        expectedInstanceRevision: selected.expectedInstanceRevision,
+        actingFor: selected.actingFor,
         decision: { tag: "Approve" },
       })
     },
   })
 }
 
-export function useRejectApprovalRequest(organizationId: number, _companyId: number) {
+export function useRejectApprovalRequest(organizationId: number, companyId: number) {
   const decide = useDecideHumanTask(organizationId)
-  const claim = useClaimHumanTask(organizationId)
-  const inbox = useHumanTaskInbox(organizationId, null, organizationId > 0)
+  const inbox = useHumanTaskInbox(organizationId, companyId, organizationId > 0 && companyId > 0)
   return useMutation({
-    mutationFn: async (input: { requestId: number; reason: string; comment?: string }) => {
+    mutationFn: async (input: { requestId: number; reason: string; comment?: string; selection?: ApprovalSelection }) => {
       const row = (inbox.data ?? []).find((r) => Number(r.id) === input.requestId)
-      if (!row) throw new Error("Human task not found in inbox")
-      const companyId = humanTaskCompanyId(row)
-      const status = taskStatusTag(row)
-      const comment = input.comment?.trim() || input.reason
-      let expectedTaskRevision = humanTaskRevision(row)
-      if (status === "Open") {
-        await claim.mutateAsync({
-          companyId,
-          taskId: input.requestId,
-          expectedRevision: expectedTaskRevision,
-        })
-        expectedTaskRevision += 1
-      }
+      if (!row) throw new Error("Human task not found in this company's inbox")
+      const selected = input.selection ?? approvalSelection(row, companyId)
+      if (selected.requestId !== input.requestId || selected.companyId !== companyId) throw new Error("Approval belongs to another task or company")
+      requireUnchangedApproval(selected, row)
       await decide.mutateAsync({
         companyId,
-        taskId: input.requestId,
-        expectedTaskRevision,
-        expectedInstanceRevision: Number(
-          row.instanceRevision ?? row.instance_revision ?? 0,
-        ),
+        taskId: selected.requestId,
+        expectedTaskRevision: selected.expectedTaskRevision,
+        expectedInstanceRevision: selected.expectedInstanceRevision,
+        actingFor: selected.actingFor,
         decision: { tag: "Reject" },
-        comment,
+        comment: input.comment?.trim() || input.reason,
       })
     },
+  })
+}
+
+export function useCreateWorkflowDelegation(organizationId: number, companyId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { principalIdentity: string; delegateIdentity: string; validFrom: string; validUntil: string; reason?: string }) => {
+      if (companyId <= 0) throw new Error("Select an operating company")
+      const metadata = workflowDelegationMetadata(input.validFrom, input.validUntil, input.reason ?? "")
+      const params = stdbParamsToJson({
+        principalIdentity: encodeIdentity(input.principalIdentity),
+        delegateIdentity: encodeIdentity(input.delegateIdentity),
+        isActive: true,
+        metadata,
+      }, "SetPurchaseApprovalDelegateParams")
+      const { urlPath, init } = stdbBffCommandPost("set_purchase_approval_delegate", { companyId, params })
+      const response = await apiFetch(urlPath, init)
+      if (!response.ok) throw new Error(await parseCallError(response))
+    },
+    onSuccess: () => invalidateHumanTaskQueries(qc, organizationId),
   })
 }
 
@@ -349,17 +385,17 @@ export function approvalRecordHref(model?: string, resId?: number): string | und
   if (!model || resId == null || resId <= 0) return undefined
   switch (model) {
     case "purchase_order":
-      return `/purchasing?po=${resId}`
+      return purchaseOrderHref(resId)
     case "sale_order":
-      return `/sales?so=${resId}`
+      return saleOrderHref(resId)
     case "account_move":
-      return `/accounting?invoice=${resId}`
+      return accountMoveHref(resId)
     case "account_payment":
-      return `/accounting?payment=${resId}`
+      return accountPaymentHref(resId)
     case "ai_action_draft":
       return `/ai-action-drafts?draft=${resId}`
     case "hr_expense_sheet":
-      return `/expenses?sheet=${resId}`
+      return expenseSheetHref(resId)
     default:
       return undefined
   }

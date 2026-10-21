@@ -7,7 +7,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{Map, Value};
 
 use super::super::conventions;
-use super::super::pg_codec::{self, snake_to_camel};
+use super::super::pg_codec::{self, rust_field_name, snake_to_camel};
 use super::checksum::{
     change_checksum, commit_checksum, commit_id, decode_identity, parse_canonical_json,
     validate_operation_id, validate_token,
@@ -176,10 +176,10 @@ pub(super) fn validate_full_row(
     let expected: BTreeSet<&str> = codec
         .columns
         .iter()
-        .map(|column| column.name.as_str())
+        .filter_map(|column| row_key(object, &column.name))
         .collect();
     let actual: BTreeSet<&str> = object.keys().map(String::as_str).collect();
-    if actual != expected {
+    if expected.len() != codec.columns.len() || actual != expected {
         bail!(
             "{} upsert must contain exactly the generated full row",
             codec.table_name
@@ -208,14 +208,27 @@ pub(super) fn validate_full_row(
     Ok(())
 }
 
+/// Key under which `object` carries a generated column: the SpacetimeDB row
+/// key (`rust_field_name`) when present, otherwise the column name itself.
+fn row_key<'a>(object: &'a Map<String, Value>, column_name: &'a str) -> Option<&'a str> {
+    let stdb_key = rust_field_name(column_name);
+    if object.contains_key(stdb_key) {
+        Some(stdb_key)
+    } else if object.contains_key(column_name) {
+        Some(column_name)
+    } else {
+        None
+    }
+}
+
 pub(super) fn normalize_row_for_codec(codec: &ProjectionCodec, row: &Value) -> Result<Value> {
     let object = row
         .as_object()
         .ok_or_else(|| anyhow!("upsert row must be a JSON object"))?;
     let mut normalized = Map::new();
     for column in &codec.columns {
-        let value = object
-            .get(&column.name)
+        let value = row_key(object, &column.name)
+            .and_then(|key| object.get(key))
             .ok_or_else(|| anyhow!("row missing column '{}'", column.name))?;
         normalized.insert(snake_to_camel(&column.name), value.clone());
     }

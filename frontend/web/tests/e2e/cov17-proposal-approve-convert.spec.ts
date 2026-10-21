@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request, type Response } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   callReducerOwner,
   fetchContactIdByName,
@@ -14,6 +15,7 @@ import {
   smokeName,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
+import { actorIdentity, canonicalRow, sessionActor } from "./sod-evidence"
 
 // COV-17 — see docs/plan/erp-cov17-proposal-approve-convert-status.md.
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -73,7 +75,7 @@ async function saleOrderScope(page: Page, saleOrderId: number) {
 
 async function selectProposal(page: Page, proposalId: number) {
   await gotoModule(page, "/proposals", "proposals")
-  await page.getByTestId("module-tab-proposals-proposals").click()
+  await selectModuleTab(page, "proposals", "proposals")
   await selectEntityRowById(page, proposalId)
 }
 
@@ -193,6 +195,11 @@ test.describe("COV-17 exact proposal award and conversion", { tag: ["@p0", "@cov
     }
     const othersProposal = await createSubmitted(`${tag}-others`, "owner")
     const ownProposal = await createSubmitted(`${tag}-own`, "admin")
+    const approverIdentity = await sessionActor(page)
+    const othersRow = await canonicalRow(page, "proposals", othersProposal)
+    const ownRow = await canonicalRow(page, "proposals", ownProposal)
+    expect(actorIdentity(othersRow.createUid ?? othersRow.create_uid)).not.toBe(approverIdentity)
+    expect(actorIdentity(ownRow.createUid ?? ownRow.create_uid)).toBe(approverIdentity)
     const snapshot = (id: number, status: string) => ({ id, organizationId, companyId, status, saleOrderId: null })
     expect(await proposalSnapshot(page, othersProposal)).toEqual(snapshot(othersProposal, "submitted"))
     expect(await proposalSnapshot(page, ownProposal)).toEqual(snapshot(ownProposal, "submitted"))
@@ -202,6 +209,7 @@ test.describe("COV-17 exact proposal award and conversion", { tag: ["@p0", "@cov
     const selfAward = await awardViaUi(page, ownProposal)
     expect(selfAward.approve.status()).toBe(422)
     expect(await proposalSnapshot(page, ownProposal)).toEqual(snapshot(ownProposal, "submitted"))
+    expect(await canonicalRow(page, "proposals", ownProposal)).toEqual(ownRow)
 
     // A second person approves and awards.
     const award = await awardViaUi(page, othersProposal)
@@ -209,6 +217,9 @@ test.describe("COV-17 exact proposal award and conversion", { tag: ["@p0", "@cov
     expect(award.status?.ok()).toBe(true)
     const effect = snapshot(othersProposal, "awarded")
     await expect.poll(() => proposalSnapshot(page, othersProposal), { timeout: 30_000 }).toEqual(effect)
+    const awardedRow = await canonicalRow(page, "proposals", othersProposal)
+    expect(actorIdentity(awardedRow.awardApprovedBy ?? awardedRow.award_approved_by)).toBe(approverIdentity)
+    expect(actorIdentity(awardedRow.createUid ?? awardedRow.create_uid)).not.toBe(approverIdentity)
 
     for (const request of [award.approve.request(), award.status!.request()]) {
       const stale = await replay(page, request)
@@ -250,9 +261,12 @@ test.describe("COV-17 exact proposal award and conversion", { tag: ["@p0", "@cov
     try {
       await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
       for (const request of [award.approve.request(), award.status!.request(), converted.request()]) {
+        const beforeDenial = await canonicalRow(page, "proposals", othersProposal)
         const denied = await replay(readerPage, request)
         expect(denied.status()).toBe(403)
         expect(await proposalSnapshot(page, othersProposal)).toEqual(convertedEffect)
+        expect(await canonicalRow(page, "proposals", othersProposal)).toEqual(beforeDenial)
+        expect(await saleOrderScope(page, saleOrderId)).toEqual([{ id: saleOrderId, organizationId, companyId }])
       }
     } finally {
       await readerContext.close()

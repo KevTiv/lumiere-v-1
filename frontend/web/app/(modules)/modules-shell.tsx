@@ -3,11 +3,16 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react"
 import {
   DashboardSidebar,
+  DashboardWorkspace,
   ErpCommandPalette,
   AIChatPanel,
   NotebookPanel,
   JournalPanel,
+  ChatterUploaderProvider,
+  NotificationBell,
+  recentNotifications,
 } from "@lumiere/ui"
+import { useWebChatterUploader } from "@/lib/chatter-attachment-uploader"
 import { useErpSession } from "@lumiere/erp-session"
 import type { ChatContext, ChatMessage, ChatMessageSourceRef, ChatAction } from "@lumiere/ui"
 import {
@@ -45,6 +50,13 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
 import { performSignOut } from "@/lib/auth-sign-out"
+import { recordPageHref } from "@/lib/record-page-href"
+import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
+import {
+  useMailMessages,
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+} from "@lumiere/query-hooks/hooks/messages"
 
 const AI_CHAT_SESSION_KEY_STORAGE = "lumiere:erp-ai-chat-session-key"
 
@@ -259,7 +271,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
         const draftResponse = await actionDraft.mutateAsync({
           companyId: operatingCompanyId,
           query: userText,
-          ui_context: uiContext as Parameters<typeof actionDraft.mutateAsync>[0]["ui_context"],
+          uiContext: uiContext as Parameters<typeof actionDraft.mutateAsync>[0]["uiContext"],
         })
         const gatewayDrafts = draftResponse.drafts ?? []
         if (gatewayDrafts.length === 0) return []
@@ -517,6 +529,29 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   )
 }
 
+/** Header bell: unread notifications addressed to the signed-in user. */
+function HeaderNotificationBell({ organizationId }: { organizationId: number }) {
+  const { identity } = useErpSession()
+  const orgId = BigInt(organizationId)
+  const { data: messages = [] } = useMailMessages(orgId)
+  const markNotificationRead = useMarkNotificationRead(orgId)
+  const markAllNotificationsRead = useMarkAllNotificationsRead(orgId)
+  const notifications = useMemo(
+    () => recentNotifications(messages as unknown as Record<string, unknown>[], identity),
+    [messages, identity],
+  )
+  return (
+    <NotificationBell
+      notifications={notifications}
+      viewAllHref="/messages"
+      itemHref={(n) => `/messages/${n.id}`}
+      onNotificationOpen={(notification) => markNotificationRead.mutateAsync(notification.id)}
+      onMarkAllRead={() => markAllNotificationsRead.mutateAsync()}
+      isMarkingRead={markNotificationRead.isPending || markAllNotificationsRead.isPending}
+    />
+  )
+}
+
 function ModulesContent({
   children,
   firstOrgProfile,
@@ -528,6 +563,7 @@ function ModulesContent({
   const [isAIChatDocked, setIsAIChatDocked] = useState(false)
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const { organizationId } = useErpSession()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
@@ -536,6 +572,8 @@ function ModulesContent({
     orgId,
     orgReady && operatingCompanyId != null && operatingCompanyId > 0,
   )
+  const currentUserProfile = useCurrentUserProfile()
+
   const navBadges = useMemo(() => {
     const badges: Record<string, number> = {}
     if (approvalInboxCountQuery.count > 0) badges["/approvals"] = approvalInboxCountQuery.count
@@ -548,51 +586,62 @@ function ModulesContent({
 
   return (
     <ErpAiChatControllerProvider open={openAiChat}>
-      <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
-        <DashboardSidebar
-          firstOrgProfile={firstOrgProfile}
-          forceCollapsed={isAIChatDocked || isNotebookOpen}
-          navBadges={navBadges}
-          onOpenJournal={() => setIsJournalOpen(true)}
-          onOpenNotebook={() => setIsNotebookOpen(true)}
-          onOpenAIChat={openAiChat}
-          onSignOut={() => void performSignOut()}
-        />
-        <main className="flex-1 overflow-auto scroll-smooth">
-          <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</div>
-        </main>
+      <DashboardWorkspace
+        forceCollapsed={isAIChatDocked || isNotebookOpen}
+        onOpenSearch={() => setIsSearchOpen(true)}
+        notifications={orgReady ? <HeaderNotificationBell organizationId={orgId} /> : null}
+        sidebar={
+          <DashboardSidebar
+            firstOrgProfile={firstOrgProfile}
+            forceCollapsed={isAIChatDocked || isNotebookOpen}
+            navBadges={navBadges}
+            onOpenJournal={() => setIsJournalOpen(true)}
+            onOpenNotebook={() => setIsNotebookOpen(true)}
+            onOpenAIChat={openAiChat}
+            onSignOut={() => void performSignOut()}
+            userProfile={currentUserProfile.data}
+          />
+        }
+        overlays={
+          <>
+            <ErpAiChatPanel
+              open={isAIChatOpen}
+              onClose={() => {
+                setIsAIChatOpen(false)
+                setIsAIChatDocked(false)
+              }}
+              docked={isAIChatDocked}
+              onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
+              config={{
+                title: "ERP Assistant",
+                welcomeMessage: "Ask questions about your data or use @ commands for quick actions.",
+                placeholder: "Ask anything... Type @ for commands",
+              }}
+            />
 
-        <ErpAiChatPanel
-          open={isAIChatOpen}
-          onClose={() => {
-            setIsAIChatOpen(false)
-            setIsAIChatDocked(false)
-          }}
-          docked={isAIChatDocked}
-          onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
-          config={{
-            title: "ERP Assistant",
-            welcomeMessage: "Ask questions about your data or use @ commands for quick actions.",
-            placeholder: "Ask anything... Type @ for commands",
-          }}
-        />
+            <NotebookPanel
+              open={isNotebookOpen}
+              onClose={() => setIsNotebookOpen(false)}
+              onAIChat={openAiChat}
+              dataContext={{}}
+            />
 
-        <NotebookPanel
-          open={isNotebookOpen}
-          onClose={() => setIsNotebookOpen(false)}
-          onAIChat={openAiChat}
-          dataContext={{}}
-        />
+            <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
 
-        <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
-
-        <ErpCommandPalette
-          firstOrgProfile={firstOrgProfile}
-          onOpenAIChat={openAiChat}
-          onOpenNotebook={() => setIsNotebookOpen(true)}
-          onOpenJournal={() => setIsJournalOpen(true)}
-        />
-      </div>
+            <ErpCommandPalette
+              open={isSearchOpen}
+              onOpenChange={setIsSearchOpen}
+              firstOrgProfile={firstOrgProfile}
+              recordHref={recordPageHref}
+              onOpenAIChat={openAiChat}
+              onOpenNotebook={() => setIsNotebookOpen(true)}
+              onOpenJournal={() => setIsJournalOpen(true)}
+            />
+          </>
+        }
+      >
+        {children}
+      </DashboardWorkspace>
     </ErpAiChatControllerProvider>
   )
 }
@@ -607,7 +656,9 @@ export default function ModulesShell({
   return (
     <Suspense fallback={null}>
       <ErpAiRouteContextProvider>
-        <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+        <ChatterUploaderProvider value={useWebChatterUploader}>
+          <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+        </ChatterUploaderProvider>
       </ErpAiRouteContextProvider>
     </Suspense>
   )

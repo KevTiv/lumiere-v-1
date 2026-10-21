@@ -86,7 +86,7 @@ pub fn request_guarded_action(
         plan.version.id,
         snapshot.subject_id,
         params.action.as_str(),
-        params.idempotency_key
+        gate_start_digest(&params.idempotency_key, &snapshot.subject_revision_hash)
     );
     start_workflow_internal(
         ctx,
@@ -227,6 +227,16 @@ pub(crate) fn guarded_action_requires_human_approval(
     )
 }
 
+/// Validate workflow discovery and selected routing without creating an instance/task.
+pub(crate) fn preflight_guarded_action_gate(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    snapshot: &GuardedActionSnapshot,
+) -> Result<(), String> {
+    discover_gate_plan(ctx, organization_id, company_id, snapshot).map(|_| ())
+}
+
 struct GatePlan {
     version: WorkflowVersion,
     task_node: Option<WorkflowNode>,
@@ -266,29 +276,32 @@ fn discover_gate_plan(
                         && action.input_schema_version == snapshot.action_version
                 })
             }) {
-                candidates.push((version, nodes));
+                let edges: Vec<_> = ctx
+                    .db
+                    .workflow_edge()
+                    .workflow_edge_by_version()
+                    .filter(&version.id)
+                    .collect();
+                let (task_node, path) = selected_task_path(&version, &nodes, &edges, snapshot)?;
+                // A published definition can mention the guarded action while its
+                // conditions route this subject directly to an end node. Such a
+                // definition does not gate this request and must not conflict with
+                // the one definition whose selected path reaches an approval task.
+                if task_node.is_some() {
+                    candidates.push(GatePlan {
+                        version,
+                        task_node,
+                        path,
+                    });
+                }
             }
         }
     }
-    candidates.sort_by_key(|(version, _)| version.id);
+    candidates.sort_by_key(|plan| plan.version.id);
     if candidates.len() > 1 {
         return Err("multiple published workflows match this guarded action".to_string());
     }
-    let Some((version, nodes)) = candidates.pop() else {
-        return Ok(None);
-    };
-    let edges: Vec<_> = ctx
-        .db
-        .workflow_edge()
-        .workflow_edge_by_version()
-        .filter(&version.id)
-        .collect();
-    let (task_node, path) = selected_task_path(&version, &nodes, &edges, snapshot)?;
-    Ok(Some(GatePlan {
-        version,
-        task_node,
-        path,
-    }))
+    Ok(candidates.pop())
 }
 
 fn selected_task_path(
@@ -438,6 +451,33 @@ fn active_token(
         return Err("guarded workflow requires exactly one active token before Wave 4".to_string());
     }
     Ok(active.remove(0))
+}
+
+fn gate_start_digest(key: &str, revision: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    for value in [key, revision] {
+        hash.update((value.len() as u64).to_be_bytes());
+        hash.update(value.as_bytes());
+    }
+    format!("{:x}", hash.finalize())
+}
+
+#[cfg(test)]
+mod revision_key_tests {
+    use super::gate_start_digest;
+    #[test]
+    fn a_revised_subject_can_request_fresh_approval_without_changing_the_callers_key() {
+        assert_eq!(
+            gate_start_digest("confirm:7", "revision-a"),
+            gate_start_digest("confirm:7", "revision-a")
+        );
+        assert_ne!(
+            gate_start_digest("confirm:7", "revision-a"),
+            gate_start_digest("confirm:7", "revision-b")
+        );
+        assert_eq!(gate_start_digest(&"k".repeat(256), "revision-b").len(), 64);
+    }
 }
 
 fn gate_transition_hash(start_key: &str, edge_id: u64, revision: u64) -> String {

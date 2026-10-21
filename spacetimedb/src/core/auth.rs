@@ -61,6 +61,23 @@ pub struct UserInvite {
     pub accepted_at: Option<Timestamp>,
 }
 
+/// Trusted receipt for retrying an accepted invite without regranting membership.
+#[spacetimedb::table(
+    accessor = user_invite_acceptance,
+    index(accessor = invite_acceptance_by_organization, btree(columns = [organization_id]))
+)]
+pub struct UserInviteAcceptance {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub organization_id: u64,
+    #[unique]
+    pub invite_id: u64,
+    pub user_identity: Identity,
+    pub platform_user_id: String,
+    pub accepted_at: Timestamp,
+}
+
 #[spacetimedb::table(
     accessor = password_reset_token,
     index(accessor = reset_token_by_organization, btree(columns = [organization_id]))
@@ -111,6 +128,7 @@ fn require_superuser(ctx: &ReducerContext) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(feature = "dev-module")]
 fn require_dev_reducers_enabled() -> Result<(), String> {
     let enabled = option_env!("LUMIERE_ENABLE_DEV_REDUCERS")
         .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true"));
@@ -127,6 +145,7 @@ fn require_dev_reducers_enabled() -> Result<(), String> {
 /// Do **not** rely on this for production security — anyone who can invoke reducers as this identity
 /// can escalate; use only with local `spacetime` or controlled deployments.
 #[spacetimedb::reducer]
+#[cfg(feature = "dev-module")]
 pub fn dev_promote_caller_superuser(ctx: &ReducerContext) -> Result<(), String> {
     require_dev_reducers_enabled()?;
 
@@ -505,6 +524,58 @@ pub fn create_user_invite(
 ) -> Result<(), String> {
     require_superuser(ctx)?;
 
+    let email = normalize_invite_email(&email)?;
+    let now = ctx.timestamp.to_micros_since_unix_epoch();
+    let expiry = expires_at.to_micros_since_unix_epoch();
+    if expiry <= now || expiry - now > 7 * 24 * 60 * 60 * 1_000_000 {
+        return Err("Invite expiry must be within seven days".into());
+    }
+    if token_hash.len() != 64 || !token_hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("Invalid invite token hash".into());
+    }
+    use crate::core::permissions::role;
+    let target_role = ctx
+        .db
+        .role()
+        .id()
+        .find(role_id)
+        .ok_or("Invite role not found")?;
+    if target_role.organization_id != organization_id || !target_role.is_active {
+        return Err("Invite role is inactive or belongs to another organization".into());
+    }
+    require_invite_authority(ctx, organization_id, invited_by)?;
+    // Alpha quotas are enforced in the same transaction as insertion, including
+    // requests bypassing HTTP. The lifetime cap bounds churn and email abuse.
+    let mut total = 0;
+    let mut pending = 0;
+    for invite in ctx
+        .db
+        .user_invite()
+        .iter()
+        .filter(|invite| invite.organization_id == organization_id)
+    {
+        total += 1;
+        if invite.accepted_at.is_none() && invite.expires_at > ctx.timestamp {
+            pending += 1;
+            if invite.email.eq_ignore_ascii_case(&email) {
+                return Err("An active invitation already exists for this address".into());
+            }
+        }
+    }
+    if total >= 500 || pending >= 50 {
+        return Err("Alpha organization invitation limit reached; contact support".into());
+    }
+    if ctx
+        .db
+        .user_organization()
+        .iter()
+        .filter(|member| member.organization_id == organization_id && member.is_active)
+        .count()
+        >= 100
+    {
+        return Err("Alpha organization member limit reached; contact support".into());
+    }
+
     let row = ctx.db.user_invite().insert(UserInvite {
         id: 0,
         organization_id,
@@ -541,7 +612,7 @@ pub fn create_user_invite(
     Ok(())
 }
 
-/// Mark an invite as accepted (called after the invitee completes sign-up).
+/// Legacy claim operation. Hosted acceptance uses `accept_user_invite` atomically.
 /// Called by the server admin identity via HTTP reducer call.
 #[spacetimedb::reducer]
 pub fn mark_invite_accepted(ctx: &ReducerContext, invite_id: u64) -> Result<(), String> {
@@ -553,6 +624,32 @@ pub fn mark_invite_accepted(ctx: &ReducerContext, invite_id: u64) -> Result<(), 
         .id()
         .find(&invite_id)
         .ok_or("Invite not found")?;
+
+    if invite.accepted_at.is_some() || invite.expires_at <= ctx.timestamp {
+        return Err("Invite is used or expired".into());
+    }
+    use crate::core::permissions::role;
+    let target_role = ctx
+        .db
+        .role()
+        .id()
+        .find(invite.role_id)
+        .ok_or("Invite role not found")?;
+    if target_role.organization_id != invite.organization_id || !target_role.is_active {
+        return Err("Invite role is inactive or belongs to another organization".into());
+    }
+
+    require_invite_authority(ctx, invite.organization_id, invite.invited_by)?;
+    if ctx
+        .db
+        .user_organization()
+        .iter()
+        .filter(|member| member.organization_id == invite.organization_id && member.is_active)
+        .count()
+        >= 100
+    {
+        return Err("Alpha organization member limit reached; contact support".into());
+    }
 
     ctx.db.user_invite().id().update(UserInvite {
         accepted_at: Some(ctx.timestamp),
@@ -574,6 +671,184 @@ pub fn mark_invite_accepted(ctx: &ReducerContext, invite_id: u64) -> Result<(), 
         },
     );
 
+    Ok(())
+}
+
+/// Complete the trusted, provider-verified handoff in one module transaction.
+/// The API supplies only a verified platform binding, never a browser-asserted identity.
+#[spacetimedb::reducer]
+pub fn accept_user_invite(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    invite_id: u64,
+    platform_user_id: String,
+    user_identity: Identity,
+    verified_email: String,
+) -> Result<(), String> {
+    require_superuser(ctx)?;
+    crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
+    if platform_user_id.trim().is_empty() || platform_user_id.len() > 128 {
+        return Err("Invalid platform user id".into());
+    }
+    let invite = ctx
+        .db
+        .user_invite()
+        .id()
+        .find(invite_id)
+        .ok_or("Invite not found")?;
+    if invite.organization_id != organization_id
+        || !invite.email.eq_ignore_ascii_case(&verified_email)
+    {
+        return Err("Invite does not match the verified identity and organization".into());
+    }
+    if let Some(receipt) = ctx.db.user_invite_acceptance().invite_id().find(invite_id) {
+        if receipt.organization_id != organization_id
+            || receipt.user_identity != user_identity
+            || receipt.platform_user_id != platform_user_id
+        {
+            return Err("Invitation was accepted by another identity".into());
+        }
+        // Never reactivate a member after a later administrator revocation.
+        return if ctx
+            .db
+            .user_organization()
+            .user_org_by_user()
+            .filter(&user_identity)
+            .any(|m| m.organization_id == organization_id && m.is_active)
+        {
+            Ok(())
+        } else {
+            Err("Organization membership is inactive".into())
+        };
+    }
+    if invite.accepted_at.is_some() || invite.expires_at <= ctx.timestamp {
+        return Err("Invite is used or expired".into());
+    }
+    require_invite_authority(ctx, organization_id, invite.invited_by)?;
+    use crate::core::permissions::role;
+    let selected_role = ctx
+        .db
+        .role()
+        .id()
+        .find(invite.role_id)
+        .filter(|r| r.organization_id == organization_id && r.is_active)
+        .ok_or("Invite role is inactive or outside the organization")?;
+    crate::core::permissions::ensure_identity_may_assign_role(
+        ctx,
+        organization_id,
+        invite.invited_by,
+        &selected_role,
+    )?;
+    let memberships: Vec<_> = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&user_identity)
+        .filter(|m| m.organization_id == organization_id)
+        .collect();
+    if memberships.len() > 1 {
+        return Err("Ambiguous organization membership".into());
+    }
+    if memberships.first().is_some_and(|m| !m.is_active) {
+        return Err("Suspended members must be reactivated by an administrator".into());
+    }
+    if memberships.is_empty() {
+        crate::core::users::enforce_alpha_membership_capacity(ctx, organization_id, false, true)?;
+        let is_default = !ctx
+            .db
+            .user_organization()
+            .user_org_by_user()
+            .filter(&user_identity)
+            .any(|m| m.is_active);
+        ctx.db
+            .user_organization()
+            .insert(crate::core::users::UserOrganization {
+                id: 0,
+                user_identity,
+                organization_id,
+                role_id: selected_role.id,
+                company_id: None,
+                department_id: None,
+                job_title: None,
+                employee_id: None,
+                date_joined: ctx.timestamp,
+                is_active: true,
+                is_default,
+                metadata: None,
+            });
+    }
+    ensure_user_profile_for_organization(ctx, user_identity, organization_id);
+    let profile = find_user_profile_for_organization(ctx, user_identity, organization_id)
+        .ok_or("User profile missing")?;
+    if !profile.is_active
+        || (!profile.platform_user_id.is_empty() && profile.platform_user_id != platform_user_id)
+        || has_duplicate_platform_user_binding(ctx, organization_id, &platform_user_id, profile.id)
+    {
+        return Err("User profile binding conflicts or is inactive".into());
+    }
+    let bindings: Vec<_> = ctx
+        .db
+        .user_credential()
+        .user_credential_by_identity()
+        .filter(&user_identity)
+        .filter(|b| b.organization_id == organization_id)
+        .collect();
+    if bindings.len() > 1
+        || bindings
+            .iter()
+            .any(|b| b.platform_user_id != platform_user_id)
+    {
+        return Err("Credential binding conflicts".into());
+    }
+    if bindings.is_empty() {
+        ctx.db.user_credential().insert(UserCredential {
+            id: 0,
+            organization_id,
+            platform_user_id: platform_user_id.clone(),
+            email: verified_email.clone(),
+            identity: user_identity,
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+        });
+    }
+    ctx.db.user_profile().id().update(UserProfile {
+        platform_user_id: platform_user_id.clone(),
+        email: verified_email,
+        email_verified: true,
+        updated_at: ctx.timestamp,
+        ..profile
+    });
+    ctx.db.user_invite().id().update(UserInvite {
+        accepted_at: Some(ctx.timestamp),
+        ..invite
+    });
+    ctx.db
+        .user_invite_acceptance()
+        .insert(UserInviteAcceptance {
+            id: 0,
+            organization_id,
+            invite_id,
+            user_identity,
+            platform_user_id,
+            accepted_at: ctx.timestamp,
+        });
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: None,
+            table_name: "user_invite",
+            record_id: invite_id,
+            action: "UPDATE",
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({"accepted_by":user_identity.to_hex().to_string()}).to_string(),
+            ),
+            changed_fields: vec!["accepted_at".into(), "membership".into(), "bindings".into()],
+            metadata: None,
+        },
+    );
+    crate::core::permissions::touch_policy_snapshot_for_user(ctx, organization_id, user_identity);
     Ok(())
 }
 
@@ -641,5 +916,50 @@ pub fn update_user_email(
         },
     );
 
+    Ok(())
+}
+
+fn normalize_invite_email(raw: &str) -> Result<String, String> {
+    let email = raw.trim().to_ascii_lowercase();
+    if email.len() > 254
+        || !email.is_ascii()
+        || email
+            .bytes()
+            .any(|b| b.is_ascii_whitespace() || b.is_ascii_control())
+        || email.split('@').count() != 2
+        || email.starts_with('@')
+        || email.ends_with('@')
+    {
+        return Err("Invalid invitation email".into());
+    }
+    Ok(email)
+}
+
+fn require_invite_authority(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    invited_by: Identity,
+) -> Result<(), String> {
+    let user = find_user_profile_for_organization(ctx, invited_by, organization_id)
+        .filter(|user| user.is_active)
+        .ok_or("Inviter account is inactive")?;
+    let roles = crate::core::permissions::effective_roles(ctx, organization_id, invited_by)?;
+    let role = &roles[0];
+    for resource in ["user_organization", "user_role_assignment"] {
+        if crate::helpers::resolve_permission(
+            ctx,
+            organization_id,
+            invited_by,
+            role.id,
+            &role.name,
+            &role.permissions,
+            user.is_superuser,
+            resource,
+            "create",
+        ) != crate::helpers::PermissionResolution::Allow
+        {
+            return Err("Inviter lacks active member-management authority".into());
+        }
+    }
     Ok(())
 }

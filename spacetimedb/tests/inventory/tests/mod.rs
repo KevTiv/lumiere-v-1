@@ -101,7 +101,9 @@ pub fn run_inventory_receipt_quant_test(ctx: &ReducerContext) -> Result<(), Stri
 #[spacetimedb::reducer]
 pub fn run_inventory_delivery_quant_test(ctx: &ReducerContext) -> Result<(), String> {
     stock_picking_quant_test::test_delivery_decreases_reserved_or_moves_quant(ctx)
-        .map_err(|e| format!("delivery_quant: {e}"))
+        .map_err(|e| format!("delivery_quant: {e}"))?;
+    stock_picking_quant_test::test_picking_unreserve_and_update(ctx)
+        .map_err(|e| format!("picking_unreserve: {e}"))
 }
 
 #[spacetimedb::reducer]
