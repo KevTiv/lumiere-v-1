@@ -2,7 +2,7 @@
 
 import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
-import type { FormField } from "../lib/form-types"
+import type { FormField, FormValues } from "../lib/form-types"
 import { fieldWidthClasses } from "../lib/form-types"
 import { Input } from "../components/input"
 import { Textarea } from "../components/textarea"
@@ -45,6 +45,7 @@ function inputModeForField(field: FormField): FormField["inputMode"] {
 
 interface FormFieldRendererProps {
   field: FormField
+  values?: FormValues
   value: unknown
   onChange: (value: unknown) => void
   error?: string
@@ -56,6 +57,7 @@ interface FormFieldRendererProps {
 
 export function FormFieldRenderer({
   field,
+  values,
   value,
   onChange,
   error,
@@ -232,6 +234,7 @@ export function FormFieldRenderer({
             <Checkbox
               id={field.id}
               data-testid={`form-field-${field.name}`}
+              aria-label={field.label}
               checked={(value as boolean) || false}
               onCheckedChange={onChange}
               disabled={field.disabled}
@@ -268,6 +271,7 @@ export function FormFieldRenderer({
             <Switch
               id={field.id}
               data-testid={`form-field-${field.name}`}
+              aria-label={field.label}
               checked={(value as boolean) || false}
               onCheckedChange={onChange}
               disabled={field.disabled}
@@ -363,6 +367,7 @@ export function FormFieldRenderer({
         return (
           <CustomComponent
             field={field}
+            values={values}
             value={value}
             onChange={onChange}
             error={error}

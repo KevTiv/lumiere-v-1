@@ -2122,7 +2122,9 @@
           "salvageValue": "Salvage value",
           "typePurchase": "Purchase",
           "typeSale": "Sale",
-          "unavailable": "(unavailable)"
+          "unavailable": "(unavailable)",
+          "showDisposalAccounts": "Show disposal account settings (optional)",
+          "showDisposalAccountsHint": "Use these accounts when the asset is disposed. Hiding these fields keeps your selections."
         }
       },
       "depreciationSchedule": {
@@ -3120,6 +3122,30 @@
           "moveLineIds": "Move line IDs",
           "moveLineIdsHint": "Comma-separated numeric ids (journal items).",
           "toCheck": "Needs review"
+        },
+        "picker": {
+          "modeBank": "Bank",
+          "modeManual": "Manual",
+          "existingMode": "Existing mode: {{mode}}",
+          "partner": "Partner",
+          "journalItems": "Journal items",
+          "selectionHint": "Search and add journal items from the selected account and partner.",
+          "lineLabel": "{{move}} · {{name}} · Debit {{debit}} · Credit {{credit}}",
+          "chooseLine": "Add a journal item",
+          "searchLines": "Search journal items",
+          "noLines": "No matching journal items",
+          "loading": "Journal item choices are unavailable until the company data is loaded.",
+          "chooseAccount": "Choose an account first. Journal items will match that account and the selected partner.",
+          "unavailableLine": "Unavailable journal item #{{id}}",
+          "removeLine": "Remove journal item #{{id}}",
+          "staleLines": "Some selected journal items no longer match the account, partner, or current company. Remove them or restore the matching selection before saving.",
+          "anyPartner": "Any partner",
+          "unavailableRecord": "Unavailable record #{{id}}",
+          "invalidAccount": "Choose an available account from the current company.",
+          "invalidPartner": "Choose an available partner from the current company, or choose Any partner.",
+          "invalidLines": "Choose at least one available journal item.",
+          "invalidMode": "Choose a listed reconciliation mode.",
+          "staleWidget": "This reconciliation widget is no longer available in the current company. Close the form and refresh the list."
         }
       }
     },
@@ -11005,6 +11031,20 @@
           "receivableAccountId": "Receivable account",
           "incomeAccountId": "Income account"
         }
+      },
+      "capture": {
+        "project": "Project",
+        "projectPlaceholder": "Select an optional project",
+        "expenseProduct": "Expense product",
+        "productEligibility": "Select a product. Expense eligibility is checked when you save.",
+        "productPlaceholder": "Select an optional expense product",
+        "taxes": "Taxes",
+        "taxHint": "Select the purchase taxes that apply to this expense.",
+        "employeeRequired": "Select an employee before uploading a receipt.",
+        "receiptRequired": "Choose a receipt file, or clear the receipt checkbox.",
+        "noProject": "No project",
+        "noProduct": "No expense product",
+        "financeRequired": "Complete the required date, journal, and account fields."
       }
     },
     "operationsTab": "Operations",
@@ -13709,8 +13749,13 @@
           "footerLine": "Footer line",
           "attachmentUse": "Attach to records",
           "multiCompany": "Multi-company",
-          "isActive": "Active"
-        }
+          "isActive": "Active",
+          "marginTopMm": "Top margin (mm)",
+          "marginBottomMm": "Bottom margin (mm)",
+          "marginLeftMm": "Left margin (mm)",
+          "marginRightMm": "Right margin (mm)"
+        },
+        "create": "Create template"
       },
       "scheduledReport": {
         "title": "Schedule report",
@@ -13734,7 +13779,8 @@
           "weekly": "Weekly",
           "monthly": "Monthly",
           "quarterly": "Quarterly"
-        }
+        },
+        "save": "Save schedule"
       },
       "analyticsMetric": {
         "title": "New metric",
@@ -13905,6 +13951,15 @@
           "name": "Report Name",
           "metadata": "Metadata (optional)"
         }
+      },
+      "reportSource": {
+        "label": "Report source",
+        "accountingDocuments": "Accounting documents (invoices, bills and journal entries)",
+        "custom": "Custom source (advanced)",
+        "customLabel": "Custom source identifier",
+        "customHint": "Enter an ERP source identifier supported by your report integration.",
+        "company": "Company (optional)",
+        "companyPlaceholder": "Select a company"
       }
     },
     "pivot": {
