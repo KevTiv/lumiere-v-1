@@ -1,8 +1,8 @@
 //! Country-pack helpers for document search locale, residency, and fiscal archive kinds.
 
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::ReducerContext;
 
-use crate::core::country_pack::{company_country_pack, country_pack_definition};
+use crate::core::country_pack::{company_country_pack, require_company_pack_definition_at};
 
 fn pack_metadata_json(meta: &Option<String>) -> Option<serde_json::Value> {
     let raw = meta.as_ref()?;
@@ -23,9 +23,15 @@ pub(crate) fn company_pack_string(
         .filter(&company_id)
         .filter(|p| p.organization_id == organization_id && p.enabled)
     {
-        let Some(def) = ctx.db.country_pack_definition().iter().find(|definition| {
-            definition.organization_id == organization_id && definition.pack_key == pack.pack_key
-        }) else {
+        // Locale/residency defaults are optional display metadata. An unavailable pin
+        // contributes no defaults; it must never silently adopt a newer catalog row.
+        let Ok(def) = require_company_pack_definition_at(
+            ctx,
+            organization_id,
+            company_id,
+            &pack.pack_key,
+            ctx.timestamp,
+        ) else {
             continue;
         };
         if let Some(v) = pack_metadata_json(&def.metadata)
@@ -45,9 +51,9 @@ pub(crate) fn company_pack_string_list(
     organization_id: u64,
     company_id: Option<u64>,
     key: &str,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
     let Some(company_id) = company_id else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let mut out = Vec::new();
     for pack in ctx
@@ -57,11 +63,15 @@ pub(crate) fn company_pack_string_list(
         .filter(&company_id)
         .filter(|p| p.organization_id == organization_id && p.enabled)
     {
-        let Some(def) = ctx.db.country_pack_definition().iter().find(|definition| {
-            definition.organization_id == organization_id && definition.pack_key == pack.pack_key
-        }) else {
-            continue;
-        };
+        // Archive declarations authorize a fiscal write, so invalid enabled packs
+        // are errors even when another enabled pack declares the requested kind.
+        let def = require_company_pack_definition_at(
+            ctx,
+            organization_id,
+            company_id,
+            &pack.pack_key,
+            ctx.timestamp,
+        )?;
         let Some(meta) = pack_metadata_json(&def.metadata) else {
             continue;
         };
@@ -76,7 +86,7 @@ pub(crate) fn company_pack_string_list(
             }
         }
     }
-    out
+    Ok(out)
 }
 
 pub(crate) fn document_search_language_for_company(
@@ -112,7 +122,7 @@ pub(crate) fn fiscal_archive_kinds_for_company(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: Option<u64>,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
     company_pack_string_list(ctx, organization_id, company_id, "fiscal_archive_kinds")
 }
 
@@ -137,12 +147,17 @@ pub(crate) fn validate_fiscal_archive(
     if kind.is_empty() {
         return Ok(());
     }
-    let expected = fiscal_archive_kinds_for_company(ctx, organization_id, company_id);
-    if !expected.is_empty() && !expected.iter().any(|k| k == kind) {
+    let expected = fiscal_archive_kinds_for_company(ctx, organization_id, company_id)
+        .map_err(|error| format!("Fiscal archive country pack resolution failed: {error}"))?;
+    if !expected.iter().any(|k| k == kind) {
         return Err(format!(
-            "fiscal_kind '{}' is not expected by enabled country packs (allowed: {})",
+            "fiscal_kind '{}' is not declared by an enabled, accepted country pack (allowed: {})",
             kind,
-            expected.join(", ")
+            if expected.is_empty() {
+                "none".to_string()
+            } else {
+                expected.join(", ")
+            }
         ));
     }
     let allowed = fiscal_kind_allowed_mimetypes(kind);

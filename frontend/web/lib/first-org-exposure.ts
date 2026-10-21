@@ -2,7 +2,7 @@ import 'server-only'
 
 import {
   getProductSurfaceForPathname,
-  isFirstOrgSurfaceAdmitted,
+  isFirstOrgRouteAdmitted,
 } from '@lumiere/ui/lib/product-surface-catalog'
 import type { ApiSession } from '@/lib/api-session'
 
@@ -43,5 +43,5 @@ export function isFirstOrgPathAdmitted(
   isAdmin: boolean,
 ): boolean {
   const surface = getProductSurfaceForPathname(pathname)
-  return surface !== null && isFirstOrgSurfaceAdmitted(surface.id, isAdmin)
+  return surface !== null && isFirstOrgRouteAdmitted(surface.id, isAdmin)
 }

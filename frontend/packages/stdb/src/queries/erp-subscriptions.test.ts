@@ -65,6 +65,32 @@ describe("C8 generated organization subscription compiler", () => {
   })
 })
 
+describe("session authority projections", () => {
+  const identityHex = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+  it("scopes role definitions and assignments to the active organization", () => {
+    const context = { organizationId: 42, identityHex }
+    const roles = subscriptionQueriesForResource("roles", context)
+    const assignments = subscriptionQueriesForResource("user-roles", context)
+
+    assert.ok(roles)
+    assert.match(roles[0]!, /FROM role WHERE organization_id = 42 AND is_active = true/)
+    assert.ok(assignments)
+    assert.match(assignments[0]!, /\bexpires_at\b/)
+    assert.match(
+      assignments[0]!,
+      new RegExp(
+        `FROM user_role_assignment WHERE user_identity = 0x${identityHex} AND organization_id = 42 AND is_active = true`,
+      ),
+    )
+  })
+
+  it("fails closed without an active organization", () => {
+    assert.equal(subscriptionQueriesForResource("roles", { identityHex }), null)
+    assert.equal(subscriptionQueriesForResource("user-roles", { identityHex }), null)
+  })
+})
+
 describe("CRM-RI-007: company-scoped live subscriptions", () => {
   it("never emits direct SQL for private CRM tables", () => {
     for (const resource of [

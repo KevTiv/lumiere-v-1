@@ -287,6 +287,8 @@ mod tests {
             role_permissions: vec!["contact:read".into()],
             identity_hex: "actor".into(),
             field_permissions: Vec::new(),
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         };
         let requested = vec!["employees".to_string(), "iot-hubs".to_string()];
         assert!(authorized_resources(&requested, Some(&access))
@@ -314,6 +316,8 @@ mod tests {
             role_permissions: vec!["module:hr:read".into(), "module:iot:read".into()],
             identity_hex: "actor".into(),
             field_permissions: Vec::new(),
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         };
         let requested = vec!["employees".to_string(), "iot-hubs".to_string()];
         assert_eq!(

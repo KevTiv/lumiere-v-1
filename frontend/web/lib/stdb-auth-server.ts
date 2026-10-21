@@ -33,7 +33,7 @@ const ENCRYPTION_KEY_HEX = process.env['STDB_CREDENTIAL_ENCRYPTION_KEY']
 
 // ─── Encryption ──────────────────────────────────────────────────────────────
 
-function getEncryptionKey(): Uint8Array {
+function getEncryptionKey(): Uint8Array<ArrayBuffer> {
   if (!ENCRYPTION_KEY_HEX || ENCRYPTION_KEY_HEX.length < 64) {
     throw new Error('STDB_CREDENTIAL_ENCRYPTION_KEY must be a 32-byte (64 hex char) env var')
   }

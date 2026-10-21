@@ -79,6 +79,7 @@ export async function canonicalRow(_page: Page, resource: string, id: number) {
     proposals: "proposal",
     "mrp-boms": "mrp_bom",
     "stock-moves": "stock_move",
+    "replenishment-rules": "replenishment_rule",
   }
   const table = tables[resource]
   if (!table || !Number.isSafeInteger(id) || id <= 0) throw new Error("invalid SoD evidence row")

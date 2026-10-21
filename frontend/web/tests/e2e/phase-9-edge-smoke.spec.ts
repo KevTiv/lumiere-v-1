@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { activeTabEntityTable, expectNoAppError, gotoModule } from "./helpers"
+import { selectModuleTab, activeTabEntityTable, expectNoAppError, gotoModule } from "./helpers"
 
 const PROPOSAL_ROW_ACTION_IDS = [
   "submit-proposal",
@@ -11,7 +11,7 @@ const PROPOSAL_ROW_ACTION_IDS = [
 test.describe("Phase 9 edge modules smoke", { tag: "@phase-9" }, () => {
   test("proposals list row actions are offered only once a row is selected", async ({ page }) => {
     await gotoModule(page, "/proposals", "proposals")
-    await page.getByTestId("module-tab-proposals-proposals").click()
+    await selectModuleTab(page, "proposals", "proposals")
     await expect(activeTabEntityTable(page)).toBeVisible()
 
     for (const actionId of PROPOSAL_ROW_ACTION_IDS) {

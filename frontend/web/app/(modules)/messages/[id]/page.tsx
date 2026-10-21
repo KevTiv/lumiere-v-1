@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { MessagePageClient } from "./message-page-client"
 
 const SSR_RESOURCES = ["mail-messages"] as const
@@ -15,7 +15,7 @@ export default async function MessagePage({ params }: MessagePageProps) {
     return <MessagePageClient messageId={id} />
   }
 
-  const [messages] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [messages] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return <MessagePageClient messageId={id} initialMessages={messages} organizationId={session.organizationId} />
 }

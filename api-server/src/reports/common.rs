@@ -83,7 +83,26 @@ pub struct ReportPreviewRequest {
     pub scenario: Option<MarginSupplyScenario>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MarginSupplyScenarioSource {
+    Manual,
+    ControlledCsv,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MarginSupplyScenarioProvenance {
+    pub source: MarginSupplyScenarioSource,
+    #[serde(default)]
+    pub file_name: Option<String>,
+    #[serde(default)]
+    pub imported_at: Option<String>,
+    #[serde(default)]
+    pub row_number: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MarginSupplyScenario {
     /// Percentage change applied to unit cost snapshots.
@@ -94,6 +113,9 @@ pub struct MarginSupplyScenario {
     pub lead_time_change_days: i32,
     /// Advisory margin threshold. It never changes a product price.
     pub target_margin_pct: f64,
+    /// Optional bounded provenance for a manual or controlled CSV assumption.
+    #[serde(default)]
+    pub provenance: Option<MarginSupplyScenarioProvenance>,
 }
 
 impl Default for MarginSupplyScenario {
@@ -103,6 +125,7 @@ impl Default for MarginSupplyScenario {
             demand_change_pct: 0.0,
             lead_time_change_days: 0,
             target_margin_pct: 25.0,
+            provenance: None,
         }
     }
 }

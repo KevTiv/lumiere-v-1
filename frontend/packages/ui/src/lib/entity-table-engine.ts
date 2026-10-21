@@ -68,9 +68,24 @@ export function compareCellValues(a: unknown, b: unknown): number {
 const sortByCellValue: SortFn<EntityTableFeatures, EntityRow> = (rowA, rowB, columnId) =>
   compareCellValues(rowA.getValue(columnId), rowB.getValue(columnId))
 
-/** A column filter: the row's cell equals the chosen value, ignoring case. */
-const equalsFilterValue: FilterFn<EntityTableFeatures, EntityRow> = (row, columnId, filterValue) =>
-  rowFilterValue(row.original, columnId).toLowerCase() === String(filterValue).toLowerCase()
+/** Joins the ticked values of a faceted filter into one stored filter value. */
+const FACET_SEPARATOR = "\u001f"
+
+export function encodeFacetValues(values: readonly string[]): string {
+  return values.length === 0 ? ALL_FILTER_VALUE : values.join(FACET_SEPARATOR)
+}
+
+/** The ticked values of a stored filter value; a plain single value reads as one. */
+export function decodeFacetValues(value: string | undefined): string[] {
+  if (!value || value === ALL_FILTER_VALUE) return []
+  return value.split(FACET_SEPARATOR).filter((part) => part !== "")
+}
+
+/** A column filter: the row's cell equals the chosen value (or one of the facet values), ignoring case. */
+const equalsFilterValue: FilterFn<EntityTableFeatures, EntityRow> = (row, columnId, filterValue) => {
+  const cell = rowFilterValue(row.original, columnId).toLowerCase()
+  return decodeFacetValues(String(filterValue)).some((value) => value.toLowerCase() === cell)
+}
 
 /** True when any of `keys` contains `query` (case-insensitive). An empty query matches everything. */
 export function matchesSearch(row: EntityRow, keys: readonly string[], query: string): boolean {

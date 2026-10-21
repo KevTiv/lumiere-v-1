@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { PosSessionPageClient } from "./session-page-client"
 
 const SSR_RESOURCES = ["pos-sessions", "pos-configs"] as const
@@ -15,7 +15,7 @@ export default async function PosSessionPage({ params }: PosSessionPageProps) {
     return <PosSessionPageClient sessionId={id} />
   }
 
-  const [sessions, configs] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [sessions, configs] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <PosSessionPageClient

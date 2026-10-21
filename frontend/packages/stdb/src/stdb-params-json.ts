@@ -30,6 +30,9 @@ const NESTED_ARRAY_STRUCTS: Partial<
   CreatePurchaseRfqParams: {
     lines: "CreatePurchaseRfqLineParams",
   },
+  CreatePurchaseRequisitionParams: {
+    lines: "CreatePurchaseRequisitionLineParams",
+  },
   CreatePurchaseReturnParams: {
     lines: "CreatePurchaseReturnLineParams",
   },
@@ -262,7 +265,8 @@ function encodeValue(
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => encodeValue(item, optionFields, undefined, optionTypes))
+    const encoded = value.map((item) => encodeValue(item, optionFields, undefined, optionTypes))
+    return fieldKey && optionFields?.has(fieldKey) ? { some: encoded } : encoded
   }
 
   if (isSatsSumJson(value)) {
@@ -373,10 +377,15 @@ export function stdbParamsToJson(
 ): Record<string, unknown> {
   const optionFieldList = structName ? (OPTION_FIELDS[structName] ?? []) : []
   const optionFields = structName ? new Set(optionFieldList) : undefined
-  const encoded = encodeValue(
-    params, optionFields, undefined, structName ? OPTION_TYPES[structName] : undefined,
-  )
-  const out = { ...((encoded ?? {}) as Record<string, unknown>) }
+  const optionTypes = structName ? OPTION_TYPES[structName] : undefined
+  const out: Record<string, unknown> = {}
+  // Params are a product, even when their only field is an array. Treating
+  // { permissions: [...] } as a pre-encoded sum loses its Option wrapper.
+  for (const [key, value] of Object.entries(params)) {
+    const snakeKey = camelToSnakeIdentifier(key)
+    const encoded = encodeValue(value, optionFields, snakeKey, optionTypes)
+    if (encoded !== undefined) out[snakeKey] = encoded
+  }
 
   const nestedArrays = structName ? NESTED_ARRAY_STRUCTS[structName] : undefined
   if (nestedArrays) {
@@ -414,6 +423,7 @@ export function stdbParamsToJson(
 
 /** Last-argument struct names retained for explicit compatibility fixtures. */
 const REDUCER_PARAM_STRUCTS: Partial<Record<string, keyof OptionFieldMap & string>> = {
+  update_role: "UpdateRoleParams",
   add_account_move_line: "AddAccountMoveLineParams",
   create_company: "CreateCompanyParams",
   create_ai_insight: "CreateAiInsightParams",

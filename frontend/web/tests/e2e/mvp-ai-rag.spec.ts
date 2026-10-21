@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   expectNoAppError,
   fetchDefaultCompanyId,
@@ -107,7 +108,7 @@ test.describe("AI-009 AI insight creation + acknowledge", { tag: "@p0" }, () => 
       .toBeGreaterThan(0)
 
     await gotoModule(page, "/documents", "documents")
-    await page.getByTestId("module-tab-documents-document-insights").click()
+    await selectModuleTab(page, "documents", "document-insights")
     await expect(page.getByTestId("module-view-documents")).toBeVisible()
 
     await selectEntityRowByText(page, title)

@@ -8,7 +8,9 @@ use crate::state::AppState;
 use crate::trusted_context::{opaque_correlation_id, TrustedOperationContext};
 use axum::Json;
 use serde_json::{json, Value};
-use stdb_client::{Exposure, ReducerCall, ReducerContract, ScalarKind, StdbClientError};
+use stdb_client::{
+    Exposure, ReducerCall, ReducerContract, ScalarKind, StdbClient, StdbClientError,
+};
 
 /// Narrow server-owned authorities for routes that cannot run as an ordinary
 /// organization session. Each variant has an explicit reducer allowlist.
@@ -31,6 +33,7 @@ impl InternalRouteAuthority {
                     | "bind_user_credential"
                     | "bind_user_profile"
                     | "mark_invite_accepted"
+                    | "accept_user_invite"
             ),
             Self::PasswordRecovery => matches!(
                 reducer,
@@ -197,6 +200,161 @@ pub(crate) async fn dispatch_session_reducer(
     context.require_current_placement(&state.organization_placements)?;
     let _ = execute_reducer_call(&context, contract, args).await?;
     Ok(context)
+}
+
+/// Only the fixed reviewed-email route may claim provider work. The reducer
+/// remains denied to generic operations and runs as the session actor.
+pub(crate) async fn dispatch_reviewed_mail_mutation(
+    state: &AppState,
+    session: &ApiSession,
+    company_id: u64,
+    reducer: &'static str,
+    args: Value,
+) -> Result<TrustedOperationContext, ApiError> {
+    let expected: &[(&str, ScalarKind)] = match reducer {
+        "claim_reviewed_mail_delivery" => &[
+            ("organization_id", ScalarKind::UnsignedInteger),
+            ("company_id", ScalarKind::UnsignedInteger),
+            ("message_id", ScalarKind::UnsignedInteger),
+            ("review_id", ScalarKind::String),
+            ("request_digest", ScalarKind::String),
+        ],
+        _ => {
+            return Err(ApiError::Forbidden(
+                "reviewed mail mutation is not admitted".into(),
+            ))
+        }
+    };
+    let contract = stdb_client::reducer_contract(reducer).ok_or_else(|| {
+        ApiError::Forbidden("reviewed mail reducer is absent from the contract".into())
+    })?;
+    if contract.exposure != Exposure::Denied
+        || contract.contract_operation_id != format!("erp.{reducer}")
+        || contract.organization_position != Some(0)
+        || contract.company_position != Some(1)
+        || contract.params.len() != expected.len()
+        || !contract
+            .params
+            .iter()
+            .zip(expected)
+            .all(|(actual, (name, kind))| {
+                actual.name == *name && actual.kind == *kind && actual.ref_target.is_none()
+            })
+    {
+        return Err(ApiError::Forbidden(
+            "reviewed mail reducers must retain the fixed denied contract".into(),
+        ));
+    }
+    let args = args
+        .as_array()
+        .cloned()
+        .ok_or_else(|| ApiError::Internal("reviewed mail arguments must be an array".into()))?;
+    let context = TrustedOperationContext::from_session_with_placement(
+        session,
+        state.client_with_token(&session.stdb_token),
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
+    let _ = validate_reducer_scope(contract, &args, context.organization_id())?;
+    let company_scope = authorize_reducer_company_scope(&context, vec![company_id]).await?;
+    let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
+    let _ = execute_reducer_call(&context, contract, args).await?;
+    Ok(context)
+}
+
+/// Narrow, preverified service authority for provider acceptance receipts.
+/// It exposes no arbitrary reducer, scope or metadata arguments to callers.
+pub(crate) struct ReviewedMailDeliveryAuthority {
+    client: StdbClient,
+    organization_id: u64,
+}
+
+impl ReviewedMailDeliveryAuthority {
+    /// Verify dedicated credentials and the organization's active service binding
+    /// before the route can claim a message or contact the email provider.
+    pub(crate) async fn prepare(state: &AppState, organization_id: u64) -> Result<Self, ApiError> {
+        let token = std::env::var("LUMIERE_REVIEWED_MAIL_STDB_TOKEN").unwrap_or_default();
+        let token = token.trim();
+        if token.is_empty()
+            || state.config.stdb_server_token.as_deref().map(str::trim) == Some(token)
+        {
+            return Err(ApiError::Unavailable(
+                "a dedicated reviewed email dispatcher credential is required".into(),
+            ));
+        }
+        let client = state.client_with_token(token);
+        crate::service_identity::verify_registered_service_identity(
+            &client,
+            organization_id,
+            crate::service_identity::REVIEWED_MAIL_DISPATCHER_SERVICE,
+        )
+        .await
+        .map_err(|_| {
+            ApiError::Unavailable(
+                "reviewed email dispatcher identity is unavailable for this organization".into(),
+            )
+        })?;
+        reviewed_mail_receipt_contract()?;
+        require_active_placement(state, organization_id)?;
+        Ok(Self {
+            client,
+            organization_id,
+        })
+    }
+
+    pub(crate) async fn record_acceptance(
+        &self,
+        state: &AppState,
+        message_id: u64,
+        review_id: &str,
+        request_digest: &str,
+        provider_id: Option<String>,
+    ) -> Result<(), ApiError> {
+        let contract = reviewed_mail_receipt_contract()?;
+        require_active_placement(state, self.organization_id)?;
+        let receipt = json!({"dispatch_review_id":review_id, "dispatch_request_digest":request_digest, "provider_message_id":provider_id}).to_string();
+        self.client
+            .call_reducer(
+                ReducerCall::from_name(
+                    contract.name,
+                    json!([self.organization_id, message_id, receipt]),
+                )
+                .map_err(|error| ApiError::Internal(error.to_string()))?,
+            )
+            .await
+            .map_err(map_reducer_error)
+    }
+}
+
+fn reviewed_mail_receipt_contract() -> Result<&'static ReducerContract, ApiError> {
+    let contract =
+        stdb_client::reducer_contract("mark_mail_message_delivered").ok_or_else(|| {
+            ApiError::Forbidden("reviewed mail receipt reducer is absent from the contract".into())
+        })?;
+    let expected = [
+        ("organization_id", ScalarKind::UnsignedInteger),
+        ("message_id", ScalarKind::UnsignedInteger),
+        ("delivery_metadata", ScalarKind::OptionalString),
+    ];
+    if contract.exposure != Exposure::Denied
+        || contract.contract_operation_id != "erp.mark_mail_message_delivered"
+        || contract.organization_position != Some(0)
+        || contract.company_position.is_some()
+        || contract.params.len() != expected.len()
+        || !contract
+            .params
+            .iter()
+            .zip(expected)
+            .all(|(actual, (name, kind))| {
+                actual.name == name && actual.kind == kind && actual.ref_target.is_none()
+            })
+    {
+        return Err(ApiError::Forbidden(
+            "reviewed mail receipt reducer must retain its fixed denied contract".into(),
+        ));
+    }
+    Ok(contract)
 }
 
 /// Dispatch the presentation draft save through an explicit API-only path.

@@ -17,7 +17,6 @@ import {
   AlertCircle,
   TrendingUp,
 } from "lucide-react"
-import { TrendBadge } from "../../components/trend-badge"
 import type { StatCardsWidget as StatCardsWidgetType } from "../../lib/dashboard-types"
 import { StatCard, StatCardGrid } from "../../components/stat-card"
 
@@ -51,7 +50,9 @@ export function StatCardsWidget({ data }: { data: StatCardsWidgetType["data"] })
           value={stat.value}
           icon={stat.icon ? iconMap[stat.icon] : undefined}
           onClick={stat.onClick}
-          footer={stat.change != null ? <TrendBadge change={stat.change} /> : undefined}
+          change={stat.change ?? undefined}
+          changeLabel={stat.changeLabel}
+          invertChange={stat.invertChange}
         />
       ))}
     </StatCardGrid>

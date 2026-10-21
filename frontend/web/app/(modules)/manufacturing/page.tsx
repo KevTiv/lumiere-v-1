@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListState, serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverFetchQueryListState, serverPrefetchQueryLists } from "@/lib/server-query"
 import { ManufacturingClient } from "./manufacturing-client"
 
 const SSR_RESOURCES = [
@@ -23,7 +23,7 @@ export default async function ManufacturingPage() {
   }
 
   const [records, iotDevicesState] = await Promise.all([
-    serverFetchQueryListsRequired(session, SSR_RESOURCES),
+    serverPrefetchQueryLists(session, SSR_RESOURCES),
     serverFetchQueryListState(session, "iot-devices"),
   ])
   const [

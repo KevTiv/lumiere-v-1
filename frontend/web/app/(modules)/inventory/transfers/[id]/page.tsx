@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { TransferPageClient } from "./transfer-page-client"
 
 const SSR_RESOURCES = ["stock-pickings", "stock-moves", "stock-locations"] as const
@@ -15,7 +15,7 @@ export default async function TransferPage({ params }: TransferPageProps) {
     return <TransferPageClient transferId={id} />
   }
 
-  const [pickings, moves, locations] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [pickings, moves, locations] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <TransferPageClient

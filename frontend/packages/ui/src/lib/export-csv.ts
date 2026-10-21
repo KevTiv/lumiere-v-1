@@ -72,6 +72,41 @@ export function widgetDataToCsv(widget: DashboardWidget, provenance?: ReportExpo
         widget.data.stages.map((s) => [s.name, s.value]),
       )
       break
+    case "combo-chart":
+      csv = seriesValuesToCsv(
+        widget.data.xAxisKey,
+        [...widget.data.bars, widget.data.line].map((series) => ({ name: series.key })),
+        widget.data.values,
+      )
+      break
+    case "step-chart":
+      csv = seriesValuesToCsv(widget.data.xAxisKey, [{ name: widget.data.series.key }], widget.data.values)
+      break
+    case "ranked-bars":
+      csv = rowsToCsv(
+        ["label", "value", "change_percent"],
+        widget.data.items.map((item) => [item.label, item.value, item.change === undefined ? "" : Number(item.change.toFixed(2))]),
+      )
+      break
+    case "share-bar": {
+      const segments = widget.data.segments
+      csv = rowsToCsv(
+        ["row", ...segments.map((segment) => segment.label)],
+        widget.data.rows.map((row) => [row.label, ...segments.map((segment) => row.values[segment.key] ?? 0)]),
+      )
+      break
+    }
+    case "tabbed-table":
+      csv = rowsToCsv(
+        widget.data.columns.map((c) => c.label),
+        widget.data.rows.map((row) =>
+          widget.data.columns.map((c) => {
+            const cell = row[c.key]
+            return typeof cell === "string" || typeof cell === "number" ? cell : ""
+          }),
+        ),
+      )
+      break
     case "table":
       csv = rowsToCsv(
         widget.data.columns.map((c) => c.label),

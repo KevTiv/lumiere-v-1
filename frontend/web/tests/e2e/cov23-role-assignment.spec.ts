@@ -1,4 +1,6 @@
-import { expect, test, type Browser, type Page, type Request, type Response } from "@playwright/test"
+import { expect, request as playwrightRequest, test, type Browser, type Page, type Request, type Response } from "@playwright/test"
+
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 import {
   callReducerBff,
@@ -10,10 +12,11 @@ import {
   smokeName,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
+import { bootstrapFixtureAccountSession } from "./fixture-account"
+import { postGeneratedOperationOk } from "./generated-operation"
 
 // COV-23 — see docs/plan/erp-cov23-role-assignment-status.md.
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
-const TARGET_EMAIL = "fixture.hr-project@example.test"
 
 type Row = Record<string, unknown>
 
@@ -55,19 +58,19 @@ async function roleAssignments(page: Page, organizationId: number, roleId: numbe
     .sort((a, b) => (a.id ?? 0) - (b.id ?? 0))
 }
 
-async function toggleRoleInSettings(page: Page, roleId: number, reducer: string): Promise<Response> {
+async function toggleRoleInSettings(page: Page, roleId: number, targetEmail: string): Promise<Response> {
   await gotoModule(page, "/settings")
   await page.getByTestId("settings-section-users").click()
   // The users list is capped (limit=100) and other specs add users; search on
   // the server for the target persona so its row is always loaded.
   // The row must come from the server-side users search; assert the API first
   // so a missing persona is reported with the payload rather than a timeout.
-  const listed = await page.request.get(`/api/settings/users?limit=100&search=${encodeURIComponent(TARGET_EMAIL)}`)
+  const listed = await page.request.get(`/api/settings/users?limit=100&search=${encodeURIComponent(targetEmail)}`)
   const listedBody = await listed.text()
   expect(listed.status(), listedBody).toBe(200)
-  expect(listedBody, `settings users search for ${TARGET_EMAIL}`).toContain(TARGET_EMAIL)
-  await page.getByTestId("settings-users-search").fill(TARGET_EMAIL)
-  const actions = page.getByTestId(`settings-user-actions-${TARGET_EMAIL}`)
+  expect(listedBody, `settings users search for ${targetEmail}`).toContain(targetEmail)
+  await page.getByTestId("settings-users-search").fill(targetEmail)
+  const actions = page.getByTestId(`settings-user-actions-${targetEmail}`)
   await expect(actions).toBeVisible({ timeout: 30_000 })
   await actions.click()
   await page.getByTestId("settings-user-edit").click()
@@ -75,20 +78,24 @@ async function toggleRoleInSettings(page: Page, roleId: number, reducer: string)
   await expect(checkbox).toBeVisible()
   await checkbox.click()
   const [accepted] = await Promise.all([
-    page.waitForResponse((response) => matchesOperationResponse(response, reducer), { timeout: 30_000 }),
+    page.waitForResponse((response) => matchesOperationResponse(response, "erp.set_member_access"), { timeout: 30_000 }),
     page.getByTestId("settings-user-save").click(),
   ])
   expect(accepted.ok()).toBe(true)
   return accepted
 }
 
-async function targetCanOpenProfileSettings(browser: Browser) {
+async function targetCanOpenProfileSettings(browser: Browser, targetEmail: string) {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } })
   try {
     const targetPage = await context.newPage()
-    await signIn(targetPage, TARGET_EMAIL, PERSONA_PASSWORD)
+    await signIn(targetPage, targetEmail, PERSONA_PASSWORD)
     await gotoModule(targetPage, "/settings")
-    return await targetPage.getByTestId("settings-section-profile").isVisible({ timeout: 10_000 })
+    // isVisible() is an immediate snapshot (its timeout option does not wait).
+    // Wait for the hydrated permission-filtered settings content on a new login.
+    return await targetPage.getByTestId("settings-section-profile")
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true, () => false)
   } finally {
     await context.close()
   }
@@ -102,12 +109,45 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     test.setTimeout(180_000)
     const organizationId = await fetchSessionOrganizationId(page)
 
+    // A shared fixture persona can retain an unrelated role after another
+    // lifecycle fails mid-grant. Give this exact-role proof its own identity on
+    // every attempt so revocation cannot be masked by someone else's grant.
+    const targetEmail = `${smokeName("cov23-role-member").toLowerCase()}@example.test`
+    const fixtureApi = await playwrightRequest.newContext({
+      baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100",
+    })
+    let fixtureIdentity = ""
+    try {
+      fixtureIdentity = await bootstrapFixtureAccountSession(fixtureApi, targetEmail, PERSONA_PASSWORD)
+    } finally {
+      await fixtureApi.dispose()
+    }
+    await postGeneratedOperationOk(page, "add_org_member", {
+      userIdentity: { __identity__: `0x${fixtureIdentity}` } as never,
+      params: stdbParamsToJson({
+        roleName: "fixture-limited-read-only",
+        companyId: BigInt(await fetchDefaultCompanyId(page)),
+        jobTitle: null,
+        departmentId: null,
+        employeeId: null,
+        isActive: true,
+        isDefault: true,
+        metadata: null,
+      }, "AddOrgMemberParams"),
+    })
+
     // The persona's identity comes from its own sign-in session cookie
     // (`/api/settings/*` is not proxied to the api-server in E2E).
     const targetContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })
     let targetIdentity = ""
     try {
-      await signIn(await targetContext.newPage(), TARGET_EMAIL, PERSONA_PASSWORD)
+      const targetPage = await targetContext.newPage()
+      await signIn(targetPage, targetEmail, PERSONA_PASSWORD)
+      // Project the new member's email into this organization's users search.
+      const projected = await targetPage.request.patch("/api/auth/profile", {
+        data: { name: "COV23 Exact Role Member" },
+      })
+      expect(projected.ok(), await projected.text()).toBe(true)
       targetIdentity = identityHex(
         (await targetContext.cookies()).find((cookie) => cookie.name === "stdb_identity")?.value,
       )
@@ -115,6 +155,8 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
       await targetContext.close()
     }
     expect(targetIdentity).toMatch(/^[0-9a-f]{64}$/)
+    expect(targetIdentity).toBe(fixtureIdentity)
+    expect(await targetCanOpenProfileSettings(browser, targetEmail)).toBe(false)
 
     // Setup only: a fresh role granting one capability the persona does not
     // already hold, so a new browser session proves assignment and revocation.
@@ -134,31 +176,33 @@ test.describe("COV-23 exact role assignment", { tag: ["@p0", "@cov23"] }, () => 
     expect(await roleAssignments(page, organizationId, roleId)).toEqual([])
 
     // Assign through Settings → Users → Edit → role checkbox → Save.
-    const assigned = await toggleRoleInSettings(page, roleId, "assign_role")
+    const assigned = await toggleRoleInSettings(page, roleId, targetEmail)
     await expect.poll(() => roleAssignments(page, organizationId, roleId), { timeout: 30_000 }).toHaveLength(1)
     const [active] = await roleAssignments(page, organizationId, roleId)
     expect(active).toMatchObject({ identity: targetIdentity, isActive: true })
     const assignmentId = active!.id
     await expect
-      .poll(() => targetCanOpenProfileSettings(browser), { timeout: 45_000 })
+      .poll(() => targetCanOpenProfileSettings(browser, targetEmail), { timeout: 45_000 })
       .toBe(true)
 
-    const staleAssign = await replay(page, assigned.request())
-    expect(staleAssign.status()).toBe(422)
+    const retriedAssign = await replay(page, assigned.request())
+    expect(retriedAssign.status()).toBe(200)
     expect(await roleAssignments(page, organizationId, roleId)).toEqual([active])
 
     // Revoke through the same dialog by clearing the checkbox.
-    const revoked = await toggleRoleInSettings(page, roleId, "revoke_role")
+    const revoked = await toggleRoleInSettings(page, roleId, targetEmail)
     const effect = [{ id: assignmentId, identity: targetIdentity, isActive: false }]
     await expect.poll(() => roleAssignments(page, organizationId, roleId), { timeout: 30_000 }).toEqual(effect)
     await expect
-      .poll(() => targetCanOpenProfileSettings(browser), { timeout: 45_000 })
+      .poll(() => targetCanOpenProfileSettings(browser, targetEmail), { timeout: 45_000 })
       .toBe(false)
 
-    // Before COV-23 a replayed revoke re-audited and rebuilt the policy
-    // snapshot; the reducer now rejects an already-revoked assignment.
-    const staleRevoke = await replay(page, revoked.request())
-    expect(staleRevoke.status()).toBe(422)
+    // Exact retries acknowledge the committed state; an older assignment must
+    // never restore access after a later revocation.
+    const retriedRevoke = await replay(page, revoked.request())
+    expect(retriedRevoke.status()).toBe(200)
+    const staleAssign = await replay(page, assigned.request())
+    expect(staleAssign.status()).toBe(422)
     expect(await roleAssignments(page, organizationId, roleId)).toEqual(effect)
 
     const readerContext = await browser.newContext({ storageState: { cookies: [], origins: [] } })

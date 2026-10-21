@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { SubscriptionPageClient } from "./subscription-page-client"
 
 const SSR_RESOURCES = ["subscriptions"] as const
@@ -15,7 +15,7 @@ export default async function SubscriptionPage({ params }: SubscriptionPageProps
     return <SubscriptionPageClient subscriptionId={id} />
   }
 
-  const [subscriptions] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [subscriptions] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <SubscriptionPageClient

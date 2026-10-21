@@ -30,7 +30,7 @@ import {
 import { Badge } from "@lumiere/ui/components/badge"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
-import { DashboardGrid } from "@lumiere/ui"
+import { DashboardGrid, RankedBarList } from "@lumiere/ui"
 import {
   AlertCircle,
   Building2,
@@ -44,6 +44,7 @@ import {
 import type {
   DailyBusinessSummaryReportV1,
   LowStockReportV1,
+  MarginSupplyScenario,
   MoneyAmount,
   ReportCatalogEntry,
   ReportPreview,
@@ -74,6 +75,8 @@ import {
   marginSupplyXlsxData,
   MARGIN_SUPPLY_SCENARIO_FIELDS,
 } from "@/lib/margin-supply-outlook-config"
+import { MarginSupplyScenarioImport } from "@/lib/margin-supply-scenario-import"
+import type { ImportedMarginSupplyScenario } from "@/lib/margin-supply-scenario-csv"
 
 interface OwnerReportsPanelProps {
   organizationId: bigint
@@ -87,6 +90,10 @@ function formatMoney(amount: MoneyAmount): string {
     minimumFractionDigits: amount.scale,
     maximumFractionDigits: amount.scale,
   })
+}
+
+function moneyValue(amount: MoneyAmount): number {
+  return amount.minorUnits / 10 ** amount.scale
 }
 
 function todayInputValue(): string {
@@ -136,6 +143,7 @@ export function OwnerReportsPanel({
   const [date, setDate] = useState(todayInputValue)
   const [timezone] = useState(timezoneInputValue)
   const [scenarioDraft, setScenarioDraft] = useState(DEFAULT_MARGIN_SUPPLY_SCENARIO_DRAFT)
+  const [importedScenario, setImportedScenario] = useState<ImportedMarginSupplyScenario | null>(null)
   const [activePreview, setActivePreview] = useState<
     ReportPreview | null
   >(null)
@@ -193,12 +201,28 @@ export function OwnerReportsPanel({
       })
       return
     }
+    let marginSupplyScenario: MarginSupplyScenario | undefined
+    if (entry.key === "margin_supply_outlook_v1") {
+      try {
+        marginSupplyScenario = marginSupplyScenarioFromDraft(
+          scenarioDraft,
+          importedScenario?.provenance ?? { source: "manual" },
+        )
+      } catch (cause) {
+        toast({
+          title: "Review the scenario assumptions",
+          description: cause instanceof Error ? cause.message : String(cause),
+          variant: "destructive",
+        })
+        return
+      }
+    }
     const result = await preview.mutateAsync({
       reportKey: entry.key,
       companyId,
       date,
       timezone,
-      scenario: entry.key === "margin_supply_outlook_v1" ? marginSupplyScenarioFromDraft(scenarioDraft) : undefined,
+      scenario: marginSupplyScenario,
     })
     setActivePreview(result)
   }
@@ -327,7 +351,7 @@ export function OwnerReportsPanel({
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Margin & supply scenario</CardTitle>
-          <CardDescription>Manual assumptions used only by Margin & Supply Outlook. They produce warnings and advisory context; no prices, orders, or stock rules are changed.</CardDescription>
+          <CardDescription>User-provided assumptions—entered directly or imported from a controlled CSV—used only by Margin & Supply Outlook. They produce warnings and advisory context; no prices, orders, or stock rules are changed.</CardDescription>
         </CardHeader>
         <CardContent>
           <FieldGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -341,15 +365,29 @@ export function OwnerReportsPanel({
                     max={field.max}
                     step={field.step}
                     value={scenarioDraft[field.key]}
-                    onChange={(event) => setScenarioDraft((current) => ({
-                      ...current,
-                      [field.key]: event.target.value,
-                    }))}
+                    onChange={(event) => {
+                      setImportedScenario(null)
+                      setScenarioDraft((current) => ({
+                        ...current,
+                        [field.key]: event.target.value,
+                      }))
+                    }}
                   />
                 </InputGroup>
               </Field>
             ))}
           </FieldGroup>
+          {importedScenario ? (
+            <p className="mt-4 text-xs text-muted-foreground" data-testid="margin-supply-scenario-provenance">
+              Scenario source: {importedScenario.name} · {importedScenario.provenance.fileName} · imported {new Date(importedScenario.provenance.importedAt).toLocaleString()} · CSV row {importedScenario.provenance.rowNumber}. Editing a field marks it as manual input.
+            </p>
+          ) : (
+            <p className="mt-4 text-xs text-muted-foreground">Scenario source: manual entry.</p>
+          )}
+          <MarginSupplyScenarioImport onApply={(scenario) => {
+            setScenarioDraft(scenario.draft)
+            setImportedScenario(scenario)
+          }} />
         </CardContent>
       </Card>
 
@@ -567,6 +605,23 @@ function ReportPreviewPanel({ preview }: ReportPreviewPanelProps) {
           gross={formatMoney(report.purchases.gross)}
         />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Where the money went</CardTitle>
+          <CardDescription>Purchases, fees and fee tax for the day, largest first.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RankedBarList
+            items={[
+              { label: t("reports.ownerReports.sections.purchases"), value: moneyValue(report.purchases.gross), hint: t("reports.ownerReports.ordersCount", { count: report.purchases.orderCount }) },
+              { label: t("reports.ownerReports.columns.fees"), value: moneyValue(report.expensesAndFees.fees) },
+              { label: t("reports.ownerReports.columns.tax"), value: moneyValue(report.expensesAndFees.tax) },
+            ]}
+            emptyLabel="No spending recorded for this day."
+          />
+        </CardContent>
+      </Card>
 
       <ReceiptsCard receipts={report.receipts} />
       <ExpensesAndFeesCard expenses={report.expensesAndFees} />

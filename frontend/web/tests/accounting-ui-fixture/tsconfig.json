@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2020",
+    "paths": {
+      "@/*": ["../../*"],
+      "@/components/ui/*": ["../../../packages/ui/src/components/*"],
+      "@/components/*": ["../../../packages/ui/src/*"],
+      "@/lib/*": ["../../lib/*", "../../../packages/ui/src/lib/*"],
+      "@/hooks/*": ["../../hooks/*", "../../../packages/ui/src/hooks/*"],
+      "@lumiere/ui": ["../../../packages/ui/src/index.ts"],
+      "@lumiere/ui/*": ["../../../packages/ui/src/*"],
+      "@lumiere/stdb": ["../../../packages/stdb/src/index.ts"],
+      "@lumiere/stdb/*": ["../../../packages/stdb/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", ".next/types/**/*.ts", ".next/dev/types/**/*.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}

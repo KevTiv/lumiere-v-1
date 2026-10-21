@@ -1,7 +1,9 @@
 //! Shared typed report queries, company scope, windows, and row limits.
 use super::{CompanyRow, ValidatedPreviewRequest};
 use crate::error::ApiError;
-use crate::reports::common::{ReportPreviewRequest, ReportScope, SourceRowCount, SourceWatermark};
+use crate::reports::common::{
+    MarginSupplyScenarioSource, ReportPreviewRequest, ReportScope, SourceRowCount, SourceWatermark,
+};
 use crate::reports::timezone::{parse_timezone, ReportDayWindow};
 use chrono::{DateTime, NaiveDate, SecondsFormat, Utc};
 use serde::{de::DeserializeOwned, Deserialize};
@@ -158,6 +160,52 @@ pub(super) fn validate_request(
         return Err(ApiError::BadRequest(
             "scenario.targetMarginPct must be between 0 and 95".into(),
         ));
+    }
+    if let Some(provenance) = scenario.provenance.as_ref() {
+        match provenance.source {
+            MarginSupplyScenarioSource::Manual => {
+                if provenance.file_name.is_some()
+                    || provenance.imported_at.is_some()
+                    || provenance.row_number.is_some()
+                {
+                    return Err(ApiError::BadRequest(
+                        "manual scenario provenance cannot include CSV import fields".into(),
+                    ));
+                }
+            }
+            MarginSupplyScenarioSource::ControlledCsv => {
+                let file_name = provenance
+                    .file_name
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| {
+                        !value.is_empty()
+                            && value.len() <= 255
+                            && !value.chars().any(char::is_control)
+                    })
+                    .ok_or_else(|| {
+                        ApiError::BadRequest(
+                            "controlled CSV provenance requires a valid fileName".into(),
+                        )
+                    })?;
+                if !file_name.to_ascii_lowercase().ends_with(".csv") {
+                    return Err(ApiError::BadRequest(
+                        "controlled CSV provenance fileName must end in .csv".into(),
+                    ));
+                }
+                let imported_at = provenance.imported_at.as_deref().ok_or_else(|| {
+                    ApiError::BadRequest("controlled CSV provenance requires importedAt".into())
+                })?;
+                DateTime::parse_from_rfc3339(imported_at).map_err(|_| {
+                    ApiError::BadRequest("scenario.provenance.importedAt must use RFC 3339".into())
+                })?;
+                if !matches!(provenance.row_number, Some(1..=1_000_000)) {
+                    return Err(ApiError::BadRequest(
+                        "controlled CSV provenance rowNumber must be between 1 and 1000000".into(),
+                    ));
+                }
+            }
+        }
     }
 
     Ok(ValidatedPreviewRequest {

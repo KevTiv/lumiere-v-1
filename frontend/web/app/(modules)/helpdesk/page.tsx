@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { HelpdeskClient } from "./helpdesk-client"
 
 const SSR_RESOURCES = [
@@ -15,7 +15,7 @@ export default async function HelpdeskPage() {
     return <HelpdeskClient />
   }
 
-  const [tickets, teams, stages, slas] = await serverFetchQueryListsRequired(
+  const [tickets, teams, stages, slas] = await serverPrefetchQueryLists(
     session,
     SSR_RESOURCES,
   )
