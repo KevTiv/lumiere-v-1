@@ -1,6 +1,7 @@
 import { workOsRedirectUri } from './lib/workos-config'
 import { authkit, handleAuthkitHeaders } from '@workos-inc/authkit-nextjs'
 import { isWorkOsEnabled } from './lib/auth-mode'
+import { withoutPkceCookie } from './lib/workos-pkce-cookie'
 import { NextResponse, NextRequest } from 'next/server'
 import { requiresPrivatePageLogin } from './lib/private-release-policy'
 
@@ -43,7 +44,7 @@ export async function proxy(request: NextRequest) {
     const forwarded = new NextRequest(request, { headers })
     const result = await authkit(forwarded, { redirectUri: workOsRedirectUri() })
     const privatePage = requiresPrivatePageLogin(pathname, process.env.NODE_ENV === 'production', Boolean(result.session.user))
-    const response = handleAuthkitHeaders(forwarded, result.headers, privatePage ? {
+    const response = handleAuthkitHeaders(forwarded, withoutPkceCookie(result.headers), privatePage ? {
       redirect: new URL(`/sign-in?callbackUrl=${encodeURIComponent(pathname)}`, workOsRedirectUri()),
     } : {})
     response.headers.set('Cache-Control', 'private, no-store')

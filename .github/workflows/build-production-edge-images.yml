@@ -46,6 +46,7 @@ jobs:
         if: matrix.service == 'web'
         run: |
           node frontend/scripts/verify-vendored-contracts.mjs
+          python3 scripts/tests/test_railway_stack_workflow.py -v
           node --experimental-vm-modules --test scripts/tests/alpha-demo-seed.test.mjs
           node --experimental-strip-types --test frontend/web/lib/demo-access-policy.test.mjs
       - name: Validate gateway configuration rendering

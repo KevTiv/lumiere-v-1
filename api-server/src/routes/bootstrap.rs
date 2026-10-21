@@ -120,7 +120,7 @@ fn stdb_option<T: Serialize>(value: Option<&T>) -> Value {
 
 fn tenant_currency_sql(organization_id: u64) -> String {
     format!(
-        "SELECT id, code, name, symbol, decimal_places FROM currency WHERE organization_id = {organization_id} AND active = true"
+        "SELECT id, code, name, symbol, decimal_places, rounding_factor FROM currency WHERE organization_id = {organization_id} AND active = true"
     )
 }
 
@@ -369,7 +369,7 @@ mod tests {
     fn tenant_currency_query_is_directly_organization_scoped() {
         assert_eq!(
             tenant_currency_sql(42),
-            "SELECT id, code, name, symbol, decimal_places FROM currency WHERE organization_id = 42 AND active = true"
+            "SELECT id, code, name, symbol, decimal_places, rounding_factor FROM currency WHERE organization_id = 42 AND active = true"
         );
     }
 

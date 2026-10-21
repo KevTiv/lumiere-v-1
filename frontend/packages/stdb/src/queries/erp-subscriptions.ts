@@ -364,7 +364,8 @@ export function subscriptionQueriesForResource(
   ].includes(r)) return null;
 
   if (r === "roles") {
-    return [selectRolesActiveSql(ctx.fieldAccess)];
+    if (ctx.organizationId == null) return null;
+    return [selectRolesActiveSql(ctx.fieldAccess, ctx.organizationId)];
   }
 
   /** Org-scoped roots only; child tables used `IN (SELECT …)` which SpacetimeDB SQL rejects. */
@@ -383,8 +384,14 @@ export function subscriptionQueriesForResource(
   }
 
   if (r === "user-roles") {
-    if (!ctx.identityHex || ctx.identityHex === "unknown") return null;
-    return [selectUserRoleAssignmentsForIdentitySql(ctx.identityHex, ctx.fieldAccess)];
+    if (!ctx.identityHex || ctx.identityHex === "unknown" || ctx.organizationId == null) return null;
+    return [
+      selectUserRoleAssignmentsForIdentitySql(
+        ctx.identityHex,
+        ctx.fieldAccess,
+        ctx.organizationId,
+      ),
+    ];
   }
 
   if (r === "my-employee") {

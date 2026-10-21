@@ -524,6 +524,7 @@ async fn process_job(
             company_id: payload.company_id,
             date,
             timezone: payload.timezone.clone(),
+            scenario: None,
         },
     )
     .await
@@ -878,7 +879,10 @@ fn complete_params_json(
 
 fn report_date(report_key: ReportKey, timezone: Tz) -> anyhow::Result<String> {
     let today = Utc::now().with_timezone(&timezone).date_naive();
-    let date = if report_key == ReportKey::MonthlyOwnerReportV1 {
+    let date = if matches!(
+        report_key,
+        ReportKey::MonthlyOwnerReportV1 | ReportKey::MarginSupplyOutlookV1
+    ) {
         let current_month = today
             .with_day(1)
             .ok_or_else(|| anyhow::anyhow!("invalid local date"))?;
@@ -926,6 +930,9 @@ mod tests {
         let timezone = "UTC".parse::<Tz>().expect("UTC timezone");
         let date = report_date(ReportKey::MonthlyOwnerReportV1, timezone).expect("report date");
         assert!(date.ends_with("-01"));
+        let outlook_date =
+            report_date(ReportKey::MarginSupplyOutlookV1, timezone).expect("outlook date");
+        assert_eq!(outlook_date, date);
     }
 
     #[test]

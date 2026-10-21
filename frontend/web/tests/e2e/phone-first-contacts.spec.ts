@@ -10,6 +10,7 @@ import {
 } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   callReducerBffResult,
   expectNoAppError,
@@ -446,9 +447,9 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
       )
 
       await alpha.page.reload()
-      await alpha.page.getByTestId("module-tab-crm-contacts").click()
+      await selectModuleTab(alpha.page, "crm", "contacts")
       await expect(alpha.page.getByText(supplierName).first()).toBeVisible({ timeout: 30_000 })
-      await alpha.page.getByTestId("module-tab-crm-duplicates").click()
+      await selectModuleTab(alpha.page, "crm", "duplicates")
       await expect(alpha.page.getByTestId("crm-duplicates-empty")).toBeVisible({ timeout: 30_000 })
 
       const foreignCompanyIdentity = await callReducerBffResult(

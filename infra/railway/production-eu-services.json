@@ -15,7 +15,52 @@
     { "name": "spacetimedb-publisher", "role": "schema-publisher" },
     { "name": "storage-migrate", "role": "migration", "runtimeBinary": "storage-migrate" },
     { "name": "chromium-worker", "role": "report-renderer" },
-    { "name": "api-server", "role": "api", "runtimeBinary": "api-server" },
+    {
+      "name": "api-server",
+      "role": "api",
+      "runtimeBinary": "api-server",
+      "localStorage": {
+        "mountPath": "/data",
+        "directory": "/data/document-blobs",
+        "maxReplicas": 1
+      },
+      "requiredVariables": {
+        "LUMIERE_DOCUMENT_BLOB_DIR": {
+          "kind": "exact",
+          "value": "/data/document-blobs"
+        }
+      },
+      "optionalFeatures": [
+        {
+          "name": "reviewed-email",
+          "selectionVariable": "RAILWAY_ENABLE_REVIEWED_MAIL",
+          "configuredVariables": [
+            "LUMIERE_REVIEWED_MAIL_STDB_TOKEN",
+            "RESEND_API_KEY"
+          ],
+          "requiredVariables": {
+            "LUMIERE_REVIEWED_MAIL_STDB_TOKEN": {
+              "kind": "secret"
+            },
+            "STDB_SERVER_TOKEN": {
+              "kind": "secret"
+            },
+            "RESEND_API_KEY": {
+              "kind": "secret"
+            },
+            "RESEND_FROM_EMAIL": {
+              "kind": "email"
+            }
+          },
+          "distinctSecrets": [
+            [
+              "LUMIERE_REVIEWED_MAIL_STDB_TOKEN",
+              "STDB_SERVER_TOKEN"
+            ]
+          ]
+        }
+      ]
+    },
     {
       "name": "ai-gateway",
       "role": "ai",

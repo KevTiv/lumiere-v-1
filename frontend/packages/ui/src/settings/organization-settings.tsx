@@ -52,6 +52,14 @@ import { createCountryForm, createCurrencyForm } from "../lib/settings-platform-
 import { useRBAC } from "@/lib/rbac-context"
 import { cn } from "@/lib/utils"
 import { CountryPackReadinessPanel } from "./country-pack-readiness-panel"
+import { InvoicePersonalizationSettings, type UploadInvoiceLogo } from "./invoice-personalization-settings"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/select"
 
 type OrgMasterCsvKind =
   | "country"
@@ -75,7 +83,7 @@ function companyIdFromForm(data: Record<string, unknown>): string {
  * Manages organization-level settings via the upsert_organization_settings reducer.
  * This connects to SpacetimeDB for persistent organization configuration.
  */
-export function OrganizationSettings() {
+export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?: UploadInvoiceLogo } = {}) {
   const { t } = useTranslation()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
@@ -717,6 +725,8 @@ export function OrganizationSettings() {
         </Card>
       ) : null}
 
+      {orgReady ? <InvoicePersonalizationSettings organizationId={orgId} companyId={selectedCompanyId || null} companyName={strVal(selectedCompany?.name)} company={selectedCompany} uploadInvoiceLogo={uploadInvoiceLogo} /> : null}
+
       {orgReady && selectedCompanyId ? (
         <CountryPackReadinessPanel
           definitions={countryPackCatalog.data ?? []}
@@ -863,19 +873,18 @@ export function OrganizationSettings() {
                 <div className="grid max-w-xl gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="delegated-admin-company">{t("settings.organization.privacy.delegatedAdminCompany")}</Label>
-                    <select
-                      id="delegated-admin-company"
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                      value={selectedCompanyId}
-                      onChange={(e) => setSelectedCompanyId(e.target.value)}
-                    >
-                      <option value="">{t("settings.organization.privacy.delegatedAdminCompanyPlaceholder")}</option>
-                      {companies.map((c) => (
-                        <option key={String(c.id)} value={String(c.id)}>
-                          {strVal(c.name)}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                      <SelectTrigger id="delegated-admin-company">
+                        <SelectValue placeholder={t("settings.organization.privacy.delegatedAdminCompanyPlaceholder")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((c) => (
+                          <SelectItem key={String(c.id)} value={String(c.id)}>
+                            {strVal(c.name)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="delegated-admin-identity">{t("settings.organization.privacy.delegatedAdminIdentity")}</Label>

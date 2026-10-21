@@ -982,9 +982,9 @@ async fn read_exact_outcome(
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/import/{entity}", post(import_entity_post))
+        .route("/import/:entity", post(import_entity_post))
         .route(
-            "/import/{entity}/requests/{request_id}",
+            "/import/:entity/requests/:request_id",
             get(import_request_get),
         )
 }
@@ -1159,6 +1159,8 @@ mod tests {
             role_permissions: vec!["hr_employee:read".into()],
             identity_hex: ACTOR.into(),
             field_permissions: vec![],
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         };
         assert!(
             import_read_columns(resolve_import_entity("hr_employee").unwrap(), &access).is_ok()

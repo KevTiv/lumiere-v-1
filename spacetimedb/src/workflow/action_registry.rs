@@ -44,6 +44,7 @@ pub enum GuardedActionKey {
     ApproveLeave,
     PostPaymentTransaction,
     ReversePaymentTransaction,
+    ReverseBankStatementSettlement,
 }
 
 impl GuardedActionKey {
@@ -60,6 +61,7 @@ impl GuardedActionKey {
             Self::ApproveLeave => "approve_leave",
             Self::PostPaymentTransaction => "post_payment_transaction",
             Self::ReversePaymentTransaction => "reverse_payment_transaction",
+            Self::ReverseBankStatementSettlement => "reverse_bank_statement_settlement",
         }
     }
 }
@@ -77,6 +79,7 @@ pub enum GuardedActionInput {
     ApproveLeave { leave_id: u64 },
     PostPaymentTransaction { transaction_id: u64 },
     ReversePaymentTransaction { transaction_id: u64 },
+    ReverseBankStatementSettlement { payment_id: u64 },
 }
 
 impl GuardedActionInput {
@@ -96,6 +99,11 @@ impl GuardedActionInput {
             GuardedActionKey::PostAccountMove => Self::PostAccountMove {
                 move_id: subject_id,
             },
+            GuardedActionKey::ReverseBankStatementSettlement => {
+                Self::ReverseBankStatementSettlement {
+                    payment_id: subject_id,
+                }
+            }
             GuardedActionKey::PostPayment => Self::PostPayment {
                 payment_id: subject_id,
             },
@@ -227,6 +235,7 @@ pub fn resolve_guarded_action(key: &str, version: u32) -> Result<GuardedActionKe
         "confirm_sales_order" => Ok(GuardedActionKey::ConfirmSalesOrder),
         "post_account_move" => Ok(GuardedActionKey::PostAccountMove),
         "post_payment" => Ok(GuardedActionKey::PostPayment),
+        "reverse_bank_statement_settlement" => Ok(GuardedActionKey::ReverseBankStatementSettlement),
         "approve_expense_sheet" => Ok(GuardedActionKey::ApproveExpenseSheet),
         "approve_ai_action_draft" => Ok(GuardedActionKey::ApproveAiActionDraft),
         "approve_leave" => Ok(GuardedActionKey::ApproveLeave),
@@ -335,7 +344,10 @@ pub fn execute_guarded_action(
         params.input.clone(),
     )?;
     if before.subject_revision_hash != params.expected_subject_revision_hash {
-        return Err("guarded action subject changed after approval was requested".to_string());
+        return Err(
+            "guarded action subject changed after approval was requested (revision mismatch)"
+                .to_string(),
+        );
     }
 
     execute_adapter(
@@ -415,6 +427,10 @@ fn material_snapshot(
         (GuardedActionKey::PostAccountMove, GuardedActionInput::PostAccountMove { move_id }) => {
             account_move_snapshot(ctx, organization_id, company_id, *move_id)
         }
+        (
+            GuardedActionKey::ReverseBankStatementSettlement,
+            GuardedActionInput::ReverseBankStatementSettlement { payment_id },
+        ) => bank_settlement_reversal_snapshot(ctx, organization_id, company_id, *payment_id),
         (GuardedActionKey::PostPayment, GuardedActionInput::PostPayment { payment_id }) => {
             payment_snapshot(ctx, organization_id, company_id, *payment_id)
         }
@@ -466,6 +482,9 @@ fn purchase_order_snapshot(
         field("company_id", order.company_id),
         debug_field("state", &order.state),
         field("partner_id", order.partner_id),
+        debug_field("origin", &order.origin),
+        debug_field("partner_ref", &order.partner_ref),
+        field("dest_address_id", option_u64(order.dest_address_id)),
         field("currency_id", order.currency_id),
         float_field("amount_untaxed", order.amount_untaxed),
         float_field("amount_tax", order.amount_tax),
@@ -475,6 +494,24 @@ fn purchase_order_snapshot(
         field("date_order", order.date_order.to_micros_since_unix_epoch()),
         field("date_planned", option_timestamp(order.date_planned)),
         field("is_locked", order.is_locked),
+        field("incoterm_id", option_u64(order.incoterm_id)),
+        debug_field("incoterm_location", &order.incoterm_location),
+        field(
+            "match_qty_tolerance",
+            order
+                .match_qty_tolerance
+                .map(f64::to_bits)
+                .map(|n| n.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+        ),
+        field(
+            "match_price_tolerance",
+            order
+                .match_price_tolerance
+                .map(f64::to_bits)
+                .map(|n| n.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+        ),
     ];
     let mut lines: Vec<_> = ctx
         .db
@@ -496,6 +533,9 @@ fn purchase_order_snapshot(
             field("line.sequence", line.sequence),
             field("line.product_id", line.product_id),
             field("line.product_uom", line.product_uom),
+            field("line.partner_id", line.partner_id),
+            field("line.lot_id", option_u64(line.lot_id)),
+            field("line.date_planned", option_timestamp(line.date_planned)),
             float_field("line.product_qty", line.product_qty),
             float_field("line.price_unit", line.price_unit),
             float_field("line.price_subtotal", line.price_subtotal),
@@ -746,6 +786,8 @@ fn payment_snapshot(
         field("currency_id", payment.currency_id),
         field("date", payment.date.to_micros_since_unix_epoch()),
         field("journal_id", payment.journal_id),
+        debug_field("ref", &payment.ref_),
+        debug_field("memo", &payment.memo),
         field("reconciled_invoice_ids", joined_ids(&invoice_ids)),
         field("reconciled_bill_ids", joined_ids(&bill_ids)),
     ];
@@ -768,6 +810,69 @@ fn payment_snapshot(
             ),
         ],
     ))
+}
+
+fn bank_settlement_reversal_snapshot(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    payment_id: u64,
+) -> Result<MaterialSnapshot, String> {
+    let (snapshot, amount, currency_id, state, _request_id) =
+        crate::accounting::bank_settlement_lifecycle::reversal_material(
+            ctx,
+            organization_id,
+            company_id,
+            payment_id,
+        )?;
+    let amount = money_value(ctx, amount, currency_id)?;
+    Ok(material(
+        GuardedActionSubjectKind::AccountPayment,
+        payment_id,
+        vec![field("bank_settlement_material", snapshot)],
+        Some(amount.clone()),
+        None,
+        vec![
+            condition_field("amount", ConditionValue::Money(amount)),
+            condition_field("state", ConditionValue::Code(state)),
+        ],
+    ))
+}
+
+/// Gate-only proposal validation; this material is never accepted for execution.
+pub(crate) fn preflight_bank_settlement_reversal_gate(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    payment_id: u64,
+) -> Result<(), String> {
+    let mut snapshot = snapshot_guarded_action(
+        ctx,
+        organization_id,
+        company_id,
+        GuardedActionKey::PostPayment,
+        GUARDED_ACTION_SCHEMA_VERSION,
+        GuardedActionInput::PostPayment { payment_id },
+    )?;
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("bank payment missing")?;
+    let amount = money_value(ctx, payment.amount, payment.currency_id)?;
+    snapshot.action = GuardedActionKey::ReverseBankStatementSettlement;
+    snapshot.condition_snapshot.fields = vec![
+        condition_field("amount", ConditionValue::Money(amount)),
+        condition_field(
+            "state",
+            ConditionValue::Code(format!("{:?}", payment.state)),
+        ),
+    ];
+    snapshot.condition_snapshot.subject_revision_hash =
+        canonical_condition_snapshot_hash(&snapshot.condition_snapshot)
+            .map_err(|error| format!("bank reversal condition snapshot invalid: {error}"))?;
+    super::approval_gate::preflight_guarded_action_gate(ctx, organization_id, company_id, &snapshot)
 }
 
 fn expense_sheet_snapshot(
@@ -1020,6 +1125,14 @@ fn execute_adapter(
         GuardedActionInput::PostAccountMove { move_id } => {
             post_account_move_impl(ctx, organization_id, *move_id, true)
         }
+        GuardedActionInput::ReverseBankStatementSettlement { payment_id } => {
+            crate::accounting::bank_settlement_lifecycle::execute_bank_statement_settlement_reversal(
+                ctx,
+                organization_id,
+                company_id,
+                *payment_id,
+            )
+        }
         GuardedActionInput::PostPayment { payment_id } => {
             post_payment_impl(ctx, organization_id, *payment_id, true)
         }
@@ -1091,6 +1204,9 @@ fn validate_input_matches_action(
             GuardedActionKey::PostAccountMove,
             GuardedActionInput::PostAccountMove { .. }
         ) | (
+            GuardedActionKey::ReverseBankStatementSettlement,
+            GuardedActionInput::ReverseBankStatementSettlement { .. }
+        ) | (
             GuardedActionKey::PostPayment,
             GuardedActionInput::PostPayment { .. }
         ) | (
@@ -1129,7 +1245,8 @@ fn subject_for_input(input: &GuardedActionInput) -> (GuardedActionSubjectKind, u
         GuardedActionInput::PostAccountMove { move_id } => {
             (GuardedActionSubjectKind::AccountMove, *move_id)
         }
-        GuardedActionInput::PostPayment { payment_id } => {
+        GuardedActionInput::PostPayment { payment_id }
+        | GuardedActionInput::ReverseBankStatementSettlement { payment_id } => {
             (GuardedActionSubjectKind::AccountPayment, *payment_id)
         }
         GuardedActionInput::ApproveExpenseSheet { sheet_id } => {

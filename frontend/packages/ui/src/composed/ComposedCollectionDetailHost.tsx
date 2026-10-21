@@ -6,6 +6,8 @@ import { Button } from "../components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/table"
 import { TablePager, usePagedRows } from "../components/table-pager"
+import { workspaceStyles } from "../lib/workspace-styles"
+import { cn } from "../lib/utils"
 
 export interface ComposedCollectionDetailHostProps {
   preview: PreviewResponse | null
@@ -49,9 +51,9 @@ function CollectionPreview({
   const fields = nodeFields(node)
   const rowsPager = usePagedRows(collection?.rows ?? [])
   return (
-    <Card data-testid={`composed-collection-${node.id}`}>
-      <CardHeader><CardTitle>{nodeTitle(node)} · {node.id}</CardTitle></CardHeader>
-      <CardContent>
+    <Card className={cn(workspaceStyles.surface, "min-w-0")} data-testid={`composed-collection-${node.id}`}>
+      <CardHeader><CardTitle className={workspaceStyles.sectionTitle}>{nodeTitle(node)} · {node.id}</CardTitle></CardHeader>
+      <CardContent className="min-w-0 [&_[data-slot=pagination-content]]:flex-wrap">
         {!collection ? (
           <p className="text-sm text-destructive" data-testid={`composed-unavailable-${node.id}`}>Collection data unavailable.</p>
         ) : collection.rows.length === 0 ? (
@@ -111,9 +113,9 @@ function DetailPreview({
   const row = collection?.rows.find((entry) => entry.id === selectedId)
   const values = row ? fieldsForRow(row) : null
   return (
-    <Card data-testid={`composed-detail-${node.id}`}>
-      <CardHeader><CardTitle>{nodeTitle(node)} · {node.id}</CardTitle></CardHeader>
-      <CardContent>
+    <Card className={cn(workspaceStyles.surface, "min-w-0")} data-testid={`composed-detail-${node.id}`}>
+      <CardHeader><CardTitle className={workspaceStyles.sectionTitle}>{nodeTitle(node)} · {node.id}</CardTitle></CardHeader>
+      <CardContent className="min-w-0">
         {!values ? <p className="text-sm text-muted-foreground">Select a record to inspect it.</p> : (
           <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {node.fields.map((field) => (
@@ -142,10 +144,10 @@ export function ComposedCollectionDetailHost({ preview, loading = false, error }
   if (!preview) return <p className="text-sm text-muted-foreground" data-testid="composed-empty-preview">No preview available.</p>
 
   return (
-    <div className="space-y-6" data-testid="composed-module-host">
+    <div className="min-w-0 space-y-6" data-testid="composed-module-host">
       {preview.definition.pages.map((page) => (
-        <section key={page.id} className="space-y-4" data-testid={`composed-page-${page.id}`}>
-          <h2 className="text-lg font-semibold">{page.title}</h2>
+        <section key={page.id} className="min-w-0 space-y-4" data-testid={`composed-page-${page.id}`}>
+          <h2 className={workspaceStyles.sectionTitle}>{page.title}</h2>
           {page.nodes.map((node) => {
             const collection = collectionFor(collections, page.id, node.id)
             if (node.kind === "collection") {

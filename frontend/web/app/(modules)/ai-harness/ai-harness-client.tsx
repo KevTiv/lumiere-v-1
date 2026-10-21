@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@lumiere/ui/components/tabs"
+import { Tabs, TabsContent } from "@lumiere/ui/components/tabs"
+import { WorkspaceTabsList as TabsList, WorkspaceTabsTrigger as TabsTrigger } from "@lumiere/ui/components/workspace-tabs"
 import { DashboardHeader } from "@lumiere/ui"
 
 import { ReportComposerPanel } from "./report-composer-panel"

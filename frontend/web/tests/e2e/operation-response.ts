@@ -15,6 +15,12 @@ export function matchesOperationResponse(
 ): boolean {
   const pathname = new URL(response.url()).pathname
   const encodedName = encodeURIComponent(operationName)
+  if (operationName.startsWith("erp.")) {
+    return (
+      pathname === `/api/operations/${encodedName}` ||
+      pathname === `/v1/operations/${encodedName}`
+    )
+  }
   if (
     pathname === `/api/compat/reducer/${encodedName}` ||
     pathname === `/v1/compat/reducer/${encodedName}`
@@ -24,4 +30,14 @@ export function matchesOperationResponse(
   if (!isSessionOperation(operationName)) return false
   const operationPath = stdbBffCallUrl(operationName)
   return pathname === operationPath || pathname === `/v1${operationPath.slice(4)}`
+}
+
+/** Resolve named/legacy fault targets to current operation routes, never substrings. */
+export function matchesOperationFaultTarget(url: URL, target: string): boolean {
+  const legacyName = target.match(/^\/(?:api|v1)\/compat\/reducer\/([^/]+)$/)?.[1]
+  const operationName = legacyName ?? target
+  return url.pathname === target || matchesOperationResponse(
+    { url: () => url.toString() },
+    operationName,
+  )
 }

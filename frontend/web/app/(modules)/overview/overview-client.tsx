@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, useRef, useCallback, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
   DashboardGrid,
@@ -30,6 +31,7 @@ import { useAiActionDraftInboxCount } from "@lumiere/query-hooks/hooks/ai-action
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
 import { OwnerControlLoop } from "./owner-control-loop"
+import { useProductivitySections } from "@/lib/use-productivity-sections"
 import { overviewResourceStatus, resourceStatusLabel, combinedResourceStatus, type OverviewInitialStates } from "./resource-state"
 import type { StockQuant, Product } from "@lumiere/stdb/types"
 
@@ -357,6 +359,23 @@ function OverviewClientLoaded({
     return { overdueInvoices, unreconciledPayments, lowStockProducts, pendingMessageApprovals }
   }, [messageBatches, operatingCompanyId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants])
 
+  const router = useRouter()
+  const myWorkActions = useMemo(
+    () => [
+      { id: "new-task", label: t("workspace.actions.newTask"), icon: "plus", color: "blue" as const, onClick: () => router.push("/tasks") },
+      { id: "upload", label: t("workspace.actions.upload"), icon: "upload", color: "green" as const, onClick: () => router.push("/documents?tab=documents") },
+      { id: "log-time", label: t("workspace.actions.logTime"), icon: "refresh", color: "orange" as const, onClick: () => router.push("/projects?tab=timesheets") },
+      { id: "new-event", label: t("workspace.actions.newEvent"), icon: "calendar", color: "purple" as const, onClick: () => router.push("/calendar") },
+    ],
+    [t, router],
+  )
+  const myWorkSections = useProductivitySections({
+    organizationId: orgId,
+    tasks,
+    projects: projectsQuery.data ?? [],
+    quickActions: myWorkActions,
+    idPrefix: "overview-work",
+  })
   const dashboardGridRef = useRef<HTMLDivElement>(null)
   const handleDashboardExport = useCallback(async () => {
     if (!dashboardGridRef.current) return
@@ -386,6 +405,7 @@ function OverviewClientLoaded({
             lowStockProducts={stockState ?? ownerControlLoop.lowStockProducts}
             pendingMessageApprovals={messagesState ?? ownerControlLoop.pendingMessageApprovals}
           />
+          <DashboardGrid sections={myWorkSections} testId="overview-my-work" widgetTestIdPrefix="overview-widget" />
           {salesState ? <p data-testid="overview-sales-trend-state">Sales trend: {salesState}</p> : null}
           <DashboardGrid
             ref={dashboardGridRef}

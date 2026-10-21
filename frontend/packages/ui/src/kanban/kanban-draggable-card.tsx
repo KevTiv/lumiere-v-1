@@ -6,7 +6,7 @@ import { cn } from "../lib/utils"
 
 interface KanbanDraggableCardProps {
   id: string
-  data?: Record<string, unknown>
+  data?: { [key: string]: unknown }
   onClick?: () => void
   isDragOverlay?: boolean
   children: React.ReactNode
@@ -33,8 +33,9 @@ export function KanbanDraggableCard({
       {...attributes}
       {...listeners}
       onClick={onClick}
+      data-testid={isDragOverlay ? undefined : `kanban-card-${id}`}
       className={cn(
-        "bg-card border border-border rounded-lg p-3 cursor-grab active:cursor-grabbing",
+        "bg-card border border-border rounded-xl p-3 shadow-xs cursor-grab active:cursor-grabbing",
         "hover:border-primary/50 hover:shadow-md transition-all",
         "select-none touch-none",
         isDragging && "opacity-50 shadow-lg",

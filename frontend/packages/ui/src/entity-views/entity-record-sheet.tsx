@@ -10,7 +10,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../components/sheet"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/tabs"
+import { Tabs, TabsContent } from "../components/tabs"
+import { ContextTabsList, ContextTabsTrigger } from "../components/context-tabs"
 import { useErpSession } from "@lumiere/erp-session"
 import { RecordChatter } from "../crm-components/crm-record-chatter"
 import { EntityDetail } from "./entity-detail"
@@ -90,33 +91,25 @@ export function EntityRecordSheet({
               )}
 
               <Tabs defaultValue="overview" className="min-w-0 flex flex-col">
-                <TabsList scrollable variant="default" className="justify-start gap-2">
-                  <TabsTrigger value="overview" className="flex-none">
-                    Overview
-                  </TabsTrigger>
+                <ContextTabsList aria-label="Record views">
+                  <ContextTabsTrigger value="overview">Overview</ContextTabsTrigger>
                   {config.customTabs?.map((tab) => (
-                    <TabsTrigger
+                    <ContextTabsTrigger
                       key={tab.id}
                       className="flex-none"
                       value={tab.id}
                       data-testid={`entity-record-sheet-tab-${tab.id}`}
                     >
                       {tab.label}
-                    </TabsTrigger>
+                    </ContextTabsTrigger>
                   ))}
                   {showDiscussion && (
-                    <TabsTrigger
-                      value="discussion"
-                      className="flex-none"
-                      data-testid="entity-record-sheet-tab-discussion"
-                    >
+                    <ContextTabsTrigger value="discussion" data-testid="entity-record-sheet-tab-discussion">
                       Discussion
-                    </TabsTrigger>
+                    </ContextTabsTrigger>
                   )}
-                  <TabsTrigger value="audit" className="flex-none">
-                    Audit
-                  </TabsTrigger>
-                </TabsList>
+                  <ContextTabsTrigger value="audit">Audit</ContextTabsTrigger>
+                </ContextTabsList>
 
                 <TabsContent value="overview" className="mt-4">
                   <EntityDetail config={config.detailConfig} data={record} />

@@ -118,6 +118,9 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { useSaleOrders, usePricelists, type SaleOrder, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import type { ChartValueFormat } from "@lumiere/ui/lib/chart-format"
+import { mrrAndChurnByMonth, planMix } from "./subscription-dashboard-charts"
 import { useAccountJournals, useAccountAccounts, useAccountMoves, useAccountMoveLines, useAccountPayments } from "@lumiere/query-hooks/hooks/accounting"
 import { subscriptionRecordLinks } from "@lumiere/query-hooks/hooks/cross-record-links"
 import { CrossRecordLinks } from "../../../components/order-handoff-links"
@@ -726,7 +729,24 @@ function SubscriptionsClientLoaded({
       })
       .reduce((sum, m) => sum + Number(m.amountUntaxed ?? m.amount_untaxed ?? 0), 0)
 
+    const now = new Date()
+    const currencyCodeById = currencyCodeMap(currencies)
+    const chartSubscriptions = subscriptions.filter((subscription) => subscription.companyId === operatingCompanyId)
+    const subscriptionCurrencies = new Set(chartSubscriptions.map((row) => currencyCodeById.get(String(row.currencyId)) ?? ""))
+    const [onlyCurrency] = [...subscriptionCurrencies]
+    const money: ChartValueFormat =
+      subscriptionCurrencies.size === 1 && onlyCurrency ? { kind: "currency", currency: onlyCurrency } : { kind: "number" }
+
     return mapDashboardWidgets(moduleConfig, (w) => {
+        if (["sub-mrr-churn", "sub-plan-mix"].includes(w.id) && (subscriptionCurrencies.size !== 1 || subscriptionCurrencies.has(""))) {
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
+        }
+        if (w.type === "combo-chart" && w.id === "sub-mrr-churn") {
+          return { ...w, data: { ...w.data, values: mrrAndChurnByMonth(chartSubscriptions, now), valueFormat: money } }
+        }
+        if (w.type === "share-bar" && w.id === "sub-plan-mix") {
+          return { ...w, data: { ...w.data, ...planMix(chartSubscriptions, plans, now), valueFormat: money } }
+        }
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -772,6 +792,7 @@ function SubscriptionsClientLoaded({
   }, [
     subscriptions,
     plans,
+    currencies,
     deferredSchedules,
     accountMoves,
     moduleConfig,

@@ -18,6 +18,7 @@ import type {
   ReportKey,
   ReportPreview,
   ReportPreviewRequest,
+  MarginSupplyScenario,
 } from "@lumiere/erp-shared/report-schemas"
 
 import { apiFetch, rqBigIntKey } from "../http"
@@ -32,6 +33,7 @@ export interface ReportPreviewInput {
   companyId: number
   date: string
   timezone: string
+  scenario?: MarginSupplyScenario
 }
 
 const OWNER_REPORTS_QUERY_KEY = "owner-reports"
@@ -58,6 +60,7 @@ export function useReportPreview(organizationId: bigint) {
         companyId: input.companyId,
         date: input.date,
         timezone: input.timezone,
+        scenario: input.scenario,
       }
       const response = await apiFetch(`/api/reports/${encodeURIComponent(input.reportKey)}/preview`, {
         method: "POST",
@@ -79,7 +82,7 @@ export function useReportPdf() {
       const response = await apiFetch(`/api/reports/${encodeURIComponent(input.reportKey)}/pdf`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId: input.companyId, date: input.date, timezone: input.timezone }),
+        body: JSON.stringify({ companyId: input.companyId, date: input.date, timezone: input.timezone, scenario: input.scenario }),
       })
       if (!response.ok) throw new Error(await response.text())
       return response.blob()

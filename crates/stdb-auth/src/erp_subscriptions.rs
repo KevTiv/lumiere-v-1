@@ -737,6 +737,8 @@ mod tests {
             role_permissions: vec!["module:hr:read".into()],
             identity_hex: identity_hex.into(),
             field_permissions: vec![],
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         };
         let privileged_access = FieldAccessContext {
             role_name: "superuser".into(),

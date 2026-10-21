@@ -1229,7 +1229,8 @@ check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pi
 contracts-staging-from-pinned:
 	@bash scripts/prepare-vendored-contracts-rust.sh
 	@cargo fetch --quiet
-	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
+	@set -euo pipefail; \
+	CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "contracts-staging-from-pinned: could not resolve the pinned lumiere-contracts checkout" >&2; \
 		exit 1; \
@@ -1244,11 +1245,12 @@ contracts-staging-from-pinned:
 			exit 1; \
 		fi; \
 	done; \
-	rm -rf .contracts-staging; \
-	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated .contracts-staging/ir; \
-	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
-	cp -R "$$CHECKOUT/manifests/." .contracts-staging/manifests/; \
-	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." .contracts-staging/ir/; fi; \
+	STAGING="$$(mktemp -d)"; \
+	trap 'rm -rf "$$STAGING"' EXIT; \
+	mkdir -p "$$STAGING/bindings" "$$STAGING/manifests" "$$STAGING/ts/generated" "$$STAGING/ir"; \
+	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." "$$STAGING/bindings/"; \
+	cp -R "$$CHECKOUT/manifests/." "$$STAGING/manifests/"; \
+	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." "$$STAGING/ir/"; fi; \
 	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
 	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
 	python3 scripts/verify-contract-ir.py \
@@ -1262,9 +1264,10 @@ contracts-staging-from-pinned:
 		python3 scripts/verify-agent-capability-artifact.py \
 			"$$CHECKOUT/ir/agent-capability-registry-v1.json"; \
 	fi; \
-	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
-	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
-	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
+	cp -R "$$CHECKOUT/packages/contracts/src/generated/." "$$STAGING/ts/generated/"; \
+	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" "$$STAGING/ts/"; \
+	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" "$$STAGING/ts/"; \
+	python3 scripts/sync-directory.py "$$STAGING" .contracts-staging; \
 	echo "contracts-staging-from-pinned: populated .contracts-staging/ from $$CHECKOUT"
 
 # CI-safe reducer drift check. Unlike full bindings drift, schema retrieval is

@@ -29,7 +29,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { ContextTabsList as TabsList, ContextTabsTrigger as TabsTrigger } from "../components/context-tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Select,
