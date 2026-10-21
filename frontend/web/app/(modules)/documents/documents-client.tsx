@@ -2,7 +2,7 @@
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
@@ -15,7 +15,6 @@ import {
   newKnowledgeCategoryForm,
   newDocumentFolderForm,
   newDocumentProcessingJobForm,
-  newDocumentTemplateForm,
   newMailTemplateForm,
   uploadDocumentVersionForm,
   editKnowledgeArticleForm,
@@ -31,10 +30,12 @@ import {
   useFormDialog,
 } from "@lumiere/ui"
 import type { EntityAction, EntityViewConfig, FormConfig } from "@lumiere/ui"
+import type { EntityRow } from "@lumiere/ui/lib/entity-view-types"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { canUseModuleData, moduleQueryState, type ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -90,7 +91,7 @@ import type {
 import {
   useDocumentTemplates,
   useMailTemplates,
-  useCreateDocumentTemplate,
+  useUpdateDocumentTemplate,
   useCreateMailTemplate,
 } from "@lumiere/query-hooks/hooks/templates"
 import {
@@ -103,7 +104,6 @@ import {
   toCreateDocumentProcessingJobParams,
   toCreateKnowledgeArticleParams,
   toCreateKnowledgeCategoryParams,
-  toCreateDocumentTemplateParams,
   toCreateMailTemplateParams,
   toAddDocumentVersionParams,
   toUpdateKnowledgeArticleParams,
@@ -284,7 +284,7 @@ function DocumentsClientLoaded({
     (session.activeCompanyId === null || (typeof session.activeCompanyId === "number" && Number.isSafeInteger(session.activeCompanyId) && session.activeCompanyId > 0 && session.companyIds?.includes(session.activeCompanyId) === true))
   const templatePermissionsReady = permissionsReady && currentUser?.id === session.identity
   const templateScopeKey = JSON.stringify([organizationId, session.organizationId, session.identity, templateScopeReady, session.activeCompanyId])
-  const [templateDesigner, setTemplateDesigner] = useState<{ scopeKey: string; template?: DocumentTemplateDesignSource } | null>(null)
+  const [templateDesigner, setTemplateDesigner] = useState<{ scopeKey: string; mode: "create" | "edit" | "duplicate"; template?: DocumentTemplateDesignSource } | null>(null)
   useEffect(() => { setTemplateDesigner(null) }, [templateScopeKey])
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvKind, setCsvKind] = useState<"knowledge_category" | "knowledge_article" | null>(null)
@@ -311,12 +311,23 @@ function DocumentsClientLoaded({
   const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs)
   const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights)
   const canReadTemplates = templateScopeReady && templatePermissionsReady && checkPermission("document_template", "read").allowed
-  const { data: documentTemplateRows = [] } = useDocumentTemplates(
+  const templatesQuery = useDocumentTemplates(
     organizationId,
     canReadTemplates,
     templateScope,
   )
-  const documentTemplates = canReadTemplates ? documentTemplateRows : []
+  const templateDataState: ModuleDataState = !templateScopeReady || !templatePermissionsReady
+    ? { status: "loading" }
+    : !canReadTemplates ? { status: "denied", message: t("documents.designer.readDenied", { defaultValue: "You do not have access to this template library." }) }
+      : moduleQueryState({ ...templatesQuery, isLoading: templatesQuery.isPending })
+  const documentTemplates = canReadTemplates && canUseModuleData(templateDataState) ? templatesQuery.data ?? [] : []
+  const templateActionScope = useRef({ key: templateScopeKey, ready: false, create: false, write: false })
+  templateActionScope.current = {
+    key: templateScopeKey,
+    ready: canReadTemplates === true && canUseModuleData(templateDataState) && typeof session.activeCompanyId === "number",
+    create: templatePermissionsReady === true && checkPermission("document_template", "create").allowed === true,
+    write: templatePermissionsReady === true && checkPermission("document_template", "write").allowed === true,
+  }
   const { data: mailTemplates = [] } = useMailTemplates(organizationId)
   const { data: aiAgents = [] } = useAiAgents(organizationId, organizationId > 0)
   const createDocument = useCreateDocument(orgId, operatingCompanyId)
@@ -349,7 +360,7 @@ function DocumentsClientLoaded({
   const createDocumentFolder = useCreateDocumentFolder(orgId)
   const updateDocumentFolder = useUpdateDocumentFolder(orgId)
   const deleteDocumentFolder = useDeleteDocumentFolder(orgId)
-  const createDocumentTemplate = useCreateDocumentTemplate(organizationId)
+  const updateDocumentTemplate = useUpdateDocumentTemplate(organizationId, templateScope)
   const createMailTemplate = useCreateMailTemplate(organizationId)
   const createProcessingJob = useCreateDocumentProcessingJob(orgId, operatingCompanyId)
   const completeProcessingJob = useCompleteDocumentProcessingJob(orgId)
@@ -357,7 +368,6 @@ function DocumentsClientLoaded({
   const acknowledgeInsight = useAcknowledgeInsight(orgId)
   const csvImports = useDocumentsCsvImportMutations(orgId)
   const versionFormConfig = useMemo(() => uploadDocumentVersionForm(t), [t])
-  const documentTemplateFormConfig = useMemo(() => newDocumentTemplateForm(t), [t])
   const mailTemplateFormConfig = useMemo(() => newMailTemplateForm(t), [t])
   const articleMemberFormConfig = useMemo(() => addArticleMemberForm(t), [t])
 
@@ -645,40 +655,82 @@ function DocumentsClientLoaded({
 
   const templateDesignerActions = useMemo<EntityAction[]>(() => {
     const companyId = session.activeCompanyId
-    if (!templateScopeReady || typeof companyId !== "number" || !templatePermissionsReady) return []
+    if (!templateScopeReady || typeof companyId !== "number" || !templatePermissionsReady || !canReadTemplates || !canUseModuleData(templateDataState)) return []
+    // Confirmation dialogs may retain an old action closure across a company
+    // switch. Re-check the live scope and permission before dispatching it.
+    const assertAction = (action: "create" | "write") => {
+      const current = templateActionScope.current
+      if (current.key !== templateScopeKey || !current.ready || !current[action]) throw new Error(t("documents.designer.actionScopeChanged", { defaultValue: "Your company or template permissions changed. Select the template again." }))
+    }
+    const sourceFor = (rows: EntityRow[]) => {
+      const row = rows.length === 1 ? documentTemplates.find((item) => String(item.id) === String(rows[0]?.id)) : undefined
+      return row ? customizableDocumentTemplate(row, organizationId, companyId) : null
+    }
+    const openExisting = (rows: EntityRow[], mode: "edit" | "duplicate") => {
+      assertAction(mode === "edit" ? "write" : "create")
+      const source = sourceFor(rows)
+      if (!source) throw new Error(t("documents.designer.selectSupported", { defaultValue: "Select a template created with the visual designer." }))
+      setDocumentToolbarError(null)
+      setTemplateDesigner({ scopeKey: templateScopeKey, mode, template: source })
+    }
     return [
       {
         id: "design-document-template",
-        label: t("documents.designer.createAction", { defaultValue: "Design template" }),
+        label: t("documents.designer.createAction", { defaultValue: "New template" }),
+        variant: "default",
         permission: { resource: "document_template", action: "create" },
         onClick: () => {
-          if (!checkPermission("document_template", "create").allowed) throw new Error(t("erpWorkflow.errors.permission_denied"))
+          assertAction("create")
           setDocumentToolbarError(null)
-          setTemplateDesigner({ scopeKey: templateScopeKey })
+          setTemplateDesigner({ scopeKey: templateScopeKey, mode: "create" })
         },
       },
       {
-        id: "customize-document-template-copy",
-        label: t("documents.designer.copyAction", { defaultValue: "Customize a copy" }),
+        id: "edit-document-template",
+        label: t("documents.designer.editAction", { defaultValue: "Edit template" }),
+        requiresSelection: true,
+        selection: "single",
+        permission: { resource: "document_template", action: "write" },
+        isApplicable: (rows) => Boolean(sourceFor(rows)),
+        onClick: (rows) => openExisting(rows, "edit"),
+      },
+      {
+        id: "duplicate-document-template",
+        label: t("documents.designer.copyAction", { defaultValue: "Duplicate template" }),
         requiresSelection: true,
         selection: "single",
         permission: { resource: "document_template", action: "create" },
-        isApplicable: (rows) => {
-          if (rows.length !== 1) return false
-          const row = documentTemplates.find((template) => String(template.id) === String(rows[0]?.id))
-          return Boolean(row && customizableDocumentTemplate(row, organizationId, companyId))
-        },
-        onClick: (rows) => {
-          if (!checkPermission("document_template", "create").allowed) throw new Error(t("erpWorkflow.errors.permission_denied"))
-          const row = rows.length === 1 ? documentTemplates.find((template) => String(template.id) === String(rows[0]?.id)) : undefined
-          const source = row ? customizableDocumentTemplate(row, organizationId, companyId) : null
-          if (!source) throw new Error(t("documents.designer.selectSupported", { defaultValue: "Select a template created with the visual designer." }))
-          setDocumentToolbarError(null)
-          setTemplateDesigner({ scopeKey: templateScopeKey, template: source })
-        },
+        isApplicable: (rows) => Boolean(sourceFor(rows)),
+        onClick: (rows) => openExisting(rows, "duplicate"),
       },
+      ...([false, true] as const).map((active): EntityAction => ({
+        id: active ? "reactivate-document-template" : "deactivate-document-template",
+        label: active ? t("documents.designer.reactivate", { defaultValue: "Reactivate" }) : t("documents.designer.deactivate", { defaultValue: "Deactivate" }),
+        requiresSelection: true,
+        selection: "single",
+        permission: { resource: "document_template", action: "write" },
+        isApplicable: (rows) => {
+          const source = sourceFor(rows)
+          return Boolean(source && (source.row.isActive ?? source.row.is_active ?? false) !== active)
+        },
+        confirm: active ? undefined : {
+          title: t("documents.designer.deactivateTitle", { defaultValue: "Deactivate this template?" }),
+          description: t("documents.designer.deactivateDescription", { defaultValue: "It will no longer appear in text fields or be available for new document output. Existing content stays unchanged, and you can reactivate it later." }),
+          confirmLabel: t("documents.designer.deactivate", { defaultValue: "Deactivate" }),
+          cancelLabel: t("common.cancel", { defaultValue: "Cancel" }),
+        },
+        successMessage: active ? t("documents.designer.reactivated", { defaultValue: "Template reactivated" }) : t("documents.designer.deactivated", { defaultValue: "Template deactivated" }),
+        onClick: async (rows) => {
+          assertAction("write")
+          const source = sourceFor(rows)
+          if (!source) throw new Error(t("documents.designer.selectSupported", { defaultValue: "Select a template created with the visual designer." }))
+          const sourceCompany = source.row.companyId !== undefined ? source.row.companyId : source.row.company_id
+          if (sourceCompany === undefined) throw new Error(t("documents.designer.scopeError", { defaultValue: "This template is no longer available in the current company." }))
+          await updateDocumentTemplate.mutateAsync({ templateId: source.row.id, companyId: sourceCompany, params: { isActive: active } })
+        },
+      })),
     ]
-  }, [session.activeCompanyId, templateScopeReady, templatePermissionsReady, t, checkPermission, templateScopeKey, documentTemplates, organizationId])
+  }, [session.activeCompanyId, templateScopeReady, templatePermissionsReady, canReadTemplates, templateDataState.status, t, checkPermission, templateScopeKey, documentTemplates, organizationId, updateDocumentTemplate])
 
   const config = useMemo(
     () => ({
@@ -1061,21 +1113,35 @@ function DocumentsClientLoaded({
           const entityConfig = withTableActions(tab.entityConfig, templateDesignerActions, true)
           return {
             ...tab,
-            createForm: documentTemplateFormConfig,
+            createForm: undefined,
+            createAction: undefined,
+            createLabel: undefined,
             entityConfig: entityConfig.view.mode === "table" ? {
               ...entityConfig,
+              title: t("documents.designer.libraryTitle", { defaultValue: "Document templates" }),
               description: t("documents.designer.tableDescription", { defaultValue: "Reusable document layouts and text templates." }),
               view: {
                 ...entityConfig.view,
-                columns: entityConfig.view.columns.map((column) => column.key === "reportType" ? {
+                searchPlaceholder: t("documents.designer.searchPlaceholder", { defaultValue: "Search templates…" }),
+                emptyState: {
+                  title: t("documents.designer.emptyTitle", { defaultValue: "Create your first reusable template" }),
+                  description: t("documents.designer.emptyDescription", { defaultValue: "Start with text for editor fields or design a quotation layout." }),
+                  primaryActionId: "design-document-template",
+                  learnHint: t("documents.designer.textHint", { defaultValue: "Insert active templates from the Templates menu in text fields." }),
+                },
+                filters: [{ key: "isActive", label: t("documents.designer.status", { defaultValue: "Status" }), type: "select" as const, options: [
+                  { value: "true", label: t("common.active", { defaultValue: "Active" }) },
+                  { value: "false", label: t("documents.designer.inactive", { defaultValue: "Inactive" }) },
+                ] }],
+                columns: entityConfig.view.columns.filter((column) => column.key !== "model" && column.key !== "isDefault").map((column) => column.key === "reportType" ? {
                   ...column,
                   label: t("documents.designer.kind", { defaultValue: "Template type" }),
                   render: (value: unknown) => value === "lumiere-rich-text-template-v1"
                     ? t("documents.designer.richText", { defaultValue: "Text for editor fields" })
                     : value === "lumiere-document-layout-v1"
                       ? t("documents.designer.document", { defaultValue: "Document layout" })
-                      : String(value ?? ""),
-                } : column),
+                      : t("documents.designer.legacyType", { defaultValue: "Legacy template" }),
+                } : { ...column, label: column.key === "name" ? t("documents.documents.columns.name") : column.key === "isActive" ? t("common.active", { defaultValue: "Active" }) : column.label }),
               },
             } : entityConfig,
           }
@@ -1211,7 +1277,6 @@ function DocumentsClientLoaded({
       knowledgeArticleFormConfig,
       knowledgeCategoryFormConfig,
       documentFolderFormConfig,
-      documentTemplateFormConfig,
       mailTemplateFormConfig,
       templateDesignerActions,
       processingJobFormConfig,
@@ -1311,10 +1376,6 @@ function DocumentsClientLoaded({
         companyId: operatingCompanyId,
         ...params,
       })
-    } else if (action === "createDocumentTemplate") {
-      const params = toCreateDocumentTemplateParams(formData)
-      if (!params) throw new Error("Document template params incomplete")
-      await createDocumentTemplate.mutateAsync(params)
     } else if (action === "createMailTemplate") {
       const params = toCreateMailTemplateParams(formData)
       if (!params) throw new Error("Mail template params incomplete")
@@ -1351,7 +1412,6 @@ function DocumentsClientLoaded({
     createDocumentFolder.isPending ||
     updateDocumentFolder.isPending ||
     deleteDocumentFolder.isPending ||
-    createDocumentTemplate.isPending ||
     createMailTemplate.isPending ||
     createProcessingJob.isPending ||
     completeProcessingJob.isPending ||
@@ -1376,11 +1436,12 @@ function DocumentsClientLoaded({
       {confirmDialogNode}
       {templateDesigner && templateDesigner.scopeKey === templateScopeKey && templateScopeReady && session.identity && typeof session.activeCompanyId === "number" ? (
         <DocumentTemplateDesignerDialog
-          key={`${templateDesigner.scopeKey}:${templateDesigner.template?.row.id ?? "new"}`}
+          key={`${templateDesigner.scopeKey}:${templateDesigner.mode}:${templateDesigner.template?.row.id ?? "new"}`}
           organizationId={organizationId}
           companyId={session.activeCompanyId}
           identity={session.identity}
           template={templateDesigner.template}
+          mode={templateDesigner.mode}
           onClose={() => setTemplateDesigner(null)}
         />
       ) : null}
@@ -1423,6 +1484,8 @@ function DocumentsClientLoaded({
           ),
         }}
         data={data}
+        dataState={{ "document-templates": templateDataState }}
+        dataLoading={{ "document-templates": templateDataState.status === "loading" }}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
       />

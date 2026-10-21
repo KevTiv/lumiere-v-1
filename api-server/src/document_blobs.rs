@@ -21,10 +21,14 @@ use tower_cookies::Cookies;
 
 use crate::error::ApiError;
 use crate::evidence_ingestion::{configured_network_hosts, validate_network_url};
-use crate::query_exec::resolve_membership_company_id;
+use crate::query_exec::{execute_resource_query_for_company, resolve_membership_company_id};
 use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session, OrgSession};
+
+#[path = "document_blob_access.rs"]
+mod generated_access;
+use generated_access::{generated_pdf_is_visible, GeneratedBlobScope};
 
 const MAX_UPLOAD_BYTES: u64 = 50 * 1024 * 1024; // 50 MiB pilot cap
 
@@ -41,6 +45,11 @@ struct BlobMeta {
     residency: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     source_url: Option<String>,
+    /// Set only by the server PDF writer; uploaded assets keep their existing access policy.
+    #[serde(default)]
+    generated_pdf: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    generated_by: Option<String>,
     completed: bool,
     actual_size: Option<u64>,
     actual_checksum: Option<String>,
@@ -231,6 +240,8 @@ async fn import_network(
             expected_checksum: Some(checksum.clone()),
             residency: Some(residency.clone()),
             source_url: Some(source_url.to_string()),
+            generated_pdf: false,
+            generated_by: None,
             completed: true,
             actual_size: Some(bytes.len() as u64),
             actual_checksum: Some(checksum.clone()),
@@ -349,6 +360,83 @@ pub(crate) struct CompletedBlob {
     pub checksum: String,
     pub source_url: Option<String>,
     pub bytes: Vec<u8>,
+}
+
+/// The immutable bytes produced by a server renderer, ready for document registration.
+pub(crate) struct GeneratedPdfBlob {
+    pub url: String,
+    pub checksum: String,
+    pub size: u64,
+}
+
+/// Write a new, company-owned object without an upload URL that could replace it.
+/// Callers register the result through the canonical `create_document` operation.
+pub(crate) fn store_generated_pdf(
+    root: &Path,
+    organization_id: u64,
+    company_id: u64,
+    actor_identity: &str,
+    file_name: &str,
+    bytes: &[u8],
+) -> Result<GeneratedPdfBlob, ApiError> {
+    if organization_id == 0
+        || company_id == 0
+        || !bytes.starts_with(b"%PDF-")
+        || bytes.len() > 8 * 1024 * 1024
+    {
+        return Err(ApiError::Unprocessable(
+            "invalid generated PDF or company scope".into(),
+        ));
+    }
+    let generated_by = stdb_auth::identity_sql_literal(actor_identity)
+        .map_err(|_| ApiError::Unprocessable("invalid generated PDF creator".into()))?;
+    let mut id_bytes = [0_u8; 16];
+    rand::thread_rng().fill_bytes(&mut id_bytes);
+    let object_id = hex::encode(id_bytes);
+    let residency = "generated";
+    let (bin_path, meta_path) = object_paths(root, organization_id, &object_id, residency);
+    let parent = bin_path
+        .parent()
+        .ok_or_else(|| ApiError::Internal("generated blob path has no parent".into()))?;
+    fs::create_dir_all(parent).map_err(ApiError::internal)?;
+    let mut binary = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&bin_path)
+        .map_err(ApiError::internal)?;
+    binary.write_all(bytes).map_err(ApiError::internal)?;
+    binary.sync_all().map_err(ApiError::internal)?;
+    let checksum = hex::encode(Sha256::digest(bytes));
+    let meta = BlobMeta {
+        organization_id,
+        company_id: Some(company_id),
+        object_key: format!("org-{organization_id}/{residency}/{object_id}"),
+        file_name: sanitize_file_name(file_name),
+        content_type: "application/pdf".into(),
+        expected_size: bytes.len() as u64,
+        expected_checksum: Some(checksum.clone()),
+        residency: Some(residency.into()),
+        source_url: None,
+        generated_pdf: true,
+        generated_by: Some(generated_by),
+        completed: true,
+        actual_size: Some(bytes.len() as u64),
+        actual_checksum: Some(checksum.clone()),
+    };
+    let mut metadata = fs::OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(&meta_path)
+        .map_err(ApiError::internal)?;
+    metadata
+        .write_all(&serde_json::to_vec(&meta).map_err(ApiError::internal)?)
+        .map_err(ApiError::internal)?;
+    metadata.sync_all().map_err(ApiError::internal)?;
+    Ok(GeneratedPdfBlob {
+        url: format!("/api/documents/blobs/object/{organization_id}/{residency}/{object_id}"),
+        checksum,
+        size: bytes.len() as u64,
+    })
 }
 
 pub(crate) fn read_completed_blob(
@@ -629,6 +717,8 @@ async fn presign(
         expected_checksum,
         residency: Some(residency.clone()),
         source_url: None,
+        generated_pdf: false,
+        generated_by: None,
         completed: false,
         actual_size: None,
         actual_checksum: None,
@@ -828,7 +918,81 @@ async fn download(
     if !meta.completed {
         return Err(ApiError::NotFound("blob not completed".into()));
     }
+    if let Some(company_id) = meta.company_id {
+        let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+        resolve_membership_company_id(
+            trusted.client(),
+            org_id,
+            trusted.actor_identity(),
+            Some(company_id),
+            "document blob company scope mismatch",
+        )
+        .await?;
+    }
+    if meta.generated_pdf {
+        let access = session.field_access.as_ref();
+        if !stdb_auth::has_resource_read_permission(access, "documents") {
+            return Err(ApiError::Forbidden(
+                "document read permission is required".into(),
+            ));
+        }
+        let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
+        let company_id = meta.company_id.ok_or_else(|| {
+            ApiError::NotFound("generated document company is unavailable".into())
+        })?;
+        let url = format!("/api/documents/blobs/object/{org_id}/{residency}/{object_id}");
+        let scope = GeneratedBlobScope {
+            organization_id: org_id,
+            company_id,
+            creator_identity: meta.generated_by.as_deref().ok_or_else(|| {
+                ApiError::NotFound("generated document creator is unavailable".into())
+            })?,
+            url: &url,
+            checksum: meta.actual_checksum.as_deref().ok_or_else(|| {
+                ApiError::NotFound("generated document checksum is unavailable".into())
+            })?,
+        };
+        let documents = execute_resource_query_for_company(
+            trusted.client(),
+            "documents",
+            org_id,
+            trusted.actor_identity(),
+            access,
+            Some(company_id),
+        )
+        .await?;
+        if !generated_pdf_is_visible(&scope, access, &documents, &[]) {
+            // Resolve historical URLs through the same authorized version query
+            // used by Documents; a copied URL never widens record visibility.
+            let versions = if stdb_auth::has_resource_read_permission(access, "document-versions") {
+                execute_resource_query_for_company(
+                    trusted.client(),
+                    "document-versions",
+                    org_id,
+                    trusted.actor_identity(),
+                    access,
+                    Some(company_id),
+                )
+                .await?
+            } else {
+                Vec::new()
+            };
+            if !generated_pdf_is_visible(&scope, access, &documents, &versions) {
+                return Err(ApiError::NotFound("generated document not found".into()));
+            }
+        }
+    }
     let bytes = fs::read(&bin_path).map_err(|e| ApiError::NotFound(e.to_string()))?;
+    if meta.generated_pdf {
+        verify_pinned_download(
+            &meta,
+            &bytes,
+            org_id,
+            meta.actual_checksum.as_deref().ok_or_else(|| {
+                ApiError::NotFound("generated document checksum is unavailable".into())
+            })?,
+        )?;
+    }
     if let Some(expected_checksum) = query.sha256.as_deref() {
         verify_pinned_download(&meta, &bytes, org_id, expected_checksum)?;
     }
@@ -876,6 +1040,34 @@ mod tests {
     use super::*;
     use base64::Engine;
 
+    #[test]
+    fn generated_pdf_is_completed_company_bound_and_checksum_pinned() {
+        let root =
+            std::env::temp_dir().join(format!("lumiere-generated-{}", rand::random::<u64>()));
+        let bytes = b"%PDF-1.7\ngenerated quotation test";
+        let actor = "a".repeat(64);
+        let generated =
+            store_generated_pdf(&root, 7, 3, &actor, "quotation.pdf", bytes).expect("store output");
+        let read = read_completed_blob(&root, 7, 3, &generated.url).expect("read immutable output");
+        assert_eq!(read.bytes, bytes);
+        assert_eq!(read.checksum, generated.checksum);
+        assert_eq!(generated.size, bytes.len() as u64);
+        assert!(read_completed_blob(&root, 7, 4, &generated.url).is_err());
+        assert!(read_completed_blob(&root, 8, 3, &generated.url).is_err());
+        assert!(store_generated_pdf(&root, 7, 3, &actor, "bad.pdf", b"not PDF").is_err());
+        assert!(store_generated_pdf(&root, 7, 3, "invalid", "quotation.pdf", bytes).is_err());
+        let next = store_generated_pdf(&root, 7, 3, &actor, "quotation.pdf", b"%PDF-1.7\nchanged")
+            .expect("new output");
+        assert_ne!(generated.url, next.url);
+        assert_eq!(
+            read_completed_blob(&root, 7, 3, &generated.url)
+                .unwrap()
+                .bytes,
+            bytes
+        );
+        std::fs::remove_dir_all(root).expect("remove fixture");
+    }
+
     struct BrandingFixture {
         root: PathBuf,
         url: String,
@@ -905,6 +1097,8 @@ mod tests {
                 expected_checksum: Some(checksum.clone()),
                 residency: Some("eu".into()),
                 source_url: None,
+                generated_pdf: false,
+                generated_by: None,
                 completed,
                 actual_size: Some(bytes.len() as u64),
                 actual_checksum: Some(checksum.clone()),

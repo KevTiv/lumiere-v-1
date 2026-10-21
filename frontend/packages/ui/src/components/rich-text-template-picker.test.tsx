@@ -4,7 +4,7 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
 } from "@testing-library/react"
 import { Editor } from "@tiptap/react"
 import * as React from "react"
@@ -14,7 +14,7 @@ import { createRichTextExtensions } from "../lib/rich-text-extensions"
 import {
   RichTextTemplateProvider,
   type RichTextTemplateOption,
-  type RichTextTemplateProviderProps
+  type RichTextTemplateProviderProps,
 } from "./rich-text-template-provider"
 import { Textarea } from "./textarea"
 
@@ -22,7 +22,7 @@ afterEach(cleanup)
 
 const templates: readonly RichTextTemplateOption[] = [
   { id: "new", name: "Greeting", html: "<p><strong>new</strong></p>" },
-  { id: "closing", name: "Closing", html: "<p>Thank you</p>" }
+  { id: "closing", name: "Closing", html: "<p>Thank you</p>" },
 ]
 
 type HarnessProps = Partial<Omit<RichTextTemplateProviderProps, "children">> & {
@@ -84,7 +84,7 @@ function openTemplates() {
 
 async function insertGreeting() {
   fireEvent.click(
-    await screen.findByRole("button", { name: "Insert Greeting" })
+    await screen.findByRole("button", { name: "Insert Greeting" }),
   )
 }
 
@@ -93,14 +93,14 @@ describe("rich text templates", () => {
     render(<Textarea aria-label="Description" />)
     await getEditor()
     expect(
-      screen.queryByRole("button", { name: "Insert text template" })
+      screen.queryByRole("button", { name: "Insert text template" }),
     ).toBeNull()
   })
 
   it("hides revoked template access without remounting the form or losing draft text", async () => {
     const textareaRef = React.createRef<HTMLTextAreaElement>()
     const { rerender } = render(
-      <Harness initialValue="Draft" textareaRef={textareaRef} />
+      <Harness initialValue="Draft" textareaRef={textareaRef} />,
     )
     const editor = await getEditor()
     const nativeField = textareaRef.current
@@ -112,10 +112,14 @@ describe("rich text templates", () => {
     await screen.findByRole("button", { name: "Insert Greeting" })
 
     rerender(
-      <Harness initialValue="Draft" textareaRef={textareaRef} enabled={false} />
+      <Harness
+        initialValue="Draft"
+        textareaRef={textareaRef}
+        enabled={false}
+      />,
     )
     expect(
-      screen.queryByRole("button", { name: "Insert text template" })
+      screen.queryByRole("button", { name: "Insert text template" }),
     ).toBeNull()
     expect(screen.queryByRole("button", { name: "Insert Greeting" })).toBeNull()
     expect(await getEditor()).toBe(editor)
@@ -123,13 +127,13 @@ describe("rich text templates", () => {
     expect(editor.getText()).toBe("Draft in progress")
     expect(
       new FormData(screen.getByRole("form") as HTMLFormElement).get(
-        "description"
-      )
+        "description",
+      ),
     ).toBe("Draft in progress")
 
     rerender(<Harness initialValue="Draft" textareaRef={textareaRef} enabled />)
     expect(
-      screen.getByRole("button", { name: "Insert text template" })
+      screen.getByRole("button", { name: "Insert text template" }),
     ).toBeTruthy()
     expect(await getEditor()).toBe(editor)
     expect(nativeField?.value).toBe("Draft in progress")
@@ -145,33 +149,33 @@ describe("rich text templates", () => {
     expect(onRequest).toHaveBeenCalledTimes(1)
     expect(await screen.findByRole("status")).toHaveProperty(
       "textContent",
-      "Loading templates…"
+      "Loading templates…",
     )
     expect(screen.queryByRole("button", { name: "Insert Greeting" })).toBeNull()
 
     rerender(<Harness status="ready" onRequest={onRequest} />)
     expect(
-      await screen.findByRole("button", { name: "Insert Greeting" })
+      await screen.findByRole("button", { name: "Insert Greeting" }),
     ).toBeTruthy()
     expect(
-      screen.getByRole("button", { name: "Insert Closing" }).textContent
+      screen.getByRole("button", { name: "Insert Closing" }).textContent,
     ).toContain("Thank you")
     fireEvent.change(
       screen.getByRole("searchbox", { name: "Search text templates" }),
       {
-        target: { value: "clos" }
-      }
+        target: { value: "clos" },
+      },
     )
     expect(screen.queryByRole("button", { name: "Insert Greeting" })).toBeNull()
     expect(screen.getByRole("button", { name: "Insert Closing" })).toBeTruthy()
     fireEvent.change(screen.getByRole("searchbox"), {
-      target: { value: "missing" }
+      target: { value: "missing" },
     })
     expect(screen.getByRole("status").textContent).toBe(
-      "No matching text templates."
+      "No matching text templates.",
     )
     fireEvent.click(
-      screen.getByRole("button", { name: "Clear template search" })
+      screen.getByRole("button", { name: "Clear template search" }),
     )
     expect(screen.getByRole("button", { name: "Insert Greeting" })).toBeTruthy()
     expect(document.activeElement).toBe(screen.getByRole("searchbox"))
@@ -195,15 +199,15 @@ describe("rich text templates", () => {
     await insertGreeting()
 
     await waitFor(() =>
-      expect(onValue).toHaveBeenLastCalledWith("Prefix **new** suffix")
+      expect(onValue).toHaveBeenLastCalledWith("Prefix **new** suffix"),
     )
     expect(onValue).toHaveBeenCalledTimes(1)
     expect(textareaRef.current?.value).toBe("Prefix **new** suffix")
     expect(editor.view.dom.querySelector("strong")?.textContent).toBe("new")
     expect(
       new FormData(screen.getByRole("form") as HTMLFormElement).get(
-        "description"
-      )
+        "description",
+      ),
     ).toBe("Prefix **new** suffix")
     await waitFor(() => expect(document.activeElement).toBe(editor.view.dom))
   })
@@ -239,10 +243,10 @@ describe("rich text templates", () => {
           {
             id: "summary",
             name: "Greeting",
-            html: '<h2>Summary</h2><p>Hello <strong>team</strong>.</p><ul><li>First</li><li>Second</li></ul><p><a href="https://example.com">Reference</a></p>'
-          }
+            html: '<h2>Summary</h2><p>Hello <strong>team</strong>.</p><ul><li>First</li><li>Second</li></ul><p><a href="https://example.com">Reference</a></p>',
+          },
         ]}
-      />
+      />,
     )
     const editor = await getEditor()
     openTemplates()
@@ -253,7 +257,7 @@ describe("rich text templates", () => {
     const restored = new Editor({
       extensions: createRichTextExtensions(),
       content: textareaRef.current?.value,
-      contentType: "markdown"
+      contentType: "markdown",
     })
     try {
       expect(restored.getJSON()).toEqual(editor.getJSON())
@@ -273,7 +277,7 @@ describe("rich text templates", () => {
         maxLength={6}
         onValue={onValue}
         textareaRef={textareaRef}
-      />
+      />,
     )
     const editor = await getEditor()
     act(() => editor.commands.setTextSelection(5))
@@ -318,16 +322,16 @@ describe("rich text templates", () => {
         onValue={onValue}
         scopeKey="org-one:company-two"
         templates={[
-          { id: "other", name: "Other company", html: "<p>Other text</p>" }
+          { id: "other", name: "Other company", html: "<p>Other text</p>" },
         ]}
-      />
+      />,
     )
     expect(screen.queryByRole("button", { name: "Insert Greeting" })).toBeNull()
     expect(screen.queryByRole("searchbox")).toBeNull()
     expect(onValue).not.toHaveBeenCalled()
     openTemplates()
     fireEvent.click(
-      await screen.findByRole("button", { name: "Insert Other company" })
+      await screen.findByRole("button", { name: "Insert Other company" }),
     )
     expect(editor.getText()).toBe("Other text")
   })
@@ -343,17 +347,17 @@ describe("rich text templates", () => {
 
       rerender(<Harness onValue={onValue} {...{ [state]: true }} />)
       expect(
-        screen.queryByRole("button", { name: "Insert Greeting" })
+        screen.queryByRole("button", { name: "Insert Greeting" }),
       ).toBeNull()
       expect(editor.isEditable).toBe(false)
       const trigger = screen.queryByRole("button", {
-        name: "Insert text template"
+        name: "Insert text template",
       })
       if (state === "disabled") expect(trigger).toHaveProperty("disabled", true)
       else expect(trigger).toBeNull()
       expect(editor.getText()).toBe("Prefix old suffix")
       expect(onValue).not.toHaveBeenCalled()
-    }
+    },
   )
 
   it("rejects stale selections when the document changes while the picker is open", async () => {
@@ -380,10 +384,10 @@ describe("rich text templates", () => {
           {
             id: "unsafe",
             name: "Greeting",
-            html: '<script>alert(1)</script><p onclick="alert(1)">Safe <strong>text</strong><img src="https://example.com/track" /></p>'
-          }
+            html: '<script>alert(1)</script><p onclick="alert(1)">Safe <strong>text</strong><img src="https://example.com/track" /></p>',
+          },
         ]}
-      />
+      />,
     )
     const editor = await getEditor()
     openTemplates()
@@ -406,16 +410,38 @@ describe("rich text templates", () => {
         error="Connection unavailable"
         onRequest={onRequest}
         onValue={onValue}
-      />
+      />,
     )
     await getEditor()
     openTemplates()
     expect(await screen.findByRole("alert")).toHaveProperty(
       "textContent",
-      "Connection unavailable"
+      "Connection unavailable",
     )
     fireEvent.click(screen.getByRole("button", { name: "Retry" }))
     expect(onRequest).toHaveBeenCalledTimes(2)
     expect(onValue).not.toHaveBeenCalled()
+  })
+  it("offers authorized creators a separate management tab without changing the current text", async () => {
+    const view = render(
+      <Harness
+        templates={[]}
+        managementHref="/documents?tab=document-templates"
+      />,
+    )
+    const editor = await getEditor()
+    const original = editor.getJSON()
+    openTemplates()
+    const link = await screen.findByRole("link", {
+      name: /Create or manage templates/,
+    })
+    expect(link.getAttribute("href")).toBe("/documents?tab=document-templates")
+    expect(link.getAttribute("target")).toBe("_blank")
+    expect(link.getAttribute("rel")).toContain("noopener")
+    expect(editor.getJSON()).toEqual(original)
+    view.rerender(<Harness templates={[]} />)
+    expect(
+      screen.queryByRole("link", { name: /Create or manage templates/ }),
+    ).toBeNull()
   })
 })

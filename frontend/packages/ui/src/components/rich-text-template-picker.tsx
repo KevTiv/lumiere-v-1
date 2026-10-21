@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useTranslation } from "@lumiere/i18n"
 import type { Editor } from "@tiptap/react"
 import { closeHistory } from "@tiptap/pm/history"
 import { DOMParser, type Node as ProseMirrorNode } from "@tiptap/pm/model"
@@ -14,7 +15,7 @@ import {
   RefreshCw,
   Search,
   TextCursorInput,
-  X
+  X,
 } from "lucide-react"
 
 import {
@@ -22,7 +23,7 @@ import {
   PopoverContent,
   PopoverDescription,
   PopoverTitle,
-  PopoverTrigger
+  PopoverTrigger,
 } from "@lumiere/ui/components/popover"
 import { useRichTextTemplates } from "@lumiere/ui/components/rich-text-template-provider"
 import { sanitizeRichTextTemplateHtml } from "@lumiere/ui/lib/document-template-designer"
@@ -47,11 +48,16 @@ type TemplatePreview = {
 }
 
 /** A small, inert preview of the same supported content used for insertion. */
-function readTemplatePreview(html: string): TemplatePreview {
+function readTemplatePreview(
+  html: string,
+  t: ReturnType<typeof useTranslation>["t"],
+): TemplatePreview {
   const fallback: TemplatePreview = {
     heading: "",
-    excerpt: "Content preview unavailable.",
-    kind: "Text"
+    excerpt: t("documents.templatePicker.previewUnavailable", {
+      defaultValue: "Content preview unavailable.",
+    }),
+    kind: "Text",
   }
   if (typeof document === "undefined") return fallback
 
@@ -94,8 +100,9 @@ function ScopedTemplatePicker({
   editor,
   disabled,
   maxLength,
-  source
+  source,
 }: RichTextTemplatePickerProps & { source: TemplateSource }) {
+  const { t } = useTranslation()
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
   const [insertionError, setInsertionError] = React.useState<string>()
@@ -108,13 +115,13 @@ function ScopedTemplatePicker({
       open && source.status === "ready"
         ? source.templates.map((template) => ({
             ...template,
-            preview: readTemplatePreview(template.html)
+            preview: readTemplatePreview(template.html, t),
           }))
         : [],
-    [open, source.status, source.templates]
+    [open, source.status, source.templates, t],
   )
   const templates = previews.filter((template) =>
-    template.name.toLocaleLowerCase().includes(query)
+    template.name.toLocaleLowerCase().includes(query),
   )
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -122,7 +129,7 @@ function ScopedTemplatePicker({
       if (disabled || editor.isDestroyed || !editor.isEditable) return
       targetRef.current = {
         doc: editor.state.doc,
-        selection: editor.state.selection
+        selection: editor.state.selection,
       }
       insertedRef.current = false
       setSearch("")
@@ -140,13 +147,19 @@ function ScopedTemplatePicker({
     const template = source.templates.find((option) => option.id === id)
     if (!target || source.status !== "ready" || !template) {
       setInsertionError(
-        "This template is no longer available. Reopen templates to try again."
+        t("documents.templatePicker.noLongerAvailable", {
+          defaultValue:
+            "This template is no longer available. Reopen templates to try again.",
+        }),
       )
       return
     }
     if (editor.state.doc !== target.doc) {
       setInsertionError(
-        "The text changed while templates were open. Reopen templates to choose where to insert."
+        t("documents.templatePicker.textChanged", {
+          defaultValue:
+            "The text changed while templates were open. Reopen templates to choose where to insert.",
+        }),
       )
       return
     }
@@ -157,7 +170,10 @@ function ScopedTemplatePicker({
       const content = DOMParser.fromSchema(editor.schema).parseSlice(container)
       if (!content.content.size) {
         setInsertionError(
-          "This template has no supported text content to insert."
+          t("documents.templatePicker.noContent", {
+            defaultValue:
+              "This template has no supported text content to insert.",
+          }),
         )
         return
       }
@@ -168,11 +184,15 @@ function ScopedTemplatePicker({
         .setSelection(target.selection)
         .replaceSelection(content)
       const count = editor.storage.characterCount.characters({
-        node: transaction.doc
+        node: transaction.doc,
       })
       if (maxLength !== undefined && maxLength >= 0 && count > maxLength) {
         setInsertionError(
-          `This template would exceed the ${maxLength}-character limit. Shorten the text or choose another template.`
+          t("documents.templatePicker.lengthLimit", {
+            defaultValue:
+              "This template would exceed the {{limit}}-character limit. Shorten the text or choose another template.",
+            limit: maxLength,
+          }),
         )
         return
       }
@@ -188,7 +208,10 @@ function ScopedTemplatePicker({
       editor.view.focus()
     } catch {
       setInsertionError(
-        "This template could not be inserted. Choose another template."
+        t("documents.templatePicker.insertFailed", {
+          defaultValue:
+            "This template could not be inserted. Choose another template.",
+        }),
       )
     }
   }
@@ -199,8 +222,12 @@ function ScopedTemplatePicker({
         render={
           <button
             type="button"
-            aria-label="Insert text template"
-            title="Insert text template"
+            aria-label={t("documents.templatePicker.insertTextTemplate", {
+              defaultValue: "Insert text template",
+            })}
+            title={t("documents.templatePicker.insertTextTemplate", {
+              defaultValue: "Insert text template",
+            })}
             disabled={disabled}
             className="mr-1.5 inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg border border-border/70 bg-background px-2.5 text-xs font-medium text-foreground shadow-xs outline-none transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-40 aria-expanded:border-primary/30 aria-expanded:bg-primary/5 aria-expanded:text-primary sm:h-8"
             onPointerDown={(event) => event.preventDefault()}
@@ -210,7 +237,9 @@ function ScopedTemplatePicker({
               aria-hidden="true"
               className="size-4 text-primary sm:size-3.5"
             />
-            Templates
+            {t("documents.templatePicker.templates", {
+              defaultValue: "Templates",
+            })}
             <ChevronDown
               aria-hidden="true"
               className="size-3 text-muted-foreground"
@@ -237,10 +266,15 @@ function ScopedTemplatePicker({
             </span>
             <div className="min-w-0 space-y-0.5 pt-0.5">
               <PopoverTitle className="text-sm font-semibold tracking-tight">
-                Text templates
+                {t("documents.templatePicker.textTemplates", {
+                  defaultValue: "Text templates",
+                })}
               </PopoverTitle>
               <PopoverDescription className="text-xs leading-relaxed">
-                Choose reusable content for this field.
+                {t(
+                  "documents.templatePicker.chooseReusableContentForThisField",
+                  { defaultValue: "Choose reusable content for this field." },
+                )}
               </PopoverDescription>
             </div>
           </div>
@@ -252,8 +286,12 @@ function ScopedTemplatePicker({
             <input
               ref={searchRef}
               type="search"
-              aria-label="Search text templates"
-              placeholder="Search templates…"
+              aria-label={t("documents.templatePicker.searchTextTemplates", {
+                defaultValue: "Search text templates",
+              })}
+              placeholder={t("documents.templatePicker.searchTemplates", {
+                defaultValue: "Search templates…",
+              })}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/70 [&::-webkit-search-cancel-button]:appearance-none"
@@ -261,7 +299,9 @@ function ScopedTemplatePicker({
             {search ? (
               <button
                 type="button"
-                aria-label="Clear template search"
+                aria-label={t("documents.templatePicker.clearTemplateSearch", {
+                  defaultValue: "Clear template search",
+                })}
                 className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30"
                 onClick={() => {
                   setSearch("")
@@ -279,7 +319,9 @@ function ScopedTemplatePicker({
               role="status"
               className="px-1 pb-3 text-xs text-muted-foreground"
             >
-              Loading templates…
+              {t("documents.templatePicker.loadingTemplates", {
+                defaultValue: "Loading templates…",
+              })}
             </p>
             <div
               aria-hidden="true"
@@ -309,12 +351,19 @@ function ScopedTemplatePicker({
             >
               <AlertCircle className="size-5" />
             </span>
-            <p className="text-sm font-medium">Templates couldn’t be loaded</p>
+            <p className="text-sm font-medium">
+              {t("documents.templatePicker.templatesCouldnTBeLoaded", {
+                defaultValue: "Templates couldn’t be loaded",
+              })}
+            </p>
             <p
               role="alert"
               className="text-xs leading-relaxed text-muted-foreground"
             >
-              {source.error ?? "Templates could not be loaded."}
+              {source.error ??
+                t("documents.templatePicker.loadFailed", {
+                  defaultValue: "Templates could not be loaded.",
+                })}
             </p>
             <button
               type="button"
@@ -322,26 +371,42 @@ function ScopedTemplatePicker({
               onClick={source.onRequest}
             >
               <RefreshCw aria-hidden="true" className="size-3.5" />
-              Retry
+              {t("documents.templatePicker.retry", { defaultValue: "Retry" })}
             </button>
           </div>
         ) : templates.length ? (
           <div className="min-h-0 overflow-y-auto overscroll-contain p-3">
             <div className="mb-2 flex items-center justify-between px-1 text-[11px] text-muted-foreground">
               <span className="font-medium">
-                {query ? "Search results" : "Available templates"}
+                {query
+                  ? t("documents.templatePicker.searchResults", {
+                      defaultValue: "Search results",
+                    })
+                  : t("documents.templatePicker.available", {
+                      defaultValue: "Available templates",
+                    })}
               </span>
               <span className="tabular-nums">
-                {templates.length}{" "}
-                {templates.length === 1 ? "template" : "templates"}
+                {t("documents.templatePicker.count", {
+                  defaultValue: "{{count}} templates",
+                  count: templates.length,
+                })}
               </span>
             </div>
-            <ul aria-label="Available text templates" className="space-y-2">
+            <ul
+              aria-label={t("documents.templatePicker.availableTextTemplates", {
+                defaultValue: "Available text templates",
+              })}
+              className="space-y-2"
+            >
               {templates.map((template) => (
                 <li key={template.id}>
                   <button
                     type="button"
-                    aria-label={`Insert ${template.name}`}
+                    aria-label={t("documents.templatePicker.insertNamed", {
+                      defaultValue: "Insert {{name}}",
+                      name: template.name,
+                    })}
                     aria-description={template.preview.excerpt}
                     className="group/template flex w-full items-stretch gap-3 rounded-xl border border-border/70 bg-background p-3 text-left outline-none transition-[border-color,box-shadow,background-color] hover:border-primary/35 hover:bg-primary/[0.025] hover:shadow-sm focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-ring/20"
                     onClick={() => insertTemplate(template.id)}
@@ -363,14 +428,19 @@ function ScopedTemplatePicker({
                           {template.name}
                         </span>
                         <span className="shrink-0 rounded-md bg-muted/70 px-1.5 py-0.5 text-[10px] leading-4 font-medium text-muted-foreground">
-                          {template.preview.kind}
+                          {t(
+                            `documents.templatePicker.kind.${template.preview.kind.toLowerCase()}`,
+                            { defaultValue: template.preview.kind },
+                          )}
                         </span>
                       </span>
                       <span className="line-clamp-2 text-[11px] leading-relaxed break-words text-muted-foreground">
                         {template.preview.excerpt}
                       </span>
                       <span className="mt-auto inline-flex items-center gap-1 pt-0.5 text-[11px] font-medium text-primary">
-                        Insert{" "}
+                        {t("documents.templatePicker.insert", {
+                          defaultValue: "Insert",
+                        })}{" "}
                         <ArrowRight
                           aria-hidden="true"
                           className="size-3 transition-transform motion-safe:group-hover/template:translate-x-0.5"
@@ -396,14 +466,43 @@ function ScopedTemplatePicker({
             </span>
             <p role="status" className="text-sm font-medium">
               {query
-                ? "No matching text templates."
-                : "No text templates are available for this company."}
+                ? t("documents.templatePicker.noMatch", {
+                    defaultValue: "No matching text templates.",
+                  })
+                : t("documents.templatePicker.empty", {
+                    defaultValue:
+                      "No text templates are available for this company.",
+                  })}
             </p>
             <p className="text-xs leading-relaxed text-muted-foreground">
               {query
-                ? "Try a different template name."
-                : "Reusable text templates from Documents will appear here."}
+                ? t("documents.templatePicker.tryDifferent", {
+                    defaultValue: "Try a different template name.",
+                  })
+                : t("documents.templatePicker.emptyHint", {
+                    defaultValue:
+                      "Reusable text templates from Documents will appear here.",
+                  })}
             </p>
+            {!query && source.managementHref ? (
+              <a
+                href={source.managementHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border bg-background px-3 text-xs font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+              >
+                {t("documents.templatePicker.manage", {
+                  defaultValue: "Create or manage templates",
+                })}
+                <ArrowRight aria-hidden="true" className="size-3.5" />
+                <span className="sr-only">
+                  {t("documents.templatePicker.newTab", {
+                    defaultValue:
+                      "Opens in a new tab so your current text is kept.",
+                  })}
+                </span>
+              </a>
+            ) : null}
           </div>
         )}
         {insertionError ? (
@@ -424,12 +523,18 @@ function ScopedTemplatePicker({
           <TextCursorInput aria-hidden="true" className="size-3.5 shrink-0" />
           <span>
             {targetRef.current?.selection.empty
-              ? "Insert at your cursor"
-              : "Replace selected text"}
+              ? t("documents.templatePicker.atCursor", {
+                  defaultValue: "Insert at your cursor",
+                })
+              : t("documents.templatePicker.replaceSelected", {
+                  defaultValue: "Replace selected text",
+                })}
             <span aria-hidden="true" className="mx-1.5 opacity-50">
               ·
             </span>
-            Keep editing after insertion
+            {t("documents.templatePicker.keepEditingAfterInsertion", {
+              defaultValue: "Keep editing after insertion",
+            })}
           </span>
         </div>
       </PopoverContent>

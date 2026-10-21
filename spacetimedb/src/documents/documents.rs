@@ -761,7 +761,9 @@ pub fn create_document(
         created_by: ctx.sender(),
         created_at: ctx.timestamp,
         is_current: true,
-        metadata: None,
+        // Preserve the source/provenance supplied with these exact bytes even
+        // when the document's editable metadata is subsequently changed.
+        metadata: doc.metadata.clone(),
     });
 
     let doc_id = doc.id;

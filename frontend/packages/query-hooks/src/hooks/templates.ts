@@ -4,7 +4,7 @@
 import { stdbBffCommandPost, type StdbBffCommandInput } from "@lumiere/stdb/commands"
 import { documentExportUrl, type DocumentExportFormat, type DocumentExportKind, type DocumentPdfKind } from "@lumiere/stdb/commands";
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
-import type { CreateDocumentTemplateParams, CreateMailTemplateParams } from "@lumiere/stdb/types"
+import type { CreateDocumentTemplateParams, CreateMailTemplateParams, UpdateDocumentTemplateParams } from "@lumiere/stdb/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { apiFetch } from "../http"
@@ -48,7 +48,7 @@ function templateScopeId(value: unknown): string | null {
 }
 
 function validTemplateScope(scope: DocumentTemplatesScope): boolean {
-  return typeof scope.identity === "string" && scope.identity !== "unknown" && scope.identity.trim().length > 0 &&
+  return typeof scope.identity === "string" && scope.identity !== "unknown" && scope.identity.length > 0 && scope.identity.trim() === scope.identity &&
     (scope.companyId === null || templateScopeId(scope.companyId) !== null)
 }
 
@@ -59,6 +59,15 @@ export function documentTemplatesQueryKey(organizationId: number, scope?: Docume
     identity: scope.identity ?? null,
     companyId: scope.companyId === null ? null : templateScopeId(scope.companyId) ?? "invalid",
   }] as const
+}
+
+export function documentTemplatesQueryPath(scope?: DocumentTemplatesScope): string {
+  if (scope === undefined) return "/api/query/document-templates"
+  if (!validTemplateScope(scope)) throw new Error("The template company is no longer available.")
+  if (scope.companyId === null) return "/api/query/document-templates"
+  const companyId = templateScopeId(scope.companyId)
+  if (companyId === null) throw new Error("The template company is no longer available.")
+  return `/api/query/document-templates?companyId=${companyId}`
 }
 
 /** Organization defaults and the active company's templates are visible; absent scope fails closed. */
@@ -91,7 +100,7 @@ export function useDocumentTemplates(organizationId: number, enabled = true, sco
     queryKey: documentTemplatesQueryKey(organizationId, scope),
     queryFn: async ({ signal }) => {
       if (scope !== undefined && (!validTemplateScope(scope) || templateScopeId(organizationId) === null)) return []
-      const r = await apiFetch("/api/query/document-templates", { signal })
+      const r = await apiFetch(documentTemplatesQueryPath(scope), { signal })
       if (!r.ok) throw new Error(await parseCallError(r))
       const j = (await r.json()) as { data?: DocumentTemplateRow[] }
       const rows = j.data ?? []
@@ -135,6 +144,46 @@ export function useCreateDocumentTemplate(
         throw new Error("The template's organization or company is no longer available.")
       }
       const { urlPath, init } = documentTemplateCreateRequest(params, companyId)
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallError(r))
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["document-templates", String(organizationId)] })
+    },
+  })
+}
+
+export type UpdateDocumentTemplateInput = {
+  templateId: TemplateScopeId
+  /** The saved row's company: explicit null keeps an organization-wide template global. */
+  companyId: TemplateScopeId | null
+  params: Partial<UpdateDocumentTemplateParams>
+}
+
+/** Validate the current editor scope before building the canonical named operation request. */
+export function documentTemplateUpdateRequest(
+  organizationId: number,
+  scope: DocumentTemplatesScope,
+  input: UpdateDocumentTemplateInput,
+) {
+  const templateId = templateScopeId(input.templateId)
+  const companyId = input.companyId === null ? null : templateScopeId(input.companyId)
+  if (!validTemplateScope(scope) || templateScopeId(organizationId) === null || templateId === null ||
+    (input.companyId !== null && (companyId === null || companyId !== templateScopeId(scope.companyId)))) {
+    throw new Error("The template's organization or company is no longer available.")
+  }
+  return stdbBffCommandPost("update_document_template", {
+    templateId: BigInt(templateId),
+    companyId: companyId === null ? null : BigInt(companyId),
+    params: stdbParamsToJson(input.params, "UpdateDocumentTemplateParams"),
+  })
+}
+
+export function useUpdateDocumentTemplate(organizationId: number, scope: DocumentTemplatesScope) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: UpdateDocumentTemplateInput) => {
+      const { urlPath, init } = documentTemplateUpdateRequest(organizationId, scope, input)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

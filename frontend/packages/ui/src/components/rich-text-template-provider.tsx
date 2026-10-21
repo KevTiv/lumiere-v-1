@@ -16,6 +16,8 @@ type RichTextTemplateSource = {
   status: "idle" | "loading" | "ready" | "error"
   error?: string
   onRequest: () => void
+  /** Authorized creators can open management without replacing their current form. */
+  managementHref?: string
 }
 
 export type RichTextTemplateProviderProps = RichTextTemplateSource & {
@@ -35,11 +37,15 @@ export function RichTextTemplateProvider({
   templates,
   status,
   error,
-  onRequest
+  onRequest,
+  managementHref,
 }: RichTextTemplateProviderProps) {
   const source = React.useMemo(
-    () => (enabled ? { scopeKey, templates, status, error, onRequest } : null),
-    [enabled, scopeKey, templates, status, error, onRequest]
+    () =>
+      enabled
+        ? { scopeKey, templates, status, error, onRequest, managementHref }
+        : null,
+    [enabled, scopeKey, templates, status, error, onRequest, managementHref],
   )
 
   return (
