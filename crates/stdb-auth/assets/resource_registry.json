@@ -58,7 +58,9 @@
       "state",
       "acquisition_date",
       "original_value",
-      "company_id"
+      "company_id",
+      "organization_id",
+      "depreciation_board_ids"
     ],
     "mandatory": [
       "id",
@@ -130,7 +132,8 @@
       "company_id",
       "payment_id",
       "account_internal_type",
-      "matching_number"
+      "matching_number",
+      "journal_id"
     ],
     "mandatory": [
       "id",
@@ -2112,7 +2115,25 @@
       "total_amount",
       "currency_id",
       "state",
-      "company_id"
+      "company_id",
+      "client_request_id",
+      "attachment_ids",
+      "has_receipt",
+      "unit_amount",
+      "quantity",
+      "description",
+      "tax_ids",
+      "product_id",
+      "account_id",
+      "analytic_account_id",
+      "project_id",
+      "line_kind",
+      "mileage_distance",
+      "mileage_rate_id",
+      "per_diem_days",
+      "per_diem_rate_id",
+      "payment_mode",
+      "merchant_key"
     ],
     "mandatory": [
       "id",
@@ -3970,7 +3991,9 @@
       "write_off_amount",
       "write_off_account_id",
       "write_off_move_id",
-      "metadata"
+      "metadata",
+      "currency_id",
+      "reversed_reconciliation_id"
     ],
     "mandatory": [
       "id",
@@ -4020,7 +4043,9 @@
       "currency_id",
       "partner_id",
       "source_entity",
-      "source_entity_id"
+      "source_entity_id",
+      "partner_type",
+      "payment_account_id"
     ],
     "mandatory": [
       "id",
@@ -5708,7 +5733,8 @@
       "group_id",
       "last_run",
       "next_run",
-      "metadata"
+      "metadata",
+      "scheduled_run_job_id"
     ],
     "mandatory": [
       "id",
@@ -5741,7 +5767,12 @@
       "name",
       "model",
       "report_type",
-      "is_active"
+      "is_active",
+      "company_id",
+      "orientation",
+      "paper_format",
+      "template_content",
+      "write_date"
     ],
     "mandatory": [
       "id",

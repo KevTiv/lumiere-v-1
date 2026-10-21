@@ -1,7 +1,7 @@
-import type { FormConfig, SelectField } from "./form-types"
+import type { FormConfig } from "./form-types"
 
 /**
- * Replace `select` field options for the field with the given `name` (react-hook / modular form name).
+ * Replace `select` or `multiselect` field options for the field with the given `name` (react-hook / modular form name).
  * Used to inject live lookup options from `/api/query/*` without duplicating entire form configs.
  */
 export function mergeSelectOptionsByFieldName(
@@ -14,8 +14,8 @@ export function mergeSelectOptionsByFieldName(
     sections: config.sections.map((section) => ({
       ...section,
       fields: section.fields.map((field) => {
-        if (field.name === fieldName && field.type === "select") {
-          return { ...field, options } as SelectField
+        if (field.name === fieldName && (field.type === "select" || field.type === "multiselect")) {
+          return { ...field, options }
         }
         return field
       }),
