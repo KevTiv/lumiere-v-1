@@ -22,6 +22,15 @@ pub fn resource_matches(configured: &str, requested: &str) -> bool {
     configured == "*" || configured.replace('-', "_") == requested.replace('-', "_")
 }
 
+/// Domain operation capabilities retain their own resource while sharing module policy.
+/// In particular, account_payment CRUD never implies payment posting or reversal.
+pub fn operation_resource_module(resource: &str) -> Option<&'static str> {
+    match resource {
+        "payment" => Some("accounting"),
+        _ => None,
+    }
+}
+
 /// Superuser is explicit; otherwise any matching deny overrides every allow.
 pub fn allows(
     superuser: bool,
@@ -75,6 +84,84 @@ pub fn allows_in_module(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn payment_operations_keep_explicit_capabilities_under_accounting_module_denies() {
+        let module = operation_resource_module("payment");
+        for action in ["post", "cancel", "reverse"] {
+            assert!(!allows_in_module(
+                false,
+                &["account_payment:*".into()],
+                &[],
+                "payment",
+                action,
+                module
+            ));
+            assert!(!allows_in_module(
+                false,
+                &["payment:write".into()],
+                &[],
+                "payment",
+                action,
+                module
+            ));
+            let permissions = vec![format!("payment:{action}")];
+            assert!(allows_in_module(
+                false,
+                &permissions,
+                &[],
+                "payment",
+                action,
+                module
+            ));
+            let deny = [Grant {
+                resource: "module:accounting",
+                action: "all",
+                allow: false,
+            }];
+            assert!(!allows_in_module(
+                false,
+                &permissions,
+                &deny,
+                "payment",
+                action,
+                module
+            ));
+            assert!(allows_in_module(
+                false,
+                &["module:accounting:*".into()],
+                &[],
+                "payment",
+                action,
+                module
+            ));
+        }
+    }
+
+    #[test]
+    fn configured_duties_detect_module_and_canonical_wildcards_and_respect_denies() {
+        for permission in ["module:accounting:*", "account_move:*"] {
+            let permissions = vec![permission.into()];
+            let holds = |action, grants: &[Grant<'_>]| {
+                allows_in_module(
+                    false,
+                    &permissions,
+                    grants,
+                    "account_move",
+                    action,
+                    Some("accounting"),
+                )
+            };
+            assert!(holds("create", &[]) && holds("write", &[]));
+            let deny = [Grant {
+                resource: "account_move",
+                action: "update",
+                allow: false,
+            }];
+            assert!(holds("create", &deny));
+            assert!(!holds("write", &deny));
+        }
+    }
 
     #[test]
     fn denies_override_wildcards_and_actions_are_canonical() {

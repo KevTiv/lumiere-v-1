@@ -67,3 +67,12 @@ does not replace those paths or claim canonical create certification for them.
   port 48083, and web port 4317. API and web share the generated test credential
   key. No Maincloud data reset is needed. Current execution results and exact-head
   CI evidence are recorded in PR #239.
+
+
+## Financial release integration experiment — 2026-10-20
+
+This isolated integration combines the financial alpha candidate `61ff049840c98bfd10bdf7dc06c9a2727b5ab088` with PR #239 at `1c3751c5a1e411c31faf4dad8fe44dc1e55e577d`. It does not change Railway configuration or deploy a release.
+
+The candidate already has a newer invoice/bill split-pane workspace with invoice personalization, current-default review, canonical submission recovery, and dirty-draft preservation. That implementation is retained; PR #239's invoice preview checks are adapted to its responsive controls and document presentation. Accounting journal/tax/payment-term previews and all Reports authoring previews are retained from PR #239. Shared preview hooks keep the candidate's workspace surfaces, dashboard contracts, create permissions, and period-close report context.
+
+Focused component/model checks cover these integrations. The combined tree still requires its own full CI, browser authoring/financial acceptance, and immutable image build before any release promotion. Earlier PR #239 browser/deployment evidence above describes the original PR head, not this combined tree.

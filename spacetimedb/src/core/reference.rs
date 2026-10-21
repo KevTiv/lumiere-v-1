@@ -800,22 +800,35 @@ pub(crate) fn require_currency_row(
 ///
 /// Company-specific rates take precedence over organization-wide rates. Within
 /// each scope, the newest rate whose date is not after `as_of` wins.
-pub(crate) fn resolve_currency_rate_as_of(
+#[derive(Clone, Copy)]
+pub(crate) struct ResolvedCurrencyRate {
+    pub rate: f64,
+    pub source_id: Option<u64>,
+    pub source_date: Option<Timestamp>,
+    pub source_company_id: Option<u64>,
+}
+
+pub(crate) fn resolve_currency_rate_snapshot_as_of(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
     from_currency_id: u64,
     to_currency_id: u64,
     as_of: Timestamp,
-) -> Result<f64, String> {
+) -> Result<ResolvedCurrencyRate, String> {
     if from_currency_id == to_currency_id {
-        return Ok(1.0);
+        return Ok(ResolvedCurrencyRate {
+            rate: 1.0,
+            source_id: None,
+            source_date: None,
+            source_company_id: None,
+        });
     }
 
     let from = require_currency_by_id(ctx, from_currency_id)?;
     let to = require_currency_by_id(ctx, to_currency_id)?;
-    let mut company_rate: Option<(Timestamp, f64)> = None;
-    let mut global_rate: Option<(Timestamp, f64)> = None;
+    let mut company_rate: Option<(Timestamp, f64, u64, Option<u64>)> = None;
+    let mut global_rate: Option<(Timestamp, f64, u64, Option<u64>)> = None;
 
     for rate in ctx
         .db
@@ -835,15 +848,16 @@ pub(crate) fn resolve_currency_rate_as_of(
             None => &mut global_rate,
             Some(_) => continue,
         };
-        if candidate.as_ref().is_none_or(|(date, _)| rate.date > *date) {
-            *candidate = Some((rate.date, rate.rate));
+        if candidate
+            .as_ref()
+            .is_none_or(|(date, _, _, _)| rate.date > *date)
+        {
+            *candidate = Some((rate.date, rate.rate, rate.id, rate.company_id));
         }
     }
 
-    let rate = company_rate
-        .or(global_rate)
-        .map(|(_, rate)| rate)
-        .ok_or_else(|| {
+    let (source_date, rate, source_id, source_company_id) =
+        company_rate.or(global_rate).ok_or_else(|| {
             format!(
                 "No exchange rate for {} → {} (company {}) at the requested time",
                 from.code, to.code, company_id
@@ -852,5 +866,29 @@ pub(crate) fn resolve_currency_rate_as_of(
     if !rate.is_finite() || rate <= 0.0 {
         return Err("Exchange rate must be positive".to_string());
     }
-    Ok(rate)
+    Ok(ResolvedCurrencyRate {
+        rate,
+        source_id: Some(source_id),
+        source_date: Some(source_date),
+        source_company_id,
+    })
+}
+
+pub(crate) fn resolve_currency_rate_as_of(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    from_currency_id: u64,
+    to_currency_id: u64,
+    as_of: Timestamp,
+) -> Result<f64, String> {
+    Ok(resolve_currency_rate_snapshot_as_of(
+        ctx,
+        organization_id,
+        company_id,
+        from_currency_id,
+        to_currency_id,
+        as_of,
+    )?
+    .rate)
 }

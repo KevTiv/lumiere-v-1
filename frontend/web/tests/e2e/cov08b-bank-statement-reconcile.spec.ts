@@ -1,13 +1,15 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
+import { randomUUID } from "node:crypto"
 
 import {
   fetchDefaultCompanyId,
+  fetchAccountIdByCode,
   fetchSessionOrganizationId,
   gotoModule,
+  openAccountingTab,
   scalarQueryId,
   signIn,
   smokeName,
-  selectModuleTab,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 
@@ -85,8 +87,39 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
       scalarQueryId(company?.currencyId ?? company?.currency_id)
     if (journalId == null || currencyId == null) throw new Error("seeded bank journal is required")
 
-    const moveLine = (await queryRows(page, "account-move-lines")).find(
-      (row) => scalarQueryId(row.companyId ?? row.company_id) === companyId,
+    // Setup a dedicated posted receivable rather than borrowing an arbitrary
+    // seeded line, which may be draft, already linked, or used by another spec.
+    const accounts = await Promise.all(["1100", "4000", "5000", "1400"].map((code) => fetchAccountIdByCode(page, code)))
+    const salesJournalId = scalarQueryId(journals.find((row) =>
+      scalarQueryId(row.companyId ?? row.company_id) === companyId && row.code === "INV",
+    )?.id)
+    const partnerId = scalarQueryId((await queryRows(page, "contacts")).find((row) =>
+      scalarQueryId(row.companyId ?? row.company_id) === companyId,
+    )?.id)
+    if (salesJournalId == null || partnerId == null) throw new Error("bank-link invoice fixture lookups missing")
+    const invoiceReference = smokeName("cov08b-invoice")
+    await callOwnerRaw("create_manual_account_invoice", [organizationId, {
+      idempotency_key: randomUUID().replaceAll("-", ""), company_id: companyId,
+      move_type: { outInvoice: [] }, journal_id: salesJournalId, partner_id: partnerId,
+      counterpart_account_id: accounts[0], currency_id: currencyId,
+      date: timestampNow(), invoice_date: timestampNow(),
+      invoice_date_due: { none: [] }, invoice_payment_term_id: { none: [] },
+      ref: { some: invoiceReference }, payment_reference: { none: [] }, metadata: { none: [] },
+      lines: [{ account_id: accounts[1], name: invoiceReference, quantity: 1, price_unit: 25, discount: 0, tax_ids: [], product_id: { none: [] } }],
+    }])
+    // The governed move projection omits the optional reference. Resolve the
+    // exact fixture through its unique, company-bound revenue line instead.
+    const invoiceLines = (await queryRows(page, "account-move-lines")).filter((row) =>
+      row.name === invoiceReference &&
+      scalarQueryId(row.companyId ?? row.company_id) === companyId &&
+      scalarQueryId(row.accountId ?? row.account_id) === accounts[1],
+    )
+    expect(invoiceLines).toHaveLength(1)
+    const moveId = scalarQueryId(invoiceLines[0]?.moveId ?? invoiceLines[0]?.move_id)
+    if (moveId == null) throw new Error("bank-link fixture invoice not found")
+    await callOwnerRaw("post_invoice", [organizationId, moveId, accounts[2], accounts[3]])
+    const moveLine = (await queryRows(page, "account-move-lines")).find((row) =>
+      scalarQueryId(row.moveId ?? row.move_id) === moveId && scalarQueryId(row.accountId ?? row.account_id) === accounts[0],
     )
     const moveLineId = scalarQueryId(moveLine?.id)
     if (moveLineId == null) throw new Error("seeded company move line is required")
@@ -143,7 +176,7 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
     if (lineId == null) throw new Error("created bank statement line not found")
 
     await gotoModule(page, "accounting")
-    await selectModuleTab(page, "accounting", "bank-statements")
+    await openAccountingTab(page, "bank-statements")
     const row = page.getByTestId(`entity-row-${statementId}`)
     await expect(row).toContainText(statementName)
     await row.click()
@@ -152,15 +185,18 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
     const dialog = page.getByRole("dialog", { name: /Bank statement/ })
     await expect(dialog).toBeVisible()
     await dialog.getByRole("button", { name: "Focus line" }).click()
-    await dialog.locator("#manual-move-ids").fill(String(moveLineId))
-    await dialog.locator("#manual-residual").fill("0")
+    const desk = dialog.getByTestId("reconciliation-workbench")
+    await expect(desk.getByTestId(`reconciliation-candidate-${moveLineId}`)).toBeVisible()
+    await desk.getByTestId(`reconciliation-candidate-${moveLineId}`).getByRole("checkbox").check()
+    await desk.getByRole("checkbox", { name: /I reviewed the statement/ }).check()
+    await expect(desk.getByTestId("reconciliation-confirm")).toBeEnabled()
 
     const [accepted] = await Promise.all([
       page.waitForResponse(
         (response) => matchesOperationResponse(response, "reconcile_account_bank_statement_line"),
         { timeout: 30_000 },
       ),
-      dialog.getByRole("button", { name: "Reconcile (manual)" }).click(),
+      desk.getByTestId("reconciliation-confirm").click(),
     ])
     expect(accepted.ok()).toBe(true)
     await expect.poll(() => fetchBankLine(page, lineId)).toEqual({
@@ -171,6 +207,23 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
       amountResidual: 0,
     })
     const acceptedEffect = await fetchBankLine(page, lineId)
+    // Confirmation now proves actual invoice and payment settlement.
+    const invoiceAfter = (await queryRows(page, "account-moves")).find((row) => scalarQueryId(row.id) === moveId)
+    expect(Number(invoiceAfter?.amountResidual ?? invoiceAfter?.amount_residual)).toBe(0)
+    const settledLine = (await queryRows(page, "bank-statement-lines")).find((row) => scalarQueryId(row.id) === lineId)
+    const paymentIds = settledLine?.paymentIds ?? settledLine?.payment_ids
+    expect(Array.isArray(paymentIds) ? paymentIds.length : 0).toBe(1)
+    const paymentId = scalarQueryId((paymentIds as unknown[])[0])
+    const paymentAfter = (await queryRows(page, "account-payments")).find((row) => scalarQueryId(row.id) === paymentId)
+    expect(Number(paymentAfter?.amount)).toBe(25)
+    const paymentMoveId = scalarQueryId(paymentAfter?.moveId ?? paymentAfter?.move_id)
+    expect(paymentMoveId).not.toBeNull()
+    const clearing = (await queryRows(page, "account-move-lines")).filter((row) =>
+      scalarQueryId(row.moveId ?? row.move_id) === paymentMoveId
+      && ["receivable", "payable"].includes(String(row.accountInternalType ?? row.account_internal_type).toLowerCase()),
+    )
+    expect(clearing).toHaveLength(1)
+    expect(Number(clearing[0]?.amountResidual ?? clearing[0]?.amount_residual)).toBe(0)
 
     const stale = await replayOperationAs(page, accepted.request())
     expect(stale.status()).toBe(422)

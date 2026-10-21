@@ -1,5 +1,11 @@
 "use client"
 
+import { useMemo } from "react"
+import {
+  projectPaymentAllocations,
+  type PaymentAllocationCollection,
+  type PaymentAllocationRow,
+} from "@lumiere/erp-shared/payment-allocation-projection"
 
 import { dispatchNamedOperation } from "../../operation-dispatch"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
@@ -65,6 +71,7 @@ import {
   useTypedStdbQuery,
 } from "../stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
+import { useCurrencies } from "../settings"
 import {
   POST_PAYMENT_AFFECTS,
   RECONCILE_PAYMENT_AFFECTS,
@@ -160,16 +167,47 @@ export function usePaymentFees(organizationId: bigint) {
   return useTypedStdbQuery("payment-fees", organizationId)
 }
 
-export function usePaymentTransactions(organizationId: bigint) {
-  return useTypedStdbQuery("payment-transactions", organizationId)
+export function usePaymentTransactions(organizationId: bigint, options?: { staleTime?: number; enabled?: boolean }) {
+  return useTypedStdbQuery("payment-transactions", organizationId, options)
 }
 
-export function usePaymentReconciliations(organizationId: bigint) {
-  return useTypedStdbQuery("payment-reconciliations", organizationId)
+export function usePaymentReconciliations(organizationId: bigint, options?: { staleTime?: number; enabled?: boolean }) {
+  return useTypedStdbQuery("payment-reconciliations", organizationId, options)
 }
 
-export function usePaymentReversals(organizationId: bigint) {
-  return useTypedStdbQuery("payment-reversals", organizationId)
+export function usePaymentReversals(organizationId: bigint, options?: { staleTime?: number; enabled?: boolean }) {
+  return useTypedStdbQuery("payment-reversals", organizationId, options)
+}
+
+function allocationRead(query: {
+  data?: readonly PaymentAllocationRow[]
+  isLoading: boolean
+  isError: boolean
+  error: unknown
+  refetch: () => unknown
+}): PaymentAllocationCollection {
+  if (query.isError) {
+    const status = query.error && typeof query.error === "object" && "status" in query.error ? query.error.status : undefined
+    return { rows: [], state: { status: status === 401 || status === 403 ? "denied" : "error", onRetry: () => { void query.refetch() } } }
+  }
+  if (query.isLoading || !query.data) return { rows: [], state: { status: "loading" } }
+  return { rows: query.data, state: { status: "ready" } }
+}
+
+/** Cached resource reads shared with the workspace; failed sources never become zero balances. */
+export function usePaymentAllocationBalances(organizationId: bigint, companyId: bigint) {
+  const options = { enabled: organizationId > 0n && companyId > 0n }
+  const payments = useAccountPayments(organizationId, options)
+  const moves = useTypedStdbQuery("account-moves", organizationId, options)
+  const moveLines = useTypedStdbQuery("account-move-lines", organizationId, options)
+  const transactions = usePaymentTransactions(organizationId, options)
+  const reversals = usePaymentReversals(organizationId, options)
+  const currencies = useCurrencies()
+  return useMemo(() => projectPaymentAllocations({
+    organizationId, companyId,
+    payments: allocationRead(payments), moves: allocationRead(moves), moveLines: allocationRead(moveLines),
+    transactions: allocationRead(transactions), reversals: allocationRead(reversals), currencies: allocationRead(currencies),
+  }), [organizationId, companyId, payments, moves, moveLines, transactions, reversals, currencies])
 }
 
 export function useCreatePaymentAccount(organizationId: bigint) {

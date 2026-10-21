@@ -20,6 +20,8 @@ import { Archive, FileDown, FileSpreadsheet, PlayCircle } from "lucide-react"
 import { reportStateTag } from "@/lib/reports-create-params"
 import { useToast } from "@/hooks/use-toast"
 import { currencyOptionsFromRows } from "@/lib/form-lookup"
+import type { PeriodReportContext } from "@lumiere/ui/lib/period-report-context"
+import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import {
   Select,
   SelectContent,
@@ -32,6 +34,8 @@ type VatReportPanelProps = {
   organizationId: bigint
   companyId?: bigint
   financialReports: Record<string, unknown>[]
+  periodContext?: PeriodReportContext
+  sourceState?: ModuleDataState
 }
 
 function reportTypeTag(row: Record<string, unknown>): string {
@@ -66,7 +70,7 @@ function mutationErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message.trim() !== "" ? error.message : fallback
 }
 
-export function VatReportPanel({ organizationId, companyId, financialReports }: VatReportPanelProps) {
+export function VatReportPanel({ organizationId, companyId, financialReports, periodContext, sourceState }: VatReportPanelProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
   const generateEuVatReport = useGenerateEuVatReport(organizationId, companyId)
@@ -75,8 +79,8 @@ export function VatReportPanel({ organizationId, companyId, financialReports }: 
   const { data: currencies = [] } = useCurrencies()
 
   const [name, setName] = useState("EU VAT Return")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  const [dateFrom, setDateFrom] = useState(periodContext?.dateFrom.slice(0, 10) ?? "")
+  const [dateTo, setDateTo] = useState(periodContext?.dateTo.slice(0, 10) ?? "")
   const [locale, setLocale] = useState("EU")
   const [currencyId, setCurrencyId] = useState("")
   const currencyOptions = useMemo(() => currencyOptionsFromRows(currencies), [currencies])
@@ -234,11 +238,11 @@ export function VatReportPanel({ organizationId, companyId, financialReports }: 
         </div>
         <div className="space-y-2">
           <Label>{t("reports.vat.dateFrom")}</Label>
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          <Input type="date" value={dateFrom} disabled={Boolean(periodContext)} onChange={(e) => setDateFrom(e.target.value)} />
         </div>
         <div className="space-y-2">
           <Label>{t("reports.vat.dateTo")}</Label>
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          <Input type="date" value={dateTo} disabled={Boolean(periodContext)} onChange={(e) => setDateTo(e.target.value)} />
         </div>
         <div className="space-y-2">
           <Label>{t("reports.vat.locale")}</Label>
@@ -260,14 +264,14 @@ export function VatReportPanel({ organizationId, companyId, financialReports }: 
       </div>
 
       <Button
-        disabled={!name.trim() || !dateFrom || !dateTo || !currencyId || generateEuVatReport.isPending}
+        disabled={!name.trim() || !dateFrom || !dateTo || !currencyId || generateEuVatReport.isPending || (sourceState != null && sourceState.status !== "ready") || Boolean(periodContext && (periodContext.organizationId !== String(organizationId) || periodContext.companyId !== String(companyId)))}
         data-testid="vat-report-generate"
         onClick={() =>
           void generateEuVatReport
             .mutateAsync({
               name,
-              dateFrom: `${dateFrom}T00:00:00.000Z`,
-              dateTo: `${dateTo}T23:59:59.999Z`,
+              dateFrom: periodContext?.dateFrom ?? `${dateFrom}T00:00:00.000Z`,
+              dateTo: periodContext?.dateTo ?? `${dateTo}T23:59:59.999Z`,
               currencyId: Number(currencyId),
               locale,
             })

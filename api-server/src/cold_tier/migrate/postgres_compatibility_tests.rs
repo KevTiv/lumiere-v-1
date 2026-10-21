@@ -168,16 +168,22 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
     ensure!(migration_count(pool).await? == prefix_length as i64);
     let previous_history = applied_migration_history(pool).await?;
     let previous_tables = public_table_names(pool).await?;
-    let expected_cost_tables = [
+    // Startup upgrades the frozen v13 prefix through the whole current catalog.
+    let expected_new_tables = [
+        "bank_statement_settlement_attempt",
+        "bank_statement_settlement_reversal",
         "mrp_production_cost",
         "mrp_productivity_cost",
         "mrp_valuation_config",
         "mrp_workcenter_cost_rate",
+        "purchase_order_creation_operation",
+        "purchase_receipt_operation",
+        "user_invite_acceptance",
     ];
-    for table in expected_cost_tables {
+    for table in expected_new_tables {
         ensure!(
             !relation_exists(pool, table).await?,
-            "cost table {table} predates migration 14"
+            "table {table} predates its catalog migration"
         );
     }
 
@@ -195,12 +201,8 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
         .into_iter()
         .filter(|table| !previous_tables.contains(table))
         .collect();
-    let mut expected_added_tables = expected_cost_tables.to_vec();
-    // The full upgrade also applies the later, forward-only invitation receipt migration.
-    expected_added_tables.push("user_invite_acceptance");
-    expected_added_tables.sort_unstable();
     ensure!(
-        added_tables == expected_added_tables,
+        added_tables == expected_new_tables,
         "migration 13 upgrade produced unexpected new tables: {added_tables:?}"
     );
 
@@ -272,6 +274,93 @@ async fn exercise_account_payment_reversal_identity_upgrade(pool: &Pool) -> Resu
     ensure!(applied_migration_history(pool).await?[..migration_15_index] == previous_history);
     ensure_schema(pool).await?;
     ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
+    Ok(())
+}
+
+#[tokio::test]
+async fn postgres_main_18_upgrades_financial_alpha_without_rewriting_history() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!("skipping financial alpha migration proof (set C4_TEST_PG=1 to run)");
+        return Ok(());
+    }
+    let base_config = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin_pool = admin_pool(&base_config)?;
+    create_database(&admin_pool, &database, &base_config.user).await?;
+    let mut test_config = base_config.clone();
+    test_config.database.clone_from(&database);
+    let test_pool = pg_pool::build_pool(&test_config)?;
+    let result = exercise_financial_alpha_upgrade(&test_pool).await;
+    drop(test_pool);
+    let cleanup = drop_database(&admin_pool, &database).await;
+    result?;
+    cleanup?;
+    Ok(())
+}
+
+async fn exercise_financial_alpha_upgrade(pool: &Pool) -> Result<()> {
+    let finance_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.name == "financial_alpha_operations")
+        .context("financial alpha migration is missing")?;
+    ensure!(MIGRATIONS[finance_index].version == 19 && finance_index == 18);
+    apply_migration_prefix(pool, finance_index).await?;
+    let previous_history = applied_migration_history(pool).await?;
+    let audit = super::audit_schema(pool).await?;
+    audit.require_compatible()?;
+    ensure!(audit.require_current().is_err());
+
+    // The earlier accounting branch used purchasing at 17. A mismatched
+    // lineage must fail before any financial schema or history is committed.
+    let client = pool.get().await?;
+    client
+        .batch_execute("update lumiere_platform.schema_migration set name = 'purchasing_keyed_operations' where version = 17")
+        .await?;
+    drop(client);
+    ensure!(super::audit_schema(pool)
+        .await?
+        .require_compatible()
+        .is_err());
+    ensure!(ensure_schema(pool).await.is_err());
+    ensure!(migration_count(pool).await? == 18);
+    ensure!(!relation_exists(pool, "purchase_order_creation_operation").await?);
+    let client = pool.get().await?;
+    client
+        .batch_execute("update lumiere_platform.schema_migration set name = 'platform_identity_lifecycle' where version = 17")
+        .await?;
+    drop(client);
+
+    ensure_schema(pool).await?;
+    super::audit_schema(pool).await?.require_current()?;
+    ensure!(applied_migration_history(pool).await?[..finance_index] == previous_history);
+    for table in [
+        "purchase_order_creation_operation",
+        "purchase_receipt_operation",
+        "bank_statement_settlement_attempt",
+        "bank_statement_settlement_reversal",
+    ] {
+        ensure!(relation_exists(pool, table).await?, "missing {table}");
+    }
+    let client = pool.get().await?;
+    client.batch_execute(
+        "insert into purchase_order_creation_operation \
+         (id, organization_id, company_id, operation_key, purchase_order_id, payload_hash, created_by, created_at) \
+         values ('migration-proof', 1, 1, 'migration-proof', 123, 'proof', decode(repeat('ab', 32), 'hex'), 0)",
+    ).await?;
+    drop(client);
+    let applied = applied_migration_history(pool).await?;
+    ensure_schema(pool).await?;
+    ensure!(applied_migration_history(pool).await? == applied);
+    let count: i64 = pool
+        .get()
+        .await?
+        .query_one(
+            "select count(*) from purchase_order_creation_operation where id = 'migration-proof'",
+            &[],
+        )
+        .await?
+        .get(0);
+    ensure!(count == 1);
     Ok(())
 }
 

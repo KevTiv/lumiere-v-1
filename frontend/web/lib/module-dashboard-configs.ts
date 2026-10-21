@@ -1,4 +1,6 @@
 import type { TFunction } from "i18next"
+import { accountingWorkspaceNavigation } from "./accounting-workspace-navigation"
+import { businessWorkspaceNavigation } from "./business-workspace-navigation"
 import { chartAccountPrimaryLabel, contactPrimaryLabel, inventoryProductPrimaryLabel, proposalPrimaryLabel, saleOrderPrimaryLabel } from "@lumiere/stdb/read-models"
 import type { DashboardConfig, ModuleConfig } from "@lumiere/ui"
 import {
@@ -299,6 +301,77 @@ export const accountingDashboard: DashboardConfig = {
       ],
     },
     {
+      id: "accounting-trends",
+      widgets: [
+        {
+          id: "acc-revenue-expenses",
+          type: "combo-chart",
+          title: "Invoiced vs Billed",
+          width: "2/3",
+          data: {
+            xAxisKey: "month",
+            bars: [
+              { key: "revenue", label: "Invoiced", color: "hsl(var(--chart-1))" },
+              { key: "expenses", label: "Billed", color: "hsl(var(--chart-3))" },
+            ],
+            line: { key: "net", label: "Net", color: "hsl(var(--chart-2))" },
+            lineAxis: "left",
+            values: [],
+          },
+        },
+        {
+          id: "acc-collection-rate",
+          type: "radial-gauge",
+          title: "Collection Rate",
+          width: "1/3",
+          data: { value: 0, max: 0, label: "Collected", stats: [] },
+        },
+        {
+          id: "acc-aging-share",
+          type: "share-bar",
+          title: "Open invoices and bills by due date",
+          width: "1/2",
+          data: {
+            segments: [
+              { key: "Current", label: "Current", color: "hsl(var(--chart-2))" },
+              { key: "1-30", label: "1–30 days", color: "hsl(var(--chart-1))" },
+              { key: "31-60", label: "31–60 days", color: "hsl(var(--chart-3))" },
+              { key: "61-90", label: "61–90 days", color: "hsl(var(--chart-4))" },
+              { key: "90+", label: "90+ days", color: "hsl(var(--destructive))" },
+            ],
+            rows: [],
+            emptyLabel: "No open invoices or bills in this company.",
+          },
+        },
+        {
+          id: "acc-top-customers",
+          type: "ranked-bars",
+          title: "Top Customers",
+          width: "1/2",
+          data: { items: [], emptyLabel: "No posted invoices in this period." },
+        },
+        {
+          id: "acc-cash-movements",
+          type: "step-chart",
+          title: "Cash Movements (weekly net)",
+          width: "full",
+          data: {
+            xAxisKey: "week",
+            series: { key: "net", label: "Net cash", color: "hsl(var(--chart-1))" },
+            values: [],
+            reference: { value: 0, label: "0" },
+          },
+        },
+        {
+          id: "acc-recent-invoices",
+          type: "tabbed-table",
+          title: "Recent Invoices",
+          width: "full",
+          data: { tabs: [], columns: [], rows: [] },
+        },
+      ],
+    },
+    {
       id: "accounting-detail",
       widgets: [
         {
@@ -336,21 +409,6 @@ export const accountingDashboard: DashboardConfig = {
           width: "1/2",
           data: { deadlines: [] },
         },
-        {
-          id: "accounting-ar-ap-aging",
-          type: "bar-chart",
-          title: "AR/AP Aging",
-          width: "full",
-          data: {
-            categoryKey: "bucket",
-            series: [
-              { name: "AR", color: "#6366f1" },
-              { name: "AP", color: "#ef4444" },
-            ],
-            values: [],
-            stacked: false,
-          },
-        },
       ],
     },
   ],
@@ -361,6 +419,7 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
   title: "Accounting",
   description: "Financial overview — P&L, cash position, and budget tracking",
   defaultTab: "dashboard",
+  workspaceNav: accountingWorkspaceNavigation(t),
   tabNavigation: "areas",
   tabGroups: [
     { label: t("accounting.navigation.receivables", { defaultValue: "Receivables" }), tabIds: ["invoices", "credit-control"] },
@@ -734,15 +793,10 @@ export const salesDashboard: DashboardConfig = {
 
 export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "sales",
+  workspaceNav: businessWorkspaceNavigation("sales", t),
   title: "Sales",
   description: "Revenue performance, pipeline health, and deal activity",
   defaultTab: "dashboard",
-  tabGroups: [
-    { label: t("modules.tabGroups.orders", { defaultValue: "Orders" }), tabIds: ["orders", "order-lines", "invoices", "returns"] },
-    { label: t("modules.tabGroups.fulfillment", { defaultValue: "Fulfillment" }), tabIds: ["deliveries", "fulfillment"] },
-    { label: t("modules.tabGroups.pricing", { defaultValue: "Pricing" }), tabIds: ["pricelists", "pricelist-items", "loyalty-programs", "loyalty-cards"] },
-    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["delivery-price-rules", "delivery-carriers", "shipping-methods", "pos-payment-methods", "commission-plans"] },
-  ],
   tabs: [
     {
       id: "dashboard",
@@ -982,6 +1036,7 @@ export const crmDashboard: DashboardConfig = {
 
 export const crmModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "crm",
+  workspaceNav: businessWorkspaceNavigation("crm", t),
   title: "CRM",
   description: "Lead pipeline, customer lifecycle, and relationship health",
   defaultTab: "dashboard",
@@ -1511,6 +1566,7 @@ export const purchasingDashboard: DashboardConfig = {
 
 export const purchasingModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "purchasing",
+  workspaceNav: businessWorkspaceNavigation("purchasing", t),
   title: "Purchasing",
   description: "Purchase orders, vendor performance, and spend analysis",
   defaultTab: "dashboard",
@@ -2512,6 +2568,7 @@ export const calendarModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "reports",
+  workspaceNav: businessWorkspaceNavigation("reports", t),
   title: t("reports.moduleTitle"),
   description: t("reports.moduleDescription"),
   defaultTab: "dashboard",
@@ -2592,6 +2649,41 @@ export const reportsModuleConfig = (t: TFunction): ModuleConfig => ({
                   { label: t("reports.dashboard.kpis.metrics"), value: "0", icon: "gauge" },
                 ],
               },
+            },
+          ],
+        },
+        {
+          id: "rep-finance",
+          widgets: [
+            {
+              id: "rep-pl-trend",
+              type: "combo-chart",
+              title: "Profit & Loss Trend",
+              width: "2/3",
+              data: {
+                xAxisKey: "month",
+                bars: [
+                  { key: "revenue", label: "Income", color: "hsl(var(--chart-1))" },
+                  { key: "expenses", label: "Expenses", color: "hsl(var(--chart-3))" },
+                ],
+                line: { key: "margin", label: "Net margin", color: "hsl(var(--chart-2))" },
+                lineFormat: { kind: "percent" },
+                values: [],
+              },
+            },
+            {
+              id: "rep-cash-runway",
+              type: "radial-gauge",
+              title: "Cash Runway",
+              width: "1/3",
+              data: { value: 0, max: 0, label: "months of runway", stats: [] },
+            },
+            {
+              id: "rep-expense-breakdown",
+              type: "ranked-bars",
+              title: "Expense Breakdown (last 90 days)",
+              width: "full",
+              data: { items: [], maxItems: 8, emptyLabel: "No posted expenses in the last 90 days." },
             },
           ],
         },
@@ -2752,6 +2844,34 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
             },
           ],
         },
+        {
+          id: "sub-charts",
+          widgets: [
+            {
+              id: "sub-mrr-churn",
+              type: "combo-chart",
+              title: "MRR & churn estimate (current contract values)",
+              width: "2/3",
+              data: {
+                xAxisKey: "month",
+                bars: [
+                  { key: "mrr", label: "MRR", color: "hsl(var(--chart-1))" },
+                  { key: "newMrr", label: "New MRR", color: "hsl(var(--chart-2))" },
+                ],
+                line: { key: "churnRate", label: "Churn rate", color: "hsl(var(--destructive))" },
+                lineFormat: { kind: "percent" },
+                values: [],
+              },
+            },
+            {
+              id: "sub-plan-mix",
+              type: "share-bar",
+              title: "Plan Mix (active MRR)",
+              width: "1/3",
+              data: { segments: [], rows: [], emptyLabel: "No active paid subscriptions yet." },
+            },
+          ],
+        },
       ],
     },
     {
@@ -2873,6 +2993,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "expenses",
+  workspaceNav: businessWorkspaceNavigation("expenses", t),
   title: "Expenses",
   description: "Employee expense management and reimbursement",
   defaultTab: "dashboard",
@@ -2916,6 +3037,42 @@ export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
                   { label: "Approved Reports", value: "0", icon: "CheckCircle" },
                 ],
               },
+            },
+          ],
+        },
+        {
+          id: "exp-charts",
+          widgets: [
+            {
+              id: "exp-monthly-spend",
+              type: "combo-chart",
+              title: "Monthly Spend",
+              width: "2/3",
+              data: {
+                xAxisKey: "month",
+                bars: [
+                  { key: "outOfPocket", label: "Out of pocket", color: "hsl(var(--chart-1))" },
+                  { key: "corporateCard", label: "Corporate card", color: "hsl(var(--chart-4))" },
+                ],
+                line: { key: "count", label: "Expenses", color: "hsl(var(--chart-3))" },
+                lineFormat: { kind: "number" },
+                stacked: true,
+                values: [],
+              },
+            },
+            {
+              id: "exp-spend-by-category",
+              type: "ranked-bars",
+              title: "Spend by Category (this month)",
+              width: "1/3",
+              data: { items: [], emptyLabel: "No submitted expenses this month." },
+            },
+            {
+              id: "exp-approval-backlog",
+              type: "tabbed-table",
+              title: "Approval Backlog",
+              width: "full",
+              data: { tabs: [], columns: [], rows: [] },
             },
           ],
         },

@@ -12,6 +12,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useRef } from "react"
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { responseErrorMessage } from "@lumiere/api-client/response-error"
@@ -27,7 +28,8 @@ import type {
 import { encodeTimestampMicros, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { i18n } from "@lumiere/i18n"
-import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import { stbTimestampFromDate, stbTimestampFromValue } from "@lumiere/erp-shared/stb-timestamp"
+import { financialReportInputKey, financialReportReady, resolveFinancialReportCreation } from "./financial-report-create-effect"
 import { downloadDocumentExport } from "./templates"
 import { resolveReportRunEffect, scheduledReportRunCount } from "./report-run-effect"
 import { currentReportTemplate, reportTemplateEditValues, reportTemplateValuesEqual, resolveReportTemplateUpdate, type ReportTemplateEditValues, type ReportTemplateUpdateRef } from "./report-template-effect"
@@ -62,9 +64,11 @@ import {
 export function useFinancialReports(
   organizationId: bigint,
   initialData?: FinancialReport[],
+  options?: { enabled?: boolean },
 ) {
   return useQuery<FinancialReport[]>({
     queryKey: ['financial-reports', rqBigIntKey(organizationId)],
+    enabled: options?.enabled,
     queryFn: () => fetchQueryList('/api/query/financial-reports', 'Failed to fetch financial reports'),
     staleTime: 30_000,
     initialData,
@@ -179,52 +183,66 @@ function requireOperatingCompany(companyId: bigint | undefined): bigint {
  * Creates a draft `FinancialReport`, resolves its id from SQL, then calls
  * `generate_financial_report` to build trial balance lines.
  */
-export function useCreateFinancialReportFlow(organizationId: bigint, companyId?: bigint) {
+export function useCreateFinancialReportFlow(organizationId: bigint, companyId?: bigint, options?: { mayDispatch?: () => boolean; scopeKey?: string }) {
   const qc = useQueryClient()
+  const attempts = useRef(new Map<string, { requestId: string; before: { id?: unknown }[]; generatedDispatched: boolean }>())
+  const inFlight = useRef(new Set<string>())
   return useMutation<void, Error, Record<string, unknown>>({
+    retry: false,
     mutationFn: async (formData) => {
       const params = toCreateFinancialReportParams(formData)
       if (!params) throw new Error('Invalid report parameters')
 
-      const name = params.name.trim()
-      const listBefore = await fetchQueryList(
-        '/api/query/financial-reports',
-        'Failed to load financial reports',
-      )
-      const maxIdBefore = listBefore.reduce(
-        (m, row) => Math.max(m, Number(row.id) || 0),
-        0,
-      )
-
-      const createCall = stdbBffCommandPost("create_financial_report", {
-        companyId: requireOperatingCompany(companyId),
-        params: stdbParamsToJson(params),
-      })
-      const createRes = await apiFetch(createCall.urlPath, createCall.init)
-      if (!createRes.ok) throw new Error('Failed to create financial report')
+      const company = requireOperatingCompany(companyId)
+      const attemptKey = `${options?.scopeKey ?? `${organizationId}:${company}`}:${financialReportInputKey(params)}`
+      if (inFlight.current.has(attemptKey)) throw new Error("This report submission is already pending")
+      inFlight.current.add(attemptKey)
+      try {
+      let attempt = attempts.current.get(attemptKey)
+      if (!attempt) {
+        const listBefore = await fetchQueryList('/api/query/financial-reports', 'Failed to load financial reports')
+        if (options?.mayDispatch && !options.mayDispatch()) throw new Error("Report scope or permissions changed before submission")
+        attempt = { requestId: globalThis.crypto.randomUUID(), before: listBefore.map((row) => ({ id: row.id })), generatedDispatched: false }
+        attempts.current.set(attemptKey, attempt)
+        const createCall = stdbBffCommandPost("create_financial_report", {
+          companyId: company,
+          params: stdbParamsToJson({ ...params, metadata: JSON.stringify({ lumiere_report_request: attempt.requestId, input_fingerprint: financialReportInputKey(params) }) }),
+        })
+        const createRes = await apiFetch(createCall.urlPath, createCall.init)
+        if (!createRes.ok) {
+          if (createRes.status >= 400 && createRes.status < 500 && createRes.status !== 408 && createRes.status !== 429) attempts.current.delete(attemptKey)
+          throw new Error('Failed to create financial report; refresh Reports before retrying an unverified submission')
+        }
+      }
 
       const listAfter = await fetchQueryList(
         '/api/query/financial-reports',
         'Failed to load financial reports',
       )
-      const created = listAfter.find(
-        (row) =>
-          Number(row.id) > maxIdBefore && String(row.name ?? '').trim() === name,
-      )
+      const created = resolveFinancialReportCreation(attempt.before, listAfter, { organizationId, companyId: company }, params, attempt.requestId)
       if (created?.id == null) {
         throw new Error(
           'Report was created but could not be resolved; refresh and generate manually if needed.',
         )
       }
+      if (financialReportReady(created)) { attempts.current.delete(attemptKey); return }
+      if (attempt.generatedDispatched) throw new Error(`Report #${String(created.id)} generation remains unverified. Refresh and review this report; generation was not sent again.`)
+      if (options?.mayDispatch && !options.mayDispatch()) throw new Error("Report scope or permissions changed before generation")
+      attempt.generatedDispatched = true
 
       const genCall = stdbBffCommandPost("generate_financial_report", {
         companyId: requireOperatingCompany(companyId),
-        reportId: Number(created.id),
+        reportId: parseStrictU64(created.id)!,
       })
       const genRes = await apiFetch(genCall.urlPath, genCall.init)
       if (!genRes.ok) throw new Error('Failed to generate financial report')
+      const generated = await fetchQueryList('/api/query/financial-reports', 'Failed to verify generated report')
+      const exact = resolveFinancialReportCreation(attempt.before, generated, { organizationId, companyId: company }, params, attempt.requestId)
+      if (!exact || parseStrictU64(exact.id) !== parseStrictU64(created.id) || !financialReportReady(exact)) throw new Error(`Report #${String(created.id)} generation is unverified. Refresh Reports before continuing.`)
+      attempts.current.delete(attemptKey)
+      } finally { inFlight.current.delete(attemptKey) }
     },
-    onSuccess: async () => {
+    onSettled: async () => {
       await invalidateReportsModule(qc, organizationId)
     },
   })
@@ -406,8 +424,9 @@ export function useGenerateEuVatReport(organizationId: bigint, companyId?: bigin
       if (!name || dateFromRaw == null || dateToRaw == null || !Number.isSafeInteger(currencyId) || currencyId <= 0) {
         throw new Error("Name, date range, and currency are required")
       }
-      const dateFrom = stbTimestampFromDate(new Date(String(dateFromRaw)))
-      const dateTo = stbTimestampFromDate(new Date(String(dateToRaw)))
+      const dateFrom = stbTimestampFromValue(dateFromRaw)
+      const dateTo = stbTimestampFromValue(dateToRaw)
+      if (!dateFrom || !dateTo || dateFrom.microsSinceUnixEpoch >= dateTo.microsSinceUnixEpoch) throw new Error("A valid report date range is required")
       const { urlPath, init } = stdbBffCommandPost("generate_eu_vat_report", {
         companyId: requireOperatingCompany(companyId),
         params: stdbParamsToJson({
@@ -527,8 +546,8 @@ export function useCreateReportTemplate(organizationId: bigint) {
     mutationFn: async (formData) => {
       const params = toCreateReportTemplateParams(formData)
       if (!params) throw new Error('Invalid template parameters')
-      const companyId = companyIdStringOrNull(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_report_template", { companyId: companyId, params: stdbParamsToJson(params) })
+      const companyId = companyIdNumberOrNull(formData)
+      const { urlPath, init } = stdbBffCommandPost("create_report_template", { companyId: companyId, params: stdbParamsToJson(params, "CreateReportTemplateParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create report template')
@@ -575,7 +594,7 @@ export function useCreateScheduledReport(organizationId: bigint) {
       const params = toCreateScheduledReportParams(formData)
       if (!params) throw new Error('Invalid scheduled report parameters')
       const companyId = companyIdNumberOrNull(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_scheduled_report", { companyId: companyId, params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("create_scheduled_report", { companyId: companyId, params: stdbParamsToJson(params, "CreateScheduledReportParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create scheduled report')
@@ -720,7 +739,7 @@ export function useCreateDashboard(organizationId: bigint) {
       const params = toCreateDashboardParams(formData)
       if (!params.name.trim()) throw new Error('Dashboard name is required')
       const companyId = companyIdFromDashboardForm(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_dashboard", { companyId: companyId, params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("create_dashboard", { companyId: companyId, params: stdbParamsToJson(params, "CreateDashboardParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create dashboard')

@@ -286,12 +286,20 @@ const HTTP_SQL_EXCLUDED_COLUMNS: Record<string, Set<string>> = {
   'contact-segments': new Set(['domain']),
   'opportunity-stages': new Set(['requirements']),
   roles: new Set(['permissions']),
+  // The legacy registry selects active, absent from released v0.3.129 SubscriptionLine.
+  'subscription-lines': new Set(['active']),
 }
 
 /** Per-resource columns selected even when globally excluded (e.g. metadata for credit-note linkage). */
 const HTTP_SQL_INCLUDED_COLUMNS: Record<string, Set<string>> = {
+  // Match the Rust policy for exact finance owner relations. Field grants
+  // resolve before this filter; these exceptions never add unselected fields.
+  'account-assets': new Set(['depreciation_board_ids']),
+  'expenses': new Set(['attachment_ids', 'tax_ids']),
+  'purchase-requisitions': new Set(['purchase_ids']),
   'account-moves': new Set(['metadata']),
   'mail-messages': new Set(['metadata']),
+  'bank-statement-lines': new Set(['move_ids', 'payment_ids', 'metadata']),
 }
 
 /** Columns unsafe in SpacetimeDB HTTP SQL across most tables (audit, vecs, identity refs). */
@@ -346,6 +354,11 @@ export function resolveHttpSqlColumns(
   if (resourceKey === 'landed-costs' && !policyCols.includes('state')) {
     policyCols.push('state')
   }
+  // Assignment expiry is part of the authorization boundary, so the session
+  // projection must retain it even while older registries omit optional fields.
+  if (resourceKey === 'user-roles' && !policyCols.includes('expires_at')) {
+    policyCols.push('expires_at')
+  }
   return assertSafeSqlIdentifiers(filterHttpSqlUnsafeColumns(policyCols, resourceKey))
 }
 
@@ -397,10 +410,13 @@ export function selectRawSql(
   return `SELECT ${colPart} ${sqlBody}`
 }
 
-export function selectRolesActiveSql(fieldAccess: FieldAccessContext | undefined): string {
+export function selectRolesActiveSql(
+  fieldAccess: FieldAccessContext | undefined,
+  organizationId: bigint | number,
+): string {
   const cols = resolveHttpSqlColumns('roles', fieldAccess)
   const colPart = cols.join(', ')
-  return `SELECT ${colPart} FROM role WHERE is_active = true`
+  return `SELECT ${colPart} FROM role WHERE organization_id = ${organizationId} AND is_active = true`
 }
 
 /** SpacetimeDB HTTP SQL: Identity columns use `0x` + 64 hex, not quoted UUIDs. */
@@ -425,11 +441,12 @@ export function selectUserProfileByIdentitySql(
 export function selectUserRoleAssignmentsForIdentitySql(
   identityHex: string,
   fieldAccess: FieldAccessContext | undefined,
+  organizationId: bigint | number,
 ): string {
   const cols = resolveHttpSqlColumns('user-roles', fieldAccess)
   const colPart = cols.join(', ')
   const id = identitySqlLiteral(identityHex)
-  return `SELECT ${colPart} FROM user_role_assignment WHERE user_identity = ${id} AND is_active = true`
+  return `SELECT ${colPart} FROM user_role_assignment WHERE user_identity = ${id} AND organization_id = ${organizationId} AND is_active = true`
 }
 
 export function selectUserOrganizationForIdentitySql(

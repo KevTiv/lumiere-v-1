@@ -66,7 +66,11 @@ export function PivotExplorer({
     () =>
       savedReports.filter((report) => {
         if (companyId == null || companyId <= 0n) return true
-        return String(report.companyId ?? report.company_id ?? "") === companyId.toString()
+        const reportCompanyId = report.companyId ?? report.company_id
+        // The BFF scopes saved reports to the selected company. Some restricted
+        // projections omit company_id, so absence here means server-scoped rather
+        // than organization-wide.
+        return reportCompanyId == null || String(reportCompanyId) === companyId.toString()
       }),
     [savedReports, companyId],
   )

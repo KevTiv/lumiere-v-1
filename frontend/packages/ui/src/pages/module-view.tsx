@@ -3,7 +3,7 @@
 import { ModuleDataNotice } from "./module-data-notice"
 import { canUseModuleData, type ModuleDataState } from "../lib/module-data-state"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback, type ReactNode } from "react"
 import { useErpSession } from "@lumiere/erp-session"
 import { buildEntitySelection, resolveAiEntityType } from "@lumiere/query-hooks/ai-ui-context"
 import {
@@ -24,7 +24,7 @@ import { EntityView } from "../entity-views/entity-view"
 import { EntityRecordSheet } from "../entity-views/entity-record-sheet"
 import { FormModal } from "../forms/form-modal"
 import { RuntimeFormModal } from "../forms/runtime-form-modal"
-import { buildModuleNavigationAreas, buildModuleTabRow, type ModuleConfig, type ModuleTab } from "../lib/module-types"
+import { buildModuleNavigationAreas, type ModuleConfig, type ModuleTab } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
 import type { EntitySurfacePermission } from "../lib/entity-view-types"
 import type { FormConfig, FormValues } from "../lib/form-types"
@@ -34,6 +34,8 @@ import { useRBAC } from "../lib/rbac-context"
 import { exportDashboardToPng } from "../lib/export-dashboard-png"
 import { KpiStrip } from "../components/kpi-strip"
 import { filterRowsByKpi, activeKpiTile, toggleKpiKey, type KpiTileDef } from "../lib/kpi-tiles"
+import { WorkspaceNav } from "./workspace-nav"
+import { moduleTabHref, moduleWorkspaceNavigation } from "../lib/workspace-navigation"
 
 /** When set, tab create forms use STDB-merged {@link RuntimeFormModal} instead of static-only FormModal. */
 export interface ModuleViewRuntimeForms {
@@ -65,6 +67,8 @@ interface ModuleViewProps {
   /** Controlled tab (use with `onActiveTabChange`, e.g. dashboard quick action → vendors tab) */
   activeTab?: string
   onActiveTabChange?: (tab: string) => void
+  /** Opt in to retaining an open create form and its source workspace across tab changes. */
+  onOpenFormChange?: (tab: string | null) => void
   /** Runtime kanban columns + move handlers keyed by entity tab id */
   entityBoardContext?: Record<string, EntityBoardRuntimeContext>
   /** Per-tab loading flags keyed by tab id — forwarded to EntityTable as skeleton rows. */
@@ -74,6 +78,8 @@ interface ModuleViewProps {
   /** Dashboard time range — shown in header only on the dashboard tab. */
   dashboardTimeRange?: TimeRangeValue
   onDashboardTimeRangeChange?: (value: TimeRangeValue) => void
+  /** Scoped overview composition owns its controls/exports; other module tabs are unchanged. */
+  dashboardContent?: ReactNode
   /**
    * Filters applied to the active entity tab. Defaults to the URL's `?filter=key:value` entries,
    * so chart drill-downs and record links work in every module without per-client wiring.
@@ -98,6 +104,7 @@ export function ModuleView({
   onRowClick,
   activeTab: activeTabProp,
   onActiveTabChange,
+  onOpenFormChange,
   isPending,
   renderCreatePreview,
   entityBoardContext,
@@ -105,10 +112,12 @@ export function ModuleView({
   dataState,
   dashboardTimeRange,
   onDashboardTimeRangeChange,
+  dashboardContent,
   urlFilters: urlFiltersProp,
   runtimeForms,
   kpiStrips,
 }: ModuleViewProps) {
+  const { t } = useTranslation()
   const routeFilters = useModuleUrlFilters()
   const clearRouteFilter = useClearModuleUrlFilter()
   const urlFilters = urlFiltersProp ?? routeFilters
@@ -130,11 +139,10 @@ export function ModuleView({
     rawRouteTab && config.tabs.some((tab) => tab.id === rawRouteTab) ? rawRouteTab : null
   const [internalTab, setInternalTab] = useState(routeTab ?? defaultTab)
   useEffect(() => {
-    if (activeTabProp === undefined && routeTab) setInternalTab(routeTab)
-  }, [activeTabProp, routeTab])
+    if (activeTabProp === undefined) setInternalTab(routeTab ?? defaultTab)
+  }, [activeTabProp, routeTab, defaultTab])
   const [isHydrated, setIsHydrated] = useState(false)
   const activeTab = activeTabProp ?? internalTab
-  const { t } = useTranslation()
   const navigationAreas = config.tabNavigation === "areas"
     ? buildModuleNavigationAreas(config.tabs, config.tabGroups, t("common.moduleNavigation.overview", { defaultValue: "Overview" })) : []
   const currentArea = navigationAreas.find((area) => area.tabIds.includes(activeTab)) ?? navigationAreas[0]
@@ -145,13 +153,8 @@ export function ModuleView({
     onActiveTabChange?.(v)
     if (activeTabProp !== undefined) return
     setInternalTab(v)
-    const params = new URLSearchParams(searchParams?.toString() ?? "")
-    // Record filters belong to the tab they were opened on.
-    params.delete("filter")
-    if (v === defaultTab) params.delete("tab")
-    else params.set("tab", v)
-    const query = params.toString()
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    const href = moduleTabHref(pathname, searchParams?.toString() ?? "", v, defaultTab)
+    router.push(href, { scroll: false })
   }
   // Tabs with an alternate view open on it; the table choice is remembered per tab.
   const [altViewChoice, setAltViewChoice] = useState<Readonly<Partial<Record<string, "alt" | "table">>>>({})
@@ -186,7 +189,11 @@ export function ModuleView({
     const trigger = tabListRef.current?.querySelector<HTMLElement>('[data-active], [aria-selected="true"]')
     trigger?.scrollIntoView({ block: "nearest", inline: "nearest" })
   }, [activeTab])
+  const workspaceNav = moduleWorkspaceNavigation(config, {
+    overview: t("modules.workspaces.overview"), more: t("modules.workspaces.more"),
+  })
   const [openForm, setOpenForm] = useState<string | null>(null)
+  useEffect(() => { onOpenFormChange?.(openForm) }, [openForm, onOpenFormChange])
   const [kpiSelection, setKpiSelection] = useState<Record<string, string | null>>({})
   const [selectedRecord, setSelectedRecord] = useState<Record<string, unknown> | null>(null)
   const dashboardGridRef = useRef<HTMLDivElement>(null)
@@ -223,12 +230,12 @@ export function ModuleView({
 
   const activeTabConfig = config.tabs.find((tab) => tab.id === activeTab)
   const showDashboardTimeRange =
-    activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
-  const showDashboardExport = activeTabConfig?.type === "dashboard" && activeTabUsable
+    dashboardContent == null && activeTabConfig?.type === "dashboard" && onDashboardTimeRangeChange != null
+  const showDashboardExport = dashboardContent == null && activeTabConfig?.type === "dashboard" && activeTabUsable
 
   return (
     <div
-      className="flex flex-col min-h-full gap-2"
+      className="flex min-h-full min-w-0 flex-col gap-2"
       data-testid={`module-view-${config.id}`}
       data-hydrated={isHydrated ? "true" : "false"}
     >
@@ -243,63 +250,65 @@ export function ModuleView({
         onExport={showDashboardExport ? () => void handleDashboardExport() : undefined}
       />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className={"flex-col flex"}>
-        {currentArea ? <div className="flex flex-wrap items-center gap-3" data-testid={`module-navigation-${config.id}`}>
-          <Label htmlFor={`module-area-${config.id}`}>{t("common.moduleNavigation.area", { defaultValue: "Task area" })}</Label>
-          <Select value={currentArea.id} onValueChange={(id) => {
-            const area = navigationAreas.find((candidate) => candidate.id === id)
-            if (area?.tabIds[0]) setActiveTab(area.tabIds[0])
-          }}>
-            <SelectTrigger id={`module-area-${config.id}`} data-testid={`module-area-${config.id}`} data-tab-areas={JSON.stringify(tabAreas)} className="w-full sm:w-64"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectGroup>{navigationAreas.map((area) => <SelectItem key={area.id} value={area.id}>{area.label}</SelectItem>)}</SelectGroup></SelectContent>
-          </Select>
-        </div> : null}
-        <div
-          ref={tabListRef}
-          className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]"
-          data-testid={`module-tabs-${config.id}`}
-        >
-        <TabsList
-          variant="line"
-          className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto"
-        >
-          {buildModuleTabRow(visibleTabs, config.tabGroups).map((item) =>
-            item.kind === "group" ? (currentArea ? null : (
-              <span
-                key={`group-${item.label}`}
-                aria-hidden
-                className="ml-3 mr-1 shrink-0 border-l border-border pl-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80"
-              >
-                {item.label}
-              </span>
-            )) : (
-              <TabsTrigger
-                key={item.tab.id}
-                // Natural width with an underline on the active tab; the
-                // default pseudo-underline is clipped by the scroll container.
-                className="-mb-px flex-none rounded-none border-0 border-b-2 border-transparent px-2.5 pb-2.5 pt-1.5 after:hidden data-active:border-foreground data-active:text-foreground"
-                data-navigation-group={navigationAreas.find((area) => area.tabIds.includes(item.tab.id))?.id}
-                value={item.tab.id}
-                data-testid={`module-tab-${config.id}-${item.tab.id}`}
-              >
-                {item.tab.label}
-              </TabsTrigger>
-            ),
-          )}
-        </TabsList>
-        </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-w-0 flex-col">
+        {currentArea ? (
+          <>
+            <div className="flex flex-wrap items-center gap-3" data-testid={`module-navigation-${config.id}`}>
+              <Label htmlFor={`module-area-${config.id}`}>
+                {t("common.moduleNavigation.area", { defaultValue: "Task area" })}
+              </Label>
+              <Select value={currentArea.id} onValueChange={(id) => {
+                const area = navigationAreas.find((candidate) => candidate.id === id)
+                if (area?.tabIds[0]) setActiveTab(area.tabIds[0])
+              }}>
+                <SelectTrigger id={`module-area-${config.id}`} data-testid={`module-area-${config.id}`} data-tab-areas={JSON.stringify(tabAreas)} className="w-full sm:w-64">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent><SelectGroup>
+                  {navigationAreas.map((area) => <SelectItem key={area.id} value={area.id}>{area.label}</SelectItem>)}
+                </SelectGroup></SelectContent>
+              </Select>
+            </div>
+            <div ref={tabListRef} className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]" data-testid={`module-tabs-${config.id}`}>
+              <TabsList variant="line" className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto">
+                {visibleTabs.map((tab) => (
+                  <TabsTrigger
+                    key={tab.id}
+                    className="-mb-px flex-none rounded-none border-0 border-b-2 border-transparent px-2.5 pb-2.5 pt-1.5 after:hidden data-active:border-foreground data-active:text-foreground"
+                    data-navigation-group={currentArea.id}
+                    value={tab.id}
+                    data-testid={`module-tab-${config.id}-${tab.id}`}
+                  >
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+          </>
+        ) : (
+          <WorkspaceNav
+            moduleId={config.id}
+            tabs={config.tabs}
+            config={workspaceNav}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            hrefForTab={(tabId) => moduleTabHref(pathname, searchParams?.toString() ?? "", tabId, defaultTab)}
+          />
+        )}
 
         {config.tabs.map((tab) => (
           <TabsContent
             key={tab.id}
             value={tab.id}
+            keepMounted={onOpenFormChange != null && openForm === tab.id}
             className="mt-6"
             aria-busy={dataState?.[tab.id]?.status === "loading"}
             data-testid={`module-panel-${config.id}-${tab.id}`}
           >
             <ModuleDataNotice state={dataState?.[tab.id]} />
             {dataState?.[tab.id]?.status !== "error" && dataState?.[tab.id]?.status !== "denied" && (<>
-            {tab.type === "dashboard" && tab.sections && (
+            {tab.type === "dashboard" && dashboardContent != null && dashboardContent}
+            {tab.type === "dashboard" && dashboardContent == null && tab.sections && (
               <DashboardGrid
                 ref={dashboardGridRef}
                 sections={tab.sections}

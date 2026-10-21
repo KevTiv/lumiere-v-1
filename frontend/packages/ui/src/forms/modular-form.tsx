@@ -5,6 +5,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { useAiFormSuggest } from "@lumiere/query-hooks/hooks/ai-forms"
 import { cn } from "../lib/utils"
+import { workspaceStyles } from "../lib/workspace-styles"
 import type { AiFormAssistConfig, FormConfig, FormField, FormPreviewRenderer, FormValues } from "../lib/form-types"
 import { serializeAiFormSchema } from "../lib/ai-form-schema"
 import { FormFieldRenderer } from "./forms-field-render"
@@ -113,6 +114,24 @@ export function ModularForm({
 
   const [values, setValues] = useState<Record<string, unknown>>(getInitialValues)
   const baselineRef = useRef<Record<string, unknown>>(values)
+  useEffect(() => {
+    // Reference reads may finish after the dialog mounts. Bind a newly known
+    // hidden context once, without resetting edits or replacing a reviewed ID.
+    const empty = (value: unknown) => value === "" || value == null
+    setValues((previous) => {
+      let next = previous
+      for (const section of config.sections) {
+        for (const field of section.fields) {
+          if (field.type !== "hidden" || empty(field.defaultValue)
+            || !empty(previous[field.name]) || !empty(baselineRef.current[field.name])) continue
+          if (next === previous) next = { ...previous }
+          next[field.name] = field.defaultValue
+          baselineRef.current = { ...baselineRef.current, [field.name]: field.defaultValue }
+        }
+      }
+      return next
+    })
+  }, [config])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [aiPanelOpen, setAiPanelOpen] = useState(false)
@@ -353,11 +372,11 @@ export function ModularForm({
   const fieldsContent = (
     <>
       {aiEnabled ? (
-        <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
+        <div className={cn(workspaceStyles.surface, "space-y-3 bg-muted/30 p-4")}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-foreground">Fill with AI</p>
-              <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+              <p className={workspaceStyles.sectionTitle}>Fill with AI</p>
+              <p className={cn(workspaceStyles.sectionDescription, "mt-0.5")}>
                 Suggestions only update this form after you apply them.
               </p>
             </div>
@@ -391,7 +410,7 @@ export function ModularForm({
                   ))}
                 </div>
               ) : null}
-              <div className="flex justify-end gap-2">
+              <div className={cn(workspaceStyles.actions, "justify-end")}>
                 <Button
                   type="button"
                   variant="outline"
@@ -425,7 +444,7 @@ export function ModularForm({
         return (
           <div key={section.id}>
             {idx > 0 && <Separator className="mb-6" />}
-            <div className="space-y-4">
+            <div className={workspaceStyles.formSection}>
               {(section.title || section.description) && (
                 <div className="mb-4 flex items-start gap-3">
                   {SectionIcon && (
@@ -435,19 +454,19 @@ export function ModularForm({
                   )}
                   <div className="space-y-0.5">
                     {section.title && (
-                      <h3 className="text-sm font-semibold tracking-[-0.01em] text-foreground">
+                      <h3 className={workspaceStyles.sectionTitle}>
                         {section.title}
                       </h3>
                     )}
                     {section.description && (
-                      <p className="text-xs leading-5 text-muted-foreground">
+                      <p className={workspaceStyles.sectionDescription}>
                         {section.description}
                       </p>
                     )}
                   </div>
                 </div>
               )}
-              <div className="grid grid-cols-12 gap-x-4 gap-y-5">
+              <div className="grid min-w-0 grid-cols-12 gap-x-4 gap-y-5 [&>div]:min-w-0">
                 {visibleSectionFields(section.fields, values).map((field) => (
                   <FormFieldRenderer
                     key={field.id}
@@ -500,13 +519,13 @@ export function ModularForm({
         <div
           data-form-actions
           className={cn(
-            "flex flex-wrap items-center gap-3",
-            scrollable ? "shrink-0 border-t border-border bg-card px-6 py-3" : "mt-6 rounded-lg border border-border bg-muted/20 px-4 py-3",
+            workspaceStyles.formActions,
+            scrollable && "mt-0 shrink-0 bg-card",
             leadingActions ? "justify-between" : "justify-end",
           )}
         >
-          {leadingActions ? <div className="flex items-center gap-2">{leadingActions}</div> : null}
-          <div className="flex items-center gap-3">
+          {leadingActions ? <div className={workspaceStyles.actions}>{leadingActions}</div> : null}
+          <div className={workspaceStyles.actions}>
             {config.showReset && (
               <Button
                 type="button"
@@ -549,11 +568,11 @@ export function ModularForm({
 
   if (config.layout === "card") {
     return (
-      <Card className={cn(className)}>
+      <Card className={cn(workspaceStyles.surface, className)}>
         {!config.hideTitle && (config.title || config.description) ? (
-          <CardHeader>
-            {config.title ? <CardTitle>{config.title}</CardTitle> : null}
-            {config.description ? <CardDescription>{config.description}</CardDescription> : null}
+          <CardHeader className={cn(workspaceStyles.pageHeader, "md:flex-col md:items-start")}>
+            {config.title ? <CardTitle className={workspaceStyles.pageTitle}>{config.title}</CardTitle> : null}
+            {config.description ? <CardDescription className={workspaceStyles.pageDescription}>{config.description}</CardDescription> : null}
           </CardHeader>
         ) : null}
         <CardContent>{formContent}</CardContent>
@@ -564,12 +583,12 @@ export function ModularForm({
   return (
     <div className={cn(scrollable ? "flex min-h-0 flex-1 flex-col" : "space-y-6", className)}>
       {!config.hideTitle && (config.title || config.description) ? (
-        <div className="space-y-1">
+        <div className={cn(workspaceStyles.pageHeader, "md:flex-col md:items-start")}>
           {config.title ? (
-            <h2 className="text-xl font-semibold text-foreground">{config.title}</h2>
+            <h2 className={workspaceStyles.pageTitle}>{config.title}</h2>
           ) : null}
           {config.description ? (
-            <p className="text-sm text-muted-foreground">{config.description}</p>
+            <p className={workspaceStyles.pageDescription}>{config.description}</p>
           ) : null}
         </div>
       ) : null}

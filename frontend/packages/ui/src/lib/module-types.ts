@@ -95,12 +95,28 @@ export interface ModuleConfig {
   defaultTab?: string
   tabs: ModuleTab[]
   /**
-   * Optional labelled groups for the tab row. Tabs not listed keep their place:
-   * those before the first grouped tab lead the row, the rest trail it.
+   * Optional workspace groups used by the shared navigation fallback. Tabs not
+   * listed remain individual workspaces; large sets move into the overflow menu.
    */
   tabGroups?: ModuleTabGroup[]
-  /** Show one task area's tabs at a time; direct tab links select their owning area. */
+  /** Show one task area at a time, preserving canonical links to every tab. */
   tabNavigation?: "areas"
+  /** Curated job-oriented groups for modules using WorkspaceNav. */
+  workspaceNav?: ModuleWorkspaceNav
+}
+
+export interface ModuleWorkspace {
+  id: string
+  label: string
+  /** The first available tab is the workspace's landing destination. */
+  tabIds: readonly string[]
+}
+
+export interface ModuleWorkspaceNav {
+  label?: string
+  workspaces: readonly ModuleWorkspace[]
+  overflow?: readonly ModuleWorkspace[]
+  overflowLabel?: string
 }
 
 export interface ModuleTabGroup {

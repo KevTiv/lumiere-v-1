@@ -58,23 +58,10 @@ const nextConfig = {
     unoptimized: true,
   },
   transpilePackages: ["@lumiere/ui", "@lumiere/stdb", "@lumiere/presentation-core"],
-  // Force a single React instance across all workspace packages.
-  // @react-three/fiber inside @lumiere/ui would otherwise resolve React from
-  // packages/ui/node_modules, causing "ReactCurrentOwner" undefined errors.
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      react: path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
-    }
-    return config
-  },
+  // Next owns React aliases for each rendering layer. Pointing them at the
+  // workspace package splits React from Next's server renderer during prerender.
   turbopack: {
     root: path.resolve(__dirname, '../..'),
-    resolveAlias: {
-      react: './frontend/web/node_modules/react',
-      'react-dom': './frontend/web/node_modules/react-dom',
-    },
   },
 }
 

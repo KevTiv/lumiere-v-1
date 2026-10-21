@@ -2,6 +2,7 @@ import { expect, test, type Page, type Request } from "@playwright/test"
 import { encodeIdentity } from "@lumiere/stdb/stdb-params-json"
 
 import {
+  selectModuleTab,
   callReducerBff,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
@@ -194,7 +195,7 @@ test.describe(
       test.setTimeout(240_000)
 
       await gotoModule(page, "/helpdesk", "helpdesk")
-      await page.getByTestId("module-tab-helpdesk-tickets").click()
+      await selectModuleTab(page, "helpdesk", "tickets")
       await waitForBffQueryMinRows(page, "/api/query/helpdesk-teams")
       await waitForBffQueryMinRows(page, "/api/query/helpdesk-stages")
 
@@ -234,7 +235,7 @@ test.describe(
       })
 
       await gotoModule(page, "/helpdesk", "helpdesk")
-      await page.getByTestId("module-tab-helpdesk-tickets").click()
+      await selectModuleTab(page, "helpdesk", "tickets")
       await selectEntityRowByText(page, ticketName)
       await waitForEntityActionEnabled(page, "entity-action-edit-ticket")
       await page.getByTestId("entity-action-edit-ticket").click()
@@ -270,7 +271,7 @@ test.describe(
       expect(await ticketSnapshot(page, ticketId)).toEqual(assignedEffect)
 
       await gotoModule(page, "/helpdesk", "helpdesk")
-      await page.getByTestId("module-tab-helpdesk-tickets").click()
+      await selectModuleTab(page, "helpdesk", "tickets")
       await selectEntityRowByText(page, ticketName)
       await waitForEntityActionEnabled(page, "entity-action-close-ticket")
 
@@ -297,7 +298,7 @@ test.describe(
       expect(await ticketSnapshot(page, ticketId)).toEqual(closedEffect)
 
       await gotoModule(page, "/helpdesk", "helpdesk")
-      await page.getByTestId("module-tab-helpdesk-tickets").click()
+      await selectModuleTab(page, "helpdesk", "tickets")
       await selectEntityRowByText(page, ticketName)
       await waitForEntityActionEnabled(page, "entity-action-reopen-ticket")
 
