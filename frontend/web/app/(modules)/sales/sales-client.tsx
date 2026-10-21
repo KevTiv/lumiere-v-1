@@ -5,7 +5,7 @@ import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data
 import { ModuleInsights } from "../../../components/module-insights"
 
 import { phCapture } from '@/lib/posthog-browser';
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@lumiere/i18n';
 import { useErpSession } from '@lumiere/erp-session';
@@ -210,9 +210,6 @@ import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow'
 import { useModuleFilters } from '@/hooks/use-module-filters';
 import { OrderHandoffLinks } from '../../../components/order-handoff-links';
 import { orderHandoffs } from '@lumiere/query-hooks/hooks/order-to-cash';
-import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
-import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
-import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
 import { RecordDocumentAttachments } from '../../../components/record-document-attachments';
 import {
   SalesOpsPanel,
@@ -238,7 +235,6 @@ import {
 } from '@/lib/form-lookup';
 import { enumTag } from '@/lib/accounting-post-draft';
 import { saleOrderLineCanBeDeleted } from './sale-order-line-gates';
-import { runtimeFormRoleId } from '@lumiere/ui/lib/runtime-form-role';
 
 function saleOrderState(row: Record<string, unknown>): string {
   const v = row.state;

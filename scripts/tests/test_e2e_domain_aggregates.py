@@ -145,7 +145,9 @@ class DomainAggregateTests(unittest.TestCase):
         workflow = (ROOT / ".github/workflows/e2e-smoke.yml").read_text()
         step = workflow.index("      - name: Run make e2e-smoke\n")
         start = workflow.index("        run: |\n", step) + len("        run: |\n")
-        end = workflow.index("\n      - name: Upload Playwright report", start)
+        # Stop at the next sibling step, regardless of which cleanup or artifact
+        # step follows. Including its YAML would execute it as part of the shell.
+        end = workflow.index("\n      - ", start)
         script = textwrap.dedent(workflow[start:end])
         with tempfile.TemporaryDirectory() as directory:
             make = Path(directory) / "make"
