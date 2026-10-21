@@ -169,6 +169,20 @@ test("duplicates, incomplete rows and cross-currency or cross-partner references
   }
 })
 
+test("a valid new operational payment cannot mask an incomplete posted seed ledger", () => {
+  const valid = { transactions: read([transaction()]) }
+  // Legacy demo rows used these combinations. Fix the fixture ledger instead
+  // of ignoring unrelated posted rows or presenting missing balances as zero.
+  for (const extra of [
+    { ...valid, payments: read([payment(), payment(2, { moveId: undefined, amount: 3600 })]) },
+    { transactions: read([transaction(), transaction(302, { accountPaymentId: undefined })]) },
+  ]) {
+    const result = projectPaymentAllocations(sources(extra))
+    assert.equal(result.state.status, "partial")
+    assert.deepEqual(result.rows, [])
+  }
+})
+
 test("missing roles on non-clearing liquidity lines do not suppress valid clearing balances", () => {
   const result = projectPaymentAllocations(sources({ moveLines: read([
     line(), line(202, { accountInternalType: undefined, balance: 100, amountResidual: 0 }),
