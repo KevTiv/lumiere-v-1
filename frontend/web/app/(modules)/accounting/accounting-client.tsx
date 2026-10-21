@@ -1,5 +1,6 @@
 "use client"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
+import { AssetDepreciationSchedule } from "@lumiere/ui/accounting-components/asset-depreciation-schedule"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { mapDashboardWidgets } from "@lumiere/ui/lib/dashboard-sections"
 import { agingShareRows, agingTotals, collectionRate, singleCurrencyId, revenueVsExpensesByMonth, topCustomers, weeklyCashMovements } from "./accounting-dashboard-charts"
@@ -875,6 +876,7 @@ function AccountingClientReady({
     action: AccountingReadinessAction
     onReady: () => void
   } | null>(null)
+  useEffect(() => { setReadinessAction(undefined) }, [accountingActiveTab])
   const [creditNoteSource, setCreditNoteSource] = useState<AccountMove | null>(null)
   // Analytic row editors (click row on Analytic tabs)
   const [analyticAccountEdit, setAnalyticAccountEdit] = useState<Record<string, unknown> | null>(null)
@@ -937,9 +939,8 @@ function AccountingClientReady({
   const plannedCollection = <Row,>(resource: string, query: Parameters<typeof moduleCollection<Row>>[0]) =>
     accountingPlannedCollection(readEnabled(resource), moduleCollection(query))
   // ── Data hooks ──────────────────────────────────────────────────────────────
-  const accountsRead = moduleCollection(useAccountAccounts(orgId, {
-    enabled: organizationId > 0,
-  }))
+  const accountsQuery = useAccountAccounts(orgId, { enabled: organizationId > 0 })
+  const accountsRead = moduleCollection(accountsQuery)
   const accounts = accountsRead.rows
   const allMovesRead = moduleCollection(useAccountMoves(orgId, {
     enabled: organizationId > 0,
@@ -997,7 +998,8 @@ function AccountingClientReady({
   const paymentTerms = paymentTermsRead.rows
   const paymentTermLinesRead = plannedCollection("account-payment-term-lines", useAccountPaymentTermLines(orgId, { enabled: readEnabled("account-payment-term-lines") }))
   const paymentTermLines = paymentTermLinesRead.rows
-  const depreciationLinesRead = plannedCollection("depreciation-lines", useDepreciationLines(orgId, { enabled: readEnabled("depreciation-lines") }))
+  const depreciationLinesQuery = useDepreciationLines(orgId, { enabled: readEnabled("depreciation-lines") })
+  const depreciationLinesRead = plannedCollection("depreciation-lines", depreciationLinesQuery)
   const depreciationLines = depreciationLinesRead.rows
   const companiesRead = moduleCollection(useCompanies(organizationId, organizationId > 0))
   const companies = companiesRead.rows
@@ -1011,7 +1013,8 @@ function AccountingClientReady({
   const invoiceSeller = invoicePersonalization.profile && invoiceIdentityReady
     ? invoiceSellerFromCompany(invoiceSellerCompany, invoicePersonalization.profile)
     : undefined
-  const currenciesRead = moduleCollection(useCurrencies())
+  const currenciesQuery = useCurrencies()
+  const currenciesRead = moduleCollection(currenciesQuery)
   const currencies = currenciesRead.rows
   const currentBankStatements = bankStatements.filter((row) => String(row.id) === String(bankStatementDetail?.id)
     && row.organizationId === orgId && row.companyId === operatingCompanyId)
@@ -1028,7 +1031,8 @@ function AccountingClientReady({
   const contacts = contactsRead.rows
   const productsRead = moduleCollection(useProducts(orgId))
   const products = productsRead.rows
-  const journalsRead = moduleCollection(useAccountJournals(orgId, { enabled: organizationId > 0 }))
+  const journalsQuery = useAccountJournals(orgId, { enabled: organizationId > 0 })
+  const journalsRead = moduleCollection(journalsQuery)
   const journals = journalsRead.rows
   const accountTypesRead = moduleCollection(useAccountAccountTypes(orgId, { enabled: organizationId > 0 }))
   const accountTypes = accountTypesRead.rows
@@ -1068,10 +1072,11 @@ function AccountingClientReady({
     staleTime: 0,
   }))
   const fiscalYearsRaw = fiscalYearsRawRead.rows
-  const accountPeriodsRawRead = moduleCollection(useAccountPeriods(orgId, {
+  const accountPeriodsQuery = useAccountPeriods(orgId, {
     enabled: organizationId > 0,
     initialData: initialAccountPeriods,
-  }))
+  })
+  const accountPeriodsRawRead = moduleCollection(accountPeriodsQuery)
   const accountPeriodsRaw = accountPeriodsRawRead.rows
   const financialReportsRead = plannedCollection("financial-reports", useFinancialReports(orgId, undefined, { enabled: readEnabled("financial-reports") }))
   const financialReportsRaw = financialReportsRead.rows
@@ -1509,6 +1514,7 @@ function AccountingClientReady({
   const runAccountingAction = useCallback(
     (action: AccountingReadinessAction, onReady: () => void) => {
       const readiness = readinessByAction[action]
+      setReadinessAction(readiness.isReady ? undefined : action)
       if (readiness.isReady) {
         onReady()
         return
@@ -1671,6 +1677,23 @@ function AccountingClientReady({
     () =>
       setQuickActionForm({
         form: accountPaymentFormConfig,
+        action: "createAccountPayment",
+      }),
+    [accountPaymentFormConfig],
+  )
+
+  // Bills have no direct "pay" mutation: open the payment form pre-filled for the
+  // supplier; the payment is then linked to the bill via the existing register flow.
+  const openBillPayment = useCallback(
+    (bill: { partnerId?: unknown; amountResidual?: number | null; name?: string | null }) =>
+      setQuickActionForm({
+        form: mergeFieldDefaultValues(accountPaymentFormConfig, {
+          paymentType: "OutBound",
+          partnerType: "Supplier",
+          ...(bill.partnerId != null ? { partnerId: String(bill.partnerId) } : {}),
+          ...(bill.amountResidual ? { amount: String(bill.amountResidual) } : {}),
+          ...(bill.name ? { ref: String(bill.name) } : {}),
+        }),
         action: "createAccountPayment",
       }),
     [accountPaymentFormConfig],
@@ -2164,6 +2187,13 @@ function AccountingClientReady({
       credit: Number(moveLineEdit.credit ?? 0),
     })
   }, [moveLineEdit, t])
+
+  const currentSelectedFixedAsset = useMemo(() => {
+    if (!selectedFixedAsset?.id) return null
+    const matches = fixedAssets.filter((asset) => String(asset.id) === String(selectedFixedAsset.id)
+      && asset.organizationId === orgId && asset.companyId === operatingCompanyId)
+    return matches.length === 1 ? matches[0]! : null
+  }, [selectedFixedAsset?.id, fixedAssets, orgId, operatingCompanyId])
 
   const depreciationLinesForSelectedAsset = useMemo(() => {
     if (!selectedFixedAsset?.id) return []
@@ -3638,6 +3668,26 @@ function AccountingClientReady({
     const noneLabel = t("accounting.entities.fixedAssets.form.none", { defaultValue: "None" })
     const accountRows = copyAsRecords(accounts)
     const journalRows = copyAsRecords(journals)
+    const lookupState = mergeModuleStates([accountsRead.state, journalsRead.state, currenciesRead.state])
+    const lookupsPending = lookupState.status === "loading" || accountsQuery.isFetching || journalsQuery.isFetching || currenciesQuery.isFetching
+    const hasRequiredChoices = ["asset", "depreciation", "expense"].every((role) =>
+      assetAccountOptions(accountRows, operatingCompanyId, role as Parameters<typeof assetAccountOptions>[2]).length > 0,
+    ) && assetJournalOptions(journalRows, operatingCompanyId).length > 0 && currencySelectOptions.length > 0
+    const lookupsReady = !lookupsPending && lookupState.status === "ready" && hasRequiredChoices
+    const unavailableLabel = lookupsPending
+      ? t("accounting.entities.fixedAssets.form.loadingSetup", { defaultValue: "Loading asset setup…" })
+      : t("accounting.entities.fixedAssets.form.unavailableSetup", { defaultValue: "Asset setup unavailable" })
+    const ensureLookupsReady = (): boolean => {
+      if (lookupsReady) return true
+      showWorkflowToast({
+        kind: "info",
+        title: unavailableLabel,
+        description: lookupsPending
+          ? t("accounting.entities.fixedAssets.form.waitForLookups", { defaultValue: "Wait for accounts, journals, and currencies to finish loading, then open the form." })
+          : t("accounting.entities.fixedAssets.form.refreshLookups", { defaultValue: "Refresh the unavailable accounts, journals, or currencies before opening the asset form." }),
+      })
+      return false
+    }
     const assetFailureMessage = (reason: AssetFailure): string => {
       switch (reason) {
         case "code":
@@ -3767,7 +3817,7 @@ function AccountingClientReady({
       })
     }
     const promptNewAsset = async () => {
-      if (operatingCompanyId <= 0n) return
+      if (operatingCompanyId <= 0n || !ensureLookupsReady()) return
       // One idempotency key per dialog: resubmitting this dialog replays instead of duplicating.
       const idempotencyKey = `create-account-asset:${globalThis.crypto.randomUUID()}`
       const values = await askForm({ title: newAssetLabel, fields: assetFields(operatingCompanyId, null) })
@@ -3787,7 +3837,7 @@ function AccountingClientReady({
     }
     const promptEditAsset = async (row: Record<string, unknown>) => {
       const companyId = assetCompanyId(row, operatingCompanyId)
-      if (companyId == null || !canEditAsset(row)) return
+      if (companyId == null || !canEditAsset(row) || !ensureLookupsReady()) return
       const values = await askForm({ title: editAssetLabel, fields: assetFields(companyId, assetEditDefaults(row)) })
       if (values == null) return
       const result = toAssetUpdateParams(values, row, { companyId, accounts: accountRows, journals: journalRows })
@@ -3814,17 +3864,17 @@ function AccountingClientReady({
         actions: [
           {
             id: "asset-new",
-            label: newAssetLabel,
+            label: lookupsReady ? newAssetLabel : unavailableLabel,
             permission: { resource: "account_asset", action: "create" },
             onClick: () => promptNewAsset(),
           },
           {
             id: "asset-edit",
-            label: editAssetLabel,
+            label: lookupsReady ? editAssetLabel : unavailableLabel,
             requiresSelection: true,
             selection: "single",
             permission: { resource: "account_asset", action: "write" },
-            isApplicable: (rows) => rows.length === 1 && canEditAsset(rows[0] as Record<string, unknown>),
+            isApplicable: (rows) => lookupsReady && rows.length === 1 && canEditAsset(rows[0] as Record<string, unknown>),
             onClick: (rows) => promptEditAsset(rows[0] as Record<string, unknown>),
           },
           {
@@ -3964,6 +4014,12 @@ function AccountingClientReady({
     askForm,
     accounts,
     journals,
+    accountsRead.state,
+    journalsRead.state,
+    currenciesRead.state,
+    accountsQuery.isFetching,
+    journalsQuery.isFetching,
+    currenciesQuery.isFetching,
     operatingCompanyId,
     defaultCurrencyId,
     currencySelectOptions,
@@ -4443,11 +4499,12 @@ function AccountingClientReady({
     [postMove, invoiceToPayment.postInvoice, runMutation],
   )
 
-  const handleInvoiceDownloadPdf = useCallback(async () => {
-    if (!selectedInvoice?.id) return
+  const handleInvoiceDownloadPdf = useCallback(async (move?: { id?: unknown }) => {
+    const target = move ?? selectedInvoice
+    if (!target?.id) return
     try {
       setInvoiceDocBusy("download")
-      await downloadDocumentPdf("account-move", Number(selectedInvoice.id))
+      await downloadDocumentPdf("account-move", Number(target.id))
     } catch (e) {
       toast({
         variant: "destructive",
@@ -4485,8 +4542,8 @@ function AccountingClientReady({
     }
   }, [selectedInvoice, operatingCompanyId, createDocument, toast])
 
-  const handleInvoiceSendEmail = useCallback(() => {
-    const id = optionalBigIntU64(selectedInvoice?.id)
+  const handleInvoiceSendEmail = useCallback((move?: { id?: unknown }) => {
+    const id = optionalBigIntU64(move?.id ?? selectedInvoice?.id)
     if (id == null || id <= 0n) return
     // Review a single document; never drain the organization-wide mail queue here.
     router.push(`/accounting/invoices/${id}?review=email`)
@@ -5359,6 +5416,9 @@ function AccountingClientReady({
   }, [csvKind, t])
 
   // ── Config: inject rich custom content for invoices/bills/accounts/ledger ───
+  const authoringCompanyLabel = companies.find((company) => company.id === operatingCompanyId)?.name
+    ?? t("accounting.authoring.companyId", { defaultValue: "Company {{id}}", id: String(operatingCompanyId) })
+
   const config = useMemo(
     () => {
       // Omit `tabs` from spread so static analysis (and runtime) only see the mapped tabs below.
@@ -5405,6 +5465,8 @@ function AccountingClientReady({
                     onInitialFilterClear={clearInvoiceFilter}
                     onSelectInvoice={(invoice) => setInvoiceSheetRecord(copyAsRecord(invoice))}
                     onCreateInvoice={openInvoiceCreate}
+                    onSendInvoice={(inv) => void handleInvoiceSendEmail(inv)}
+                    onDownloadPdf={(inv) => void handleInvoiceDownloadPdf(inv)}
                     onRecalculateTotals={(inv) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint))
                     }
@@ -5446,6 +5508,8 @@ function AccountingClientReady({
                     onInitialFilterClear={clearInvoiceFilter}
                     onCreateBill={openBillCreate}
                     onSelectBill={(bill) => setInvoiceSheetRecord(copyAsRecord(bill))}
+                    onPayBill={openBillPayment}
+                    onDownloadBill={(bill) => void handleInvoiceDownloadPdf(bill)}
                     onRecalculateTotals={(bill) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint))
                     }
@@ -5664,14 +5728,26 @@ function AccountingClientReady({
                       data={fixedAssets}
                       onRowClick={(row) => setSelectedFixedAsset(row)}
                     />
-                    {selectedFixedAsset ? (
+                    {currentSelectedFixedAsset ? (
+                      <div className="flex flex-col gap-4">
+                        <AssetDepreciationSchedule
+                          key={String(currentSelectedFixedAsset.id)}
+                          asset={currentSelectedFixedAsset}
+                          lines={depreciationLines}
+                          companyId={operatingCompanyId}
+                          dataState={mergeModuleStates([fixedAssetsRead.state, depreciationLinesRead.state])}
+                          currencyLabel={currencySelectOptions.find((option) => option.value === String(currentSelectedFixedAsset.currencyId))?.label}
+                          onGenerate={checkPermission("account_asset", "write").allowed ? async () => { await computeDepreciationBoard.mutateAsync(BigInt(String(currentSelectedFixedAsset.id))) } : undefined}
+                          generationPending={computeDepreciationBoard.isPending}
+                          onRefresh={async () => { const result = await depreciationLinesQuery.refetch(); if (result.isError) throw result.error }}
+                        />
                       <div className="rounded-lg border p-4 space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-sm text-muted-foreground">
                             {t("accounting.entities.depreciationSchedule.title")}
                             {" — "}
                             <span className="font-medium text-foreground">
-                              {String(selectedFixedAsset.name ?? selectedFixedAsset.id ?? "")}
+                              {String(currentSelectedFixedAsset.name ?? currentSelectedFixedAsset.id ?? "")}
                             </span>
                           </p>
                           <Button
@@ -5692,6 +5768,7 @@ function AccountingClientReady({
                           }}
                           data={depreciationLinesForSelectedAsset}
                         />
+                      </div>
                       </div>
                     ) : null}
                   </div>
@@ -5978,6 +6055,21 @@ function AccountingClientReady({
                   moves: allMovesRead.state, bankStatements: bankStatementsRead.state,
                   bankStatementLines: bankStatementLinesRead.state, financialReports: financialReportsRead.state }}
                 onNavigateToTab={setAccountingActiveTab}
+                companyLabel={authoringCompanyLabel}
+                dataState={mergeModuleStates([fiscalYearsRawRead.state, accountPeriodsRawRead.state, allMovesRead.state, bankStatementsRead.state, bankStatementLinesRead.state, financialReportsRead.state])}
+                onClosePeriod={checkPermission("account_period", "write").allowed ? async (periodId) => {
+                  await closeAccountPeriod.mutateAsync(periodId)
+                  const result = await accountPeriodsQuery.refetch()
+                  if (result.isError) throw result.error
+                } : undefined}
+                closePending={closeAccountPeriod.isPending}
+                onInspectBankLine={(statementId, lineId) => {
+                  const statements = bankStatements.filter((statement) => String(statement.id) === statementId && String(statement.companyId) === String(operatingCompanyId))
+                  const lines = bankStatementLines.filter((line) => String(line.id) === lineId && String(line.statementId) === statementId)
+                  if (statements.length !== 1 || lines.length !== 1) return
+                  setBankLineMatchFocus(lines[0]!)
+                  setBankStatementDetail(statements[0]!)
+                }}
               />
             ),
           }
@@ -6053,6 +6145,22 @@ function AccountingClientReady({
       fixedAssetsEntityConfig,
       fixedAssets,
       depreciationLinesForSelectedAsset,
+      currentSelectedFixedAsset,
+      depreciationLinesQuery.refetch,
+      fixedAssetsRead.state,
+      depreciationLinesRead.state,
+      allMovesRead.state,
+      accountsRead.state,
+      accountMoveLinesRead.state,
+      fiscalYearsRawRead.state,
+      accountPeriodsRawRead.state,
+      bankStatementsRead.state,
+      bankStatementLinesRead.state,
+      financialReportsRead.state,
+      closeAccountPeriod,
+      computeDepreciationBoard,
+      checkPermission,
+      authoringCompanyLabel,
       selectedFixedAsset,
       depreciationLinesEntityConfig,
       intercompanyRuleCreateFormConfig,
@@ -6231,8 +6339,6 @@ function AccountingClientReady({
     [paymentsLoading, bankStatementsLoading, movesLoading],
   )
 
-  const authoringCompanyLabel = companies.find((company) => company.id === operatingCompanyId)?.name
-    ?? t("accounting.authoring.companyId", { defaultValue: "Company {{id}}", id: String(operatingCompanyId) })
   const renderAccountingAuthoringPreview = (values: FormValues, form: FormConfig) => {
     if (!hasAccountingAuthoringPreview(form.id)) return null
     const selectedJournal = journals.find((journal) => String(journal.id) === String(values.journalId ?? ""))
@@ -6255,6 +6361,7 @@ function AccountingClientReady({
       {activeTabUsable && formDialog}
       {companyAvailable ? <AccountingSetupReadinessPanel
         setup={accountingSetup}
+        compact={readinessAction === undefined && !config.tabGroups?.find((group) => group.tabIds.includes("taxes"))?.tabIds.includes(accountingActiveTab)}
         action={readinessAction}
         onResolve={handleReadinessResolve}
         className="mb-4"
@@ -6288,6 +6395,9 @@ function AccountingClientReady({
             glAccountOptions={glAccountFieldOptions}
             partnerOptions={partnerSelectOptions}
             moveLines={accountMoveLines}
+            moves={allMoves}
+            glAccounts={accounts}
+            lookupDataReady={allMovesRead.state.status === "ready" && accountsRead.state.status === "ready" && accountMoveLinesRead.state.status === "ready"}
             onRecoveryLockChange={setPaymentOperationsLocked}
             scopeAvailable={companyAvailable}
           />

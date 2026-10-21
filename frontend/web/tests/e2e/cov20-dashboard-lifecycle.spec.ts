@@ -401,6 +401,7 @@ test.describe(
       await selectModuleTab(page, "reports", "report-templates")
       await page.getByTestId("module-create-reports-report-templates").click()
       await fillField(page, "name", templateName)
+      await chooseSelectOptionByLabel(page, "reportSource", "Custom source (advanced)")
       await fillField(page, "model", "sale_order")
       const [templateCreated] = await Promise.all([
         page.waitForResponse(
@@ -414,6 +415,7 @@ test.describe(
         (row) => row.name === templateName,
       )
       expect(template).toHaveLength(1)
+      expect(template[0]?.model).toBe("sale_order")
       const templateId = scalarQueryId(template[0]?.id)
       if (templateId == null) throw new Error("created template not found")
 
@@ -422,6 +424,7 @@ test.describe(
       await page.getByTestId("module-create-reports-scheduled-reports").click()
       await fillField(page, "name", scheduleName)
       await chooseSelectOptionByLabel(page, "reportTemplateId", templateName)
+      await chooseSelectOptionByLabel(page, "reportSource", "Custom source (advanced)")
       await fillField(page, "model", "sale_order")
       await page.getByTestId("form-field-nextRun").fill("2034-01-02T06:00")
       await fillField(page, "recipients", "ops@example.test")

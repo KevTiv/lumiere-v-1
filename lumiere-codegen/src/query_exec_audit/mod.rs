@@ -8,7 +8,7 @@ use crate::support::read_to_string;
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::collections::BTreeSet;
-use syn::{Expr, ExprPath, File, Item, Lit, Pat, Stmt};
+use syn::{Expr, ExprMatch, ExprPath, File, Item, ItemFn, Lit, Pat, Stmt};
 
 pub fn run(paths: &Paths, registry_text: &str) -> Result<()> {
     let allowlist_json = read_to_string(&paths.query_exec_non_registry_json)?;
@@ -55,15 +55,22 @@ pub fn parse_early_special_resources(query_exec_rs: &str) -> Result<BTreeSet<Str
         })
         .context("intended execute_resource_query dispatcher not found in query_exec.rs")?;
 
-    let resource_match = dispatcher
-        .block
-        .stmts
-        .iter()
-        .find_map(|statement| match statement {
-            Stmt::Expr(Expr::Match(expression), _) if is_resource_expr(&expression.expr) => {
-                Some(expression)
+    let resource_match = top_level_resource_match(dispatcher)
+        .or_else(|| {
+            // The public dispatcher may normalize query results after its private reader.
+            // Follow only that explicit, scope-preserving delegation, never an unrelated
+            // helper's match or a nested resource match elsewhere in the module.
+            if dispatcher.sig.ident != "execute_resource_query_for_company"
+                || !delegates_to_company_reader(dispatcher)
+            {
+                return None;
             }
-            _ => None,
+            file.items.iter().find_map(|item| match item {
+                Item::Fn(function) if function.sig.ident == "read_resource_query_for_company" => {
+                    top_level_resource_match(function)
+                }
+                _ => None,
+            })
         })
         .context("top-level match resource block not found in intended dispatcher")?;
 
@@ -83,14 +90,67 @@ pub fn parse_early_special_resources(query_exec_rs: &str) -> Result<BTreeSet<Str
     Ok(resources)
 }
 
+fn top_level_resource_match(function: &ItemFn) -> Option<&ExprMatch> {
+    function
+        .block
+        .stmts
+        .iter()
+        .find_map(|statement| match statement {
+            Stmt::Expr(Expr::Match(expression), _) if is_resource_expr(&expression.expr) => {
+                Some(expression)
+            }
+            _ => None,
+        })
+}
+
+fn delegates_to_company_reader(function: &ItemFn) -> bool {
+    let mut calls = function.block.stmts.iter().filter_map(|statement| {
+        let Stmt::Local(local) = statement else {
+            return None;
+        };
+        let Expr::Try(result) = &*local.init.as_ref()?.expr else {
+            return None;
+        };
+        let Expr::Await(awaited) = &*result.expr else {
+            return None;
+        };
+        let Expr::Call(call) = &*awaited.base else {
+            return None;
+        };
+        is_named_expr(&call.func, "read_resource_query_for_company").then_some(call)
+    });
+    let Some(call) = calls.next() else {
+        return false;
+    };
+    const FORWARDED_ARGUMENTS: [&str; 6] = [
+        "client",
+        "resource",
+        "organization_id",
+        "identity_hex",
+        "field_access",
+        "requested_company_id",
+    ];
+    calls.next().is_none()
+        && call.args.len() == FORWARDED_ARGUMENTS.len()
+        && call
+            .args
+            .iter()
+            .zip(FORWARDED_ARGUMENTS)
+            .all(|(argument, name)| is_named_expr(argument, name))
+}
+
 fn is_resource_expr(expression: &Expr) -> bool {
+    is_named_expr(expression, "resource")
+}
+
+fn is_named_expr(expression: &Expr, name: &str) -> bool {
     let Expr::Path(ExprPath {
         qself: None, path, ..
     }) = expression
     else {
         return false;
     };
-    path.segments.len() == 1 && path.segments[0].ident == "resource"
+    path.segments.len() == 1 && path.segments[0].ident == name
 }
 
 fn pattern_resource_literals(pattern: &Pat) -> Result<Vec<String>> {
@@ -163,6 +223,94 @@ mod tests {
 
     fn manifest_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    const WRAPPED_DISPATCHER: &str = r#"
+fn authoritative_resource_scope(resource: &str) {
+    match resource {
+        "unrelated-policy-match" => {},
+        _ => {},
+    }
+}
+
+pub async fn execute_resource_query_for_company() {
+    let mut rows = read_resource_query_for_company(
+        client, resource, organization_id, identity_hex, field_access, requested_company_id,
+    ).await?;
+    row_values::preserve_query_timestamp_precision(&mut rows);
+    Ok(rows)
+}
+
+async fn read_resource_query_for_company() {
+    require_ui_child_read_permission(resource, organization_id, identity_hex, field_access)?;
+    match resource {
+        "roles" => {
+            let _ = match resource {
+                "nested-not-dispatched" => true,
+                _ => false,
+            };
+            return Ok(vec![]);
+        }
+        "import-jobs" | "policy-snapshots" => return Ok(vec![]),
+        _ => {}
+    }
+    read_registered_resource(resource)
+}
+"#;
+
+    #[test]
+    fn wrapper_audits_only_the_scope_preserving_reader_dispatch() {
+        let keys = parse_early_special_resources(WRAPPED_DISPATCHER).unwrap();
+        assert_eq!(
+            keys,
+            ["roles", "import-jobs", "policy-snapshots"]
+                .into_iter()
+                .map(str::to_string)
+                .collect()
+        );
+        audit_query_exec_special_cases(
+            WRAPPED_DISPATCHER,
+            r#"{"roles": {}}"#,
+            r#"["import-jobs", "policy-snapshots"]"#,
+        )
+        .expect("wrapped reader retains the registry/allowlist audit");
+        let error = audit_query_exec_special_cases(WRAPPED_DISPATCHER, "{}", "[]").unwrap_err();
+        assert!(error.to_string().contains("not in resource_registry.json"));
+    }
+
+    #[test]
+    fn wrapper_requires_the_actual_reader_call_and_unchanged_scope_arguments() {
+        for (original, replacement) in [
+            ("let mut rows = read_resource_query_for_company(", "let mut rows = unrelated_reader("),
+            ("client, resource, organization_id, identity_hex, field_access, requested_company_id,",
+             "client, other_resource, organization_id, identity_hex, field_access, requested_company_id,"),
+            ("client, resource, organization_id, identity_hex, field_access, requested_company_id,",
+             "client, resource, organization_id, identity_hex, None, requested_company_id,"),
+            ("client, resource, organization_id, identity_hex, field_access, requested_company_id,",
+             "client, resource, organization_id, identity_hex, field_access, None,"),
+        ] {
+            let source = WRAPPED_DISPATCHER.replace(original, replacement);
+            let error = parse_early_special_resources(&source).unwrap_err();
+            assert!(error.to_string().contains("top-level match resource"));
+        }
+    }
+
+    #[test]
+    fn wrapped_reader_still_requires_a_top_level_fallback() {
+        let source = WRAPPED_DISPATCHER.replace("_ => {}", "\"not-a-fallback\" => {}");
+        let error = parse_early_special_resources(&source).unwrap_err();
+        assert!(error.to_string().contains("wildcard fallback"));
+    }
+
+    #[test]
+    fn wrapper_rejects_multiple_reader_dispatches() {
+        let source = WRAPPED_DISPATCHER.replace(
+            "row_values::preserve_query_timestamp_precision(&mut rows);",
+            "let other = read_resource_query_for_company(client, resource, organization_id,
+                identity_hex, field_access, requested_company_id).await?;",
+        );
+        let error = parse_early_special_resources(&source).unwrap_err();
+        assert!(error.to_string().contains("top-level match resource"));
     }
 
     #[test]

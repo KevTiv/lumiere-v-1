@@ -59,7 +59,7 @@ use documents::{read_document_templates, read_mail_templates};
 use hr::{maybe_log_hr_pii_read, read_direct_reports, read_employees, read_my_employee};
 use messaging::read_queued_mail_messages;
 pub(crate) use row_values::{
-    filter_and_strip_archived, filter_and_strip_soft_deleted, has_iot_read_permission, row_u64,
+    filter_and_strip_soft_deleted, filter_resource_archived_rows, has_iot_read_permission, row_u64,
 };
 #[cfg(test)]
 use row_values::{
@@ -140,6 +140,27 @@ pub async fn execute_resource_query(
 }
 
 pub async fn execute_resource_query_for_company(
+    client: &StdbClient,
+    resource: &str,
+    organization_id: u64,
+    identity_hex: &str,
+    field_access: Option<&FieldAccessContext>,
+    requested_company_id: Option<u64>,
+) -> Result<Vec<Value>, ApiError> {
+    let mut rows = read_resource_query_for_company(
+        client,
+        resource,
+        organization_id,
+        identity_hex,
+        field_access,
+        requested_company_id,
+    )
+    .await?;
+    row_values::preserve_query_timestamp_precision(&mut rows);
+    Ok(rows)
+}
+
+async fn read_resource_query_for_company(
     client: &StdbClient,
     resource: &str,
     organization_id: u64,
@@ -578,9 +599,7 @@ pub async fn execute_resource_query_for_company(
         filter_and_strip_soft_deleted(&mut rows);
     }
 
-    if resource == "contact-phone-identities" || resource == "payment-accounts" {
-        filter_and_strip_archived(&mut rows);
-    }
+    filter_resource_archived_rows(resource, &mut rows);
 
     registered::sort_registered_rows(resource, &mut rows);
 
