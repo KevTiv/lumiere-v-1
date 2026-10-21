@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsAllowEmpty } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { SalesClient } from "./sales-client"
 
 const SSR_RESOURCES = [
@@ -44,7 +44,7 @@ export default async function SalesPage() {
     stockPickings,
     returnOrders,
     returnOrderLines,
-  ] = await serverFetchQueryListsAllowEmpty(session, SSR_RESOURCES)
+  ] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <SalesClient

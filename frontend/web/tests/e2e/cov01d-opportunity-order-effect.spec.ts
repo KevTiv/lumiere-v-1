@@ -4,6 +4,8 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import { matchesOperationResponse } from "./operation-response"
 import {
+  selectModuleTab,
+  activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   expectFormModalVisible,
@@ -26,6 +28,7 @@ import {
   waitForEntityActionEnabled,
   waitForOpportunityLineExists,
   waitForSaleOrderLineExists,
+  reloadSettled,
 } from "./helpers"
 
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -55,7 +58,7 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     await submitForm(page, "new-lead")
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-leads").click()
+    await selectModuleTab(page, "crm", "leads")
     await expectSeededText(page, leadName, "/api/query/leads")
     await waitForBffQueryMinRows(page, "/api/query/opportunity-stages")
     await selectEntityRowByText(page, leadName)
@@ -65,9 +68,9 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     await chooseFirstEnabledOption(page, "opportunityStageId")
     await submitForm(page, "convert-lead")
 
-    await page.reload({ waitUntil: "domcontentloaded" })
+    await reloadSettled(page)
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await expectSeededText(page, opportunityName, "/api/query/opportunities")
     const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
 
@@ -86,7 +89,7 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     // First conversion must dispatch through the real CRM action and resolve to
     // one exact sale_order(opportunity_id, company_id) effect.
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await selectEntityRowByText(page, opportunityName)
     await waitForEntityActionEnabled(page, "entity-action-convert-opp-order")
     await page.getByTestId("entity-action-convert-opp-order").click()
@@ -102,8 +105,40 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     await submitForm(page, "convert-opportunity-order")
     await firstDispatch
 
+    await expect(
+      page.getByText("Sales order ready.", { exact: true }),
+    ).toBeVisible({ timeout: 15_000 })
+    await page.getByRole("button", { name: "Open sales order", exact: true }).click()
+
     const orderId = await fetchSaleOrderIdByOpportunityId(page, opportunityId, companyId)
     expect(orderId).toBeGreaterThan(0)
+    await expect(page).toHaveURL((url) => {
+      return (
+        url.pathname === "/sales" &&
+        url.searchParams.get("tab") === "orders" &&
+        url.searchParams.getAll("filter").length === 1 &&
+        url.searchParams.get("filter") === `id:${orderId}`
+      )
+    })
+    await expect(page.getByTestId("module-tab-sales-orders")).toHaveCount(1, { timeout: 30_000 })
+    await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    )
+    await expect(
+      activeTabEntityTable(page).getByTestId(`entity-row-${orderId}`),
+    ).toBeVisible({ timeout: 30_000 })
+    await reloadSettled(page)
+    await expect(page).toHaveURL((url) => {
+      return (
+        url.pathname === "/sales" &&
+        url.searchParams.get("tab") === "orders" &&
+        url.searchParams.get("filter") === `id:${orderId}`
+      )
+    })
+    await expect(
+      activeTabEntityTable(page).getByTestId(`entity-row-${orderId}`),
+    ).toBeVisible({ timeout: 30_000 })
     await expect
       .poll(
         async () => fetchSaleOrderIdsByOpportunityId(page, opportunityId, companyId),
@@ -116,7 +151,7 @@ test.describe("COV-01d/COV-03 opportunity → sale-order effect certification", 
     // return AlreadyApplied, close with semantic feedback, and never dispatch a
     // second consequential operation.
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await selectEntityRowByText(page, opportunityName)
     await waitForEntityActionEnabled(page, "entity-action-convert-opp-order")
     await page.getByTestId("entity-action-convert-opp-order").click()

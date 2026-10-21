@@ -7,8 +7,8 @@ use crate::inventory::product::product;
 use crate::sales::oms_extensions::create_exchange_order_from_return;
 use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
 use crate::sales::return_orders::{
-    confirm_return_order, create_return_order, return_order, CreateReturnOrderLineParams,
-    CreateReturnOrderParams,
+    confirm_return_order, create_return_order, return_order, return_order_creation,
+    CreateReturnOrderLineParams, CreateReturnOrderParams,
 };
 use crate::sales::sales_core::{
     confirm_sales_order, create_sale_order, create_sale_order_line, delete_sale_order_line,
@@ -658,6 +658,7 @@ pub fn test_exchange_order_from_return(ctx: &ReducerContext) -> Result<(), Strin
                 to_refund: true,
                 lot_id: None,
             }],
+            idempotency_key: None,
         },
     )?;
 
@@ -688,6 +689,86 @@ pub fn test_exchange_order_from_return(ctx: &ReducerContext) -> Result<(), Strin
     let expected_stamp = format!("\"exchange_return_id\":{rma_id}");
     if !exchange.metadata.as_deref().is_some_and(|m| m.contains(&expected_stamp)) {
         return Err(format!("Expected exchange metadata to contain {expected_stamp}, got {:?}", exchange.metadata));
+    }
+    Ok(())
+}
+
+/// A keyed return create commits exactly one return per key: a replay converges on it, the same
+/// key with a different request is rejected, and the creation row names the exact return.
+pub fn test_keyed_return_order_replay(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let uom = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .map(|p| p.uom_id)
+        .ok_or("product")?;
+    let params = |qty: f64, key: Option<&str>| CreateReturnOrderParams {
+        sale_order_id: None,
+        partner_id: fixture.partner_id,
+        return_reason: Some("keyed replay".to_string()),
+        lines: vec![CreateReturnOrderLineParams {
+            sale_order_line_id: None,
+            product_id: fixture.product_id,
+            product_uom: uom,
+            product_uom_qty: qty,
+            price_unit: 5.0,
+            to_refund: true,
+            lot_id: None,
+        }],
+        idempotency_key: key.map(str::to_string),
+    };
+    let returns_in_org = |ctx: &ReducerContext| {
+        ctx.db
+            .return_order()
+            .iter()
+            .filter(|r| r.organization_id == org_id)
+            .count()
+    };
+
+    let before = returns_in_org(ctx);
+    create_return_order(ctx, org_id, company_id, params(1.0, Some(" rma-key-1 ")))?;
+    create_return_order(ctx, org_id, company_id, params(1.0, Some("rma-key-1")))?;
+    if returns_in_org(ctx) != before + 1 {
+        return Err("A replayed key must not create a second return".to_string());
+    }
+
+    let creations: Vec<_> = ctx
+        .db
+        .return_order_creation()
+        .return_order_creation_by_key()
+        .filter("rma-key-1")
+        .filter(|c| c.organization_id == org_id)
+        .collect();
+    let [creation] = creations.as_slice() else {
+        return Err(format!("Expected one creation row, found {}", creations.len()));
+    };
+    let created = ctx
+        .db
+        .return_order()
+        .id()
+        .find(&creation.return_order_id)
+        .ok_or("Creation row must name an existing return")?;
+    if created.organization_id != org_id || created.sale_order_id.is_some() {
+        return Err("Creation row names the wrong return".to_string());
+    }
+
+    match create_return_order(ctx, org_id, company_id, params(2.0, Some("rma-key-1"))) {
+        Err(e) if e.contains("different request") => {}
+        other => return Err(format!("Reusing a key for another request must fail, got {other:?}")),
+    }
+    if create_return_order(ctx, org_id, company_id, params(1.0, Some("  "))).is_ok() {
+        return Err("A blank key must be rejected".to_string());
+    }
+
+    create_return_order(ctx, org_id, company_id, params(1.0, None))?;
+    create_return_order(ctx, org_id, company_id, params(1.0, None))?;
+    if returns_in_org(ctx) != before + 3 {
+        return Err("Unkeyed creates keep creating a return each time".to_string());
     }
     Ok(())
 }

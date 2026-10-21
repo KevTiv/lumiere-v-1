@@ -20,6 +20,7 @@ import {
   markWarehouseOutboxError,
   markWarehouseOutboxSynced,
 } from '../../../lib/warehouse-sync-outbox'
+import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
 
 export type InventoryOpsQueueId = 'short_atp' | 'expired_lots' | 'open_qc'
 
@@ -84,6 +85,8 @@ export function InventoryOpsPanel({
         return openQc.data ?? []
     }
   }, [activeQueue, shortAtp.data, expiredLots.data, openQc.data])
+  const pendingPager = usePagedRows(pendingSync.data ?? [])
+  const rowsPager = usePagedRows(rows)
 
   const counts = {
     short_atp: shortAtp.data?.length ?? 0,
@@ -206,7 +209,7 @@ export function InventoryOpsPanel({
                   </td>
                 </tr>
               ) : (
-                rows.map((row) => {
+                rowsPager.pageRows.map((row) => {
                   const id = rowId(row)
                   return (
                     <tr key={id} className="border-b last:border-0">
@@ -245,6 +248,7 @@ export function InventoryOpsPanel({
               )}
             </tbody>
           </table>
+          <TablePager {...rowsPager} />
         </div>
       </div>
 
@@ -287,7 +291,7 @@ export function InventoryOpsPanel({
                   </td>
                 </tr>
               ) : (
-                (pendingSync.data ?? []).map((row) => {
+                pendingPager.pageRows.map((row) => {
                   const id = rowId(row)
                   return (
                     <tr key={id} className="border-b last:border-0">
@@ -326,6 +330,7 @@ export function InventoryOpsPanel({
               )}
             </tbody>
           </table>
+          <TablePager {...pendingPager} />
         </div>
       </div>
     </div>

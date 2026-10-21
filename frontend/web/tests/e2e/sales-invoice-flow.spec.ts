@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   chooseSelectOptionByLabel,
   expectNoAppError,
@@ -9,7 +10,7 @@ import {
   fetchAccountSelectLabelByInternalType,
   fetchCurrencyIdByCode,
   fetchDefaultCompanyId,
-  fetchDraftInvoiceMoveIdByPartner,
+  fetchDraftInvoiceMoveIdForSaleOrder,
   fetchFirstPricelistId,
   fetchFirstWarehouseId,
   fetchSalesInvoiceJournalLabel,
@@ -23,7 +24,9 @@ import {
   waitForEntityActionEnabled,
   waitForSaleOrderBillableLines,
   waitForSaleOrderConfirmed,
+  openCreateInvoiceFromOrder,
 } from "./helpers"
+import { saleOrderHref } from "@lumiere/erp-shared/record-links"
 
 /**
  * Smoke-level sales → invoice linkage checks.
@@ -40,8 +43,15 @@ import {
  */
 test.describe("Sales and invoice flow e2e", { tag: "@dev-fixture" }, () => {
   test("seeded sale order is visible on Sales Orders tab", { tag: "@dev-fixture" }, async ({ page }) => {
-    await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    const soRes = await page.request.get("/api/query/sale-orders")
+    expect(soRes.ok()).toBe(true)
+    const soJson = (await soRes.json()) as { data?: Array<{ id?: unknown; reference?: unknown }> }
+    const seededId = scalarQueryId(
+      (soJson.data ?? []).find((row) => String(row.reference ?? "") === "SO/2024/0001")?.id,
+    )
+    expect(seededId).not.toBeNull()
+    // Tables list newest first; focus the seeded (oldest) order exactly.
+    await gotoModule(page, saleOrderHref(seededId!), "sales")
 
     await expectSeededText(page, "SO/2024/0001", "/api/query/sale-orders")
     await expect(page.getByText("ACME-2024-001")).toBeVisible()
@@ -63,7 +73,7 @@ test.describe("Sales and invoice flow e2e", { tag: "@dev-fixture" }, () => {
 
   test("sales dashboard quick action opens new sale order form", async ({ page }) => {
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-dashboard").click()
+    await selectModuleTab(page, "sales", "dashboard")
 
     await page.getByTestId("quick-action-create_sale_order").click()
     await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
@@ -84,10 +94,10 @@ const none = { none: [] as [] }
 const some = <T,>(value: T) => ({ some: value })
 
 /**
- * Poll until the sale-orders query contains the given order id.
- * Returns the newest matching row id.
+ * Poll until the sale-orders query contains exactly one order for the test-only
+ * customer. Duplicate matches fail instead of selecting the newest row.
  */
-async function fetchLatestSaleOrderIdByPartnerId(
+async function fetchUniqueSaleOrderIdByPartnerId(
   page: Parameters<typeof callReducerBff>[0],
   partnerId: number,
 ): Promise<number> {
@@ -101,10 +111,12 @@ async function fetchLatestSaleOrderIdByPartnerId(
       const matches = (json.data ?? []).filter(
         (row) => scalarQueryId(row.partnerId ?? row.partner_id) === partnerId,
       )
-      const newest = [...matches].sort(
-        (a, b) => (scalarQueryId(b.id) ?? 0) - (scalarQueryId(a.id) ?? 0),
-      )[0]
-      const id = scalarQueryId(newest?.id)
+      if (matches.length > 1) {
+        throw new Error(
+          `expected one sale order for partner ${partnerId}, found ${matches.length}`,
+        )
+      }
+      const id = scalarQueryId(matches[0]?.id)
       if (id != null) return id
     }
     await page.waitForTimeout(250)
@@ -327,7 +339,7 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
       ])
 
       // Poll until the new SO appears in the query for this partner.
-      const orderId = await fetchLatestSaleOrderIdByPartnerId(page, customer.id)
+      const orderId = await fetchUniqueSaleOrderIdByPartnerId(page, customer.id)
 
       // ── Step 5: Confirm sale order via BFF ───────────────────────────────────
       await callReducerBff(page, "confirm_sales_order", [
@@ -347,20 +359,13 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
 
       // ── Step 7: Navigate to Sales → Orders and select the SO ─────────────────
       await gotoModule(page, "/sales", "sales")
-      await page.getByTestId("module-tab-sales-orders").click()
+      await selectModuleTab(page, "sales", "orders")
       await page
         .locator('[role="tabpanel"]:visible')
         .getByRole("textbox", { name: "Search records" })
         .fill(customerName)
 
-      await selectEntityRowById(page, orderId)
-
-      // ── Step 8: Click "Create Invoice" action ─────────────────────────────────
-      await waitForEntityActionEnabled(page, "entity-action-create-invoice")
-      await page.getByTestId("entity-action-create-invoice").click()
-      await expect(page.getByTestId("form-modal-create-invoice-from-sale-order")).toBeVisible({
-        timeout: 15_000,
-      })
+      await openCreateInvoiceFromOrder(page, orderId)
 
       // ── Step 9: Fill and submit the invoice creation form ─────────────────────
       await chooseSelectOptionByLabel(page, "journalId", journalLabel)
@@ -378,9 +383,7 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
       expect(invoiceRes.ok()).toBe(true)
 
       // ── Step 10: Assert draft invoice was created ─────────────────────────────
-      // fetchDraftInvoiceMoveIdByPartner matches by invoicePartnerDisplayName which
-      // the create_invoice_from_sale_order reducer copies from the SO partner.
-      const invoiceMoveId = await fetchDraftInvoiceMoveIdByPartner(page, customerName)
+      const invoiceMoveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
       expect(invoiceMoveId).toBeGreaterThan(0)
 
       // Verify the draft invoice appears in the account-moves query with residual > 0,

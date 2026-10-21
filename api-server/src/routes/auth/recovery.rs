@@ -1,14 +1,15 @@
 //! Password reset request and completion handlers.
-use super::cookies::set_stdb_session_cookies;
+use super::cookies::clear_stdb_session_cookies;
 use crate::auth_password::{
-    decrypt_token, find_credential_by_email, find_credential_by_platform_id,
-    find_reset_token_by_hash, generate_secure_token, micros_to_secs, now_micros, send_resend_email,
+    find_credential_by_email, find_reset_token_by_hash, generate_secure_token,
+    hash_native_password, normalized_auth_email, now_micros, send_resend_email,
+    validate_native_password,
 };
 use crate::cold_tier::pg_pool;
 use crate::commands::{dispatch_internal_reducer, InternalRouteAuthority};
 use crate::error::ApiError;
 use crate::platform_control::{self, PlatformId};
-use crate::session::{identity_json_for_reducer_call, normalize_identity_hex_for_sql};
+use crate::session::identity_json_for_reducer_call;
 use crate::state::AppState;
 use axum::extract::State;
 use axum::response::IntoResponse;
@@ -28,24 +29,19 @@ pub(super) async fn forgot_password(
     State(state): State<Arc<AppState>>,
     Json(body): Json<ForgotBody>,
 ) -> Result<Json<Value>, ApiError> {
-    if state.config.workos_client_id.is_some() {
-        return Err(ApiError::Gone(
-            "Password reset is handled by WorkOS. Use the WorkOS sign-in screen.".into(),
-        ));
-    }
+    require_supported_password_recovery(state.config.workos_client_id.is_some())?;
 
     let msg = "If that email exists, a reset link has been sent.";
-    let email = body.email.trim().to_lowercase();
-    if !email.contains('@') {
+    let Ok(email) = normalized_auth_email(&body.email) else {
         return Ok(Json(json!({ "message": msg })));
-    }
+    };
 
     let cred = match find_credential_by_email(&state, &email).await {
         Ok(c) => c,
         Err(_) => return Ok(Json(json!({ "message": msg }))),
     };
 
-    if let Some(cred) = cred {
+    if let Some(cred) = cred.filter(|c| c.password_hash.is_some()) {
         let (token, token_hash) = generate_secure_token();
         let expires_at_micros = now_micros() + (60_i128 * 60 * 1_000_000);
         let expires_at = std::time::SystemTime::now()
@@ -119,79 +115,92 @@ pub(super) async fn reset_password(
     cookies: Cookies,
     Json(body): Json<ResetBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    if state.config.workos_client_id.is_some() {
-        return Err(ApiError::Gone(
-            "Password reset is handled by WorkOS.".into(),
-        ));
-    }
+    require_supported_password_recovery(state.config.workos_client_id.is_some())?;
 
-    if body.new_password.len() < 8 {
-        return Err(ApiError::BadRequest(
-            "Password must be at least 8 characters".into(),
-        ));
+    validate_native_password(&body.new_password)?;
+    if body.token.len() != 43 {
+        return Err(ApiError::BadRequest("Invalid or expired reset link".into()));
     }
-
-    let key = state
-        .config
-        .stdb_credential_encryption_key
-        .as_ref()
-        .ok_or_else(|| {
-            ApiError::Internal("STDB_CREDENTIAL_ENCRYPTION_KEY not configured".into())
-        })?;
 
     let hash = hex::encode(Sha256::digest(body.token.as_bytes()));
     let reset_token = find_reset_token_by_hash(&state, &hash)
         .await?
         .ok_or_else(|| ApiError::BadRequest("Invalid or expired reset link".into()))?;
 
-    if reset_token.used_at.is_some() {
-        return Err(ApiError::BadRequest(
-            "Reset link has already been used".into(),
-        ));
-    }
+    validate_reset_state(&reset_token, std::time::SystemTime::now())?;
+    let new_hash = hash_native_password(body.new_password).await?;
 
-    let now_s = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
-    if micros_to_secs(reset_token.expires_at) < now_s {
-        return Err(ApiError::BadRequest("Reset link has expired".into()));
-    }
-
-    let new_hash =
-        bcrypt::hash(body.new_password, bcrypt::DEFAULT_COST).map_err(ApiError::internal)?;
-
-    let platform_id =
-        PlatformId::new(reset_token.platform_user_id.clone()).map_err(ApiError::internal)?;
     let pool = pg_pool::shared_pool().ok_or_else(|| {
         ApiError::Unavailable("platform authentication storage is unavailable".into())
     })?;
-    if !platform_control::consume_password_reset_token(pool, &hash)
+    if !platform_control::complete_password_reset(pool, &hash, &new_hash)
         .await
         .map_err(ApiError::internal)?
     {
         return Err(ApiError::BadRequest("Invalid or expired reset link".into()));
     }
-    if !platform_control::replace_password_hash(pool, &platform_id, &new_hash)
-        .await
-        .map_err(ApiError::internal)?
-    {
+    dispatch_internal_reducer(
+        &state,
+        InternalRouteAuthority::PasswordRecovery,
+        None,
+        "mark_password_reset_token_projection_used",
+        json!([reset_token.platform_reset_token_id]),
+    )
+    .await?;
+    // Password recovery must not reissue the previous persistent STDB token.
+    clear_stdb_session_cookies(&state.config, &cookies);
+
+    Ok(Json(json!({ "redirectTo": "/sign-in" })))
+}
+
+fn validate_reset_state(
+    token: &crate::auth_password::StdbResetToken,
+    now: std::time::SystemTime,
+) -> Result<(), ApiError> {
+    if token.used_at.is_some() || token.expires_at <= now {
         return Err(ApiError::BadRequest("Invalid or expired reset link".into()));
     }
+    Ok(())
+}
 
-    if let Some(cred) = find_credential_by_platform_id(&state, platform_id.as_str()).await? {
-        dispatch_internal_reducer(
-            &state,
-            InternalRouteAuthority::PasswordRecovery,
-            None,
-            "mark_password_reset_token_projection_used",
-            json!([reset_token.platform_reset_token_id]),
-        )
-        .await?;
-        let raw = decrypt_token(key, &cred.stdb_token_enc)?;
-        let id_hex = normalize_identity_hex_for_sql(&cred.identity_hex);
-        set_stdb_session_cookies(&state.config, &cookies, &raw, &id_hex);
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn recovery_is_fail_closed_until_sessions_are_revocable() {
+        assert!(matches!(
+            require_supported_password_recovery(false),
+            Err(ApiError::Gone(_))
+        ));
+        assert!(matches!(
+            require_supported_password_recovery(true),
+            Err(ApiError::Gone(_))
+        ));
     }
+    #[test]
+    fn reset_expiry_uses_system_time_and_rejects_used_links() {
+        let now = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_800_000_000);
+        let mut token = crate::auth_password::StdbResetToken {
+            platform_reset_token_id: "p_token".into(),
+            platform_user_id: "p_user".into(),
+            expires_at: now + std::time::Duration::from_secs(3600),
+            used_at: None,
+        };
+        assert!(validate_reset_state(&token, now).is_ok());
+        assert!(validate_reset_state(&token, token.expires_at).is_err());
+        assert!(
+            validate_reset_state(&token, token.expires_at + std::time::Duration::from_secs(1))
+                .is_err()
+        );
+        token.used_at = Some(now);
+        assert!(validate_reset_state(&token, now).is_err());
+    }
+}
 
-    Ok(Json(json!({ "redirectTo": "/overview" })))
+fn require_supported_password_recovery(workos: bool) -> Result<(), ApiError> {
+    Err(ApiError::Gone(if workos {
+        "Password reset is handled by WorkOS. Use the WorkOS sign-in screen."
+    } else {
+        "Native password recovery is unavailable until revocable sessions are supported. Contact your alpha administrator."
+    }.into()))
 }

@@ -199,7 +199,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn structured_server_grounded_output_is_released_with_claim_provenance() {
+    async fn structured_run_evidence_is_traceable_but_withheld_without_semantic_verification() {
         let support = crate::orchestrator::intelligence::EvidenceRef {
             kind: "live_snapshot".to_string(),
             id: "sale_order:42".to_string(),
@@ -211,13 +211,12 @@ mod tests {
         let result = admit_structured_output(1, 2, &draft, &evidence)
             .await
             .expect("gate result");
-        assert_eq!(result.verification.outcome, TextAnswerOutcome::Admitted);
-        assert_eq!(result.released.as_deref(), Some(draft.content.as_str()));
-        assert_eq!(result.provenance.claims.len(), 1);
         assert_eq!(
-            result.provenance.claims[0].verification_outcome,
-            "traceable"
+            result.verification.outcome,
+            TextAnswerOutcome::RequiresReview
         );
+        assert!(result.released.is_none());
+        assert!(result.provenance.claims.is_empty());
     }
 
     #[tokio::test]
@@ -226,12 +225,26 @@ mod tests {
             kind: "live_snapshot".to_string(),
             id: "sale_order:42".to_string(),
         };
-        let mut evidence = TextEvidence::default();
-        evidence.refs.push(support.clone());
-        let draft = GeneratedOutputDraft::single_claim("Sensitive claim.", vec![support]);
-        let mut result = admit_structured_output(1, 2, &draft, &evidence)
-            .await
-            .expect("gate result");
+        let draft = GeneratedOutputDraft::single_claim("Sensitive claim.", vec![support.clone()]);
+        let mut result = GatedTextAnswer {
+            released: Some(draft.content.clone()),
+            verification: crate::orchestrator::text_answer_gate::TextAnswerVerification {
+                outcome: TextAnswerOutcome::Admitted,
+                methods: vec!["deterministic"],
+                limitations: Vec::new(),
+                reason: None,
+            },
+            provenance: crate::orchestrator::text_answer_gate::TextAnswerProvenance {
+                claims: Vec::new(),
+                citations: vec![support],
+                calculations: Vec::new(),
+                persisted: false,
+                persistence_reason: None,
+                contribution_id: None,
+                claim_ids: Vec::new(),
+            },
+            durable_provenance: Default::default(),
+        };
 
         withhold_for_persistence(&mut result, "recording unavailable");
 

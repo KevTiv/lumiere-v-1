@@ -268,6 +268,11 @@
         }
       ]
     },
+    "return-order-creations": {
+      "table": "return_order_creation",
+      "predicates": [],
+      "order_by": []
+    },
     "pos-loyalty-programs": {
       "table": "pos_loyalty_program",
       "predicates": [],
@@ -641,6 +646,21 @@
     },
     "hr-skills": {
       "table": "hr_skill",
+      "predicates": [],
+      "order_by": []
+    },
+    "hr-leave-allocations": {
+      "table": "hr_leave_allocation",
+      "predicates": [],
+      "order_by": []
+    },
+    "hr-offboarding-checklists": {
+      "table": "hr_offboarding_checklist",
+      "predicates": [],
+      "order_by": []
+    },
+    "hr-statutory-ids": {
+      "table": "hr_statutory_id",
       "predicates": [],
       "order_by": []
     },
@@ -1024,6 +1044,11 @@
       "predicates": [],
       "order_by": []
     },
+    "landed-cost-applications": {
+      "table": "stock_landed_cost_application",
+      "predicates": [],
+      "order_by": []
+    },
     "supplier-intakes": {
       "table": "supplier_intake_request",
       "predicates": [],
@@ -1131,6 +1156,26 @@
     },
     "mrp-productions": {
       "table": "mrp_production",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-production-costs": {
+      "table": "mrp_production_cost",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-productivity-costs": {
+      "table": "mrp_productivity_cost",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-valuation-configs": {
+      "table": "mrp_valuation_config",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-workcenter-cost-rates": {
+      "table": "mrp_workcenter_cost_rate",
       "predicates": [],
       "order_by": []
     },
@@ -1343,6 +1388,36 @@
       "predicates": [],
       "order_by": []
     },
+    "profit-loss-lines": {
+      "table": "profit_loss_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "balance-sheet-lines": {
+      "table": "balance_sheet_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "cash-flow-lines": {
+      "table": "cash_flow_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "bank-statement-import-lines": {
+      "table": "bank_statement_import_line",
+      "predicates": [],
+      "order_by": []
+    },
+    "tax-deadline-reminders": {
+      "table": "tax_deadline_reminder",
+      "predicates": [],
+      "order_by": []
+    },
+    "consolidation-company-rates": {
+      "table": "consolidation_company_rate",
+      "predicates": [],
+      "order_by": []
+    },
     "trial-balances": {
       "table": "trial_balance",
       "predicates": [],
@@ -1407,6 +1482,21 @@
     },
     "document-versions": {
       "table": "document_version",
+      "predicates": [],
+      "order_by": []
+    },
+    "document-external-refs": {
+      "table": "document_external_ref",
+      "predicates": [],
+      "order_by": []
+    },
+    "document-legal-holds": {
+      "table": "document_legal_hold",
+      "predicates": [],
+      "order_by": []
+    },
+    "document-signature-requests": {
+      "table": "document_signature_request",
       "predicates": [],
       "order_by": []
     },

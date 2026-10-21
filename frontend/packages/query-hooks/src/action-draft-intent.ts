@@ -48,9 +48,9 @@ export function gatewayDraftToPayload(
 ): ActionDraftChatAction["draft"] {
   return {
     draftId,
-    reducerName: gateway.reducer_name,
+    reducerName: gateway.reducerName,
     summary: gateway.summary,
-    paramsJson: gateway.params_json,
+    paramsJson: gateway.paramsJson,
     confidence: gateway.confidence,
     warnings: gateway.warnings,
     elevated: gateway.elevated,

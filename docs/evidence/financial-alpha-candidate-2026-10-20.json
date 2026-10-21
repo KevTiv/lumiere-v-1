@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "validatedPinCommit": "51f21c6090fa8d58a56eee16adfcaa3db084b15c",
+  "contracts": {
+    "version": "0.3.129",
+    "revision": "f6ea683d129b34f0114a04f0f780240ff026899e",
+    "generatedSourceCommit": "a1f2c7aa1a5cbf0e6740d631adeb511a330d9394",
+    "publicationWorkflowRun": 39438910508,
+    "publicationConclusion": "success",
+    "exactModuleBuild": "passed",
+    "cleanRegenerationAndDrift": "passed",
+    "applicationCompilationAndManifest": "passed"
+  },
+  "migration": {
+    "catalogVersion": 19,
+    "catalogChecksum": "sha256:6b6362516927227dedc0b3d09ac68047fb7b1e56ce08dbf2016754a6096d3098",
+    "preservedReleasedPrefix": "1-18",
+    "evidence": "docs/evidence/financial-alpha-migration19-2026-10-20.json"
+  },
+  "localValidation": {
+    "prePinWebTestsPassed": 495,
+    "prePinUiTestsPassed": 821,
+    "postPinFieldPolicyTestsPassed": 66,
+    "postPinBankLifecycleAndTransportTestsPassed": 10,
+    "generatorTestsPassed": 21,
+    "translationCheck": "passed",
+    "existingTypeDebtGate": "passed",
+    "formattingOfChangedRustFiles": "passed"
+  },
+  "remainingGates": [
+    "Final candidate CI and complete browser suite",
+    "Deployment preflight and consistent artifact promotion",
+    "Isolated deployed financial acceptance rehearsal"
+  ],
+  "disposition": "Development candidate; deployment and live acceptance are pending."
+}

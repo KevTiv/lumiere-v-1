@@ -65,7 +65,7 @@ export function useRuntimeFormModalConfig(options: UseRuntimeFormModalConfigOpti
   return {
     config: merged.config,
     isLoading,
-    error,
+    error: error ?? (merged.bindingErrors.length ? merged.bindingErrors.join("; ") : null),
     customFieldIds: merged.customFieldIds,
     runtimeFromDatabase,
   }

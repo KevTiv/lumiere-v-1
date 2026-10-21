@@ -57,6 +57,16 @@ export function resolveAllowedActiveCompanyId(
     : (allowed[0] ?? null)
 }
 
+/** Resolve an explicit company switch, rejecting malformed or unauthorized ids. */
+export function resolveRequestedActiveCompanyId(
+  requestedCompanyId: number,
+  companyIds?: readonly number[],
+): number | null {
+  const requested = Math.floor(requestedCompanyId)
+  if (!Number.isFinite(requested) || requested <= 0) return null
+  return normalizeCompanyIds(companyIds).includes(requested) ? requested : null
+}
+
 export function ErpSessionProvider({
   value,
   children,
@@ -95,12 +105,14 @@ export function ErpSessionProvider({
   const setActiveCompanyId = useCallback(
     (companyId: number) => {
       if (organizationId == null || organizationId <= 0) return
-      const next = Math.floor(companyId)
-      if (!Number.isFinite(next) || next <= 0) return
+      const next = resolveRequestedActiveCompanyId(companyId, value.companyIds)
+      // Company selection is part of session authorization, not just a UI
+      // preference. Never persist or briefly expose a forged company id.
+      if (next == null) return
       setActiveCompanyIdState(next)
       writeStoredActiveCompany(organizationId, next)
     },
-    [organizationId],
+    [organizationId, value.companyIds],
   )
 
   const contextValue = useMemo<ErpSessionState>(

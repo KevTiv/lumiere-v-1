@@ -1,3 +1,5 @@
+import { bootstrapFixtureAccountSession } from './fixture-account'
+import { matchesOperationFaultTarget } from "./operation-response"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -113,16 +115,27 @@ export const CAPABILITIES = {
     ],
   },
   agentLoop: {
-    id: "agent-loop",
-    prerequisite: "Requires H4 bounded agent loop and event persistence (PR #23).",
+    id: "governed-proposal-loop",
+    prerequisite:
+      "Requires the live governed proposal/capability runtime plus GOV-01/GOV-05 capability admission; the retained agent_loop.rs interfaces are not an execution loop.",
     probes: [
-      { kind: "source", path: "ai-gateway/src/orchestrator/agent_loop.rs" },
+      {
+        kind: "source",
+        path: "ai-gateway/src/orchestrator/proposal_loop.rs",
+        contains: "GovernedCapabilityService",
+      },
+      {
+        kind: "source",
+        path: "ai-gateway/src/orchestrator/governed_services.rs",
+        contains: "GovernedCapabilityService",
+      },
       { kind: "ai-gateway" },
     ],
   },
   agentPolicy: {
     id: "agent-per-call-policy",
-    prerequisite: "Requires H5a per-call policy enforcement and approval stops (PR #24).",
+    prerequisite:
+      "Requires a live governed runtime plus GOV-01 current-authorization resolution and next-call revocation enforcement.",
     probes: [
       { kind: "source", path: "ai-gateway/src/orchestrator/invocation_policy.rs" },
       { kind: "ai-gateway" },
@@ -131,7 +144,7 @@ export const CAPABILITIES = {
   agentBudgetPersistence: {
     id: "agent-budget-persistence",
     prerequisite:
-      "Requires H5 durable agent budget/run-draft persistence after AI harness stack merges (PR #26).",
+      "Requires live GOV-02 spend/provider-attempt provisioning and GOV-03 exact run-correlated drafts; AG-09 additionally requires a fresh-STDB reconstruction drill.",
     probes: [
       { kind: "source", path: "spacetimedb/src/ai/spend.rs" },
       { kind: "reducer", pattern: /^reserve_ai_spend$/ },
@@ -341,11 +354,7 @@ async function signupIdentityHex(email: string, password: string): Promise<strin
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100"
   const isolated = await playwrightRequest.newContext({ baseURL })
   try {
-    const signup = await isolated.post("/api/auth/signup", { data: { email, password } })
-    if (!signup.ok()) throw new Error(`signup failed (${signup.status()}): ${await signup.text()}`)
-    const identity = (await isolated.storageState()).cookies.find((c) => c.name === "stdb_identity")
-    if (!identity?.value) throw new Error("signup did not set stdb_identity cookie")
-    return identity.value.replace(/^0x/i, "")
+    return await bootstrapFixtureAccountSession(isolated, email, password)
   } finally {
     await isolated.dispose()
   }
@@ -355,9 +364,9 @@ async function signupIdentityHex(email: string, password: string): Promise<strin
  * Provision a non-superuser organization member holding exactly `permissions`
  * (pattern from auth-permission-enforcement.spec.ts). `ownerPage` is the seeded admin session.
  */
-export async function provisionActor(ownerPage: Page, label: string, permissions: string[]): Promise<Actor> {
+export async function provisionActor(ownerPage: Page, label: string, permissions: string[], scopedCompanyId?: number): Promise<Actor> {
   const organizationId = await fetchSessionOrganizationId(ownerPage)
-  const companyId = await fetchDefaultCompanyId(ownerPage)
+  const companyId = scopedCompanyId ?? await fetchDefaultCompanyId(ownerPage)
   const roleName = smokeName(`pretenant-${label}`)
   await callReducerBff(ownerPage, "create_role", [
     organizationId,
@@ -453,14 +462,15 @@ export function seededRng(seed: number): () => number {
 
 /**
  * Let the request reach the server (so the mutation commits) and then drop the response,
- * modelling a mobile network losing the reply. Applies to the first matching request only.
+ * modelling a mobile network losing the reply. Applies to the first matching POST only;
+ * background collection reads must not consume the mutation's injected failure.
  */
 export async function loseNextResponse(page: Page, urlPart: string): Promise<{ lost: () => boolean }> {
   let lost = false
   await page.route(
-    (url) => url.pathname.includes(urlPart),
+    (url) => matchesOperationFaultTarget(url, urlPart),
     async (route) => {
-      if (lost) return route.continue()
+      if (route.request().method() !== "POST" || lost) return route.continue()
       lost = true
       await route.fetch()
       await route.abort("connectionreset")

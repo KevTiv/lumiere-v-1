@@ -15,7 +15,7 @@ export interface AiRouteContext {
 }
 
 const GATEWAY_UNCONFIGURED =
-  'AI gateway is not configured for this deployment. Set LUMIERE_AI_GATEWAY_URL (server-side).'
+  'AI features are disabled or not configured for this deployment.'
 
 export function aiGatewayUnavailableResponse() {
   return NextResponse.json({ error: GATEWAY_UNCONFIGURED }, { status: 503 })

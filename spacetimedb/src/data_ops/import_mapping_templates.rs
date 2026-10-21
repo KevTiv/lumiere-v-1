@@ -1,7 +1,9 @@
 /// Import Mapping Templates — saved column maps for AI-assisted CSV imports.
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::data_ops::import_tracker::{import_job, ImportJob};
+use crate::data_ops::import_tracker::{
+    import_job, ImportJob, ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY,
+};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 
 // ── Tables ────────────────────────────────────────────────────────────────────
@@ -45,6 +47,26 @@ pub struct SaveImportMappingTemplateParams {
 pub struct FinalizeImportAssistantJobParams {
     pub metadata_json: String,
     pub template_id: Option<u64>,
+}
+
+fn merge_assistant_metadata(existing: Option<&str>, assistant: &str) -> Result<String, String> {
+    let mut base = existing
+        .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+        .and_then(|value| value.as_object().cloned())
+        .unwrap_or_default();
+    let overlay = serde_json::from_str::<serde_json::Value>(assistant)
+        .map_err(|_| "metadata_json must be valid JSON".to_string())?;
+    let overlay = overlay
+        .as_object()
+        .ok_or_else(|| "metadata_json must be a JSON object".to_string())?;
+    for (key, value) in overlay {
+        // File identity and rollback provenance are domain-owned. Finalizing
+        // assistant provenance must neither erase nor forge either marker.
+        if key != "sha256" && key != ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY {
+            base.insert(key.clone(), value.clone());
+        }
+    }
+    Ok(serde_json::Value::Object(base).to_string())
 }
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -212,10 +234,6 @@ pub fn finalize_import_assistant_job(
     if params.metadata_json.trim().is_empty() {
         return Err("metadata_json is required".to_string());
     }
-    if serde_json::from_str::<serde_json::Value>(&params.metadata_json).is_err() {
-        return Err("metadata_json must be valid JSON".to_string());
-    }
-
     let job = ctx
         .db
         .import_job()
@@ -227,6 +245,7 @@ pub fn finalize_import_assistant_job(
     }
 
     check_permission(ctx, organization_id, &job.table_name, "create")?;
+    let merged_metadata = merge_assistant_metadata(job.metadata.as_deref(), &params.metadata_json)?;
 
     if let Some(template_id) = params.template_id {
         let template = ctx
@@ -254,7 +273,7 @@ pub fn finalize_import_assistant_job(
     }
 
     ctx.db.import_job().id().update(ImportJob {
-        metadata: Some(params.metadata_json.clone()),
+        metadata: Some(merged_metadata),
         ..job
     });
 
@@ -274,4 +293,67 @@ pub fn finalize_import_assistant_job(
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assistant_metadata_cannot_replace_domain_owned_markers() {
+        let existing = serde_json::json!({
+            "sha256": "original-hash",
+            ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1,
+                "role": "complete",
+                "token": "bundle-1",
+                "parent_job_id": 41,
+            },
+            "retained": true,
+        });
+        let assistant = serde_json::json!({
+            "sha256": "forged-hash",
+            ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1,
+                "role": "complete",
+                "token": "forged-bundle",
+                "parent_job_id": 99,
+            },
+            "assistant": { "mapped": true },
+        });
+
+        let merged = merge_assistant_metadata(Some(&existing.to_string()), &assistant.to_string())
+            .expect("metadata should merge");
+        let merged: serde_json::Value = serde_json::from_str(&merged).expect("valid JSON");
+
+        assert_eq!(merged["sha256"], "original-hash");
+        assert_eq!(
+            merged[ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY],
+            existing[ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY]
+        );
+        assert_eq!(merged["retained"], true);
+        assert_eq!(merged["assistant"], serde_json::json!({ "mapped": true }));
+    }
+
+    #[test]
+    fn assistant_metadata_cannot_create_domain_owned_markers() {
+        let assistant = serde_json::json!({
+            "sha256": "forged-hash",
+            ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY: {
+                "version": 1,
+                "role": "complete",
+                "token": "forged-bundle",
+                "parent_job_id": 99,
+            },
+            "assistant": true,
+        });
+
+        let merged =
+            merge_assistant_metadata(None, &assistant.to_string()).expect("metadata should merge");
+        let merged: serde_json::Value = serde_json::from_str(&merged).expect("valid JSON");
+
+        assert!(merged.get("sha256").is_none());
+        assert!(merged.get(ACCOUNT_MOVE_BUNDLE_JOB_METADATA_KEY).is_none());
+        assert_eq!(merged["assistant"], true);
+    }
 }

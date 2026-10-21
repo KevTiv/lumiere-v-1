@@ -9,6 +9,7 @@ import { expect, test, type Page } from "@playwright/test"
 /** @dev-fixture — excluded from E2E_SUITE=p0; requires seed_dev_data fixture rows. */
 
 import {
+  selectModuleTab,
   chooseFirstOption,
   callReducerBff,
   expectNoAppError,
@@ -35,7 +36,7 @@ const INVENTORY_KEY_TAB_IDS = [
 ] as const
 
 async function openInventoryTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-inventory-${tabId}`).click()
+  await selectModuleTab(page, "inventory", tabId)
 }
 
 async function assertInventoryTabRenders(page: Page, tabId: string) {

@@ -12,7 +12,6 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
 /// The scope a read must resolve before it can be compiled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -641,16 +640,17 @@ pub fn run(paths: &Paths) -> Result<()> {
     let storage_policy = read_to_string(&paths.storage_policy_json)?;
     let codec_manifest = read_to_string(&paths.codec_manifest_out)?;
     let output = emit_descriptor_manifest(&descriptor_policy, &storage_policy, &codec_manifest)?;
-    validate_postgres_access_paths(&output, &storage_policy, &paths.cold_ddl_dir)?;
+    // SQL access paths are validated after the canonical IR handoff, against
+    // the rendered PostgreSQL artifacts before any of them are written.
     write_file(&paths.read_descriptor_manifest_out, &output)?;
     println!("Wrote {}", paths.read_descriptor_manifest_out.display());
     Ok(())
 }
 
-fn validate_postgres_access_paths(
+pub(crate) fn validate_postgres_access_paths(
     descriptor_manifest_json: &str,
     storage_policy_json: &str,
-    cold_ddl_dir: &Path,
+    cold_ddl: &BTreeMap<String, String>,
 ) -> Result<()> {
     let descriptors: ReadDescriptorManifest = serde_json::from_str(descriptor_manifest_json)
         .context("parse generated read descriptor manifest")?;
@@ -667,15 +667,17 @@ fn validate_postgres_access_paths(
         let cold_table = policy["archive"]["cold_table"]
             .as_str()
             .with_context(|| format!("query {} has no cold table", query.resource))?;
-        let ddl_path = cold_ddl_dir.join(format!("{cold_table}.sql"));
-        let ddl = read_to_string(&ddl_path)?;
+        let filename = format!("{cold_table}.sql");
+        let ddl = cold_ddl
+            .get(&filename)
+            .with_context(|| format!("missing canonical PostgreSQL artifact {filename}"))?;
         let expected = expected_postgres_index_ddl(cold_table, &query.access_path.columns);
         if !ddl.contains(&expected) {
             bail!(
                 "query {} requires PostgreSQL access path {:?}, absent from {}",
                 query.resource,
                 query.access_path.columns,
-                ddl_path.display()
+                filename
             );
         }
     }

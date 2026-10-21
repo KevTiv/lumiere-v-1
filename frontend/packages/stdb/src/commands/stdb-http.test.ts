@@ -56,3 +56,39 @@ test("AI run cancellation uses its released immutable ID and named company input
     reason: "Cancelled from UI",
   })
 })
+
+test("documents and workflow snapshot reducers use released named contracts", () => {
+  const release = stdbBffCommandPost("release_document_legal_hold", {
+    holdId: 17n,
+    params: { metadata: { some: "case-17" } },
+  })
+  assert.equal(
+    release.urlPath,
+    `/api/operations/${encodeURIComponent(SESSION_OPERATION_DESCRIPTORS.release_document_legal_hold.contractOperationId)}`,
+  )
+  assert.deepEqual(JSON.parse(String(release.init.body)), {
+    holdId: 17,
+    params: { metadata: { some: "case-17" } },
+  })
+
+  const snapshot = stdbBffCommandPost("request_workflow_subject_snapshot", {
+    companyId: 4n,
+    params: {
+      subjectModel: "sale_order",
+      subjectId: 23n,
+      workflowVersionId: 29n,
+    },
+  })
+  assert.equal(
+    snapshot.urlPath,
+    `/api/operations/${encodeURIComponent(SESSION_OPERATION_DESCRIPTORS.request_workflow_subject_snapshot.contractOperationId)}`,
+  )
+  assert.deepEqual(JSON.parse(String(snapshot.init.body)), {
+    companyId: 4,
+    params: {
+      subjectModel: "sale_order",
+      subjectId: 23,
+      workflowVersionId: 29,
+    },
+  })
+})

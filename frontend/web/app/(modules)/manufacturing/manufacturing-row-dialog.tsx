@@ -10,20 +10,28 @@ import {
   manufacturingWorkcenterRowActionForm,
 } from "@lumiere/ui"
 import type { ManufacturingMutations } from "@lumiere/query-hooks/hooks/manufacturing"
+import type { ResolvedOperationEffectOutcome } from "@lumiere/query-hooks/hooks/operation-effect"
+import type { QualityCheck } from "@lumiere/stdb/types"
+import type { ResourceQueryRowMap } from "@lumiere/stdb/resource-reads"
 import type { QueryRows } from "@/lib/query-fetch"
 import { submitManufacturingRowAction } from "@/lib/manufacturing-row-action-submit"
 
 type TabEntity = "orders" | "boms" | "workorders" | "workcenters"
 
 export interface ManufacturingRowDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  tabId: string | null
-  row: Record<string, unknown> | null
-  workcenters: QueryRows
-  iotDevices: QueryRows
-  mutations: ManufacturingMutations
-  t: TFunction
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onActionResult?: (outcome: ResolvedOperationEffectOutcome) => void;
+  tabId: string | null;
+  row: Record<string, unknown> | null;
+  workcenters: QueryRows;
+  workcenterCostRates?: ResourceQueryRowMap["mrp-workcenter-cost-rates"][];
+  iotDevices: QueryRows;
+  iotReferenceStatus?: string;
+  qualityChecks: QualityCheck[];
+  productOptions: Array<{ value: string; label: string; disabled?: boolean }>;
+  mutations: ManufacturingMutations;
+  t: TFunction;
 }
 
 function rowId(row: Record<string, unknown>): string {
@@ -48,10 +56,15 @@ function workcenterIdOnDevice(d: Record<string, unknown>): string {
 export function ManufacturingRowDialog({
   open,
   onOpenChange,
+  onActionResult,
   tabId,
   row,
   workcenters,
+  workcenterCostRates,
   iotDevices,
+  iotReferenceStatus,
+  qualityChecks,
+  productOptions,
   mutations,
   t,
 }: ManufacturingRowDialogProps) {
@@ -76,6 +89,9 @@ export function ManufacturingRowDialog({
   )
 
   const iotDeviceOptions = useMemo(() => {
+    if (iotReferenceStatus) {
+      return [{ value: "", label: `IoT devices: ${iotReferenceStatus}`, disabled: true as const }]
+    }
     const sorted = [...iotDevices].sort((a, b) =>
       String(a.name ?? "").localeCompare(String(b.name ?? "")),
     )
@@ -89,7 +105,7 @@ export function ManufacturingRowDialog({
       .filter((o) => o.value !== "")
     if (opts.length > 0) return opts
     return [{ value: "", label: t("manufacturing.rowActions.noIotDevices"), disabled: true as const }]
-  }, [iotDevices, t])
+  }, [iotDevices, iotReferenceStatus, t])
 
   const linkedDeviceIdForWc = useMemo(() => {
     if (!row || entity !== "workcenters") return ""
@@ -113,21 +129,30 @@ export function ManufacturingRowDialog({
         state,
         defaultProduceQty,
         workcenterOptions,
-      })
+      });
     }
     if (entity === "boms") {
       return manufacturingBomRowActionForm(t, {
         recordId: id,
         defaultProductQty: Number(row.productQty ?? 1) || 1,
-      })
+        productOptions,
+      });
     }
-    if (entity === "workorders") {
-      const workcenterId = String(row.workcenterId ?? row.workcenter_id ?? "")
+    if (entity === 'workorders') {
+      const workcenterId = String(row.workcenterId ?? row.workcenter_id ?? '');
+      const qualityCheck = qualityChecks.find(
+        (check) => String(check.workorderId ?? '') === id,
+      );
       return manufacturingWorkorderRowActionForm(t, {
         recordId: id,
         state,
         workcenterId,
-      })
+        qualityCheckId:
+          qualityCheck?.id != null ? String(qualityCheck.id) : undefined,
+        qualityState: String(
+          qualityCheck?.qualityState ?? 'none',
+        ),
+      });
     }
     if (entity === "workcenters") {
       return manufacturingWorkcenterRowActionForm(t, {
@@ -135,10 +160,23 @@ export function ManufacturingRowDialog({
         defaultName: String(row.name ?? ""),
         iotDeviceOptions,
         linkedDeviceId: linkedDeviceIdForWc || undefined,
+        defaultHourlyRate: workcenterCostRates?.find(rate => String(rate.workcenterId) === id)?.hourlyRate,
       })
     }
-    return null
-  }, [row, entity, id, state, t, workcenterOptions, iotDeviceOptions, linkedDeviceIdForWc])
+    return null;
+  }, [
+    row,
+    entity,
+    id,
+    state,
+    t,
+    workcenterOptions,
+    workcenterCostRates,
+    iotDeviceOptions,
+    linkedDeviceIdForWc,
+    qualityChecks,
+    productOptions,
+  ]);
 
   if (!formConfig || !tabId) return null
 
@@ -154,7 +192,8 @@ export function ManufacturingRowDialog({
         onSubmit={async (data) => {
           setSubmitError(null)
           try {
-            await submitManufacturingRowAction(tabId, data, mutations)
+            const outcome = await submitManufacturingRowAction(tabId, data, mutations)
+            if (outcome) onActionResult?.(outcome)
             onOpenChange(false)
           } catch (e) {
             setSubmitError(e instanceof Error ? e.message : String(e))

@@ -1,8 +1,15 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, type MouseEvent } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
-import type { EntityAction, EntityRow, EntityTableConfig } from "../lib/entity-view-types"
+import type {
+  EntityAction,
+  EntityActionConfirmation,
+  EntityRow,
+  EntityRowAction,
+  EntityTableConfig,
+} from "../lib/entity-view-types"
 import { filterEntitySurface } from "../lib/entity-view-types"
 import { useRBAC } from "../lib/rbac-context"
 import {
@@ -32,26 +39,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/select"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "../components/pagination"
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "../components/empty"
+import { TABLE_PAGE_SIZE, TablePager } from "../components/table-pager"
+import { EmptyStateCard } from "../components/empty-state-card"
+import { decideListEmptyState, resolveEmptyCtas, type ResolvedEmptyCta } from "../lib/list-empty-state"
 import { Skeleton } from "../components/skeleton"
+import { Checkbox } from "../components/checkbox"
+import { showWorkflowToast } from "../lib/workflow-toast"
+import { commitRecordListFor, rememberRecordList } from "../lib/record-list-context"
 import { TooltipProvider } from "../components/tooltip"
-import { Search, ArrowUp, ArrowDown, ArrowUpDown, FileDown, X } from "lucide-react"
+import { Search, ArrowUp, ArrowDown, ArrowUpDown, Bookmark, Columns3, FileDown, Trash2, X, Inbox, SearchX, Loader2, MoreHorizontal } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "../components/dropdown-menu"
+import { EntityFacetFilter } from "./entity-facet-filter"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -59,15 +64,33 @@ import {
 } from "../forms/utils/radix-select-empty-value"
 import {
   formatEntityFieldValue,
-  formatTimestampLike,
   getRowField,
 } from "../lib/entity-row-utils"
-import { rowsToCsv, downloadCsv } from "../lib/export-csv"
+import { useEntityTableExport } from "./use-entity-table-export"
+import { rowFilterValue } from "../lib/entity-table-engine"
+import { useEntityTable } from "./use-entity-table"
+import { InlineEditCell } from "./inline-edit-cell"
+import {
+  EMPTY_TABLE_VIEW,
+  countRowsBy,
+  groupRowsBy,
+  readTableView,
+  tableViewStorageKey,
+  readSavedFilters,
+  removeSavedFilter,
+  sumRowsBy,
+  savedFiltersStorageKey,
+  toggleHiddenColumn,
+  upsertSavedFilter,
+  type EntityTableViewState,
+  type SavedTableFilter,
+} from "../lib/entity-table-view"
+import { Popover, PopoverContent, PopoverTrigger } from "../components/popover"
 
-const PAGE_SIZE = 25
+const PAGE_SIZE = TABLE_PAGE_SIZE
+/** Rows-per-page choices offered under every table. */
+export const ENTITY_TABLE_PAGE_SIZES = [10, 25, 50, 100] as const
 const LOADING_ROW_COUNT = 5
-
-type SortDirection = "asc" | "desc"
 
 interface EntityTableProps {
   config: EntityTableConfig
@@ -81,46 +104,20 @@ interface EntityTableProps {
   initialFilters?: Record<string, string>
   /** Clears a parent-owned filter at its source rather than persisting a local override. */
   onInitialFilterClear?: (key: string) => void
+  /** Explicitly enable export for a reviewed list. Export is fail-closed by default. */
+  allowExport?: boolean
+  /** Narrowing applied above the table (a KPI tile): counts as an active filter for the empty state. */
+  externalFilter?: { active: boolean; onClear?: () => void }
 }
 
-function rowFilterValue(row: EntityRow, key: string): string {
-  const val = row[key]
-  if (val == null) return ""
-  if (typeof val === "object" && !Array.isArray(val)) {
-    const obj = val as EntityRow
-    if ("tag" in obj && typeof obj.tag === "string") return obj.tag
-    if ("some" in obj) return rowFilterValue({ [key]: obj.some }, key)
-  }
-  return String(val)
-}
-
-function csvCellValue(value: unknown): string | number {
-  if (value == null) return ""
-  if (typeof value === "string" || typeof value === "number") return value
-  if (typeof value === "boolean") return value ? "Yes" : "No"
-  if (typeof value === "object" && !Array.isArray(value)) {
-    const obj = value as EntityRow
-    if ("tag" in obj && typeof obj.tag === "string") return obj.tag
-    if ("some" in obj) return csvCellValue(obj.some)
-    const d = formatTimestampLike(value)
-    if (d) return d.toISOString()
-  }
-  return String(value)
-}
-
-function compareRowValues(a: unknown, b: unknown, direction: SortDirection): number {
-  const mul = direction === "asc" ? 1 : -1
-  if (a == null && b == null) return 0
-  if (a == null) return 1
-  if (b == null) return -1
-
-  const dateA = formatTimestampLike(a)
-  const dateB = formatTimestampLike(b)
-  if (dateA && dateB) return mul * (dateA.getTime() - dateB.getTime())
-
-  if (typeof a === "number" && typeof b === "number") return mul * (a - b)
-
-  return mul * String(a).localeCompare(String(b), undefined, { numeric: true })
+/** "Status" → "All statuses", "Priority" → "All priorities". */
+export function allFilterLabel(label: string): string {
+  const lower = label.toLowerCase()
+  let plural: string
+  if (/[^aeiou]y$/.test(lower)) plural = `${lower.slice(0, -1)}ies`
+  else if (/(s|x|z|ch|sh)$/.test(lower)) plural = `${lower}es`
+  else plural = `${lower}s`
+  return `All ${plural}`
 }
 
 function readPersistedFilters(
@@ -137,23 +134,6 @@ function readPersistedFilters(
   )
 }
 
-function paginationItems(currentPage: number, totalPages: number): Array<number | "ellipsis"> {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1)
-  }
-
-  const items: Array<number | "ellipsis"> = [1]
-  if (currentPage > 3) items.push("ellipsis")
-
-  const start = Math.max(2, currentPage - 1)
-  const end = Math.min(totalPages - 1, currentPage + 1)
-  for (let page = start; page <= end; page += 1) items.push(page)
-
-  if (currentPage < totalPages - 2) items.push("ellipsis")
-  items.push(totalPages)
-  return items
-}
-
 export function EntityTable({
   config,
   data,
@@ -163,15 +143,16 @@ export function EntityTable({
   isLoading = false,
   initialFilters,
   onInitialFilterClear,
+  allowExport,
+  externalFilter,
 }: EntityTableProps) {
+  const { t } = useTranslation()
   const { checkPermission } = useRBAC()
   const [search, setSearch] = useState("")
   const [persistedFilters, setPersistedFilters] = useState<Record<string, string>>({})
   const [loadedListViewKey, setLoadedListViewKey] = useState<string | null>(null)
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
-  const [sortKey, setSortKey] = useState<string | null>(null)
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
-  const [page, setPage] = useState(1)
+  const [pendingActionIds, setPendingActionIds] = useState<ReadonlySet<string>>(new Set())
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE)
   const persistedFilterKeys = useMemo(
     () => new Set(config.filters?.map((filter) => filter.key) ?? []),
     [config.filters],
@@ -208,22 +189,95 @@ export function EntityTable({
     }
   }, [config.listViewKey, loadedListViewKey, persistedFilters])
 
+  const [savedFilters, setSavedFilters] = useState<SavedTableFilter[]>([])
+  const [loadedSavedKey, setLoadedSavedKey] = useState<string | null>(null)
+  const [newFilterName, setNewFilterName] = useState("")
+
+  useEffect(() => {
+    const key = config.listViewKey
+    if (!key || typeof window === "undefined") {
+      setSavedFilters([])
+      setLoadedSavedKey(key ?? "")
+      return
+    }
+    let saved: SavedTableFilter[] = []
+    try {
+      const raw = window.localStorage.getItem(savedFiltersStorageKey(key))
+      if (raw) saved = readSavedFilters(JSON.parse(raw) as unknown, persistedFilterKeys)
+    } catch {
+      // ignore corrupt saved filters
+    }
+    setSavedFilters(saved)
+    setLoadedSavedKey(key)
+  }, [config.listViewKey, persistedFilterKeys])
+
+  useEffect(() => {
+    const key = config.listViewKey
+    if (!key || loadedSavedKey !== key || typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(savedFiltersStorageKey(key), JSON.stringify(savedFilters))
+    } catch {
+      // ignore quota errors
+    }
+  }, [config.listViewKey, loadedSavedKey, savedFilters])
+
   const filters = useMemo(
     () => ({ ...persistedFilters, ...initialFilters }),
     [initialFilters, persistedFilters],
   )
 
-  useEffect(() => {
-    setPage(1)
-  }, [search, filters, sortKey, sortDirection, data.length])
-
-  const columns = useMemo(
+  const permittedColumns = useMemo(
     () => filterEntitySurface(config.columns, checkPermission),
     [config.columns, checkPermission],
+  )
+  const groupableFilters = useMemo(
+    () => (config.filters ?? []).filter((filter) => (filter.options?.length ?? 0) > 0),
+    [config.filters],
+  )
+  const [view, setView] = useState<EntityTableViewState>(EMPTY_TABLE_VIEW)
+  const [loadedViewKey, setLoadedViewKey] = useState<string | null>(null)
+  const permittedColumnKeys = useMemo(() => permittedColumns.map((col) => col.key), [permittedColumns])
+  const groupKeys = useMemo(() => groupableFilters.map((filter) => filter.key), [groupableFilters])
+
+  useEffect(() => {
+    const key = config.listViewKey
+    if (!key || typeof window === "undefined") {
+      setView(EMPTY_TABLE_VIEW)
+      setLoadedViewKey(key ?? "")
+      return
+    }
+    let saved: EntityTableViewState = EMPTY_TABLE_VIEW
+    try {
+      const raw = window.localStorage.getItem(tableViewStorageKey(key))
+      if (raw) saved = readTableView(JSON.parse(raw) as unknown, permittedColumnKeys, groupKeys)
+    } catch {
+      // ignore corrupt saved view
+    }
+    setView(saved)
+    setLoadedViewKey(key)
+  }, [config.listViewKey, permittedColumnKeys, groupKeys])
+
+  useEffect(() => {
+    const key = config.listViewKey
+    if (!key || loadedViewKey !== key || typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(tableViewStorageKey(key), JSON.stringify(view))
+    } catch {
+      // ignore quota errors
+    }
+  }, [config.listViewKey, loadedViewKey, view])
+
+  const columns = useMemo(
+    () => permittedColumns.filter((col) => !view.hiddenColumns.includes(col.key)),
+    [permittedColumns, view.hiddenColumns],
   )
   const actions = useMemo(
     () => filterEntitySurface(config.actions, checkPermission),
     [config.actions, checkPermission],
+  )
+  const rowActions = useMemo(
+    () => filterEntitySurface(config.rowActions, checkPermission),
+    [config.rowActions, checkPermission],
   )
 
   const rowKey = config.rowKey ?? "id"
@@ -234,112 +288,260 @@ export function EntityTable({
     ([key, value]) => value && value !== "__all__" && !config.filters?.some((f) => f.key === key),
   )
 
-  const filtered = useMemo(() => {
-    let rows = data
+  const {
+    table,
+    sortedRows: sorted,
+    pageRows,
+    selectedRows,
+    selectedCount,
+    currentPage,
+    pageCount: totalPages,
+    setPage,
+    sortedBy,
+    toggleSort,
+    clearSelection,
+  } = useEntityTable({
+    columns,
+    data,
+    rowKey,
+    pageSize,
+    searchKeys: config.searchKeys,
+    search,
+    filters,
+    groupBy: view.groupBy,
+  })
 
-    if (search && config.searchKeys?.length) {
-      const q = search.toLowerCase()
-      rows = rows.filter((row) =>
-        config.searchKeys!.some((k) => String(row[k] ?? "").toLowerCase().includes(q)),
-      )
-    }
-
-    for (const [key, val] of Object.entries(filters)) {
-      if (val && val !== "__all__") {
-        rows = rows.filter(
-          (row) => rowFilterValue(row, key).toLowerCase() === val.toLowerCase(),
-        )
-      }
-    }
-
-    return rows
-  }, [data, search, filters, config.searchKeys])
-
-  const sorted = useMemo(() => {
-    if (!sortKey) return filtered
-    return [...filtered].sort((a, b) =>
-      compareRowValues(getRowField(a, sortKey), getRowField(b, sortKey), sortDirection),
-    )
-  }, [filtered, sortKey, sortDirection])
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
-  const currentPage = Math.min(page, totalPages)
-
-  const paginated = useMemo(() => {
-    const start = (currentPage - 1) * PAGE_SIZE
-    return sorted.slice(start, start + PAGE_SIZE)
-  }, [sorted, currentPage])
-
-  const selectedRows = filtered.filter((row) =>
-    selectedKeys.has(String(getRowField(row, rowKey) ?? "")),
+  const groupFilter = groupableFilters.find((filter) => filter.key === view.groupBy)
+  const groupCounts = useMemo(
+    () => (view.groupBy ? countRowsBy(sorted, view.groupBy) : null),
+    [sorted, view.groupBy],
   )
-
-  const toggleRow = (key: string) => {
-    setSelectedKeys((prev) => {
-      if (prev.size === 1 && prev.has(key)) return prev
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      return next
-    })
-  }
+  const currencyColumns = useMemo(() => columns.filter((col) => col.type === "currency"), [columns])
+  const groupSums = useMemo(() => {
+    const groupKey = view.groupBy
+    if (!groupKey) return null
+    return new Map(currencyColumns.map((col) => [col.key, sumRowsBy(sorted, groupKey, col.key)] as const))
+  }, [sorted, view.groupBy, currencyColumns])
+  // Rows of the group on top of this page that began on the previous one.
+  const continuedGroup = useMemo(() => {
+    const groupKey = view.groupBy
+    const start = (currentPage - 1) * pageSize
+    if (!groupKey || start === 0) return null
+    const previous = sorted[start - 1]
+    return previous ? rowFilterValue(previous, groupKey) : null
+  }, [sorted, view.groupBy, currentPage, pageSize])
+  const renderGroups = useMemo(
+    () => (view.groupBy ? groupRowsBy(pageRows, view.groupBy) : [{ value: "", rows: pageRows }]),
+    [pageRows, view.groupBy],
+  )
+  const groupLabel = (value: string): string =>
+    value === ""
+      ? "None"
+      : (groupFilter?.options?.find((option) => String(option.value) === value)?.label ?? value)
 
   const [pendingConfirm, setPendingConfirm] = useState<{
-    action: EntityAction
+    confirm: EntityActionConfirmation
     rows: EntityRow[]
+    run: () => void
   } | null>(null)
 
+  /** Runs the action, keeps its button pending until it settles, and reports failures. */
+  const executeAction = async (action: EntityAction, rows: EntityRow[]) => {
+    if (pendingActionIds.has(action.id)) return
+    setPendingActionIds((prev) => new Set(prev).add(action.id))
+    try {
+      await action.onClick(rows)
+      if (action.successMessage) {
+        showWorkflowToast({ kind: "success", title: action.successMessage })
+      }
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: `${action.label} failed`,
+        description: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      setPendingActionIds((prev) => {
+        const next = new Set(prev)
+        next.delete(action.id)
+        return next
+      })
+    }
+  }
+
   const runAction = (action: EntityAction) => {
-    if (action.confirm) setPendingConfirm({ action, rows: selectedRows })
-    else action.onClick(selectedRows)
+    const rows = selectedRows
+    if (action.confirm) {
+      setPendingConfirm({ confirm: action.confirm, rows, run: () => void executeAction(action, rows) })
+    } else {
+      void executeAction(action, rows)
+    }
+  }
+
+  /** Runs a row menu entry; its pending state is keyed by action and row. */
+  const executeRowAction = async (action: EntityRowAction, row: EntityRow, pendingId: string) => {
+    if (pendingActionIds.has(pendingId)) return
+    setPendingActionIds((prev) => new Set(prev).add(pendingId))
+    try {
+      await action.onClick(row)
+      if (action.successMessage) showWorkflowToast({ kind: "success", title: action.successMessage })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: `${action.label} failed`,
+        description: error instanceof Error ? error.message : String(error),
+      })
+    } finally {
+      setPendingActionIds((prev) => {
+        const next = new Set(prev)
+        next.delete(pendingId)
+        return next
+      })
+    }
+  }
+
+  const runRowAction = (action: EntityRowAction, row: EntityRow, rowId: string) => {
+    const pendingId = `row:${rowId}:${action.id}`
+    if (action.confirm) {
+      setPendingConfirm({ confirm: action.confirm, rows: [row], run: () => void executeRowAction(action, row, pendingId) })
+    } else {
+      void executeRowAction(action, row, pendingId)
+    }
   }
 
   const hasActions = actions.length > 0
+  // Row actions only appear once rows are selected; inapplicable ones stay
+  // visible but disabled so the selection's state is still explained.
+  const selectionActions = actions.filter((action) => action.requiresSelection)
+  const renderActionButton = (action: EntityAction) => {
+    const Icon = action.icon
+    const isPending = pendingActionIds.has(action.id)
+    const needsSingleRow =
+      action.requiresSelection === true &&
+      (action.selection ?? "single") === "single" &&
+      selectedRows.length > 1
+    return (
+      <Button
+        key={action.id}
+        variant={action.variant ?? "outline"}
+        size="sm"
+        disabled={
+          isPending ||
+          needsSingleRow ||
+          (selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false)
+        }
+        title={needsSingleRow ? "Select a single record to use this action" : undefined}
+        aria-busy={isPending || undefined}
+        onClick={() => runAction(action)}
+        data-testid={`entity-action-${action.id}`}
+      >
+        {isPending ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          Icon && <Icon className="mr-2 h-4 w-4" />
+        )}
+        {action.label}
+      </Button>
+    )
+  }
   const selectionToggleOnRowClick =
     config.rowSelectionToggleOnClick ??
     (hasActions && actions.some((a) => a.requiresSelection === true))
   const rowsAreInteractive = Boolean(onRowClick || selectionToggleOnRowClick)
+  // Rows can be ticked individually, and the whole page at once, whenever the table has actions
+  // that run on a selection.
+  const showSelectColumn = selectionActions.length > 0 || config.selectable === true
+  const selectColumnCount = showSelectColumn ? 1 : 0
+  const rowActionColumnCount = rowActions.length > 0 ? 1 : 0
 
-  const activateRow = (key: string, row: EntityRow) => {
-    if (selectionToggleOnRowClick) toggleRow(key)
-    onRowClick?.(row)
+  const activateRow = (tableRow: (typeof pageRows)[number]) => {
+    // A click on the only selected row keeps it selected; untick it with its checkbox.
+    if (selectionToggleOnRowClick && !(selectedCount === 1 && tableRow.getIsSelected())) {
+      tableRow.toggleSelected()
+    }
+    onRowClick?.(tableRow.original)
   }
 
   const handleSort = (columnKey: string, sortable?: boolean) => {
     if (!sortable) return
-    if (sortKey === columnKey) {
-      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))
-      return
-    }
-    setSortKey(columnKey)
-    setSortDirection("asc")
+    toggleSort(columnKey)
   }
 
   const getSortIcon = (columnKey: string, sortable?: boolean) => {
     if (!sortable) return null
-    if (sortKey !== columnKey) {
+    if (sortedBy?.id !== columnKey) {
       return <ArrowUpDown className="ml-1 h-4 w-4 opacity-50" />
     }
-    return sortDirection === "asc" ? (
+    return !sortedBy.desc ? (
       <ArrowUp className="ml-1 h-4 w-4" />
     ) : (
       <ArrowDown className="ml-1 h-4 w-4" />
     )
   }
 
-  const emptyTitle =
-    config.emptyState?.title ?? config.emptyMessage ?? "No records found."
-
-  const handleCsvExport = () => {
-    const csv = rowsToCsv(
-      columns.map((col) => col.label),
-      sorted.map((row) => columns.map((col) => csvCellValue(getRowField(row, col.key)))),
-    )
-    downloadCsv(config.listViewKey ?? "export", csv)
+  // First-time (nothing exists yet) and no-results (search, filters or a KPI tile hide everything)
+  // are different situations: the first onboards, the second offers to clear.
+  const emptyKind = decideListEmptyState({
+    isLoading,
+    totalRows: data.length,
+    visibleRows: sorted.length,
+    search,
+    filters,
+    externalFilterActive: externalFilter?.active,
+  })
+  const emptyCtas = resolveEmptyCtas(
+    config.emptyState,
+    actions,
+    (permission) => checkPermission(permission.resource, permission.action).allowed,
+  )
+  const clearAllFilters = () => {
+    setSearch("")
+    setPersistedFilters({})
+    for (const key of Object.keys(initialFilters ?? {})) onInitialFilterClear?.(key)
+    externalFilter?.onClear?.()
   }
+  const ctaFromAction = (cta: ResolvedEmptyCta | null, testId?: string) => {
+    if (!cta) return undefined
+    const action = cta.actionId ? actions.find((a) => a.id === cta.actionId) : undefined
+    return {
+      label: cta.label,
+      testId,
+      disabled: action ? pendingActionIds.has(action.id) : false,
+      onClick: () => (action ? runAction(action) : cta.onClick?.()),
+    }
+  }
+
+  // Opening a record from this list (a name link, or a row whose sheet has an Open button) files
+  // the keys now shown, in order, so the record page's previous / next follow this list.
+  const publishRecordList = (event: MouseEvent<HTMLElement>) => {
+    try {
+      const ids = sorted.map((row) => String(row[rowKey] ?? ""))
+      rememberRecordList(ids)
+      const anchor = (event.target as Element | null)?.closest?.("a[href]")
+      commitRecordListFor(anchor?.getAttribute("href") ?? undefined, ids)
+    } catch {
+      // Navigation must never depend on this.
+    }
+  }
+
+  // Selected rows go out in the order shown; with no selection, every row matching the search and filters.
+  const selectedSet = new Set(selectedRows)
+  const { exportCsv } = useEntityTableExport({
+    columns,
+    selectedRows: selectedSet.size > 0 ? sorted.filter((row) => selectedSet.has(row)) : [],
+    filteredRows: sorted,
+    listViewKey: config.listViewKey,
+  })
+  const exportLabel = t("common.entityView.export", { defaultValue: "Export" })
+  const canExport = (allowExport ?? config.allowExport ?? false) && columns.some((col) => !col.sensitive)
 
   return (
     <TooltipProvider>
-      <div className={cn("space-y-4", className)} data-testid="entity-table">
+      <div
+        className={cn("space-y-4", className)}
+        data-testid="entity-table"
+        onClickCapture={publishRecordList}
+      >
         {hiddenFilters.length > 0 && (
           <div className="flex flex-wrap items-center gap-2" data-testid="entity-active-filters">
             {hiddenFilters.map(([key, value]) => (
@@ -383,6 +585,21 @@ export function EntityTable({
             )}
             {config.filters?.map((f) => {
               const raw = filters[f.key] ?? "__all__"
+              if (f.faceted && (f.options?.length ?? 0) > 0) {
+                return (
+                  <EntityFacetFilter
+                    key={f.key}
+                    filter={f}
+                    value={raw}
+                    rows={data}
+                    disabled={Object.hasOwn(initialFilters ?? {}, f.key) && !onInitialFilterClear}
+                    onChange={(val) => {
+                      if (Object.hasOwn(initialFilters ?? {}, f.key)) onInitialFilterClear?.(f.key)
+                      setPersistedFilters((prev) => ({ ...prev, [f.key]: val }))
+                    }}
+                  />
+                )
+              }
               const selectValue =
                 raw === "__all__" ? "__all__" : radixSelectControlledValue(raw, f.options)
               return (
@@ -404,7 +621,7 @@ export function EntityTable({
                     <SelectValue placeholder={f.placeholder ?? f.label} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">All {f.label}s</SelectItem>
+                    <SelectItem value="__all__">{allFilterLabel(f.label)}</SelectItem>
                     {f.options?.map((o, idx) => (
                       <SelectItem
                         key={`${radixSelectItemValue(o, idx)}-${idx}`}
@@ -418,38 +635,166 @@ export function EntityTable({
               )
             })}
             <div className="ml-auto flex items-center gap-2">
-              {sorted.length > 0 && (
+              {config.listViewKey && ((config.filters?.length ?? 0) > 0 || config.searchable) && (
+                <Popover>
+                  <PopoverTrigger
+                    render={
+                      <Button variant="outline" size="sm" aria-label="Saved filters" data-testid="entity-saved-filters" />
+                    }
+                  >
+                    <Bookmark className="mr-2 h-4 w-4" />
+                    Saved filters
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-72 space-y-3">
+                    {savedFilters.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No saved filters yet. Set a search or filters, then save them under a name.
+                      </p>
+                    ) : (
+                      <ul className="space-y-1" data-testid="entity-saved-filter-list">
+                        {savedFilters.map((saved) => (
+                          <li key={saved.name} className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="min-w-0 flex-1 justify-start truncate"
+                              data-testid={`entity-saved-filter-apply-${saved.name}`}
+                              onClick={() => {
+                                setSearch(saved.search)
+                                setPersistedFilters((prev) => ({
+                                  ...Object.fromEntries(Object.keys(prev).map((key) => [key, "__all__"])),
+                                  ...saved.filters,
+                                }))
+                              }}
+                            >
+                              {saved.name}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Delete saved filter ${saved.name}`}
+                              data-testid={`entity-saved-filter-delete-${saved.name}`}
+                              onClick={() => setSavedFilters((prev) => removeSavedFilter(prev, saved.name))}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <form
+                      className="flex items-center gap-2"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        setSavedFilters((prev) =>
+                          upsertSavedFilter(prev, { name: newFilterName, search, filters }),
+                        )
+                        setNewFilterName("")
+                      }}
+                    >
+                      <Input
+                        aria-label="Name for the current filters"
+                        placeholder="Name for current filters"
+                        value={newFilterName}
+                        onChange={(event) => setNewFilterName(event.target.value)}
+                        data-testid="entity-saved-filter-name"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={!newFilterName.trim()}
+                        data-testid="entity-saved-filter-save"
+                      >
+                        Save
+                      </Button>
+                    </form>
+                  </PopoverContent>
+                </Popover>
+              )}
+              {groupableFilters.length > 0 && (
+                <Select
+                  value={view.groupBy ?? "__none__"}
+                  onValueChange={(val) =>
+                    setView((prev) => ({ ...prev, groupBy: val === "__none__" ? null : String(val) }))
+                  }
+                >
+                  <SelectTrigger className="w-40" aria-label="Group by" data-testid="entity-group-by">
+                    <SelectValue placeholder="Group by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">No grouping</SelectItem>
+                    {groupableFilters.map((filter) => (
+                      <SelectItem key={filter.key} value={filter.key}>
+                        Group by {filter.label.toLowerCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {permittedColumns.length > 1 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" aria-label="Choose columns" data-testid="entity-columns">
+                      <Columns3 className="mr-2 h-4 w-4" />
+                      Columns
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Show columns</DropdownMenuLabel>
+                    {permittedColumns.map((col) => (
+                      <DropdownMenuCheckboxItem
+                        key={col.key}
+                        checked={!view.hiddenColumns.includes(col.key)}
+                        onSelect={(event) => event.preventDefault()}
+                        onCheckedChange={() =>
+                          setView((prev) => ({
+                            ...prev,
+                            hiddenColumns: toggleHiddenColumn(prev.hiddenColumns, col.key, permittedColumnKeys),
+                          }))
+                        }
+                        data-testid={`entity-column-toggle-${col.key}`}
+                      >
+                        {col.label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              {canExport && sorted.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleCsvExport}
-                  aria-label="Export CSV"
-                  data-testid="entity-export-csv"
+                  onClick={exportCsv}
+                  aria-label={exportLabel}
+                  data-testid="entity-table-export"
                 >
                   <FileDown className="mr-2 h-4 w-4" />
-                  Export CSV
+                  {exportLabel}
                 </Button>
               )}
-              {actions.map((action) => {
-                const Icon = action.icon
-                return (
-                  <Button
-                    key={action.id}
-                    variant={action.variant ?? "outline"}
-                    size="sm"
-                    disabled={
-                      (action.requiresSelection && selectedRows.length === 0) ||
-                      (selectedRows.length > 0 && action.isApplicable?.(selectedRows) === false)
-                    }
-                    onClick={() => runAction(action)}
-                    data-testid={`entity-action-${action.id}`}
-                  >
-                    {Icon && <Icon className="mr-2 h-4 w-4" />}
-                    {action.label}
-                  </Button>
-                )
-              })}
+              {actions.filter((action) => !action.requiresSelection).map(renderActionButton)}
             </div>
+          </div>
+        )}
+
+        {selectedRows.length > 0 && selectionActions.length > 0 && (
+          <div
+            className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2"
+            data-testid="entity-selection-actions"
+          >
+            <span className="mr-1 text-sm font-medium text-foreground">
+              {selectedRows.length} selected
+            </span>
+            {selectionActions.map(renderActionButton)}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto"
+              onClick={clearSelection}
+              data-testid="entity-selection-clear"
+            >
+              Clear selection
+            </Button>
           </div>
         )}
 
@@ -457,6 +802,18 @@ export function EntityTable({
           <Table>
             <TableHeader className="bg-muted/25">
               <TableRow>
+                {showSelectColumn && (
+                  <TableHead className="w-10">
+                    <Checkbox
+                      aria-label="Select all rows on this page"
+                      data-testid="entity-select-all"
+                      checked={table.getIsAllPageRowsSelected()}
+                      indeterminate={table.getIsSomePageRowsSelected()}
+                      disabled={pageRows.length === 0}
+                      onCheckedChange={(checked) => table.toggleAllPageRowsSelected(checked === true)}
+                    />
+                  </TableHead>
+                )}
                 {columns.map((col) => (
                   <TableHead
                     key={col.key}
@@ -477,10 +834,10 @@ export function EntityTable({
                         )}
                         onClick={() => handleSort(col.key, col.sortable)}
                         aria-sort={
-                          sortKey === col.key
-                            ? sortDirection === "asc"
-                              ? "ascending"
-                              : "descending"
+                          sortedBy?.id === col.key
+                            ? sortedBy.desc
+                              ? "descending"
+                              : "ascending"
                             : "none"
                         }
                       >
@@ -492,50 +849,98 @@ export function EntityTable({
                     )}
                   </TableHead>
                 ))}
+                {rowActionColumnCount > 0 && (
+                  <TableHead className="w-10">
+                    <span className="sr-only">Row actions</span>
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 Array.from({ length: LOADING_ROW_COUNT }, (_, rowIndex) => (
                   <TableRow key={`loading-${rowIndex}`}>
+                    {showSelectColumn && (
+                      <TableCell className="w-10">
+                        <Skeleton className="h-4 w-4" />
+                      </TableCell>
+                    )}
                     {columns.map((col) => (
                       <TableCell key={col.key}>
                         <Skeleton className="h-4 w-full max-w-32" />
                       </TableCell>
                     ))}
+                    {rowActionColumnCount > 0 && <TableCell className="w-10" />}
                   </TableRow>
                 ))
               ) : sorted.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={Math.max(columns.length, 1)} className="p-0">
-                    <Empty className="border-0 py-12">
-                      <EmptyHeader>
-                        {config.emptyState?.icon ? (
-                          <EmptyMedia variant="icon">{config.emptyState.icon}</EmptyMedia>
-                        ) : null}
-                        <EmptyTitle>{emptyTitle}</EmptyTitle>
-                        {config.emptyState?.description ? (
-                          <EmptyDescription>{config.emptyState.description}</EmptyDescription>
-                        ) : null}
-                      </EmptyHeader>
-                      {config.emptyState?.actionLabel && config.emptyState.onAction ? (
-                        <EmptyContent>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={config.emptyState.onAction}
-                          >
-                            {config.emptyState.actionLabel}
-                          </Button>
-                        </EmptyContent>
-                      ) : null}
-                    </Empty>
+                  <TableCell colSpan={Math.max(columns.length + selectColumnCount + rowActionColumnCount, 1)} className="p-0">
+                    {emptyKind === "no-results" ? (
+                      <EmptyStateCard
+                        data-testid="entity-empty-no-results"
+                        icon={<SearchX />}
+                        title={t("common.entityView.noResults.title", { defaultValue: "No matching records" })}
+                        description={t("common.entityView.noResults.description", {
+                          defaultValue: "Try a different search or clear the filters.",
+                        })}
+                        primaryAction={{
+                          label: t("common.entityView.noResults.clear", { defaultValue: "Clear filters" }),
+                          onClick: clearAllFilters,
+                          testId: "entity-empty-clear-filters",
+                        }}
+                      />
+                    ) : (
+                      <EmptyStateCard
+                        data-testid="entity-empty-first-time"
+                        icon={config.emptyState?.icon ?? <Inbox />}
+                        title={config.emptyState?.title ?? config.emptyMessage ?? t("common.entityView.firstTime.title", { defaultValue: "No records yet" })}
+                        description={config.emptyState?.description}
+                        primaryAction={ctaFromAction(emptyCtas.primary, "entity-empty-cta")}
+                        secondaryAction={ctaFromAction(emptyCtas.secondary, "entity-empty-secondary-cta")}
+                        hint={config.emptyState?.learnHint}
+                        readOnlyMessage={
+                          emptyCtas.readOnly
+                            ? (config.emptyState?.readOnlyMessage ??
+                              t("common.entityView.firstTime.readOnly", {
+                                defaultValue: "You have read-only access. Ask an administrator to add the first record.",
+                              }))
+                            : undefined
+                        }
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (
-                paginated.map((row, i) => {
-                  const key = String(getRowField(row, rowKey) ?? i)
-                  const isSelected = selectedKeys.has(key)
+                renderGroups.flatMap((group) => [
+                  view.groupBy ? (
+                    <TableRow key={`group-${group.value}`} className="bg-muted/40 hover:bg-muted/40" data-testid="entity-group-row">
+                      <TableCell colSpan={selectColumnCount + 1} className="py-2 text-sm font-medium">
+                        {groupLabel(group.value)}
+                        <span className="ml-2 font-normal text-muted-foreground">
+                          {groupCounts?.get(group.value) ?? group.rows.length}
+                          {group.value === continuedGroup ? " · continued" : ""}
+                        </span>
+                      </TableCell>
+                      {columns.slice(1).map((col) => {
+                        const total = groupSums?.get(col.key)?.get(group.value)
+                        return (
+                          <TableCell
+                            key={col.key}
+                            className={cn("py-2 text-sm font-medium", col.align === "right" && "text-right")}
+                            data-testid={total === undefined ? undefined : `entity-group-sum-${col.key}`}
+                          >
+                            {total === undefined ? null : formatEntityFieldValue(total, col.type)}
+                          </TableCell>
+                        )
+                      })}
+                      {rowActionColumnCount > 0 && <TableCell />}
+                    </TableRow>
+                  ) : null,
+                  ...group.rows.map((tableRow) => {
+                  const row = tableRow.original
+                  const key = tableRow.id
+                  const isSelected = tableRow.getIsSelected()
                   const isAiFocused =
                     aiFocusRowKey != null && aiFocusRowKey !== "" && key === aiFocusRowKey
                   return (
@@ -543,12 +948,15 @@ export function EntityTable({
                       key={key}
                       data-testid={`entity-row-${key}`}
                       data-ai-focus={isAiFocused ? "true" : undefined}
-                      onClick={rowsAreInteractive ? () => activateRow(key, row) : undefined}
+                      onClick={rowsAreInteractive ? () => activateRow(tableRow) : undefined}
                       onKeyDown={(event) => {
                         if (!rowsAreInteractive) return
+                        // Keys pressed on a control inside the row (the checkbox, a link) are that
+                        // control's own.
+                        if (event.target !== event.currentTarget) return
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault()
-                          activateRow(key, row)
+                          activateRow(tableRow)
                         }
                       }}
                       tabIndex={rowsAreInteractive ? 0 : undefined}
@@ -561,6 +969,16 @@ export function EntityTable({
                         isSelected && !isAiFocused && "bg-muted/50",
                       )}
                     >
+                      {showSelectColumn && (
+                        <TableCell className="w-10" onClick={(event) => event.stopPropagation()}>
+                          <Checkbox
+                            aria-label="Select row"
+                            data-testid={`entity-select-row-${key}`}
+                            checked={isSelected}
+                            onCheckedChange={(checked) => tableRow.toggleSelected(checked === true)}
+                          />
+                        </TableCell>
+                      )}
                       {columns.map((col) => {
                         const value = getRowField(row, col.key)
                         return (
@@ -571,98 +989,140 @@ export function EntityTable({
                               col.align === "center" && "text-center",
                             )}
                           >
-                            {col.render
-                              ? col.render(value, row)
-                              : formatEntityFieldValue(
-                                  value,
-                                  col.type,
-                                  col.badgeVariants,
-                                  col.badgeLabels,
-                                )}
+                            {(() => {
+                              const content = col.render
+                                ? col.render(value, row)
+                                : formatEntityFieldValue(
+                                    value,
+                                    col.type,
+                                    col.badgeVariants,
+                                    col.badgeLabels,
+                                  )
+                              return col.inlineEdit ? (
+                                <InlineEditCell
+                                  edit={col.inlineEdit}
+                                  row={row}
+                                  columnKey={col.key}
+                                  label={col.label}
+                                  value={value}
+                                >
+                                  {content}
+                                </InlineEditCell>
+                              ) : (
+                                content
+                              )
+                            })()}
                           </TableCell>
                         )
                       })}
+                      {rowActionColumnCount > 0 && (
+                        <TableCell className="w-10 text-right" onClick={(event) => event.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                aria-label="Row actions"
+                                data-testid={`entity-row-actions-${key}`}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {rowActions.map((action) => {
+                                const Icon = action.icon
+                                return (
+                                  <DropdownMenuItem
+                                    key={action.id}
+                                    variant={action.destructive ? "destructive" : undefined}
+                                    disabled={
+                                      action.isApplicable?.(row) === false ||
+                                      pendingActionIds.has(`row:${key}:${action.id}`)
+                                    }
+                                    onClick={() => runRowAction(action, row, key)}
+                                    data-testid={`entity-row-action-${action.id}-${key}`}
+                                  >
+                                    {Icon ? <Icon className="h-4 w-4" /> : null}
+                                    {action.label}
+                                  </DropdownMenuItem>
+                                )
+                              })}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      )}
                     </TableRow>
                   )
-                })
+                  }),
+                ])
               )}
             </TableBody>
           </Table>
         </div>
 
-        {!isLoading && sorted.length > PAGE_SIZE ? (
-          <Pagination className="justify-end">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault()
-                    if (currentPage > 1) setPage(currentPage - 1)
-                  }}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
-                />
-              </PaginationItem>
-              {paginationItems(currentPage, totalPages).map((item, index) =>
-                item === "ellipsis" ? (
-                  <PaginationItem key={`ellipsis-${index}`}>
-                    <PaginationEllipsis />
-                  </PaginationItem>
-                ) : (
-                  <PaginationItem key={item}>
-                    <PaginationLink
-                      href="#"
-                      isActive={item === currentPage}
-                      onClick={(event) => {
-                        event.preventDefault()
-                        setPage(item)
-                      }}
-                    >
-                      {item}
-                    </PaginationLink>
-                  </PaginationItem>
-                ),
-              )}
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(event) => {
-                    event.preventDefault()
-                    if (currentPage < totalPages) setPage(currentPage + 1)
-                  }}
-                  className={
-                    currentPage === totalPages ? "pointer-events-none opacity-50" : undefined
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+        {!isLoading && sorted.length > ENTITY_TABLE_PAGE_SIZES[0] ? (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span id="entity-rows-per-page-label">Rows per page</span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(val) => {
+                  setPageSize(Number(val))
+                  setPage(1)
+                }}
+              >
+                <SelectTrigger
+                  className="h-8 w-20"
+                  aria-labelledby="entity-rows-per-page-label"
+                  data-testid="entity-rows-per-page"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ENTITY_TABLE_PAGE_SIZES.map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <TablePager
+              currentPage={currentPage}
+              totalPages={totalPages}
+              setPage={setPage}
+              total={sorted.length}
+              pageSize={pageSize}
+              showRange={false}
+            />
+          </div>
         ) : null}
 
         {!isLoading && sorted.length > 0 && (
           <p className="text-xs text-muted-foreground">
-            {sorted.length > PAGE_SIZE
-              ? `${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, sorted.length)} of ${sorted.length}`
+            {sorted.length > pageSize
+              ? `${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, sorted.length)} of ${sorted.length}`
               : `${sorted.length} of ${data.length}`}{" "}
             record{sorted.length !== 1 ? "s" : ""}
-            {selectedKeys.size > 0 && ` · ${selectedKeys.size} selected`}
+            {selectedCount > 0 && ` · ${selectedCount} selected`}
           </p>
         )}
       </div>
       <AlertDialog open={pendingConfirm != null} onOpenChange={(open) => !open && setPendingConfirm(null)}>
         <AlertDialogContent data-testid="entity-action-confirm">
           <AlertDialogHeader>
-            <AlertDialogTitle>{pendingConfirm?.action.confirm?.title}</AlertDialogTitle>
-            <AlertDialogDescription>{pendingConfirm?.action.confirm?.description}</AlertDialogDescription>
+            <AlertDialogTitle>{pendingConfirm?.confirm.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {typeof pendingConfirm?.confirm.description === "function"
+                ? pendingConfirm.confirm.description(pendingConfirm.rows)
+                : pendingConfirm?.confirm.description}
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{pendingConfirm?.action.confirm?.cancelLabel}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (pendingConfirm) pendingConfirm.action.onClick(pendingConfirm.rows)
-              }}
-            >
-              {pendingConfirm?.action.confirm?.confirmLabel}
+            <AlertDialogCancel>{pendingConfirm?.confirm.cancelLabel}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => pendingConfirm?.run()}>
+              {pendingConfirm?.confirm.confirmLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

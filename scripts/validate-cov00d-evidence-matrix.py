@@ -56,9 +56,17 @@ def fail_non_empty(entry: dict[str, Any], field: str, failures: list[str]) -> No
 
 
 def catalog_exposure(surface_id: str, catalog: str) -> str | None:
+    # alphaFinanceSurface(...) is the catalog helper that sets firstOrgExposure
+    # to "enabled"; it is the only exposure it can produce.
+    if re.search(rf"alphaFinanceSurface\(\s*\"{re.escape(surface_id)}\"\s*,", catalog):
+        return "enabled"
     pending = re.search(rf"pendingU5\(\s*\"{re.escape(surface_id)}\"\s*,", catalog)
     if pending:
         return "review"
+
+    alpha = re.search(rf"alphaFinanceSurface\(\s*\"{re.escape(surface_id)}\"\s*,", catalog)
+    if alpha:
+        return "enabled"
 
     explicit = re.search(
         rf"\{{\s*id:\s*\"{re.escape(surface_id)}\"[\s\S]*?"

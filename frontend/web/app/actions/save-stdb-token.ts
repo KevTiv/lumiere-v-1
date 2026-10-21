@@ -41,4 +41,5 @@ export async function clearStdbSession(): Promise<void> {
   const store = await cookies()
   store.delete('stdb_token')
   store.delete('stdb_identity')
+  store.set('stdb_token', '', { path: '/v1/realtime', maxAge: 0, httpOnly: true, sameSite: 'strict', secure: cookieSecure })
 }

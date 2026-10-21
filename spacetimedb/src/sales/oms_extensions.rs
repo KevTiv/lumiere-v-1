@@ -14,7 +14,7 @@ use crate::purchasing::purchase_orders::{
 };
 use crate::sales::return_orders::{return_order, return_order_line};
 use crate::sales::sales_core::{
-    create_sale_order, sale_order, sale_order_line, sale_order_option, CreateSaleOrderLineParams,
+    create_sale_order_record, sale_order, sale_order_line, sale_order_option, CreateSaleOrderLineParams,
     CreateSaleOrderParams, SaleOrder, SaleOrderOption,
 };
 use crate::types::{AccountMoveState, MoveType, PaymentState};
@@ -1855,7 +1855,7 @@ pub fn create_exchange_order_from_return(
         })
         .collect();
 
-    create_sale_order(
+    let exchange_order_id = create_sale_order_record(
         ctx,
         organization_id,
         CreateSaleOrderParams {
@@ -1906,24 +1906,19 @@ pub fn create_exchange_order_from_return(
         },
     )?;
 
-    // Link origin_so_id on the new draft SO
-    if let Some(ex) = ctx
+    // Link origin_so_id on the exact order just created (never the newest matching origin).
+    let exchange_order = ctx
         .db
         .sale_order()
-        .iter()
-        .filter(|o| {
-            o.organization_id == organization_id
-                && o.origin.as_deref() == Some(&format!("exchange:RMA/{return_order_id}"))
-        })
-        .max_by_key(|o| o.id)
-    {
-        ctx.db.sale_order().id().update(SaleOrder {
-            origin_so_id: Some(so.id),
-            write_uid: ctx.sender(),
-            write_date: ctx.timestamp,
-            ..ex
-        });
-    }
+        .id()
+        .find(&exchange_order_id)
+        .ok_or("Exchange order not found after creation")?;
+    ctx.db.sale_order().id().update(SaleOrder {
+        origin_so_id: Some(so.id),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..exchange_order
+    });
 
     write_audit_log_v2(
         ctx,

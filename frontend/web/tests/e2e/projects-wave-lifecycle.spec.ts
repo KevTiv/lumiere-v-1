@@ -8,6 +8,8 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
+  expectRowActionsOffered,
   callReducerBff,
   callReducerBffResult,
   expectNoAppError,
@@ -21,7 +23,7 @@ const some = <T>(value: T) => ({ some: value })
 const none = { none: [] as [] }
 
 async function openProjectsTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-projects-${tabId}`).click()
+  await selectModuleTab(page, "projects", tabId)
 }
 
 async function fetchFirstCompanyId(page: Page): Promise<number> {
@@ -80,8 +82,7 @@ test.describe("Projects wave A lifecycle e2e @projects", () => {
   test("timesheet toolbar exposes validate + bill actions @p0", async ({ page }) => {
     await gotoModule(page, "/projects", "projects")
     await openProjectsTab(page, "timesheets")
-    await expect(page.getByTestId("entity-action-validate-timesheets")).toBeVisible()
-    await expect(page.getByTestId("entity-action-bill-timesheets")).toBeVisible()
+    await expectRowActionsOffered(page, ["validate-timesheets", "bill-timesheets"])
     await expectNoAppError(page)
   })
 
@@ -279,7 +280,6 @@ test.describe("Projects wave A lifecycle e2e @projects", () => {
   test("bill form opens for timesheet selection @p0", async ({ page }) => {
     await gotoModule(page, "/projects", "projects")
     await openProjectsTab(page, "timesheets")
-    await expect(page.getByTestId("entity-action-bill-timesheets")).toBeVisible()
 
     // Select first row when present so Bill modal can open.
     const row = page.locator("tbody tr").first()

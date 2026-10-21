@@ -6,6 +6,8 @@ pub struct Config {
     pub port: u16,
     /// Shared secret required on non-health HTTP routes (`X-Lumiere-Gateway-Secret`).
     pub internal_secret: Option<String>,
+    /// Server-only HMAC key for trusted execution envelopes.
+    pub ai_execution_envelope_key: Option<String>,
     pub qdrant_url: String,
     pub qdrant_api_key: Option<String>,
     pub qdrant_collection: String,
@@ -113,10 +115,15 @@ impl Config {
             ai_certification_stdb_token.as_deref(),
             ai_spend_read_stdb_token.as_deref(),
         )?;
+        let ai_execution_envelope_key =
+            validate_execution_envelope_key(std::env::var("AI_EXECUTION_ENVELOPE_KEY").ok())?;
         if runtime_is_production() && ai_certification_stdb_token.is_none() {
             anyhow::bail!(
                 "AI_CERTIFICATION_STDB_TOKEN and AI_CERTIFICATION_RUNTIME_HASH are required in production"
             );
+        }
+        if runtime_is_production() && ai_execution_envelope_key.is_none() {
+            anyhow::bail!("AI_EXECUTION_ENVELOPE_KEY is required in production");
         }
 
         Ok(Config {
@@ -127,6 +134,7 @@ impl Config {
             internal_secret: std::env::var("LUMIERE_AI_GATEWAY_INTERNAL_SECRET")
                 .ok()
                 .filter(|value| !value.trim().is_empty()),
+            ai_execution_envelope_key,
             qdrant_url: std::env::var("QDRANT_URL")
                 .unwrap_or_else(|_| "http://localhost:6334".to_string()),
             qdrant_api_key: std::env::var("QDRANT_API_KEY").ok(),
@@ -177,7 +185,7 @@ impl Config {
             ollama_url: std::env::var("OLLAMA_URL")
                 .unwrap_or_else(|_| "http://localhost:11434".to_string()),
             ollama_embed_model: std::env::var("OLLAMA_EMBED_MODEL")
-                .unwrap_or_else(|_| "nomic-embed-text".to_string()),
+                .unwrap_or_else(|_| "embeddinggemma:latest".to_string()),
             ollama_vision_model: std::env::var("OLLAMA_VISION_MODEL")
                 .unwrap_or_else(|_| "llava".to_string()),
             ollama_llm_model: std::env::var("OLLAMA_LLM_MODEL")
@@ -257,6 +265,16 @@ fn validate_certification_identity(
     }
 }
 
+fn validate_execution_envelope_key(value: Option<String>) -> Result<Option<String>> {
+    let Some(value) = value.filter(|value| !value.trim().is_empty()) else {
+        return Ok(None);
+    };
+    if value.as_bytes().len() < 32 {
+        anyhow::bail!("AI_EXECUTION_ENVELOPE_KEY must contain at least 32 bytes");
+    }
+    Ok(Some(value))
+}
+
 fn valid_sha256(value: &str) -> bool {
     value.strip_prefix("sha256:").is_some_and(|digest| {
         digest.len() == 64
@@ -320,6 +338,19 @@ mod tests {
         assert!(
             validate_certification_identity(None, Some(format!("sha256:{}", "a".repeat(64))))
                 .is_err()
+        );
+    }
+
+    #[test]
+    fn execution_envelope_key_requires_256_bits_of_server_material() {
+        assert!(validate_execution_envelope_key(None).unwrap().is_none());
+        assert!(validate_execution_envelope_key(Some("x".repeat(31))).is_err());
+        assert_eq!(
+            validate_execution_envelope_key(Some("x".repeat(32)))
+                .expect("strong key")
+                .expect("configured key")
+                .len(),
+            32
         );
     }
 

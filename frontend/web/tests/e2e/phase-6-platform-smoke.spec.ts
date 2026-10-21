@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { assertModuleTabs, activeTabEntityTable, expectNoAppError, gotoModule } from "./helpers"
+import { selectModuleTab, assertModuleTabs, activeTabEntityTable, expectNoAppError, expectRowActionsOffered, gotoModule } from "./helpers"
 
 const DOCUMENTS_TAB_IDS = [
   "dashboard",
@@ -39,6 +39,12 @@ async function assertDocumentsTab(page: Page, tabId: string) {
       await expect(page.getByTestId("quick-action-upload_document")).toBeVisible()
       break
     case "documents":
+      await page.getByTestId("module-view-alt-documents").click()
+      await expect(page.getByTestId("module-view-alt-documents")).toHaveAttribute("aria-pressed", "true")
+      await expect(page.getByTestId("file-browser")).toBeVisible()
+      await expect(page.getByTestId("file-browser-upload")).toBeVisible()
+      await page.getByTestId("module-view-table-documents").click()
+      await expect(page.getByTestId("module-view-table-documents")).toHaveAttribute("aria-pressed", "true")
       await expect(page.getByTestId("module-create-documents-documents")).toBeVisible()
       await expect(activeTabEntityTable(page)).toBeVisible()
       break
@@ -59,8 +65,7 @@ async function assertDocumentsTab(page: Page, tabId: string) {
       await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "document-insights":
-      await expect(page.getByTestId("entity-action-ask-ai")).toBeVisible()
-      await expect(activeTabEntityTable(page)).toBeVisible()
+      await expectRowActionsOffered(page, ["ask-ai"])
       break
     default:
       break
@@ -80,8 +85,7 @@ async function assertSubscriptionsTab(page: Page, tabId: string) {
       await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "deferred-lines":
-      await expect(page.getByTestId("entity-action-recognize-line")).toBeVisible()
-      await expect(activeTabEntityTable(page)).toBeVisible()
+      await expectRowActionsOffered(page, ["recognize-line"])
       break
     default:
       break
@@ -95,7 +99,7 @@ async function assertHelpdeskTab(page: Page, tabId: string) {
       break
     case "tickets":
       await expect(page.getByTestId("module-create-helpdesk-tickets")).toBeVisible()
-      await expect(page.getByTestId("entity-action-close-ticket")).toBeVisible()
+      await expectRowActionsOffered(page, ["close-ticket"])
       break
     case "teams":
       await expect(page.getByTestId("module-create-helpdesk-teams")).toBeVisible()
@@ -119,7 +123,7 @@ test.describe("Phase 6 platform smoke", { tag: "@phase-6" }, () => {
 
   test("reports dashboard-widgets tab renders", async ({ page }) => {
     await gotoModule(page, "/reports", "reports")
-    await page.getByTestId("module-tab-reports-dashboard-widgets").click()
+    await selectModuleTab(page, "reports", "dashboard-widgets")
     await expect(page.getByTestId("module-create-reports-dashboard-widgets")).toBeVisible()
     await expect(page.getByTestId("entity-table")).toBeVisible()
     await expectNoAppError(page)

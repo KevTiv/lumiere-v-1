@@ -13,10 +13,10 @@ const projectStateBadges = (t: TFunction) => ({
 })
 
 const taskStateBadges = (t: TFunction) => ({
-  badgeVariants: { InProgress: "default", Changes: "outline", Approved: "default", Cancelled: "destructive", Done: "secondary" },
+  badgeVariants: { InProgress: "info", ChangesRequested: "warning", Approved: "default", Cancelled: "destructive", Done: "success" },
   badgeLabels: {
     InProgress: t("projects.tasks.states.InProgress"),
-    Changes: t("projects.tasks.states.Changes"),
+    ChangesRequested: t("projects.tasks.states.ChangesRequested"),
     Approved: t("projects.tasks.states.Approved"),
     Cancelled: t("projects.tasks.states.Cancelled"),
     Done: t("projects.tasks.states.Done"),
@@ -24,7 +24,7 @@ const taskStateBadges = (t: TFunction) => ({
 })
 
 const priorityBadges = (t: TFunction) => ({
-  badgeVariants: { "0": "secondary", "1": "outline", "2": "default", "3": "destructive" },
+  badgeVariants: { "0": "info", "1": "secondary", "2": "warning", "3": "destructive" },
   badgeLabels: {
     "0": t("projects.tasks.priority.0"),
     "1": t("projects.tasks.priority.1"),
@@ -67,6 +67,13 @@ export const projectsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "taskCount", label: t("projects.projects.columns.taskCount"), type: "number", align: "right" },
     ],
     emptyMessage: t("projects.projects.emptyMessage"),
+    emptyState: {
+      title: t("projects.projects.emptyMessage"),
+      description: t("projects.projects.emptyState.description", { defaultValue: "Projects group tasks, timesheets and billing for a piece of work, so progress and profitability are visible." }),
+      permission: { resource: "project_project", action: "create" },
+      secondaryActionId: "csv-project",
+      learnHint: t("projects.projects.emptyState.hint", { defaultValue: "Add tasks to a project, then log time against them." }),
+    },
   },
 })
 
@@ -81,28 +88,40 @@ export const tasksTableConfig = (t: TFunction): EntityViewConfig => ({
     searchable: true,
     searchPlaceholder: t("projects.tasks.searchPlaceholder"),
     searchKeys: ["name"],
+    selectable: true,
     filters: [
       {
-        key: "kanbanState",
-        label: t("projects.tasks.filters.kanbanState.label"),
+        key: "state",
+        label: t("projects.tasks.columns.kanbanState"),
         type: "select",
+        faceted: true,
         options: [
-          { value: "InProgress", label: t("projects.tasks.filters.kanbanState.options.InProgress") },
-          { value: "Changes", label: t("projects.tasks.filters.kanbanState.options.Changes") },
-          { value: "Approved", label: t("projects.tasks.filters.kanbanState.options.Approved") },
-          { value: "Done", label: t("projects.tasks.filters.kanbanState.options.Done") },
-          { value: "Cancelled", label: t("projects.tasks.filters.kanbanState.options.Cancelled") },
+          { value: "InProgress", label: t("projects.tasks.states.InProgress") },
+          { value: "ChangesRequested", label: t("projects.tasks.states.ChangesRequested") },
+          { value: "Approved", label: t("projects.tasks.states.Approved") },
+          { value: "Done", label: t("projects.tasks.states.Done") },
+          { value: "Cancelled", label: t("projects.tasks.states.Cancelled") },
         ],
+      },
+      {
+        key: "priority",
+        label: t("projects.tasks.columns.priority"),
+        type: "select",
+        faceted: true,
+        options: (["0", "1", "2", "3"] as const).map((value) => ({
+          value,
+          label: t(`projects.tasks.priority.${value}`),
+        })),
       },
     ],
     columns: [
-      { key: "name", label: t("projects.tasks.columns.name"), width: "min-w-48" },
+      { key: "name", label: t("projects.tasks.columns.name"), width: "min-w-48", sortable: true },
       { key: "projectId", label: t("projects.tasks.columns.projectId"), width: "min-w-32" },
-      { key: "kanbanState", label: t("projects.tasks.columns.kanbanState"), type: "badge", ...taskStateBadges(t) },
-      { key: "priority", label: t("projects.tasks.columns.priority"), type: "badge", ...priorityBadges(t) },
-      { key: "plannedHours", label: t("projects.tasks.columns.plannedHours"), type: "number", align: "right" },
-      { key: "effectiveHours", label: t("projects.tasks.columns.effectiveHours"), type: "number", align: "right" },
-      { key: "dateDeadline", label: t("projects.tasks.columns.dateDeadline"), type: "date" },
+      { key: "state", label: t("projects.tasks.columns.kanbanState"), type: "badge", ...taskStateBadges(t) },
+      { key: "priority", label: t("projects.tasks.columns.priority"), type: "badge", sortable: true, ...priorityBadges(t) },
+      { key: "plannedHours", label: t("projects.tasks.columns.plannedHours"), type: "number", align: "right", sortable: true },
+      { key: "effectiveHours", label: t("projects.tasks.columns.effectiveHours"), type: "number", align: "right", sortable: true },
+      { key: "dateDeadline", label: t("projects.tasks.columns.dateDeadline"), type: "date", sortable: true },
     ],
     emptyMessage: t("projects.tasks.emptyMessage"),
   },

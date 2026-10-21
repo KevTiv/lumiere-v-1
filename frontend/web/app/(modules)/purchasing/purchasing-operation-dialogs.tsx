@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@lumiere/ui/components/select"
 import { Textarea } from "@lumiere/ui/components/textarea"
+import { selectedRfqCurrencyId } from "./purchase-order-forms"
 
 export interface PurchasingDialogOption {
   value: string
@@ -50,6 +51,11 @@ export interface AddPurchaseRfqBidFormPayload {
   notes: string | null
 }
 
+export interface AwardPurchaseRfqBidFormPayload {
+  rfqId: string
+  bidId: string
+}
+
 export interface CreatePurchaseReturnFormPayload {
   purchaseOrderId: bigint
   partnerId: bigint
@@ -75,14 +81,25 @@ export interface CreateVendorCreditFormPayload {
 }
 
 export type PurchasingOperationDialogRequest =
+  | { kind: "approve-supplier-intake"; intakeId: string; intakeLabel: string }
   | { kind: "create-rfq"; requisitionId?: string }
   | { kind: "add-rfq-bid"; rfqId?: string }
+  | { kind: "award-rfq-bid"; rfqId?: string; bidId?: string }
   | { kind: "create-purchase-return"; purchaseOrderId?: string; partnerId?: string }
   | { kind: "create-vendor-credit"; purchaseReturnId?: string }
 
+export interface PurchasingRfqBidDialogOption extends PurchasingDialogOption {
+  rfqId: string
+}
+
+export interface PurchasingRfqDialogOption extends PurchasingDialogOption {
+  currencyId: string
+}
+
 export interface PurchasingOperationDialogOptions {
   requisitions: PurchasingDialogOption[]
-  rfqs: PurchasingDialogOption[]
+  rfqs: PurchasingRfqDialogOption[]
+  rfqBids: PurchasingRfqBidDialogOption[]
   vendors: PurchasingDialogOption[]
   products: PurchasingDialogOption[]
   uoms: PurchasingDialogOption[]
@@ -99,34 +116,36 @@ export interface PurchasingOperationDialogsProps {
   options: PurchasingOperationDialogOptions
   t: TFunction
   onDismiss: () => void
+  onApproveSupplierIntake: (payload: { intakeId: string; partnerId: string }) => Promise<unknown>
   onCreateRfq: (payload: CreatePurchaseRfqFormPayload) => Promise<unknown>
   onAddRfqBid: (payload: AddPurchaseRfqBidFormPayload) => Promise<unknown>
+  onAwardRfqBid: (payload: AwardPurchaseRfqBidFormPayload) => Promise<unknown>
   onCreatePurchaseReturn: (payload: CreatePurchaseReturnFormPayload) => Promise<unknown>
   onCreateVendorCredit: (payload: CreateVendorCreditFormPayload) => Promise<unknown>
 }
 
 const NONE_VALUE = "__none__"
 
-function requiredId(value: string, label: string): bigint {
+function requiredId(value: string, label: string, t: TFunction): bigint {
   const normalized = value.trim()
   if (!/^\d+$/.test(normalized) || BigInt(normalized) <= 0n) {
-    throw new Error(`${label} is required`)
+    throw new Error(t("purchasing.forms.validation.required", { defaultValue: "{{label}} is required", label }))
   }
   return BigInt(normalized)
 }
 
-function requiredIdString(value: string, label: string): string {
-  return requiredId(value, label).toString()
+function requiredIdString(value: string, label: string, t: TFunction): string {
+  return requiredId(value, label, t).toString()
 }
 
-function optionalId(value: string): bigint | null {
-  return value && value !== NONE_VALUE ? requiredId(value, "Selection") : null
+function optionalId(value: string, t: TFunction): bigint | null {
+  return value && value !== NONE_VALUE ? requiredId(value, t("purchasing.forms.fields.selection", { defaultValue: "Selection" }), t) : null
 }
 
-function finiteNumber(value: string, label: string, minimum: number): number {
+function finiteNumber(value: string, label: string, minimum: number, t: TFunction): number {
   const parsed = Number(value)
   if (!Number.isFinite(parsed) || parsed < minimum) {
-    throw new Error(`${label} must be ${minimum > 0 ? "greater than zero" : "zero or greater"}`)
+    throw new Error(t("purchasing.forms.validation.minimum", { defaultValue: "{{label}} must be {{minimum}}", label, minimum: minimum > 0 ? t("purchasing.forms.validation.greaterThanZero", { defaultValue: "greater than zero" }) : t("purchasing.forms.validation.zeroOrGreater", { defaultValue: "zero or greater" }) }))
   }
   return parsed
 }
@@ -139,6 +158,7 @@ interface ChoiceFieldProps {
   onValueChange: (value: string) => void
   placeholder: string
   optional?: boolean
+  t: TFunction
 }
 
 function ChoiceField({
@@ -149,6 +169,7 @@ function ChoiceField({
   onValueChange,
   placeholder,
   optional = false,
+  t,
 }: ChoiceFieldProps) {
   return (
     <div className="space-y-2">
@@ -158,7 +179,7 @@ function ChoiceField({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {optional ? <SelectItem value={NONE_VALUE}>None</SelectItem> : null}
+          {optional ? <SelectItem value={NONE_VALUE}>{t("purchasing.forms.common.none", { defaultValue: "None" })}</SelectItem> : null}
           {options.map((option) => (
             <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
               {option.label}
@@ -167,7 +188,7 @@ function ChoiceField({
         </SelectContent>
       </Select>
       {options.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No choices are available.</p>
+        <p className="text-xs text-muted-foreground">{t("purchasing.forms.common.noChoices", { defaultValue: "No choices are available." })}</p>
       ) : null}
     </div>
   )
@@ -182,6 +203,7 @@ interface OperationDialogProps {
   onDismiss: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   children: ReactNode
+  t: TFunction
 }
 
 function OperationDialog({
@@ -193,6 +215,7 @@ function OperationDialog({
   onDismiss,
   onSubmit,
   children,
+  t,
 }: OperationDialogProps) {
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onDismiss())}>
@@ -213,10 +236,10 @@ function OperationDialog({
           {children}
           <DialogFooter>
             <Button type="button" variant="outline" disabled={pending} onClick={onDismiss}>
-              Cancel
+              {t("purchasing.forms.common.cancel", { defaultValue: "Cancel" })}
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? "Saving…" : submitLabel}
+              {pending ? t("purchasing.forms.common.saving", { defaultValue: "Saving…" }) : submitLabel}
             </Button>
           </DialogFooter>
         </form>
@@ -245,6 +268,52 @@ function useAsyncSubmit(onDismiss: () => void) {
   return { pending, error, run }
 }
 
+function ApproveSupplierIntakeDialog({ request, options, t, onDismiss, onSubmit }: {
+  request: Extract<PurchasingOperationDialogRequest, { kind: "approve-supplier-intake" }>
+  options: PurchasingOperationDialogOptions
+  t: TFunction
+  onDismiss: () => void
+  onSubmit: PurchasingOperationDialogsProps["onApproveSupplierIntake"]
+}) {
+  const [partnerId, setPartnerId] = useState("")
+  const submission = useAsyncSubmit(onDismiss)
+  return (
+    <OperationDialog
+      title={t("purchasing.forms.intakeApproval.title", { defaultValue: "Approve supplier intake" })}
+      description={t("purchasing.forms.intakeApproval.description", {
+        defaultValue: "Select the vendor to link to this supplier request. Approval requires a different person from the submitter.",
+      })}
+      submitLabel={t("purchasing.forms.intakeApproval.submit", { defaultValue: "Approve supplier" })}
+      pending={submission.pending}
+      error={submission.error}
+      onDismiss={onDismiss}
+      t={t}
+      onSubmit={(event) => {
+        event.preventDefault()
+        void submission.run(() => onSubmit({
+          intakeId: request.intakeId,
+          partnerId: requiredIdString(
+            partnerId,
+            t("purchasing.forms.fields.vendor", { defaultValue: "Vendor" }),
+            t,
+          ),
+        }))
+      }}
+    >
+      <p>{request.intakeLabel}</p>
+      <ChoiceField
+        id="intake-approval-vendor"
+        label={t("purchasing.forms.fields.vendor", { defaultValue: "Vendor" })}
+        value={partnerId}
+        options={options.vendors}
+        onValueChange={setPartnerId}
+        placeholder={t("purchasing.forms.placeholders.vendor", { defaultValue: "Select a vendor" })}
+        t={t}
+      />
+    </OperationDialog>
+  )
+}
+
 interface CreateRfqDialogProps {
   request: Extract<PurchasingOperationDialogRequest, { kind: "create-rfq" }>
   currencyId: bigint | null
@@ -266,15 +335,15 @@ function CreateRfqDialog({ request, currencyId, options, t, onDismiss, onSubmit 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     void submission.run(async () => {
-      if (currencyId == null || currencyId <= 0n) throw new Error("No active currency is available")
+      if (currencyId == null || currencyId <= 0n) throw new Error(t("purchasing.forms.validation.noCurrency", { defaultValue: "No active currency is available" }))
       await onSubmit({
-        requisitionId: optionalId(requisitionId),
+        requisitionId: optionalId(requisitionId, t),
         currencyId,
         notes: notes.trim() || null,
         lines: [{
-          productId: requiredId(productId, "Product"),
-          productUom: requiredId(uomId, "Unit of measure"),
-          productUomQty: finiteNumber(quantity, "Quantity", Number.MIN_VALUE),
+          productId: requiredId(productId, t("purchasing.forms.fields.product", { defaultValue: "Product" }), t),
+          productUom: requiredId(uomId, t("purchasing.forms.fields.uom", { defaultValue: "Unit of measure" }), t),
+          productUomQty: finiteNumber(quantity, t("purchasing.forms.fields.quantity", { defaultValue: "Quantity" }), Number.MIN_VALUE, t),
           name: lineName.trim() || null,
           sequence: 10,
         }],
@@ -292,22 +361,23 @@ function CreateRfqDialog({ request, currencyId, options, t, onDismiss, onSubmit 
       error={submission.error}
       onDismiss={onDismiss}
       onSubmit={submit}
+      t={t}
     >
-      <ChoiceField id="rfq-requisition" label="Requisition" value={requisitionId} options={options.requisitions} onValueChange={setRequisitionId} placeholder="Select a requisition" optional />
-      <ChoiceField id="rfq-product" label="Product" value={productId} options={options.products} onValueChange={setProductId} placeholder="Select a product" />
-      <ChoiceField id="rfq-uom" label="Unit of measure" value={uomId} options={options.uoms} onValueChange={setUomId} placeholder="Select a unit" />
+      <ChoiceField id="rfq-requisition" label={t("purchasing.forms.fields.requisition", { defaultValue: "Requisition" })} value={requisitionId} options={options.requisitions} onValueChange={setRequisitionId} placeholder={t("purchasing.forms.placeholders.requisition", { defaultValue: "Select a requisition" })} optional t={t} />
+      <ChoiceField id="rfq-product" label={t("purchasing.forms.fields.product", { defaultValue: "Product" })} value={productId} options={options.products} onValueChange={setProductId} placeholder={t("purchasing.forms.placeholders.product", { defaultValue: "Select a product" })} t={t} />
+      <ChoiceField id="rfq-uom" label={t("purchasing.forms.fields.uom", { defaultValue: "Unit of measure" })} value={uomId} options={options.uoms} onValueChange={setUomId} placeholder={t("purchasing.forms.placeholders.uom", { defaultValue: "Select a unit" })} t={t} />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="rfq-quantity">Quantity</Label>
+          <Label htmlFor="rfq-quantity">{t("purchasing.forms.fields.quantity", { defaultValue: "Quantity" })}</Label>
           <Input id="rfq-quantity" type="number" min="0" step="any" required value={quantity} onChange={(event) => setQuantity(event.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="rfq-line-name">Line description</Label>
+          <Label htmlFor="rfq-line-name">{t("purchasing.forms.fields.lineDescription", { defaultValue: "Line description" })}</Label>
           <Input id="rfq-line-name" value={lineName} onChange={(event) => setLineName(event.target.value)} />
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="rfq-notes">Notes</Label>
+        <Label htmlFor="rfq-notes">{t("purchasing.forms.fields.notes", { defaultValue: "Notes" })}</Label>
         <Textarea id="rfq-notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
       </div>
     </OperationDialog>
@@ -323,7 +393,7 @@ interface AddRfqBidDialogProps {
   onSubmit: (payload: AddPurchaseRfqBidFormPayload) => Promise<unknown>
 }
 
-function AddRfqBidDialog({ request, currencyId, options, t, onDismiss, onSubmit }: AddRfqBidDialogProps) {
+function AddRfqBidDialog({ request, options, t, onDismiss, onSubmit }: AddRfqBidDialogProps) {
   const [rfqId, setRfqId] = useState(request.rfqId ?? "")
   const [partnerId, setPartnerId] = useState("")
   const [priceUnit, setPriceUnit] = useState("0")
@@ -333,12 +403,13 @@ function AddRfqBidDialog({ request, currencyId, options, t, onDismiss, onSubmit 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     void submission.run(async () => {
-      if (currencyId == null || currencyId <= 0n) throw new Error("No active currency is available")
+      const currencyId = selectedRfqCurrencyId(options.rfqs, rfqId)
+      if (currencyId == null) throw new Error(t("purchasing.forms.validation.noCurrency", { defaultValue: "The selected RFQ currency is unavailable" }))
       await onSubmit({
-        rfqId: requiredId(rfqId, "RFQ"),
-        partnerId: requiredId(partnerId, "Vendor"),
+        rfqId: requiredId(rfqId, t("purchasing.forms.fields.rfq", { defaultValue: "RFQ" }), t),
+        partnerId: requiredId(partnerId, t("purchasing.forms.fields.vendor", { defaultValue: "Vendor" }), t),
         currencyId,
-        priceUnit: finiteNumber(priceUnit, "Unit price", 0),
+        priceUnit: finiteNumber(priceUnit, t("purchasing.forms.fields.unitPrice", { defaultValue: "Unit price" }), 0, t),
         notes: notes.trim() || null,
       })
     })
@@ -353,17 +424,80 @@ function AddRfqBidDialog({ request, currencyId, options, t, onDismiss, onSubmit 
       error={submission.error}
       onDismiss={onDismiss}
       onSubmit={submit}
+      t={t}
     >
-      <ChoiceField id="bid-rfq" label="RFQ" value={rfqId} options={options.rfqs} onValueChange={setRfqId} placeholder="Select an RFQ" />
-      <ChoiceField id="bid-vendor" label="Vendor" value={partnerId} options={options.vendors} onValueChange={setPartnerId} placeholder="Select a vendor" />
+      <ChoiceField id="bid-rfq" label={t("purchasing.forms.fields.rfq", { defaultValue: "RFQ" })} value={rfqId} options={options.rfqs} onValueChange={setRfqId} placeholder={t("purchasing.forms.placeholders.rfq", { defaultValue: "Select an RFQ" })} t={t} />
+      <ChoiceField id="bid-vendor" label={t("purchasing.forms.fields.vendor", { defaultValue: "Vendor" })} value={partnerId} options={options.vendors} onValueChange={setPartnerId} placeholder={t("purchasing.forms.placeholders.vendor", { defaultValue: "Select a vendor" })} t={t} />
       <div className="space-y-2">
-        <Label htmlFor="bid-price">Unit price</Label>
+        <Label htmlFor="bid-price">{t("purchasing.forms.fields.unitPrice", { defaultValue: "Unit price" })}</Label>
         <Input id="bid-price" type="number" min="0" step="any" required value={priceUnit} onChange={(event) => setPriceUnit(event.target.value)} />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="bid-notes">Notes</Label>
+        <Label htmlFor="bid-notes">{t("purchasing.forms.fields.notes", { defaultValue: "Notes" })}</Label>
         <Textarea id="bid-notes" value={notes} onChange={(event) => setNotes(event.target.value)} />
       </div>
+    </OperationDialog>
+  )
+}
+
+interface AwardRfqBidDialogProps {
+  request: Extract<PurchasingOperationDialogRequest, { kind: "award-rfq-bid" }>
+  options: PurchasingOperationDialogOptions
+  t: TFunction
+  onDismiss: () => void
+  onSubmit: (payload: AwardPurchaseRfqBidFormPayload) => Promise<unknown>
+}
+
+function AwardRfqBidDialog({ request, options, t, onDismiss, onSubmit }: AwardRfqBidDialogProps) {
+  const [rfqId, setRfqId] = useState(request.rfqId ?? "")
+  const [bidId, setBidId] = useState(request.bidId ?? "")
+  const submission = useAsyncSubmit(onDismiss)
+  const bidOptions = options.rfqBids.filter((option) => option.rfqId === rfqId)
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    void submission.run(() =>
+      onSubmit({
+        rfqId: requiredIdString(rfqId, t("purchasing.forms.fields.rfq", { defaultValue: "RFQ" }), t),
+        bidId: requiredIdString(bidId, t("purchasing.forms.fields.rfqBid", { defaultValue: "RFQ bid" }), t),
+      }),
+    )
+  }
+
+  return (
+    <OperationDialog
+      title={t("purchasing.forms.rfqAward.title", { defaultValue: "Award RFQ bid" })}
+      description={t("purchasing.forms.rfqAward.description", {
+        defaultValue: "Select an open RFQ and one of its submitted bids.",
+      })}
+      submitLabel={t("purchasing.ops.awardRfqBid", { defaultValue: "Award RFQ bid" })}
+      pending={submission.pending}
+      error={submission.error}
+      onDismiss={onDismiss}
+      onSubmit={submit}
+      t={t}
+    >
+      <ChoiceField
+        id="award-rfq"
+        label={t("purchasing.forms.fields.rfq", { defaultValue: "RFQ" })}
+        value={rfqId}
+        options={options.rfqs.filter((rfq) => options.rfqBids.some((bid) => bid.rfqId === rfq.value))}
+        onValueChange={(value) => {
+          setRfqId(value)
+          setBidId("")
+        }}
+        placeholder={t("purchasing.forms.placeholders.rfq", { defaultValue: "Select an RFQ" })}
+        t={t}
+      />
+      <ChoiceField
+        id="award-rfq-bid"
+        label={t("purchasing.forms.fields.submittedBid", { defaultValue: "Submitted bid" })}
+        value={bidId}
+        options={bidOptions}
+        onValueChange={setBidId}
+        placeholder={rfqId ? t("purchasing.forms.placeholders.submittedBid", { defaultValue: "Select a submitted bid" }) : t("purchasing.forms.placeholders.rfqFirst", { defaultValue: "Select an RFQ first" })}
+        t={t}
+      />
     </OperationDialog>
   )
 }
@@ -390,15 +524,16 @@ function CreatePurchaseReturnDialog({ request, options, t, onDismiss, onSubmit }
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     void submission.run(() => onSubmit({
-      purchaseOrderId: requiredId(purchaseOrderId, "Purchase order"),
-      partnerId: requiredId(partnerId, "Vendor"),
+      purchaseOrderId: requiredId(purchaseOrderId, t("purchasing.forms.fields.purchaseOrder", { defaultValue: "Purchase order" }), t),
+      partnerId: requiredId(partnerId, t("purchasing.forms.fields.vendor", { defaultValue: "Vendor" }), t),
+      // This value is persisted as business data and must not vary by UI locale.
       returnReason: reason.trim() || "Purchase return",
       lines: [{
         purchaseOrderLineId: null,
-        productId: requiredId(productId, "Product"),
-        productUom: requiredId(uomId, "Unit of measure"),
-        productUomQty: finiteNumber(quantity, "Quantity", Number.MIN_VALUE),
-        priceUnit: finiteNumber(priceUnit, "Unit price", 0),
+        productId: requiredId(productId, t("purchasing.forms.fields.product", { defaultValue: "Product" }), t),
+        productUom: requiredId(uomId, t("purchasing.forms.fields.uom", { defaultValue: "Unit of measure" }), t),
+        productUomQty: finiteNumber(quantity, t("purchasing.forms.fields.quantity", { defaultValue: "Quantity" }), Number.MIN_VALUE, t),
+        priceUnit: finiteNumber(priceUnit, t("purchasing.forms.fields.unitPrice", { defaultValue: "Unit price" }), 0, t),
         toRefund,
       }],
     }))
@@ -413,28 +548,29 @@ function CreatePurchaseReturnDialog({ request, options, t, onDismiss, onSubmit }
       error={submission.error}
       onDismiss={onDismiss}
       onSubmit={submit}
+      t={t}
     >
-      <ChoiceField id="return-order" label="Purchase order" value={purchaseOrderId} options={options.purchaseOrders} onValueChange={setPurchaseOrderId} placeholder="Select a purchase order" />
-      <ChoiceField id="return-vendor" label="Vendor" value={partnerId} options={options.vendors} onValueChange={setPartnerId} placeholder="Select a vendor" />
+      <ChoiceField id="return-order" label={t("purchasing.forms.fields.purchaseOrder", { defaultValue: "Purchase order" })} value={purchaseOrderId} options={options.purchaseOrders} onValueChange={setPurchaseOrderId} placeholder={t("purchasing.forms.placeholders.purchaseOrder", { defaultValue: "Select a purchase order" })} t={t} />
+      <ChoiceField id="return-vendor" label={t("purchasing.forms.fields.vendor", { defaultValue: "Vendor" })} value={partnerId} options={options.vendors} onValueChange={setPartnerId} placeholder={t("purchasing.forms.placeholders.vendor", { defaultValue: "Select a vendor" })} t={t} />
       <div className="space-y-2">
-        <Label htmlFor="return-reason">Return reason</Label>
+        <Label htmlFor="return-reason">{t("purchasing.forms.fields.returnReason", { defaultValue: "Return reason" })}</Label>
         <Textarea id="return-reason" required value={reason} onChange={(event) => setReason(event.target.value)} />
       </div>
-      <ChoiceField id="return-product" label="Product" value={productId} options={options.products} onValueChange={setProductId} placeholder="Select a product" />
-      <ChoiceField id="return-uom" label="Unit of measure" value={uomId} options={options.uoms} onValueChange={setUomId} placeholder="Select a unit" />
+      <ChoiceField id="return-product" label={t("purchasing.forms.fields.product", { defaultValue: "Product" })} value={productId} options={options.products} onValueChange={setProductId} placeholder={t("purchasing.forms.placeholders.product", { defaultValue: "Select a product" })} t={t} />
+      <ChoiceField id="return-uom" label={t("purchasing.forms.fields.uom", { defaultValue: "Unit of measure" })} value={uomId} options={options.uoms} onValueChange={setUomId} placeholder={t("purchasing.forms.placeholders.uom", { defaultValue: "Select a unit" })} t={t} />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="return-quantity">Quantity</Label>
+          <Label htmlFor="return-quantity">{t("purchasing.forms.fields.quantity", { defaultValue: "Quantity" })}</Label>
           <Input id="return-quantity" type="number" min="0" step="any" required value={quantity} onChange={(event) => setQuantity(event.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="return-price">Unit price</Label>
+          <Label htmlFor="return-price">{t("purchasing.forms.fields.unitPrice", { defaultValue: "Unit price" })}</Label>
           <Input id="return-price" type="number" min="0" step="any" required value={priceUnit} onChange={(event) => setPriceUnit(event.target.value)} />
         </div>
       </div>
       <label className="flex items-center gap-2 text-sm" htmlFor="return-refund">
         <input id="return-refund" type="checkbox" checked={toRefund} onChange={(event) => setToRefund(event.target.checked)} />
-        Create a refundable return line
+        {t("purchasing.forms.purchaseReturn.refundableLine", { defaultValue: "Create a refundable return line" })}
       </label>
     </OperationDialog>
   )
@@ -458,11 +594,11 @@ function CreateVendorCreditDialog({ request, options, t, onDismiss, onSubmit }: 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     void submission.run(() => onSubmit({
-      purchaseReturnId: requiredIdString(purchaseReturnId, "Purchase return"),
+      purchaseReturnId: requiredIdString(purchaseReturnId, t("purchasing.forms.fields.purchaseReturn", { defaultValue: "Purchase return" }), t),
       params: {
-        journalId: requiredId(journalId, "Journal"),
-        expenseAccountId: requiredId(expenseAccountId, "Expense account"),
-        payableAccountId: requiredId(payableAccountId, "Payable account"),
+        journalId: requiredId(journalId, t("purchasing.forms.fields.journal", { defaultValue: "Journal" }), t),
+        expenseAccountId: requiredId(expenseAccountId, t("purchasing.forms.fields.expenseAccount", { defaultValue: "Expense account" }), t),
+        payableAccountId: requiredId(payableAccountId, t("purchasing.forms.fields.payableAccount", { defaultValue: "Payable account" }), t),
       },
     }))
   }
@@ -476,11 +612,12 @@ function CreateVendorCreditDialog({ request, options, t, onDismiss, onSubmit }: 
       error={submission.error}
       onDismiss={onDismiss}
       onSubmit={submit}
+      t={t}
     >
-      <ChoiceField id="credit-return" label="Purchase return" value={purchaseReturnId} options={options.purchaseReturns} onValueChange={setPurchaseReturnId} placeholder="Select a purchase return" />
-      <ChoiceField id="credit-journal" label="Journal" value={journalId} options={options.journals} onValueChange={setJournalId} placeholder="Select a journal" />
-      <ChoiceField id="credit-expense-account" label="Expense account" value={expenseAccountId} options={options.expenseAccounts} onValueChange={setExpenseAccountId} placeholder="Select an expense account" />
-      <ChoiceField id="credit-payable-account" label="Payable account" value={payableAccountId} options={options.payableAccounts} onValueChange={setPayableAccountId} placeholder="Select a payable account" />
+      <ChoiceField id="credit-return" label={t("purchasing.forms.fields.purchaseReturn", { defaultValue: "Purchase return" })} value={purchaseReturnId} options={options.purchaseReturns} onValueChange={setPurchaseReturnId} placeholder={t("purchasing.forms.placeholders.purchaseReturn", { defaultValue: "Select a purchase return" })} t={t} />
+      <ChoiceField id="credit-journal" label={t("purchasing.forms.fields.journal", { defaultValue: "Journal" })} value={journalId} options={options.journals} onValueChange={setJournalId} placeholder={t("purchasing.forms.placeholders.journal", { defaultValue: "Select a journal" })} t={t} />
+      <ChoiceField id="credit-expense-account" label={t("purchasing.forms.fields.expenseAccount", { defaultValue: "Expense account" })} value={expenseAccountId} options={options.expenseAccounts} onValueChange={setExpenseAccountId} placeholder={t("purchasing.forms.placeholders.expenseAccount", { defaultValue: "Select an expense account" })} t={t} />
+      <ChoiceField id="credit-payable-account" label={t("purchasing.forms.fields.payableAccount", { defaultValue: "Payable account" })} value={payableAccountId} options={options.payableAccounts} onValueChange={setPayableAccountId} placeholder={t("purchasing.forms.placeholders.payableAccount", { defaultValue: "Select a payable account" })} t={t} />
     </OperationDialog>
   )
 }
@@ -491,18 +628,24 @@ export function PurchasingOperationDialogs({
   options,
   t,
   onDismiss,
+  onApproveSupplierIntake,
   onCreateRfq,
   onAddRfqBid,
+  onAwardRfqBid,
   onCreatePurchaseReturn,
   onCreateVendorCredit,
 }: PurchasingOperationDialogsProps) {
   if (request == null) return null
 
   switch (request.kind) {
+    case "approve-supplier-intake":
+      return <ApproveSupplierIntakeDialog request={request} options={options} t={t} onDismiss={onDismiss} onSubmit={onApproveSupplierIntake} />
     case "create-rfq":
       return <CreateRfqDialog request={request} currencyId={defaultCurrencyId} options={options} t={t} onDismiss={onDismiss} onSubmit={onCreateRfq} />
     case "add-rfq-bid":
       return <AddRfqBidDialog request={request} currencyId={defaultCurrencyId} options={options} t={t} onDismiss={onDismiss} onSubmit={onAddRfqBid} />
+    case "award-rfq-bid":
+      return <AwardRfqBidDialog request={request} options={options} t={t} onDismiss={onDismiss} onSubmit={onAwardRfqBid} />
     case "create-purchase-return":
       return <CreatePurchaseReturnDialog request={request} options={options} t={t} onDismiss={onDismiss} onSubmit={onCreatePurchaseReturn} />
     case "create-vendor-credit":

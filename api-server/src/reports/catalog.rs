@@ -31,7 +31,7 @@ pub struct ReportCatalogV1 {
     pub reports: Vec<ReportCatalogEntry>,
 }
 
-pub const REPORT_CATALOG: [ReportCatalogEntry; 10] = [
+pub const REPORT_CATALOG: [ReportCatalogEntry; 11] = [
     ReportCatalogEntry {
         key: ReportKey::DailyBusinessSummaryV1,
         schema_version: 1,
@@ -187,6 +187,22 @@ pub const REPORT_CATALOG: [ReportCatalogEntry; 10] = [
         availability: ReportAvailability::Preview,
         max_window_days: 31,
     },
+    ReportCatalogEntry {
+        key: ReportKey::MarginSupplyOutlookV1,
+        schema_version: 1,
+        title: "Margin & Supply Outlook",
+        description: "Model cost, demand, and lead-time shocks against historical sales and current stock without changing prices.",
+        mandatory_sections: &[
+            "scenario_assumptions",
+            "gross_margin",
+            "profit_at_risk",
+            "stockout_risk",
+            "advisory_price_context",
+        ],
+        authoritative_sources: &["sales", "inventory", "replenishment"],
+        availability: ReportAvailability::Preview,
+        max_window_days: 31,
+    },
 ];
 
 pub fn report_catalog() -> ReportCatalogV1 {
@@ -210,7 +226,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn catalog_contains_the_ten_canonical_unique_keys() {
+    fn catalog_contains_the_eleven_canonical_unique_keys() {
         let catalog = report_catalog();
         let keys: Vec<_> = catalog
             .reports
@@ -220,8 +236,8 @@ mod tests {
         let unique: HashSet<_> = keys.iter().copied().collect();
 
         assert_eq!(catalog.catalog_schema_version, 1);
-        assert_eq!(keys.len(), 10);
-        assert_eq!(unique.len(), 10);
+        assert_eq!(keys.len(), 11);
+        assert_eq!(unique.len(), 11);
         assert_eq!(
             keys,
             vec![
@@ -235,18 +251,19 @@ mod tests {
                 "purchase_spend_v1",
                 "payment_fee_summary_v1",
                 "monthly_owner_report_v1",
+                "margin_supply_outlook_v1",
             ]
         );
     }
 
     #[test]
-    fn catalog_exposes_all_ten_previewable_reports() {
+    fn catalog_exposes_all_eleven_previewable_reports() {
         let previewable: Vec<_> = REPORT_CATALOG
             .iter()
             .filter(|entry| entry.availability == ReportAvailability::Preview)
             .collect();
 
-        assert_eq!(previewable.len(), 10);
+        assert_eq!(previewable.len(), 11);
         let keys: Vec<_> = previewable.iter().map(|entry| entry.key).collect();
         assert!(keys.contains(&ReportKey::DailyBusinessSummaryV1));
         assert!(keys.contains(&ReportKey::CashMobileMoneyV1));
@@ -258,6 +275,7 @@ mod tests {
         assert!(keys.contains(&ReportKey::PurchaseSpendV1));
         assert!(keys.contains(&ReportKey::PaymentFeeSummaryV1));
         assert!(keys.contains(&ReportKey::MonthlyOwnerReportV1));
+        assert!(keys.contains(&ReportKey::MarginSupplyOutlookV1));
         assert_eq!(
             catalog_entry(ReportKey::DailyBusinessSummaryV1).max_window_days,
             1

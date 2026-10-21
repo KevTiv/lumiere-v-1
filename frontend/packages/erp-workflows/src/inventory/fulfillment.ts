@@ -11,6 +11,7 @@
 
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 import { recordAction, type WorkflowAction, type WorkflowExecuteContext } from "../core/action"
+import { singleAddedId } from "../core/effect-delta"
 import { recordRef } from "../core/record-ref"
 import type { WorkflowResult } from "../core/result"
 import { rowId } from "../core/row"
@@ -171,13 +172,35 @@ export function pickingStepsToDone(row: RowValueMap): readonly PickingStep[] | u
 /** Exact same-record readback for confirm/assign/validate transitions. */
 export function observePickingState(
   pickingId: string,
-  expectedState: "confirmed" | "assigned" | "done",
+  expectedState: "confirmed" | "assigned" | "done" | "cancel",
   pickings: readonly RowValueMap[],
 ): ObservedTransition {
   const picking = pickings.find((row) => rowId(row) === pickingId)
   if (!picking || pickingStateTag(picking) !== expectedState) return {}
   return {
     outcome: "applied",
+    next: recordRef(pickingWorkflow.resource, pickingId, pickingWorkflow.module),
+  }
+}
+
+/** Packages created for this picking (the child-owned `stock_package.picking_id` relation). */
+export function pickingPackageIds(pickingId: string, packages: readonly RowValueMap[]): string[] {
+  return packages
+    .filter((row) => String(firstNonNullKey(row, "pickingId", "picking_id") ?? "") === pickingId)
+    .map(rowId)
+}
+
+/** `pack_stock_picking` creates one package on the picking: exactly one new package id is the effect. */
+export function observePackedPicking(
+  pickingId: string,
+  packageIdsBefore: readonly string[],
+  packages: readonly RowValueMap[],
+): ObservedTransition {
+  const created = singleAddedId(packageIdsBefore, pickingPackageIds(pickingId, packages))
+  if (!created) return {}
+  return {
+    outcome: "applied",
+    createdRecords: [recordRef("stock_package", created, pickingWorkflow.module)],
     next: recordRef(pickingWorkflow.resource, pickingId, pickingWorkflow.module),
   }
 }
@@ -230,17 +253,9 @@ export function observePartialValidatedPicking(
   const source = pickings.find((row) => rowId(row) === pickingId)
   if (!source || pickingStateTag(source) !== "done") return {}
 
-  const backorderIdsAfter = pickingBackorderIds(pickingId, pickings)
-  if (!backorderIdsAfter) return {}
+  const backorderId = singleAddedId(backorderIdsBefore, pickingBackorderIds(pickingId, pickings))
+  if (!backorderId) return {}
 
-  const after = new Set(backorderIdsAfter)
-  if (backorderIdsBefore.some((id) => !after.has(id))) return {}
-
-  const before = new Set(backorderIdsBefore)
-  const created = backorderIdsAfter.filter((id) => !before.has(id))
-  if (created.length !== 1) return {}
-
-  const backorderId = created[0]
   const backorder = pickings.find((row) => rowId(row) === backorderId)
   if (
     !backorder ||

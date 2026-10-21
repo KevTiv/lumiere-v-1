@@ -15,6 +15,7 @@ use super::{
     daily_business_summary::DailyBusinessSummaryReportV1,
     financial_position::CashMobileMoneyReportV1,
     low_stock::LowStockReportV1,
+    margin_supply::MarginSupplyOutlookReportV1,
     open_balances::{CustomerBalancesReportV1, SupplierPayablesReportV1},
     stock_movement::StockMovementReportV1,
 };
@@ -28,6 +29,7 @@ mod daily_summary;
 mod financial;
 mod history;
 mod inventory;
+mod margin_supply;
 mod source_queries;
 
 use self::commercial::{
@@ -37,6 +39,7 @@ use self::commercial::{
 use self::daily_summary::preview_daily_business_summary;
 use self::financial::{preview_cash_mobile_money, preview_open_balances};
 use self::inventory::{preview_low_stock, preview_stock_movement};
+use self::margin_supply::preview_margin_supply_outlook;
 
 pub use self::history::{report_artifact_key, report_history};
 use self::source_queries::{
@@ -59,6 +62,7 @@ struct ValidatedPreviewRequest {
     company_id: u64,
     date: NaiveDate,
     timezone: String,
+    scenario: crate::reports::common::MarginSupplyScenario,
 }
 
 #[derive(Debug, Serialize)]
@@ -74,6 +78,7 @@ pub enum ReportPreview {
     PurchaseSpendV1(ReportEnvelope<PurchaseSpendReportV1>),
     PaymentFeeSummaryV1(ReportEnvelope<PaymentFeeSummaryReportV1>),
     MonthlyOwnerReportV1(ReportEnvelope<MonthlyOwnerReportV1>),
+    MarginSupplyOutlookV1(ReportEnvelope<MarginSupplyOutlookReportV1>),
 }
 
 pub async fn preview_report(
@@ -88,6 +93,11 @@ pub async fn preview_report(
         return Err(ApiError::Unprocessable(format!(
             "Report '{report_key}' is catalogued but preview is not available yet"
         )));
+    }
+    if report_key != ReportKey::MarginSupplyOutlookV1 && request.scenario.is_some() {
+        return Err(ApiError::Unprocessable(
+            "scenario is only accepted for margin_supply_outlook_v1".into(),
+        ));
     }
 
     let request = validate_request(request)?;
@@ -138,6 +148,9 @@ pub async fn preview_report(
         ReportKey::MonthlyOwnerReportV1 => {
             preview_monthly_owner(client, organization_id, identity_hex, request).await
         }
+        ReportKey::MarginSupplyOutlookV1 => {
+            preview_margin_supply_outlook(client, organization_id, identity_hex, request).await
+        }
     }
 }
 
@@ -159,6 +172,7 @@ mod tests {
             company_id: 1,
             date: "07/10/2026".into(),
             timezone: "Africa/Nairobi' OR 1=1".into(),
+            scenario: None,
         });
         assert!(invalid.is_err());
     }
@@ -169,6 +183,7 @@ mod tests {
             company_id: 7,
             date: "2026-07-10".into(),
             timezone: "Africa/Nairobi".into(),
+            scenario: None,
         })
         .expect("valid request");
 
@@ -183,7 +198,80 @@ mod tests {
             company_id: 1,
             date: "2026-07-10".into(),
             timezone: "Not/A_Real_Zone".into(),
+            scenario: None,
         });
+        assert!(invalid.is_err());
+    }
+
+    #[test]
+    fn preview_request_validates_margin_supply_scenario_bounds() {
+        let invalid = validate_request(ReportPreviewRequest {
+            company_id: 1,
+            date: "2026-07-10".into(),
+            timezone: "UTC".into(),
+            scenario: Some(crate::reports::common::MarginSupplyScenario {
+                input_cost_change_pct: f64::NAN,
+                demand_change_pct: 0.0,
+                lead_time_change_days: 0,
+                target_margin_pct: 25.0,
+                provenance: None,
+            }),
+        });
+        assert!(invalid.is_err());
+    }
+
+    #[test]
+    fn preview_request_preserves_valid_controlled_csv_provenance() {
+        use crate::reports::common::{
+            MarginSupplyScenario, MarginSupplyScenarioProvenance, MarginSupplyScenarioSource,
+        };
+
+        let request = validate_request(ReportPreviewRequest {
+            company_id: 1,
+            date: "2026-07-10".into(),
+            timezone: "UTC".into(),
+            scenario: Some(MarginSupplyScenario {
+                input_cost_change_pct: 12.0,
+                demand_change_pct: -5.0,
+                lead_time_change_days: 2,
+                target_margin_pct: 30.0,
+                provenance: Some(MarginSupplyScenarioProvenance {
+                    source: MarginSupplyScenarioSource::ControlledCsv,
+                    file_name: Some("october-shock.csv".into()),
+                    imported_at: Some("2026-10-18T12:00:00Z".into()),
+                    row_number: Some(2),
+                }),
+            }),
+        })
+        .expect("valid controlled CSV scenario");
+
+        assert_eq!(
+            request.scenario.provenance.expect("provenance").file_name,
+            Some("october-shock.csv".into())
+        );
+    }
+
+    #[test]
+    fn preview_request_rejects_csv_fields_on_manual_provenance() {
+        use crate::reports::common::{
+            MarginSupplyScenario, MarginSupplyScenarioProvenance, MarginSupplyScenarioSource,
+        };
+
+        let invalid = validate_request(ReportPreviewRequest {
+            company_id: 1,
+            date: "2026-07-10".into(),
+            timezone: "UTC".into(),
+            scenario: Some(MarginSupplyScenario {
+                provenance: Some(MarginSupplyScenarioProvenance {
+                    source: MarginSupplyScenarioSource::Manual,
+                    file_name: Some("should-not-be-accepted.csv".into()),
+                    imported_at: None,
+                    row_number: None,
+                }),
+                ..MarginSupplyScenario::default()
+            }),
+        });
+
         assert!(invalid.is_err());
     }
 }
