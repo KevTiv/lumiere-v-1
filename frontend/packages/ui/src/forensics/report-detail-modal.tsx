@@ -191,7 +191,7 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
         {/* Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
           <div className="px-6">
-            <TabsList>
+            <TabsList scrollable>
               <TabsTrigger value="overview">
                 {t("forensics.detailModal.tabOverview")}
               </TabsTrigger>

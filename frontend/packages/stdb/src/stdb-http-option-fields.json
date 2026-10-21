@@ -610,21 +610,11 @@
   "AiProviderAttempt": [
     "failure_reason",
     "resolution",
-    "recovery_actor",
-    "recovery_approval_id",
-    "recovery_at",
-    "reconciliation_actor",
-    "reconciliation_approval_id",
     "dispatched_at",
     "finished_at"
   ],
   "AiProviderAttemptRead": [
-    "failure_reason",
-    "resolution",
-    "recovery_actor",
-    "recovery_approval_id",
-    "reconciliation_actor",
-    "reconciliation_approval_id"
+    "failure_reason"
   ],
   "AiReducerAllowlist": [
     "metadata"
@@ -5013,7 +5003,8 @@
     "group_id",
     "last_run",
     "next_run",
-    "metadata"
+    "metadata",
+    "scheduled_run_job_id"
   ],
   "ReportTemplate": [
     "description",
