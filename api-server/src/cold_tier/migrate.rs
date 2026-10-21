@@ -223,6 +223,15 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0019_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 20,
+        name: "replenishment_schedule_readback",
+        change_set: 12,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0020_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

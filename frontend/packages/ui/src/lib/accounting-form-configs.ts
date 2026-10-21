@@ -1,5 +1,7 @@
 import type { TFunction } from "i18next"
 import type { FormConfig, FormField } from "./form-types"
+import { ReconciliationMoveLinePicker } from "../forms/reconciliation-move-line-picker"
+import { reconciliationId } from "./reconciliation-widget-choices"
 
 export const newInvoiceForm = (t: TFunction): FormConfig => ({
   id: "new-invoice",
@@ -2161,6 +2163,24 @@ export function editBankStatementLineForm(t: TFunction, p: EditBankStatementLine
   }
 }
 
+function reconciliationWidgetModeOptions(t: TFunction, currentMode?: string) {
+  const options = [
+    { value: "bank", label: t("accounting.forms.reconciliationWidget.picker.modeBank", { defaultValue: "Bank" }) },
+    { value: "manual", label: t("accounting.forms.reconciliationWidget.picker.modeManual", { defaultValue: "Manual" }) },
+  ]
+  if (currentMode && !options.some((option) => option.value === currentMode)) {
+    options.push({ value: currentMode, label: t("accounting.forms.reconciliationWidget.picker.existingMode", { defaultValue: "Existing mode: {{mode}}", mode: currentMode }) })
+  }
+  return options
+}
+
+function reconciliationMoveLineValidation(t: TFunction, value: unknown, allowEmpty = false): string | null {
+  return !Array.isArray(value) || (!allowEmpty && value.length === 0) || new Set(value).size !== value.length
+    || value.some((id) => typeof id !== "string" || reconciliationId(id) === null)
+    ? t("accounting.forms.reconciliationWidget.picker.invalidLines", { defaultValue: "Choose at least one available journal item." })
+    : null
+}
+
 export function newReconciliationWidgetForm(t: TFunction): FormConfig {
   return {
     id: "new-reconciliation-widget",
@@ -2180,6 +2200,7 @@ export function newReconciliationWidgetForm(t: TFunction): FormConfig {
             id: "accountId",
             name: "accountId",
             label: t("accounting.forms.reconciliationWidget.fields.accountId"),
+            searchable: true,
             required: true,
             width: "full",
             options: [{ value: "", label: t("common.noData"), disabled: true }],
@@ -2188,26 +2209,31 @@ export function newReconciliationWidgetForm(t: TFunction): FormConfig {
             type: "select",
             id: "partnerId",
             name: "partnerId",
-            label: t("accounting.forms.reconciliationWidget.fields.partnerId"),
+            label: t("accounting.forms.reconciliationWidget.picker.partner", { defaultValue: "Partner" }),
+            searchable: true,
             width: "1/2",
             options: [{ value: "", label: "—" }],
           },
           {
-            type: "text",
+            type: "select",
             id: "mode",
             name: "mode",
             label: t("accounting.forms.reconciliationWidget.fields.mode"),
             defaultValue: "bank",
+            required: true,
+            options: reconciliationWidgetModeOptions(t),
             width: "1/2",
           },
           {
-            type: "textarea",
+            type: "custom",
             id: "moveLineIds",
             name: "moveLineIds",
-            label: t("accounting.forms.reconciliationWidget.fields.moveLineIds"),
-            description: t("accounting.forms.reconciliationWidget.fields.moveLineIdsHint"),
+            label: t("accounting.forms.reconciliationWidget.picker.journalItems", { defaultValue: "Journal items" }),
+            description: t("accounting.forms.reconciliationWidget.picker.selectionHint", { defaultValue: "Search and add journal items from the selected account and partner." }),
             required: true,
-            rows: 4,
+            defaultValue: [],
+            component: ReconciliationMoveLinePicker,
+            validation: { custom: (value) => reconciliationMoveLineValidation(t, value) },
             width: "full",
           },
           {
@@ -2229,7 +2255,7 @@ export interface EditReconciliationWidgetFormParams {
   accountId: string
   partnerId: string
   mode: string
-  moveLineIds: string
+  moveLineIds: string[]
   toCheck: boolean
 }
 
@@ -2258,6 +2284,7 @@ export function editReconciliationWidgetForm(t: TFunction, p: EditReconciliation
             id: "accountId",
             name: "accountId",
             label: t("accounting.forms.reconciliationWidget.fields.accountId"),
+            searchable: true,
             required: true,
             defaultValue: p.accountId,
             width: "full",
@@ -2267,27 +2294,31 @@ export function editReconciliationWidgetForm(t: TFunction, p: EditReconciliation
             type: "select",
             id: "partnerId",
             name: "partnerId",
-            label: t("accounting.forms.reconciliationWidget.fields.partnerId"),
+            label: t("accounting.forms.reconciliationWidget.picker.partner", { defaultValue: "Partner" }),
+            searchable: true,
             defaultValue: p.partnerId,
             width: "1/2",
             options: [{ value: "", label: "—" }],
           },
           {
-            type: "text",
+            type: "select",
             id: "mode",
             name: "mode",
             label: t("accounting.forms.reconciliationWidget.fields.mode"),
             defaultValue: p.mode,
+            required: true,
+            options: reconciliationWidgetModeOptions(t, p.mode),
             width: "1/2",
           },
           {
-            type: "textarea",
+            type: "custom",
             id: "moveLineIds",
             name: "moveLineIds",
-            label: t("accounting.forms.reconciliationWidget.fields.moveLineIds"),
-            description: t("accounting.forms.reconciliationWidget.fields.moveLineIdsHint"),
+            label: t("accounting.forms.reconciliationWidget.picker.journalItems", { defaultValue: "Journal items" }),
+            description: t("accounting.forms.reconciliationWidget.picker.selectionHint", { defaultValue: "Search and add journal items from the selected account and partner." }),
             defaultValue: p.moveLineIds,
-            rows: 4,
+            component: ReconciliationMoveLinePicker,
+            validation: { custom: (value) => reconciliationMoveLineValidation(t, value, true) },
             width: "full",
           },
           {
@@ -2500,7 +2531,7 @@ export const accountingFormConfigs = (t: TFunction): Record<string, FormConfig> 
     accountId: "",
     partnerId: "",
     mode: "bank",
-    moveLineIds: "",
+    moveLineIds: [],
     toCheck: false,
   }),
   "new-consolidation-account": newConsolidationAccountForm(t),

@@ -54,7 +54,8 @@ describe("Textarea", () => {
       </form>
     )
 
-    await getEditor("Description")
+    const editor = await getEditor("Description")
+    expect(screen.getByLabelText("Description")).toBe(editor.view.dom)
     expect(screen.getByRole("toolbar", { name: "Text formatting" })).toBeTruthy()
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement
     expect(ref.current).toBe(textarea)

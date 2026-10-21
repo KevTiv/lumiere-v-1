@@ -120,6 +120,11 @@ function RichTextarea({
     return () => textarea.removeEventListener("focus", redirect)
   }, [])
 
+  // The bridge is hidden; give only the editable surface an ARIA name.
+  const nativeProps = Object.fromEntries(
+    Object.entries(props).filter(([key]) => !key.startsWith("aria-"))
+  )
+
   const ariaLabel = props["aria-label"]
   const ariaLabelledBy = props["aria-labelledby"]
 
@@ -230,7 +235,7 @@ function RichTextarea({
         disabled={disabled}
         readOnly={readOnly}
         maxLength={maxLength}
-        {...props}
+        {...nativeProps}
       />
     </>
   )

@@ -20,6 +20,8 @@ import { bankSettlementAttempt, bankSettlementRecoveryAllowed, bankSettlementRec
 import { CollectionsWorkspace } from "../../../../packages/ui/src/accounting-components/collections-workspace"
 import { AccountingAuthoringPreview, hasAccountingAuthoringPreview } from "./accounting-authoring-preview"
 import type { FormValues } from "@lumiere/ui/lib/form-types"
+import { ReconciliationMoveLineProvider } from "@lumiere/ui/forms/reconciliation-move-line-picker"
+import { reconciliationAccountChoices, reconciliationPartnerChoices, reconciliationSelectionIssue, type ReconciliationSelectionIssue } from "@lumiere/ui/lib/reconciliation-widget-choices"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -455,6 +457,7 @@ import {
   toAssetUpdateParams,
   type AssetFailure,
 } from "./asset-actions"
+import { withAssetAuthoringVisibility } from "./asset-authoring-fields"
 import { accountIsDeprecated, deprecateAccountParams } from "./account-deprecation"
 import { ACCOUNT_INTERNAL_TYPES, accountEditDefaults, toAccountUpdateParams } from "./account-edit"
 import {
@@ -2478,13 +2481,42 @@ function AccountingClientReady({
     })
   }, [bankStatementDetail, defaultCurrencyId, t, optionalPartnerSelectOptions])
 
+  const reconciliationSelectionContext = useMemo(() => ({
+    organizationId: String(orgId),
+    companyId: String(operatingCompanyId),
+    accounts,
+    partners: contacts,
+    lines: accountMoveLines,
+    ready: canUseModuleData(accountsRead.state) && canUseModuleData(contactsRead.state) && canUseModuleData(accountMoveLinesRead.state),
+  }), [orgId, operatingCompanyId, accounts, contacts, accountMoveLines, accountsRead.state, contactsRead.state, accountMoveLinesRead.state])
+
+  const reconciliationAccountOptions = useMemo(() => {
+    const choices = reconciliationAccountChoices(accounts, reconciliationSelectionContext)
+    return choices.length > 0 ? choices : [{ value: "", label: t("common.noData"), disabled: true }]
+  }, [accounts, reconciliationSelectionContext, t])
+  const reconciliationPartnerOptions = useMemo(() => [
+    { value: "", label: t("accounting.forms.reconciliationWidget.picker.anyPartner", { defaultValue: "Any partner" }) },
+    ...reconciliationPartnerChoices(contacts, reconciliationSelectionContext),
+  ], [contacts, reconciliationSelectionContext, t])
+
+  const reconciliationSelectionMessage = useCallback((issue: ReconciliationSelectionIssue) => {
+    switch (issue) {
+      case "loading": return t("accounting.forms.reconciliationWidget.picker.loading", { defaultValue: "Journal item choices are unavailable until the company data is loaded." })
+      case "account": return t("accounting.forms.reconciliationWidget.picker.invalidAccount", { defaultValue: "Choose an available account from the current company." })
+      case "partner": return t("accounting.forms.reconciliationWidget.picker.invalidPartner", { defaultValue: "Choose an available partner from the current company, or choose Any partner." })
+      case "lines": return t("accounting.forms.reconciliationWidget.picker.invalidLines", { defaultValue: "Choose at least one available journal item." })
+      case "staleLines": return t("accounting.forms.reconciliationWidget.picker.staleLines", { defaultValue: "Some selected journal items no longer match the account, partner, or current company. Remove them or restore the matching selection before saving." })
+      case "mode": return t("accounting.forms.reconciliationWidget.picker.invalidMode", { defaultValue: "Choose a listed reconciliation mode." })
+    }
+  }, [t])
+
   const reconciliationWidgetCreateFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newReconciliationWidgetForm(t), {
-        accountId: glAccountFieldOptions,
-        partnerId: optionalPartnerSelectOptions,
+        accountId: reconciliationAccountOptions,
+        partnerId: reconciliationPartnerOptions,
       }),
-    [t, glAccountFieldOptions, optionalPartnerSelectOptions],
+    [t, reconciliationAccountOptions, reconciliationPartnerOptions],
   )
 
   const reconciliationWidgetEditFormConfig = useMemo(() => {
@@ -2493,33 +2525,38 @@ function AccountingClientReady({
       accountId: "",
       partnerId: "",
       mode: "bank",
-      moveLineIds: "",
+      moveLineIds: [],
       toCheck: false,
     }
     if (!reconciliationWidgetEdit) {
       return mergeSelectOptionsForFields(editReconciliationWidgetForm(t, empty), {
-        accountId: glAccountFieldOptions,
-        partnerId: optionalPartnerSelectOptions,
+        accountId: reconciliationAccountOptions,
+        partnerId: reconciliationPartnerOptions,
       })
     }
     const ml = reconciliationWidgetEdit.moveLineIds
-    const moveLineIds = Array.isArray(ml) ? ml.map((x) => String(x)).join(", ") : ""
+    const moveLineIds = Array.isArray(ml) ? ml.map((x) => String(x)) : []
+    const accountId = String(reconciliationWidgetEdit.accountId ?? "")
+    const partnerId = String(reconciliationWidgetEdit.partnerId ?? "")
+    const retainUnavailable = (options: Array<{ value: string; label: string; disabled?: boolean }>, selected: string) =>
+      selected && !options.some((option) => option.value === selected)
+        ? [...options, { value: selected, label: t("accounting.forms.reconciliationWidget.picker.unavailableRecord", { defaultValue: "Unavailable record #{{id}}", id: selected }), disabled: true }]
+        : options
     return mergeSelectOptionsForFields(
       editReconciliationWidgetForm(t, {
         widgetId: String(reconciliationWidgetEdit.id ?? ""),
-        accountId: String(reconciliationWidgetEdit.accountId ?? ""),
-        partnerId:
-          reconciliationWidgetEdit.partnerId != null ? String(reconciliationWidgetEdit.partnerId) : "",
+        accountId,
+        partnerId,
         mode: String(reconciliationWidgetEdit.mode ?? "bank"),
         moveLineIds,
         toCheck: Boolean(reconciliationWidgetEdit.toCheck),
       }),
       {
-        accountId: glAccountFieldOptions,
-        partnerId: optionalPartnerSelectOptions,
+        accountId: retainUnavailable(reconciliationAccountOptions, accountId),
+        partnerId: retainUnavailable(reconciliationPartnerOptions, partnerId),
       },
     )
-  }, [reconciliationWidgetEdit, t, glAccountFieldOptions, optionalPartnerSelectOptions])
+  }, [reconciliationWidgetEdit, t, reconciliationAccountOptions, reconciliationPartnerOptions])
 
   const editBankStatementLineFormConfig = useMemo(() => {
     const empty = {
@@ -2638,9 +2675,16 @@ function AccountingClientReady({
   )
 
   const onSubmitReconciliationWidgetEdit = useCallback(
-    async (formData: Record<string, unknown>) => {
+    async (formData: FormValues) => {
       const wid = formData.widgetId
       if (wid === "" || wid == null) return
+      const matches = reconciliationWidgets.filter((widget) => String(widget.id) === String(wid)
+        && String(widget.organizationId) === String(orgId) && String(widget.companyId) === String(operatingCompanyId))
+      if (!canUseModuleData(reconciliationWidgetsRead.state) || matches.length !== 1) {
+        throw new Error(t("accounting.forms.reconciliationWidget.picker.staleWidget", { defaultValue: "This reconciliation widget is no longer available in the current company. Close the form and refresh the list." }))
+      }
+      const issue = reconciliationSelectionIssue(formData, { ...reconciliationSelectionContext, existingMode: String(matches[0].mode ?? "bank"), allowEmpty: true })
+      if (issue) throw new Error(reconciliationSelectionMessage(issue))
       const params = toUpdateAccountReconciliationWidgetParams(formData)
       if (!params) return
       await updateReconciliationWidget.mutateAsync({
@@ -2649,7 +2693,7 @@ function AccountingClientReady({
       })
       setReconciliationWidgetEdit(null)
     },
-    [updateReconciliationWidget],
+    [updateReconciliationWidget, reconciliationWidgets, reconciliationWidgetsRead.state, orgId, operatingCompanyId, reconciliationSelectionContext, reconciliationSelectionMessage, t],
   )
 
   const onSubmitFiscalYearEdit = useCallback(
@@ -3655,7 +3699,7 @@ function AccountingClientReady({
         Degressive: f("methodDegressive", "Degressive"),
         DegressiveThenLinear: f("methodDegressiveThenLinear", "Degressive then linear"),
       }
-      return [
+      return withAssetAuthoringVisibility([
         ...(current == null
           ? ([
               { id: "code", name: "code", label: f("code", "Code"), type: "text", required: true, width: "1/2" },
@@ -3717,7 +3761,10 @@ function AccountingClientReady({
         accountSelect("gainAccountId", f("gainAccount", "Disposal gain account (optional)"), "gain", current?.gainAccountId ?? "", true),
         accountSelect("lossAccountId", f("lossAccount", "Disposal loss account (optional)"), "loss", current?.lossAccountId ?? "", true),
         accountSelect("accountDisposalId", f("disposalAccount", "Disposal account (optional)"), "disposal", current?.accountDisposalId ?? "", true),
-      ]
+      ], {
+        disposalAccounts: f("showDisposalAccounts", "Show disposal account settings (optional)"),
+        disposalAccountsHint: f("showDisposalAccountsHint", "Use these accounts when the asset is disposed. Hiding these fields keeps your selections."),
+      })
     }
     const promptNewAsset = async () => {
       if (operatingCompanyId <= 0n) return
@@ -4956,6 +5003,8 @@ function AccountingClientReady({
       const p = toCreateAnalyticDistributionModelParams(formData, operatingCompanyId)
       if (p) await createAnalyticDistributionModel.mutateAsync(analyticParamsToJson(p, "CreateAnalyticDistributionModelParams"))
     } else if (action === "createReconciliationWidget") {
+      const issue = reconciliationSelectionIssue(formData, reconciliationSelectionContext)
+      if (issue) throw new Error(reconciliationSelectionMessage(issue))
       const p = toCreateAccountReconciliationWidgetParams(formData)
       if (p) await createReconciliationWidget.mutateAsync(reconciliationWidgetParamsToJson(p))
     } else if (action === "createFiscalYear") {
@@ -6202,7 +6251,7 @@ function AccountingClientReady({
   }
 
   return (
-    <>
+    <ReconciliationMoveLineProvider value={reconciliationSelectionContext}>
       {activeTabUsable && formDialog}
       {companyAvailable ? <AccountingSetupReadinessPanel
         setup={accountingSetup}
@@ -7123,6 +7172,6 @@ function AccountingClientReady({
         onSubmit={onSubmitEditBankStatementLine}
       />
       {confirmDialogNode}
-    </>
+    </ReconciliationMoveLineProvider>
   )
 }

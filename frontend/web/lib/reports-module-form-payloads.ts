@@ -1,3 +1,5 @@
+import type { FormValues } from "@lumiere/ui/lib/form-types"
+
 /**
  * Explicit form field → mutation payload objects for the reports module.
  * Keeps UI fields visible at the call site and aligned with hook expectations.
@@ -20,10 +22,14 @@ export function toCreateFinancialReportPayload(formData: Record<string, unknown>
   }
 }
 
+function reportSourceModel(formData: FormValues): unknown {
+  return formData.reportSource === "account.move" ? "account.move" : formData.model
+}
+
 export function toCreateReportTemplatePayload(formData: Record<string, unknown>): Record<string, unknown> {
   return {
     name: formData.name,
-    model: formData.model,
+    model: reportSourceModel(formData),
     reportType: formData.reportType,
     orientation: formData.orientation,
     marginTop: formData.marginTop,
@@ -43,7 +49,7 @@ export function toCreateScheduledReportPayload(formData: Record<string, unknown>
   return {
     name: formData.name,
     reportTemplateId: formData.reportTemplateId,
-    model: formData.model,
+    model: reportSourceModel(formData),
     frequency: formData.frequency,
     nextRun: formData.nextRun,
     attachmentFormat: formData.attachmentFormat,

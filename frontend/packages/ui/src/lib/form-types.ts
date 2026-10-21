@@ -35,8 +35,8 @@ export interface BaseField {
   width?: FieldWidth
   className?: string
   defaultValue?: unknown
-  /** When set, field is shown only if `values[field] === equals` (string compare). */
-  visibleWhen?: { field: string; equals: string }
+  /** Show a field for one value or a fixed set of values (string comparison). */
+  visibleWhen?: { field: string; equals: string } | { field: string; oneOf: readonly string[] }
   validation?: {
     min?: number
     max?: number
@@ -139,6 +139,8 @@ export interface CustomField extends BaseField {
   type: "custom"
   component: ComponentType<{
     field: CustomField
+    /** Current form values for dependent record choices. */
+    values?: FormValues
     value: unknown
     onChange: (value: unknown) => void
     error?: string

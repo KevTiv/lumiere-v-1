@@ -61,8 +61,8 @@ use crate::inventory::stock::{
     create_stock_picking, create_stock_quant, increase_quant_at_location, move_stock_quant,
     reserve_quantity_at_location, reserve_stock_quant, resolve_warehouse_stock_location,
     stock_move, stock_picking, stock_quant, to_product_stock_qty, validate_stock_picking,
-    CreateStockMoveParams, CreateStockPickingParams, CreateStockQuantParams,
-    MoveStockQuantParams, StockQuantReserveParams,
+    CreateStockMoveParams, CreateStockPickingParams, CreateStockQuantParams, MoveStockQuantParams,
+    StockQuantReserveParams,
 };
 use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
@@ -1958,12 +1958,28 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
     }
     let job = jobs_before[0].clone();
     let job_id = job.scheduled_id;
+    let rule_scheduled = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("rule after schedule")?;
+    if rule_scheduled.scheduled_run_job_id != Some(job_id) {
+        return Err(format!(
+            "expected rule.scheduled_run_job_id {:?} after schedule, got {:?}",
+            Some(job_id),
+            rule_scheduled.scheduled_run_job_id
+        ));
+    }
 
     // Simulate the scheduler's own dispatch: the job row is gone by the time
     // the reducer body runs (SpacetimeDB deletes it after invoking the
     // reducer for a real fire, but the row must not exist to test that this
     // reducer's own reschedule is a fresh insert, not a mutation of the same row).
-    ctx.db.replenishment_run_job().scheduled_id().delete(&job_id);
+    ctx.db
+        .replenishment_run_job()
+        .scheduled_id()
+        .delete(&job_id);
     run_scheduled_replenishment(ctx, job.clone())?;
 
     let rule_after = ctx
@@ -2051,6 +2067,12 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
     if jobs_after[0].scheduled_id == job_id {
         return Err("reschedule reused the old job id instead of inserting a new one".into());
     }
+    if rule_after.scheduled_run_job_id != Some(jobs_after[0].scheduled_id) {
+        return Err(format!(
+            "expected rule.scheduled_run_job_id to follow the rescheduled job {}, got {:?}",
+            jobs_after[0].scheduled_id, rule_after.scheduled_run_job_id
+        ));
+    }
 
     // Lost-response replay: the deterministic job id must resolve to the same
     // PO and must not create either a second line or a second recurrence.
@@ -2097,7 +2119,11 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
         },
     ) {
         Err(message) if message.to_lowercase().contains("supplier relation") => {}
-        Err(message) => return Err(format!("expected service-authorization rejection, got: {message}")),
+        Err(message) => {
+            return Err(format!(
+                "expected service-authorization rejection, got: {message}"
+            ))
+        }
         Ok(_) => return Err("scheduled buy accepted an unauthorized supplier relation".into()),
     }
     if ctx.db.purchase_order().iter().any(|candidate| {
@@ -2159,7 +2185,11 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
         },
     ) {
         Err(message) if message.to_lowercase().contains("locked") => {}
-        Err(message) => return Err(format!("expected inventory-close rejection, got: {message}")),
+        Err(message) => {
+            return Err(format!(
+                "expected inventory-close rejection, got: {message}"
+            ))
+        }
         Ok(_) => return Err("scheduled buy bypassed the locked inventory close".into()),
     }
     if ctx.db.purchase_order().iter().any(|candidate| {
@@ -2182,6 +2212,15 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
             "expected no scheduled jobs after cancel, got {}",
             jobs_cancelled.len()
         ));
+    }
+    let rule_cancelled = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("rule after cancel")?;
+    if rule_cancelled.scheduled_run_job_id.is_some() {
+        return Err("expected scheduled_run_job_id cleared by cancel".into());
     }
 
     // Cancelling an unscheduled rule is a no-op success, not an error.
@@ -2411,8 +2450,24 @@ pub fn test_quality_fail_ambiguous_source_rejected(ctx: &ReducerContext) -> Resu
         .map(|location| location.id)
         .ok_or("No second active fixture location for ambiguity test")?;
 
-    create_quant(ctx, org_id, company_id, product_id, fixture.location_id, 5.0, None)?;
-    create_quant(ctx, org_id, company_id, product_id, second_location_id, 5.0, None)?;
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.location_id,
+        5.0,
+        None,
+    )?;
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        second_location_id,
+        5.0,
+        None,
+    )?;
 
     create_quality_check(
         ctx,
@@ -2530,8 +2585,15 @@ pub fn test_quality_fail_ambiguous_destination_rejected(
         .map(|l| l.id)
         .ok_or("qc location missing")?;
 
-    let source_quant_id =
-        create_quant(ctx, org_id, company_id, product_id, fixture.location_id, 5.0, None)?;
+    let source_quant_id = create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.location_id,
+        5.0,
+        None,
+    )?;
     // Two compatible destination identities already exist at the quarantine
     // location. Keep their quantity at zero so they cannot also become source
     // candidates before quarantine_quantity checks the duplicate destination.

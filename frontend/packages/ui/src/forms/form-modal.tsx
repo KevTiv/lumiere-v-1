@@ -178,7 +178,7 @@ export function FormModal({
         className={cn(
           maxW,
           workspaceStyles.surface,
-          "flex max-h-[86dvh] flex-col gap-0 overflow-hidden p-0",
+          "flex max-h-[86dvh] min-h-0 flex-col gap-0 overflow-hidden p-0",
           "sm:has-[[data-form-preview]]:max-w-[min(1200px,calc(100vw-2rem))]",
           className
         )}
@@ -206,14 +206,15 @@ export function FormModal({
           </div>
         </DialogHeader>
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {submitError ? (
-            <p className="mb-4 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+            <p className="mx-6 mt-4 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
               {submitError}
             </p>
           ) : null}
           <ModularForm
-            config={{ ...config, title: "", description: "" }}
+            config={{ ...config, title: "", description: "", layout: "default" }}
+            scrollable
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             leadingActions={formLeadingActions}

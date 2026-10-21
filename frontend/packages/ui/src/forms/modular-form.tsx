@@ -6,7 +6,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { useAiFormSuggest } from "@lumiere/query-hooks/hooks/ai-forms"
 import { cn } from "../lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
-import type { AiFormAssistConfig, FormConfig, FormField, FormPreviewRenderer } from "../lib/form-types"
+import type { AiFormAssistConfig, FormConfig, FormField, FormPreviewRenderer, FormValues } from "../lib/form-types"
 import { serializeAiFormSchema } from "../lib/ai-form-schema"
 import { FormFieldRenderer } from "./forms-field-render"
 import { formValuesDiffer } from "./use-unsaved-changes-guard"
@@ -21,7 +21,8 @@ import { toast } from "sonner"
 function isFieldVisible(field: FormField, values: Record<string, unknown>): boolean {
   const rule = field.visibleWhen
   if (!rule?.field) return true
-  return String(values[rule.field] ?? "") === String(rule.equals ?? "")
+  const value = String(values[rule.field] ?? "")
+  return "oneOf" in rule ? rule.oneOf.includes(value) : value === rule.equals
 }
 
 function visibleSectionFields(
@@ -29,6 +30,15 @@ function visibleSectionFields(
   values: Record<string, unknown>,
 ): FormField[] {
   return fields.filter((field) => isFieldVisible(field, values))
+}
+
+function clearHiddenFileSelections(config: FormConfig, values: FormValues): void {
+  // A hidden file input is unmounted. Clear its selection so it cannot be submitted unseen.
+  for (const section of config.sections) {
+    for (const field of section.fields) {
+      if (field.type === "file" && !isFieldVisible(field, values)) values[field.name] = undefined
+    }
+  }
 }
 
 interface ModularFormProps {
@@ -50,6 +60,8 @@ interface ModularFormProps {
   onDirtyChange?: (dirty: boolean) => void
   /** Renders beside the controls using the current, unsaved form values. */
   renderPreview?: FormPreviewRenderer
+  /** Keep actions outside the scrolling body when embedded in a constrained dialog. */
+  scrollable?: boolean
 }
 
 export function ModularForm({
@@ -64,6 +76,7 @@ export function ModularForm({
   aiAssist,
   onDirtyChange,
   renderPreview,
+  scrollable = false,
 }: ModularFormProps) {
   const { t } = useTranslation()
   const aiSuggest = useAiFormSuggest()
@@ -156,6 +169,7 @@ export function ModularForm({
   const handleChange = (name: string, value: unknown) => {
     setValues((prev) => {
       const next = { ...prev, [name]: value }
+      clearHiddenFileSelections(config, next)
       onValuesChange?.(next)
       return next
     })
@@ -226,6 +240,7 @@ export function ModularForm({
           note: suggestion.note,
         }
       }
+      clearHiddenFileSelections(config, next)
       onValuesChange?.(next)
       return next
     })
@@ -454,6 +469,7 @@ export function ModularForm({
                   <FormFieldRenderer
                     key={field.id}
                     field={field}
+                    values={values}
                     value={values[field.name]}
                     onChange={(value) => handleChange(field.name, value)}
                     error={errors[field.name]}
@@ -472,8 +488,14 @@ export function ModularForm({
   const hasPreview = preview != null && preview !== false
 
   const formContent = (
-    <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <div className={cn(hasPreview && "grid items-start gap-6 lg:grid-cols-2")}>
+    <form noValidate onSubmit={handleSubmit} className={cn("flex flex-col", scrollable ? "min-h-0 flex-1 overflow-hidden" : "gap-6")}>
+      <div
+        data-form-body={scrollable ? "" : undefined}
+        className={cn(
+          scrollable && "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5",
+          hasPreview && "grid items-start gap-6 lg:grid-cols-2",
+        )}
+      >
         <div className="flex min-w-0 flex-col gap-6">{fieldsContent}</div>
         {hasPreview ? (
           <aside
@@ -493,8 +515,10 @@ export function ModularForm({
 
       {config.showActions !== false ? (
         <div
+          data-form-actions
           className={cn(
             workspaceStyles.formActions,
+            scrollable && "mt-0 shrink-0 bg-card",
             leadingActions ? "justify-between" : "justify-end",
           )}
         >
@@ -555,7 +579,7 @@ export function ModularForm({
   }
 
   return (
-    <div className={cn("space-y-6", className)}>
+    <div className={cn(scrollable ? "flex min-h-0 flex-1 flex-col" : "space-y-6", className)}>
       {!config.hideTitle && (config.title || config.description) ? (
         <div className={cn(workspaceStyles.pageHeader, "md:flex-col md:items-start")}>
           {config.title ? (
