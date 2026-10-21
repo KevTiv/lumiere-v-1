@@ -825,6 +825,12 @@ pub fn add_document_version(
         return Err("Cannot version a deleted document".to_string());
     }
 
+    // A new revision retains the document's fiscal kind. Revalidate its pinned
+    // policy and MIME before even clearing an expired lock (which persists a write).
+    if let Some(kind) = doc.fiscal_kind.as_deref() {
+        validate_fiscal_archive(ctx, organization_id, doc.company_id, kind, &params.mimetype)?;
+    }
+
     let doc = refresh_expired_lock(ctx, doc);
 
     if doc.is_locked && doc.locked_by != Some(ctx.sender()) {
@@ -1212,6 +1218,11 @@ pub fn restore_document(
 
     if !doc.is_deleted {
         return Ok(());
+    }
+
+    // Restoring makes a fiscal archive active again under the current policy.
+    if let Some(kind) = doc.fiscal_kind.as_deref() {
+        validate_fiscal_archive(ctx, organization_id, doc.company_id, kind, &doc.mimetype)?;
     }
 
     if let Some(fid) = doc.folder_id {

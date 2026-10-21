@@ -14,6 +14,11 @@ function optionalString(v: unknown): string | undefined {
   return s === "" ? undefined : s
 }
 
+/** An untouched quantity input submits "", which must mean the default single unit, not 0. */
+export function expenseQuantity(v: unknown): number {
+  return v == null || String(v).trim() === "" ? 1 : Number(v)
+}
+
 function requiredTimestamp(v: unknown): CreateExpenseParams["date"] | null {
   if (v == null || String(v).trim() === "") return null
   const d = new Date(String(v))
@@ -114,7 +119,7 @@ export function toCreateExpenseParams(
     name: String(formData.name ?? ""),
     date,
     unitAmount: Number(formData.totalAmount ?? formData.unitAmount ?? 0),
-    quantity: Number(formData.quantity ?? 1),
+    quantity: expenseQuantity(formData.quantity),
     currencyId: parsedCurrencyId,
     description: optionalString(formData.description),
     productId: optionalBigIntU64(formData.productId),

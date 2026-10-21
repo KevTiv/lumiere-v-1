@@ -2,11 +2,12 @@
 -- Migration version: 15
 -- Migration name: 0015_durable_projection_delta
 -- Checksum algorithm: sha256
--- Body checksum: sha256:52e870e8bd03b1b34754d556a29c1d638ed816c8afc6c19ce0263cfcf91f2a33
+-- Body checksum: sha256:63d09ed76a56f5f35b02b04040d71a580e51ce7f96fb80657074dadba5fc4feb
 
--- Durable projection delta: ai_provider_attempt
-ALTER TABLE "ai_provider_attempt" ADD COLUMN IF NOT EXISTS "recovery_actor" TEXT;
-ALTER TABLE "ai_provider_attempt" ADD COLUMN IF NOT EXISTS "recovery_approval_id" TEXT;
-ALTER TABLE "ai_provider_attempt" ADD COLUMN IF NOT EXISTS "recovery_at" BIGINT;
-ALTER TABLE "ai_provider_attempt" ADD COLUMN IF NOT EXISTS "reconciliation_actor" TEXT;
-ALTER TABLE "ai_provider_attempt" ADD COLUMN IF NOT EXISTS "reconciliation_approval_id" TEXT;
+-- Durable projection delta: account_payment
+ALTER TABLE "account_payment"
+    ADD COLUMN IF NOT EXISTS "reversal_move_id" NUMERIC(20,0);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "account_payment_reversal_move_id"
+    ON "account_payment" ("reversal_move_id")
+    WHERE "reversal_move_id" IS NOT NULL;

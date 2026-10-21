@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
   if (!resolveAiGatewayBaseUrl()) {
     return NextResponse.json({
       configured: false,
-      message: 'LUMIERE_AI_GATEWAY_URL is not set.',
+      enabled: false,
+      message: 'AI features are disabled or not configured for this deployment.',
     })
   }
 

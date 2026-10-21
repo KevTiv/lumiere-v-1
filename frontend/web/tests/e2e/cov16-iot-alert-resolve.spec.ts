@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
@@ -106,7 +107,7 @@ test.describe("COV-16 exact IoT alert resolution", { tag: ["@p0", "@cov16"] }, (
     })
 
     await gotoModule(page, "/iot", "iot")
-    await page.getByTestId("module-tab-iot-iot-alerts").click()
+    await selectModuleTab(page, "iot", "iot-alerts")
     const alertRow = page.getByTestId(`entity-row-${alertId}`)
     await expect(alertRow).toBeVisible({ timeout: 30_000 })
     await alertRow.click()

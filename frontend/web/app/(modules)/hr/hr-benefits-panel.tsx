@@ -2,15 +2,10 @@
 
 import { useState } from "react"
 
+import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
 import { Input } from "@lumiere/ui/components/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@lumiere/ui/components/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 import type { QueryRows } from "@lumiere/query-hooks/http"
 import {
   useAssignBenefitEnrollment,
@@ -38,19 +33,11 @@ interface HrBenefitsPanelProps {
   employees: QueryRows
 }
 
-const PLAN_TYPES = [
-  { value: "health", label: "Health" },
-  { value: "dental", label: "Dental" },
-  { value: "retirement", label: "Retirement" },
-  { value: "other", label: "Other" },
-]
+const PLAN_TYPES = ["health", "dental", "retirement", "other"] as const
 
 /** HR module tab — persisted benefit plans and employee enrollments. */
-export function HrBenefitsPanel({
-  organizationId,
-  companyId,
-  employees,
-}: HrBenefitsPanelProps) {
+export function HrBenefitsPanel({ organizationId, companyId, employees }: HrBenefitsPanelProps) {
+  const { t } = useTranslation()
   const { data: plans = [] } = useBenefitPlans(organizationId)
   const { data: enrollments = [] } = useBenefitEnrollments(organizationId)
   const createPlan = useCreateBenefitPlan(organizationId, companyId)
@@ -63,12 +50,21 @@ export function HrBenefitsPanel({
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("")
   const [error, setError] = useState<string | null>(null)
 
+  const planTypeLabels: Record<(typeof PLAN_TYPES)[number], string> = {
+    health: t("hr.benefits.planTypes.health", { defaultValue: "Health" }),
+    dental: t("hr.benefits.planTypes.dental", { defaultValue: "Dental" }),
+    retirement: t("hr.benefits.planTypes.retirement", {
+      defaultValue: "Retirement",
+    }),
+    other: t("hr.benefits.planTypes.other", { defaultValue: "Other" }),
+  }
+
   const run = async (fn: () => Promise<void>) => {
     setError(null)
     try {
       await fn()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed")
+      setError(e instanceof Error ? e.message : t("hr.benefits.actionFailed", { defaultValue: "Action failed" }))
     }
   }
 
@@ -83,11 +79,13 @@ export function HrBenefitsPanel({
   return (
     <div className="space-y-8 p-1">
       <section className="space-y-3">
-        <h3 className="text-sm font-medium">Benefit plans</h3>
+        <h3 className="text-sm font-medium">{t("hr.benefits.plans.title", { defaultValue: "Benefit plans" })}</h3>
         <div className="flex flex-wrap items-end gap-2">
           <Input
             className="max-w-xs"
-            placeholder="Plan name"
+            placeholder={t("hr.benefits.plans.namePlaceholder", {
+              defaultValue: "Plan name",
+            })}
             value={planName}
             onChange={(e) => setPlanName(e.target.value)}
           />
@@ -96,9 +94,9 @@ export function HrBenefitsPanel({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {PLAN_TYPES.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
+              {PLAN_TYPES.map((planTypeValue) => (
+                <SelectItem key={planTypeValue} value={planTypeValue}>
+                  {planTypeLabels[planTypeValue]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -117,7 +115,7 @@ export function HrBenefitsPanel({
               })
             }
           >
-            Create plan
+            {t("hr.benefits.plans.create", { defaultValue: "Create plan" })}
           </Button>
         </div>
         <ul className="text-sm text-muted-foreground space-y-1">
@@ -125,20 +123,33 @@ export function HrBenefitsPanel({
             const r = row as Record<string, unknown>
             return (
               <li key={String(r.id)}>
-                {String(r.name ?? r.id)} ({String(r.planType ?? r.plan_type ?? "other")})
+                {String(r.name ?? r.id)} (
+                {planTypeLabels[String(r.planType ?? r.plan_type ?? "other") as keyof typeof planTypeLabels] ??
+                  String(r.planType ?? r.plan_type ?? "other")}
+                )
               </li>
             )
           })}
-          {activePlans.length === 0 ? <li>No benefit plans yet.</li> : null}
+          {activePlans.length === 0 ? (
+            <li>
+              {t("hr.benefits.plans.empty", {
+                defaultValue: "No benefit plans yet.",
+              })}
+            </li>
+          ) : null}
         </ul>
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-medium">Enroll employee</h3>
+        <h3 className="text-sm font-medium">{t("hr.benefits.enroll.title", { defaultValue: "Enroll employee" })}</h3>
         <div className="flex flex-wrap items-end gap-2">
           <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Plan" />
+              <SelectValue
+                placeholder={t("hr.benefits.planPlaceholder", {
+                  defaultValue: "Plan",
+                })}
+              />
             </SelectTrigger>
             <SelectContent>
               {activePlans.map((row) => {
@@ -153,7 +164,11 @@ export function HrBenefitsPanel({
           </Select>
           <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Employee" />
+              <SelectValue
+                placeholder={t("hr.benefits.employeePlaceholder", {
+                  defaultValue: "Employee",
+                })}
+              />
             </SelectTrigger>
             <SelectContent>
               {(employees as QueryRows).map((row) => {
@@ -168,9 +183,7 @@ export function HrBenefitsPanel({
           </Select>
           <Button
             size="sm"
-            disabled={
-              !selectedPlanId || !selectedEmployeeId || assignEnrollment.isPending
-            }
+            disabled={!selectedPlanId || !selectedEmployeeId || assignEnrollment.isPending}
             onClick={() =>
               void run(async () => {
                 await assignEnrollment.mutateAsync({
@@ -181,13 +194,17 @@ export function HrBenefitsPanel({
               })
             }
           >
-            Assign
+            {t("hr.benefits.enroll.assign", { defaultValue: "Assign" })}
           </Button>
         </div>
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-medium">Active enrollments</h3>
+        <h3 className="text-sm font-medium">
+          {t("hr.benefits.enroll.activeTitle", {
+            defaultValue: "Active enrollments",
+          })}
+        </h3>
         <ul className="space-y-2">
           {enrolledRows.map((row) => {
             const r = row as Record<string, unknown>
@@ -198,8 +215,11 @@ export function HrBenefitsPanel({
                 className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
               >
                 <span>
-                  Employee {rowNum(r, "employeeId", "employee_id")} → plan{" "}
-                  {rowNum(r, "planId", "plan_id")}
+                  {t("hr.benefits.enroll.summary", {
+                    defaultValue: "Employee {{employeeId}} → plan {{planId}}",
+                    employeeId: rowNum(r, "employeeId", "employee_id"),
+                    planId: rowNum(r, "planId", "plan_id"),
+                  })}
                 </span>
                 <Button
                   size="sm"
@@ -207,13 +227,19 @@ export function HrBenefitsPanel({
                   disabled={unenroll.isPending}
                   onClick={() => void run(() => unenroll.mutateAsync(enrollmentId))}
                 >
-                  Unenroll
+                  {t("hr.benefits.enroll.unenroll", {
+                    defaultValue: "Unenroll",
+                  })}
                 </Button>
               </li>
             )
           })}
           {enrolledRows.length === 0 ? (
-            <li className="text-sm text-muted-foreground">No active enrollments.</li>
+            <li className="text-sm text-muted-foreground">
+              {t("hr.benefits.enroll.empty", {
+                defaultValue: "No active enrollments.",
+              })}
+            </li>
           ) : null}
         </ul>
       </section>

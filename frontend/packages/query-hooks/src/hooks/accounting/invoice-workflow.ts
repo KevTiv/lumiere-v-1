@@ -50,6 +50,10 @@ export interface PaymentRegistrationProjection {
   readonly companyId?: unknown
   readonly company_id?: unknown
   readonly state?: unknown
+  readonly reconciledInvoiceIds?: unknown
+  readonly reconciled_invoice_ids?: unknown
+  readonly reconciledBillIds?: unknown
+  readonly reconciled_bill_ids?: unknown
 }
 
 export interface RegisteredInvoiceProjection {
@@ -111,10 +115,11 @@ function finiteNonnegative(value: unknown): boolean {
 }
 
 /**
- * Confirm payment registration from fields available to the operator: the exact payment and every
- * exact invoice/bill must share a company, be posted, and expose a settled payment state/residual.
- * The payment's reconciled-id arrays are field-policy protected and are therefore not a usable
- * browser readback contract for ordinary accounting operators.
+ * Confirm payment registration from fields available to the operator: the exact payment must own
+ * every requested invoice/bill relation, and every exact document must share its company, be
+ * posted, and expose a settled payment state/residual. The generated account-payment resource
+ * projects both reconciled-id arrays for ordinary accounting reads, so this proof does not infer an
+ * allocation from document state alone.
  */
 export function resolveRegisteredPaymentEffect(
   payments: readonly PaymentRegistrationProjection[],
@@ -140,6 +145,15 @@ export function resolveRegisteredPaymentEffect(
   const payment = exactRow(payments, input.paymentId, "account payment")
   const paymentCompany = parseStrictU64(payment?.companyId ?? payment?.company_id)
   if (!payment || paymentCompany == null || stateTag(payment.state) !== "paid") return null
+
+  const relation = input.isBill
+    ? payment.reconciledBillIds ?? payment.reconciled_bill_ids
+    : payment.reconciledInvoiceIds ?? payment.reconciled_invoice_ids
+  if (!Array.isArray(relation)) return null
+  const relatedIds = relation.map(parseStrictU64)
+  if (relatedIds.some((id) => id == null)) return null
+  const related = new Set(relatedIds as bigint[])
+  if (![...new Set(input.invoiceIds)].every((invoiceId) => related.has(invoiceId))) return null
 
   const expectedMoveTypes = input.isBill
     ? new Set(["ininvoice", "inrefund"])

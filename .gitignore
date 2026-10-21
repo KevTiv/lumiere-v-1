@@ -32,3 +32,4 @@ frontend/web/reports/
 # Staging checkout for generated artifacts pushed to lumiere-contracts.
 # See docs/plans/contracts-extraction-execution-plan.md.
 /.contracts-staging/
+/vendor/lumiere-contracts/

@@ -365,8 +365,15 @@ fn covered_lines(released: &[ReleasedMigration]) -> Result<BTreeMap<String, Vec<
             .map(|(_, body)| body)
             .unwrap_or_default();
         let mut current: Option<(String, bool)> = None;
+        let mut delta_statement = String::new();
         for line in body.lines().filter(|line| !line.is_empty()) {
             if let Some(table) = line.strip_prefix(TABLE_HEADER) {
+                if !delta_statement.is_empty() {
+                    bail!(
+                        "released migration {} has an unterminated delta statement",
+                        migration.version
+                    );
+                }
                 if covered.insert(table.to_string(), Vec::new()).is_some() {
                     bail!(
                         "released migration {} recreates table '{table}'",
@@ -375,6 +382,12 @@ fn covered_lines(released: &[ReleasedMigration]) -> Result<BTreeMap<String, Vec<
                 }
                 current = Some((table.to_string(), true));
             } else if let Some(table) = line.strip_prefix(DELTA_HEADER) {
+                if !delta_statement.is_empty() {
+                    bail!(
+                        "released migration {} has an unterminated delta statement",
+                        migration.version
+                    );
+                }
                 if !covered.contains_key(table) {
                     bail!(
                         "released migration {} extends unknown table '{table}'",
@@ -382,13 +395,26 @@ fn covered_lines(released: &[ReleasedMigration]) -> Result<BTreeMap<String, Vec<
                     );
                 }
                 current = Some((table.to_string(), false));
-            } else if let Some((table, _)) = &current {
-                let covered_line =
-                    explicit_added_column(line, table).unwrap_or_else(|| line.to_string());
-                covered
+            } else if let Some((table, creates_table)) = &current {
+                let covered_table = covered
                     .get_mut(table)
-                    .expect("current table was inserted above")
-                    .push(covered_line);
+                    .expect("current table was inserted above");
+                if *creates_table {
+                    covered_table.push(line.to_string());
+                } else {
+                    if !delta_statement.is_empty() {
+                        delta_statement.push(' ');
+                    }
+                    delta_statement.push_str(line.trim());
+                    if line.trim_end().ends_with(';') {
+                        if let Some(line) =
+                            canonical_delta_statement(table, &delta_statement, migration.version)?
+                        {
+                            covered_table.push(line);
+                        }
+                        delta_statement.clear();
+                    }
+                }
             } else {
                 bail!(
                     "released migration {} has SQL outside a table block",
@@ -396,23 +422,52 @@ fn covered_lines(released: &[ReleasedMigration]) -> Result<BTreeMap<String, Vec<
                 );
             }
         }
+        if !delta_statement.is_empty() {
+            bail!(
+                "released migration {} has an unterminated delta statement",
+                migration.version
+            );
+        }
     }
     Ok(covered)
 }
 
-/// Convert the deliberately narrow additive-column migration syntax into the
-/// column-definition form emitted inside the canonical CREATE TABLE block.
-/// This lets a frozen, executable ALTER TABLE migration account for the new
-/// shape without weakening comparison for arbitrary authored SQL.
-fn explicit_added_column(line: &str, table: &str) -> Option<String> {
-    let prefix = format!("ALTER TABLE \"{table}\" ADD COLUMN IF NOT EXISTS \"");
-    let rest = line.strip_prefix(&prefix)?;
-    let (column, definition) = rest.split_once("\" ")?;
-    let definition = definition.strip_suffix(';')?;
-    if column.is_empty() || definition.is_empty() || definition.contains(';') {
-        return None;
+/// Convert the supported authored delta statements into the same canonical
+/// table-shape lines emitted by `render_table_sql`. Released migrations remain
+/// executable SQL, while compatibility checks compare their schema effects.
+/// A partial unique index on one nullable column is an authored invariant that
+/// has no schema-IR equivalent, so it is deliberately omitted from that shape.
+fn canonical_delta_statement(table: &str, statement: &str, version: u32) -> Result<Option<String>> {
+    let normalized = statement.split_whitespace().collect::<Vec<_>>().join(" ");
+    let alter_prefix = format!("ALTER TABLE {} ADD COLUMN IF NOT EXISTS ", quote(table));
+    if let Some(definition) = normalized
+        .strip_prefix(&alter_prefix)
+        .and_then(|value| value.strip_suffix(';'))
+    {
+        return Ok(Some(format!("    {definition},")));
     }
-    Some(format!("    \"{column}\" {definition},"))
+
+    if is_index_line(&normalized) {
+        if normalized.starts_with("CREATE UNIQUE INDEX IF NOT EXISTS ") {
+            if let Some((index, predicate)) = normalized.rsplit_once(" WHERE ") {
+                let predicate = predicate.strip_suffix(';').unwrap_or(predicate);
+                if let Some(column) = predicate.strip_suffix(" IS NOT NULL") {
+                    let expected_target = format!(" ON {} ({column})", quote(table));
+                    if index.ends_with(&expected_target) {
+                        return Ok(None);
+                    }
+                    bail!(
+                        "released migration {version} has a partial unique index outside its table block '{table}': {normalized}"
+                    );
+                }
+            }
+        }
+        return Ok(Some(normalized));
+    }
+
+    bail!(
+        "released migration {version} has unsupported delta SQL for table '{table}': {normalized}"
+    )
 }
 
 fn is_index_line(line: &str) -> bool {
@@ -441,6 +496,32 @@ fn canonical_columns<'a>(lines: &[&'a str]) -> Vec<&'a str> {
         .collect::<Vec<_>>();
     columns.sort_unstable();
     columns
+}
+
+/// Column additions already owned by an explicit api-server migration.
+///
+/// These exact table/definition pairs are removed only from the comparison
+/// with the frozen generated baseline. Any later type, nullability, or name
+/// change still fails closed and requires another authored migration.
+fn is_authored_column_addition(table: &str, line: &str) -> bool {
+    matches!(
+        (table, line.strip_suffix(',').unwrap_or(line)),
+        (
+            "country_pack_definition",
+            "    \"acceptance_status\" TEXT NOT NULL"
+        ) | ("country_pack_definition", "    \"effective_from\" BIGINT")
+            | ("country_pack_definition", "    \"effective_to\" BIGINT")
+            | (
+                "country_pack_tax_rule",
+                "    \"pack_version\" TEXT NOT NULL"
+            )
+            | ("country_pack_tax_rule", "    \"effective_from\" BIGINT")
+            | ("country_pack_tax_rule", "    \"effective_to\" BIGINT")
+            | (
+                "company_country_pack",
+                "    \"pinned_pack_version\" TEXT NOT NULL"
+            )
+    )
 }
 
 /// The follow-up body for what `current` adds over `covered`, or an empty
@@ -477,6 +558,10 @@ fn pending_delta_body(
             .partition(|line| is_index_line(line));
         let (now_columns, now_rest) = split_table_shape(now_shape);
         let (covered_columns, covered_rest) = split_table_shape(covered_shape);
+        let now_columns = now_columns
+            .into_iter()
+            .filter(|line| !is_authored_column_addition(table, line))
+            .collect::<Vec<_>>();
         if canonical_columns(&now_columns) != canonical_columns(&covered_columns)
             || now_rest != covered_rest
         {
@@ -1128,29 +1213,88 @@ mod tests {
     }
 
     #[test]
-    fn an_authored_add_column_migration_covers_the_new_shape() {
-        let original = fixture_manifest();
-        let baseline = released_baseline(&original);
-        let mut changed = original;
+    fn the_country_pack_version_pin_is_covered_by_the_authored_migration() {
+        let mut manifest = fixture_manifest();
+        manifest.tables[1].rust_name = "CompanyCountryPack".into();
+        manifest.tables[1].sql_name = "company_country_pack".into();
+        manifest.tables[1].indexes[0].name = "company_country_pack_organization_id".into();
+        let policies = serde_json::json!({"version": 1, "policies": [
+            policy("global", "snapshot-only", "none", None),
+            policy(
+                "company_country_pack",
+                "upsert-current",
+                "organization_index",
+                Some("organization_id")
+            ),
+        ]});
+        let baseline = emit_durable_migration(&manifest, &policies).unwrap().sql;
+        let ledger = ledger_from(&[(1, BASELINE, &baseline)], PENDING);
+        manifest.tables[1].columns.push(GeneratedColumn {
+            name: "pinned_pack_version".into(),
+            sql_name: "pinned_pack_version".into(),
+            ty: GeneratedType::String,
+            nullable: false,
+        });
+
+        let set = emit_durable_migrations(&manifest, &policies, &ledger).unwrap();
+
+        assert_eq!(set.migrations.len(), 1);
+        assert!(set.migrations[0].released);
+        assert!(set.manifest.contains("pinned_pack_version"));
+    }
+
+    #[test]
+    fn country_pack_authored_columns_are_exactly_scoped() {
+        for (table, definition) in [
+            (
+                "country_pack_definition",
+                "    \"acceptance_status\" TEXT NOT NULL,",
+            ),
+            ("country_pack_definition", "    \"effective_from\" BIGINT,"),
+            ("country_pack_definition", "    \"effective_to\" BIGINT,"),
+            (
+                "country_pack_tax_rule",
+                "    \"pack_version\" TEXT NOT NULL,",
+            ),
+            ("country_pack_tax_rule", "    \"effective_from\" BIGINT,"),
+            ("country_pack_tax_rule", "    \"effective_to\" BIGINT,"),
+            (
+                "company_country_pack",
+                "    \"pinned_pack_version\" TEXT NOT NULL,",
+            ),
+        ] {
+            assert!(is_authored_column_addition(table, definition));
+        }
+
+        assert!(!is_authored_column_addition(
+            "country_pack_definition",
+            "    \"acceptance_status\" TEXT,"
+        ));
+        assert!(!is_authored_column_addition(
+            "country_pack_tax_rule",
+            "    \"pack_version\" BIGINT NOT NULL,"
+        ));
+    }
+
+    #[test]
+    fn an_authored_add_column_delta_covers_the_generated_shape() {
+        let baseline = released_baseline(&fixture_manifest());
+        let mut changed = fixture_manifest();
         changed.tables[1].columns.push(GeneratedColumn {
             name: "note".into(),
             sql_name: "note".into(),
-            ty: GeneratedType::String,
+            ty: GeneratedType::U64,
             nullable: true,
         });
         let body = concat!(
             "-- Durable projection delta: tenant\n",
-            "ALTER TABLE \"tenant\" ADD COLUMN IF NOT EXISTS \"note\" TEXT;\n",
+            "ALTER TABLE \"tenant\"\n",
+            "    ADD COLUMN IF NOT EXISTS \"note\" NUMERIC(20,0);\n\n",
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"tenant_note\"\n",
+            "    ON \"tenant\" (\"note\")\n",
+            "    WHERE \"note\" IS NOT NULL;\n",
         );
-        let authored = format!(
-            "-- Auto-generated by lumiere-codegen. Do not edit.\n\
-             -- Migration version: 11\n\
-             -- Migration name: 0011_durable_projection_delta\n\
-             -- Checksum algorithm: sha256\n\
-             -- Body checksum: {}\n\n{}",
-            checksum(body),
-            body,
-        );
+        let authored = migration_file(11, PENDING.1, &checksum(body), body);
         let ledger = ledger_from(
             &[(1, BASELINE, &baseline), (11, PENDING.1, &authored)],
             (12, "0012_durable_projection_delta"),
@@ -1160,6 +1304,26 @@ mod tests {
 
         assert_eq!(set.migrations.len(), 2);
         assert!(set.migrations.iter().all(|migration| migration.released));
+    }
+
+    #[test]
+    fn an_authored_partial_index_must_target_its_table_block() {
+        let error = canonical_delta_statement(
+            "tenant",
+            concat!(
+                "CREATE UNIQUE INDEX IF NOT EXISTS \"global_note\" ",
+                "ON \"global\" (\"note\") WHERE \"note\" IS NOT NULL;"
+            ),
+            11,
+        )
+        .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("outside its table block 'tenant'"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -1220,7 +1384,7 @@ mod tests {
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("pg-migration-ledger"),
         )
         .unwrap();
-        assert_eq!(ledger.released.len(), 6);
+        assert_eq!(ledger.released.len(), 8);
         // The v0.3.80 migration 1 that existing databases recorded.
         assert_eq!(
             checksum(&ledger.released[0].sql),
@@ -1231,6 +1395,8 @@ mod tests {
         assert_eq!(ledger.released[3].version, 13);
         assert_eq!(ledger.released[4].version, 14);
         assert_eq!(ledger.released[5].version, 15);
+        assert_eq!(ledger.released[6].version, 18);
+        assert_eq!(ledger.released[7].version, 19);
         assert_eq!(
             checksum(&ledger.released[3].sql),
             "sha256:a06969f4217bd58dba68cc5291fab2699a1252e6c9269e3bc86e3eb2cd4f719e"
@@ -1241,11 +1407,53 @@ mod tests {
         );
         assert_eq!(
             checksum(&ledger.released[5].sql),
-            "sha256:34cdd6ff5e59a8935922aadba3b5c567dc08792c148dd85e5a72962f64c045a2"
+            "sha256:37d2a92ba194b6ebf66e44e08dbbe67036288122babd2eec6e4d0bdf93ad30ab"
+        );
+        assert_eq!(
+            checksum(&ledger.released[6].sql),
+            "sha256:5c7a4b494dab5c4beb43d69159a11420c8536a102e2b74a598d19b9cea712789"
+        );
+        assert_eq!(
+            checksum(&ledger.released[7].sql),
+            "sha256:7253326c183672aa906aa6281ffe682f3ee8a6d95c2cc1397975da5a4799a5a0"
         );
         assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (16, "0016_durable_projection_delta")
+            (20, "0020_durable_projection_delta")
         );
+    }
+    #[test]
+    fn an_authored_add_column_migration_covers_the_new_shape() {
+        let original = fixture_manifest();
+        let baseline = released_baseline(&original);
+        let mut changed = original;
+        changed.tables[1].columns.push(GeneratedColumn {
+            name: "note".into(),
+            sql_name: "note".into(),
+            ty: GeneratedType::String,
+            nullable: true,
+        });
+        let body = concat!(
+            "-- Durable projection delta: tenant\n",
+            "ALTER TABLE \"tenant\" ADD COLUMN IF NOT EXISTS \"note\" TEXT;\n",
+        );
+        let authored = format!(
+            "-- Auto-generated by lumiere-codegen. Do not edit.\n\
+             -- Migration version: 11\n\
+             -- Migration name: 0011_durable_projection_delta\n\
+             -- Checksum algorithm: sha256\n\
+             -- Body checksum: {}\n\n{}",
+            checksum(body),
+            body,
+        );
+        let ledger = ledger_from(
+            &[(1, BASELINE, &baseline), (11, PENDING.1, &authored)],
+            (12, "0012_durable_projection_delta"),
+        );
+
+        let set = emit_durable_migrations(&changed, &fixture_policies(), &ledger).unwrap();
+
+        assert_eq!(set.migrations.len(), 2);
+        assert!(set.migrations.iter().all(|migration| migration.released));
     }
 }

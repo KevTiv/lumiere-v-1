@@ -3,13 +3,16 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::accounting::bank_reconciliation::{
     account_bank_statement, account_bank_statement_line, create_account_bank_statement,
-    create_account_bank_statement_line, reconcile_account_bank_statement_line,
-    CreateAccountBankStatementLineParams, CreateAccountBankStatementParams,
-    ReconcileAccountBankStatementLineParams,
+    create_account_bank_statement_line, delete_account_bank_statement_line,
+    reconcile_account_bank_statement_line, unreconciled_account_bank_statement_line,
+    update_account_bank_statement_line, CreateAccountBankStatementLineParams,
+    CreateAccountBankStatementParams, ReconcileAccountBankStatementLineParams,
+    UnreconcileAccountBankStatementLineParams, UpdateAccountBankStatementLineParams,
 };
 use crate::accounting::journal_entries::{
     account_move, account_move_line, reconcile_payment_with_invoice,
 };
+use crate::accounting::payment_management::payment_transaction;
 use crate::accounting::payments::{
     account_payment, cancel_payment, create_payment, post_payment, register_payment_on_invoice,
     unregister_payment_allocations, CreatePaymentParams,
@@ -28,6 +31,1103 @@ use super::helpers::{
     seed_bank_journal, seed_distinctive_ar_account, seed_sibling_company,
 };
 use crate::test_harness::chart_keys;
+
+fn settlement_financial_snapshot(ctx: &ReducerContext, organization_id: u64) -> String {
+    let moves: Vec<_> = ctx
+        .db
+        .account_move()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .map(|row| {
+            (
+                row.id,
+                row.amount_residual,
+                format!("{:?}", row.payment_state),
+                format!("{:?}", row.write_date),
+            )
+        })
+        .collect();
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .map(|row| {
+            (
+                row.id,
+                row.amount_residual,
+                row.amount_residual_currency,
+                row.debit,
+                row.credit,
+                row.matching_number,
+                format!("{:?}", row.write_date),
+            )
+        })
+        .collect();
+    let payments: Vec<_> = ctx
+        .db
+        .account_payment()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .map(|row| {
+            (
+                row.id,
+                row.amount,
+                row.move_id,
+                format!("{:?}", row.state),
+                row.reconciled_invoice_ids,
+                row.reconciled_bill_ids,
+            )
+        })
+        .collect();
+    let bank: Vec<_> = ctx
+        .db
+        .account_bank_statement_line()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .map(|row| {
+            (
+                row.id,
+                row.is_reconciled,
+                row.amount_residual,
+                row.move_ids,
+                row.payment_ids,
+                format!("{:?}", row.write_date),
+            )
+        })
+        .collect();
+    let audit = ctx
+        .db
+        .audit_log()
+        .iter()
+        .filter(|row| row.organization_id == organization_id)
+        .count();
+    serde_json::json!([moves, lines, payments, bank, audit]).to_string()
+}
+
+/// An org-level financial capability must not escape a company-scoped membership.
+/// Policy changes are fixture setup; compare the complete outcome after that setup.
+pub(super) fn assert_bank_company_denial(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    allowed_company_id: u64,
+    label: &str,
+    action: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    use crate::core::users::UserOrganization;
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == organization_id && row.is_active)
+        .ok_or("company-denial fixture membership missing")?;
+    let membership_id = membership.id;
+    let original_company_id = membership.company_id;
+    ctx.db.user_organization().id().update(UserOrganization {
+        company_id: Some(allowed_company_id),
+        ..membership
+    });
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
+        .ok_or("company-denial fixture profile missing")?;
+    let profile_id = profile.id;
+    let was_superuser = profile.is_superuser;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..profile
+    });
+    // Prove the rejection is company authority, rather than a missing financial
+    // action. These current capabilities cover all settlement lifecycle routes.
+    for (resource, capability) in [
+        ("account_bank_statement_line", "write"),
+        ("account_bank_statement", "write"),
+        ("payment", "create"),
+        ("payment", "post"),
+        ("payment", "reconcile"),
+        ("payment", "cancel"),
+        ("payment", "reverse"),
+        ("account_move", "write"),
+    ] {
+        crate::helpers::check_permission(ctx, organization_id, resource, capability)
+            .map_err(|error| format!("{label}: fixture lacks {resource}:{capability}: {error}"))?;
+    }
+    let before = super::bank_settlement_lifecycle_test::snapshot(ctx, organization_id)?;
+    let result = action();
+    let unchanged =
+        super::bank_settlement_lifecycle_test::snapshot(ctx, organization_id)? == before;
+    let membership = ctx
+        .db
+        .user_organization()
+        .id()
+        .find(&membership_id)
+        .ok_or("restricted membership missing after denied command")?;
+    ctx.db.user_organization().id().update(UserOrganization {
+        company_id: original_company_id,
+        ..membership
+    });
+    let profile = ctx
+        .db
+        .user_profile()
+        .id()
+        .find(&profile_id)
+        .ok_or("restricted profile missing after denied command")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: was_superuser,
+        ..profile
+    });
+    match result {
+        Err(error) if error.contains("workflow actor has no active access to this company") && unchanged=>Ok(()),
+        Err(error)=>Err(format!("{label}: expected company-access denial with zero financial/approval/counter/audit writes, unchanged={unchanged}: {error}")),
+        Ok(())=>Err(format!("{label}: company-restricted member changed a different company's bank settlement")),
+    }
+}
+
+/// Exact bank settlement creates one posted payment, actually clears invoice and
+/// clearing residuals, and rejects stale/replayed/denied commands without effects.
+pub fn test_bank_statement_settlement_exact_effect(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let ar_account_id = *fixture
+        .chart_account_ids
+        .get(chart_keys::AR)
+        .ok_or("settlement AR account missing")?;
+    let invoice_ids = [
+        create_balanced_customer_invoice_on_account(
+            ctx,
+            &fixture,
+            0.1,
+            ar_account_id,
+            "bank-settlement-decimal-first",
+            true,
+        )?,
+        create_balanced_customer_invoice_on_account(
+            ctx,
+            &fixture,
+            0.2,
+            ar_account_id,
+            "bank-settlement-decimal-second",
+            true,
+        )?,
+    ];
+    let (journal_id, liquidity_id) = seed_bank_journal(ctx, &fixture)?;
+    create_account_bank_statement(
+        ctx,
+        org,
+        company_id,
+        journal_id,
+        CreateAccountBankStatementParams {
+            name: Some("Exact bank settlement".to_string()),
+            reference: None,
+            date: Some(ctx.timestamp),
+            balance_start: 0.0,
+            currency_id: fixture.currency_id,
+            metadata: None,
+        },
+    )?;
+    let statement = ctx
+        .db
+        .account_bank_statement()
+        .bank_statement_by_org()
+        .filter(&org)
+        .find(|row| row.journal_id == journal_id)
+        .ok_or("settlement statement missing")?;
+    create_account_bank_statement_line(
+        ctx,
+        org,
+        company_id,
+        statement.id,
+        CreateAccountBankStatementLineParams {
+            date: ctx.timestamp,
+            amount: 0.3,
+            amount_currency: 0.3,
+            currency_id: Some(fixture.currency_id),
+            foreign_currency_id: None,
+            partner_id: Some(fixture.partner_id),
+            bank_account_id: None,
+            account_number: None,
+            move_id: None,
+            is_reconciled: false,
+            transaction_type: None,
+            move_ids: vec![],
+            payment_ids: vec![],
+            amount_residual: 0.3,
+            auto_reconcile_ids: vec![],
+            metadata: None,
+        },
+    )?;
+    let bank = ctx
+        .db
+        .account_bank_statement_line()
+        .statement_line_by_statement()
+        .filter(&statement.id)
+        .next()
+        .ok_or("settlement bank line missing")?;
+    let target_ids: Vec<_> = invoice_ids
+        .iter()
+        .map(|invoice_id| {
+            ctx.db
+                .account_move_line()
+                .move_line_by_move()
+                .filter(invoice_id)
+                .find(|row| {
+                    row.account_internal_type
+                        .as_deref()
+                        .is_some_and(|kind| kind.eq_ignore_ascii_case("receivable"))
+                })
+                .map(|row| row.id)
+                .ok_or("invoice receivable missing")
+        })
+        .collect::<Result<_, _>>()?;
+    let params = ReconcileAccountBankStatementLineParams {
+        move_ids: target_ids.clone(),
+        amount_residual: 0.0,
+    };
+    let forged = create_account_bank_statement_line(
+        ctx,
+        org,
+        company_id,
+        statement.id,
+        CreateAccountBankStatementLineParams {
+            date: ctx.timestamp,
+            amount: 0.3,
+            amount_currency: 0.3,
+            currency_id: Some(fixture.currency_id),
+            foreign_currency_id: None,
+            partner_id: Some(fixture.partner_id),
+            bank_account_id: None,
+            account_number: None,
+            move_id: Some(invoice_ids[0]),
+            is_reconciled: true,
+            transaction_type: None,
+            move_ids: target_ids.clone(),
+            payment_ids: vec![99999],
+            amount_residual: 0.0,
+            auto_reconcile_ids: vec![],
+            metadata: None,
+        },
+    );
+    if forged.is_ok()
+        || ctx
+            .db
+            .account_bank_statement_line()
+            .statement_line_by_statement()
+            .filter(&statement.id)
+            .count()
+            != 1
+    {
+        return Err("generic bank create accepted forged settlement provenance".to_string());
+    }
+    let before = settlement_financial_snapshot(ctx, org);
+    for invalid in [
+        ReconcileAccountBankStatementLineParams {
+            move_ids: vec![target_ids[0]],
+            amount_residual: 0.0,
+        },
+        ReconcileAccountBankStatementLineParams {
+            move_ids: vec![target_ids[0], target_ids[0]],
+            amount_residual: 0.0,
+        },
+        ReconcileAccountBankStatementLineParams {
+            move_ids: target_ids.clone(),
+            amount_residual: 1.0,
+        },
+    ] {
+        if reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, invalid).is_ok()
+            || settlement_financial_snapshot(ctx, org) != before
+        {
+            return Err("invalid exact bank selection changed financial state".to_string());
+        }
+    }
+    if reconcile_account_bank_statement_line(ctx, org, company_id + 9999, bank.id, params.clone())
+        .is_ok()
+        || settlement_financial_snapshot(ctx, org) != before
+    {
+        return Err("cross-company bank settlement changed financial state".to_string());
+    }
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == org)
+        .ok_or("settlement membership missing")?;
+    let owner_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&membership.role_id)
+        .ok_or("settlement owner role missing")?;
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
+        .ok_or("settlement caller missing")?;
+    let profile_id = profile.id;
+    let was_superuser = profile.is_superuser;
+    ctx.db.role().id().update(Role {
+        permissions: vec![],
+        ..owner_role.clone()
+    });
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..profile
+    });
+    let denied =
+        reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, params.clone());
+    ctx.db.role().id().update(owner_role);
+    let profile = ctx
+        .db
+        .user_profile()
+        .id()
+        .find(&profile_id)
+        .ok_or("settlement caller disappeared")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: was_superuser,
+        ..profile
+    });
+    if denied.is_ok() || settlement_financial_snapshot(ctx, org) != before {
+        return Err("denied bank settlement changed financial state".to_string());
+    }
+    // Simulate a concurrent allocation after the operator's review.
+    let target = ctx
+        .db
+        .account_move_line()
+        .id()
+        .find(&target_ids[0])
+        .ok_or("stale target missing")?;
+    ctx.db
+        .account_move_line()
+        .id()
+        .update(crate::accounting::journal_entries::AccountMoveLine {
+            amount_residual: 0.0,
+            ..target.clone()
+        });
+    let stale_before = settlement_financial_snapshot(ctx, org);
+    let stale =
+        reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, params.clone());
+    if stale.is_ok() || settlement_financial_snapshot(ctx, org) != stale_before {
+        return Err("stale bank settlement changed financial state".to_string());
+    }
+    ctx.db.account_move_line().id().update(target.clone());
+    // An accepted attempt must have an exact, reversible base-currency snapshot.
+    // Neither malformed source may create even a draft, receipt, task or audit.
+    for malformed in [
+        crate::accounting::journal_entries::AccountMoveLine {
+            is_matching: true,
+            ..target.clone()
+        },
+        crate::accounting::journal_entries::AccountMoveLine {
+            amount_currency: target.balance + 1.0,
+            ..target.clone()
+        },
+    ] {
+        ctx.db.account_move_line().id().update(malformed);
+        let before = super::bank_settlement_lifecycle_test::snapshot(ctx, org)?;
+        if reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, params.clone())
+            .is_ok()
+            || super::bank_settlement_lifecycle_test::snapshot(ctx, org)? != before
+        {
+            return Err("non-reversible bank source item created financial, receipt, approval or durable effects".to_string());
+        }
+    }
+    ctx.db.account_move_line().id().update(target);
+    let restricted_company = seed_sibling_company(ctx, &fixture)?;
+    assert_bank_company_denial(
+        ctx,
+        org,
+        restricted_company,
+        "initial exact bank settlement",
+        || reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, params.clone()),
+    )?;
+    reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, params.clone())?;
+    let settled = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&bank.id)
+        .ok_or("settled bank line missing")?;
+    if !settled.is_reconciled || settled.amount_residual != 0.0 || settled.payment_ids.len() != 1 {
+        return Err("bank line was not settled with one payment".to_string());
+    }
+    let payment_id = settled.payment_ids[0];
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("bank payment missing")?;
+    if payment.state != PaymentState::Paid
+        || payment.amount != 0.3
+        || payment.reconciled_invoice_ids.len() != 2
+    {
+        return Err("bank settlement did not post and allocate one exact payment".to_string());
+    }
+    let move_id = payment.move_id.ok_or("bank payment move missing")?;
+    let posted_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&move_id)
+        .collect();
+    if !posted_lines
+        .iter()
+        .any(|row| row.account_id == liquidity_id && row.debit == 0.3 && row.credit == 0.0)
+        || posted_lines.iter().any(|row| {
+            row.account_internal_type
+                .as_deref()
+                .is_some_and(|kind| kind.eq_ignore_ascii_case("receivable"))
+                && row.amount_residual != 0.0
+        })
+        || invoice_ids.iter().any(|id| {
+            ctx.db.account_move().id().find(id).is_none_or(|row| {
+                row.amount_residual != 0.0 || row.payment_state != PaymentState::Paid
+            })
+        })
+    {
+        return Err(
+            "bank settlement did not clear canonical invoice and payment residuals".to_string(),
+        );
+    }
+    let after = settlement_financial_snapshot(ctx, org);
+    let replay = reconcile_account_bank_statement_line(ctx, org, company_id, bank.id, params);
+    let unlink = unreconciled_account_bank_statement_line(
+        ctx,
+        org,
+        company_id,
+        bank.id,
+        UnreconcileAccountBankStatementLineParams {
+            move_ids: vec![],
+            amount_residual: 0.3,
+        },
+    );
+    let cancel = cancel_payment(ctx, org, payment_id);
+    let unregister = unregister_payment_allocations(ctx, org, payment_id);
+    let delete = delete_account_bank_statement_line(ctx, org, company_id, bank.id);
+    // Even the operational reversal path must reject bank-owned ledger payments
+    // before creating a correcting payment, mutation or approval request.
+    let operational = ctx.db.payment_transaction().insert(
+        crate::accounting::payment_management::PaymentTransaction {
+            id: 0,
+            organization_id: org,
+            company_id,
+            payment_account_id: 0,
+            direction: crate::types::PaymentDirection::Inbound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            external_reference: None,
+            reference_fingerprint: String::new(),
+            gross_external_amount: 0.3,
+            settlement_amount: 0.3,
+            net_account_amount: 0.3,
+            currency_id: fixture.currency_id,
+            occurred_at: ctx.timestamp,
+            status: crate::types::PaymentTransactionStatus::Posted,
+            account_payment_id: Some(payment_id),
+            source_entity: None,
+            source_entity_id: None,
+            evidence_document_ids: vec![],
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            created_by: ctx.sender(),
+            updated_by: ctx.sender(),
+            voided_at: None,
+            metadata: None,
+        },
+    );
+    let reverse = crate::accounting::payment_management::reverse_payment_transaction(
+        ctx,
+        org,
+        operational.id,
+        crate::accounting::payment_management::ReversePaymentTransactionParams {
+            company_id,
+            reason: None,
+            metadata: None,
+        },
+    );
+    if !matches!(&reverse, Err(error) if error.contains("bank-linked payments require a dedicated bank settlement reversal"))
+    {
+        return Err(
+            "operational reversal did not reach the bank-ownership guard before mutation"
+                .to_string(),
+        );
+    }
+    ctx.db.payment_transaction().id().delete(&operational.id);
+    let edit = update_account_bank_statement_line(
+        ctx,
+        org,
+        company_id,
+        bank.id,
+        UpdateAccountBankStatementLineParams {
+            date: None,
+            amount: Some(200.0),
+            amount_currency: None,
+            currency_id: None,
+            foreign_currency_id: None,
+            partner_id: None,
+            bank_account_id: None,
+            account_number: None,
+            move_id: None,
+            is_reconciled: None,
+            transaction_type: None,
+            move_ids: None,
+            payment_ids: Some(vec![]),
+            amount_residual: None,
+            auto_reconcile_ids: None,
+            metadata: None,
+        },
+    );
+    if [replay, unlink, cancel, unregister, delete, edit, reverse]
+        .iter()
+        .any(Result::is_ok)
+        || settlement_financial_snapshot(ctx, org) != after
+    {
+        return Err(
+            "replay, unlink, edit, cancellation or unwind changed settled bank effects".to_string(),
+        );
+    }
+    Ok(())
+}
+
+/// A real published approval workflow must hold the payment in draft. Human
+/// approval posts it, and only an explicit continuation settles the bank line.
+pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::core::permissions::{
+        org_permission, OrgPermission, PermissionAction, PermissionEffect, PermissionSubject,
+    };
+    use crate::core::users::UserOrganization;
+    use crate::workflow::approvals::{
+        decide_workflow_human_task_for_actor, workflow_human_task, DecideWorkflowHumanTaskParams,
+        WorkflowHumanTaskDecision,
+    };
+    use crate::workflow::definitions::*;
+    use crate::workflow::runtime::workflow_instance;
+    use spacetimedb::rand::Rng;
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let invoice_id = create_balanced_customer_invoice(ctx, &fixture, 100.0, true)?;
+    let (journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+    create_payment(
+        ctx,
+        org,
+        CreatePaymentParams {
+            idempotency_key: "bank-last-cent-prior-payment".to_string(),
+            company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount: 99.99,
+            currency_id: fixture.currency_id,
+            date: Some(ctx.timestamp),
+            journal_id,
+            ref_: Some("bank-last-cent-prior".to_string()),
+            memo: None,
+        },
+    )?;
+    let prior = ctx
+        .db
+        .account_payment()
+        .payment_by_org()
+        .filter(&org)
+        .find(|row| row.ref_.as_deref() == Some("bank-last-cent-prior"))
+        .ok_or("prior payment missing")?;
+    post_payment(ctx, org, prior.id)?;
+    register_payment_on_invoice(ctx, org, prior.id, vec![invoice_id], false)?;
+    // An ordinary posted, unallocated payment exercises the second-argument
+    // registration bypass without depending on an already exhausted payment.
+    create_payment(
+        ctx,
+        org,
+        CreatePaymentParams {
+            idempotency_key: "bank-counterpart-adversarial-payment".to_string(),
+            company_id,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount: 0.01,
+            currency_id: fixture.currency_id,
+            date: Some(ctx.timestamp),
+            journal_id,
+            ref_: Some("bank-counterpart-adversarial".to_string()),
+            memo: None,
+        },
+    )?;
+    let ordinary_payment = ctx
+        .db
+        .account_payment()
+        .payment_by_org()
+        .filter(&org)
+        .find(|row| row.ref_.as_deref() == Some("bank-counterpart-adversarial"))
+        .ok_or("adversarial ordinary payment missing")?;
+    post_payment(ctx, org, ordinary_payment.id)?;
+    let target = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&invoice_id)
+        .find(|row| {
+            row.account_internal_type
+                .as_deref()
+                .is_some_and(|kind| kind.eq_ignore_ascii_case("receivable"))
+        })
+        .ok_or("last-cent target missing")?;
+    let target_id = target.id;
+    // Reproduce a residual persisted by the previous f64 allocation implementation.
+    ctx.db
+        .account_move_line()
+        .id()
+        .update(crate::accounting::journal_entries::AccountMoveLine {
+            amount_residual: 100.0 - 99.99,
+            amount_residual_currency: 100.0 - 99.99,
+            ..target
+        });
+    create_account_bank_statement(
+        ctx,
+        org,
+        company_id,
+        journal_id,
+        CreateAccountBankStatementParams {
+            name: Some("Last cent approval".to_string()),
+            reference: None,
+            date: Some(ctx.timestamp),
+            balance_start: 0.0,
+            currency_id: fixture.currency_id,
+            metadata: None,
+        },
+    )?;
+    let statement = ctx
+        .db
+        .account_bank_statement()
+        .bank_statement_by_org()
+        .filter(&org)
+        .next()
+        .ok_or("approval statement missing")?;
+    create_account_bank_statement_line(
+        ctx,
+        org,
+        company_id,
+        statement.id,
+        CreateAccountBankStatementLineParams {
+            date: ctx.timestamp,
+            amount: 0.01,
+            amount_currency: 0.01,
+            currency_id: Some(fixture.currency_id),
+            foreign_currency_id: None,
+            partner_id: Some(fixture.partner_id),
+            bank_account_id: None,
+            account_number: None,
+            move_id: None,
+            is_reconciled: false,
+            transaction_type: None,
+            move_ids: vec![],
+            payment_ids: vec![],
+            amount_residual: 0.01,
+            auto_reconcile_ids: vec![],
+            metadata: None,
+        },
+    )?;
+    let bank_id = ctx
+        .db
+        .account_bank_statement_line()
+        .statement_line_by_statement()
+        .filter(&statement.id)
+        .next()
+        .ok_or("approval bank line missing")?
+        .id;
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == org)
+        .ok_or("approval role missing")?;
+    let owner_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&membership.role_id)
+        .ok_or("approval owner role missing")?;
+    let approver_role = ctx.db.role().insert(Role {
+        id: 0,
+        name: format!("Bank approver {company_id}"),
+        permissions: vec![
+            "workflow_task:approve".to_string(),
+            "workflow_task:reject".to_string(),
+            "payment:post".to_string(),
+        ],
+        is_system: false,
+        ..owner_role
+    });
+    let role_id = approver_role.id;
+    let actor = spacetimedb::Identity::from_byte_array(ctx.rng().gen::<[u8; 32]>());
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
+        .ok_or("approval profile missing")?;
+    ctx.db.user_profile().insert(UserProfile {
+        id: 0,
+        identity: actor,
+        platform_user_id: format!("bank-approver-{company_id}"),
+        is_superuser: false,
+        ..profile
+    });
+    ctx.db.user_organization().insert(UserOrganization {
+        id: 0,
+        user_identity: actor,
+        role_id,
+        ..membership
+    });
+    let workflow_key = format!("bank-payment-approval-{company_id}");
+    create_workflow(
+        ctx,
+        org,
+        Some(company_id),
+        CreateWorkflowParams {
+            workflow_key: workflow_key.clone(),
+            model: "account_payment".to_string(),
+            name: "Bank payment approval".to_string(),
+            description: None,
+            trigger: WorkflowTrigger::Manual,
+            schema_version: 1,
+            snapshot_fields: vec![],
+            metadata: None,
+        },
+    )?;
+    let definition = ctx
+        .db
+        .workflow()
+        .workflow_by_key()
+        .filter(&workflow_key)
+        .find(|row| row.organization_id == org)
+        .ok_or("bank approval workflow missing")?;
+    let version = ctx
+        .db
+        .workflow_version()
+        .workflow_version_by_workflow()
+        .filter(&definition.id)
+        .next()
+        .ok_or("bank approval version missing")?;
+    let mut revision = version.draft_revision;
+    for (index, (key, kind)) in [
+        ("start", WorkflowNodeKind::Start),
+        ("approve", WorkflowNodeKind::HumanTask),
+        ("post", WorkflowNodeKind::Action),
+        ("done", WorkflowNodeKind::End),
+        ("rejected", WorkflowNodeKind::End),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        upsert_workflow_node(
+            ctx,
+            org,
+            version.id,
+            revision,
+            UpsertWorkflowNodeParams {
+                node_key: key.to_string(),
+                name: key.to_string(),
+                kind,
+                sequence: index as u32 + 1,
+                split_kind: WorkflowBranchKind::None,
+                join_kind: WorkflowBranchKind::None,
+                action: (key == "post").then(|| WorkflowActionReference {
+                    action_key: "post_payment".to_string(),
+                    input_schema_version: 1,
+                    input: vec![],
+                }),
+                task_policy: (key == "approve").then(|| WorkflowTaskPolicy {
+                    kind: WorkflowHumanTaskKind::ApproveReject,
+                    assignment: WorkflowTaskAssignment::AnyCandidate,
+                    candidate_role_ids: vec![role_id],
+                    candidate_group_ids: vec![],
+                    candidate_unit_ids: vec![],
+                    require_comment_on_reject: true,
+                }),
+                timer_policy: None,
+                retry_policy: None,
+                subflow: None,
+                metadata: None,
+            },
+        )?;
+        revision += 1;
+    }
+    for (index, (from, to, signal)) in [
+        ("start", "approve", None),
+        ("approve", "post", Some("approved")),
+        ("approve", "rejected", Some("rejected")),
+        ("post", "done", None),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        upsert_workflow_edge(
+            ctx,
+            org,
+            version.id,
+            revision,
+            UpsertWorkflowEdgeParams {
+                edge_key: format!("{from}-{to}"),
+                from_node_key: from.to_string(),
+                to_node_key: to.to_string(),
+                sequence: index as u32 + 1,
+                signal_key: signal.map(str::to_string),
+                condition: None,
+                metadata: None,
+            },
+        )?;
+        revision += 1;
+    }
+    publish_workflow_version(ctx, org, version.id, revision)?;
+    let params = ReconcileAccountBankStatementLineParams {
+        move_ids: vec![target_id],
+        amount_residual: 0.0,
+    };
+    reconcile_account_bank_statement_line(ctx, org, company_id, bank_id, params.clone())?;
+    let waiting = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&bank_id)
+        .ok_or("waiting bank line missing")?;
+    let payment_id = *waiting
+        .payment_ids
+        .first()
+        .ok_or("waiting bank payment missing")?;
+    let draft = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("waiting draft payment missing")?;
+    if waiting.is_reconciled
+        || !waiting.move_ids.is_empty()
+        || waiting.amount_residual != 0.01
+        || draft.state != PaymentState::NotPaid
+        || draft.move_id.is_some()
+    {
+        return Err("bank settlement bypassed the payment approval gate".to_string());
+    }
+    let restricted_company = seed_sibling_company(ctx, &fixture)?;
+    assert_bank_company_denial(
+        ctx,
+        org,
+        restricted_company,
+        "native bank-owned payment posting",
+        || post_payment(ctx, org, payment_id),
+    )?;
+    let task = ctx
+        .db
+        .workflow_human_task()
+        .iter()
+        .find(|task| task.organization_id == org && task.subject_id == payment_id)
+        .ok_or("payment approval task missing")?;
+    let before_replay = settlement_financial_snapshot(ctx, org);
+    reconcile_account_bank_statement_line(ctx, org, company_id, bank_id, params.clone())?;
+    if settlement_financial_snapshot(ctx, org) != before_replay
+        || ctx
+            .db
+            .workflow_human_task()
+            .iter()
+            .filter(|task| task.organization_id == org && task.subject_id == payment_id)
+            .count()
+            != 1
+    {
+        return Err(
+            "waiting settlement replay duplicated payment, financial effect or approval"
+                .to_string(),
+        );
+    }
+    let instance = ctx
+        .db
+        .workflow_instance()
+        .id()
+        .find(&task.workflow_instance_id)
+        .ok_or("payment approval instance missing")?;
+    let approve = DecideWorkflowHumanTaskParams {
+        company_id,
+        task_id: task.id,
+        expected_task_revision: task.revision,
+        expected_instance_revision: instance.revision,
+        decision: WorkflowHumanTaskDecision::Approve,
+        acting_for: None,
+        comment: Some("approve exact bank amount".to_string()),
+        idempotency_key: format!("approve-bank-payment-{payment_id}"),
+        correlation_id: "bank-settlement-test".to_string(),
+        causation_id: None,
+    };
+    // The task actor is a separate authorized approver. Domain adapters use the
+    // real reducer sender, whose explicit financial capability must still yield
+    // to an accounting-module deny before ledger or approval evidence is written.
+    let financial_membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == org)
+        .ok_or("financial executor membership missing")?;
+    let financial_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&financial_membership.role_id)
+        .ok_or("financial executor role missing")?;
+    ctx.db.role().id().update(Role {
+        permissions: vec!["payment:post".to_string(), "account_move:write".to_string()],
+        ..financial_role.clone()
+    });
+    let financial_profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
+        .ok_or("financial executor profile missing")?;
+    let financial_profile_id = financial_profile.id;
+    let financial_was_superuser = financial_profile.is_superuser;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..financial_profile
+    });
+    let module_deny = ctx.db.org_permission().insert(OrgPermission {
+        id: 0,
+        organization_id: org,
+        subject: PermissionSubject::User(ctx.sender()),
+        role_id: None,
+        resource: "module:accounting".to_string(),
+        action: PermissionAction::All,
+        effect: PermissionEffect::Deny,
+        created_by: ctx.sender(),
+        created_at: ctx.timestamp,
+    });
+    let before_module_denial = super::bank_settlement_lifecycle_test::snapshot(ctx, org)?;
+    let module_denied = decide_workflow_human_task_for_actor(ctx, org, actor, approve.clone());
+    if !matches!(module_denied,Err(ref error) if error.contains("Permission denied: post on payment"))
+        || super::bank_settlement_lifecycle_test::snapshot(ctx, org)? != before_module_denial
+    {
+        return Err("accounting-module denial did not block the inner bank payment post before all financial, approval, receipt and durable writes".to_string());
+    }
+    ctx.db.org_permission().id().delete(&module_deny.id);
+    // The same reviewed request succeeds with explicit payment:post, while the
+    // reducer sender is still a normal user; account_payment CRUD is insufficient.
+    decide_workflow_human_task_for_actor(ctx, org, actor, approve)?;
+    ctx.db.role().id().update(financial_role);
+    let financial_profile = ctx
+        .db
+        .user_profile()
+        .id()
+        .find(&financial_profile_id)
+        .ok_or("financial executor profile missing after approval")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: financial_was_superuser,
+        ..financial_profile
+    });
+    if ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("approved payment missing")?
+        .state
+        != PaymentState::Paid
+        || ctx
+            .db
+            .account_bank_statement_line()
+            .id()
+            .find(&bank_id)
+            .ok_or("approved bank line missing")?
+            .is_reconciled
+    {
+        return Err(
+            "approval did not post independently of bank settlement completion".to_string(),
+        );
+    }
+    let approved_snapshot = settlement_financial_snapshot(ctx, org);
+    let direct_register =
+        register_payment_on_invoice(ctx, org, payment_id, vec![invoice_id], false);
+    let payment_move_id = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("approved bank payment missing")?
+        .move_id
+        .ok_or("approved bank payment entry missing")?;
+    let direct_reconcile = reconcile_payment_with_invoice(ctx, org, payment_move_id, invoice_id);
+    let reversed_reconcile = reconcile_payment_with_invoice(ctx, org, invoice_id, payment_move_id);
+    let counterpart_register =
+        register_payment_on_invoice(ctx, org, ordinary_payment.id, vec![payment_move_id], false);
+    let bank_write_off = crate::accounting::credit_control::create_bad_debt_write_off(
+        ctx,
+        org,
+        company_id,
+        crate::accounting::credit_control::CreateBadDebtWriteOffParams {
+            partner_id: fixture.partner_id,
+            move_id: payment_move_id,
+            amount: 0.01,
+            journal_id,
+            receivable_account_id: fixture.chart_account_ids[chart_keys::AR],
+            write_off_account_id: fixture.chart_account_ids[chart_keys::REVENUE],
+            date: ctx.timestamp,
+            reference: None,
+            metadata: None,
+        },
+    );
+    for result in [&reversed_reconcile, &counterpart_register, &bank_write_off] {
+        if !matches!(result, Err(error) if error.contains("bank-linked payments require")) {
+            return Err(
+                "bank-owned payment was accepted as the invoice-side counterpart".to_string(),
+            );
+        }
+    }
+    if direct_register.is_ok()
+        || direct_reconcile.is_ok()
+        || reversed_reconcile.is_ok()
+        || counterpart_register.is_ok()
+        || bank_write_off.is_ok()
+        || settlement_financial_snapshot(ctx, org) != approved_snapshot
+    {
+        return Err("generic invoice registration diverted a bank-owned payment".to_string());
+    }
+    assert_bank_company_denial(
+        ctx,
+        org,
+        restricted_company,
+        "approved bank settlement completion",
+        || reconcile_account_bank_statement_line(ctx, org, company_id, bank_id, params.clone()),
+    )?;
+    reconcile_account_bank_statement_line(ctx, org, company_id, bank_id, params)?;
+    let invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("last-cent invoice missing")?;
+    if invoice.amount_residual != 0.0
+        || invoice.payment_state != PaymentState::Paid
+        || ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(&target_id)
+            .ok_or("last-cent target missing")?
+            .amount_residual
+            != 0.0
+        || !ctx
+            .db
+            .account_bank_statement_line()
+            .id()
+            .find(&bank_id)
+            .ok_or("last-cent bank line missing")?
+            .is_reconciled
+    {
+        return Err(
+            "approved last-cent bank settlement left a dust residual or unmatched line".to_string(),
+        );
+    }
+    test_bank_reversal_prior_last_cent_and_generation(
+        ctx,
+        &fixture,
+        bank_id,
+        invoice_id,
+        target_id,
+        prior.id,
+        restricted_company,
+    )?;
+    Ok(())
+}
 
 fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
     ctx.db
@@ -89,8 +1189,7 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
         .id()
         .find(&invoice_id)
         .ok_or("paid invoice missing")?;
-    if paid_invoice.amount_residual.abs() > 0.01
-        || paid_invoice.payment_state != PaymentState::Paid
+    if paid_invoice.amount_residual.abs() > 0.01 || paid_invoice.payment_state != PaymentState::Paid
     {
         return Err("invoice did not settle before unwind".to_string());
     }
@@ -113,17 +1212,22 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
             ) && line.matching_number.is_some()
         })
         .ok_or("allocated invoice line missing")?;
-    ctx.db.account_move_line().id().update(
-        crate::accounting::journal_entries::AccountMoveLine {
+    ctx.db
+        .account_move_line()
+        .id()
+        .update(crate::accounting::journal_entries::AccountMoveLine {
             matching_number: Some("MATCH-FOREIGN-OWNER".to_string()),
             ..allocated_line.clone()
-        },
-    );
+        });
     let stale_cancel = cancel_payment(ctx, fixture.organization_id, payment_id);
     ctx.db.account_move_line().id().update(allocated_line);
     match stale_cancel {
         Err(error) if error.contains("another payment") => {}
-        Err(error) => return Err(format!("unexpected stale-owner cancellation error: {error}")),
+        Err(error) => {
+            return Err(format!(
+                "unexpected stale-owner cancellation error: {error}"
+            ))
+        }
         Ok(()) => return Err("cancellation overwrote a foreign allocation owner".to_string()),
     }
     let after_stale_cancel = ctx
@@ -158,15 +1262,14 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
         .id()
         .find(&invoice_id)
         .ok_or("invoice missing before cross-company test")?;
-    ctx.db.account_move().id().update(crate::accounting::journal_entries::AccountMove {
-        company_id: sibling_company_id,
-        ..canonical_invoice.clone()
-    });
-    let cross_company = unregister_payment_allocations(
-        ctx,
-        fixture.organization_id,
-        payment_id,
-    );
+    ctx.db
+        .account_move()
+        .id()
+        .update(crate::accounting::journal_entries::AccountMove {
+            company_id: sibling_company_id,
+            ..canonical_invoice.clone()
+        });
+    let cross_company = unregister_payment_allocations(ctx, fixture.organization_id, payment_id);
     ctx.db.account_move().id().update(canonical_invoice);
     match cross_company {
         Err(error) if error.contains("scope") => {}
@@ -198,12 +1301,9 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
         .id()
         .find(&membership.role_id)
         .ok_or("unwind authorization role missing")?;
-    let caller_profile = find_user_profile_for_organization(
-        ctx,
-        ctx.sender(),
-        fixture.organization_id,
-    )
-    .ok_or("unwind authorization profile missing")?;
+    let caller_profile =
+        find_user_profile_for_organization(ctx, ctx.sender(), fixture.organization_id)
+            .ok_or("unwind authorization profile missing")?;
     ctx.db.role().id().update(Role {
         permissions: vec![],
         ..owner_role.clone()
@@ -351,7 +1451,7 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
     {
         return Err("reconciled cancellation did not unwind before reversal".to_string());
     }
-    let reversal_count = ctx
+    let reversal_moves: Vec<_> = ctx
         .db
         .account_move()
         .iter()
@@ -363,11 +1463,15 @@ pub fn test_reconciled_payment_unwind_and_cancel_exact_effect(
                     == Some(payment_move_id)
             })
         })
-        .count();
-    if reversal_count != 1 {
+        .collect();
+    if reversal_moves.len() != 1 {
         return Err(format!(
-            "reconciled cancellation created {reversal_count} reversal moves"
+            "reconciled cancellation created {} reversal moves",
+            reversal_moves.len()
         ));
+    }
+    if cancelled.reversal_move_id != Some(reversal_moves[0].id) {
+        return Err("reconciled cancellation did not expose its exact reversal".to_string());
     }
     Ok(())
 }
@@ -623,11 +1727,11 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
             partner_id: Some(fixture.partner_id),
             bank_account_id: None,
             account_number: None,
-            move_id: Some(invoice_move_id),
+            move_id: None,
             is_reconciled: false,
             transaction_type: Some("customer_payment".to_string()),
             move_ids: vec![],
-            payment_ids: vec![payment_id],
+            payment_ids: vec![],
             amount_residual: amount,
             auto_reconcile_ids: vec![],
             metadata: None,
@@ -639,6 +1743,19 @@ pub fn test_payment_reconciles_invoice(ctx: &ReducerContext) -> Result<(), Strin
         .iter()
         .find(|row| row.statement_id == statement.id)
         .ok_or("COV-08B bank statement line not found")?;
+    // Simulate a pre-existing, trusted historical payment link. Generic data
+    // entry cannot manufacture settlement provenance in the new workflow.
+    ctx.db.account_bank_statement_line().id().update(
+        crate::accounting::bank_reconciliation::AccountBankStatementLine {
+            payment_ids: vec![payment_id],
+            ..ctx
+                .db
+                .account_bank_statement_line()
+                .id()
+                .find(&statement_line.id)
+                .ok_or("legacy bank line missing")?
+        },
+    );
     let invoice_receivable_id = ctx
         .db
         .account_move_line()
@@ -899,11 +2016,16 @@ pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
             })
         })
         .collect();
-    if reversal_moves.len() != 1 || reversal_moves[0].state != crate::types::AccountMoveState::Posted {
+    if reversal_moves.len() != 1
+        || reversal_moves[0].state != crate::types::AccountMoveState::Posted
+    {
         return Err(format!(
             "Expected one posted reversal move, got {}",
             reversal_moves.len()
         ));
+    }
+    if cancelled.reversal_move_id != Some(reversal_moves[0].id) {
+        return Err("Cancelled payment does not identify its exact reversal move".to_string());
     }
     let reversal_lines: Vec<_> = ctx
         .db
@@ -946,6 +2068,15 @@ pub fn test_cancel_payment_audited(ctx: &ReducerContext) -> Result<(), String> {
         .count();
     if reversal_count_after_replay != 1 {
         return Err("Cancellation replay duplicated the reversal move".to_string());
+    }
+    let after_replay = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("Payment missing after cancellation replay")?;
+    if after_replay.reversal_move_id != cancelled.reversal_move_id {
+        return Err("Cancellation replay changed the canonical reversal identity".to_string());
     }
 
     let has_cancel_audit = ctx
@@ -1193,5 +2324,1043 @@ pub fn test_payment_multi_invoice_residual_and_clearing_account(
         ));
     }
 
+    Ok(())
+}
+
+/// Reverse only the last-cent delta, retaining the earlier 99.99 allocation,
+/// reopening a posted statement and fencing every subsequent generation.
+fn test_bank_reversal_prior_last_cent_and_generation(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    bank_id: u64,
+    invoice_id: u64,
+    target_id: u64,
+    prior_payment_id: u64,
+    restricted_company: u64,
+) -> Result<(), String> {
+    use super::bank_settlement_lifecycle_test::snapshot;
+    use crate::accounting::bank_reconciliation::{
+        delete_account_bank_statement, post_account_bank_statement,
+    };
+    use crate::accounting::bank_settlement_lifecycle::{
+        bank_statement_settlement_attempt, bank_statement_settlement_reversal,
+        reverse_bank_statement_settlement, ReverseBankStatementSettlementParams,
+    };
+    use crate::accounting::fiscal_periods::{account_period, AccountPeriod};
+    use crate::types::{BankStatementState, PeriodState};
+    let org = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let line = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&bank_id)
+        .ok_or("last-cent reversal bank line missing")?;
+    let payment_id = *line
+        .payment_ids
+        .first()
+        .ok_or("last-cent reversal payment missing")?;
+    let attempt = ctx
+        .db
+        .bank_statement_settlement_attempt()
+        .payment_id()
+        .find(&payment_id)
+        .ok_or("last-cent reversal snapshot missing")?;
+    let before_line = attempt
+        .line_snapshots
+        .iter()
+        .find(|row| row.line_id == target_id)
+        .ok_or("last-cent immutable item snapshot missing")?;
+    let prior = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&prior_payment_id)
+        .ok_or("prior payment missing")?;
+    let prior_json = serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&prior))
+        .map_err(|e| e.to_string())?;
+    let params = ReverseBankStatementSettlementParams {
+        payment_id,
+        date: ctx.timestamp,
+        idempotency_key: format!("bank-last-cent-reversal-{bank_id}"),
+        reason: "Reverse only the reviewed bank receipt".to_string(),
+    };
+    assert_bank_company_denial(
+        ctx,
+        org,
+        restricted_company,
+        "direct posted bank reversal",
+        || reverse_bank_statement_settlement(ctx, org, company_id, bank_id, params.clone()),
+    )?;
+    let target = ctx
+        .db
+        .account_move_line()
+        .id()
+        .find(&target_id)
+        .ok_or("bank reversal target missing")?;
+    ctx.db
+        .account_move_line()
+        .id()
+        .update(crate::accounting::journal_entries::AccountMoveLine {
+            matching_number: Some("later-owner".to_string()),
+            ..target.clone()
+        });
+    let stale = snapshot(ctx, org)?;
+    if reverse_bank_statement_settlement(ctx, org, company_id, bank_id, params.clone()).is_ok()
+        || snapshot(ctx, org)? != stale
+    {
+        return Err(
+            "stale bank reversal changed financial, receipt, workflow or commit state".to_string(),
+        );
+    }
+    ctx.db.account_move_line().id().update(target);
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == org)
+        .ok_or("bank reversal actor membership missing")?;
+    let own_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&membership.role_id)
+        .ok_or("bank reversal owner role missing")?;
+    let original_permissions = own_role.permissions.clone();
+    ctx.db.role().id().update(Role {
+        permissions: vec![
+            "account_bank_statement_line:write".into(),
+            "account_bank_statement:write".into(),
+            "account_move:write".into(),
+        ],
+        ..own_role
+    });
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), org)
+        .ok_or("bank reversal actor profile missing")?;
+    let profile_id = profile.id;
+    let original_superuser = profile.is_superuser;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..profile
+    });
+    let denied = snapshot(ctx, org)?;
+    let denied_result =
+        reverse_bank_statement_settlement(ctx, org, company_id, bank_id, params.clone());
+    let denied_unchanged = snapshot(ctx, org)? == denied;
+    let profile = ctx
+        .db
+        .user_profile()
+        .id()
+        .find(&profile_id)
+        .ok_or("bank reversal actor profile missing after denial")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: original_superuser,
+        ..profile
+    });
+    let own_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&membership.role_id)
+        .ok_or("bank reversal role missing after denial")?;
+    ctx.db.role().id().update(Role {
+        permissions: original_permissions,
+        ..own_role
+    });
+    if denied_result.is_ok() || !denied_unchanged {
+        return Err(
+            "bank reversal did not require explicit payment reverse authority before all writes"
+                .to_string(),
+        );
+    }
+    let protected_prior = snapshot(ctx, org)?;
+    let prior_unwind = unregister_payment_allocations(ctx, org, prior_payment_id);
+    let prior_reverse = cancel_payment(ctx, org, prior_payment_id);
+    if !matches!(prior_unwind,Err(ref error) if error.contains("owned by another payment"))
+        || !matches!(prior_reverse,Err(ref error) if error.contains("owned by another payment"))
+        || snapshot(ctx, org)? != protected_prior
+    {
+        return Err("ordinary earlier-payment unwind/reversal overrode the active bank allocation or wrote before ownership denial".to_string());
+    }
+    post_account_bank_statement(ctx, org, company_id, line.statement_id)?;
+    let period = ctx
+        .db
+        .account_period()
+        .period_by_company()
+        .filter(&company_id)
+        .find(|row| row.date_from <= ctx.timestamp && row.date_to >= ctx.timestamp)
+        .ok_or("bank reversal original period missing")?;
+    ctx.db.account_period().id().update(AccountPeriod {
+        state: PeriodState::Closed,
+        ..period.clone()
+    });
+    let closed = snapshot(ctx, org)?;
+    if reverse_bank_statement_settlement(ctx, org, company_id, bank_id, params.clone()).is_ok()
+        || snapshot(ctx, org)? != closed
+    {
+        return Err("closed reversal period changed bank settlement state".to_string());
+    }
+    let new_date = spacetimedb::Timestamp::from_micros_since_unix_epoch(
+        period.date_to.to_micros_since_unix_epoch() + 1,
+    );
+    ctx.db.account_period().insert(AccountPeriod {
+        id: 0,
+        name: format!("Reversal period {bank_id}"),
+        code: format!("REV-{bank_id}"),
+        date_from: new_date,
+        date_to: spacetimedb::Timestamp::from_micros_since_unix_epoch(
+            new_date.to_micros_since_unix_epoch() + 86_400_000_000,
+        ),
+        state: PeriodState::Open,
+        ..period.clone()
+    });
+    let reviewed = ReverseBankStatementSettlementParams {
+        date: new_date,
+        ..params.clone()
+    };
+    reverse_bank_statement_settlement(ctx, org, company_id, bank_id, reviewed.clone())?;
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("reversed bank payment missing")?;
+    let reversal_id = payment
+        .reversal_move_id
+        .ok_or("bank reversal journal entry missing")?;
+    let original_move = payment
+        .move_id
+        .ok_or("original bank journal entry missing")?;
+    let reversal = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&reversal_id)
+        .ok_or("bank compensation missing")?;
+    let metadata = serde_json::from_str::<serde_json::Value>(
+        reversal
+            .metadata
+            .as_deref()
+            .ok_or("bank reversal metadata missing")?,
+    )
+    .map_err(|e| e.to_string())?;
+    if payment.state != PaymentState::Reversed
+        || !payment.reconciled_invoice_ids.is_empty()
+        || reversal.date != new_date
+        || metadata
+            .get("reverses_payment_move_id")
+            .and_then(serde_json::Value::as_u64)
+            != Some(original_move)
+        || metadata
+            .get("account_payment_id")
+            .and_then(serde_json::Value::as_u64)
+            != Some(payment_id)
+    {
+        return Err("bank reversal did not create the uniquely linked compensation at its reviewed open date".to_string());
+    }
+    for id in [original_move, reversal_id] {
+        let rows: Vec<_> = ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(&id)
+            .collect();
+        if rows.len() != 2
+            || rows.iter().any(|row| {
+                row.amount_residual != 0.0
+                    || row.amount_residual_currency != 0.0
+                    || !row.is_matching
+            })
+        {
+            return Err(
+                "bank reversal left an allocatable original or compensating payment line"
+                    .to_string(),
+            );
+        }
+    }
+    let target = ctx
+        .db
+        .account_move_line()
+        .id()
+        .find(&target_id)
+        .ok_or("restored last-cent target missing")?;
+    let invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("restored last-cent invoice missing")?;
+    if target.amount_residual != before_line.residual_before
+        || target.amount_residual_currency != before_line.residual_currency_before
+        || target.matching_number != before_line.matching_number_before
+        || target.matching_label != before_line.matching_label_before
+        || target.is_matching != before_line.is_matching_before
+        || (invoice.amount_residual - 0.01).abs() > 1e-9
+        || invoice.payment_state != PaymentState::Partial
+    {
+        return Err("bank reversal erased the earlier payment or did not restore the exact prior matching owner".to_string());
+    }
+    let prior_now = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&prior_payment_id)
+        .ok_or("prior payment missing after reversal")?;
+    if serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&prior_now))
+        .map_err(|e| e.to_string())?
+        != prior_json
+    {
+        return Err("bank reversal altered an earlier independent payment".to_string());
+    }
+    let line = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&bank_id)
+        .ok_or("reopened bank line missing")?;
+    let statement = ctx
+        .db
+        .account_bank_statement()
+        .id()
+        .find(&line.statement_id)
+        .ok_or("reopened parent missing")?;
+    if line.is_reconciled
+        || !line.payment_ids.is_empty()
+        || !line.move_ids.is_empty()
+        || line.move_id.is_some()
+        || line.amount_residual != 0.01
+        || statement.state != BankStatementState::Open
+        || statement.date_done.is_some()
+    {
+        return Err("bank reversal did not atomically reopen its posted statement and unmatched signed balance".to_string());
+    }
+    let complete = snapshot(ctx, org)?;
+    reverse_bank_statement_settlement(ctx, org, company_id, bank_id, reviewed.clone())?;
+    if snapshot(ctx, org)? != complete {
+        return Err(
+            "bank reversal replay created another compensation or workflow/commit effect"
+                .to_string(),
+        );
+    }
+    let changed = ReverseBankStatementSettlementParams {
+        reason: "Changed reviewed input".to_string(),
+        ..reviewed.clone()
+    };
+    if reverse_bank_statement_settlement(ctx, org, company_id, bank_id, changed).is_ok()
+        || snapshot(ctx, org)? != complete
+    {
+        return Err("bank reversal accepted changed-key replay".to_string());
+    }
+    if delete_account_bank_statement_line(ctx, org, company_id, bank_id).is_ok()
+        || delete_account_bank_statement(ctx, org, company_id, line.statement_id).is_ok()
+        || snapshot(ctx, org)? != complete
+    {
+        return Err("closed bank history lost a required retained parent".to_string());
+    }
+    ctx.db.account_period().id().update(period);
+    // The bank dependency disappears after exact compensation. Ordinary earlier
+    // allocation management can proceed again under its restored matching owner.
+    unregister_payment_allocations(ctx, org, prior_payment_id)?;
+    if ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_id)
+        .ok_or("ordinary unwind invoice missing")?
+        .amount_residual
+        != 100.0
+    {
+        return Err("closed bank attempt incorrectly pinned independent earlier-payment allocation management".to_string());
+    }
+    register_payment_on_invoice(ctx, org, prior_payment_id, vec![invoice_id], false)?;
+    reconcile_account_bank_statement_line(
+        ctx,
+        org,
+        company_id,
+        bank_id,
+        ReconcileAccountBankStatementLineParams {
+            move_ids: vec![target_id],
+            amount_residual: 0.0,
+        },
+    )?;
+    let fresh = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&bank_id)
+        .ok_or("new bank cycle missing")?;
+    let new_id = *fresh
+        .payment_ids
+        .first()
+        .ok_or("new bank cycle payment missing")?;
+    let next = ctx
+        .db
+        .bank_statement_settlement_attempt()
+        .payment_id()
+        .find(&new_id)
+        .ok_or("new bank cycle snapshot missing")?;
+    if new_id == payment_id
+        || next.generation != attempt.generation + 1
+        || next.receipt_key == attempt.receipt_key
+    {
+        return Err(
+            "re-settlement reused a closed payment or immutable receipt generation".to_string(),
+        );
+    }
+    let fresh_before = snapshot(ctx, org)?;
+    reverse_bank_statement_settlement(ctx, org, company_id, bank_id, reviewed)?;
+    if snapshot(ctx, org)? != fresh_before
+        || ctx
+            .db
+            .bank_statement_settlement_reversal()
+            .bank_settlement_reversal_by_attempt()
+            .filter(&attempt.id)
+            .count()
+            != 1
+    {
+        return Err("an old reversal request touched a later settlement generation".to_string());
+    }
+    Ok(())
+}
+
+fn create_and_settle_bank_test_line(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    journal_id: u64,
+    amount: f64,
+    selected: Vec<u64>,
+    reference: &str,
+) -> Result<u64, String> {
+    create_account_bank_statement(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        journal_id,
+        CreateAccountBankStatementParams {
+            name: Some(reference.to_string()),
+            reference: Some(reference.to_string()),
+            date: Some(ctx.timestamp),
+            balance_start: 0.0,
+            currency_id: fixture.currency_id,
+            metadata: None,
+        },
+    )?;
+    let statement = ctx
+        .db
+        .account_bank_statement()
+        .bank_statement_by_org()
+        .filter(&fixture.organization_id)
+        .find(|row| row.reference.as_deref() == Some(reference))
+        .ok_or("bank reversal fixture statement missing")?;
+    create_account_bank_statement_line(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        statement.id,
+        CreateAccountBankStatementLineParams {
+            date: ctx.timestamp,
+            amount,
+            amount_currency: amount,
+            currency_id: Some(fixture.currency_id),
+            foreign_currency_id: None,
+            partner_id: Some(fixture.partner_id),
+            bank_account_id: None,
+            account_number: None,
+            move_id: None,
+            is_reconciled: false,
+            transaction_type: None,
+            move_ids: vec![],
+            payment_ids: vec![],
+            amount_residual: amount,
+            auto_reconcile_ids: vec![],
+            metadata: None,
+        },
+    )?;
+    let id = ctx
+        .db
+        .account_bank_statement_line()
+        .statement_line_by_statement()
+        .filter(&statement.id)
+        .next()
+        .ok_or("bank reversal fixture line missing")?
+        .id;
+    reconcile_account_bank_statement_line(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        id,
+        ReconcileAccountBankStatementLineParams {
+            move_ids: selected,
+            amount_residual: 0.0,
+        },
+    )?;
+    if !ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&id)
+        .ok_or("settled bank fixture missing")?
+        .is_reconciled
+    {
+        return Err("bank reversal fixture did not create real paid allocation".to_string());
+    }
+    Ok(id)
+}
+
+fn bank_test_prior_payment(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    journal_id: u64,
+    invoice_id: u64,
+    amount: f64,
+    vendor: bool,
+    reference: &str,
+) -> Result<u64, String> {
+    create_payment(
+        ctx,
+        fixture.organization_id,
+        CreatePaymentParams {
+            idempotency_key: reference.to_string(),
+            company_id: fixture.company_id,
+            payment_type: if vendor {
+                PaymentType::OutBound
+            } else {
+                PaymentType::InBound
+            },
+            partner_type: if vendor {
+                PartnerType::Supplier
+            } else {
+                PartnerType::Customer
+            },
+            partner_id: fixture.partner_id,
+            amount,
+            currency_id: fixture.currency_id,
+            date: Some(ctx.timestamp),
+            journal_id,
+            ref_: Some(reference.to_string()),
+            memo: None,
+        },
+    )?;
+    let payment = ctx
+        .db
+        .account_payment()
+        .payment_by_org()
+        .filter(&fixture.organization_id)
+        .find(|row| row.ref_.as_deref() == Some(reference))
+        .ok_or("prior bank test payment missing")?;
+    post_payment(ctx, fixture.organization_id, payment.id)?;
+    register_payment_on_invoice(
+        ctx,
+        fixture.organization_id,
+        payment.id,
+        vec![invoice_id],
+        vendor,
+    )?;
+    Ok(payment.id)
+}
+
+fn bank_test_sale_order(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    total: f64,
+) -> Result<u64, String> {
+    use crate::sales::pricelists::{create_pricelist, product_pricelist, CreatePricelistParams};
+    use crate::sales::sales_core::{
+        create_sale_order_record, sale_order, CreateSaleOrderParams, SaleOrder,
+    };
+    create_pricelist(
+        ctx,
+        fixture.organization_id,
+        CreatePricelistParams {
+            company_id: Some(fixture.company_id),
+            name: "Bank reversal shared order".to_string(),
+            currency_id: fixture.currency_id,
+            discount_policy: crate::types::DiscountPolicy::WithDiscount,
+        },
+    )?;
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .iter()
+        .find(|row| row.organization_id == fixture.organization_id)
+        .ok_or("bank order pricelist missing")?
+        .id;
+    let id = create_sale_order_record(
+        ctx,
+        fixture.organization_id,
+        CreateSaleOrderParams {
+            company_id: Some(fixture.company_id),
+            partner_id: fixture.partner_id,
+            partner_invoice_id: fixture.partner_id,
+            partner_shipping_id: fixture.partner_id,
+            pricelist_id,
+            currency_id: fixture.currency_id,
+            warehouse_id: fixture.warehouse_id,
+            order_lines: vec![],
+            origin: None,
+            client_order_ref: Some("bank-shared-order".to_string()),
+            payment_term_id: None,
+            fiscal_position_id: None,
+            team_id: None,
+            opportunity_id: None,
+            proposal_id: None,
+            note: None,
+            terms_and_conditions: None,
+            validity_days: None,
+            shipping_policy: None,
+            picking_policy: None,
+            campaign_id: None,
+            medium_id: None,
+            source_id: None,
+            commitment_date: None,
+            expected_date: None,
+            incoterm_id: None,
+            incoterm: None,
+            incoterm_location: None,
+            carrier_id: None,
+            customer_lead: None,
+            analytic_account_id: None,
+            user_id: None,
+            is_printed: None,
+            is_locked: None,
+            is_dropship: None,
+            invoice_policy: None,
+            message_follower_ids: None,
+            message_partner_ids: None,
+            message_channel_ids: None,
+            activity_ids: None,
+            metadata: None,
+        },
+    )?;
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&id)
+        .ok_or("bank shared order missing")?;
+    ctx.db.sale_order().id().update(SaleOrder {
+        amount_total: total,
+        amount_untaxed: total,
+        amount_paid: 0.0,
+        amount_residual: total,
+        ..order
+    });
+    Ok(id)
+}
+
+/// Three selected AR rows in two invoices share one sale order. The reversal
+/// restores only the bank90 delta, preserving a genuine earlier60 payment.
+pub fn test_bank_reversal_multi_invoice_shared_order_and_supplier(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    use super::bank_settlement_lifecycle_test::snapshot;
+    use crate::accounting::bank_settlement_lifecycle::{
+        reverse_bank_statement_settlement, ReverseBankStatementSettlementParams,
+    };
+    use crate::accounting::journal_entries::{AccountMove, AccountMoveLine};
+    use crate::sales::sales_core::{sale_order, SaleOrder};
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let ar = fixture.chart_account_ids[chart_keys::AR];
+    let revenue = fixture.chart_account_ids[chart_keys::REVENUE];
+    let first = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        100.0,
+        ar,
+        "bank-reverse-shared-first",
+        true,
+    )?;
+    let second = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        50.0,
+        ar,
+        "bank-reverse-shared-second",
+        false,
+    )?;
+    let original_second = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&second)
+        .find(|row| row.account_id == ar)
+        .ok_or("shared second AR missing")?;
+    let first_installment = AccountMoveLine {
+        debit: 25.0,
+        balance: 25.0,
+        amount_currency: 25.0,
+        amount_residual: 25.0,
+        amount_residual_currency: 25.0,
+        debit_currency: 25.0,
+        price_unit: 25.0,
+        price: 25.0,
+        price_subtotal: 25.0,
+        price_total: 25.0,
+        ..original_second
+    };
+    ctx.db
+        .account_move_line()
+        .id()
+        .update(first_installment.clone());
+    ctx.db.account_move_line().insert(AccountMoveLine {
+        id: 0,
+        sequence: 3,
+        name: "Second receivable installment".to_string(),
+        ..first_installment
+    });
+    crate::accounting::journal_entries::post_invoice(ctx, org, second, revenue, revenue)?;
+    let order_id = bank_test_sale_order(ctx, &fixture, 150.0)?;
+    for id in [first, second] {
+        let invoice = ctx
+            .db
+            .account_move()
+            .id()
+            .find(&id)
+            .ok_or("shared invoice missing")?;
+        ctx.db.account_move().id().update(AccountMove {
+            sale_order_id: Some(order_id),
+            ..invoice
+        });
+    }
+    let (journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+    let prior_id = bank_test_prior_payment(
+        ctx,
+        &fixture,
+        journal_id,
+        first,
+        60.0,
+        false,
+        "bank-shared-prior-sixty",
+    )?;
+    let mut selected = Vec::new();
+    let mut before = Vec::new();
+    for id in [first, second] {
+        for row in ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(&id)
+            .filter(|row| row.account_id == ar)
+        {
+            selected.push(row.id);
+            before.push((
+                row.id,
+                row.amount_residual,
+                row.amount_residual_currency,
+                row.matching_number,
+                row.matching_label,
+                row.is_matching,
+            ));
+        }
+    }
+    if selected.len() != 3 {
+        return Err(
+            "multi-invoice bank fixture must contain three independent outstanding AR rows"
+                .to_string(),
+        );
+    }
+    let bank_id = create_and_settle_bank_test_line(
+        ctx,
+        &fixture,
+        journal_id,
+        90.0,
+        selected.clone(),
+        "bank-reverse-shared-order",
+    )?;
+    let line = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&bank_id)
+        .ok_or("shared bank line missing")?;
+    let payment_id = *line
+        .payment_ids
+        .first()
+        .ok_or("shared bank payment missing")?;
+    let params = ReverseBankStatementSettlementParams {
+        payment_id,
+        date: ctx.timestamp,
+        idempotency_key: format!("bank-shared-reversal-{bank_id}"),
+        reason: "Restore only shared order bank effects".to_string(),
+    };
+    let second_target = ctx
+        .db
+        .account_move_line()
+        .id()
+        .find(&selected[2])
+        .ok_or("second selected row missing")?;
+    ctx.db.account_move_line().id().update(AccountMoveLine {
+        matching_number: Some("different-current-owner".to_string()),
+        ..second_target.clone()
+    });
+    let stale = snapshot(ctx, org)?;
+    if reverse_bank_statement_settlement(ctx, org, company_id, bank_id, params.clone()).is_ok()
+        || snapshot(ctx, org)? != stale
+    {
+        return Err("second-invoice staleness partially restored a bank reversal".to_string());
+    }
+    ctx.db.account_move_line().id().update(second_target);
+    let sibling = seed_sibling_company(ctx, &fixture)?;
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .ok_or("shared order missing")?;
+    ctx.db.sale_order().id().update(SaleOrder {
+        company_id: sibling,
+        ..order
+    });
+    let wrong_scope = snapshot(ctx, org)?;
+    if reverse_bank_statement_settlement(ctx, org, company_id, bank_id, params.clone()).is_ok()
+        || snapshot(ctx, org)? != wrong_scope
+    {
+        return Err(
+            "cross-company shared-order reversal wrote an earlier invoice before failing"
+                .to_string(),
+        );
+    }
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .ok_or("cross-company order missing")?;
+    ctx.db.sale_order().id().update(SaleOrder {
+        company_id,
+        ..order
+    });
+    reverse_bank_statement_settlement(ctx, org, company_id, bank_id, params.clone())?;
+    for (id, residual, residual_currency, number, label, is_matching) in before {
+        let row = ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(&id)
+            .ok_or("shared restored row missing")?;
+        if row.amount_residual != residual
+            || row.amount_residual_currency != residual_currency
+            || row.matching_number != number
+            || row.matching_label != label
+            || row.is_matching != is_matching
+        {
+            return Err(
+                "shared bank reversal failed to restore exact prior selected-line ownership"
+                    .to_string(),
+            );
+        }
+    }
+    let order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&order_id)
+        .ok_or("restored shared order missing")?;
+    if order.amount_paid != 60.0 || order.amount_residual != 90.0 {
+        return Err(
+            "shared sale-order bank deltas were overwritten instead of restored exactly once"
+                .to_string(),
+        );
+    }
+    for (id, residual) in [(first, 40.0), (second, 50.0)] {
+        let invoice = ctx
+            .db
+            .account_move()
+            .id()
+            .find(&id)
+            .ok_or("shared restored invoice missing")?;
+        if invoice.amount_residual != residual {
+            return Err("shared bank reversal erased the earlier partial payment".to_string());
+        }
+    }
+    if ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&prior_id)
+        .ok_or("shared prior payment missing")?
+        .state
+        != PaymentState::Paid
+    {
+        return Err("shared bank reversal reversed independent earlier funds".to_string());
+    }
+    let complete = snapshot(ctx, org)?;
+    reverse_bank_statement_settlement(ctx, org, company_id, bank_id, params)?;
+    if snapshot(ctx, org)? != complete {
+        return Err("shared bank reversal replay repeated restoration".to_string());
+    }
+    test_bank_reversal_signed_supplier_partial(ctx)
+}
+
+fn test_bank_reversal_signed_supplier_partial(ctx: &ReducerContext) -> Result<(), String> {
+    use crate::accounting::bank_settlement_lifecycle::{
+        reverse_bank_statement_settlement, ReverseBankStatementSettlementParams,
+    };
+    use crate::accounting::chart_of_accounts::{account_journal, AccountJournal};
+    use crate::accounting::journal_entries::{AccountMove, AccountMoveLine};
+    use crate::crm::contacts::{contact, Contact};
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org = fixture.organization_id;
+    let company_id = fixture.company_id;
+    let partner = ctx
+        .db
+        .contact()
+        .id()
+        .find(&fixture.partner_id)
+        .ok_or("supplier fixture partner missing")?;
+    ctx.db.contact().id().update(Contact {
+        is_vendor: true,
+        supplier_rank: 1,
+        ..partner
+    });
+    let ap = fixture.chart_account_ids[chart_keys::AP];
+    let revenue = fixture.chart_account_ids[chart_keys::REVENUE];
+    let bill_id = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        100.0,
+        ap,
+        "bank-supplier-reversal-bill",
+        false,
+    )?;
+    let bill = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&bill_id)
+        .ok_or("supplier draft missing")?;
+    let sales_journal = ctx
+        .db
+        .account_journal()
+        .id()
+        .find(&bill.journal_id)
+        .ok_or("supplier template journal missing")?;
+    let purchase_journal = ctx.db.account_journal().insert(AccountJournal {
+        id: 0,
+        type_: crate::types::JournalType::Purchase,
+        code: format!("BAP{company_id}"),
+        name: "Supplier reversal journal".to_string(),
+        ..sales_journal
+    });
+    ctx.db.account_move().id().update(AccountMove {
+        move_type: crate::types::MoveType::InInvoice,
+        journal_id: purchase_journal.id,
+        ..bill
+    });
+    for row in ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&bill_id)
+        .collect::<Vec<_>>()
+    {
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            journal_id: purchase_journal.id,
+            debit: row.credit,
+            credit: row.debit,
+            debit_currency: row.credit_currency,
+            credit_currency: row.debit_currency,
+            balance: -row.balance,
+            amount_currency: -row.amount_currency,
+            amount_residual: -row.amount_residual,
+            amount_residual_currency: -row.amount_residual_currency,
+            ..row
+        });
+    }
+    crate::accounting::journal_entries::post_invoice(ctx, org, bill_id, revenue, revenue)?;
+    let (bank_journal, _) = seed_bank_journal(ctx, &fixture)?;
+    let prior_id = bank_test_prior_payment(
+        ctx,
+        &fixture,
+        bank_journal,
+        bill_id,
+        60.0,
+        true,
+        "bank-supplier-prior-sixty",
+    )?;
+    let target = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&bill_id)
+        .find(|row| row.account_id == ap)
+        .ok_or("supplier payable missing")?;
+    if target.amount_residual != -40.0 {
+        return Err("supplier fixture did not persist signed prior partial residual".to_string());
+    }
+    let prior_owner = target.matching_number.clone();
+    let bank_id = create_and_settle_bank_test_line(
+        ctx,
+        &fixture,
+        bank_journal,
+        -40.0,
+        vec![target.id],
+        "bank-supplier-signed-reversal",
+    )?;
+    let line = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&bank_id)
+        .ok_or("supplier bank line missing")?;
+    let payment_id = *line
+        .payment_ids
+        .first()
+        .ok_or("supplier bank payment missing")?;
+    reverse_bank_statement_settlement(
+        ctx,
+        org,
+        company_id,
+        bank_id,
+        ReverseBankStatementSettlementParams {
+            payment_id,
+            date: ctx.timestamp,
+            idempotency_key: format!("supplier-bank-reverse-{bank_id}"),
+            reason: "Restore signed payable remainder only".to_string(),
+        },
+    )?;
+    let restored = ctx
+        .db
+        .account_move_line()
+        .id()
+        .find(&target.id)
+        .ok_or("restored payable missing")?;
+    let bill = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&bill_id)
+        .ok_or("restored bill missing")?;
+    let bank = ctx
+        .db
+        .account_bank_statement_line()
+        .id()
+        .find(&bank_id)
+        .ok_or("restored supplier bank line missing")?;
+    if restored.amount_residual != -40.0
+        || restored.amount_residual_currency != -40.0
+        || restored.matching_number != prior_owner
+        || bill.amount_residual != 40.0
+        || bill.payment_state != PaymentState::Partial
+        || bank.amount_residual != -40.0
+        || bank.is_reconciled
+        || !bank.payment_ids.is_empty()
+        || ctx
+            .db
+            .account_payment()
+            .id()
+            .find(&prior_id)
+            .ok_or("supplier earlier payment missing")?
+            .state
+            != PaymentState::Paid
+    {
+        return Err(
+            "supplier bank reversal lost signed AP residual or erased earlier funds".to_string(),
+        );
+    }
     Ok(())
 }

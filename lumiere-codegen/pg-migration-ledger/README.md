@@ -24,8 +24,10 @@ other shape changes continue to fail closed.
 
 `pending.version` shares the api-server migration catalog's version space
 (`api-server/src/cold_tier/migrate.rs`); keep it contiguous with the authored
-migrations there. After a release, copy the published pending file here, add it
-to `released`, and advance `pending`.
+migrations there. When an explicit api-server migration consumes the pending
+version, advance `pending` without adding that authored SQL to `released`.
+After a generated release, copy the published pending file here, add it to
+`released`, and advance `pending`.
 
 ## Landing a follow-up
 

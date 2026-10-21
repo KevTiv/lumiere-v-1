@@ -5,6 +5,7 @@ import type { MergedFormConfiguration, ParsedFormField } from "../forms/config/t
 import { mergeRuntimeFormConfig, parsedFieldToModularField } from "./runtime-form-config"
 import { defaultValuesFromMetadata, metadataFromCustomFields } from "../forms/utils/metadata-defaults"
 import { serializeAiFormSchema } from "./ai-form-schema"
+import { salesForms } from "../forms/config/modules/sales.config"
 
 const field = (overrides: Partial<ParsedFormField> = {}): ParsedFormField => ({
   id: 1, fieldId: "custom:regions", name: "regions", label: "Regions", type: "MultiSelect",
@@ -111,6 +112,43 @@ describe("runtime form cardinality", () => {
 
     assert.deepEqual(merged.config.sections[0]?.fields[0]?.options, [
       { value: "abc123", label: "Ada Lovelace", disabled: undefined },
+    ])
+  })
+
+  it("preserves canonical customer options for the sales order partner field", () => {
+    const customerField = salesForms
+      .find((entry) => entry.formId === "new-sale-order")
+      ?.defaultConfig()
+      .fields.find((candidate) => candidate.fieldId === "customer")
+    assert.equal(customerField?.fieldType, "Select")
+
+    const staticConfig: FormConfig = {
+      id: "new-sale-order",
+      title: "New sale order",
+      sections: [{
+        id: "main",
+        fields: [{
+          id: "partnerId",
+          name: "partnerId",
+          label: "Customer",
+          type: "select",
+          options: [{ value: "344", label: "Acme Corporation" }],
+        }],
+      }],
+    }
+    const runtimeCustomer = field({
+      fieldId: "customer",
+      name: "customer",
+      label: "Customer",
+      type: customerField?.fieldType ?? "Select",
+      options: [],
+      isSystem: true,
+    })
+
+    const merged = mergeRuntimeFormConfig(staticConfig, runtime(runtimeCustomer))
+
+    assert.deepEqual(merged.config.sections[0]?.fields[0]?.options, [
+      { value: "344", label: "Acme Corporation" },
     ])
   })
 })

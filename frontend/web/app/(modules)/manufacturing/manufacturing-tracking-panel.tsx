@@ -16,6 +16,13 @@ import {
 } from "@/lib/manufacturing-tracking-intent"
 import { manufacturingResultLinks, type ManufacturingResultLink } from "@/lib/manufacturing-result-links"
 import { ManufacturingActionResult } from "./manufacturing-action-result"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const resources = ["products", "mrp-boms", "mrp-bom-byproducts", "mrp-bom-lines",
   "stock-production-lots", "stock-production-serials", "stock-moves", "stock-quants", "stock-locations"] as const
@@ -154,21 +161,33 @@ export function ManufacturingTrackingPanel({ order, organizationId, companyId }:
       {references.error || choices?.error ? <p role="alert">{references.error?.message ?? choices?.error}</p> : null}
       {mode === "close" ? choices?.requirements.map((requirement) => <label className="block space-y-1 text-sm" key={requirement.key}>
         <span>{labelOf(requirement.product)} · {requirement.quantity} units · {requirement.tracking}</span>
-        <select className={inputClass} aria-label={`${labelOf(requirement.product)} ${requirement.tracking}`} disabled={busy}
-          value={(requirement.tracking === "serial" ? selections[requirement.key]?.serialId : selections[requirement.key]?.lotId) ?? ""}
-          onChange={(event) => setSelections({ ...selections, [requirement.key]: requirement.tracking === "serial"
-            ? { serialId: event.target.value } : { lotId: event.target.value } })}>
-          <option value="">Select {requirement.tracking}</option>
-          {outputIdentityOptions(requirement, references.data!, organizationId, companyId).map((identity) => <option key={trackingId(identity.id)} value={trackingId(identity.id)}>{labelOf(identity)}</option>)}
-        </select>
+        <Select disabled={busy} value={(requirement.tracking === "serial" ? selections[requirement.key]?.serialId : selections[requirement.key]?.lotId) ?? ""} onValueChange={(value) => setSelections({ ...selections, [requirement.key]: requirement.tracking === "serial"
+            ? { serialId: value } : { lotId: value } })}>
+          <SelectTrigger aria-label={`${labelOf(requirement.product)} ${requirement.tracking}`}>
+            <SelectValue placeholder={<>Select {requirement.tracking}</>} />
+          </SelectTrigger>
+          <SelectContent>
+            {outputIdentityOptions(requirement, references.data!, organizationId, companyId).map((identity) => <SelectItem key={trackingId(identity.id)} value={trackingId(identity.id)}>{labelOf(identity)}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </label>) : <>
         <label className="block space-y-1 text-sm"><span>{mode === "output" ? "Exact completed output" : "Available BOM material stock"}</span>
-          <select className={inputClass} value={sourceId} onChange={(event) => setSourceId(event.target.value)} disabled={busy}>
-            <option value="">Select stock</option>{choices?.sources.map((row) => <option key={trackingId(row.id)} value={trackingId(row.id)}>{sourceLabel(row)}</option>)}
-          </select></label>
-        <label className="block space-y-1 text-sm"><span>Scrap location</span><select className={inputClass} value={locationId} onChange={(event) => setLocationId(event.target.value)} disabled={busy}>
-          <option value="">Select scrap location</option>{choices?.locations.map((row) => <option key={trackingId(row.id)} value={trackingId(row.id)}>{labelOf(row)}</option>)}
-        </select></label>
+          <Select value={sourceId} onValueChange={setSourceId} disabled={busy}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select stock" />
+            </SelectTrigger>
+            <SelectContent>
+              {choices?.sources.map((row) => <SelectItem key={trackingId(row.id)} value={trackingId(row.id)}>{sourceLabel(row)}</SelectItem>)}
+            </SelectContent>
+          </Select></label>
+        <label className="block space-y-1 text-sm"><span>Scrap location</span><Select value={locationId} onValueChange={setLocationId} disabled={busy}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select scrap location" />
+          </SelectTrigger>
+          <SelectContent>
+            {choices?.locations.map((row) => <SelectItem key={trackingId(row.id)} value={trackingId(row.id)}>{labelOf(row)}</SelectItem>)}
+          </SelectContent>
+        </Select></label>
         <label className="block space-y-1 text-sm"><span>Quantity</span><input className={inputClass} type="number" min="0" step="any" value={quantity} onChange={(event) => setQuantity(event.target.value)} disabled={busy} /></label>
       </>}
       {mode === "close" && choices && !choices.error && choices.requirements.length === 0 ? <p className="text-sm">This order has no tracked outputs. Use the standard finish action.</p> : null}

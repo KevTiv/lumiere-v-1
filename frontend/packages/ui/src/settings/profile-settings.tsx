@@ -1,28 +1,21 @@
 "use client"
 
-import { useRBAC } from "@/lib/rbac-context"
+import { useState } from "react"
+import { useErpSession } from "@lumiere/erp-session"
+import { useCurrentUserProfile, useUpdateUserProfile } from "@lumiere/query-hooks/hooks/auth"
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+
+
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import {
-  User,
-  Mail,
-  Building,
   Bell,
   Moon,
   Sun,
   Monitor,
-  Globe,
   Palette,
   Sparkles,
   LayoutTemplate,
@@ -38,8 +31,12 @@ interface ProfileSettingsProps {
 
 export function ProfileSettings({ section }: ProfileSettingsProps) {
   const { t } = useTranslation()
-  const { currentUser } = useRBAC()
   const { theme, setTheme, palette, setPalette, shell, setShell } = useTheme()
+  const { organizationId } = useErpSession()
+  const { data: profile, isLoading } = useCurrentUserProfile(section === 'profile')
+  const saveProfile = useUpdateUserProfile(BigInt(organizationId ?? 0))
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
 
   if (section === "profile") {
     return (
@@ -50,61 +47,37 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
             <CardDescription>{t("settings.profile.personalInfoDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-6">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-medium">
-                {currentUser?.name.split(" ").map(n => n[0]).join("")}
-              </div>
-              <div>
-                <Button variant="outline" size="sm">{t("settings.profile.changeAvatar")}</Button>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t("settings.profile.avatarHint")}
-                </p>
-              </div>
-            </div>
-            <Separator />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  {t("settings.profile.fullName")}
-                </Label>
-                <Input id="name" defaultValue={currentUser?.name} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  {t("settings.profile.email")}
-                </Label>
-                <Input id="email" type="email" defaultValue={currentUser?.email} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="department" className="flex items-center gap-2">
-                  <Building className="h-4 w-4" />
-                  {t("settings.profile.department")}
-                </Label>
-                <Input id="department" defaultValue={currentUser?.department} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="timezone" className="flex items-center gap-2">
-                  <Globe className="h-4 w-4" />
-                  {t("settings.profile.timezone")}
-                </Label>
-                <Select defaultValue="utc-5">
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="utc-8">{t("settings.profile.timezones.pacific")}</SelectItem>
-                    <SelectItem value="utc-5">{t("settings.profile.timezones.eastern")}</SelectItem>
-                    <SelectItem value="utc">{t("settings.profile.timezones.utc")}</SelectItem>
-                    <SelectItem value="utc+1">{t("settings.profile.timezones.centralEuropean")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button>{t("settings.profile.saveChanges")}</Button>
-            </div>
+            {isLoading ? <p role="status">Loading your profile…</p> : profile ? (
+              <form key={`${profile.name}:${profile.timezone}:${profile.language}`} className="space-y-4" onSubmit={async event => {
+                event.preventDefault()
+                const form = new FormData(event.currentTarget)
+                setProfileError(null)
+                setSaved(false)
+                try {
+                  await saveProfile.mutateAsync({
+                    name: String(form.get('name') ?? '').trim(),
+                    firstName: String(form.get('firstName') ?? '').trim(),
+                    lastName: String(form.get('lastName') ?? '').trim(),
+                    timezone: String(form.get('timezone') ?? 'UTC'),
+                    language: String(form.get('language') ?? 'en'),
+                  })
+                  setSaved(true)
+                } catch (error) { setProfileError(error instanceof Error ? error.message : 'Could not save your profile') }
+              }}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2"><Label htmlFor="profile-name">{t('settings.profile.fullName')}</Label><Input id="profile-name" name="name" defaultValue={profile.name} required /></div>
+                  <div className="space-y-2"><Label htmlFor="profile-email">{t('settings.profile.email')}</Label><Input id="profile-email" type="email" value={profile.email} readOnly /></div>
+                  <div className="space-y-2"><Label htmlFor="profile-first-name">First name</Label><Input id="profile-first-name" name="firstName" defaultValue={profile.firstName ?? ''} /></div>
+                  <div className="space-y-2"><Label htmlFor="profile-last-name">Last name</Label><Input id="profile-last-name" name="lastName" defaultValue={profile.lastName ?? ''} /></div>
+                  <div className="space-y-2"><Label htmlFor="profile-timezone">{t('settings.profile.timezone')}</Label><Input id="profile-timezone" name="timezone" defaultValue={profile.timezone ?? 'UTC'} required /></div>
+                  <div className="space-y-2"><Label htmlFor="profile-language">Language</Label><Input id="profile-language" name="language" defaultValue={profile.language ?? 'en'} required /></div>
+                </div>
+                <p className="text-sm text-muted-foreground">Email changes require identity-provider verification and administrator approval.</p>
+                {profileError && <p role="alert" className="text-sm text-destructive">{profileError}</p>}
+                {saved && <p role="status" className="text-sm">Your profile has been saved.</p>}
+                <div className="flex justify-end"><Button type="submit" disabled={saveProfile.isPending}>{t('settings.profile.saveChanges')}</Button></div>
+              </form>
+            ) : <p role="alert">Could not load your profile. Reload to try again.</p>}
           </CardContent>
         </Card>
 
@@ -114,24 +87,8 @@ export function ProfileSettings({ section }: ProfileSettingsProps) {
             <CardDescription>{t("settings.profile.securityDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="current-password">{t("settings.profile.currentPassword")}</Label>
-                <Input id="current-password" type="password" />
-              </div>
-              <div></div>
-              <div className="space-y-2">
-                <Label htmlFor="new-password">{t("settings.profile.newPassword")}</Label>
-                <Input id="new-password" type="password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">{t("settings.profile.confirmPassword")}</Label>
-                <Input id="confirm-password" type="password" />
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button variant="outline">{t("settings.profile.updatePassword")}</Button>
-            </div>
+            <p className="text-sm text-muted-foreground">Your identity provider manages your password and sign-in security.</p>
+            <a href="/forgot-password" className={buttonVariants({ variant: "outline" })}>Manage sign-in security</a>
           </CardContent>
         </Card>
       </div>

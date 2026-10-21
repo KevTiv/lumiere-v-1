@@ -161,7 +161,7 @@ async fn resolve_policy_snapshot_hash(
     let rows = state
         .stdb
         .query_sql(&format!(
-            "SELECT version_hash FROM policy_snapshot WHERE organization_id = {organization_id} \
+            "SELECT version_hash, refreshed_at FROM policy_snapshot WHERE organization_id = {organization_id} \
              AND user_identity = {identity} LIMIT 2"
         ))
         .await
@@ -171,6 +171,30 @@ async fn resolve_policy_snapshot_hash(
             "current authorization generation is unavailable".into(),
         ));
     };
+    let refreshed_at = row
+        .get("refreshedAt")
+        .or_else(|| row.get("refreshed_at"))
+        .and_then(timestamp_micros)
+        .ok_or_else(|| {
+            ApiError::Unavailable("current authorization generation is unavailable".into())
+        })?;
+    let assignments = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT expires_at FROM user_role_assignment WHERE organization_id = {organization_id} \
+             AND user_identity = {identity} AND is_active = true"
+        ))
+        .await
+        .map_err(ApiError::internal)?;
+    if policy_snapshot_expired(
+        refreshed_at,
+        &assignments,
+        chrono::Utc::now().timestamp_micros(),
+    ) {
+        return Err(ApiError::Unavailable(
+            "authorization generation expired and must be refreshed".into(),
+        ));
+    }
     row.get("versionHash")
         .or_else(|| row.get("version_hash"))
         .and_then(Value::as_str)
@@ -179,6 +203,16 @@ async fn resolve_policy_snapshot_hash(
         .ok_or_else(|| {
             ApiError::Unavailable("current authorization generation is unavailable".into())
         })
+}
+
+fn policy_snapshot_expired(refreshed_at: i64, assignments: &[Value], now_micros: i64) -> bool {
+    assignments.iter().any(|assignment| {
+        assignment
+            .get("expiresAt")
+            .or_else(|| assignment.get("expires_at"))
+            .and_then(timestamp_micros)
+            .is_some_and(|expires_at| expires_at > refreshed_at && expires_at <= now_micros)
+    })
 }
 
 /// Content generation for exact current AI grants. `effective_grants` is
@@ -539,5 +573,15 @@ mod tests {
         }]);
         assert_ne!(first, narrowed);
         assert_eq!(first.len(), "sha256:".len() + 64);
+    }
+
+    #[test]
+    fn policy_snapshot_rejects_authority_that_expired_after_refresh() {
+        let assignments = vec![json!({
+            "expiresAt": { "__timestamp_micros_since_unix_epoch__": 150 }
+        })];
+        assert!(!policy_snapshot_expired(100, &assignments, 149));
+        assert!(policy_snapshot_expired(100, &assignments, 150));
+        assert!(!policy_snapshot_expired(200, &assignments, 250));
     }
 }

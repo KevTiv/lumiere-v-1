@@ -1,7 +1,8 @@
 # COV-05c Vendor bill convergence
 
 **Package:** `COV-05c`  
-**Disposition:** `IMPLEMENTED` — runtime acceptance pending  
+**Disposition:** `REVIEW` — implemented; fresh-stack runtime proof passed
+
 **Stacked base:** PR #62 / `codex/cov05b-purchase-receipt`  
 **Operator proof:** [`../../frontend/web/tests/e2e/cov05c-vendor-bill.spec.ts`](../../frontend/web/tests/e2e/cov05c-vendor-bill.spec.ts)
 
@@ -29,7 +30,16 @@ received PurchaseOrder
 - replay of the exact accepted request must return 422 and preserve the one-bill relation;
 - the limited reader must return 403 and preserve the same bill identity.
 
-## Runtime validation required
+## Runtime validation
+
+The integrated local gate passed: **1 browser test**, including one exact
+PO-owned Draft InInvoice, Accounting navigation, stale 422, and reader 403.
+Proof used fresh dedicated `lumiere_cov05c_20261011212115` /
+`lumiere-cov05c-20261011212115`.
+See [COV-05d runtime evidence](erp-cov05d-runtime-evidence.md) for actual commands,
+source fingerprint, initial failures, and service/storage ledger.
+
+Reference commands below require fresh names; never clear an existing user's database:
 
 ```bash
 PG_DATABASE=lumiere_cov05c_e2e make e2e-smoke-setup E2E_STDB_MODULE=lumiere-cov05c-e2e
@@ -38,7 +48,8 @@ PG_DATABASE=lumiere_cov05c_e2e make e2e-single \
   E2E_GREP= E2E_WORKERS=1 E2E_STDB_MODULE=lumiere-cov05c-e2e
 ```
 
-Do not mark this slice `ACCEPTED` until fresh-stack runtime proof passes.
+Runtime proof is now present. Formal review/CI and full Purchasing U4/U5 certification
+are separate gates; this document does not promote the module.
 
 ## Evidence limit
 
@@ -54,7 +65,9 @@ PO confirmation
 → exact vendor bill
 ```
 
-All three slices still require their fresh-stack acceptance gates. Full COV-05 remains open for broader Purchasing U4/U5 evidence.
+All three slices now have passing fresh-stack runtime gates. COV-05d additionally
+proves stock-receipt response-loss recovery. Full COV-05 remains open for broader
+Purchasing U4/U5 evidence.
 
 ## Next bounded Purchasing work
 

@@ -1,3 +1,4 @@
+import { bootstrapFixtureAccountSession } from './fixture-account'
 import { matchesOperationResponse } from "./operation-response"
 import {
   expect,
@@ -9,6 +10,7 @@ import {
 } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   callReducerBffResult,
   expectNoAppError,
@@ -193,12 +195,7 @@ async function bootstrapTenant(browser: Browser, label: string): Promise<Tenant>
   let context: BrowserContext | undefined
 
   try {
-    const signup = await api.post("/api/auth/signup", {
-      data: { email: `${suffix}@example.test`, password: E2E_PASSWORD },
-    })
-    if (!signup.ok()) {
-      throw new Error(`tenant signup failed (${signup.status()}): ${await signup.text()}`)
-    }
+    await bootstrapFixtureAccountSession(api, `${suffix}@example.test`, E2E_PASSWORD)
 
     const currencyResponse = await api.get("/api/bootstrap/currencies")
     if (!currencyResponse.ok()) {
@@ -450,9 +447,9 @@ test.describe("P1-CONTACT-01 phone-first contacts", { tag: ["@p1", "@contacts"] 
       )
 
       await alpha.page.reload()
-      await alpha.page.getByTestId("module-tab-crm-contacts").click()
+      await selectModuleTab(alpha.page, "crm", "contacts")
       await expect(alpha.page.getByText(supplierName).first()).toBeVisible({ timeout: 30_000 })
-      await alpha.page.getByTestId("module-tab-crm-duplicates").click()
+      await selectModuleTab(alpha.page, "crm", "duplicates")
       await expect(alpha.page.getByTestId("crm-duplicates-empty")).toBeVisible({ timeout: 30_000 })
 
       const foreignCompanyIdentity = await callReducerBffResult(

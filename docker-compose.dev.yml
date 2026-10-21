@@ -25,17 +25,6 @@ services:
       retries: 20
       start_period: 10s
 
-  redis:
-    image: redis:7-alpine
-    command: ["redis-server", "--save", "", "--appendonly", "no"]
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   # Cold-tier storage (docs/plans/sliding-window-cold-tier.md). NoTls locally —
   # api-server/src/cold_tier/pg_pool.rs enforces PG_TLS_MODE=require in production.
   postgres:
@@ -195,6 +184,9 @@ services:
       STDB_MODULE: ${STDB_MODULE:?set STDB_MODULE in .env.docker}
       STDB_SERVER_TOKEN: ${STDB_SERVER_TOKEN:?set STDB_SERVER_TOKEN in .env.docker}
       AI_GATEWAY_URL: http://ai-gateway:8080
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@lumiere-erp.com}
+      LUMIERE_REVIEWED_MAIL_STDB_TOKEN: ${LUMIERE_REVIEWED_MAIL_STDB_TOKEN:-}
       LUMIERE_AI_GATEWAY_INTERNAL_SECRET: ${LUMIERE_AI_GATEWAY_INTERNAL_SECRET:?set LUMIERE_AI_GATEWAY_INTERNAL_SECRET in .env.docker}
       LUMIERE_REPORT_RENDERER_URL: http://chromium-worker:8090
       LUMIERE_REPORT_ARTIFACT_DIR: /var/lib/lumiere/owner-reports

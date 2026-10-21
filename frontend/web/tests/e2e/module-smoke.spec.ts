@@ -97,7 +97,7 @@ test.describe("ERP module smoke", () => {
 
   test("renders guarded workflow/action controls for CRM and Helpdesk", async ({ page }) => {
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-leads").click()
+    await selectModuleTab(page, "crm", "leads")
     // Row actions are offered only once a row is selected.
     await expect(activeTabEntityTable(page)).toBeVisible()
     await expect(page.getByTestId("entity-action-convert-lead")).toHaveCount(0)

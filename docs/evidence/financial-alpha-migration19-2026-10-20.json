@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "candidateSourceCommit": "9f0d7a5c45401815903fb941cf5c33552bba5456",
+  "previousMainCommit": "28eea2e85c83a0e7b105b3d62aa6cfbe8e8acba4",
+  "generation": {
+    "method": "Production durable_postgresql_ir::emit replay, no handwritten DDL",
+    "inputContractsVersion": "0.3.124",
+    "inputContractsRevision": "9ae2450ef6e4efc01e624b9f2d8b638eb76b5e50",
+    "inputArchiveSha256": "ad98125fc8ab8ec58dc72b78074c7e421a4520523bc937dc341aaf53640a090d",
+    "canonicalIrSourceCommit": "eda388077b8ed8e00acb9943aae1b6bd1f500e56",
+    "canonicalIrSchemaHash": "sha256:892176e43f0f4e1f6966ccf59dbd9023dc0a91e29cde88d6f580fcb2a85d4ca2",
+    "canonicalIrArtifactSha256": "111d4c54b60bcb989c3e8ca841a044973c44d406670a9c1320a6ec6523eafd4d",
+    "productionEmitterSource": "lumiere-codegen/src/durable_postgresql_ir.rs",
+    "pendingVersionAfterPromotion": 20,
+    "replayPendingMigrations": 0
+  },
+  "sourceCompatibility": {
+    "accountingAndPurchasingIdenticalToPr230Head": "ba826de80c946bc1dcd541187a7b50540a8e7894",
+    "main128ProjectionDefinitionsPreserved": 511,
+    "changedSharedProjectionDefinitions": 0,
+    "newProjectionTables": [
+      "bank_statement_settlement_attempt",
+      "bank_statement_settlement_reversal",
+      "purchase_order_creation_operation",
+      "purchase_receipt_operation"
+    ],
+    "releasedMainSqlArtifacts": [
+      {
+        "version": 1,
+        "sha256": "5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab"
+      },
+      {
+        "version": 11,
+        "sha256": "15e0a40dc9c99df670e6d4e2a970541ac11ee4c39fd6357d3d10dee03d193080"
+      },
+      {
+        "version": 12,
+        "sha256": "ea4cc157bc6750ccfee3f6645d51491c6c87480048e185f97dcdfd34489acde1"
+      },
+      {
+        "version": 13,
+        "sha256": "a06969f4217bd58dba68cc5291fab2699a1252e6c9269e3bc86e3eb2cd4f719e"
+      },
+      {
+        "version": 14,
+        "sha256": "cf436ddd59cf2e2105bc7639ce4d8b1a3a3cd7906383a4e01fba60a2d595b84c"
+      },
+      {
+        "version": 15,
+        "sha256": "37d2a92ba194b6ebf66e44e08dbbe67036288122babd2eec6e4d0bdf93ad30ab"
+      },
+      {
+        "version": 18,
+        "sha256": "5c7a4b494dab5c4beb43d69159a11420c8536a102e2b74a598d19b9cea712789"
+      }
+    ],
+    "migrationCatalog1Through18Unchanged": true
+  },
+  "migration19": {
+    "path": "lumiere-codegen/pg-migration-ledger/0019_durable_projection_delta.sql",
+    "sha256": "7253326c183672aa906aa6281ffe682f3ee8a6d95c2cc1397975da5a4799a5a0",
+    "catalogName": "financial_alpha_operations",
+    "applicationCatalogChecksum": "sha256:6b6362516927227dedc0b3d09ac68047fb7b1e56ce08dbf2016754a6096d3098"
+  },
+  "verification": {
+    "generatorUnitTestsPassed": 18,
+    "databaseImage": "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+    "nativeRunner": "Unchanged production migrate.rs and migration_audit.rs, linked in a bounded standalone harness with immutable baseline SQL and regenerated projection manifest",
+    "main18ReadOnlyAuditCompatible": true,
+    "main18To19AppliedAndVerified": true,
+    "newRelationsVerified": 4,
+    "repeatApplyPreservedHistoryAndSentinel": true,
+    "divergentPurchasing17RejectedBeforeSchemaOrHistoryWrites": true
+  },
+  "limits": [
+    "Exact combined-source WASM and immutable contracts publication remain required before application release.",
+    "Full API integration regression is checked in for the C4_TEST_PG lane; the local bounded harness exercised the production migration and audit modules directly.",
+    "No production Railway database was read or changed."
+  ]
+}

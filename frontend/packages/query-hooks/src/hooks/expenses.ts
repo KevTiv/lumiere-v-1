@@ -247,8 +247,11 @@ export function useCreateExpense(organizationId: bigint, companyId?: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create expense')
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      // Do not keep the create form open while the list refreshes. The command
+      // response is the mutation boundary; the invalidation is follow-up work.
+      void qc.invalidateQueries({ queryKey: ['expenses', rqBigIntKey(organizationId)] })
+    },
   })
 }
 

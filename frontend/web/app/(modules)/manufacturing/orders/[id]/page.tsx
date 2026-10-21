@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { ManufacturingOrderPageClient } from "./order-page-client"
 
 const SSR_RESOURCES = ["mrp-productions", "mrp-workorders", "mrp-workcenters", "products"] as const
@@ -15,7 +15,7 @@ export default async function ManufacturingOrderPage({ params }: ManufacturingOr
     return <ManufacturingOrderPageClient orderId={id} />
   }
 
-  const [productions, workorders, workcenters, products] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [productions, workorders, workcenters, products] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <ManufacturingOrderPageClient

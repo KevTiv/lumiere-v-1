@@ -1,15 +1,20 @@
+import { isWorkOsEnabled } from '@/lib/auth-mode'
+import { AuthModeProvider } from '@/lib/auth-mode-context'
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { GeistMono } from 'geist/font/mono'
+import { GeistSans } from 'geist/font/sans'
 import { Providers } from './providers'
 import './globals.css'
 
 import { getBrowserStdbSession, hasAuthenticatedIdentity } from '@/lib/browser-session'
 import { requireServerQueryRows, serverFetchQueryListState } from '@/lib/server-query'
-import { resolveSessionCompanyIds } from '@/lib/session-company-scope'
-
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+import {
+  resolveSessionAuthorityExpiryMicros,
+  resolveSessionCompanyIds,
+  resolveSessionRoleIds,
+  resolveSessionRoleNames,
+} from '@/lib/session-company-scope'
 
 export const metadata: Metadata = {
   title: 'Lumiere ERP',
@@ -44,34 +49,30 @@ export default async function RootLayout({
   const fieldAccess = session?.fieldAccess
 
   let serverRoleNames: string[] = []
-  if (identityHex && session) {
+  let serverRoleIds: number[] = []
+  let authorityExpiresAtMicros: number | null = null
+  let companyIds: readonly number[] | undefined
+  if (identityHex && organizationId != null && session) {
     {
-      const [assignmentsState, rolesState] = await Promise.all([
+      const [assignmentsState, rolesState, companiesState, membershipsState] = await Promise.all([
         serverFetchQueryListState(session, "user-roles"),
         serverFetchQueryListState(session, "roles"),
-      ])
-      const assignments = requireServerQueryRows(assignmentsState, "user-roles")
-      const allRoles = requireServerQueryRows(rolesState, "roles")
-      const assignedIds = new Set(
-        assignments
-          .filter((a) => a["isActive"])
-          .map((a) => String(a["roleId"]))
-      )
-      serverRoleNames = allRoles
-        .filter((r) => assignedIds.has(String(r["id"])))
-        .map((r) => String(r["name"]))
-    }
-  }
-
-  let companyIds: readonly number[] | undefined
-  if (organizationId != null && session) {
-    {
-      const [companiesState, membershipsState] = await Promise.all([
         serverFetchQueryListState(session, "companies"),
         serverFetchQueryListState(session, "user-organization"),
       ])
+      const assignments = requireServerQueryRows(assignmentsState, "user-roles")
+      const allRoles = requireServerQueryRows(rolesState, "roles")
       const companies = requireServerQueryRows(companiesState, "companies")
       const memberships = requireServerQueryRows(membershipsState, "user-organization")
+      const roleInput = {
+        organizationId,
+        roles: allRoles,
+        memberships,
+        assignments,
+      }
+      serverRoleNames = resolveSessionRoleNames(roleInput)
+      serverRoleIds = resolveSessionRoleIds(roleInput)
+      authorityExpiresAtMicros = resolveSessionAuthorityExpiryMicros(roleInput)
       const validCompanies = companies
         .map((row) => ({
           id: Number(row["id"]),
@@ -86,23 +87,32 @@ export default async function RootLayout({
         companies: validCompanies,
         membershipCompanyId,
         roleNames: serverRoleNames,
+        organizationWideAccess: Boolean(session.fieldAccess?.isSuperuser || session.fieldAccess?.rolePermissions.includes("*:*")),
       })
       companyIds = allowedCompanyIds.length === 0 ? undefined : allowedCompanyIds
     }
   }
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      suppressHydrationWarning
+    >
       <body className="font-sans antialiased">
+        <AuthModeProvider enabled={isWorkOsEnabled()}>
         <Providers
           serverIdentity={identityHex}
           serverRoleNames={serverRoleNames}
+          serverRoleIds={serverRoleIds}
+          authorityExpiresAtMicros={authorityExpiresAtMicros}
           organizationId={organizationId}
           companyIds={companyIds}
           fieldAccess={fieldAccess}
         >
           {children}
         </Providers>
+        </AuthModeProvider>
         <Analytics />
       </body>
     </html>

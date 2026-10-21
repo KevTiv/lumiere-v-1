@@ -20,6 +20,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::ledger;
 use crate::platform_control;
 
+#[path = "migration_audit.rs"]
+mod migration_audit;
+pub use migration_audit::{audit_schema, MigrationAuditReport, MigrationAuditStatus};
+
 /// The table containing the durable migration history.
 pub const MIGRATION_TABLE: &str = platform_control::SCHEMA_MIGRATION_TABLE;
 
@@ -180,11 +184,52 @@ pub const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 15,
-        name: "ai_provider_attempt_recovery_attribution",
+        name: "account_payment_reversal_identity",
         change_set: 7,
         phase: MigrationPhase::Expand,
         sql: include_str!(
             "../../../lumiere-codegen/pg-migration-ledger/0015_durable_projection_delta.sql"
+        ),
+    },
+    Migration {
+        version: 16,
+        name: "country_pack_versioning",
+        change_set: 8,
+        phase: MigrationPhase::Expand,
+        sql: COUNTRY_PACK_VERSIONING_SQL,
+    },
+    Migration {
+        version: 17,
+        name: "platform_identity_lifecycle",
+        change_set: 9,
+        phase: MigrationPhase::Expand,
+        sql: platform_control::PLATFORM_IDENTITY_LIFECYCLE_DDL,
+    },
+    Migration {
+        version: 18,
+        name: "durable_invite_acceptance_receipts",
+        change_set: 10,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0018_durable_projection_delta.sql"
+        ),
+    },
+    Migration {
+        version: 19,
+        name: "financial_alpha_operations",
+        change_set: 11,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0019_durable_projection_delta.sql"
+        ),
+    },
+    Migration {
+        version: 20,
+        name: "ai_provider_attempt_recovery_attribution",
+        change_set: 12,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0020_durable_projection_delta.sql"
         ),
     },
 ];
@@ -387,6 +432,24 @@ select organization_id, applied_sequence + 1
 from organization_projection_watermark
 on conflict (organization_id) do update
 set next_sequence = excluded.next_sequence;
+"#;
+
+/// Add the lifecycle and effective-date fields used by version-aware country
+/// packs. Defaults preserve the behavior of rows projected before this schema
+/// existed and keep rolling-upgrade writes valid.
+const COUNTRY_PACK_VERSIONING_SQL: &str = r#"
+alter table "country_pack_definition"
+    add column if not exists "acceptance_status" text not null default 'legacy_enabled',
+    add column if not exists "effective_from" bigint,
+    add column if not exists "effective_to" bigint;
+
+alter table "country_pack_tax_rule"
+    add column if not exists "pack_version" text not null default '1.0.0',
+    add column if not exists "effective_from" bigint,
+    add column if not exists "effective_to" bigint;
+
+alter table "company_country_pack"
+    add column if not exists "pinned_pack_version" text not null default '1.0.0';
 "#;
 
 fn postgres_identifier(identifier: &str) -> String {
@@ -1119,6 +1182,70 @@ mod tests {
             .sql
             .contains("on conflict (organization_id) do update"));
         assert!(!migration.sql.contains("delete"));
+    }
+
+    #[test]
+    fn country_pack_versioning_is_additive_and_backfills_legacy_rows() {
+        let migration = MIGRATIONS
+            .iter()
+            .find(|migration| migration.name == "country_pack_versioning")
+            .expect("country-pack versioning migration is shipped");
+
+        assert_eq!(migration.version, 16);
+        assert_eq!(migration.change_set, 8);
+        assert_eq!(migration.phase, MigrationPhase::Expand);
+        assert!(migration
+            .sql
+            .contains("alter table \"country_pack_definition\""));
+        assert!(migration.sql.contains(
+            "add column if not exists \"acceptance_status\" text not null default 'legacy_enabled'"
+        ));
+        assert!(migration
+            .sql
+            .contains("add column if not exists \"effective_from\" bigint"));
+        assert!(migration
+            .sql
+            .contains("add column if not exists \"effective_to\" bigint"));
+        assert!(migration
+            .sql
+            .contains("alter table \"country_pack_tax_rule\""));
+        assert!(migration
+            .sql
+            .contains("add column if not exists \"pack_version\" text not null default '1.0.0'"));
+        assert!(migration
+            .sql
+            .contains("alter table \"company_country_pack\""));
+        assert!(migration.sql.contains(
+            "add column if not exists \"pinned_pack_version\" text not null default '1.0.0'"
+        ));
+        assert!(!migration.sql.contains("drop "));
+    }
+
+    #[test]
+    fn account_payment_reversal_identity_is_nullable_additive_and_unique() {
+        let migration = MIGRATIONS
+            .iter()
+            .find(|migration| migration.name == "account_payment_reversal_identity")
+            .expect("account payment reversal identity migration is shipped");
+        assert_eq!(migration.version, 15);
+        assert_eq!(migration.change_set, 7);
+        assert_eq!(migration.phase, MigrationPhase::Expand);
+        assert!(migration
+            .sql
+            .contains("ADD COLUMN IF NOT EXISTS \"reversal_move_id\" NUMERIC(20,0);"));
+        assert!(!migration
+            .sql
+            .contains("reversal_move_id\" NUMERIC(20,0) NOT NULL"));
+        assert!(!migration
+            .sql
+            .contains("reversal_move_id\" NUMERIC(20,0) DEFAULT"));
+        assert!(migration
+            .sql
+            .contains("CREATE UNIQUE INDEX IF NOT EXISTS \"account_payment_reversal_move_id\""));
+        assert!(migration
+            .sql
+            .contains("WHERE \"reversal_move_id\" IS NOT NULL;"));
+        assert!(!migration.sql.contains("drop "));
     }
 
     #[test]

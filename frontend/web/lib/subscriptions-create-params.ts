@@ -50,19 +50,14 @@ export function toCreateSubscriptionFromSaleOrderParams(
   if (!so) return null
 
   const partnerId = parseU64FromForm(so.partnerId)
-  const partnerInvoiceId = parseU64FromForm(so.partnerInvoiceId)
-  const partnerShippingId = parseU64FromForm(so.partnerShippingId)
-  const currencyId = parseU64FromForm(so.currencyId)
-  const pricelistId = parseU64FromForm(so.pricelistId)
-  if (
-    partnerId == null ||
-    partnerInvoiceId == null ||
-    partnerShippingId == null ||
-    currencyId == null ||
-    pricelistId == null
-  ) {
-    return null
-  }
+  if (partnerId == null) return null
+  // The reducer reads billing/shipping partner, currency and pricelist from the
+  // confirmed order itself; the sale-orders read model does not project them, so
+  // the form must not require them. Send the order's own partner as a stand-in.
+  const partnerInvoiceId = parseU64FromForm(so.partnerInvoiceId) ?? partnerId
+  const partnerShippingId = parseU64FromForm(so.partnerShippingId) ?? partnerId
+  const currencyId = parseU64FromForm(so.currencyId) ?? 0n
+  const pricelistId = parseU64FromForm(so.pricelistId) ?? 0n
 
   const dateStart = requiredTimestampFromFormDate(
     formData.dateStart ?? new Date().toISOString(),

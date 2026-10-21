@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import {
   Dialog,
   DialogContent,
@@ -79,6 +80,21 @@ export function TaskDetailModal({
   onSave,
   teamMembers,
 }: TaskDetailModalProps) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.resolvedLanguage ?? i18n.language
+  const priorityLabels: Record<TaskPriority, string> = {
+    low: t("tasks.priorities.low"),
+    medium: t("tasks.priorities.medium"),
+    high: t("tasks.priorities.high"),
+    urgent: t("tasks.priorities.urgent"),
+  }
+  const statusLabels: Record<TaskStatus, string> = {
+    backlog: t("tasks.statuses.backlog"),
+    todo: t("tasks.statuses.todo"),
+    "in-progress": t("tasks.statuses.in-progress"),
+    review: t("tasks.statuses.review"),
+    done: t("tasks.statuses.done"),
+  }
   const [isEditing, setIsEditing] = useState(false)
   const [editedTask, setEditedTask] = useState<Task | null>(null)
   const [newComment, setNewComment] = useState("")
@@ -121,7 +137,7 @@ export function TaskDetailModal({
     const comment = {
       id: `comment-${Date.now()}`,
       userId: "user-1",
-      userName: "Current User",
+      userName: t("tasks.identity.currentUser"),
       content: newComment,
       createdAt: new Date().toISOString(),
     }
@@ -152,17 +168,17 @@ export function TaskDetailModal({
                 <>
                   <Button size="sm" variant="ghost" onClick={handleCancel}>
                     <X className="h-4 w-4 mr-1" />
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                   <Button size="sm" onClick={handleSave}>
                     <Save className="h-4 w-4 mr-1" />
-                    Save
+                    {t("common.save")}
                   </Button>
                 </>
               ) : (
                 <Button size="sm" variant="outline" onClick={handleEdit}>
                   <Edit2 className="h-4 w-4 mr-1" />
-                  Edit
+                  {t("common.edit")}
                 </Button>
               )}
             </div>
@@ -186,17 +202,17 @@ export function TaskDetailModal({
             <div className="col-span-2 space-y-4">
               {/* Description */}
               <div>
-                <h4 className="text-sm font-medium mb-2">Description</h4>
+                <h4 className="text-sm font-medium mb-2">{t("tasks.fields.description")}</h4>
                 {isEditing ? (
                   <Textarea
                     value={editedTask?.description || ""}
                     onChange={(e) => updateField("description", e.target.value)}
                     rows={4}
-                    placeholder="Add a description..."
+                    placeholder={t("tasks.detail.descriptionPlaceholder")}
                   />
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {currentTask.description || "No description provided"}
+                    {currentTask.description || t("tasks.detail.noDescription")}
                   </p>
                 )}
               </div>
@@ -205,7 +221,7 @@ export function TaskDetailModal({
               <div>
                 <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
-                  Comments ({currentTask.comments.length})
+                  {t("tasks.detail.commentsCount", { count: currentTask.comments.length })}
                 </h4>
                 <div className="space-y-3">
                   {currentTask.comments.map((comment) => (
@@ -227,7 +243,7 @@ export function TaskDetailModal({
                             {comment.userName}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {new Date(comment.createdAt).toLocaleString()}
+                            {new Date(comment.createdAt).toLocaleString(locale)}
                           </span>
                         </div>
                         <p className="text-sm text-foreground">{comment.content}</p>
@@ -238,12 +254,12 @@ export function TaskDetailModal({
                   {/* Add Comment */}
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Add a comment..."
+                      placeholder={t("tasks.detail.commentPlaceholder")}
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && handleAddComment()}
                     />
-                    <Button size="icon" onClick={handleAddComment}>
+                    <Button size="icon" onClick={handleAddComment} aria-label={t("tasks.actions.addComment")}>
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
@@ -256,7 +272,7 @@ export function TaskDetailModal({
               {/* Status */}
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                  Status
+                  {t("tasks.fields.status")}
                 </h4>
                 <Select
                   value={currentTask.status}
@@ -270,7 +286,7 @@ export function TaskDetailModal({
                       <SelectItem key={col.id} value={col.id}>
                         <div className="flex items-center gap-2">
                           <div className={cn("w-2 h-2 rounded-full", col.color)} />
-                          {col.title}
+                          {statusLabels[col.id]}
                         </div>
                       </SelectItem>
                     ))}
@@ -281,7 +297,7 @@ export function TaskDetailModal({
               {/* Priority */}
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                  Priority
+                  {t("tasks.fields.priority")}
                 </h4>
                 {isEditing ? (
                   <Select
@@ -300,7 +316,7 @@ export function TaskDetailModal({
                             <span className={priorityConfig[p].color}>
                               {priorityIcons[p]}
                             </span>
-                            {priorityConfig[p].label}
+                            {priorityLabels[p]}
                           </div>
                         </SelectItem>
                       ))}
@@ -312,7 +328,7 @@ export function TaskDetailModal({
                       {priorityIcons[currentTask.priority]}
                     </span>
                     <span className="text-sm">
-                      {priorityConfig[currentTask.priority].label}
+                      {priorityLabels[currentTask.priority]}
                     </span>
                   </div>
                 )}
@@ -322,7 +338,7 @@ export function TaskDetailModal({
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                   <User className="h-3 w-3" />
-                  Assignee
+                  {t("tasks.fields.assignee")}
                 </h4>
                 {isEditing ? (
                   <Select
@@ -339,10 +355,10 @@ export function TaskDetailModal({
                     }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Unassigned" />
+                      <SelectValue placeholder={t("tasks.assignee.unassigned")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">{t("tasks.assignee.unassigned")}</SelectItem>
                       {teamMembers.map((member) => (
                         <SelectItem key={member.id} value={member.id}>
                           <div className="flex items-center gap-2">
@@ -373,7 +389,7 @@ export function TaskDetailModal({
                     <span className="text-sm">{currentTask.assigneeName}</span>
                   </div>
                 ) : (
-                  <span className="text-sm text-muted-foreground">Unassigned</span>
+                  <span className="text-sm text-muted-foreground">{t("tasks.assignee.unassigned")}</span>
                 )}
               </div>
 
@@ -381,7 +397,7 @@ export function TaskDetailModal({
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  Due Date
+                  {t("tasks.fields.dueDate")}
                 </h4>
                 {isEditing ? (
                   <Input
@@ -391,10 +407,10 @@ export function TaskDetailModal({
                   />
                 ) : currentTask.dueDate ? (
                   <span className="text-sm">
-                    {new Date(currentTask.dueDate).toLocaleDateString()}
+                    {new Date(currentTask.dueDate).toLocaleDateString(locale)}
                   </span>
                 ) : (
-                  <span className="text-sm text-muted-foreground">Not set</span>
+                  <span className="text-sm text-muted-foreground">{t("tasks.detail.notSet")}</span>
                 )}
               </div>
 
@@ -402,7 +418,7 @@ export function TaskDetailModal({
               <div>
                 <h4 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                   <Tag className="h-3 w-3" />
-                  Labels
+                  {t("tasks.fields.labels")}
                 </h4>
                 <div className="flex flex-wrap gap-1">
                   {currentTask.labels.map((label) => (
@@ -411,7 +427,7 @@ export function TaskDetailModal({
                     </Badge>
                   ))}
                   {currentTask.labels.length === 0 && (
-                    <span className="text-sm text-muted-foreground">No labels</span>
+                    <span className="text-sm text-muted-foreground">{t("tasks.detail.noLabels")}</span>
                   )}
                 </div>
               </div>
@@ -420,7 +436,7 @@ export function TaskDetailModal({
               {currentTask.storyPoints !== undefined && (
                 <div>
                   <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                    Story Points
+                    {t("tasks.fields.storyPoints")}
                   </h4>
                   {isEditing ? (
                     <Input
@@ -441,13 +457,15 @@ export function TaskDetailModal({
               <div className="pt-4 border-t border-border space-y-2">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  Created:{" "}
-                  {new Date(currentTask.createdAt).toLocaleDateString()}
+                  {t("tasks.detail.createdOn", {
+                    date: new Date(currentTask.createdAt).toLocaleDateString(locale),
+                  })}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  Updated:{" "}
-                  {new Date(currentTask.updatedAt).toLocaleDateString()}
+                  {t("tasks.detail.updatedOn", {
+                    date: new Date(currentTask.updatedAt).toLocaleDateString(locale),
+                  })}
                 </div>
               </div>
             </div>

@@ -27,6 +27,7 @@ import type {
   CreateCurrencyRateParams,
   CreateEliminationEntryParams,
   CreateFiscalYearParams,
+  CreateManualAccountInvoiceParams,
   CreatePaymentParams,
   CreatePaymentTermLineParams,
   CreatePaymentTermParams,
@@ -255,12 +256,12 @@ export function toCreateAccountMoveFromInvoiceModal(
     partnerBankId: undefined,
     fiscalPositionId: undefined,
     invoiceDate: optionalTimestampFromFormDate(params.invoiceDate),
-    invoiceDateDue: optionalTimestampFromFormDate(params.invoiceDateDue),
+    invoiceDateDue: optionalTimestampFromFormDate(params.invoiceDateDue ?? params.dueDate),
     invoicePaymentTermId: optionalBigIntU64(params.invoicePaymentTermId),
     paymentReference: undefined,
     invoiceOrigin: undefined,
     invoicePartnerDisplayName: optionalTrimmedString(
-      params.invoicePartnerDisplayName ?? params.partner,
+      params.invoicePartnerDisplayName ?? params.partnerName ?? params.partner,
     ),
     invoiceCashRoundingId: undefined,
     partnerShippingId: undefined,
@@ -273,6 +274,152 @@ export function toCreateAccountMoveFromInvoiceModal(
     secureSequenceNumber: undefined,
     metadata:
       optionalTrimmedString(params.metadata) ?? optionalTrimmedString(params.narration),
+  }
+}
+
+/** Temporary authored shape matching the pending generated `CreateManualInvoiceParams`. */
+export interface ManualInvoiceCommandLineParams {
+  accountId: bigint
+  name: string
+  quantity: number
+  priceUnit: number
+  discount: number
+  taxIds: bigint[]
+}
+
+/**
+ * Source contract for the atomic draft command. Replace this alias with the generated
+ * type when the next contracts package containing `create_manual_invoice` is pinned.
+ */
+export interface ManualInvoiceCommandParams {
+  idempotencyKey: string
+  companyId: bigint
+  journalId: bigint
+  moveType: { tag: 'OutInvoice' | 'InInvoice' }
+  currencyId: bigint
+  partnerId: bigint
+  counterpartAccountId: bigint
+  date: Timestamp
+  invoiceDate: Timestamp
+  invoiceDateDue?: Timestamp
+  ref?: string
+  lines: ManualInvoiceCommandLineParams[]
+  metadata?: string
+}
+
+/** Typed boundary accepted from the invoice modal before reducer coercion. */
+export interface ManualInvoiceDraftFormLine {
+  accountId: unknown
+  description?: unknown
+  name?: unknown
+  quantity: unknown
+  unitPrice?: unknown
+  priceUnit?: unknown
+  discount?: unknown
+  taxId?: unknown
+}
+
+/** Only the modal fields consumed by the atomic manual-invoice command. */
+export interface ManualInvoiceDraftFormData {
+  idempotencyKey: unknown
+  journalId: unknown
+  currencyId: unknown
+  partnerId: unknown
+  counterpartAccountId: unknown
+  moveType?: unknown
+  date?: unknown
+  invoiceDate?: unknown
+  invoiceDateDue?: unknown
+  dueDate?: unknown
+  ref?: unknown
+  lineItems: ManualInvoiceDraftFormLine[]
+  metadata?: unknown
+}
+
+/** Map the invoice/bill modal's canonical draft payload to the atomic reducer intent. */
+export function toCreateManualInvoiceParams(
+  formData: ManualInvoiceDraftFormData,
+  companyId: bigint,
+): ManualInvoiceCommandParams {
+  const idempotencyKey = optionalTrimmedString(formData.idempotencyKey)
+  const journalId = requiredBigIntU64(formData.journalId)
+  const currencyId = requiredBigIntU64(formData.currencyId)
+  const partnerId = requiredBigIntU64(formData.partnerId)
+  const counterpartAccountId = requiredBigIntU64(formData.counterpartAccountId)
+  const rawLines = Array.isArray(formData.lineItems) ? formData.lineItems : []
+  if (
+    !idempotencyKey ||
+    journalId == null ||
+    currencyId == null ||
+    partnerId == null ||
+    counterpartAccountId == null
+  ) {
+    throw new Error('Invoice draft is missing a required journal, currency, partner, or account')
+  }
+  if (rawLines.length === 0) throw new Error('Invoice draft requires at least one line')
+
+  const lines = rawLines.map((line, index): ManualInvoiceCommandLineParams => {
+    const accountId = requiredBigIntU64(line.accountId)
+    const name = optionalTrimmedString(line.description ?? line.name)
+    const quantity = Number(line.quantity)
+    const priceUnit = Number(line.unitPrice ?? line.priceUnit)
+    const discount = Number(line.discount ?? 0)
+    const taxId = optionalBigIntU64(line.taxId)
+    if (
+      accountId == null ||
+      !name ||
+      !Number.isFinite(quantity) ||
+      quantity <= 0 ||
+      !Number.isFinite(priceUnit) ||
+      priceUnit < 0 ||
+      !Number.isFinite(discount) ||
+      discount < 0 ||
+      discount > 100
+    ) {
+      throw new Error(`Invoice line ${index + 1} is incomplete or invalid`)
+    }
+    return {
+      accountId,
+      name,
+      quantity,
+      priceUnit,
+      discount,
+      taxIds: taxId == null ? [] : [taxId],
+    }
+  })
+
+  return {
+    idempotencyKey,
+    companyId,
+    journalId,
+    moveType: { tag: formData.moveType === 'InInvoice' ? 'InInvoice' : 'OutInvoice' },
+    currencyId,
+    partnerId,
+    counterpartAccountId,
+    date: timestampFromFormDate(formData.date ?? formData.invoiceDate),
+    invoiceDate: timestampFromFormDate(formData.invoiceDate ?? formData.date),
+    invoiceDateDue: optionalTimestampFromFormDate(formData.invoiceDateDue ?? formData.dueDate),
+    ref: optionalTrimmedString(formData.ref),
+    lines,
+    metadata: optionalTrimmedString(formData.metadata),
+  }
+}
+
+/**
+ * Encode the temporary authored command shape exactly as the generated SATS
+ * encoder will once the reducer is present in the pinned contracts package.
+ */
+export function manualInvoiceParamsToJson(params: ManualInvoiceCommandParams) {
+  const wire = stdbParamsToJson(params)
+  return {
+    ...wire,
+    invoice_date_due:
+      params.invoiceDateDue == null
+        ? { none: [] as never[] }
+        : { some: wire.invoice_date_due },
+    ref: params.ref == null ? { none: [] as never[] } : { some: params.ref },
+    metadata:
+      params.metadata == null ? { none: [] as never[] } : { some: params.metadata },
   }
 }
 
@@ -1356,7 +1503,7 @@ export function toUpdateAccountMoveLineParams(
 }
 
 export function updateAccountMoveLineParamsToJson(params: Record<string, unknown>): Record<string, unknown> {
-  return stdbParamsToJson(params)
+  return stdbParamsToJson(params, 'UpdateAccountMoveLineParams')
 }
 
 // ── Tax (Extended) ────────────────────────────────────────────────────────────
@@ -1684,6 +1831,150 @@ export function toCreateAccountMoveParams(
   companyId: bigint,
 ): CreateAccountMoveParams | null {
   return toCreateJournalEntryMoveParams(formData, companyId)
+}
+
+type ManualAccountInvoiceLineForm = {
+  readonly accountId?: unknown
+  readonly account_id?: unknown
+  readonly name?: unknown
+  readonly quantity?: unknown
+  readonly priceUnit?: unknown
+  readonly price_unit?: unknown
+  readonly discount?: unknown
+  readonly taxIds?: unknown
+  readonly tax_ids?: unknown
+  readonly productId?: unknown
+  readonly product_id?: unknown
+}
+
+type ManualAccountInvoiceForm = {
+  readonly idempotencyKey?: unknown
+  readonly idempotency_key?: unknown
+  readonly companyId?: unknown
+  readonly company_id?: unknown
+  readonly moveType?: unknown
+  readonly move_type?: unknown
+  readonly journalId?: unknown
+  readonly journal_id?: unknown
+  readonly partnerId?: unknown
+  readonly partner_id?: unknown
+  readonly counterpartAccountId?: unknown
+  readonly counterpart_account_id?: unknown
+  readonly currencyId?: unknown
+  readonly currency_id?: unknown
+  readonly date?: unknown
+  readonly invoiceDate?: unknown
+  readonly invoice_date?: unknown
+  readonly invoiceDateDue?: unknown
+  readonly invoice_date_due?: unknown
+  readonly invoicePaymentTermId?: unknown
+  readonly invoice_payment_term_id?: unknown
+  readonly ref?: unknown
+  readonly paymentReference?: unknown
+  readonly payment_reference?: unknown
+  readonly metadata?: unknown
+  readonly lines?: unknown
+}
+
+/** Normalize the manual invoice modal into the released generated operation input. */
+export function toCreateManualAccountInvoiceParams(
+  formData: ManualAccountInvoiceForm,
+): CreateManualAccountInvoiceParams | null {
+  const idempotencyKey = String(formData.idempotencyKey ?? formData.idempotency_key ?? "").trim()
+  const companyId = requiredBigIntU64(formData.companyId ?? formData.company_id)
+  const journalId = requiredBigIntU64(formData.journalId ?? formData.journal_id)
+  const partnerId = requiredBigIntU64(formData.partnerId ?? formData.partner_id)
+  const counterpartAccountId = requiredBigIntU64(
+    formData.counterpartAccountId ?? formData.counterpart_account_id,
+  )
+  const currencyId = requiredBigIntU64(formData.currencyId ?? formData.currency_id)
+  if (
+    !/^[0-9a-f]{32}$/.test(idempotencyKey) ||
+    companyId == null || companyId === 0n ||
+    journalId == null || journalId === 0n ||
+    partnerId == null || partnerId === 0n ||
+    counterpartAccountId == null || counterpartAccountId === 0n ||
+    currencyId == null || currencyId === 0n
+  ) return null
+
+  const rawMoveType = formData.moveType ?? formData.move_type
+  const moveTypeTag = typeof rawMoveType === "object" && rawMoveType != null
+    ? String((rawMoveType as { tag?: unknown }).tag ?? "")
+    : String(rawMoveType ?? "")
+  if (moveTypeTag !== "OutInvoice" && moveTypeTag !== "InInvoice") return null
+
+  const rawLines = formData.lines
+  if (!Array.isArray(rawLines) || rawLines.length === 0) return null
+  const lines: CreateManualAccountInvoiceParams["lines"] = []
+  for (const rawLine of rawLines) {
+    if (rawLine == null || typeof rawLine !== "object" || Array.isArray(rawLine)) return null
+    const line = rawLine as ManualAccountInvoiceLineForm
+    const accountId = requiredBigIntU64(line.accountId ?? line.account_id)
+    const name = String(line.name ?? "").trim()
+    const quantity = Number(line.quantity)
+    const priceUnit = Number(line.priceUnit ?? line.price_unit)
+    const discount = Number(line.discount ?? 0)
+    const rawTaxIds = line.taxIds ?? line.tax_ids
+    const taxIds: bigint[] = []
+    for (const rawTaxId of Array.isArray(rawTaxIds) ? rawTaxIds : []) {
+      const taxId = requiredBigIntU64(rawTaxId)
+      if (taxId == null || taxId === 0n) return null
+      taxIds.push(taxId)
+    }
+    const rawProductId = line.productId ?? line.product_id
+    const productId = rawProductId == null || String(rawProductId).trim() === ""
+      ? undefined
+      : requiredBigIntU64(rawProductId)
+    if (
+      accountId == null || accountId === 0n || !name ||
+      !Number.isFinite(quantity) || quantity <= 0 ||
+      !Number.isFinite(priceUnit) || priceUnit < 0 ||
+      !Number.isFinite(discount) || discount < 0 || discount > 100 ||
+      productId === null || productId === 0n
+    ) return null
+    lines.push({ accountId, name, quantity, priceUnit, discount, taxIds, productId })
+  }
+
+  const rawPaymentTermId = formData.invoicePaymentTermId ?? formData.invoice_payment_term_id
+  const invoicePaymentTermId = rawPaymentTermId == null || String(rawPaymentTermId).trim() === ""
+    ? undefined
+    : requiredBigIntU64(rawPaymentTermId)
+  if (invoicePaymentTermId === null || invoicePaymentTermId === 0n) return null
+
+  const rawDueDate = formData.invoiceDateDue ?? formData.invoice_date_due
+  const invoiceDateDue = optionalTimestampFromFormDate(rawDueDate)
+  if (rawDueDate != null && String(rawDueDate).trim() !== "" && invoiceDateDue == null) return null
+
+  try {
+    return {
+      idempotencyKey,
+      companyId,
+      moveType: { tag: moveTypeTag },
+      journalId,
+      partnerId,
+      counterpartAccountId,
+      currencyId,
+      date: timestampFromFormDate(formData.date),
+      invoiceDate: timestampFromFormDate(formData.invoiceDate ?? formData.invoice_date),
+      invoiceDateDue,
+      invoicePaymentTermId,
+      ref: optionalTrimmedString(formData.ref),
+      paymentReference: optionalTrimmedString(
+        formData.paymentReference ?? formData.payment_reference,
+      ),
+      metadata: optionalTrimmedString(formData.metadata),
+      lines,
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Encode generated camel-case fields as the reducer's SATS JSON field names. */
+export function manualAccountInvoiceParamsToJson(
+  params: CreateManualAccountInvoiceParams,
+) {
+  return stdbParamsToJson(params, "CreateManualAccountInvoiceParams")
 }
 
 export function toCreateAccountBankStatementParams(

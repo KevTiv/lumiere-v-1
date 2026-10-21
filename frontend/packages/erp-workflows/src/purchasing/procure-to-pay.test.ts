@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
+import { WorkflowError } from "../core/errors"
 import {
   awardRfqBidAction,
   isPurchaseLineReceivable,
@@ -172,17 +173,93 @@ test("receipt correlation captures one open move before dispatch and never choos
     context: "purchasing",
   })
 
-  // Ambiguous open relations are unresolved, not reduced to first/latest.
-  assert.equal(
-    resolveOpenReceiptTarget("8", [
-      { id: 100, purchaseLineId: 8, state: "draft", pickingId: 30 },
-      { id: 102, purchaseLineId: 8, state: "assigned", pickingId: 31 },
+  // Ambiguous open relations fail closed, not reduced to first/latest or zero.
+  assert.throws(
+    () => resolveOpenReceiptTarget("8", [
+      { id: 100, purchaseLineId: 8, state: "draft", isDone: false, pickingId: 30 },
+      { id: 102, purchaseLineId: 8, state: "assigned", isDone: false, pickingId: 31 },
     ]),
-    undefined,
+    (error: unknown) => error instanceof WorkflowError && error.kind === "conflict",
   )
 
-  // A service line has no stock move, so the user stays where they are.
-  assert.deepEqual(observeReceivedLine("8", undefined, []), { outcome: "applied" })
+  // No move is not proof of a service line or an applied receipt.
+  assert.equal(resolveOpenReceiptTarget("8", []), undefined)
+  assert.deepEqual(observeReceivedLine("8", undefined, []), {})
+  assert.deepEqual(observeReceivedLine("8", undefined, after), {})
+})
+
+test("receipt resolution excludes wrong lines and terminal moves and supports snake-case identities", () => {
+  const terminal = [
+    { id: 100, purchaseLineId: 8, state: "done", isDone: true, pickingId: 30 },
+    { id: 101, purchaseLineId: 8, state: "done", isDone: true, pickingId: 30 },
+    { id: 102, purchaseLineId: 8, state: "cancel", isDone: false, pickingId: 30 },
+    { id: 103, purchaseLineId: 9, state: "draft", pickingId: null },
+  ]
+  assert.equal(resolveOpenReceiptTarget("8", terminal), undefined)
+  assert.deepEqual(resolveOpenReceiptTarget("8", [
+    ...terminal,
+    { id: 104n, purchase_line_id: 8n, state: "assigned", is_done: false, picking_id: 31n },
+  ]), { moveId: "104", pickingId: "31" })
+})
+
+test("matched open receipt moves with missing or malformed identities throw typed conflicts", () => {
+  for (const pickingId of [undefined, null, "", " ", 0, -1, 1.5, NaN, Infinity, {}, [], true, "invalid"]) {
+    for (const moves of [
+      [{ id: 100, purchaseLineId: 8, state: "draft", isDone: false, pickingId }],
+      [
+        { id: 99, purchaseLineId: 8, state: "draft", isDone: false, pickingId: 29 },
+        { id: 100, purchaseLineId: 8, state: "draft", isDone: false, pickingId },
+      ],
+    ]) {
+      assert.throws(
+        () => resolveOpenReceiptTarget("8", moves),
+        (error: unknown) => error instanceof WorkflowError && error.kind === "conflict",
+      )
+    }
+  }
+  for (const id of [undefined, null, "", {}, 0]) {
+    assert.throws(
+      () => resolveOpenReceiptTarget("8", [{ id, purchaseLineId: 8, state: "draft", isDone: false, pickingId: 30 }]),
+      (error: unknown) => error instanceof WorkflowError && error.kind === "conflict",
+    )
+  }
+})
+
+test("receipt readback requires the captured move, exact line and picking, and done proof", () => {
+  const target = { moveId: "100", pickingId: "30" }
+  for (const moves of [
+    [],
+    [{ id: 109, purchaseLineId: 8, pickingId: 30, state: "done" }],
+    [{ id: 100, purchaseLineId: 9, pickingId: 30, state: "done" }],
+    [{ id: 100, purchaseLineId: 8, pickingId: 31, state: "done" }],
+    [{ id: 100, purchaseLineId: 8, pickingId: null, state: "done" }],
+    [{ id: 100, purchaseLineId: 8, pickingId: 30, state: "assigned", isDone: false }],
+    [{ id: 100, purchaseLineId: 8, pickingId: 30, state: "cancel", isDone: false }],
+  ]) {
+    assert.deepEqual(observeReceivedLine("8", target, moves), {})
+  }
+  for (const proof of [{ state: "done", isDone: true }, { state: "done", is_done: true }]) {
+    const observed = observeReceivedLine("8", target, [
+      { id: 100, purchase_line_id: 8, picking_id: 30, ...proof },
+    ])
+    assert.equal(observed.outcome, "applied")
+    assert.deepEqual(observed.createdRecords, [observed.next])
+    assert.equal(observed.next?.id, "30")
+  }
+})
+
+test("matching receipt done evidence must be boolean and consistent before and after dispatch", () => {
+  const target = { moveId: "100", pickingId: "30" }
+  for (const proof of [
+    { state: "assigned" }, { state: "done" },
+    ...[null, "false", "true", 0, 1].map((isDone) => ({ state: "done", isDone })),
+    { state: "assigned", isDone: true }, { state: "done", isDone: false },
+  ]) {
+    const move = { id: 100, purchaseLineId: 8, pickingId: 30, ...proof }
+    assert.throws(() => resolveOpenReceiptTarget("8", [move]),
+      (error: unknown) => error instanceof WorkflowError && error.kind === "conflict")
+    assert.deepEqual(observeReceivedLine("8", target, [move]), {})
+  }
 })
 
 test("an RFQ award prepares the bid's rfq and id and only offers submitted bids", () => {

@@ -1,6 +1,7 @@
 "use client"
 import { accountMoveHref, projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { useProductivitySections } from "@/lib/use-productivity-sections"
 import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
@@ -1049,6 +1050,13 @@ function ProjectsClientLoaded({
     timesheetFormConfig,
   ])
 
+  // "My work" widgets sit under the KPI tiles.
+  const productivitySections = useProductivitySections({ organizationId: orgId, tasks, projects, idPrefix: "proj-work" })
+  const dashboardSections = useMemo(() => {
+    const at = liveSections.findIndex((section) => section.id === "proj-kpis") + 1
+    return [...liveSections.slice(0, at), ...productivitySections, ...liveSections.slice(at)]
+  }, [liveSections, productivitySections])
+
   const csvFormConfig = useMemo(() => {
     if (!csvKind) return null
     return projectsCsvImportForm(t, csvKind)
@@ -1059,12 +1067,13 @@ function ProjectsClientLoaded({
       ({
         ...moduleConfig,
         tabs: [
-          ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
+          ...withDashboardSections(moduleConfig, dashboardSections).tabs.map((tab) => {
           if (tab.id === "projects" && tab.entityConfig && tab.entityConfig.view.mode === "table") {
             // The row opens the edit form; the project's name opens its page.
             const view = tab.entityConfig.view
             return {
               ...tab,
+              createForm: projectFormConfig,
               entityConfig: withInlineEdits({
                 ...tab.entityConfig,
                 view: {
@@ -1181,6 +1190,7 @@ function ProjectsClientLoaded({
             return {
               ...tab,
               createForm: timesheetFormConfig,
+              createAction: "logTimesheet",
               entityConfig: withTimesheetLifecycleColumns(addCsvToolbar(tab.entityConfig, [
                 {
                   id: "csv-timesheet",
@@ -1265,7 +1275,7 @@ function ProjectsClientLoaded({
       utilisationTab,
       advancedTab,
       approvalTab,
-      liveSections,
+      dashboardSections,
       projectFormConfig,
       taskFormConfig,
       timesheetFormConfig,
@@ -1453,7 +1463,9 @@ function ProjectsClientLoaded({
               setLifecycleError(null)
             }
           }}
-          config={lifecycleModal.form}
+          // Billing references may finish after this modal opens; retain the
+          // draft while resolving its options from the current query results.
+          config={lifecycleModal.type === "billTimesheets" ? billTimesheetsFormConfig : lifecycleModal.form}
           isPending={isFormMutationPending}
           closeOnSubmit={false}
           submitError={lifecycleError}

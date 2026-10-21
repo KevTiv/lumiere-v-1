@@ -20,6 +20,7 @@ import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import { decodeOperationDispatch } from '@lumiere/api-client'
 import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect, type CanonicalRecordRef, type ResolvedOperationEffectOutcome } from './operation-effect'
 import { resolveTimesheetBillingEffect, resolveTimesheetStatusEffect } from './partial-slice-effects'
+import { buildTaskStateCommand } from './task-state-command'
 import type {
   HrResource,
   ProjectProject,
@@ -335,7 +336,9 @@ export function useCreateProject(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost("create_project", { params: stdbParamsToJson(withCompanyScope(params, companyId)) })
+      const { urlPath, init } = stdbBffCommandPost("create_project", {
+        params: stdbParamsToJson(withCompanyScope(params, companyId), "CreateProjectParams"),
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create project')
@@ -348,7 +351,9 @@ export function useCreateTask(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost("create_task", { params: stdbParamsToJson(withCompanyScope(params, companyId)) })
+      const { urlPath, init } = stdbBffCommandPost("create_task", {
+        params: stdbParamsToJson(withCompanyScope(params, companyId), "CreateTaskParams"),
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create task')
@@ -361,7 +366,9 @@ export function useCreateTimesheet(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
     mutationFn: async (params) => {
-      const { urlPath, init } = stdbBffCommandPost("log_timesheet", { params: stdbParamsToJson(withCompanyScope(params, companyId)) })
+      const { urlPath, init } = stdbBffCommandPost("log_timesheet", {
+        params: stdbParamsToJson(withCompanyScope(params, companyId), "LogTimesheetParams"),
+      })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create timesheet')
@@ -418,21 +425,7 @@ export function useUpdateTaskState(organizationId: bigint) {
       taskId: string | number | bigint
       state: unknown
     }) => {
-      const tag =
-        typeof state === "string"
-          ? state
-          : state && typeof state === "object" && "tag" in state
-            ? String((state as { tag: unknown }).tag)
-            : ""
-      if (!["Cancelled", "InProgress", "Done", "Approved", "ChangesRequested"].includes(tag)) {
-        throw new Error("Invalid task state")
-      }
-      const { urlPath, init } = stdbBffCommandPost("update_task_state", {
-        taskId,
-        state: { tag } as {
-          tag: "Cancelled" | "InProgress" | "Done" | "Approved" | "ChangesRequested"
-        },
-      })
+      const { urlPath, init } = buildTaskStateCommand(taskId, state)
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update task state')

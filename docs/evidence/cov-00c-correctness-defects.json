@@ -250,6 +250,7 @@
       "frontend/web/lib/stdb-org-resolve.ts"
     ],
     "runtime_form_modal_files": [
+      "frontend/packages/ui/src/forms/form-style-propagation.test.tsx",
       "frontend/packages/ui/src/pages/module-view.tsx",
       "frontend/packages/ui/src/forms/runtime-form-modal.test.tsx",
       "frontend/web/app/(modules)/accounting/accounting-client.tsx",
@@ -263,7 +264,7 @@
       "frontend/web/app/(modules)/sales/sale-order-dialogs.tsx"
     ],
     "operator_bypass_files": [
-      "frontend/web/tests/e2e/accounting-post-reconcile.spec.ts",
+      "frontend/web/tests/e2e/account-deprecation-readback.spec.ts",
       "frontend/web/tests/e2e/ai-human-review-provenance.spec.ts",
       "frontend/web/tests/e2e/ai-rag-evidence-access.spec.ts",
       "frontend/web/tests/e2e/analytics-lifecycle.spec.ts",
@@ -271,7 +272,7 @@
       "frontend/web/tests/e2e/bank-statement-import.spec.ts",
       "frontend/web/tests/e2e/cov04-sales-order-confirmation.spec.ts",
       "frontend/web/tests/e2e/cov09-hr-leave-approval.spec.ts",
-      "frontend/web/tests/e2e/cov11-expense-sheet-lifecycle.spec.ts",
+      "frontend/web/tests/e2e/cov10-project-timesheet-validation.spec.ts",
       "frontend/web/tests/e2e/cov13-pos-session-close.spec.ts",
       "frontend/web/tests/e2e/cov14-helpdesk-ticket-lifecycle.spec.ts",
       "frontend/web/tests/e2e/cov16-iot-alert-resolve.spec.ts",
@@ -296,8 +297,6 @@
       "frontend/web/tests/e2e/mobile-money-payments.spec.ts",
       "frontend/web/tests/e2e/mvp-ai-rag.spec.ts",
       "frontend/web/tests/e2e/mvp-lead-to-cash.spec.ts",
-      "frontend/web/tests/e2e/mvp-procure-to-pay.spec.ts",
-      "frontend/web/tests/e2e/o2c-certification.spec.ts",
       "frontend/web/tests/e2e/operational-messaging.spec.ts",
       "frontend/web/tests/e2e/parity-phase3-approvals-documents-mutations.spec.ts",
       "frontend/web/tests/e2e/payment-fixtures.ts",
@@ -310,8 +309,10 @@
       "frontend/web/tests/e2e/projects-wave-lifecycle.spec.ts",
       "frontend/web/tests/e2e/proposals-lifecycle.spec.ts",
       "frontend/web/tests/e2e/purchasing-module.spec.ts",
+      "frontend/web/tests/e2e/sales-approval-fixture.ts",
       "frontend/web/tests/e2e/sales-invoice-flow.spec.ts",
       "frontend/web/tests/e2e/sales-mutations.spec.ts",
+      "frontend/web/tests/e2e/tasks-board-drag.spec.ts",
       "frontend/web/tests/e2e/vertical-distributor.spec.ts",
       "frontend/web/tests/e2e/workflows-gate-ui.spec.ts"
     ],
