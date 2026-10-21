@@ -54,6 +54,7 @@ type RichTextEditorProps = {
   contentClassName?: string
   /** Accessibility attributes applied to the editable surface. */
   ariaAttributes?: React.AriaAttributes
+  editorAttributes?: Record<string, string>
   /** Escape hatch for wrappers that need the Tiptap instance. */
   onEditorReady?: (editor: Editor | null) => void
 }
@@ -84,13 +85,14 @@ function ToolbarButton({
     <button
       type="button"
       className={cn(
-        "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-muted aria-pressed:text-foreground [&_svg]:size-3.5",
+        "inline-flex size-11 shrink-0 touch-manipulation items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-muted aria-pressed:text-foreground sm:size-7 [&_svg]:size-4 sm:[&_svg]:size-3.5",
         className
       )}
       aria-label={label}
       aria-pressed={active}
       title={shortcut ? `${label} (${shortcut})` : label}
       disabled={disabled}
+      onPointerDown={(event) => event.preventDefault()}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       {...props}
@@ -323,6 +325,7 @@ function RichTextEditor({
   className,
   contentClassName,
   ariaAttributes,
+  editorAttributes,
   onEditorReady,
 }: RichTextEditorProps) {
   const editable = !disabled && !readOnly
@@ -342,6 +345,7 @@ function RichTextEditor({
       "aria-multiline": "true",
       style: `min-height: ${rows * LINE_HEIGHT_REM + VERTICAL_PADDING_REM}rem`,
     }
+    Object.assign(attrs, editorAttributes)
     if (id) attrs.id = id
     if (testId) attrs["data-testid"] = testId
     if (readOnly) attrs["aria-readonly"] = "true"
@@ -350,7 +354,7 @@ function RichTextEditor({
       if (attrValue !== undefined && attrValue !== null) attrs[key] = String(attrValue)
     }
     return attrs
-  }, [ariaAttributes, contentClassName, disabled, id, readOnly, rows, testId])
+  }, [ariaAttributes, editorAttributes, contentClassName, disabled, id, readOnly, rows, testId])
 
   const editor = useEditor(
     {

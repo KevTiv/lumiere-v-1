@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   chooseFirstOption,
   expectNoAppError,
   expectRecordAbsentFromQuery,
@@ -31,7 +32,7 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
     const updatedName = `${productName}-updated`
 
     await gotoModule(page, "/inventory", "inventory")
-    await page.getByTestId("module-tab-inventory-products").click()
+    await selectModuleTab(page, "inventory", "products")
     await waitForBffQueryMinRows(page, "/api/query/product-categories")
     await waitForBffQueryMinRows(page, "/api/query/uoms")
     await waitForBffQueryMinRows(page, "/api/query/pricelists")

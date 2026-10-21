@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   expectFormModalVisible,
   expectNoAppError,
   gotoModule,
@@ -59,7 +60,7 @@ test.describe("COV-26 workforce module resilience", { tag: ["@cov09", "@cov10", 
 
       for (const module of MODULES) {
         await gotoModule(page, module.href, module.moduleId)
-        await page.getByTestId(`module-tab-${module.moduleId}-${module.tabId}`).click()
+        await selectModuleTab(page, module.moduleId, module.tabId)
         await expectNoHorizontalOverflow(page, `${module.label} at ${width}px`)
 
         const create = page.getByTestId(`module-create-${module.moduleId}-${module.tabId}`)
@@ -83,7 +84,7 @@ test.describe("COV-26 workforce module resilience", { tag: ["@cov09", "@cov10", 
     for (const module of MODULES) {
       await gotoModule(page, module.href, module.moduleId)
       await waitForBffQueryMinRows(page, `/api/query/${module.resource}`)
-      await page.getByTestId(`module-tab-${module.moduleId}-${module.tabId}`).click()
+      await selectModuleTab(page, module.moduleId, module.tabId)
 
       const search = page.getByRole("textbox", { name: "Search records" })
       await search.fill(`cov26-no-match-${module.moduleId}-${Date.now()}`)
@@ -101,7 +102,7 @@ test.describe("COV-26 workforce module resilience", { tag: ["@cov09", "@cov10", 
       await signIn(page, "fixture.reader@example.test", PERSONA_PASSWORD)
       for (const module of MODULES) {
         await gotoModule(page, module.href, module.moduleId)
-        await page.getByTestId(`module-tab-${module.moduleId}-${module.tabId}`).click()
+        await selectModuleTab(page, module.moduleId, module.tabId)
         await expect(page.getByTestId(`module-create-${module.moduleId}-${module.tabId}`)).toBeHidden()
       }
       await expectNoAppError(page)
@@ -132,7 +133,7 @@ test.describe("COV-26 workforce module resilience", { tag: ["@cov09", "@cov10", 
       expect(response.ok()).toBe(true)
       const rows = ((await response.json()) as { data?: Array<{ id?: unknown }> }).data ?? []
       expect(rows.map((row) => scalarQueryId(row.id))).toContain(canonicalId)
-      await page.getByTestId(`module-tab-${module.moduleId}-${module.tabId}`).click()
+      await selectModuleTab(page, module.moduleId, module.tabId)
       await expect(page.getByTestId(`entity-row-${canonicalId}`)).toBeVisible()
       await expectNoAppError(page)
     }

@@ -3,6 +3,7 @@
 import { cn } from "../lib/utils"
 import type { KpiTone } from "../lib/kpi-tiles"
 import { Skeleton } from "./skeleton"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 export interface KpiStripTile {
   key: string
@@ -50,7 +51,8 @@ export function KpiStrip({ tiles, loading = false, className }: KpiStripProps) {
             ) : (
               <span
                 className={cn(
-                  "mt-1 truncate text-xl font-semibold tabular-nums tracking-tight",
+                  workspaceStyles.metricValue,
+                  "mt-1 truncate text-xl",
                   toneValueClass[tile.tone ?? "default"],
                 )}
                 data-testid={`kpi-tile-${tile.key}-value`}

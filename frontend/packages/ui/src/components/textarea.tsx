@@ -71,6 +71,10 @@ function pickAriaAttributes(
  * `<textarea>` carries `name`, `value`, `ref` and `onChange`, while a Tiptap
  * editor is what people type into. Content is stored as Markdown.
  */
+function normalizeMarkdown(markdown: string | undefined) {
+  return markdown?.replace(/(^|[\s(])\*\*\s+([^*\n]+?)\s+\*\*/g, "$1**$2**").replace(/(^|[\s(])~~\s+([^~\n]+?)\s+~~/g, "$1~~$2~~")
+}
+
 function RichTextarea({
   className,
   value,
@@ -94,6 +98,7 @@ function RichTextarea({
   const surfaceId = React.useId()
   const [labelledBy, setLabelledBy] = React.useState<string | undefined>()
 
+  const [bridgeEditor, setBridgeEditor] = React.useState<Editor | null>(null)
   const controlledValue = toText(value)
   const initialValue = toText(defaultValue)
 
@@ -110,7 +115,7 @@ function RichTextarea({
   React.useEffect(() => {
     const textarea = textareaRef.current
     if (!textarea) return
-    const redirect = () => editorRef.current?.commands.focus()
+    const redirect = () => editorRef.current?.view.dom.focus({ preventScroll: true })
     textarea.addEventListener("focus", redirect)
     return () => textarea.removeEventListener("focus", redirect)
   }, [])
@@ -125,13 +130,12 @@ function RichTextarea({
       `label[for="${CSS.escape(id)}"]`
     )
     if (!label) return
-    if (!label.id) label.id = `${surfaceId}-label`
-    setLabelledBy(label.id)
+    setLabelledBy(label.textContent?.trim() ? `${label.textContent.trim()} rich text editor` : undefined)
   }, [ariaLabel, ariaLabelledBy, id, surfaceId])
 
   const ariaAttributes = React.useMemo(() => {
     const aria = pickAriaAttributes(props)
-    if (labelledBy && !aria["aria-labelledby"]) aria["aria-labelledby"] = labelledBy
+    if (labelledBy && !aria["aria-labelledby"] && !aria["aria-label"]) aria["aria-label"] = labelledBy
     if (props.required) aria["aria-required"] = true
     return aria
   }, [labelledBy, props])
@@ -163,6 +167,7 @@ function RichTextarea({
 
   const handleEditorReady = React.useCallback((editor: Editor | null) => {
     editorRef.current = editor
+    setBridgeEditor(editor)
   }, [])
 
   const handleValueChange = React.useCallback((markdown: string) => {
@@ -170,11 +175,26 @@ function RichTextarea({
     if (textarea) setNativeTextareaValue(textarea, markdown)
   }, [])
 
+  React.useEffect(() => {
+    if (!bridgeEditor) return
+    const root = bridgeEditor.view.dom
+    Object.defineProperty(root, "value", {
+      configurable: true,
+      get: () => textareaRef.current?.value ?? "",
+      set: (next: unknown) => {
+        const raw = String(next ?? "").slice(0, maxLength)
+        bridgeEditor.commands.setContent(normalizeMarkdown(raw) ?? "", { contentType: "markdown", emitUpdate: false })
+        if (textareaRef.current) setNativeTextareaValue(textareaRef.current, raw)
+      },
+    })
+    return () => { delete (root as HTMLElement & { value?: string }).value }
+  }, [bridgeEditor, maxLength])
+
   return (
     <>
       <RichTextEditor
-        value={controlledValue}
-        defaultValue={initialValue}
+        value={normalizeMarkdown(controlledValue)}
+        defaultValue={normalizeMarkdown(initialValue)}
         onValueChange={handleValueChange}
         onFocus={() => dispatchFocus("focusin")}
         onBlur={() => dispatchFocus("focusout")}
@@ -189,6 +209,13 @@ function RichTextarea({
         className={className}
         testId={testId}
         ariaAttributes={ariaAttributes}
+        editorAttributes={{
+          ...(props.inputMode ? { inputmode: props.inputMode } : {}),
+          ...(props.enterKeyHint ? { enterkeyhint: props.enterKeyHint } : {}),
+          ...(props.autoCapitalize ? { autocapitalize: props.autoCapitalize } : {}),
+          ...(props.autoCorrect ? { autocorrect: props.autoCorrect } : {}),
+          ...(props.spellCheck !== undefined ? { spellcheck: String(props.spellCheck) } : {}),
+        }}
       />
       <textarea
         ref={setTextareaRef}

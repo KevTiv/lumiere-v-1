@@ -26,6 +26,8 @@ import {
 } from "../components/command"
 
 export interface ErpCommandPaletteProps {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   onOpenAIChat?: () => void
   onOpenNotebook?: () => void
   onOpenJournal?: () => void
@@ -36,22 +38,27 @@ export interface ErpCommandPaletteProps {
 }
 
 export function ErpCommandPalette({
+  open: controlledOpen,
+  onOpenChange,
   onOpenAIChat,
   onOpenNotebook,
   onOpenJournal,
   firstOrgProfile = false,
   recordHref,
 }: ErpCommandPaletteProps) {
-  const [open, setOpenState] = useState(false)
+  const [internalOpen, setOpenState] = useState(false)
+  const open = controlledOpen ?? internalOpen
   const [search, setSearch] = useState("")
   const [recordSummary, setRecordSummary] = useState<RecordSearchSummary | null>(null)
   const { organizationId } = useErpSession()
   const setOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
-    setOpenState(next)
+    const value = typeof next === "function" ? next(open) : next
+    setOpenState(value)
+    onOpenChange?.(value)
     // The next opening starts from an empty query.
     setSearch("")
     setRecordSummary(null)
-  }, [])
+  }, [onOpenChange, open])
   const router = useRouter()
   const { checkPermission, isAdmin } = useRBAC()
   const { t } = useTranslation()
@@ -99,14 +106,14 @@ export function ErpCommandPalette({
   const runAction = useCallback((action: () => void) => {
     setOpen(false)
     action()
-  }, [])
+  }, [setOpen])
 
   const navigate = useCallback(
     (href: string) => {
       setOpen(false)
       router.push(href)
     },
-    [router],
+    [router, setOpen],
   )
 
   useEffect(() => {
@@ -119,7 +126,7 @@ export function ErpCommandPalette({
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
+  }, [setOpen])
 
   const visibleAiChat = quickActionIsVisible("ai-assistant") ? onOpenAIChat : undefined
   const visibleNotebook = quickActionIsVisible("notebook") ? onOpenNotebook : undefined

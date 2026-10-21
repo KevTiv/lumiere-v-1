@@ -57,6 +57,7 @@ test.describe("COV-25 sale order → delivery link", { tag: ["@p0", "@cov25", "@
     const income = await fetchAccountSelectLabelByInternalType(page, "income")
     const receivable = await fetchAccountSelectLabelByInternalType(page, "receivable")
     await gotoModule(page, saleOrderHref(orderId), "sales")
+    await expect(page.getByTestId("module-tab-sales-orders")).toHaveCount(1, { timeout: 30_000 })
     await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
     await openCreateInvoiceFromOrder(page, orderId)
     await chooseSelectOptionByLabel(page, "journalId", journal)

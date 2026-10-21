@@ -10,6 +10,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   expectRowActionsOffered,
   callReducerBff,
   callReducerOwner,
@@ -34,7 +35,7 @@ const some = <T>(value: T) => ({ some: value })
 const none = { none: [] as [] }
 
 async function openExpensesTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-expenses-${tabId}`).click()
+  await selectModuleTab(page, "expenses", tabId)
 }
 
 test.describe("Expenses wave lifecycle e2e @expenses", () => {
@@ -54,7 +55,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
 
   test("dashboard New Report opens create sheet form @p0", async ({ page }) => {
     await gotoModule(page, "/expenses", "expenses")
-    await page.getByTestId("module-tab-expenses-dashboard").click()
+    await selectModuleTab(page, "expenses", "dashboard")
     const newReport = page.getByRole("button", { name: /New Report/i }).first()
     await expect(newReport).toBeVisible()
     await newReport.click()

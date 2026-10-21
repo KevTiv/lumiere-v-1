@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
@@ -42,7 +43,7 @@ test.describe("Sales update mutations", { tag: ["@p0", "@phase-3"] }, () => {
     const updatedRef = `${initialRef}-updated`
 
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await waitForBffQueryMinRows(page, "/api/query/contacts")
     await waitForBffQueryMinRows(page, "/api/query/pricelists")
     await waitForBffQueryMinRows(page, "/api/query/warehouses")

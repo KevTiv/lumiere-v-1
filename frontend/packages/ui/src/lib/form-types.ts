@@ -188,6 +188,11 @@ export interface FormConfig {
   onCancel?: () => void
 }
 
+/** Values at the existing dynamic form submission boundary, also used by local previews. */
+export type FormValues = Parameters<NonNullable<FormConfig["onSubmit"]>>[0]
+
+export type FormPreviewRenderer = (values: FormValues) => import("react").ReactNode
+
 export interface AiFormAssistConfig {
   enabled?: boolean
   companyId?: number

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { DashboardHeader, MissingOrganization, Button } from "@lumiere/ui"
 import { Textarea } from "@lumiere/ui/components/textarea"
 import {
@@ -19,8 +20,14 @@ import {
   useHumanTaskInbox,
   type HumanTaskRow,
 } from "@lumiere/query-hooks/hooks/approvals"
+import {
+  approvalActorOptions,
+  approvalSelection,
+  resolveApprovalActor,
+} from "@lumiere/query-hooks/hooks/approval-controls"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { CheckCircle2, ExternalLink, Hand, Loader2, Sparkles, XCircle } from "lucide-react"
+import { approvalInboxTarget, approvalTaskMatchesTarget } from "./approval-inbox-view"
 
 function hasValidOrganizationId(value?: number): value is number {
   return value != null && value > 0
@@ -42,6 +49,7 @@ export function ApprovalsClient({ organizationId }: { organizationId?: number })
 }
 
 function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
+  const searchParams = useSearchParams()
   const operatingCompanyId = useOperatingCompanyId(organizationId)
   const inboxQuery = useHumanTaskInbox(
     organizationId,
@@ -56,6 +64,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   const [rejectReason, setRejectReason] = useState("")
   const [commentingId, setCommentingId] = useState<number | null>(null)
   const [commentText, setCommentText] = useState("")
+  const [actingForByTask, setActingForByTask] = useState<Record<number, string>>({})
 
   const pendingTasks = useMemo(
     () =>
@@ -71,13 +80,27 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
     [pendingTasks],
   )
 
+  const target = useMemo(
+    () => approvalInboxTarget(searchParams.get("model"), searchParams.get("resId")),
+    [searchParams],
+  )
+  const visibleTasks = useMemo(
+    () => target ? pendingTasks.filter((row) => approvalTaskMatchesTarget(row, target)) : pendingTasks,
+    [pendingTasks, target],
+  )
+
   const busy = claimTask.isPending || decideTask.isPending || commentTask.isPending
 
   const handleClaim = async (row: HumanTaskRow) => {
+    if (operatingCompanyId == null) return
+    const taskId = humanTaskId(row)
+    const requested = Object.hasOwn(actingForByTask, taskId) ? actingForByTask[taskId] : undefined
+    const selection = approvalSelection(row, operatingCompanyId, requested)
     await claimTask.mutateAsync({
-      companyId: humanTaskCompanyId(row),
-      taskId: humanTaskId(row),
-      expectedRevision: humanTaskRevision(row),
+      companyId: selection.companyId,
+      taskId: selection.requestId,
+      expectedRevision: selection.expectedTaskRevision,
+      actingFor: selection.actingFor,
     })
   }
 
@@ -86,22 +109,17 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
     decision: "Approve" | "Reject" | "Complete",
     comment?: string,
   ) => {
-    let expectedTaskRevision = humanTaskRevision(row)
-    const status = taskStatusTag(row)
-    if (status === "Open") {
-      await claimTask.mutateAsync({
-        companyId: humanTaskCompanyId(row),
-        taskId: humanTaskId(row),
-        expectedRevision: expectedTaskRevision,
-      })
-      expectedTaskRevision += 1
-    }
+    if (operatingCompanyId == null) return
+    const taskId = humanTaskId(row)
+    const requested = Object.hasOwn(actingForByTask, taskId) ? actingForByTask[taskId] : undefined
+    const selection = approvalSelection(row, operatingCompanyId, requested)
     await decideTask.mutateAsync({
-      companyId: humanTaskCompanyId(row),
-      taskId: humanTaskId(row),
-      expectedTaskRevision,
-      expectedInstanceRevision: Number(row.instanceRevision ?? row.instance_revision ?? 0),
+      companyId: selection.companyId,
+      taskId: selection.requestId,
+      expectedTaskRevision: selection.expectedTaskRevision,
+      expectedInstanceRevision: selection.expectedInstanceRevision,
       decision: { tag: decision },
+      actingFor: selection.actingFor,
       comment: comment ?? null,
     })
   }
@@ -155,17 +173,18 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
         >
           Select an operating company to load your authorized task inbox.
         </div>
-      ) : pendingTasks.length === 0 ? (
+      ) : visibleTasks.length === 0 ? (
         <div
           className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
           data-testid="approvals-inbox-empty"
         >
-          No open tasks for this company. Guarded actions create version-pinned human tasks when
-          approval is required.
+          {target
+            ? `No open approval task matches ${target.model} #${target.resId}.`
+            : "No open tasks for this company. Guarded actions create version-pinned human tasks when approval is required."}
         </div>
       ) : (
         <div className="grid gap-4">
-          {pendingTasks.map((row) => {
+          {visibleTasks.map((row) => {
             const taskId = humanTaskId(row)
             const model = humanTaskSubjectModel(row) ?? ""
             const resId = humanTaskSubjectId(row) ?? 0
@@ -174,6 +193,13 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
             const status = taskStatusTag(row)
             const requireComment =
               row.requireCommentOnReject ?? row.require_comment_on_reject ?? false
+            const requestedActor = Object.hasOwn(actingForByTask, taskId)
+              ? actingForByTask[taskId]
+              : undefined
+            const selectedActor = resolveApprovalActor(row, requestedActor)
+            const actorOptions = approvalActorOptions(row)
+            const needsActorSelection = selectedActor == null
+            const showActorSelection = row.directlyEligible !== true || actorOptions.length > 0
 
             return (
               <div
@@ -214,13 +240,36 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
+                  {showActorSelection ? (
+                    <label className="flex items-center gap-2 text-sm">
+                      Acting as
+                      <select
+                        className="rounded border bg-background px-2 py-1"
+                        data-testid={`approval-acting-for-${taskId}`}
+                        value={selectedActor ?? ""}
+                        onChange={(event) => setActingForByTask((current) => ({
+                          ...current,
+                          [taskId]: event.target.value,
+                        }))}
+                        disabled={busy}
+                      >
+                        {row.directlyEligible === true ? <option value="">Myself</option> : null}
+                        {row.directlyEligible !== true && needsActorSelection ? (
+                          <option value="">Select an eligible principal</option>
+                        ) : null}
+                        {actorOptions.map((option) => (
+                          <option key={option.identityHex} value={option.identityHex}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                   {status === "Open" ? (
                     <Button
                       size="sm"
                       variant="outline"
                       data-testid={`approval-claim-${taskId}`}
                       onClick={() => void handleClaim(row)}
-                      disabled={busy}
+                      disabled={busy || needsActorSelection}
                     >
                       <Hand className="mr-1.5 h-4 w-4" />
                       Claim
@@ -230,7 +279,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                     size="sm"
                     data-testid={`approval-approve-${taskId}`}
                     onClick={() => void handleDecide(row, "Approve")}
-                    disabled={busy}
+                    disabled={busy || needsActorSelection}
                   >
                     <CheckCircle2 className="mr-1.5 h-4 w-4" />
                     Approve
@@ -244,6 +293,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       setCommentingId(null)
                       setRejectReason("")
                     }}
+                    disabled={busy || needsActorSelection}
                   >
                     <XCircle className="mr-1.5 h-4 w-4" />
                     Reject
@@ -262,6 +312,12 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                     Comment
                   </Button>
                 </div>
+
+                {needsActorSelection ? (
+                  <p className="text-xs text-muted-foreground" role="status">
+                    Select a currently eligible principal before claiming or deciding this task.
+                  </p>
+                ) : null}
 
                 {commentingId === taskId ? (
                   <div className="space-y-3 border-t pt-4">

@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use axum::body::Bytes;
-use axum::extract::{Path as AxumPath, State};
+use axum::extract::{Path as AxumPath, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
@@ -91,6 +91,11 @@ struct ObjectPath {
     organization_id: u64,
     residency: String,
     object_id: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct BlobDownloadQuery {
+    sha256: Option<String>,
 }
 
 pub fn blob_router() -> Router<Arc<AppState>> {
@@ -352,23 +357,116 @@ pub(crate) fn read_completed_blob(
     expected_company_id: u64,
     object_url: &str,
 ) -> Result<CompletedBlob, ApiError> {
+    read_completed_scoped_blob(
+        root,
+        expected_organization_id,
+        expected_company_id,
+        object_url,
+        false,
+        None,
+    )
+}
+
+/// Branding may use an organization logo or the invoice's exact company logo.
+/// This exception does not change the stricter company-owned evidence boundary.
+pub(crate) fn read_completed_branding_blob(
+    root: &Path,
+    expected_organization_id: u64,
+    expected_company_id: u64,
+    object_url: &str,
+) -> Result<CompletedBlob, ApiError> {
+    let (object_url, expected_checksum) = pinned_branding_reference(object_url)?;
+    let blob = read_completed_scoped_blob(
+        root,
+        expected_organization_id,
+        expected_company_id,
+        object_url,
+        true,
+        Some(2 * 1024 * 1024),
+    )?;
+    if blob.checksum != expected_checksum {
+        return Err(ApiError::Conflict(
+            "pinned invoice logo content has changed".into(),
+        ));
+    }
+    validate_branding_raster(&blob.content_type, &blob.bytes)?;
+    Ok(blob)
+}
+
+fn pinned_branding_reference(object_url: &str) -> Result<(&str, &str), ApiError> {
+    let (url, checksum) = object_url.split_once("?sha256=").ok_or_else(|| {
+        ApiError::Unprocessable("invoice logo requires a pinned SHA-256 content hash".into())
+    })?;
+    validate_pinned_checksum(checksum)?;
+    Ok((url, checksum))
+}
+
+fn validate_pinned_checksum(checksum: &str) -> Result<(), ApiError> {
+    if checksum.len() != 64
+        || !checksum
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err(ApiError::Unprocessable(
+            "invalid pinned SHA-256 content hash".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn completed_blob_key(object_url: &str) -> Result<String, ApiError> {
     const PREFIX: &str = "/api/documents/blobs/object/";
     let key = object_url.strip_prefix(PREFIX).ok_or_else(|| {
         ApiError::Conflict("document version does not name a managed blob".into())
     })?;
-    let (organization_id, residency, object_id) = parse_object_key(key)?;
+    // Object URLs use `/object/7/...`; storage keys use `org-7/...`.
+    // Keep support for previously stored key-form URLs without accepting arbitrary URLs.
+    Ok(if key.starts_with("org-") {
+        key.to_string()
+    } else {
+        format!("org-{key}")
+    })
+}
+
+fn read_completed_scoped_blob(
+    root: &Path,
+    expected_organization_id: u64,
+    expected_company_id: u64,
+    object_url: &str,
+    allow_organization_owned: bool,
+    max_bytes: Option<u64>,
+) -> Result<CompletedBlob, ApiError> {
+    let key = completed_blob_key(object_url)?;
+    let (organization_id, residency, object_id) = parse_object_key(&key)?;
     if organization_id != expected_organization_id {
         return Err(ApiError::Forbidden("organization mismatch".into()));
     }
     let (bin_path, meta_path) = object_paths(root, organization_id, &object_id, &residency);
     let meta = read_meta(&meta_path)?;
-    if !meta.completed || meta.company_id != Some(expected_company_id) {
+    let company_allowed = meta.company_id == Some(expected_company_id)
+        || (allow_organization_owned && meta.company_id.is_none());
+    if !meta.completed || meta.organization_id != expected_organization_id || !company_allowed {
         return Err(ApiError::NotFound(
             "completed company blob not found".into(),
         ));
     }
+    if let Some(limit) = max_bytes {
+        let size = fs::metadata(&bin_path)
+            .map_err(|_| ApiError::NotFound("blob bytes not found".into()))?
+            .len();
+        if size == 0 || size > limit {
+            return Err(ApiError::Unprocessable(
+                "invoice logo must be at most 2 MiB".into(),
+            ));
+        }
+    }
     let bytes =
         fs::read(&bin_path).map_err(|_| ApiError::NotFound("blob bytes not found".into()))?;
+    if max_bytes.is_some_and(|limit| bytes.is_empty() || bytes.len() as u64 > limit) {
+        return Err(ApiError::Unprocessable(
+            "invoice logo must be at most 2 MiB".into(),
+        ));
+    }
     let checksum = hex::encode(Sha256::digest(&bytes));
     if meta.actual_size != Some(bytes.len() as u64)
         || meta.actual_checksum.as_deref() != Some(checksum.as_str())
@@ -384,6 +482,85 @@ pub(crate) fn read_completed_blob(
         source_url: meta.source_url,
         bytes,
     })
+}
+
+/// Limit decoded pixels before giving an image to Chromium. Only PNG and JPEG
+/// signatures with bounded dimensions are admitted; SVG, HTML and remote assets never are.
+fn validate_branding_raster(content_type: &str, bytes: &[u8]) -> Result<(), ApiError> {
+    let invalid = || {
+        ApiError::Unprocessable(
+            "invoice logo must be a valid PNG or JPEG within 4096px and 4 megapixels".into(),
+        )
+    };
+    let dimensions = match content_type {
+        "image/png"
+            if bytes.starts_with(b"\x89PNG\r\n\x1a\n")
+                && bytes.get(8..16) == Some(&b"\0\0\0\rIHDR"[..])
+                && bytes.len() >= 45
+                && bytes.ends_with(b"\0\0\0\0IEND\xaeB`\x82") =>
+        {
+            let width = bytes
+                .get(16..20)
+                .and_then(|value| <[u8; 4]>::try_from(value).ok())
+                .map(u32::from_be_bytes);
+            let height = bytes
+                .get(20..24)
+                .and_then(|value| <[u8; 4]>::try_from(value).ok())
+                .map(u32::from_be_bytes);
+            width.zip(height)
+        }
+        "image/jpeg" if bytes.starts_with(&[0xff, 0xd8]) && bytes.ends_with(&[0xff, 0xd9]) => {
+            jpeg_dimensions(bytes)
+        }
+        _ => None,
+    }
+    .ok_or_else(invalid)?;
+    let (width, height) = dimensions;
+    if width == 0
+        || height == 0
+        || width > 4096
+        || height > 4096
+        || u64::from(width) * u64::from(height) > 4_000_000
+    {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
+fn jpeg_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
+    let mut offset = 2;
+    while offset < bytes.len() {
+        if bytes.get(offset) != Some(&0xff) {
+            return None;
+        }
+        while bytes.get(offset) == Some(&0xff) {
+            offset += 1;
+        }
+        let marker = *bytes.get(offset)?;
+        offset += 1;
+        if matches!(marker, 0xd9 | 0xda) {
+            return None;
+        }
+        if matches!(marker, 0x01 | 0xd0..=0xd8) {
+            continue;
+        }
+        let length = u16::from_be_bytes([*bytes.get(offset)?, *bytes.get(offset + 1)?]) as usize;
+        if length < 2 {
+            return None;
+        }
+        let segment = bytes.get(offset..offset.checked_add(length)?)?;
+        if matches!(marker, 0xc0..=0xc3 | 0xc5..=0xc7 | 0xc9..=0xcb | 0xcd..=0xcf) {
+            if segment.len() < 8 {
+                return None;
+            }
+            return Some((
+                u32::from(u16::from_be_bytes([segment[5], segment[6]])),
+                u32::from(u16::from_be_bytes([segment[3], segment[4]])),
+            ));
+        }
+        offset += length;
+    }
+    None
 }
 
 fn read_meta(path: &Path) -> Result<BlobMeta, ApiError> {
@@ -621,6 +798,7 @@ async fn download(
     headers: HeaderMap,
     cookies: Cookies,
     AxumPath(path): AxumPath<ObjectPath>,
+    Query(query): Query<BlobDownloadQuery>,
 ) -> Result<Response, ApiError> {
     let session = resolve_session(&state, &headers, &cookies)
         .await?
@@ -630,11 +808,17 @@ async fn download(
         return Err(ApiError::Forbidden("organization mismatch".into()));
     }
 
-    let residency = residency_segment(Some(&path.residency));
+    if let Some(checksum) = query.sha256.as_deref() {
+        validate_pinned_checksum(checksum)?;
+    }
+    let (_, residency, object_id) = parse_object_key(&format!(
+        "org-{}/{}/{}",
+        path.organization_id, path.residency, path.object_id
+    ))?;
     let (bin_path, meta_path) = object_paths(
         &state.config.document_blob_dir,
         path.organization_id,
-        &path.object_id,
+        &object_id,
         &residency,
     );
     if !meta_path.exists() {
@@ -645,6 +829,9 @@ async fn download(
         return Err(ApiError::NotFound("blob not completed".into()));
     }
     let bytes = fs::read(&bin_path).map_err(|e| ApiError::NotFound(e.to_string()))?;
+    if let Some(expected_checksum) = query.sha256.as_deref() {
+        verify_pinned_download(&meta, &bytes, org_id, expected_checksum)?;
+    }
 
     let mut response = bytes.into_response();
     let headers_mut = response.headers_mut();
@@ -664,9 +851,83 @@ async fn download(
     Ok(response)
 }
 
+fn verify_pinned_download(
+    meta: &BlobMeta,
+    bytes: &[u8],
+    organization_id: u64,
+    expected_checksum: &str,
+) -> Result<(), ApiError> {
+    validate_pinned_checksum(expected_checksum)?;
+    if meta.organization_id != organization_id {
+        return Err(ApiError::Forbidden("organization mismatch".into()));
+    }
+    let actual = hex::encode(Sha256::digest(bytes));
+    if meta.actual_size != Some(bytes.len() as u64)
+        || meta.actual_checksum.as_deref() != Some(actual.as_str())
+        || actual != expected_checksum
+    {
+        return Err(ApiError::Conflict("pinned blob content has changed".into()));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::Engine;
+
+    struct BrandingFixture {
+        root: PathBuf,
+        url: String,
+        pinned_url: String,
+        bin: PathBuf,
+        meta: PathBuf,
+    }
+
+    impl BrandingFixture {
+        fn new(company_id: Option<u64>, completed: bool) -> Self {
+            let root = std::env::temp_dir().join(format!(
+                "lumiere-branding-test-{}-{}",
+                std::process::id(),
+                rand::random::<u64>()
+            ));
+            let object_id = "0123456789abcdef0123456789abcdef";
+            let (bin, meta_path) = object_paths(&root, 7, object_id, "eu");
+            let bytes = base64::engine::general_purpose::STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZ1kAAAAASUVORK5CYII=").expect("PNG fixture");
+            let checksum = hex::encode(Sha256::digest(&bytes));
+            let meta = BlobMeta {
+                organization_id: 7,
+                company_id,
+                object_key: format!("org-7/eu/{object_id}"),
+                file_name: "logo.png".into(),
+                content_type: "image/png".into(),
+                expected_size: bytes.len() as u64,
+                expected_checksum: Some(checksum.clone()),
+                residency: Some("eu".into()),
+                source_url: None,
+                completed,
+                actual_size: Some(bytes.len() as u64),
+                actual_checksum: Some(checksum.clone()),
+            };
+            write_meta(&meta_path, &meta).expect("fixture metadata");
+            fs::write(&bin, bytes).expect("fixture PNG");
+            Self {
+                root,
+                url: format!("/api/documents/blobs/object/7/eu/{object_id}"),
+                pinned_url: format!(
+                    "/api/documents/blobs/object/7/eu/{object_id}?sha256={checksum}"
+                ),
+                bin,
+                meta: meta_path,
+            }
+        }
+    }
+
+    impl Drop for BrandingFixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
 
     #[test]
     fn managed_blob_urls_reject_cross_org_and_unsafe_residency_segments() {
@@ -677,5 +938,117 @@ mod tests {
         );
         assert!(managed_blob_url(8, key).is_err());
         assert!(managed_blob_url(7, "org-7/../0123456789abcdef0123456789abcdef").is_err());
+    }
+
+    #[test]
+    fn branding_allows_same_org_logo_without_relaxing_company_evidence_scope() {
+        let organization_logo = BrandingFixture::new(None, true);
+        assert!(read_completed_branding_blob(
+            &organization_logo.root,
+            7,
+            3,
+            &organization_logo.pinned_url
+        )
+        .is_ok());
+        assert!(
+            read_completed_blob(&organization_logo.root, 7, 3, &organization_logo.url).is_err()
+        );
+        let company_logo = BrandingFixture::new(Some(3), true);
+        assert!(
+            read_completed_branding_blob(&company_logo.root, 7, 3, &company_logo.pinned_url)
+                .is_ok()
+        );
+        assert!(read_completed_blob(&company_logo.root, 7, 3, &company_logo.url).is_ok());
+        assert!(
+            read_completed_branding_blob(&company_logo.root, 7, 4, &company_logo.pinned_url)
+                .is_err()
+        );
+        assert!(
+            read_completed_branding_blob(&company_logo.root, 8, 3, &company_logo.pinned_url)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn branding_requires_completed_integrity_checked_local_raster() {
+        let fixture = BrandingFixture::new(Some(3), false);
+        assert!(read_completed_branding_blob(&fixture.root, 7, 3, &fixture.pinned_url).is_err());
+        let fixture = BrandingFixture::new(Some(3), true);
+        fs::write(&fixture.bin, b"changed after completion").expect("corrupt fixture");
+        assert!(read_completed_branding_blob(&fixture.root, 7, 3, &fixture.pinned_url).is_err());
+        for url in [
+            "https://example.test/logo.png",
+            "data:image/png;base64,AA==",
+            "/api/documents/blobs/object/7/../0123456789abcdef0123456789abcdef",
+        ] {
+            assert!(read_completed_branding_blob(&fixture.root, 7, 3, url).is_err());
+        }
+        let fixture = BrandingFixture::new(Some(3), true);
+        let mut meta = read_meta(&fixture.meta).expect("meta");
+        meta.content_type = "image/svg+xml".into();
+        write_meta(&fixture.meta, &meta).expect("change MIME");
+        assert!(read_completed_branding_blob(&fixture.root, 7, 3, &fixture.pinned_url).is_err());
+    }
+
+    #[test]
+    fn raster_signature_and_decoded_pixel_caps_reject_disguised_or_oversized_images() {
+        assert!(validate_branding_raster("image/png", b"<svg>bad</svg>").is_err());
+        assert!(validate_branding_raster("image/jpeg", b"not a JPEG").is_err());
+        let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
+        png.extend_from_slice(&3000_u32.to_be_bytes());
+        png.extend_from_slice(&3000_u32.to_be_bytes());
+        assert!(validate_branding_raster("image/png", &png).is_err());
+        let mut jpeg = vec![0xff, 0xd8, 0xff, 0xc0, 0, 8, 8, 0, 2, 0, 3, 1];
+        assert_eq!(jpeg_dimensions(&jpeg), Some((3, 2)));
+        jpeg[8] = 0xff;
+        jpeg[9] = 0xff;
+        assert!(validate_branding_raster("image/jpeg", &jpeg).is_err());
+    }
+
+    #[test]
+    fn logo_hash_pin_rejects_mutation_even_when_completed_blob_metadata_is_replaced() {
+        let fixture = BrandingFixture::new(Some(3), true);
+        let original = read_meta(&fixture.meta)
+            .expect("original metadata")
+            .actual_checksum
+            .expect("checksum");
+        assert!(
+            read_completed_branding_blob(&fixture.root, 7, 3, &fixture.url).is_err(),
+            "unversioned logo must be rejected"
+        );
+        let mut bytes = fs::read(&fixture.bin).expect("original bytes");
+        bytes[32] ^= 1;
+        fs::write(&fixture.bin, &bytes).expect("replace bytes");
+        let mut meta = read_meta(&fixture.meta).expect("metadata");
+        meta.actual_checksum = Some(hex::encode(Sha256::digest(&bytes)));
+        write_meta(&fixture.meta, &meta).expect("replace completed metadata");
+        assert!(read_completed_blob(&fixture.root, 7, 3, &fixture.url).is_ok());
+        assert!(read_completed_branding_blob(&fixture.root, 7, 3, &fixture.pinned_url).is_err());
+        assert!(verify_pinned_download(&meta, &bytes, 7, &original).is_err());
+        assert!(verify_pinned_download(
+            &meta,
+            &bytes,
+            7,
+            meta.actual_checksum.as_deref().expect("new checksum")
+        )
+        .is_ok());
+        for invalid in [
+            "",
+            "NOT_A_HASH",
+            &"A".repeat(64),
+            &format!("{}&extra=1", original),
+        ] {
+            assert!(validate_pinned_checksum(invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn branding_rejects_oversized_blob_before_image_decode() {
+        let fixture = BrandingFixture::new(Some(3), true);
+        fs::write(&fixture.bin, vec![0_u8; 2 * 1024 * 1024 + 1]).expect("oversized fixture");
+        let error = read_completed_branding_blob(&fixture.root, 7, 3, &fixture.pinned_url)
+            .err()
+            .expect("size error");
+        assert!(matches!(error, ApiError::Unprocessable(message) if message.contains("2 MiB")));
     }
 }
