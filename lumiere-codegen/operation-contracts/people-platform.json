@@ -511,13 +511,6 @@
       },
       "evidence": "spacetimedb/src/workflow/delivery.rs: body delegates through an explicit replay/idempotency receipt guard"
     },
-    "claim_reviewed_mail_delivery": {
-      "semantic_kind": "internal",
-      "client_facing": false,
-      "idempotency": "request_guarded",
-      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
-      "evidence": "spacetimedb/src/documents/templates.rs: exact scoped invoice review and queued lifecycle guard atomically claim one provider request; repeats are rejected"
-    },
     "claim_ai_capability_execution": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -547,6 +540,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/core/queue.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
+    },
+    "claim_reviewed_mail_delivery": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/documents/templates.rs: exact scoped invoice review and queued lifecycle guard atomically claim one provider request; repeats are rejected"
     },
     "claim_workflow_human_task": {
       "semantic_kind": "command",
@@ -3078,6 +3081,16 @@
       },
       "evidence": "spacetimedb/src/workflow/delivery.rs: body delegates through an explicit replay/idempotency receipt guard"
     },
+    "recover_ai_provider_attempt": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "state_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/spend.rs: approved recovery attribution is replay-safe and lifecycle transitions fail closed"
+    },
     "refresh_hr_capacity_forecast": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -3507,6 +3520,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/tests/ai/mod.rs: test reducer executes assertions; retry classification is not applicable"
+    },
+    "run_ai_spend_recovery_tests": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/ai/mod.rs: persisted recovery test reducer executes assertions; retry classification is not applicable"
     },
     "run_all_ai_tests": {
       "semantic_kind": "test",

@@ -26,6 +26,7 @@ pub const MAX_ALLOWANCE_TOKENS: u32 = 10_000_000;
 
 pub const STATUS_RESERVED: &str = "reserved";
 pub const STATUS_SETTLED: &str = "settled";
+pub const STATUS_RELEASED: &str = "released";
 
 /// `ai_provider_attempt.status` values, mirroring the module's transitions.
 pub const ATTEMPT_ACCEPTED: &str = "accepted";
@@ -33,6 +34,7 @@ pub const ATTEMPT_DISPATCHED: &str = "dispatched";
 pub const ATTEMPT_SUCCEEDED: &str = "succeeded";
 pub const ATTEMPT_FAILED: &str = "failed";
 pub const ATTEMPT_OUTCOME_UNKNOWN: &str = "outcome_unknown";
+pub const ATTEMPT_ABANDONED: &str = "abandoned";
 /// Mirrors `MAX_ATTEMPT_NOTE_LEN` in the module.
 pub const ATTEMPT_NOTE_MAX_LEN: usize = 1_024;
 
@@ -46,7 +48,8 @@ input_token_allowance, output_token_allowance, status, settled_input_tokens, set
 const DRAFT_REQUEST_COLS: &str =
     "id, organization_id, company_id, run_id, request_key, draft_id, creation_payload_hash";
 const ATTEMPT_COLS: &str = "id, organization_id, company_id, agent_id, run_id, reservation_id, \
-request_key, provider, model, status, input_tokens, output_tokens, failure_reason";
+request_key, provider, model, status, input_tokens, output_tokens, failure_reason, resolution, \
+recovery_actor, recovery_approval_id, reconciliation_actor, reconciliation_approval_id";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RequestKind {
@@ -181,6 +184,8 @@ pub struct Reservation {
     pub input_token_allowance: u32,
     pub output_token_allowance: u32,
     pub status: String,
+    pub settled_input_tokens: u32,
+    pub settled_output_tokens: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -204,6 +209,51 @@ pub struct ProviderAttempt {
     pub input_tokens: u32,
     pub output_tokens: u32,
     pub failure_reason: Option<String>,
+    pub resolution: Option<String>,
+    pub recovery_actor: Option<String>,
+    pub recovery_approval_id: Option<String>,
+    pub reconciliation_actor: Option<String>,
+    pub reconciliation_approval_id: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecoveryAttribution {
+    pub actor_identity: String,
+    pub approval_id: String,
+    pub resolution: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProviderRecoveryAction {
+    MarkOutcomeUnknown,
+    AbandonAccepted,
+}
+
+impl ProviderRecoveryAction {
+    fn label(self) -> &'static str {
+        match self {
+            Self::MarkOutcomeUnknown => "mark_outcome_unknown",
+            Self::AbandonAccepted => "abandon_accepted",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecoverAttemptRequest {
+    pub organization_id: u64,
+    pub attempt_id: u64,
+    pub action: ProviderRecoveryAction,
+    pub attribution: RecoveryAttribution,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReconcileAttemptRequest {
+    pub organization_id: u64,
+    pub attempt_id: u64,
+    pub status: &'static str,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub attribution: RecoveryAttribution,
 }
 
 /// Exact binding for an accepted attempt, mirroring
@@ -523,6 +573,86 @@ pub async fn record_provider_attempt_result(
     .context("record_ai_provider_attempt_result reducer failed")
 }
 
+/// Recover a stranded provider attempt without authorizing provider I/O.
+/// `MarkOutcomeUnknown` is only valid after dispatch; `AbandonAccepted` is
+/// only valid before dispatch and atomically releases its reservation.
+pub async fn recover_provider_attempt(
+    stdb: &StdbClient,
+    request: &RecoverAttemptRequest,
+) -> Result<()> {
+    validate_recovery_attribution(&request.attribution)?;
+    if request.attempt_id == 0 {
+        bail!("provider attempt recovery requires an attempt id");
+    }
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "recover_ai_provider_attempt",
+        json!([
+            request.organization_id,
+            {
+                "attempt_id": request.attempt_id,
+                "action": request.action.label(),
+                "resolution": request.attribution.resolution,
+                "actor_identity": request.attribution.actor_identity,
+                "approval_id": request.attribution.approval_id,
+            }
+        ]),
+    ))
+    .await
+    .context("recover_ai_provider_attempt reducer failed")
+}
+
+/// Resolve an outcome_unknown attempt through the separately permissioned
+/// reconciliation reducer. Settlement remains a distinct idempotent step.
+pub async fn reconcile_provider_attempt(
+    stdb: &StdbClient,
+    request: &ReconcileAttemptRequest,
+) -> Result<()> {
+    validate_recovery_attribution(&request.attribution)?;
+    if request.attempt_id == 0 {
+        bail!("provider attempt reconciliation requires an attempt id");
+    }
+    if !matches!(request.status, ATTEMPT_SUCCEEDED | ATTEMPT_FAILED) {
+        bail!("provider attempt reconciliation requires succeeded or failed");
+    }
+    stdb.call_reducer(stdb_client::reducer_call!(
+        "reconcile_ai_provider_attempt",
+        json!([
+            request.organization_id,
+            {
+                "attempt_id": request.attempt_id,
+                "status": request.status,
+                "input_tokens": request.input_tokens,
+                "output_tokens": request.output_tokens,
+                "resolution": request.attribution.resolution,
+                "actor_identity": request.attribution.actor_identity,
+                "approval_id": request.attribution.approval_id,
+            }
+        ]),
+    ))
+    .await
+    .context("reconcile_ai_provider_attempt reducer failed")
+}
+
+fn validate_recovery_attribution(attribution: &RecoveryAttribution) -> Result<()> {
+    for (label, value, max) in [
+        ("actor identity", attribution.actor_identity.as_str(), 160),
+        ("approval id", attribution.approval_id.as_str(), 160),
+        (
+            "resolution",
+            attribution.resolution.as_str(),
+            ATTEMPT_NOTE_MAX_LEN,
+        ),
+    ] {
+        if value.trim().is_empty() {
+            bail!("recovery {label} is required");
+        }
+        if value != value.trim() || value.len() > max || value.chars().any(char::is_control) {
+            bail!("recovery {label} is invalid");
+        }
+    }
+    Ok(())
+}
+
 /// Create a run-correlated draft. `params` is the `CreateAiActionDraftParams`
 /// object; the module binds it to the run and request key atomically.
 pub async fn create_run_action_draft(
@@ -652,7 +782,10 @@ fn find_reservation(
             bail!("multiple reservations share one request key");
         }
         let status = req_str(row, "status", "status")?;
-        if status != STATUS_RESERVED && status != STATUS_SETTLED {
+        if !matches!(
+            status.as_str(),
+            STATUS_RESERVED | STATUS_SETTLED | STATUS_RELEASED
+        ) {
             bail!("reservation has unknown status '{status}'");
         }
         found = Some(Reservation {
@@ -667,6 +800,8 @@ fn find_reservation(
             input_token_allowance: req_u32(row, "inputTokenAllowance", "input_token_allowance")?,
             output_token_allowance: req_u32(row, "outputTokenAllowance", "output_token_allowance")?,
             status,
+            settled_input_tokens: req_u32(row, "settledInputTokens", "settled_input_tokens")?,
+            settled_output_tokens: req_u32(row, "settledOutputTokens", "settled_output_tokens")?,
         });
     }
     Ok(found)
@@ -731,6 +866,7 @@ fn find_attempt(
                 | ATTEMPT_SUCCEEDED
                 | ATTEMPT_FAILED
                 | ATTEMPT_OUTCOME_UNKNOWN
+                | ATTEMPT_ABANDONED
         ) {
             bail!("provider attempt has unknown status '{status}'");
         }
@@ -754,9 +890,33 @@ fn find_attempt(
                 .or_else(|| row.get("failure_reason"))
                 .and_then(Value::as_str)
                 .map(str::to_string),
+            resolution: optional_row_string(row, "resolution", "resolution"),
+            recovery_actor: optional_row_string(row, "recoveryActor", "recovery_actor"),
+            recovery_approval_id: optional_row_string(
+                row,
+                "recoveryApprovalId",
+                "recovery_approval_id",
+            ),
+            reconciliation_actor: optional_row_string(
+                row,
+                "reconciliationActor",
+                "reconciliation_actor",
+            ),
+            reconciliation_approval_id: optional_row_string(
+                row,
+                "reconciliationApprovalId",
+                "reconciliation_approval_id",
+            ),
         });
     }
     Ok(found)
+}
+
+fn optional_row_string(row: &Value, camel: &str, snake: &str) -> Option<String> {
+    row.get(camel)
+        .or_else(|| row.get(snake))
+        .and_then(Value::as_str)
+        .map(str::to_string)
 }
 
 /// Keep a failure reason inside the module's note limit. Truncation is marked
@@ -1067,6 +1227,28 @@ mod tests {
             .unwrap();
         assert!(note.len() <= ATTEMPT_NOTE_MAX_LEN);
         assert!(note.ends_with(" […]"));
+    }
+
+    #[test]
+    fn recovery_attribution_is_required_and_bounded() {
+        let valid = RecoveryAttribution {
+            actor_identity: "actor:operator-1".into(),
+            approval_id: "approval:spend-1".into(),
+            resolution: "verified in provider request log".into(),
+        };
+        assert!(validate_recovery_attribution(&valid).is_ok());
+        let mut invalid = valid.clone();
+        invalid.approval_id.clear();
+        assert!(validate_recovery_attribution(&invalid).is_err());
+        invalid = valid;
+        invalid.resolution = "x".repeat(ATTEMPT_NOTE_MAX_LEN + 1);
+        assert!(validate_recovery_attribution(&invalid).is_err());
+        let whitespace_padded = RecoveryAttribution {
+            actor_identity: " actor:operator-1".into(),
+            approval_id: "approval:spend-1".into(),
+            resolution: "verified".into(),
+        };
+        assert!(validate_recovery_attribution(&whitespace_padded).is_err());
     }
 
     #[test]

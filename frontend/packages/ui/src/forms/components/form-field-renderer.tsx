@@ -24,6 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, FileIcon, X, Sparkles } from "lucide-react"
 import { format } from "date-fns"
 import type { ParsedFormField, FieldOption } from "../config/types"
+import { isPlainTextareaField } from "../../lib/form-types"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -73,6 +74,7 @@ export function FormFieldRenderer({
       case "Textarea":
         return (
           <Textarea
+            variant={isPlainTextareaField({ name: field.name }) ? "plain" : "rich"}
             placeholder={field.placeholder}
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
