@@ -343,7 +343,13 @@ impl<'a> AgentLoopReasoner<'a> {
             transport,
             provider: profile.provider.clone(),
             model: profile.model.clone(),
-            max_tokens: profile.max_tokens.min(1024),
+            // Mistral's total output allowance includes native thinking. Honor
+            // the admitted profile instead of starving high effort at 1,024.
+            max_tokens: if normalize_provider(&profile.provider) == "mistral" {
+                profile.max_tokens
+            } else {
+                profile.max_tokens.min(1024)
+            },
             temperature: profile.temperature.or(Some(0.2)),
             top_p: profile.top_p,
         }
@@ -448,7 +454,10 @@ async fn complete_reasoning_with_bounded_fallback(
     mut request: LlmRequest,
 ) -> Result<LlmResponse> {
     let response = transport.complete(request.clone()).await?;
-    if response.thinking_exhausted_before_content() && request.thinking == ThinkingMode::Enabled {
+    if normalize_provider(&request.provider) == "ollama"
+        && response.thinking_exhausted_before_content()
+        && request.thinking == ThinkingMode::Enabled
+    {
         request.thinking = ThinkingMode::Disabled;
         let fallback = transport.complete(request).await?;
         ensure_complete_response(&fallback, "reasoning fallback")?;
@@ -854,6 +863,7 @@ mod tests {
             termination: CompletionTermination::Complete,
             provider_done_reason: Some("stop".to_string()),
             thinking_observed: false,
+            mistral_replay: None,
         }
     }
 
@@ -1174,6 +1184,89 @@ mod tests {
             .reason(reasoning_request(vec![PROPOSAL_KIND_DECISION]))
             .await;
         assert!(outcome.is_err());
+    }
+
+    #[tokio::test]
+    async fn reasoner_honors_mistral_profile_budget_and_leaves_effort_to_transport() {
+        use super::super::model_configuration::{IntelligenceRole, ModelProfileRef};
+
+        for (provider, expected_ceiling, expected_thinking) in [
+            ("mistral", 8192, ThinkingMode::ProviderDefault),
+            ("ollama", 1024, ThinkingMode::Enabled),
+        ] {
+            let profile = ModelProfile {
+                reference: ModelProfileRef {
+                    key: "reasoning".to_string(),
+                    version: 1,
+                },
+                provider: provider.to_string(),
+                model: "reasoning-model".to_string(),
+                allowed_roles: vec![IntelligenceRole::Reasoning],
+                temperature: None,
+                top_p: None,
+                max_tokens: 8192,
+                context_window: 32_000,
+                timeout_ms: 30_000,
+                max_retries: 0,
+                max_concurrency: 1,
+                supports_tool_calling: true,
+                supports_structured_output: true,
+                supports_parallel_requests: false,
+                input_cost_per_1k_microunits: None,
+                output_cost_per_1k_microunits: None,
+                per_request_cost_ceiling_microunits: None,
+            };
+            let mut completed = base_response();
+            completed.provider = provider.to_string();
+            completed.tool_calls = vec![tool_call(
+                TOOL_PROPOSE_CAPABILITY,
+                json!({"capability": "erp.search", "arguments": {"q": "PO-42"}}),
+            )];
+            let transport = ScriptedLlm::new(vec![completed]);
+
+            let outcome = AgentLoopReasoner::from_profile(&transport, &profile)
+                .reason(reasoning_request(vec![PROPOSAL_KIND_CAPABILITY]))
+                .await
+                .unwrap();
+
+            assert!(matches!(outcome, ReasoningOutcome::CapabilityProposal(_)));
+            let requests = transport.requests();
+            assert_eq!(requests.len(), 1);
+            assert_eq!(requests[0].max_tokens, expected_ceiling);
+            assert_eq!(requests[0].thinking, expected_thinking);
+        }
+    }
+
+    #[tokio::test]
+    async fn mistral_explicit_thinking_starvation_never_uses_ollama_fallback() {
+        let mut exhausted = base_response();
+        exhausted.termination = CompletionTermination::Length;
+        exhausted.provider_done_reason = Some("model_length".to_string());
+        exhausted.thinking_observed = true;
+        let transport = ScriptedLlm::new(vec![exhausted]);
+        let request = LlmRequest {
+            provider: "mistral".to_string(),
+            model: "mistral-large-4".to_string(),
+            system: "bounded reasoning".to_string(),
+            messages: vec![LlmMessage::text("user", "Find the purchase order")],
+            max_tokens: 8192,
+            temperature: None,
+            top_p: None,
+            tools: reasoning_tool_specs(&reasoning_request(vec![PROPOSAL_KIND_CAPABILITY])),
+            single_shot_tool: true,
+            thinking: ThinkingMode::Enabled,
+        };
+
+        let error = complete_reasoning_with_bounded_fallback(&transport, request)
+            .await
+            .unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("reasoning completion exhausted its output budget in provider thinking"));
+        let requests = transport.requests();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].thinking, ThinkingMode::Enabled);
     }
 
     #[tokio::test]
