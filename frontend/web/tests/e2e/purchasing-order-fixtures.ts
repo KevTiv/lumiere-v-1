@@ -60,7 +60,7 @@ export async function createDraftPurchaseOrder(
   await Promise.all([
     page.waitForResponse(
       (response) =>
-        matchesOperationResponse(response, "create_purchase_order") && response.ok(),
+        matchesOperationResponse(response, "erp.create_purchase_order_once") && response.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "new-purchase-order"),
@@ -251,7 +251,7 @@ export async function receivePurchaseLineViaUi(
   await clickEntityActionAndWaitForReducer(
     page,
     "entity-action-pol-receive-qty",
-    "receive_po_line",
+    "erp.receive_po_line_once",
   )
 }
 

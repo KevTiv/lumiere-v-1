@@ -352,6 +352,8 @@ mod tests {
             role_permissions: Vec::new(),
             identity_hex: identity_hex.into(),
             field_permissions: Vec::new(),
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         }
     }
 

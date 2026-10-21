@@ -534,6 +534,7 @@ pub fn close_pos_session(
     session_id: u64,
     cash_register_balance_end_real: f64,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "pos_session", "close")?;
     let session = ctx
         .db
         .pos_session()
@@ -555,8 +556,6 @@ pub fn close_pos_session(
     {
         return Err("POS session and config do not belong to this organization".to_string());
     }
-
-    check_permission(ctx, organization_id, "pos_session", "close")?;
 
     if session.user_id != ctx.sender() {
         return Err("Only the session opener can close the session".to_string());
@@ -621,12 +620,147 @@ pub fn close_pos_session(
     Ok(())
 }
 
+fn pos_order_projection_changes(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    session_id: u64,
+    order_id: u64,
+    loyalty_card_id: Option<u64>,
+    queued_iot_action_ids: &[u64],
+) -> Result<Vec<RowChange>, String> {
+    let committed_session = ctx
+        .db
+        .pos_session()
+        .id()
+        .find(&session_id)
+        .ok_or("POS session disappeared before commit recording")?;
+    let committed_order = ctx
+        .db
+        .pos_order()
+        .id()
+        .find(&order_id)
+        .ok_or("POS order disappeared before commit recording")?;
+    if committed_session.organization_id != organization_id
+        || committed_order.organization_id != organization_id
+        || committed_order.session_id != session_id
+    {
+        return Err("POS projection commit rows do not belong to this organization".to_string());
+    }
+    let mut committed_lines: Vec<_> = ctx
+        .db
+        .pos_order_line()
+        .iter()
+        .filter(|line| line.organization_id == organization_id && line.order_id == order_id)
+        .collect();
+    committed_lines.sort_by_key(|line| line.id);
+    let mut committed_payments: Vec<_> = ctx
+        .db
+        .pos_payment()
+        .iter()
+        .filter(|payment| {
+            payment.organization_id == organization_id && payment.order_id == order_id
+        })
+        .collect();
+    committed_payments.sort_by_key(|payment| payment.id);
+
+    let mut changes = vec![RowChange::upsert_stdb_row(
+        "pos_session",
+        serde_json::json!({"id": committed_session.id}),
+        &committed_session,
+    )?];
+    changes.push(RowChange::upsert_stdb_row(
+        "pos_order",
+        serde_json::json!({"id": committed_order.id}),
+        &committed_order,
+    )?);
+    for line in &committed_lines {
+        changes.push(RowChange::upsert_stdb_row(
+            "pos_order_line",
+            serde_json::json!({"id": line.id}),
+            line,
+        )?);
+    }
+    for payment in &committed_payments {
+        changes.push(RowChange::upsert_stdb_row(
+            "pos_payment",
+            serde_json::json!({"id": payment.id}),
+            payment,
+        )?);
+    }
+    if let Some(loyalty_card_id) = loyalty_card_id {
+        let loyalty_card = ctx
+            .db
+            .pos_loyalty_card()
+            .id()
+            .find(&loyalty_card_id)
+            .ok_or("POS loyalty card disappeared before commit recording")?;
+        if loyalty_card.organization_id != organization_id {
+            return Err("POS loyalty card does not belong to this organization".to_string());
+        }
+        changes.push(RowChange::upsert_stdb_row(
+            "pos_loyalty_card",
+            serde_json::json!({"id": loyalty_card.id}),
+            &loyalty_card,
+        )?);
+    }
+
+    let mut sorted_iot_action_ids = queued_iot_action_ids.to_vec();
+    sorted_iot_action_ids.sort_unstable();
+    for action_id in sorted_iot_action_ids {
+        let action = ctx
+            .db
+            .iot_action()
+            .id()
+            .find(&action_id)
+            .ok_or("IoT action disappeared before commit recording")?;
+        if action.organization_id != organization_id {
+            return Err("IoT action does not belong to this organization".to_string());
+        }
+        changes.push(RowChange::upsert_stdb_row(
+            "iot_action",
+            serde_json::json!({"id": action.id}),
+            &action,
+        )?);
+    }
+
+    Ok(changes)
+}
+
+pub(crate) fn record_pos_order_projection_commit(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    session_id: u64,
+    order_id: u64,
+    loyalty_card_id: Option<u64>,
+    queued_iot_action_ids: &[u64],
+) -> Result<(), String> {
+    let changes = pos_order_projection_changes(
+        ctx,
+        organization_id,
+        session_id,
+        order_id,
+        loyalty_card_id,
+        queued_iot_action_ids,
+    )?;
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.create_pos_order".to_string(),
+            correlation_id: format!("pos-session:{session_id}:order:{order_id}"),
+            changes,
+        },
+    )
+    .map(|_| ())
+}
+
 #[reducer]
 pub fn create_pos_order(
     ctx: &ReducerContext,
     organization_id: u64,
     params: CreatePosOrderParams,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "pos_order", "create")?;
     let session = ctx
         .db
         .pos_session()
@@ -652,8 +786,6 @@ pub fn create_pos_order(
     {
         return Err("POS session and config do not belong to this organization".to_string());
     }
-
-    check_permission(ctx, organization_id, "pos_order", "create")?;
 
     let uid = format!("{}-{}-{}", config.id, session.id, session.sequence_number);
     let sequence_number = session.sequence_number + 1;
@@ -960,79 +1092,14 @@ pub fn create_pos_order(
         },
     );
 
-    let committed_session = ctx
-        .db
-        .pos_session()
-        .id()
-        .find(&params.session_id)
-        .ok_or("POS session disappeared before commit recording")?;
-    let committed_order = ctx
-        .db
-        .pos_order()
-        .id()
-        .find(&order.id)
-        .ok_or("POS order disappeared before commit recording")?;
-    let mut committed_lines: Vec<_> = ctx
-        .db
-        .pos_order_line()
-        .iter()
-        .filter(|line| line.organization_id == organization_id && line.order_id == order.id)
-        .collect();
-    committed_lines.sort_by_key(|line| line.id);
-    let mut committed_payments: Vec<_> = ctx
-        .db
-        .pos_payment()
-        .iter()
-        .filter(|payment| {
-            payment.organization_id == organization_id && payment.order_id == order.id
-        })
-        .collect();
-    committed_payments.sort_by_key(|payment| payment.id);
-    let mut changes = vec![RowChange::upsert_stdb_row(
-        "pos_session",
-        serde_json::json!({"id": committed_session.id}),
-        &committed_session,
-    )?];
-    changes.push(RowChange::upsert_stdb_row(
-        "pos_order",
-        serde_json::json!({"id": committed_order.id}),
-        &committed_order,
-    )?);
-    for line in &committed_lines {
-        changes.push(RowChange::upsert_stdb_row(
-            "pos_order_line",
-            serde_json::json!({"id": line.id}),
-            line,
-        )?);
-    }
-    for payment in &committed_payments {
-        changes.push(RowChange::upsert_stdb_row(
-            "pos_payment",
-            serde_json::json!({"id": payment.id}),
-            payment,
-        )?);
-    }
-    if let Some(loyalty_card) = updated_loyalty_card {
-        changes.push(RowChange::upsert_stdb_row(
-            "pos_loyalty_card",
-            serde_json::json!({"id": loyalty_card.id}),
-            &loyalty_card,
-        )?);
-    }
-    queued_iot_action_ids.sort_unstable();
-    for action_id in queued_iot_action_ids {
-        let action = ctx
-            .db
-            .iot_action()
-            .id()
-            .find(&action_id)
-            .ok_or("IoT action disappeared before commit recording")?;
-        changes.push(RowChange::upsert_stdb_row(
-            "iot_action",
-            serde_json::json!({"id": action.id}),
-            &action,
-        )?);
-    }
+    let changes = pos_order_projection_changes(
+        ctx,
+        organization_id,
+        params.session_id,
+        order.id,
+        updated_loyalty_card.as_ref().map(|card| card.id),
+        &queued_iot_action_ids,
+    )?;
     record_organization_commit(
         ctx,
         OrganizationCommitInput {

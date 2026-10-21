@@ -1,7 +1,9 @@
 "use client"
+import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -25,8 +27,12 @@ import {
   completeDocumentProcessingJobForm,
   acknowledgeDocumentInsightForm,
   formatStdbTaggedValue,
+  useFormDialog,
 } from "@lumiere/ui"
-import type { EntityViewConfig, FormConfig } from "@lumiere/ui"
+import type { EntityAction, EntityViewConfig, FormConfig } from "@lumiere/ui"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -55,6 +61,10 @@ import {
   useUnlockKnowledgeArticle,
   useSetArticlePublished,
   useAddArticleMember,
+  useRemoveArticleMember,
+  useUpdateKnowledgeCategory,
+  useDeleteKnowledgeCategory,
+  useScheduleDocumentRetentionPurge,
   useCreateKnowledgeCategory,
   useCreateDocumentFolder,
   useUpdateDocumentFolder,
@@ -98,6 +108,18 @@ import {
   toUpdateDocumentFolderParams,
   toSetDocumentRetentionParams,
 } from "@/lib/documents-create-params"
+import { documentRecordHref, formatFileSize } from "./document-record"
+import { documentNameFromFile, toBrowserFiles, toBrowserFolders } from "./file-browser-rows"
+import { FileBrowser } from "@lumiere/ui"
+import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
+import { documentFolderCanBeDeleted } from "./document-folder-gates"
+import {
+  canDeleteKnowledgeCategory,
+  canRemoveArticleMember,
+  parseMemberIdentity,
+  parseRetentionDelaySeconds,
+  toKnowledgeCategoryUpdateBody,
+} from "./knowledge-actions"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -208,12 +230,7 @@ function truthyRowBool(v: unknown): boolean {
 
 function withTableActions(
   ec: EntityViewConfig,
-  actions: Array<{
-    id: string
-    label: string
-    requiresSelection?: boolean
-    onClick: (selectedRows: Record<string, unknown>[]) => void
-  }>,
+  actions: EntityAction[],
   rowSelectionToggleOnClick?: boolean,
 ): EntityViewConfig {
   if (ec.view.mode !== "table") return ec
@@ -232,6 +249,14 @@ export function DocumentsClient(props: DocumentsClientProps) {
     return <MissingOrganization />
   }
   return <DocumentsClientLoaded {...props} organizationId={props.organizationId} />
+}
+
+/** Form fields (or browser defaults) that describe an uploaded document. */
+interface DocumentUploadFields {
+  name?: string
+  folderId?: unknown
+  residencyRegion?: unknown
+  [field: string]: unknown
 }
 
 function DocumentsClientLoaded({
@@ -260,6 +285,8 @@ function DocumentsClientLoaded({
   const [ackModalRows, setAckModalRows] = useState<Record<string, unknown>[] | null>(null)
   const [ackSubmitError, setAckSubmitError] = useState<string | null>(null)
   const openErpAiChat = useOpenErpAiChat()
+  const router = useRouter()
+  const identityLabels = useIdentityLabelMap(orgId)
 
   const { data: documents = [] } = useDocuments(orgId, initialDocuments)
   const { data: deletedDocuments = [] } = useDeletedDocuments(
@@ -294,6 +321,12 @@ function DocumentsClientLoaded({
   const unlockKnowledgeArticle = useUnlockKnowledgeArticle(orgId)
   const setArticlePublished = useSetArticlePublished(orgId, operatingCompanyId)
   const addArticleMember = useAddArticleMember(orgId)
+  const removeArticleMember = useRemoveArticleMember(orgId)
+  const updateKnowledgeCategory = useUpdateKnowledgeCategory(orgId)
+  const deleteKnowledgeCategory = useDeleteKnowledgeCategory(orgId)
+  const scheduleRetentionPurge = useScheduleDocumentRetentionPurge(orgId)
+  const { askForm, formDialog } = useFormDialog()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const createKnowledgeCategory = useCreateKnowledgeCategory(orgId, operatingCompanyId)
   const createDocumentFolder = useCreateDocumentFolder(orgId)
   const updateDocumentFolder = useUpdateDocumentFolder(orgId)
@@ -310,23 +343,174 @@ function DocumentsClientLoaded({
   const mailTemplateFormConfig = useMemo(() => newMailTemplateForm(t), [t])
   const articleMemberFormConfig = useMemo(() => addArticleMemberForm(t), [t])
 
-  const addCsvToolbar = (
-    ec: EntityViewConfig,
-    actions: Array<{
-      id: string
-      label: string
-      onClick: (selectedRows: Record<string, unknown>[]) => void
-    }>,
-  ): EntityViewConfig => {
-    if (ec.view.mode !== "table") return ec
-    return {
-      ...ec,
-      view: {
-        ...ec.view,
-        rowSelectionToggleOnClick: false,
-        actions,
-      },
+  /** Run one command from a dialog; the reducer re-validates, so failures surface as an error toast. */
+  const runKnowledgeCommand = async (title: string, work: () => Promise<unknown>, doneTitle?: string) => {
+    try {
+      await work()
+      showWorkflowToast({
+        kind: "success",
+        title: doneTitle ?? t("documents.knowledgeActions.done", { defaultValue: "{{action}} completed", action: title }),
+      })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("documents.knowledgeActions.failed", { defaultValue: "{{action}} failed", action: title }),
+        description: error instanceof Error ? error.message : String(error),
+      })
     }
+  }
+  const knowledgeInputError = (title: string, description: string) =>
+    showWorkflowToast({
+      kind: "error",
+      title: t("documents.knowledgeActions.failed", { defaultValue: "{{action}} failed", action: title }),
+      description,
+    })
+
+  const editCategoryAction: EntityAction = {
+    id: "edit-kb-category",
+    label: t("documents.knowledgeActions.editCategory", { defaultValue: "Edit category" }),
+    requiresSelection: true,
+    permission: { resource: "knowledge_article_category", action: "write" },
+    onClick: async (rows) => {
+      const row = rows[0]
+      if (!row) return
+      const title = t("documents.knowledgeActions.editCategory", { defaultValue: "Edit category" })
+      const values = await askForm({
+        title,
+        fields: [
+          { id: "name", name: "name", label: t("documents.forms.newCategory.fields.name"), type: "text", required: true, defaultValue: String(row.name ?? "") },
+          { id: "description", name: "description", label: t("documents.forms.newCategory.fields.description"), type: "textarea", defaultValue: String(row.description ?? "") },
+          { id: "sequence", name: "sequence", label: t("documents.forms.newCategory.fields.sequence"), type: "number", min: 0, defaultValue: row.sequence != null ? Number(row.sequence) : 10, width: "1/2" },
+          { id: "color", name: "color", label: t("documents.forms.newCategory.fields.color"), type: "number", min: 0, max: 11, defaultValue: row.color != null ? Number(row.color) : undefined, width: "1/2" },
+        ],
+      })
+      if (values == null) return
+      const params = toKnowledgeCategoryUpdateBody(values)
+      if (params == null) {
+        knowledgeInputError(
+          title,
+          t("documents.knowledgeActions.categoryInvalid", {
+            defaultValue: "Enter a name, a colour from 0 to 11 and a whole-number sequence.",
+          }),
+        )
+        return
+      }
+      await runKnowledgeCommand(title, () =>
+        updateKnowledgeCategory.mutateAsync({ categoryId: row.id as string | number, params }),
+      )
+    },
+  }
+
+  const deleteCategoryAction: EntityAction = {
+    id: "delete-kb-category",
+    label: t("documents.knowledgeActions.deleteCategory", { defaultValue: "Delete category" }),
+    variant: "destructive",
+    requiresSelection: true,
+    permission: { resource: "knowledge_article_category", action: "delete" },
+    // The reducer refuses a category that still has articles, so the action stays disabled for one.
+    isApplicable: (rows) => rows.every((row) => canDeleteKnowledgeCategory(row)),
+    confirm: {
+      title: t("documents.knowledgeActions.deleteCategory", { defaultValue: "Delete category" }),
+      description: t("documents.knowledgeActions.deleteCategoryConfirm", {
+        defaultValue: "Delete this category? Only categories without articles can be deleted, so move or delete their articles first.",
+      }),
+      confirmLabel: t("common.delete", { defaultValue: "Delete" }),
+      cancelLabel: t("common.cancel", { defaultValue: "Cancel" }),
+    },
+    successMessage: t("common.actionCompleted", {
+      action: t("documents.knowledgeActions.deleteCategory", { defaultValue: "Delete category" }),
+    }),
+    onClick: async (rows) => {
+      const row = rows[0]
+      if (!row) return
+      await deleteKnowledgeCategory.mutateAsync(row.id as string | number)
+    },
+  }
+
+  const removeMemberAction: EntityAction = {
+    id: "remove-article-member",
+    label: t("documents.knowledgeActions.removeMember", { defaultValue: "Remove member" }),
+    requiresSelection: true,
+    permission: { resource: "knowledge_article", action: "write" },
+    isApplicable: (rows) => rows.every((row) => canRemoveArticleMember(row)),
+    onClick: async (rows) => {
+      const row = rows[0]
+      if (!row) return
+      const title = t("documents.knowledgeActions.removeMember", { defaultValue: "Remove member" })
+      const values = await askForm({
+        title,
+        fields: [
+          {
+            id: "member",
+            name: "member",
+            label: t("documents.knowledgeActions.memberIdentity", { defaultValue: "Member identity (hex)" }),
+            type: "text",
+            required: true,
+          },
+        ],
+      })
+      if (values == null) return
+      const member = parseMemberIdentity(values)
+      if (member == null) {
+        knowledgeInputError(title, t("documents.knowledgeActions.memberRequired", { defaultValue: "Member identity is required." }))
+        return
+      }
+      await runKnowledgeCommand(title, () =>
+        removeArticleMember.mutateAsync({ articleId: row.id as string | number, member }),
+      )
+    },
+  }
+
+  const retentionPurgeAction: EntityAction = {
+    id: "run-retention-purge",
+    label: t("documents.knowledgeActions.retentionPurge", { defaultValue: "Run retention purge" }),
+    requiresSelection: false,
+    permission: { resource: "document", action: "admin" },
+    onClick: async () => {
+      const title = t("documents.knowledgeActions.retentionPurge", { defaultValue: "Run retention purge" })
+      const values = await askForm({
+        title,
+        description: t("documents.knowledgeActions.retentionPurgeHint", {
+          defaultValue: "Permanently deletes recycle-bin documents whose retention period has ended, after the delay.",
+        }),
+        fields: [
+          {
+            id: "delaySeconds",
+            name: "delaySeconds",
+            label: t("documents.knowledgeActions.delaySeconds", { defaultValue: "Delay (seconds)" }),
+            type: "number",
+            required: true,
+            min: 1,
+            defaultValue: 60,
+          },
+        ],
+      })
+      if (values == null) return
+      const delaySeconds = parseRetentionDelaySeconds(values.delaySeconds)
+      if (delaySeconds == null) {
+        knowledgeInputError(title, t("documents.knowledgeActions.delayInvalid", { defaultValue: "Enter a whole number of seconds, 1 or more." }))
+        return
+      }
+      if (
+        !(await confirmDialog({
+          title,
+          description: t("documents.knowledgeActions.retentionPurgeConfirm", {
+            defaultValue: "Schedule the purge to run in {{seconds}} seconds? Purged documents cannot be restored.",
+            seconds: delaySeconds,
+          }),
+        }))
+      ) {
+        return
+      }
+      await runKnowledgeCommand(
+        title,
+        () => scheduleRetentionPurge.mutateAsync({ delaySeconds }),
+        t("documents.knowledgeActions.retentionPurgeScheduled", {
+          defaultValue: "Retention purge scheduled in {{seconds}} seconds",
+          seconds: delaySeconds,
+        }),
+      )
+    },
   }
 
   const csvFormConfig = useMemo(() => {
@@ -395,10 +579,13 @@ function DocumentsClientLoaded({
 
   const processingJobFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newDocumentProcessingJobForm(t), {
-        aiAgentId: aiAgentSelectOptions,
-      }),
-    [t, aiAgentSelectOptions],
+      withLinkedPickers(
+        mergeSelectOptionsForFields(newDocumentProcessingJobForm(t), {
+          aiAgentId: aiAgentSelectOptions,
+        }),
+        { documentId: recordOptions(documents as unknown as Record<string, unknown>[], (row) => row.name) },
+      ),
+    [t, aiAgentSelectOptions, documents],
   )
 
   const liveSections = useMemo(() => {
@@ -443,13 +630,118 @@ function DocumentsClientLoaded({
       ...moduleConfig,
       tabs: withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
         if (tab.id === "documents" && tab.entityConfig) {
-          // No toolbar actions are wired for this tab, so `selectionToggleOnRowClick`
-          // (EntityTable) would otherwise default to false and a row click would
-          // never set `data-state="selected"` even though ModuleView always makes
-          // the row interactive. Force selection-on-click explicitly.
+          // Selection-on-click is forced explicitly: `selectionToggleOnRowClick`
+          // (EntityTable) defaults to false, so a row click would otherwise
+          // never set `data-state="selected"` for the lock actions below.
           return {
             ...tab,
-            entityConfig: withTableActions(tab.entityConfig, [], true),
+            recordSheet: {
+              titleKey: "name",
+              auditTableName: "document",
+              discussion: {},
+              openHref: documentRecordHref,
+              detailConfig: {
+                mode: "detail" as const,
+                sections: [
+                  {
+                    id: "document",
+                    fields: [
+                      { key: "fileName", label: t("documents.documents.columns.fileName") },
+                      { key: "mimetype", label: t("documents.documents.columns.mimetype") },
+                      { key: "fileSize", label: t("documents.documents.columns.fileSize"), render: (value: unknown) => formatFileSize(value) },
+                      { key: "resName", label: "Attached to" },
+                      { key: "description", label: "Description" },
+                    ],
+                  },
+                ],
+              },
+            },
+            entityConfig: withInlineEdits(
+              withTableActions(
+              tab.entityConfig,
+              [
+                {
+                  id: "lock-document",
+                  label: "Lock",
+                  requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !(row.isLocked === true)),
+                  successMessage: t("common.actionCompleted", { action: "Lock" }),
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await lockDocument.mutateAsync(row.id as string | number)
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
+                    }
+                  },
+                },
+                {
+                  id: "unlock-document",
+                  label: "Unlock",
+                  requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => row.isLocked === true),
+                  successMessage: t("common.actionCompleted", { action: "Unlock" }),
+                  onClick: async (rows) => {
+                    setDocumentToolbarError(null)
+                    try {
+                      for (const row of rows) {
+                        await unlockDocument.mutateAsync(row.id as string | number)
+                      }
+                    } catch (e) {
+                      setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
+                    }
+                  },
+                },
+                {
+                  id: "upload-document-version",
+                  label: "Upload version",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    if (rows.length !== 1) return
+                    setDocumentRowAction({
+                      action: "uploadVersion",
+                      row: rows[0],
+                      form: uploadDocumentVersionForm(t),
+                    })
+                  },
+                },
+                {
+                  id: "set-document-retention",
+                  label: "Set retention",
+                  requiresSelection: true,
+                  onClick: (rows) => {
+                    if (rows.length !== 1) return
+                    setDocumentRowAction({
+                      action: "setRetention",
+                      row: rows[0],
+                      form: setDocumentRetentionForm(t),
+                    })
+                  },
+                },
+              ],
+              true,
+            ),
+              {
+                name: {
+                  kind: "text",
+                  canEdit: (row) => !truthyRowBool(row.isDeleted) && !truthyRowBool(row.isLocked),
+                  save: async (row, value) => {
+                    const name = String(value)
+                    if (!name) throw new Error("A document needs a name")
+                    await updateDocument.mutateAsync({
+                      documentId: row.id as string | number,
+                      params: { name },
+                    })
+                  },
+                },
+              },
+            ),
           }
         }
         if (tab.id === "knowledge-base" && tab.entityConfig) {
@@ -486,6 +778,8 @@ function DocumentsClientLoaded({
                   id: "publish-article",
                   label: "Publish",
                   requiresSelection: true,
+                  selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Publish" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -497,6 +791,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -504,6 +799,8 @@ function DocumentsClientLoaded({
                   id: "unpublish-article",
                   label: "Unpublish",
                   requiresSelection: true,
+                  selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Unpublish" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -515,6 +812,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -522,6 +820,9 @@ function DocumentsClientLoaded({
                   id: "lock-article",
                   label: "Lock",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !(row.isLocked === true)),
+                  successMessage: t("common.actionCompleted", { action: "Lock" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -530,6 +831,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -537,6 +839,8 @@ function DocumentsClientLoaded({
                   id: "unlock-article",
                   label: "Unlock",
                   requiresSelection: true,
+                  selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Unlock" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -545,6 +849,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -561,10 +866,14 @@ function DocumentsClientLoaded({
                     })
                   },
                 },
+                removeMemberAction,
                 {
                   id: "delete-article",
                   label: "Delete",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !truthyRowBool(row.isLocked)),
+                  successMessage: t("common.actionCompleted", { action: "Delete" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -573,6 +882,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -585,13 +895,19 @@ function DocumentsClientLoaded({
           return {
             ...tab,
             createForm: knowledgeCategoryFormConfig,
-            entityConfig: addCsvToolbar(tab.entityConfig, [
-              {
-                id: "csv-kb-category-tab",
-                label: t("documents.toolbar.importCategoryCsv"),
-                onClick: (_rows) => setCsvKind("knowledge_category"),
-              },
-            ]),
+            entityConfig: withTableActions(
+              tab.entityConfig,
+              [
+                {
+                  id: "csv-kb-category-tab",
+                  label: t("documents.toolbar.importCategoryCsv"),
+                  onClick: (_rows) => setCsvKind("knowledge_category"),
+                },
+                editCategoryAction,
+                deleteCategoryAction,
+              ],
+              false,
+            ),
           }
         }
         if (tab.id === "document-folders" && tab.entityConfig) {
@@ -620,6 +936,10 @@ function DocumentsClientLoaded({
                   id: "delete-folder",
                   label: "Delete folder",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.every((row) => documentFolderCanBeDeleted(row, folders as Record<string, unknown>[])),
+                  successMessage: t("common.actionCompleted", { action: "Delete folder" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -628,6 +948,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -646,6 +967,8 @@ function DocumentsClientLoaded({
                   id: "restore-document",
                   label: "Restore",
                   requiresSelection: true,
+                  selection: "multiple",
+                  successMessage: t("common.actionCompleted", { action: "Restore" }),
                   onClick: async (rows) => {
                     setDocumentToolbarError(null)
                     try {
@@ -654,6 +977,7 @@ function DocumentsClientLoaded({
                       }
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
@@ -661,15 +985,18 @@ function DocumentsClientLoaded({
                   id: "purge-expired",
                   label: "Purge expired",
                   requiresSelection: false,
+                  successMessage: t("common.actionCompleted", { action: "Purge expired" }),
                   onClick: async () => {
                     setDocumentToolbarError(null)
                     try {
                       await purgeExpiredDocuments.mutateAsync()
                     } catch (e) {
                       setDocumentToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
                     }
                   },
                 },
+                retentionPurgeAction,
               ],
               true,
             ),
@@ -712,6 +1039,11 @@ function DocumentsClientLoaded({
                   id: "approve-job",
                   label: t("documents.processing.actions.approve"),
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) =>
+                    rows.some(
+                      (r) => formatStdbTaggedValue(r.status) === "Completed" && !truthyRowBool(r.isApproved),
+                    ),
                   onClick: async (rows) => {
                     setProcessingToolbarError(null)
                     const eligible = rows.filter(
@@ -747,6 +1079,7 @@ function DocumentsClientLoaded({
                   id: "ack-insight",
                   label: t("documents.insights.actions.acknowledge"),
                   requiresSelection: true,
+                  selection: "multiple",
                   onClick: (rows) => {
                     setProcessingToolbarError(null)
                     const eligible = rows.filter(
@@ -807,6 +1140,7 @@ function DocumentsClientLoaded({
       knowledgeCategoryFormConfig,
       documentFolderFormConfig,
       processingJobFormConfig,
+      folders,
     ],
   )
 
@@ -835,6 +1169,47 @@ function DocumentsClientLoaded({
     ],
   )
 
+  /** Stores the bytes, registers the document, then queues its evidence ingestion. */
+  const uploadAndRegisterDocument = async (file: File, formData: DocumentUploadFields) => {
+    const folderId = optionalBigIntU64(formData.folderId)
+    const folderResidency =
+      folderId != null
+        ? folders.find((f) => String(f.id) === String(folderId))?.residencyRegion
+        : undefined
+    const residency =
+      (typeof formData.residencyRegion === "string" && formData.residencyRegion.trim()) ||
+      (typeof folderResidency === "string" ? folderResidency : undefined) ||
+      undefined
+    const uploaded = await uploadDocumentBlob({
+      file,
+      companyId: operatingCompanyId,
+      residency: residency ? String(residency) : undefined,
+    })
+    const params = toCreateDocumentParams({
+      ...formData,
+      fileName: uploaded.fileName,
+      fileSize: uploaded.fileSize,
+      mimetype: uploaded.mimetype,
+      url: uploaded.url,
+      checksum: uploaded.checksum,
+      residencyRegion: formData.residencyRegion ?? residency,
+    })
+    if (!params) {
+      throw new Error("Document registration params incomplete after upload")
+    }
+    await createDocument.mutateAsync(params)
+    await ingestDocumentEvidence.mutateAsync({
+      companyId: operatingCompanyId,
+      objectKey: uploaded.objectKey,
+    })
+  }
+
+  const browserFiles = useMemo(
+    () => toBrowserFiles(documents, identityLabels),
+    [documents, identityLabels],
+  )
+  const browserFolders = useMemo(() => toBrowserFolders(folders, browserFiles), [folders, browserFiles])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
@@ -845,37 +1220,7 @@ function DocumentsClientLoaded({
       if (!file) {
         throw new Error(t("documents.forms.newDocument.fields.fileHint"))
       }
-      const folderId = optionalBigIntU64(formData.folderId)
-      const folderResidency =
-        folderId != null
-          ? folders.find((f) => String(f.id) === String(folderId))?.residencyRegion
-          : undefined
-      const residency =
-        (typeof formData.residencyRegion === "string" && formData.residencyRegion.trim()) ||
-        (typeof folderResidency === "string" ? folderResidency : undefined) ||
-        undefined
-      const uploaded = await uploadDocumentBlob({
-        file,
-        companyId: operatingCompanyId,
-        residency: residency ? String(residency) : undefined,
-      })
-      const params = toCreateDocumentParams({
-        ...formData,
-        fileName: uploaded.fileName,
-        fileSize: uploaded.fileSize,
-        mimetype: uploaded.mimetype,
-        url: uploaded.url,
-        checksum: uploaded.checksum,
-        residencyRegion: formData.residencyRegion ?? residency,
-      })
-      if (!params) {
-        throw new Error("Document registration params incomplete after upload")
-      }
-      await createDocument.mutateAsync(params)
-      await ingestDocumentEvidence.mutateAsync({
-        companyId: operatingCompanyId,
-        objectKey: uploaded.objectKey,
-      })
+      await uploadAndRegisterDocument(file, formData)
     } else if (action === "createArticle") {
       const params = toCreateKnowledgeArticleParams(formData, operatingCompanyId)
       if (!params) return
@@ -923,6 +1268,10 @@ function DocumentsClientLoaded({
     unlockKnowledgeArticle.isPending ||
     setArticlePublished.isPending ||
     addArticleMember.isPending ||
+    removeArticleMember.isPending ||
+    updateKnowledgeCategory.isPending ||
+    deleteKnowledgeCategory.isPending ||
+    scheduleRetentionPurge.isPending ||
     createKnowledgeCategory.isPending ||
     createDocumentFolder.isPending ||
     updateDocumentFolder.isPending ||
@@ -948,8 +1297,46 @@ function DocumentsClientLoaded({
           {documentToolbarError}
         </p>
       ) : null}
+      {formDialog}
+      {confirmDialogNode}
       <ModuleView
-        config={config}
+        config={{
+          ...config,
+          tabs: config.tabs.map((tab) =>
+            tab.id === "documents" && tab.type === "entity"
+              ? {
+                  ...tab,
+                  entityAltView: {
+                    label: t("documents.browser.viewFiles"),
+                    tableLabel: t("documents.browser.viewTable"),
+                    content: (
+                      <FileBrowser
+                        folders={browserFolders}
+                        files={browserFiles}
+                        storageKey="lumiere:documents-browser-layout"
+                        onOpenFile={(id) => router.push(`/documents/${id}`)}
+                        onCreateFolder={() =>
+                          setQuickActionForm({ form: documentFolderFormConfig, action: "createDocumentFolder" })
+                        }
+                        onUpload={async (picked, folderId) => {
+                          for (const file of picked) {
+                            await uploadAndRegisterDocument(file, {
+                              name: documentNameFromFile(file.name),
+                              folderId: folderId ?? undefined,
+                            })
+                          }
+                          showWorkflowToast({
+                            kind: "success",
+                            title: t("common.actionCompleted", { action: t("documents.browser.upload") }),
+                          })
+                        }}
+                      />
+                    ),
+                  },
+                }
+              : tab,
+          ),
+        }}
         data={data}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
@@ -968,6 +1355,9 @@ function DocumentsClientLoaded({
       />
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={csvKind === "knowledge_category" ? "knowledge_article_category" : "knowledge_article"}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
@@ -1038,7 +1428,9 @@ function DocumentsClientLoaded({
                   language:
                     typeof formData.language === "string" ? formData.language : undefined,
                 })
-                if (formData.unlockAfter !== false) {
+                // unlock_document rejects an already-unlocked document, so only
+                // release a lock that this check-in row actually holds.
+                if (formData.unlockAfter !== false && documentRowAction.row.isLocked === true) {
                   await unlockDocument.mutateAsync(
                     documentRowAction.row.id as string | number,
                   )

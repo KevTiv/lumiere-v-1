@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
+  expectRowActionsOffered,
   chooseFirstOption,
   activeTabEntityTable,
   expectNoAppError,
@@ -12,19 +14,19 @@ import {
 } from "./helpers"
 
 async function openHrTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-hr-${tabId}`).click()
+  await selectModuleTab(page, "hr", tabId)
 }
 
 async function openProjectsTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-projects-${tabId}`).click()
+  await selectModuleTab(page, "projects", tabId)
 }
 
 async function openExpensesTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-expenses-${tabId}`).click()
+  await selectModuleTab(page, "expenses", tabId)
 }
 
 async function openCalendarTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-calendar-${tabId}`).click()
+  await selectModuleTab(page, "calendar", tabId)
 }
 
 test.describe("Workforce modules e2e @phase-5", () => {
@@ -89,15 +91,13 @@ test.describe("Workforce modules e2e @phase-5", () => {
       await openExpensesTab(page, "expense-sheets")
       await expect(page.getByTestId("entity-action-csv-sheets")).toBeVisible()
       await expect(page.getByText("Import reports (CSV)")).toBeVisible()
-      await expect(page.getByTestId("entity-action-submit-sheets")).toBeVisible()
-      await expect(page.getByTestId("entity-action-post-sheets")).toBeVisible()
-      await expect(page.getByTestId("entity-action-reimburse-sheets")).toBeVisible()
+      await expectRowActionsOffered(page, ["submit-sheets", "post-sheets", "reimburse-sheets"])
       await expectNoAppError(page)
     })
 
     test("dashboard New Report quick action opens create sheet form", async ({ page }) => {
       await gotoModule(page, "/expenses", "expenses")
-      await page.getByTestId("module-tab-expenses-dashboard").click()
+      await selectModuleTab(page, "expenses", "dashboard")
       const newReport = page.getByRole("button", { name: /New Report/i }).first()
       await expect(newReport).toBeVisible()
       await newReport.click()

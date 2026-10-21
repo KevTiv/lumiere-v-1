@@ -322,6 +322,9 @@ export const productsTableConfig = (
         description: t("inventory.products.emptyState.description"),
         actionLabel: t("inventory.products.emptyState.actionLabel"),
         onAction: options?.onEmptyAction,
+        permission: { resource: "product", action: "create" },
+        secondaryActionId: "csv-product",
+        learnHint: t("inventory.products.emptyState.hint", { defaultValue: "Products are what you buy, stock and sell: every order, transfer and invoice line points to one." }),
       },
     },
   }
@@ -402,20 +405,22 @@ export type TransfersTableConfigOptions = {
 // ── Transfers (pickings) ──────────────────────────────────────────────────────
 
 export type PickingActionHandlers = Partial<
-  Record<PickingActionId, (rows: EntityRow[]) => void>
+  Record<PickingActionId, (rows: EntityRow[]) => void | Promise<unknown>>
 >
 
 const PICKING_ACTION_ORDER: Array<{
   id: PickingActionId
   labelKey: string
   destructive?: boolean
+  /** Runs once per selected transfer; the rest act on a single one. */
+  multiple?: boolean
 }> = [
-  { id: "confirm", labelKey: "inventory.transferActions.confirm" },
-  { id: "assign", labelKey: "inventory.transferActions.assign" },
+  { id: "confirm", labelKey: "inventory.transferActions.confirm", multiple: true },
+  { id: "assign", labelKey: "inventory.transferActions.assign", multiple: true },
   { id: "assign-user", labelKey: "inventory.transferActions.assignUser" },
   { id: "partial-validate", labelKey: "sales.fulfillment.actions.partialValidate" },
-  { id: "pack", labelKey: "sales.fulfillment.actions.pack" },
-  { id: "validate", labelKey: "inventory.transferActions.validate" },
+  { id: "pack", labelKey: "sales.fulfillment.actions.pack", multiple: true },
+  { id: "validate", labelKey: "inventory.transferActions.validate", multiple: true },
   { id: "cancel", labelKey: "inventory.transferActions.cancel", destructive: true },
 ]
 
@@ -428,7 +433,7 @@ export const pickingRowActions = (
   handlers: PickingActionHandlers,
   icons: Partial<Record<PickingActionId, EntityAction["icon"]>> = {},
 ): EntityAction[] =>
-  PICKING_ACTION_ORDER.flatMap(({ id, labelKey, destructive }) => {
+  PICKING_ACTION_ORDER.flatMap(({ id, labelKey, destructive, multiple }) => {
     const handler = handlers[id]
     if (!handler) return []
     return [
@@ -438,6 +443,7 @@ export const pickingRowActions = (
         icon: icons[id],
         variant: destructive ? ("destructive" as const) : undefined,
         requiresSelection: true,
+        selection: multiple ? ("multiple" as const) : ("single" as const),
         isApplicable: (rows: EntityRow[]) => isPickingActionApplicableToAll(id, rows),
         onClick: handler,
       },
@@ -504,6 +510,8 @@ export const transfersTableConfig = (
       description: t("inventory.transfers.emptyState.description"),
       actionLabel: t("inventory.transfers.emptyState.actionLabel"),
       onAction: options?.onEmptyAction,
+      permission: { resource: "stock_picking", action: "create" },
+      learnHint: t("inventory.transfers.emptyState.hint", { defaultValue: "Transfers (receipts, deliveries, internal moves) are how stock levels change." }),
     },
   },
 })
@@ -750,6 +758,28 @@ export const pickingWavesTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "dateStart", label: t("inventory.pickingWaves.columns.dateStart"), type: "datetime" },
     ],
     emptyMessage: t("inventory.pickingWaves.emptyMessage"),
+  },
+})
+
+// ── Stock packages ───────────────────────────────────────────────────────────
+export const stockPackagesTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "stock-packages-table",
+  title: t("inventory.stockPackages.title", { defaultValue: "Packages" }),
+  description: t("inventory.stockPackages.description", { defaultValue: "Packed shipments awaiting confirmation or dispatch" }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchKeys: ["name", "state"],
+    columns: [
+      { key: "name", label: t("inventory.stockPackages.columns.name", { defaultValue: "Package" }), width: "min-w-40" },
+      { key: "state", label: t("inventory.stockPackages.columns.state", { defaultValue: "Status" }), type: "badge" },
+      { key: "pickingId", label: t("inventory.stockPackages.columns.pickingId", { defaultValue: "Transfer" }), width: "min-w-24" },
+      { key: "weight", label: t("inventory.stockPackages.columns.weight", { defaultValue: "Weight" }), type: "number" },
+      { key: "volume", label: t("inventory.stockPackages.columns.volume", { defaultValue: "Volume" }), type: "number" },
+      { key: "createDate", label: t("inventory.stockPackages.columns.createDate", { defaultValue: "Created" }), type: "datetime" },
+    ],
+    emptyMessage: t("inventory.stockPackages.emptyMessage", { defaultValue: "No packages found." }),
   },
 })
 
@@ -1050,6 +1080,7 @@ export const inventoryEntityConfigs = (t: TFunction): Record<string, EntityViewC
   "quality-alerts-table": qualityAlertsTableConfig(t),
   "cycle-counts-table": cycleCountsTableConfig(t),
   "picking-waves-table": pickingWavesTableConfig(t),
+  "stock-packages-table": stockPackagesTableConfig(t),
   "warehouse-tasks-table": warehouseTasksTableConfig(t),
   "stock-routes-table": stockRoutesTableConfig(t),
   "stock-rules-table": stockRulesTableConfig(t),

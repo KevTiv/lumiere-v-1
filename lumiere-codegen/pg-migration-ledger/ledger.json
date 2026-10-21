@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "_comment": "Released durable PostgreSQL migrations are frozen verbatim in this directory. lumiere-codegen re-emits them byte for byte and generates only a pending follow-up (the next version below) for what the current schema adds on top. After a contracts release, promote the published pending file into this directory and advance pending.",
+  "released": [
+    {
+      "version": 1,
+      "name": "0001_durable_projection",
+      "file": "0001_durable_projection.sql"
+    },
+    {
+      "version": 11,
+      "name": "0011_durable_projection_delta",
+      "file": "0011_durable_projection_delta.sql"
+    },
+    {
+      "version": 12,
+      "name": "0012_durable_projection_delta",
+      "file": "0012_durable_projection_delta.sql"
+    },
+    {
+      "version": 13,
+      "name": "0013_durable_projection_delta",
+      "file": "0013_durable_projection_delta.sql"
+    },
+    {
+      "version": 14,
+      "name": "0014_durable_projection_delta",
+      "file": "0014_durable_projection_delta.sql"
+    },
+    {
+      "version": 15,
+      "name": "0015_durable_projection_delta",
+      "file": "0015_durable_projection_delta.sql"
+    },
+    {
+      "version": 18,
+      "name": "0018_durable_projection_delta",
+      "file": "0018_durable_projection_delta.sql"
+    },
+    {
+      "version": 19,
+      "name": "0019_durable_projection_delta",
+      "file": "0019_durable_projection_delta.sql"
+    }
+  ],
+  "pending": {
+    "version": 20,
+    "name": "0020_durable_projection_delta"
+  }
+}

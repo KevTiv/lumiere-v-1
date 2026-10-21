@@ -32,6 +32,7 @@ export const POS_CATEGORIES = [
 ];
 
 export interface UsePOSReturn {
+  isHydrated: boolean;
   cart: POSCartItem[];
   search: string;
   category: string;
@@ -137,16 +138,19 @@ export function usePOS(
     null,
   );
 
-  const { data: productRows = [] } = useProducts(
+  const { data: productRows = [], isLoading: productsLoading } = useProducts(
     organizationId,
     initialProducts,
   );
-  const { data: terminals = [] } = usePosTerminals(
+  const { data: terminals = [], isLoading: terminalsLoading } = usePosTerminals(
     organizationId,
     initialTerminals,
   );
-  const { data: configs = [] } = usePosConfigs(organizationId, initialConfigs);
-  const { data: sessions = [] } = usePosSessions(
+  const { data: configs = [], isLoading: configsLoading } = usePosConfigs(
+    organizationId,
+    initialConfigs,
+  );
+  const { data: sessions = [], isLoading: sessionsLoading } = usePosSessions(
     organizationId,
     initialSessions,
   );
@@ -157,7 +161,7 @@ export function usePOS(
   const activatePosConfig = useActivatePosConfig(organizationId);
   const deactivatePosConfig = useDeactivatePosConfig(organizationId);
   const openPosSession = useOpenPosSession(organizationId);
-  const closePosSession = useClosePosSession(organizationId);
+  const closePosSession = useClosePosSession(organizationId, companyId);
   const computePosSessionTotals = useComputePosSessionTotals(organizationId);
 
   const isPosLifecyclePending =
@@ -458,6 +462,11 @@ export function usePOS(
   );
 
   return {
+    isHydrated:
+      !productsLoading &&
+      !terminalsLoading &&
+      !configsLoading &&
+      !sessionsLoading,
     cart,
     search,
     category,

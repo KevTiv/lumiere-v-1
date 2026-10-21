@@ -54,7 +54,7 @@ test.describe(
         )
 
         const serialName = smokeName("cov06i-serial")
-        await createSerialViaUi(warehousePage, productId, serialName)
+        await createSerialViaUi(warehousePage, productName, serialName)
         const serialId = await fetchSerialIdByName(page, serialName)
 
         // The create action must produce a genuinely reservable serial —

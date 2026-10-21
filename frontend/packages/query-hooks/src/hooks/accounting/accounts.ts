@@ -11,7 +11,8 @@ import type {
   AccountTaxQueryRow,
 } from "@lumiere/stdb/resource-reads"
 import { createStdbSdk } from "@lumiere/stdb/sdk"
-import { apiFetch } from "../../http"
+import { decodeOperationDispatch } from "@lumiere/api-client"
+import { apiFetch, fetchQueryList } from "../../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   paymentParamsToJson,
@@ -64,6 +65,11 @@ import {
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import {
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+} from "../operation-effect"
+import { resolveExactRecordState } from "../exact-record-state"
 export function useAccountAccounts(
   organizationId: bigint,
   options?: {
@@ -136,15 +142,36 @@ export function useDeprecateAccountAccount(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { accountId: bigint; params: DeprecateAccountAccountParams }) => {
-      const { urlPath, init } = stdbBffCommandPost("deprecate_account_account", {
-        accountId: args.accountId,
-        params: stdbParamsToJson(args.params as object, "DeprecateAccountAccountParams"),
+      const expected = Boolean(args.params.deprecated)
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveBeforeDispatch: false,
+        resolveEffect: async () =>
+          resolveExactRecordState(
+            await fetchQueryList("/api/query/account-accounts", "Failed to read account"),
+            BigInt(organizationId),
+            args.accountId,
+            "account-accounts",
+            (row) => Boolean(row.deprecated) === expected,
+            `/accounting?tab=accounts&recordId=${args.accountId}`,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("deprecate_account_account", {
+            accountId: args.accountId,
+            params: stdbParamsToJson(args.params as object, "DeprecateAccountAccountParams"),
+          })
+          return decodeOperationDispatch(await apiFetch(urlPath, init), "Failed to change account state")
+        },
+        afterDispatch: () =>
+          invalidateStdbQueryResources(
+            qc,
+            organizationId,
+            stdbInvalidationFor("deprecate_account_account"),
+          ),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
       })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: () =>
-      invalidateStdbQueryResources(qc, organizationId, stdbInvalidationFor("deprecate_account_account")),
   })
 }
 

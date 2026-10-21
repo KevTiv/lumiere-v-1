@@ -7,9 +7,25 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
  */
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { responseErrorMessage } from "@lumiere/api-client/response-error"
 
-import { apiFetch, fetchQueryList, rqBigIntKey, type QueryRows } from "../http"
+import {
+  apiFetch,
+  fetchQueryList,
+  parseQueryListResponse,
+  rqBigIntKey,
+  type QueryRows,
+} from "../http"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import {
+  buildSignalWorkflowWireParams,
+  buildStartWorkflowWireParams,
+  buildWorkflowSubjectSnapshotRequest,
+  selectWorkflowSubjectSnapshot,
+  type SignalWorkflowInput,
+  type StartWorkflowInput,
+  type WorkflowConditionSnapshotWire,
+} from "./workflow-runtime"
 import type {
   CancelWorkflowParams,
   CancelWorkflowOutboxParams,
@@ -19,12 +35,13 @@ import type {
   FireWorkflowTimerParams,
   MigrateWorkflowInstanceParams,
   PreflightWorkflowMigrationParams,
-  SignalWorkflowParams,
   SimulateWorkflowParams,
-  StartWorkflowParams,
   Workflow,
   WorkflowInstance,
 } from "@lumiere/stdb/types"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
+
+import { resolveWorkflowVersionStateEffect } from "./workflow-version-effect"
 
 const wfKeys = (organizationId: bigint) => rqBigIntKey(organizationId)
 
@@ -201,6 +218,30 @@ function optionalCompanyArg(companyId?: number | null): { some: number } | { non
   return companyId != null && companyId > 0 ? { some: companyId } : { none: [] }
 }
 
+async function requireWorkflowVersionState(
+  organizationId: bigint,
+  workflowVersionId: bigint | number | string,
+  expectedStatus: "Published" | "Retired",
+): Promise<void> {
+  const exactId = parseStrictU64(workflowVersionId)
+  if (exactId == null) throw new Error("Workflow version id is invalid")
+
+  // Query projection propagation is normally immediate, but use a short,
+  // bounded reconciliation window so an acknowledged command cannot be shown
+  // as success until its exact sealed version reads back.
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const rows = await fetchQueryList(
+      "/api/query/workflow-versions",
+      "Failed to read back workflow version",
+    )
+    if (resolveWorkflowVersionStateEffect(rows, organizationId, exactId, expectedStatus)) return
+    if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 75 * (attempt + 1)))
+  }
+  throw new Error(
+    `Workflow version ${exactId} did not read back as ${expectedStatus}`,
+  )
+}
+
 export function useCreateWorkflow(organizationId: bigint, companyId?: number | null) {
   const qc = useQueryClient()
   return useMutation<void, Error, CreateWorkflowParams>({
@@ -223,6 +264,7 @@ export function usePublishWorkflowVersion(organizationId: bigint, _companyId?: n
       const { urlPath, init } = stdbBffCommandPost("publish_workflow_version", { workflowVersionId: input.workflowVersionId, expectedRevision: input.expectedDraftRevision })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to publish workflow version")
+      await requireWorkflowVersionState(organizationId, input.workflowVersionId, "Published")
     },
     onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
   })
@@ -256,6 +298,7 @@ export function useRetireWorkflowVersion(organizationId: bigint, _companyId?: nu
       const { urlPath, init } = stdbBffCommandPost("retire_workflow_version", { workflowVersionId: input.workflowVersionId, expectedRevision: input.expectedDraftRevision })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to retire workflow version")
+      await requireWorkflowVersionState(organizationId, input.workflowVersionId, "Retired")
     },
     onSuccess: () => invalidateAllWorkflowQueries(qc, organizationId),
   })
@@ -273,13 +316,48 @@ export function useImportWorkflowCsv(organizationId: bigint) {
   })
 }
 
+async function requestWorkflowSubjectSnapshot(input: {
+  companyId: bigint | number | string
+  workflowVersionId: bigint | number | string
+  subjectModel: string
+  subjectId: bigint | number | string
+}): Promise<WorkflowConditionSnapshotWire> {
+  const normalized = buildWorkflowSubjectSnapshotRequest(input)
+  const { urlPath, init } = stdbBffCommandPost("request_workflow_subject_snapshot", {
+    companyId: normalized.companyId,
+    params: stdbParamsToJson(
+      normalized.params,
+      "RequestWorkflowSubjectSnapshotParams",
+    ),
+  })
+  const request = await apiFetch(urlPath, init)
+  if (!request.ok) {
+    throw new Error(
+      await responseErrorMessage(request, "Failed to request workflow subject snapshot"),
+    )
+  }
+
+  const query = await apiFetch("/api/query/workflow-subject-snapshots")
+  if (!query.ok) {
+    throw new Error(
+      await responseErrorMessage(query, "Failed to read workflow subject snapshot"),
+    )
+  }
+
+  return selectWorkflowSubjectSnapshot(parseQueryListResponse(await query.json()), input)
+}
+
 export function useStartWorkflow(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: StartWorkflowParams) => {
-      const { urlPath, init } = stdbBffCommandPost("start_workflow", { params: stdbParamsToJson(params as object, "StartWorkflowParams") })
+  return useMutation<void, Error, StartWorkflowInput>({
+    mutationFn: async (input) => {
+      const snapshot = await requestWorkflowSubjectSnapshot(input)
+      const params = buildStartWorkflowWireParams(input, snapshot)
+      const { urlPath, init } = stdbBffCommandPost("start_workflow", { params })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to start workflow")
+      if (!r.ok) {
+        throw new Error(await responseErrorMessage(r, "Failed to start workflow"))
+      }
     },
     onSuccess: async () => {
       invalidateAllWorkflowQueries(qc, organizationId)
@@ -289,11 +367,15 @@ export function useStartWorkflow(organizationId: bigint) {
 
 export function useSignalWorkflow(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (params: SignalWorkflowParams) => {
-      const { urlPath, init } = stdbBffCommandPost("signal_workflow", { params: stdbParamsToJson(params as object, "SignalWorkflowParams") })
+  return useMutation<void, Error, SignalWorkflowInput>({
+    mutationFn: async (input) => {
+      const snapshot = await requestWorkflowSubjectSnapshot(input)
+      const params = buildSignalWorkflowWireParams(input, snapshot)
+      const { urlPath, init } = stdbBffCommandPost("signal_workflow", { params })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error("Failed to signal workflow")
+      if (!r.ok) {
+        throw new Error(await responseErrorMessage(r, "Failed to signal workflow"))
+      }
     },
     onSuccess: async () => {
       invalidateAllWorkflowQueries(qc, organizationId)
@@ -427,43 +509,6 @@ export function useCancelWorkflowInstance(organizationId: bigint) {
   return useCancelWorkflow(organizationId)
 }
 
-/** @deprecated Removed — use publish_workflow_version */
-export function useSetWorkflowActive(organizationId: bigint) {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("set_workflow_active was removed; publish or retire a workflow version")
-    },
-    onSuccess: () => undefined,
-  })
-}
-
-/** @deprecated */
-export function useAddWorkflowActivity(organizationId: bigint) {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("add_workflow_activity was removed; use upsert_workflow_node")
-    },
-  })
-}
-
-/** @deprecated */
-export function useAddWorkflowTransition(organizationId: bigint) {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("add_workflow_transition was removed; use upsert_workflow_edge")
-    },
-  })
-}
-
-/** @deprecated */
-export function useSetWorkitemException(organizationId: bigint) {
-  return useMutation({
-    mutationFn: async () => {
-      throw new Error("set_workitem_exception was removed with the workitem model")
-    },
-  })
-}
-
 export type {
   CreateWorkflowParams,
   StartWorkflowParams,
@@ -479,3 +524,4 @@ export type {
   Workflow,
   WorkflowInstance,
 } from "@lumiere/stdb/types"
+export type { SignalWorkflowInput, StartWorkflowInput } from "./workflow-runtime"

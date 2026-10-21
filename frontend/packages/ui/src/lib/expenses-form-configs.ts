@@ -176,6 +176,16 @@ export const newExpenseForm = (t: TFunction): FormConfig => ({
           rows: 2,
         },
         {
+          id: "receiptFile",
+          name: "receiptFile",
+          type: "file",
+          label: t("expenses.forms.newExpense.fields.receiptFile", {
+            defaultValue: "Receipt file",
+          }),
+          accept: "image/*,application/pdf",
+          width: "full",
+        },
+        {
           id: "storageKey",
           name: "storageKey",
           type: "text",
@@ -366,6 +376,16 @@ export const editExpenseForm = (t: TFunction): FormConfig => ({
           label: t("expenses.forms.editExpense.fields.merchantKey"),
           placeholder: t("expenses.forms.newExpense.fields.merchantKeyPlaceholder"),
           width: "1/2",
+        },
+        {
+          id: "receiptFile",
+          name: "receiptFile",
+          type: "file",
+          label: t("expenses.forms.editExpense.fields.receiptFile", {
+            defaultValue: "Receipt file",
+          }),
+          accept: "image/*,application/pdf",
+          width: "full",
         },
         {
           id: "storageKey",

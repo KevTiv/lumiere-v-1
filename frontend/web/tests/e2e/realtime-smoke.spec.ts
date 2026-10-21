@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   expectNoAppError,
   fillField,
   gotoModule,
@@ -15,7 +16,7 @@ test.describe("Realtime query invalidation", { tag: "@phase-11" }, () => {
     const contactName = smokeName("rt-contact")
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-contacts").click()
+    await selectModuleTab(page, "crm", "contacts")
     await waitForBffQueryMinRows(page, "/api/query/contacts")
 
     await page.getByTestId("module-create-crm-contacts").click()

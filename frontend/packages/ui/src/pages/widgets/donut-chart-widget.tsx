@@ -1,6 +1,7 @@
 "use client"
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts"
+import { PieChart, Pie, Cell } from "recharts"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "../../components/chart"
 import type { DonutChartWidget as DonutChartWidgetType } from "../../lib/dashboard-types"
 
 const FALLBACK_COLORS = [
@@ -27,11 +28,13 @@ export function DonutChartWidget({ data }: { data: DonutChartWidgetType["data"] 
     color ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length]
 
   const percentOf = (value: number) => `${((value / total) * 100).toFixed(1)}%`
+  const config: ChartConfig = {}
+  for (const segment of segments) config[segment.name] = { label: segment.name }
 
   return (
     <div className="flex h-[300px] w-full flex-col">
       <div className="relative min-h-0 flex-1">
-        <ResponsiveContainer width="100%" height="100%">
+        <ChartContainer config={config} className="aspect-auto h-full w-full">
           <PieChart>
             <Pie
               data={segments}
@@ -54,20 +57,28 @@ export function DonutChartWidget({ data }: { data: DonutChartWidgetType["data"] 
                 <Cell key={segment.name} fill={segmentColor(segment.color, index)} />
               ))}
             </Pie>
-            <Tooltip
-              formatter={(value: number, name: string) => [
-                `${value.toLocaleString()} (${percentOf(value)})`,
-                name,
-              ]}
-              contentStyle={{
-                backgroundColor: "hsl(var(--card))",
-                border: "1px solid hsl(var(--border))",
-                borderRadius: "8px",
-                color: "hsl(var(--foreground))",
-              }}
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  hideLabel
+                  nameKey="name"
+                  formatter={(value, name, item) => (
+                    <div className="flex w-full min-w-36 items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                        style={{ backgroundColor: typeof item.payload?.fill === "string" ? item.payload.fill : undefined }}
+                      />
+                      <span className="text-muted-foreground">{String(name)}</span>
+                      <span className="ml-auto pl-3 font-mono font-medium tabular-nums text-foreground">
+                        {Number(value).toLocaleString()} ({percentOf(Number(value))})
+                      </span>
+                    </div>
+                  )}
+                />
+              }
             />
           </PieChart>
-        </ResponsiveContainer>
+        </ChartContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-2xl font-semibold tabular-nums text-foreground">
             {total.toLocaleString()}

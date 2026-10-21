@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListAllowEmpty } from "@/lib/server-query"
+import { serverFetchQueryListState } from "@/lib/server-query"
 import { CalendarClient } from "./calendar-client"
 
 export default async function CalendarPage() {
@@ -8,11 +8,18 @@ export default async function CalendarPage() {
     return <CalendarClient />
   }
 
-  const events = await serverFetchQueryListAllowEmpty(session, "calendar-events")
+  const events = await serverFetchQueryListState(session, "calendar-events")
+  if (events.status === "denied" || events.status === "unavailable") {
+    return (
+      <main className="p-6" role="alert">
+        Calendar data {events.status}: {events.message}
+      </main>
+    )
+  }
 
   return (
     <CalendarClient
-      initialEvents={events}
+      initialEvents={events.rows}
       organizationId={session.organizationId}
     />
   )

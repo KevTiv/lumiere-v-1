@@ -36,17 +36,21 @@ import type {
   AssignmentRule,
   AuditLog,
   AuditRule,
+  BalanceSheetLine,
   BankMatchCandidate,
+  BankStatementImportLine,
   BarcodeNomenclature,
   BarcodeRule,
   BudgetPost,
   CalendarEvent,
   CapacityForecastSnapshot,
   CartonizationResult,
+  CashFlowLine,
   CommodityPriceIndex,
   Company,
   ConsignmentAgreement,
   ConsolidationAccount,
+  ConsolidationCompanyRate,
   ConsolidationEliminationEntry,
   ConsolidationJournal,
   Contact,
@@ -77,7 +81,11 @@ import type {
   DeliveryCarrier,
   DeliveryPriceRule,
   Document,
+  DocumentExternalRef,
   DocumentFolder,
+  DocumentLegalHold,
+  DocumentRetentionPurgeJob,
+  DocumentSignatureRequest,
   DocumentTemplate,
   DocumentVersion,
   ExpenseCardStatementLine,
@@ -119,7 +127,9 @@ import type {
   HrJobPosition,
   HrLaborCostSnapshot,
   HrLeave,
+  HrLeaveAllocation,
   HrLeaveType,
+  HrOffboardingChecklist,
   HrOnboardingProgress,
   HrOnboardingTemplate,
   HrOnboardingTemplateItem,
@@ -160,10 +170,15 @@ import type {
   MessageBatch,
   MessageTemplate,
   MrpBom,
+  MrpBomByproduct,
   MrpBomLine,
   MrpProduction,
+  MrpProductionCost,
+  MrpProductivityCost,
   MrpRoutingWorkcenter,
+  MrpValuationConfig,
   MrpWorkcenter,
+  MrpWorkcenterCostRate,
   MrpWorkorder,
   OperationalMessage,
   Opportunity,
@@ -188,9 +203,15 @@ import type {
   PosTerminal,
   PrivacyConsent,
   Product,
+  ProductAttribute,
+  ProductAttributeLine,
+  ProductAttributeValue,
   ProductCategory,
+  ProductPackaging,
   ProductPricelist,
   ProductPricelistItem,
+  ProductSupplierInfo,
+  ProfitLossLine,
   ProjectBaseline,
   ProjectChangeOrder,
   ProjectEarnedValueSnapshot,
@@ -228,7 +249,9 @@ import type {
   PurchaseBlanketRelease,
   PurchaseContract,
   PurchaseOrder,
+  PurchaseOrderCreationOperation,
   PurchaseOrderLine,
+  PurchaseReceiptOperation,
   PurchaseRequisition,
   PurchaseRequisitionLine,
   PurchaseReturn,
@@ -242,6 +265,7 @@ import type {
   QualityTeam,
   RecordCustomFieldValue,
   ReplenishmentRule,
+  ReplenishmentRunJob,
   ReportTemplate,
   ResPartnerBank,
   ResourceAllocation,
@@ -253,8 +277,11 @@ import type {
   RevenueRecognitionRule,
   Role,
   SaleCommission,
+  SaleCommissionPlan,
+  SaleCommissionPlanSplit,
   SaleOrder,
   SaleOrderLine,
+  SaleOrderOption,
   SavedReport,
   ScheduledReport,
   SegmentMember,
@@ -268,6 +295,7 @@ import type {
   StockLandedCostLines,
   StockLocation,
   StockMove,
+  StockMoveLine,
   StockPackage,
   StockPicking,
   StockPickingBatch,
@@ -295,6 +323,7 @@ import type {
   SubscriptionUsageEvent,
   SupplierIntakeRequest,
   TaxDeadline,
+  TaxDeadlineReminder,
   TaxJurisdiction,
   TaxSchedule,
   TrialBalance,
@@ -356,7 +385,9 @@ export interface QueryRowMap {
   "audit-log": AuditLog
   "audit-rules": AuditRule
   "auth-role-table": Role
+  "balance-sheet-lines": BalanceSheetLine
   "bank-match-candidates": BankMatchCandidate
+  "bank-statement-import-lines": BankStatementImportLine
   "bank-statement-lines": AccountBankStatementLine
   "bank-statements": AccountBankStatement
   "barcode-nomenclatures": BarcodeNomenclature
@@ -369,11 +400,13 @@ export interface QueryRowMap {
   "calendar-events": CalendarEvent
   "capacity-forecast-by-employee": CapacityForecastSnapshot
   "cartonization-results": CartonizationResult
+  "cash-flow-lines": CashFlowLine
   "commodity-price-indexes": CommodityPriceIndex
   "companies": Company
   "compensation-events": HrCompensationEvent
   "consignment-agreements": ConsignmentAgreement
   "consolidation-accounts": ConsolidationAccount
+  "consolidation-company-rates": ConsolidationCompanyRate
   "consolidation-elimination-entries": ConsolidationEliminationEntry
   "consolidation-journals": ConsolidationJournal
   "contact-categories": ContactCategory
@@ -405,7 +438,11 @@ export interface QueryRowMap {
   "departments": HrDepartment
   "depreciation-lines": AccountAssetDepreciationLine
   "direct-reports": HrEmployee
+  "document-external-refs": DocumentExternalRef
   "document-folders": DocumentFolder
+  "document-legal-holds": DocumentLegalHold
+  "document-retention-purge-jobs": DocumentRetentionPurgeJob
+  "document-signature-requests": DocumentSignatureRequest
   "document-templates": DocumentTemplate
   "document-versions": DocumentVersion
   "documents": Document
@@ -443,6 +480,8 @@ export interface QueryRowMap {
   "hr-capacity-forecast": HrCapacityForecast
   "hr-employee-skills": HrEmployeeSkill
   "hr-integration-intents": HrIntegrationIntent
+  "hr-leave-allocations": HrLeaveAllocation
+  "hr-offboarding-checklists": HrOffboardingChecklist
   "hr-resources": HrResource
   "hr-skills": HrSkill
   "hr-statutory-ids": HrStatutoryId
@@ -482,10 +521,15 @@ export interface QueryRowMap {
   "mail-templates": MailTemplate
   "message-batches": MessageBatch
   "message-templates": MessageTemplate
+  "mrp-bom-byproducts": MrpBomByproduct
   "mrp-bom-lines": MrpBomLine
   "mrp-boms": MrpBom
+  "mrp-production-costs": MrpProductionCost
   "mrp-productions": MrpProduction
+  "mrp-productivity-costs": MrpProductivityCost
   "mrp-routing-workcenters": MrpRoutingWorkcenter
+  "mrp-valuation-configs": MrpValuationConfig
+  "mrp-workcenter-cost-rates": MrpWorkcenterCostRate
   "mrp-workcenters": MrpWorkcenter
   "mrp-workorders": MrpWorkorder
   "my-employee": HrEmployee
@@ -525,8 +569,14 @@ export interface QueryRowMap {
   "pricelist-items": ProductPricelistItem
   "pricelists": ProductPricelist
   "privacy-consent": PrivacyConsent
+  "product-attribute-lines": ProductAttributeLine
+  "product-attribute-values": ProductAttributeValue
+  "product-attributes": ProductAttribute
   "product-categories": ProductCategory
+  "product-packagings": ProductPackaging
+  "product-supplier-infos": ProductSupplierInfo
   "products": Product
+  "profit-loss-lines": ProfitLossLine
   "project-baselines": ProjectBaseline
   "project-change-orders": ProjectChangeOrder
   "project-earned-value-by-project": ProjectEarnedValueSnapshot
@@ -561,11 +611,13 @@ export interface QueryRowMap {
   "purchase-blanket-orders": PurchaseBlanketOrder
   "purchase-blanket-releases": PurchaseBlanketRelease
   "purchase-contracts": PurchaseContract
+  "purchase-order-creations": PurchaseOrderCreationOperation
   "purchase-order-lines": PurchaseOrderLine
   "purchase-order-lines-over-billed": PurchaseOrderLine
   "purchase-orders": PurchaseOrder
   "purchase-orders-partial-receipt": PurchaseOrder
   "purchase-orders-to-approve": PurchaseOrder
+  "purchase-receipt-operations": PurchaseReceiptOperation
   "purchase-requisition-lines": PurchaseRequisitionLine
   "purchase-requisitions": PurchaseRequisition
   "purchase-return-lines": PurchaseReturnLine
@@ -579,6 +631,7 @@ export interface QueryRowMap {
   "quality-teams": QualityTeam
   "record-custom-field-values": RecordCustomFieldValue
   "replenishment-rules": ReplenishmentRule
+  "replenishment-run-jobs": ReplenishmentRunJob
   "report-templates": ReportTemplate
   "resource-allocations": ResourceAllocation
   "resource-capacity-by-employee": ResourceCapacitySnapshot
@@ -589,9 +642,12 @@ export interface QueryRowMap {
   "revenue-recognition-rules": RevenueRecognitionRule
   "roles": Role
   "salary-rules": HrSalaryRule
+  "sale-commission-plan-splits": SaleCommissionPlanSplit
+  "sale-commission-plans": SaleCommissionPlan
   "sale-commissions": SaleCommission
   "sale-commissions-pending": SaleCommission
   "sale-order-lines": SaleOrderLine
+  "sale-order-options": SaleOrderOption
   "sale-orders": SaleOrder
   "sale-orders-to-approve": SaleOrder
   "saved-reports": SavedReport
@@ -604,6 +660,7 @@ export interface QueryRowMap {
   "stock-cycle-counts": StockCycleCount
   "stock-inventories": StockInventory
   "stock-locations": StockLocation
+  "stock-move-lines": StockMoveLine
   "stock-moves": StockMove
   "stock-packages": StockPackage
   "stock-pickings": StockPicking
@@ -635,6 +692,7 @@ export interface QueryRowMap {
   "subscriptions": Subscription
   "supplier-intakes": SupplierIntakeRequest
   "tasks": ProjectTask
+  "tax-deadline-reminders": TaxDeadlineReminder
   "tax-deadlines": TaxDeadline
   "tax-groups": AccountTaxGroup
   "tax-jurisdictions": TaxJurisdiction

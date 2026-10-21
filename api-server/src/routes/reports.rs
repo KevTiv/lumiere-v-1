@@ -1,4 +1,4 @@
-use std::{fs, str::FromStr, sync::Arc};
+use std::{str::FromStr, sync::Arc};
 
 use axum::{
     extract::{Path, Query, State},
@@ -17,7 +17,7 @@ use crate::{
     error::ApiError,
     query_exec::{resolve_membership_company_id, row_u64},
     reports::{
-        artifacts::artifact_path,
+        artifacts::read_artifact,
         auth::{
             ensure_report_access, ensure_report_history_access, mask_report_preview, ReportAccess,
         },
@@ -386,11 +386,9 @@ async fn artifact_get(
     let client = trusted.client();
     let (_company_id, artifact_key) =
         report_artifact_key(&client, organization_id, report_id).await?;
-    let path = artifact_path(&state.config.report_artifact_dir, &artifact_key)?;
-    let bytes = fs::read(path).map_err(|error| match error.kind() {
-        std::io::ErrorKind::NotFound => ApiError::NotFound("report artifact is unavailable".into()),
-        _ => ApiError::Internal(format!("read report artifact: {error}")),
-    })?;
+    let bytes = read_artifact(&state.config.report_artifact_store, &artifact_key)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("report artifact is unavailable".into()))?;
     Ok((
         [
             (axum::http::header::CONTENT_TYPE, "application/pdf"),

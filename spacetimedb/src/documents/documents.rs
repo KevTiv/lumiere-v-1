@@ -825,6 +825,12 @@ pub fn add_document_version(
         return Err("Cannot version a deleted document".to_string());
     }
 
+    // A new revision retains the document's fiscal kind. Revalidate its pinned
+    // policy and MIME before even clearing an expired lock (which persists a write).
+    if let Some(kind) = doc.fiscal_kind.as_deref() {
+        validate_fiscal_archive(ctx, organization_id, doc.company_id, kind, &params.mimetype)?;
+    }
+
     let doc = refresh_expired_lock(ctx, doc);
 
     if doc.is_locked && doc.locked_by != Some(ctx.sender()) {
@@ -842,6 +848,16 @@ pub fn add_document_version(
     let current_version_id = doc.current_version_id;
     let new_version_number = old_version_count + 1;
     let checksum = params.checksum.trim().to_lowercase();
+
+    // COV-18: re-registering the blob that is already the current version is a
+    // stale replay, not a new revision.
+    if let Some(current) =
+        current_version_id.and_then(|vid| ctx.db.document_version().id().find(&vid))
+    {
+        if current.url == params.url && current.checksum.as_deref() == Some(checksum.as_str()) {
+            return Err("Document version is identical to the current version".to_string());
+        }
+    }
 
     let version = ctx.db.document_version().insert(DocumentVersion {
         id: 0,
@@ -1042,8 +1058,10 @@ pub fn unlock_document(
 
     let doc = refresh_expired_lock(ctx, doc);
 
+    // COV-18: unlocking an unlocked (or lease-expired) document is a stale
+    // replay, not a no-op success — it must not look like a second transition.
     if !doc.is_locked {
-        return Ok(());
+        return Err("Document is not locked".to_string());
     }
 
     if doc.locked_by != Some(ctx.sender()) {
@@ -1200,6 +1218,11 @@ pub fn restore_document(
 
     if !doc.is_deleted {
         return Ok(());
+    }
+
+    // Restoring makes a fiscal archive active again under the current policy.
+    if let Some(kind) = doc.fiscal_kind.as_deref() {
+        validate_fiscal_archive(ctx, organization_id, doc.company_id, kind, &doc.mimetype)?;
     }
 
     if let Some(fid) = doc.folder_id {

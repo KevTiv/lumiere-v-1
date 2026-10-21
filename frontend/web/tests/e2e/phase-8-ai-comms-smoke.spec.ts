@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { expectNoAppError, gotoModule } from "./helpers"
+import { selectModuleTab, expectNoAppError, gotoModule } from "./helpers"
 
 test.describe("Phase 8 AI and communications smoke", { tag: "@phase-8" }, () => {
   test("ai-skills page loads and create skill modal opens then cancels", async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe("Phase 8 AI and communications smoke", { tag: "@phase-8" }, () => 
 
   test("messages module renders and followers tab is visible", async ({ page }) => {
     await gotoModule(page, "/messages", "messages")
-    await page.getByTestId("module-tab-messages-followers").click()
+    await selectModuleTab(page, "messages", "followers")
     await expect(page.getByTestId("module-create-messages-followers")).toBeVisible()
     await expect(page.getByTestId("entity-table")).toBeVisible()
     await expectNoAppError(page)

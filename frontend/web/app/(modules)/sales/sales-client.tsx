@@ -1,5 +1,8 @@
 'use client';
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights } from "../../../components/module-insights"
 
 import { phCapture } from '@/lib/posthog-browser';
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -26,16 +29,14 @@ import {
   newReturnOrderForm,
   addSaleOrderLineForm,
   editSaleOrderLineForm,
-  createInvoiceFromSaleOrderForm,
   buildPartialDeliveryForm,
   cancelPickingConfirmForm,
-  editSaleOrderForm,
   InvoiceListView,
   MissingOrganization,
   mergeSelectOptionsForFields,
   mergeFieldDefaultValues,
   saleOrdersTableConfig,
-  saleOrderDetailConfig,
+  saleOrdersWithBoard,
   saleOrderStatusBadges,
   saleOrderLinesTableConfig,
   pricelistsTableConfig,
@@ -56,6 +57,10 @@ import {
   percentChange,
   previousPeriodMs,
   timeRangeToMs,
+  formNumber,
+  formText,
+  recordOptions,
+  useFormDialog,
 } from '@lumiere/ui';
 import type {
   EntityRow,
@@ -73,7 +78,6 @@ import {
   toCreateSaleOrderLineParams,
   toUpdateSaleOrderLineParams,
   toCreateCreditNoteFromReturnOrderParams,
-  toCreateInvoiceFromSaleOrderParams,
   toCreateReturnOrderParams,
 } from '@/lib/sales-create-params';
 import { saleOrderPrimaryLabel } from '@lumiere/stdb/read-models';
@@ -96,7 +100,6 @@ import {
 } from '@lumiere/erp-shared/csv-import-bundles';
 import {
   planPartialDelivery,
-  isSaleOrderConfirmed,
   withOrderCashSummary,
   type TransitionNotice,
 } from '@lumiere/erp-workflows';
@@ -110,7 +113,6 @@ import {
   useCreatePricelist,
   useCreatePricelistItem,
   useCreatePickingBatch,
-  useApplySalePromotion,
   useApplySaleOrderOptions,
   useUpdatePricelist,
   useDeletePricelist,
@@ -144,12 +146,12 @@ import {
   useReverseSaleCommissionSettlement,
   useAccrueSaleCommission,
   useCreateSaleCommissionPlan,
+  useSaleCommissionPlans,
   useCreateSaleCommissionPlanSplit,
   useCreateSaleContract,
   useCreateSaleCpqConstraint,
   useCreateSalesIntegrationIntent,
   useRecordSalesIntegrationResult,
-  useApplyOmnichannelAllocation,
   useScheduleSalesSlaEscalation,
   type SaleOrder,
   type SaleOrderLine,
@@ -167,6 +169,7 @@ import {
 } from '@lumiere/query-hooks/hooks/sales';
 import {
   useAccountMoves,
+  useAccountPayments,
   useAccountJournals,
   useAccountAccounts,
   useAccountPaymentTerms,
@@ -183,6 +186,7 @@ import { useContacts, useUsers, type Contact } from '@lumiere/query-hooks/hooks/
 import { useWarehouses, useProducts, useUoms, useProductCategories } from '@lumiere/query-hooks/hooks/inventory';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useRuntimeListConfig } from '@lumiere/ui/forms';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import {
   customFieldEntriesFromMetadata,
   findNewestRowByField,
@@ -191,13 +195,19 @@ import {
 } from '@/lib/persist-record-custom-fields';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
+import { currencyCodeMap, type KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
+import { saleOrderKpis } from './sale-order-kpis';
 import { useModuleTab } from '@/hooks/use-module-tab';
+import { recordOptions as linkedRecordOptions, withLinkedPickers } from '@/lib/linked-options';
+import { CommissionPlansTab } from './commission-plans-tab';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { useSaleOrderWorkflow } from '@lumiere/query-hooks/hooks/sales-order-workflow';
 import { useReturnOrderWorkflow } from '@lumiere/query-hooks/hooks/return-order-workflow';
 import { useSaleOrderLineWorkflow } from '@lumiere/query-hooks/hooks/sale-order-line-workflow';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
 import { useModuleFilters } from '@/hooks/use-module-filters';
+import { OrderHandoffLinks } from '../../../components/order-handoff-links';
+import { orderHandoffs } from '@lumiere/query-hooks/hooks/order-to-cash';
 import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
 import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
 import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
@@ -206,9 +216,10 @@ import {
   SalesOpsPanel,
   parseOpsQueueFilter,
   parseCommissionRatePercent,
-  mergeCommissionRateIntoMetadata,
   type SalesOpsQueueId,
 } from './sales-ops-panel';
+import { useInvoiceFormConfig } from './sale-order-dialogs';
+import { saleOrderDetailWithPartners, saleOrderRecordHref } from './sale-order-record';
 import {
   contactRowsToPartnerSelectOptions,
   pricelistRowsToSelectOptions,
@@ -224,6 +235,8 @@ import {
   currencyOptionsFromRows,
 } from '@/lib/form-lookup';
 import { enumTag } from '@/lib/accounting-post-draft';
+import { saleOrderLineCanBeDeleted } from './sale-order-line-gates';
+import { runtimeFormRoleId } from '@lumiere/ui/lib/runtime-form-role';
 
 function saleOrderState(row: Record<string, unknown>): string {
   const v = row.state;
@@ -359,13 +372,15 @@ function SalesClientLoaded({
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useRBAC();
-  const runtimeRoleId = currentUser?.roles[0];
+  const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles);
   const { orgId } = orgBigInts(organizationId)
+  const { askForm, formDialog } = useFormDialog();
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
 
   const saleOrdersTableRuntime = useRuntimeListConfig({
     base: saleOrdersTableConfig(t, {
       formatSaleOrderDisplayName: saleOrderPrimaryLabel,
+      recordHref: saleOrderRecordHref,
     }).view as EntityTableConfig,
     moduleId: 'sales',
     formId: 'new-sale-order',
@@ -378,8 +393,6 @@ function SalesClientLoaded({
     action: string;
   } | null>(null);
   const [csvKind, setCsvKind] = useState<SalesCsvImportKind | null>(null);
-  const [invoiceOrderId, setInvoiceOrderId] = useState<bigint | null>(null);
-  const [invoiceOrderError, setInvoiceOrderError] = useState<string | null>(null);
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null);
   const [partialDeliveryPicking, setPartialDeliveryPicking] =
     useState<Record<string, unknown> | null>(null);
@@ -387,9 +400,6 @@ function SalesClientLoaded({
   const [cancelPickingTarget, setCancelPickingTarget] =
     useState<Record<string, unknown> | null>(null);
   const [cancelPickingError, setCancelPickingError] = useState<string | null>(null);
-  const [editSaleOrderTarget, setEditSaleOrderTarget] =
-    useState<Record<string, unknown> | null>(null);
-  const [editSaleOrderError, setEditSaleOrderError] = useState<string | null>(null);
   const [selectedReturnOrderId, setSelectedReturnOrderId] = useState<string | null>(null);
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>('30d');
   const [creditReturnOrderId, setCreditReturnOrderId] = useState<bigint | null>(null);
@@ -397,7 +407,8 @@ function SalesClientLoaded({
   const [openReturnForm, setOpenReturnForm] = useState(false);
   const [createReturnError, setCreateReturnError] = useState<string | null>(null);
 
-  const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders);
+  const ordersQuery = useSaleOrders(orgId, initialOrders);
+  const { data: orders = [], isLoading: ordersLoading } = ordersQuery;
   const { data: orderLines = [] } = useSaleOrderLines(
     orgId,
     initialOrderLines,
@@ -438,18 +449,22 @@ function SalesClientLoaded({
   const { data: products = [] } = useProducts(orgId);
   const { data: productCategories = [] } = useProductCategories(orgId);
   const { data: uoms = [] } = useUoms(orgId);
-  const { data: accountMoves = [] } = useAccountMoves(orgId);
+  const accountMovesQuery = useAccountMoves(orgId);
+  const { data: accountMoves = [] } = accountMovesQuery;
+  const { data: accountPayments = [] } = useAccountPayments(orgId);
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
   const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId);
   const { data: partnerCreditHolds = [] } = usePartnerCreditHolds(orgId);
-  const { data: currencies = [] } = useCurrencies();
+  const currenciesQuery = useCurrencies();
+  const { data: currencies = [] } = currenciesQuery;
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
   const { data: stockMoves = [] } = useStockMoves(orgId);
   const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
   const { data: returnOrderLines = [] } = useReturnOrderLines(orgId, initialReturnOrderLines);
   const { data: saleCommissions = [] } = useSaleCommissions(orgId);
+  const { data: saleCommissionPlans = [] } = useSaleCommissionPlans(orgId);
   const { data: saleOrdersToApprove = [] } = useSaleOrdersToApprove(orgId);
   const { data: saleCommissionsPending = [] } = useSaleCommissionsPending(orgId);
   const settleSaleCommissions = useSettleSaleCommissions(orgId, operatingCompanyId);
@@ -467,7 +482,6 @@ function SalesClientLoaded({
     orgId,
     operatingCompanyId,
   );
-  const createDocument = useCreateDocument(orgId, operatingCompanyId);
   const createSaleContract = useCreateSaleContract(orgId, operatingCompanyId);
   const createSaleCpqConstraint = useCreateSaleCpqConstraint(
     orgId,
@@ -481,36 +495,34 @@ function SalesClientLoaded({
     orgId,
     operatingCompanyId,
   );
-  const applyOmnichannelAllocation = useApplyOmnichannelAllocation(
-    orgId,
-    operatingCompanyId,
-  );
   const scheduleSalesSlaEscalation = useScheduleSalesSlaEscalation(
     orgId,
     operatingCompanyId,
   );
 
+  const label = (key: string, defaultValue: string) => t(`sales.ops.prompt.${key}`, { defaultValue });
+
   const promptCreateCommissionPlan = async () => {
-    const name =
-      window
-        .prompt(
-          t('sales.ops.prompt.commissionPlanName', {
-            defaultValue: 'Commission plan name',
-          }),
-        )
-        ?.trim() ?? '';
-    if (!name) return;
-    const rateRaw =
-      window.prompt(
-        t('sales.ops.prompt.commissionPlanRate', {
-          defaultValue: 'Default rate percent (e.g. 5)',
-        }),
-        '5',
-      ) ?? '';
-    const defaultRatePercent = Number(rateRaw);
-    if (!Number.isFinite(defaultRatePercent)) {
-      throw new Error('Invalid rate percent');
-    }
+    const values = await askForm({
+      title: t('sales.ops.createCommissionPlan', { defaultValue: 'New commission plan' }),
+      fields: [
+        { id: 'name', name: 'name', label: label('commissionPlanName', 'Commission plan name'), type: 'text', required: true },
+        {
+          id: 'rate',
+          name: 'rate',
+          label: label('commissionPlanRate', 'Default rate percent (e.g. 5)'),
+          type: 'number',
+          required: true,
+          min: 0,
+          max: 100,
+          step: 0.01,
+          defaultValue: 5,
+        },
+      ],
+    });
+    const name = formText(values?.name);
+    const defaultRatePercent = formNumber(values?.rate);
+    if (name == null || defaultRatePercent == null) return;
     await createSaleCommissionPlan.mutateAsync({
       companyId: operatingCompanyId,
       name,
@@ -520,31 +532,39 @@ function SalesClientLoaded({
     });
   };
 
+  // The plan is chosen from the readable commission plans (number field -> searchable picker).
   const promptCreateCommissionPlanSplit = async () => {
-    const planId =
-      window
-        .prompt(
-          t('sales.ops.prompt.planId', { defaultValue: 'Commission plan id' }),
-        )
-        ?.trim() ?? '';
-    const partnerId =
-      window
-        .prompt(
-          t('sales.ops.prompt.partnerId', { defaultValue: 'Partner id' }),
-        )
-        ?.trim() ?? '';
-    const shareRaw =
-      window.prompt(
-        t('sales.ops.prompt.sharePercent', {
-          defaultValue: 'Share percent (0–100)',
-        }),
-        '50',
-      ) ?? '';
-    if (!planId || !partnerId) return;
-    const sharePercent = Number(shareRaw);
-    if (!Number.isFinite(sharePercent)) {
-      throw new Error('Invalid share percent');
-    }
+    const values = await askForm({
+      title: t('sales.ops.createCommissionSplit', { defaultValue: 'New commission split' }),
+      fields: withLinkedPickers(
+        {
+          id: 'commission-split-fields',
+          title: '',
+          sections: [{ id: 'main', fields: [
+        { id: 'planId', name: 'planId', label: label('planId', 'Commission plan'), type: 'number', required: true, min: 1 },
+        { id: 'partnerId', name: 'partnerId', label: label('partnerId', 'Partner'), type: 'select', required: true, searchable: true, options: partnerFieldOptions },
+        {
+          id: 'share',
+          name: 'share',
+          label: label('sharePercent', 'Share percent (0–100)'),
+          type: 'number',
+          required: true,
+          min: 0,
+          max: 100,
+          step: 0.01,
+          defaultValue: 50,
+        },
+          ] }],
+        } as FormConfig,
+        {
+          planId: linkedRecordOptions(saleCommissionPlans as Record<string, unknown>[], (row) => row.name ?? row.Name),
+        },
+      ).sections[0].fields,
+    });
+    const planId = formText(values?.planId);
+    const partnerId = formText(values?.partnerId);
+    const sharePercent = formNumber(values?.share);
+    if (planId == null || partnerId == null || sharePercent == null) return;
     await createSaleCommissionPlanSplit.mutateAsync({
       planId: BigInt(planId),
       partnerId: BigInt(partnerId),
@@ -554,21 +574,16 @@ function SalesClientLoaded({
   };
 
   const promptCreateSaleContract = async () => {
-    const name =
-      window
-        .prompt(
-          t('sales.ops.prompt.contractName', {
-            defaultValue: 'Contract name',
-          }),
-        )
-        ?.trim() ?? '';
-    const partnerId =
-      window
-        .prompt(
-          t('sales.ops.prompt.partnerId', { defaultValue: 'Partner id' }),
-        )
-        ?.trim() ?? '';
-    if (!name || !partnerId) return;
+    const values = await askForm({
+      title: t('sales.ops.createContract', { defaultValue: 'New sale contract' }),
+      fields: [
+        { id: 'name', name: 'name', label: label('contractName', 'Contract name'), type: 'text', required: true },
+        { id: 'partnerId', name: 'partnerId', label: label('partnerId', 'Partner'), type: 'select', required: true, searchable: true, options: partnerFieldOptions },
+      ],
+    });
+    const name = formText(values?.name);
+    const partnerId = formText(values?.partnerId);
+    if (name == null || partnerId == null) return;
     await createSaleContract.mutateAsync({
       companyId: operatingCompanyId,
       name,
@@ -581,24 +596,34 @@ function SalesClientLoaded({
   };
 
   const promptCreateCpqConstraint = async () => {
-    const name =
-      window
-        .prompt(
-          t('sales.ops.prompt.cpqName', {
-            defaultValue: 'CPQ constraint name',
-          }),
-        )
-        ?.trim() ?? '';
-    const ruleJson =
-      window
-        .prompt(
-          t('sales.ops.prompt.cpqRuleJson', {
-            defaultValue: 'Rule JSON (e.g. {})',
-          }),
-          '{}',
-        )
-        ?.trim() ?? '';
-    if (!name || !ruleJson) return;
+    const values = await askForm({
+      title: t('sales.ops.createCpqConstraint', { defaultValue: 'New CPQ constraint' }),
+      fields: [
+        { id: 'name', name: 'name', label: label('cpqName', 'CPQ constraint name'), type: 'text', required: true },
+        {
+          id: 'ruleJson',
+          name: 'ruleJson',
+          label: label('cpqRuleJson', 'Rule JSON (e.g. {})'),
+          type: 'textarea',
+          rows: 4,
+          required: true,
+          defaultValue: '{}',
+          validation: {
+            custom: (value) => {
+              try {
+                JSON.parse(String(value ?? ''));
+                return null;
+              } catch {
+                return t('sales.ops.invalidJson', { defaultValue: 'Not valid JSON' });
+              }
+            },
+          },
+        },
+      ],
+    });
+    const name = formText(values?.name);
+    const ruleJson = formText(values?.ruleJson);
+    if (name == null || ruleJson == null) return;
     await createSaleCpqConstraint.mutateAsync({
       companyId: operatingCompanyId,
       name,
@@ -609,42 +634,26 @@ function SalesClientLoaded({
   };
 
   const promptCreateIntegrationIntent = async () => {
-    const provider =
-      window
-        .prompt(
-          t('sales.ops.prompt.intentProvider', {
-            defaultValue: 'Provider (e.g. fiscal, carrier)',
-          }),
-          'fiscal',
-        )
-        ?.trim() ?? '';
-    const intentType =
-      window
-        .prompt(
-          t('sales.ops.prompt.intentType', {
-            defaultValue: 'Intent type (e.g. submit, book)',
-          }),
-          'submit',
-        )
-        ?.trim() ?? '';
-    const orderRaw =
-      window
-        .prompt(
-          t('sales.ops.prompt.intentOrderId', {
-            defaultValue: 'Sale order id (optional)',
-          }),
-        )
-        ?.trim() ?? '';
-    const idempotencyKey =
-      window
-        .prompt(
-          t('sales.ops.prompt.idempotencyKey', {
-            defaultValue: 'Idempotency key',
-          }),
-          `intent-${Date.now()}`,
-        )
-        ?.trim() ?? '';
-    if (!provider || !intentType || !idempotencyKey) return;
+    const orderOptions = [
+      { value: '', label: t('sales.ops.noOrder', { defaultValue: 'No sale order' }) },
+      ...recordOptions(orders as unknown as Record<string, unknown>[], (order) =>
+        saleOrderPrimaryLabel(order as never) || `#${String(order.id)}`,
+      ),
+    ];
+    const values = await askForm({
+      title: t('sales.ops.createIntegrationIntent', { defaultValue: 'New integration intent' }),
+      fields: [
+        { id: 'provider', name: 'provider', label: label('intentProvider', 'Provider (e.g. fiscal, carrier)'), type: 'text', required: true, defaultValue: 'fiscal' },
+        { id: 'intentType', name: 'intentType', label: label('intentType', 'Intent type (e.g. submit, book)'), type: 'text', required: true, defaultValue: 'submit' },
+        { id: 'orderId', name: 'orderId', label: label('intentOrderId', 'Sale order (optional)'), type: 'select', searchable: true, options: orderOptions },
+        { id: 'idempotencyKey', name: 'idempotencyKey', label: label('idempotencyKey', 'Idempotency key'), type: 'text', required: true, defaultValue: `intent-${Date.now()}` },
+      ],
+    });
+    const provider = formText(values?.provider);
+    const intentType = formText(values?.intentType);
+    const idempotencyKey = formText(values?.idempotencyKey);
+    if (provider == null || intentType == null || idempotencyKey == null) return;
+    const orderRaw = formText(values?.orderId);
     await createSalesIntegrationIntent.mutateAsync({
       companyId: operatingCompanyId,
       provider,
@@ -656,38 +665,24 @@ function SalesClientLoaded({
     });
   };
 
+  // Integration intents have no list query yet, so an intent is still identified by its id.
   const promptRecordIntegrationResult = async () => {
-    const intentId =
-      window
-        .prompt(
-          t('sales.ops.prompt.intentId', {
-            defaultValue: 'Integration intent id',
-          }),
-        )
-        ?.trim() ?? '';
-    const status =
-      window
-        .prompt(
-          t('sales.ops.prompt.intentStatus', {
-            defaultValue: 'Status (e.g. succeeded, failed)',
-          }),
-          'succeeded',
-        )
-        ?.trim() ?? '';
-    if (!intentId || !status) return;
-    const externalReference =
-      window
-        .prompt(
-          t('sales.ops.prompt.externalRef', {
-            defaultValue: 'External reference (optional)',
-          }),
-        )
-        ?.trim() || undefined;
+    const values = await askForm({
+      title: t('sales.ops.recordIntegrationResult', { defaultValue: 'Record integration result' }),
+      fields: [
+        { id: 'intentId', name: 'intentId', label: label('intentId', 'Integration intent id'), type: 'number', required: true, min: 1 },
+        { id: 'status', name: 'status', label: label('intentStatus', 'Status (e.g. succeeded, failed)'), type: 'text', required: true, defaultValue: 'succeeded' },
+        { id: 'externalReference', name: 'externalReference', label: label('externalRef', 'External reference (optional)'), type: 'text' },
+      ],
+    });
+    const intentId = formText(values?.intentId);
+    const status = formText(values?.status);
+    if (intentId == null || status == null) return;
     await recordSalesIntegrationResult.mutateAsync({
       intentId,
       params: {
         status,
-        externalReference,
+        externalReference: formText(values?.externalReference),
         lastError: status === 'failed' ? 'recorded via Ops' : undefined,
         metadata: undefined,
       },
@@ -695,17 +690,22 @@ function SalesClientLoaded({
   };
 
   const promptScheduleSlaEscalation = async () => {
-    const delayRaw =
-      window.prompt(
-        t('sales.ops.prompt.slaDelaySecs', {
-          defaultValue: 'Delay seconds (min 60)',
-        }),
-        '300',
-      ) ?? '';
-    const delaySecs = Number(delayRaw);
-    if (!Number.isFinite(delaySecs) || delaySecs <= 0) {
-      throw new Error('Invalid delay');
-    }
+    const values = await askForm({
+      title: t('sales.ops.scheduleSlaEscalation', { defaultValue: 'Schedule SLA escalation' }),
+      fields: [
+        {
+          id: 'delay',
+          name: 'delay',
+          label: label('slaDelaySecs', 'Delay seconds (min 60)'),
+          type: 'number',
+          required: true,
+          min: 60,
+          defaultValue: 300,
+        },
+      ],
+    });
+    const delaySecs = formNumber(values?.delay);
+    if (delaySecs == null) return;
     await scheduleSalesSlaEscalation.mutateAsync({ delaySecs });
   };
 
@@ -755,7 +755,6 @@ function SalesClientLoaded({
     },
     workflowCallbacks,
   );
-  const applySalePromotion = useApplySalePromotion(orgId);
   const applySaleOrderOptions = useApplySaleOrderOptions(orgId);
   const updatePricelist = useUpdatePricelist(orgId);
   const deletePricelist = useDeletePricelist(orgId);
@@ -774,6 +773,7 @@ function SalesClientLoaded({
   const createPaymentMethod = useCreatePaymentMethod(orgId, operatingCompanyId);
   const createLoyaltyProgram = useCreateLoyaltyProgram(orgId, operatingCompanyId);
   const createLoyaltyCard = useCreateLoyaltyCard(orgId, operatingCompanyId);
+  const createInvoiceFormConfig = useInvoiceFormConfig(organizationId);
   const returnOrderWorkflow = useReturnOrderWorkflow(
     orgId,
     operatingCompanyId,
@@ -1081,38 +1081,20 @@ function SalesClientLoaded({
     return map;
   }, [contacts]);
 
+  const partnerNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const contact of contacts) {
+      const row = contact as Record<string, unknown>;
+      const name = String(row.name ?? row.displayName ?? '').trim();
+      if (row.id != null && name) map.set(String(row.id), name);
+    }
+    return map;
+  }, [contacts]);
+
   const saleOrderRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = saleOrderStatusBadges(t);
     const linesConfig = saleOrderLinesTableConfig(t);
-    const baseDetail = saleOrderDetailConfig(t);
-    const detailConfig = {
-      ...baseDetail,
-      sections: baseDetail.sections.map((section) =>
-        section.id === 'customer'
-          ? {
-              ...section,
-              fields: section.fields.map((field) =>
-                field.key === 'partnerName'
-                  ? {
-                      ...field,
-                      render: (_value: unknown, record: Record<string, unknown>) => {
-                        const direct = String(
-                          record.partnerName ?? record.partner_name ?? '',
-                        ).trim();
-                        if (direct) return direct;
-                        const partnerId = record.partnerId ?? record.partner_id;
-                        if (partnerId == null) return '—';
-                        return (
-                          partnerLabelById.get(String(partnerId)) ?? `Partner ${String(partnerId)}`
-                        );
-                      },
-                    }
-                  : field,
-              ),
-            }
-          : section,
-      ),
-    };
+    const detailConfig = saleOrderDetailWithPartners(t, partnerLabelById);
     return {
       titleKey: 'sheetTitle',
       statusKey: 'state',
@@ -1120,6 +1102,17 @@ function SalesClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig,
       auditTableName: 'sale_order',
+      discussion: {
+        attachments: (record) => (
+          <RecordDocumentAttachments
+            organizationId={orgId}
+            resModel='sale_order'
+            resId={BigInt(String(record.id))}
+            title='Attachments'
+          />
+        ),
+      },
+      openHref: saleOrderRecordHref,
       customTabs: [
         {
           id: 'lines',
@@ -1142,9 +1135,32 @@ function SalesClientLoaded({
             );
           },
         },
+        {
+          // COV-25: link the order straight to the deliveries and invoices it generated.
+          id: 'handoffs',
+          label: t('sales.order.handoffs', { defaultValue: 'Deliveries & invoices' }),
+          content: (record) => {
+            const orderId = BigInt(String(record.id ?? 0));
+            return (
+              <div className="p-4" data-testid="sale-order-handoffs">
+                <OrderHandoffLinks
+                  testIdPrefix="sale-order-handoff"
+                  handoffs={orderHandoffs(
+                    orderId,
+                    { organizationId: orgId, companyId: operatingCompanyId },
+                    stockPickings as EntityRow[],
+                    accountMoves as unknown as EntityRow[],
+                    returnOrders as unknown as EntityRow[],
+                    accountPayments as unknown as EntityRow[],
+                  )}
+                />
+              </div>
+            );
+          },
+        },
       ],
     };
-  }, [t, orderLines, partnerLabelById]);
+  }, [t, orderLines, partnerLabelById, orgId, operatingCompanyId, stockPickings, accountMoves, returnOrders, accountPayments]);
 
   const pickingBatchFormConfig = useMemo(() => newPickingBatchForm(t), [t]);
 
@@ -1168,6 +1184,15 @@ function SalesClientLoaded({
       }),
     [t, loyaltyProgramFieldOptions, partnerFieldOptions],
   );
+
+  const invoiceCurrencyOptions = useMemo(() => currencies.map((row) => {
+    const code = String(row.code ?? '').trim().toUpperCase();
+    return {
+      value: String(row.id),
+      label: String(row.code ?? row.name ?? row.id),
+      code: /^[A-Z]{3}$/.test(code) ? code : undefined,
+    };
+  }), [currencies]);
 
   const salesInvoices = useMemo(
     () =>
@@ -1196,48 +1221,6 @@ function SalesClientLoaded({
   const returnOrderLinesEntityConfig = useMemo(
     () => returnOrderLinesTableConfig(t),
     [t],
-  );
-
-  const incomeAccountFieldOptions = useMemo(() => {
-    const fromApi = accountAccountRowsToSelectOptions(
-      accountAccounts as Record<string, unknown>[],
-    );
-    if (fromApi.length > 0) return fromApi;
-    return [
-      { value: '', label: t('sales.forms.createInvoiceFromOrder.noAccounts'), disabled: true },
-    ];
-  }, [accountAccounts, t]);
-
-  const receivableAccountFieldOptions = useMemo(() => {
-    const receivableRows = (accountAccounts as Record<string, unknown>[]).filter(
-      (row) => {
-        const v = row.internalType ?? row.internal_type;
-        const tag =
-          v != null && typeof v === 'object' && 'tag' in v
-            ? String((v as { tag: string }).tag).toLowerCase()
-            : String(v ?? '').toLowerCase();
-        return tag === 'receivable';
-      },
-    );
-    const fromApi = accountAccountRowsToSelectOptions(receivableRows);
-    if (fromApi.length > 0) return fromApi;
-    return [
-      {
-        value: '',
-        label: t('sales.forms.createInvoiceFromOrder.noReceivableAccounts'),
-        disabled: true,
-      },
-    ];
-  }, [accountAccounts, t]);
-
-  const createInvoiceFormConfig = useMemo(
-    () =>
-      mergeSelectOptionsForFields(createInvoiceFromSaleOrderForm(t), {
-        journalId: journalFieldOptions,
-        defaultIncomeAccountId: incomeAccountFieldOptions,
-        receivableAccountId: receivableAccountFieldOptions,
-      }),
-    [t, journalFieldOptions, incomeAccountFieldOptions, receivableAccountFieldOptions],
   );
 
   const productLabelById = useMemo(() => {
@@ -1366,6 +1349,7 @@ function SalesClientLoaded({
   const ordersEntityConfig = useMemo((): EntityViewConfig => {
     const base = saleOrdersTableConfig(t, {
       formatSaleOrderDisplayName: saleOrderPrimaryLabel,
+      recordHref: saleOrderRecordHref,
       onEmptyAction: openCreateSaleOrder,
     });
     const runtimeView = saleOrdersTableRuntime;
@@ -1391,69 +1375,15 @@ function SalesClientLoaded({
             },
           }),
           {
-            id: 'accept-quotation',
-            label: saleOrderWorkflow.acceptQuotation.label,
-            requiresSelection: true,
-            isApplicable: (rows) =>
-              rows.some((r) => saleOrderWorkflow.acceptQuotation.canPresent(r as EntityRow)),
-            onClick: (rows) => {
-              for (const r of rows) {
-                if (!saleOrderWorkflow.acceptQuotation.canPresent(r as EntityRow)) continue;
-                const signedBy =
-                  window.prompt(
-                    t('sales.actions.acceptQuotationPrompt', {
-                      defaultValue: 'Accepted by (name)',
-                    }),
-                  )?.trim() ?? '';
-                if (!signedBy) continue;
-                // The workflow surface already reports the typed failure.
-                saleOrderWorkflow.acceptQuotation
-                  .execute({ orderId: String(r.id), signedBy })
-                  .catch(() => undefined);
-              }
-            },
-          },
-          {
-            id: 'view-deliveries',
-            label: t('sales.actions.viewDeliveries'),
-            requiresSelection: true,
-            // Only a confirmed order has fulfillment; the fulfillment tab lists its pickings and backorders.
-            isApplicable: (rows) => rows.length === 1 && isSaleOrderConfirmed(rows[0] as EntityRow),
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              navigateToSalesTab('fulfillment', { saleId: String(rows[0]?.id) });
-            },
-          },
-          {
-            id: 'apply-promotion',
-            label: t('sales.actions.applyPromotion', { defaultValue: 'Apply promotion' }),
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const r = rows[0];
-              const st = saleOrderState(r);
-              if (st !== 'Draft' && st !== 'Sent') return;
-              const code =
-                window.prompt(
-                  t('sales.actions.applyPromotionPrompt', {
-                    defaultValue: 'Promotion code',
-                  }),
-                )?.trim() ?? '';
-              if (!code) return;
-              void applySalePromotion
-                .mutateAsync({
-                  orderId: r.id as string | number | bigint,
-                  promotionCode: code,
-                })
-                .catch((e: unknown) => {
-                  window.alert(e instanceof Error ? e.message : String(e));
-                });
-            },
-          },
-          {
             id: 'apply-options',
             label: t('sales.actions.applyOptions', { defaultValue: 'Apply CPQ options' }),
             requiresSelection: true,
+            selection: 'multiple',
+            isApplicable: (rows) =>
+              rows.some((r) => {
+                const st = saleOrderState(r);
+                return st === 'Draft' || st === 'Sent';
+              }),
             onClick: (rows) => {
               for (const r of rows) {
                 const st = saleOrderState(r);
@@ -1464,49 +1394,6 @@ function SalesClientLoaded({
                     window.alert(e instanceof Error ? e.message : String(e));
                   });
               }
-            },
-          },
-          {
-            id: 'export-commercial-packet',
-            label: t('sales.actions.exportCommercialPacket', {
-              defaultValue: 'Export commercial packet',
-            }),
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const order = rows[0] as Record<string, unknown>;
-              const orderId = String(order.id ?? '');
-              const lines = (orderLines as Record<string, unknown>[]).filter(
-                (l) => String(l.orderId ?? l.order_id ?? '') === orderId,
-              );
-              const packet = {
-                documentType: 'commercial_invoice_packet',
-                generatedAt: new Date().toISOString(),
-                order,
-                lines,
-                note: 'Fiscal submit remains a worker/procedure; this packet is export data only.',
-              };
-              const blob = new Blob([JSON.stringify(packet, null, 2)], {
-                type: 'application/json',
-              });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `commercial-packet-SO-${orderId}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-            },
-          },
-          {
-            id: 'edit-order',
-            label: t('sales.actions.editOrder'),
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const r = rows[0] as Record<string, unknown>;
-              if (!saleOrderWorkflow.update.canPresent(r)) return;
-              setEditSaleOrderError(null);
-              setEditSaleOrderTarget(r);
             },
           },
           ...workflowActionsToEntityActions([saleOrderWorkflow.cancel], {
@@ -1521,108 +1408,27 @@ function SalesClientLoaded({
               defaultValue: 'Accrue commission',
             }),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: 'multiple',
+            isApplicable: (rows) =>
+              rows.some((r) => {
+                const st = saleOrderState(r);
+                return st === 'Sale' || st === 'Done';
+              }),
+            successMessage: t('common.actionCompleted', {
+              action: t('sales.actions.accrueCommission', { defaultValue: 'Accrue commission' }),
+            }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const row = r as Record<string, unknown>;
                 const st = saleOrderState(row);
                 if (st !== 'Sale' && st !== 'Done') continue;
                 const rate = parseCommissionRatePercent(row);
                 if (rate <= 0) continue;
-                void accrueSaleCommission.mutateAsync({
+                await accrueSaleCommission.mutateAsync({
                   orderId: row.id as string | number | bigint,
                   ratePercent: rate,
                 });
               }
-            },
-          },
-          {
-            id: 'apply-omnichannel',
-            label: t('sales.actions.applyOmnichannel', {
-              defaultValue: 'Apply omnichannel allocation',
-            }),
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const r = rows[0] as Record<string, unknown>;
-              const channel =
-                window
-                  .prompt(
-                    t('sales.actions.omnichannelChannelPrompt', {
-                      defaultValue: 'Channel (optional, e.g. web, store)',
-                    }),
-                  )
-                  ?.trim() || undefined;
-              const routeRaw =
-                window
-                  .prompt(
-                    t('sales.actions.omnichannelRoutePrompt', {
-                      defaultValue: 'Preferred route id (optional)',
-                    }),
-                  )
-                  ?.trim() ?? '';
-              void applyOmnichannelAllocation
-                .mutateAsync({
-                  orderId: r.id as string | number | bigint,
-                  params: {
-                    preferredRouteId: routeRaw ? BigInt(routeRaw) : undefined,
-                    channel,
-                    metadata: undefined,
-                  },
-                })
-                .catch((e: unknown) => {
-                  window.alert(e instanceof Error ? e.message : String(e));
-                });
-            },
-          },
-          {
-            id: 'create-invoice',
-            label: t('sales.actions.createInvoice'),
-            requiresSelection: true,
-            isApplicable: (rows) =>
-              rows.length === 1 && saleOrderWorkflow.createInvoice.canPresent(rows[0] as EntityRow),
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              if (!saleOrderWorkflow.createInvoice.canPresent(rows[0] as EntityRow)) return;
-              const id = rows[0]?.id;
-              if (id == null) return;
-              setInvoiceOrderError(null);
-              setInvoiceOrderId(BigInt(String(id)));
-            },
-          },
-          {
-            id: 'download-pdf',
-            label: 'Download PDF',
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const id = rows[0]?.id;
-              if (id == null) return;
-              void downloadDocumentPdf('sale-order', Number(id)).catch((e) => {
-                window.alert(e instanceof Error ? e.message : String(e));
-              });
-            },
-          },
-          {
-            id: 'archive-pdf-dms',
-            label: 'Archive PDF to Documents',
-            requiresSelection: true,
-            onClick: (rows) => {
-              if (rows.length !== 1) return;
-              const id = rows[0]?.id;
-              if (id == null) return;
-              void (async () => {
-                try {
-                  const params = await archiveRenderedPdfAsDocument({
-                    kind: 'sale-order',
-                    recordId: Number(id),
-                    companyId: operatingCompanyId,
-                    name: String(rows[0]?.name ?? `Sale order ${id}`),
-                  });
-                  await createDocument.mutateAsync(params);
-                } catch (e) {
-                  window.alert(e instanceof Error ? e.message : String(e));
-                }
-              })();
             },
           },
           ...workflowActionsToEntityActions([saleOrderWorkflow.lock, saleOrderWorkflow.unlock], {
@@ -1636,18 +1442,12 @@ function SalesClientLoaded({
     saleOrdersTableRuntime,
     openCreateSaleOrder,
     saleOrderWorkflow.actions,
-    saleOrderWorkflow.createInvoice,
-    saleOrderWorkflow.acceptQuotation,
     saleOrderWorkflow.cancel,
     saleOrderWorkflow.totals,
     saleOrderWorkflow.lock,
     saleOrderWorkflow.unlock,
-    saleOrderWorkflow.update,
-    navigateToSalesTab,
-    applySalePromotion,
     applySaleOrderOptions,
     accrueSaleCommission,
-    applyOmnichannelAllocation,
     orderLines,
     setCsvKind,
     organizationId,
@@ -1666,11 +1466,13 @@ function SalesClientLoaded({
             id: 'toggle-active',
             label: t('sales.actions.togglePricelistActive'),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: 'multiple',
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.togglePricelistActive') }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 const id = r.id as string | number | bigint;
                 const active = Boolean(r.active);
-                updatePricelist.mutate({ pricelistId: id, isActive: !active });
+                await updatePricelist.mutateAsync({ pricelistId: id, isActive: !active });
               }
             },
           },
@@ -1678,20 +1480,19 @@ function SalesClientLoaded({
             id: 'delete-pricelists',
             label: t('sales.actions.deletePricelists'),
             requiresSelection: true,
+            selection: 'multiple',
             variant: 'destructive',
-            onClick: (rows) => {
-              if (
-                typeof window !== 'undefined' &&
-                !window.confirm(
-                  t('sales.actions.deletePricelistsConfirm', {
-                    count: rows.length,
-                  }),
-                )
-              ) {
-                return;
-              }
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.deletePricelists') }),
+            confirm: {
+              title: t('sales.actions.deletePricelists'),
+              description: (rows) =>
+                t('sales.actions.deletePricelistsConfirm', { count: rows.length }),
+              confirmLabel: t('common.confirm'),
+              cancelLabel: t('common.cancel'),
+            },
+            onClick: async (rows) => {
               for (const r of rows) {
-                deletePricelist.mutate(r.id as string | number | bigint);
+                await deletePricelist.mutateAsync(r.id as string | number | bigint);
               }
             },
           },
@@ -1712,20 +1513,19 @@ function SalesClientLoaded({
             id: 'delete-pricelist-rules',
             label: t('sales.actions.deletePricelistRules'),
             requiresSelection: true,
+            selection: 'multiple',
             variant: 'destructive',
-            onClick: (rows) => {
-              if (
-                typeof window !== 'undefined' &&
-                !window.confirm(
-                  t('sales.actions.deletePricelistRulesConfirm', {
-                    count: rows.length,
-                  }),
-                )
-              ) {
-                return;
-              }
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.deletePricelistRules') }),
+            confirm: {
+              title: t('sales.actions.deletePricelistRules'),
+              description: (rows) =>
+                t('sales.actions.deletePricelistRulesConfirm', { count: rows.length }),
+              confirmLabel: t('common.confirm'),
+              cancelLabel: t('common.cancel'),
+            },
+            onClick: async (rows) => {
               for (const r of rows) {
-                deletePricelistItem.mutate(r.id as string | number | bigint);
+                await deletePricelistItem.mutateAsync(r.id as string | number | bigint);
               }
             },
           },
@@ -1746,10 +1546,13 @@ function SalesClientLoaded({
             id: 'start-batches',
             label: t('sales.actions.startBatches'),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: 'multiple',
+            isApplicable: (rows) => rows.some((r) => deliveryBatchState(r) === 'Draft'),
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.startBatches') }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (deliveryBatchState(r) === 'Draft') {
-                  startPickingBatch.mutate(r.id as string | number | bigint);
+                  await startPickingBatch.mutateAsync(r.id as string | number | bigint);
                 }
               }
             },
@@ -1758,10 +1561,13 @@ function SalesClientLoaded({
             id: 'complete-batches',
             label: t('sales.actions.completeBatches'),
             requiresSelection: true,
-            onClick: (rows) => {
+            selection: 'multiple',
+            isApplicable: (rows) => rows.some((r) => deliveryBatchState(r) === 'InProgress'),
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.completeBatches') }),
+            onClick: async (rows) => {
               for (const r of rows) {
                 if (deliveryBatchState(r) === 'InProgress') {
-                  completePickingBatch.mutate(r.id as string | number | bigint);
+                  await completePickingBatch.mutateAsync(r.id as string | number | bigint);
                 }
               }
             },
@@ -1770,12 +1576,15 @@ function SalesClientLoaded({
             id: 'cancel-batches',
             label: t('sales.actions.cancelBatches'),
             requiresSelection: true,
+            selection: 'multiple',
+            isApplicable: (rows) => rows.some((r) => deliveryBatchState(r) !== 'Done'),
+            successMessage: t('common.actionCompleted', { action: t('sales.actions.cancelBatches') }),
             variant: 'destructive',
-            onClick: (rows) => {
+            onClick: async (rows) => {
               for (const r of rows) {
                 const st = deliveryBatchState(r);
                 if (st !== 'Done') {
-                  cancelPickingBatch.mutate(r.id as string | number | bigint);
+                  await cancelPickingBatch.mutateAsync(r.id as string | number | bigint);
                 }
               }
             },
@@ -2168,7 +1977,7 @@ function SalesClientLoaded({
           if (tab.id === 'orders' && tab.type === 'entity') {
             return {
               ...tab,
-              entityConfig: ordersEntityConfig,
+              entityConfig: saleOrdersWithBoard(t, ordersEntityConfig, saleOrderPrimaryLabel),
               createForm: saleOrderFormConfig,
               recordSheet: saleOrderRecordSheet,
             };
@@ -2209,7 +2018,12 @@ function SalesClientLoaded({
                         defaultValue: 'Delete lines',
                       }),
                       requiresSelection: true,
+                      selection: 'multiple',
                       variant: 'destructive' as const,
+                      isApplicable: (rows) =>
+                        rows.every((r) =>
+                          saleOrderLineCanBeDeleted(r, orders as Record<string, unknown>[]),
+                        ),
                       onClick: (rows) => {
                         for (const r of rows) {
                           // The workflow surface already reports the typed failure.
@@ -2280,6 +2094,13 @@ function SalesClientLoaded({
               ),
             };
           }
+          if (tab.id === 'commission-plans') {
+            return {
+              ...tab,
+              type: 'custom' as const,
+              customContent: <CommissionPlansTab orgId={orgId} partnerNameById={partnerNameById} />,
+            };
+          }
           if (tab.id === 'invoices') {
             return {
               ...tab,
@@ -2287,10 +2108,19 @@ function SalesClientLoaded({
               customContent: (
                 <InvoiceListView
                   invoices={salesInvoices}
+                  worklistScope={{ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }}
+                  sourceState={mergeModuleStates([moduleQueryState(accountMovesQuery), moduleQueryState(currenciesQuery)])}
+                  currencyOptions={invoiceCurrencyOptions}
                   onRecalculateTotals={(inv) =>
-                    void computeInvoiceTotals.mutateAsync(
-                      inv.id as string | number | bigint,
-                    )
+                    void computeInvoiceTotals
+                      .mutateAsync(inv.id as string | number | bigint)
+                      .catch((error: unknown) => {
+                        showWorkflowToast({
+                          kind: 'error',
+                          title: t('common.error.title'),
+                          description: error instanceof Error ? error.message : String(error),
+                        });
+                      })
                   }
                 />
               ),
@@ -2432,6 +2262,12 @@ function SalesClientLoaded({
       linesForSelectedReturn,
       returnOrderFormConfig,
       salesInvoices,
+      invoiceCurrencyOptions,
+      accountMovesQuery,
+      currenciesQuery,
+      organizationId,
+      operatingCompanyId,
+      currentUser?.id,
       computeInvoiceTotals,
       loyaltyCardFormConfig,
       t,
@@ -2446,6 +2282,8 @@ function SalesClientLoaded({
       saleCommissions,
       saleOrdersToApprove,
       saleCommissionsPending,
+      partnerNameById,
+      orgId,
       accountMoves,
       accountJournals,
       accountAccounts,
@@ -2513,6 +2351,20 @@ function SalesClientLoaded({
       loyaltyPrograms,
       loyaltyCards,
     ],
+  );
+
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      orders: {
+        tiles: saleOrderKpis(data.orders, {
+          t,
+          now: new Date(),
+          currencyCodeById: currencyCodeMap(currencies as Record<string, unknown>[]),
+        }),
+        loading: ordersLoading,
+      },
+    }),
+    [data.orders, currencies, ordersLoading, t],
   );
 
   const handleFormSubmit = async (
@@ -2632,8 +2484,10 @@ function SalesClientLoaded({
     <>
       <ModuleView
         config={config}
+        dashboardContent={<ModuleInsights input={{ module: "sales", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: moduleQueryState(ordersQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataLoading={{ orders: ordersLoading }}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         activeTab={activeTab}
@@ -2716,60 +2570,15 @@ function SalesClientLoaded({
       ) : null}
       {csvKind && csvKind !== 'order' && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={"sale_order_line"}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             await importSaleOrderLineCsv.mutateAsync(text);
-          }}
-        />
-      ) : null}
-      {invoiceOrderId != null ? (
-        <RuntimeFormModal
-          key={`invoice-order-${invoiceOrderId.toString()}`}
-          open
-          onOpenChange={(o) => {
-            if (!o) {
-              setInvoiceOrderId(null);
-              setInvoiceOrderError(null);
-            }
-          }}
-          staticConfig={createInvoiceFormConfig}
-          moduleId="sales"
-          formId="create-invoice-from-sale-order"
-          organizationId={organizationId}
-          roleId={runtimeRoleId}
-          preferStdbVisibility
-          foldCustomFieldsIntoMetadata={false}
-          closeOnSubmit={false}
-          submitError={invoiceOrderError}
-          isPending={saleOrderWorkflow.isPending}
-          onSubmit={async (formData) => {
-            setInvoiceOrderError(null);
-            const orderRow = (orders as Record<string, unknown>[]).find(
-              (o) => String(o.id) === String(invoiceOrderId),
-            );
-            const partnerInvoiceId =
-              orderRow?.partnerInvoiceId != null
-                ? BigInt(String(orderRow.partnerInvoiceId))
-                : undefined;
-            const params = toCreateInvoiceFromSaleOrderParams(formData, {
-              partnerInvoiceId,
-            });
-            if (!params) {
-              setInvoiceOrderError(t('common.validation.required'));
-              return;
-            }
-            try {
-              await saleOrderWorkflow.createInvoice.execute(
-                { orderId: String(invoiceOrderId), params },
-                { navigateToNext: true },
-              );
-              setInvoiceOrderId(null);
-            } catch (e) {
-              setInvoiceOrderError(e instanceof Error ? e.message : String(e));
-            }
           }}
         />
       ) : null}
@@ -2850,112 +2659,7 @@ function SalesClientLoaded({
           }}
         />
       ) : null}
-      {editSaleOrderTarget != null ? (
-        <RuntimeFormModal
-          key={`edit-sale-order-${String(editSaleOrderTarget.id)}`}
-          open
-          onOpenChange={(o) => {
-            if (!o) {
-              setEditSaleOrderTarget(null);
-              setEditSaleOrderError(null);
-            }
-          }}
-          staticConfig={editSaleOrderForm(t)}
-          moduleId="sales"
-          formId="edit-sale-order"
-          organizationId={organizationId}
-          roleId={runtimeRoleId}
-          preferStdbVisibility
-          transformConfig={(cfg) =>
-            mergeFieldDefaultValues(cfg, {
-              clientOrderRef: String(
-                editSaleOrderTarget.clientOrderRef ??
-                  editSaleOrderTarget.client_order_ref ??
-                  '',
-              ),
-              note: String(editSaleOrderTarget.note ?? ''),
-              incoterm: String(editSaleOrderTarget.incoterm ?? ''),
-              incotermLocation: String(
-                editSaleOrderTarget.incotermLocation ??
-                  editSaleOrderTarget.incoterm_location ??
-                  '',
-              ),
-              commissionRatePercent:
-                parseCommissionRatePercent(editSaleOrderTarget) || '',
-            })
-          }
-          closeOnSubmit={false}
-          submitError={editSaleOrderError}
-          isPending={saleOrderWorkflow.isPending}
-          onSubmit={async (formData) => {
-            setEditSaleOrderError(null);
-            const id = editSaleOrderTarget.id;
-            if (id == null) return;
-            try {
-              const rateRaw = formData.commissionRatePercent;
-              const rate =
-                rateRaw === '' || rateRaw == null
-                  ? null
-                  : Number(rateRaw);
-              const metadata = mergeCommissionRateIntoMetadata(
-                editSaleOrderTarget.metadata,
-                rate != null && Number.isFinite(rate) ? rate : null,
-              );
-              let mergedMeta = metadata;
-              try {
-                const customRaw = formData.metadata;
-                const customObj =
-                  typeof customRaw === 'string'
-                    ? (JSON.parse(customRaw) as Record<string, unknown>)
-                    : customRaw != null && typeof customRaw === 'object'
-                      ? (customRaw as Record<string, unknown>)
-                      : null;
-                const baseObj = metadata
-                  ? (JSON.parse(metadata) as Record<string, unknown>)
-                  : {};
-                if (customObj) {
-                  mergedMeta = JSON.stringify({ ...baseObj, ...customObj });
-                }
-              } catch {
-                mergedMeta = metadata;
-              }
-              await saleOrderWorkflow.update.execute({
-                orderId: String(id),
-                params: {
-                  clientOrderRef:
-                    typeof formData.clientOrderRef === 'string'
-                      ? formData.clientOrderRef
-                      : undefined,
-                  note: typeof formData.note === 'string' ? formData.note : undefined,
-                  incoterm:
-                    typeof formData.incoterm === 'string' ? formData.incoterm : undefined,
-                  incotermLocation:
-                    typeof formData.incotermLocation === 'string'
-                      ? formData.incotermLocation
-                      : undefined,
-                  metadata: mergedMeta,
-                },
-              });
-              if (
-                operatingCompanyId &&
-                operatingCompanyId !== 0n &&
-                customFieldEntriesFromMetadata(mergedMeta).length > 0
-              ) {
-                await persistCustomFieldsToEav({
-                  organizationId,
-                  companyId: operatingCompanyId,
-                  model: 'sale_order',
-                  recordId: BigInt(String(id)),
-                  metadata: mergedMeta,
-                });
-              }
-              setEditSaleOrderTarget(null);
-            } catch (e) {
-              setEditSaleOrderError(e instanceof Error ? e.message : String(e));
-            }
-          }}
-        />
-      ) : null}
+      {formDialog}
       <FormModal
         open={openReturnForm}
         onOpenChange={(open) => {

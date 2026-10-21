@@ -201,6 +201,7 @@ impl ToolRegistry {
     ///
     /// This namespace never falls back to the local runtime tools. Nonempty
     /// catalogs remain unsupported until the contract supplies provider metadata.
+    #[cfg(test)]
     pub fn generated_specs(&self) -> Result<Vec<crate::providers::llm::ToolSpec>> {
         Ok(super::generated::embedded_catalog()?.specs()?)
     }
@@ -469,6 +470,7 @@ mod generated_registry_tests {
         let config = Config {
             port: 8080,
             internal_secret: None,
+            ai_execution_envelope_key: None,
             qdrant_url: "http://127.0.0.1:6334".into(),
             qdrant_api_key: None,
             qdrant_collection: "test".into(),

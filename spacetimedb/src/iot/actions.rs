@@ -274,6 +274,14 @@ pub fn acknowledge_iot_action(
     if action.organization_id != organization_id {
         return Err("Action does not belong to this organization".to_string());
     }
+    // The gateway may acknowledge before its mark_action_sent call lands, so
+    // Pending is accepted alongside Sent; terminal states stay rejected.
+    if action.status != "Sent" && action.status != "Pending" {
+        return Err(format!(
+            "Cannot acknowledge action — current status is {}",
+            action.status
+        ));
+    }
 
     ctx.db.iot_action().id().update(IoTAction {
         status: "Acknowledged".to_string(),

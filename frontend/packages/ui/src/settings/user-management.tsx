@@ -3,17 +3,15 @@
 import { useMemo, useState } from "react"
 import { useRBAC } from "@/lib/rbac-context"
 import {
-  useAssignRole,
   useAddOrgMember,
   useAddUserToOrganization,
   useCreateUserInvite,
   useRemoveUserFromOrganization,
-  useRevokeRole,
   useSettingsRoles,
   useSettingsUsers,
+  useSetMemberAccess,
   useUpdateOrgMemberDetails,
   useUpdateOrgMemberRole,
-  useUpdateUserOrganizationStatus,
   type SettingsUserRecord,
 } from "@lumiere/query-hooks/hooks/auth"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
@@ -59,6 +57,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { Role } from "@/lib/rbac-types"
 import { useTranslation } from "@lumiere/i18n"
+import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { rolePillClassForColor, userStatusPillClass } from "@/lib/theme-colors"
 import { FormModal } from "../forms/form-modal"
 import {
@@ -75,25 +74,25 @@ function identityHexForAssign(value: string): string {
 
 export function UserManagement() {
   const { t } = useTranslation()
+  const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { organizationId } = useErpSession()
   const orgReady = hasValidOrganizationId(organizationId)
   const orgBigInt = orgReady ? BigInt(organizationId) : 0n
   const [searchQuery, setSearchQuery] = useState("")
   const { data: users = [], isLoading, refetch } = useSettingsUsers(orgBigInt, searchQuery)
   const { data: roles = [] } = useSettingsRoles(orgBigInt)
-  const assignRole = useAssignRole(orgBigInt)
-  const revokeRole = useRevokeRole(orgBigInt)
+  const setMemberAccess = useSetMemberAccess(orgBigInt)
   const createInvite = useCreateUserInvite(orgBigInt)
   const addOrgMember = useAddOrgMember(orgBigInt)
   const addUserToOrganization = useAddUserToOrganization(orgBigInt)
   const updateOrgMemberDetails = useUpdateOrgMemberDetails(orgBigInt)
   const updateOrgMemberRole = useUpdateOrgMemberRole(orgBigInt)
   const removeUser = useRemoveUserFromOrganization(orgBigInt)
-  const updateOrgStatus = useUpdateUserOrganizationStatus(orgBigInt)
   const { checkPermission } = useRBAC()
   const [editingUser, setEditingUser] = useState<SettingsUserRecord | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedRoles, setSelectedRoles] = useState<string[]>([])
+  const [primaryRoleId, setPrimaryRoleId] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [memberModal, setMemberModal] = useState<"addByName" | "addById" | "updateDetails" | "updateRole" | null>(null)
   const [memberError, setMemberError] = useState<string | null>(null)
@@ -134,38 +133,18 @@ export function UserManagement() {
 
   const handleEditUser = (user: SettingsUserRecord) => {
     setEditingUser(user)
-    setSelectedRoles(user.roles)
+    setSelectedRoles(user.roles.filter(id => id !== user.primaryRoleId))
+    setPrimaryRoleId(user.primaryRoleId)
+    setMemberError(null)
     setIsDialogOpen(true)
   }
 
   const handleCreateUser = () => {
     setEditingUser(null)
     setSelectedRoles([])
+    setPrimaryRoleId("")
+    setMemberError(null)
     setIsDialogOpen(true)
-  }
-
-  const syncUserRoles = async (user: SettingsUserRecord, nextRoleIds: string[]) => {
-    const previousRoleIds = new Set(user.roles)
-    const nextRoleSet = new Set(nextRoleIds)
-    const assignmentsByRole = new Map(
-      user.roleAssignments.map((entry) => [entry.roleId, entry.assignmentId]),
-    )
-
-    for (const roleId of nextRoleIds) {
-      if (previousRoleIds.has(roleId)) continue
-      await assignRole.mutateAsync({
-        userIdentity: identityHexForAssign(user.id),
-        roleId,
-        params: { expiresAtMicros: null, metadata: null },
-      })
-    }
-
-    for (const roleId of user.roles) {
-      if (nextRoleSet.has(roleId)) continue
-      const assignmentId = assignmentsByRole.get(roleId)
-      if (!assignmentId) continue
-      await revokeRole.mutateAsync({ assignmentId })
-    }
   }
 
   const handleSaveUser = async (formData: FormData) => {
@@ -174,19 +153,19 @@ export function UserManagement() {
     const email = String(formData.get("email") ?? "").trim()
 
     setIsSaving(true)
+    setMemberError(null)
     try {
       if (editingUser) {
-        await syncUserRoles(editingUser, selectedRoles)
-        const department = String(formData.get("department") ?? "").trim()
-        if (editingUser.userOrgId && department !== (editingUser.department ?? "")) {
-          await updateOrgMemberDetails.mutateAsync({
-            userOrgId: editingUser.userOrgId,
-            params: { jobTitle: department || null, departmentId: null, employeeId: null },
-          })
-        }
+        if (!primaryRoleId) throw new Error('Choose a primary role')
+        await setMemberAccess.mutateAsync({
+          user: editingUser, primaryRoleId,
+          roleIds: [...new Set([primaryRoleId, ...selectedRoles])],
+          isActive: formData.get('status') === 'active',
+          jobTitle: formData.has('department') ? String(formData.get('department') ?? '').trim() : undefined,
+        })
       } else {
         if (!email) throw new Error("Email is required")
-        if (selectedRoles.length === 0) throw new Error("At least one role is required")
+        if (selectedRoles.length !== 1) throw new Error("Choose one initial role for this invitation")
         await createInvite.mutateAsync({
           email,
           roleId: selectedRoles[0],
@@ -195,21 +174,19 @@ export function UserManagement() {
       await refetch()
       setIsDialogOpen(false)
     } catch (error) {
-      console.error(error)
-      alert(t("settings.formConfig.fieldUpdateError"))
+      setMemberError(error instanceof Error ? error.message : t("settings.formConfig.fieldUpdateError"))
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleDeleteUser = async (user: SettingsUserRecord) => {
-    if (!confirm(t("settings.users.deleteConfirm"))) return
+    if (!(await confirmDialog({ description: t("settings.users.deleteConfirm") }))) return
     try {
       await removeUser.mutateAsync(identityHexForAssign(user.id))
       await refetch()
     } catch (error) {
-      console.error(error)
-      alert(t("settings.formConfig.fieldDeleteError"))
+      setMemberError(error instanceof Error ? error.message : t("settings.formConfig.fieldDeleteError"))
     }
   }
 
@@ -220,14 +197,12 @@ export function UserManagement() {
     }
     const nextActive = user.status !== "active"
     try {
-      await updateOrgStatus.mutateAsync({
-        userOrgId: user.userOrgId,
-        isActive: nextActive,
+      await setMemberAccess.mutateAsync({
+        user, primaryRoleId: user.primaryRoleId, roleIds: user.roles, isActive: nextActive,
       })
       await refetch()
     } catch (error) {
-      console.error(error)
-      alert(t("settings.formConfig.fieldUpdateError"))
+      setMemberError(error instanceof Error ? error.message : t("settings.formConfig.fieldUpdateError"))
     }
   }
 
@@ -242,6 +217,7 @@ export function UserManagement() {
 
   return (
     <div className="space-y-6">
+      {memberError && !isDialogOpen && <p role="alert" className="text-sm text-destructive">{memberError}</p>}
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -440,7 +416,7 @@ export function UserManagement() {
             }}
             className="space-y-4"
           >
-            <div className="grid gap-4 sm:grid-cols-2">
+            {editingUser && <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">{t("settings.users.fullName")}</Label>
                 <Input 
@@ -462,35 +438,36 @@ export function UserManagement() {
                   disabled={Boolean(editingUser)}
                 />
               </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            </div>}
+            {!editingUser && <div className="space-y-2"><Label htmlFor="invite-email">{t("settings.users.email")}</Label><Input id="invite-email" name="email" type="email" required autoComplete="email" /></div>}
+            {editingUser && <p className="text-sm text-muted-foreground">Identity email is managed through WorkOS. Members can edit their display name in account settings.</p>}
+            {editingUser && <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="department">{t("settings.users.department")}</Label>
+                <Label htmlFor="department">Job title</Label>
                 <Input 
                   id="department" 
                   name="department"
                   defaultValue={editingUser?.department}
-                  disabled={Boolean(editingUser)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="status">{t("settings.users.status")}</Label>
-                <Select name="status" defaultValue={editingUser?.status || "pending"} disabled={Boolean(editingUser)}>
+                <Select name="status" defaultValue={editingUser?.status === "inactive" ? "inactive" : "active"}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">{t("settings.users.statuses.active")}</SelectItem>
                     <SelectItem value="inactive">{t("settings.users.statuses.inactive")}</SelectItem>
-                    <SelectItem value="pending">{t("settings.users.statuses.pending")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            </div>
+            </div>}
+            {editingUser && <div className="space-y-2"><Label>Primary role</Label><Select value={primaryRoleId} onValueChange={setPrimaryRoleId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map(role => <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>)}</SelectContent></Select></div>}
             <div className="space-y-2">
-              <Label>{t("settings.users.roles")}</Label>
+              <Label>{editingUser ? "Additional roles" : "Initial role"}</Label>
               <div className="grid max-h-64 gap-2 overflow-y-auto rounded-md border p-3 sm:grid-cols-2">
-                {roles.map((role) => (
+                {roles.filter(role => !editingUser || role.id !== primaryRoleId).map((role) => (
                   <div key={role.id} className="flex items-center gap-2">
                     <Checkbox
                       id={role.id}
@@ -498,7 +475,7 @@ export function UserManagement() {
                       checked={selectedRoles.includes(role.id)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedRoles(prev => [...prev, role.id])
+                          setSelectedRoles(prev => editingUser ? [...prev, role.id] : [role.id])
                         } else {
                           setSelectedRoles(prev => prev.filter(r => r !== role.id))
                         }
@@ -511,6 +488,7 @@ export function UserManagement() {
                 ))}
               </div>
             </div>
+            {memberError && <p role="alert" className="text-sm text-destructive">{memberError}</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}
@@ -579,6 +557,7 @@ export function UserManagement() {
           }}
         />
       ) : null}
+      {confirmDialogNode}
     </div>
   )
 }

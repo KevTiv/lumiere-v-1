@@ -16,12 +16,6 @@ pub(crate) fn has_iot_read_permission(
     resource: &str,
 ) -> bool {
     has_resource_read_permission(field_access, resource)
-        || field_access.is_some_and(|access| {
-            access
-                .role_permissions
-                .iter()
-                .any(|permission| permission == "module:iot:read" || permission == "module:iot:*")
-        })
 }
 
 pub(crate) fn strip_soft_delete_fields(row: &mut Value) {

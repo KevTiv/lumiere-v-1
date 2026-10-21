@@ -4,6 +4,13 @@ import {
   type CreateFormFieldParams as StdbCreateFormFieldParams,
   type PublishFormConfigurationParams,
 } from "@lumiere/stdb/client-ui-bridge"
+import { fetchQueryList } from "@lumiere/query-hooks/http"
+import {
+  formConfigVersion,
+  resolveFormPublishEffect,
+  type FormConfigEffectProjection,
+} from "@lumiere/query-hooks/hooks/form-import-effect"
+import type { CanonicalRecordRef } from "@lumiere/query-hooks/hooks/operation-effect"
 import type {
   FieldType as StdbFieldType,
   FieldWidth as StdbFieldWidth,
@@ -50,7 +57,7 @@ export function registryFieldToStdbParams(field: RegistryFieldParams): StdbCreat
 export async function pushRegistryFormToDatabase(
   organizationId: number,
   formEntry: FormRegistryEntry,
-): Promise<void> {
+): Promise<CanonicalRecordRef> {
   const def = formEntry.defaultConfig()
 
   const roleConfigs = Object.values(def.roleConfigs ?? {})
@@ -76,5 +83,18 @@ export async function pushRegistryFormToDatabase(
     replaceMissingFields: false,
   }
 
-  await publishFormConfiguration(BigInt(organizationId), params)
+  const readConfigs = async () =>
+    (await fetchQueryList(
+      "/api/query/form-configs",
+      "Failed to read back form configuration",
+    )) as unknown as FormConfigEffectProjection[]
+  const org = BigInt(organizationId)
+  const priorVersion = formConfigVersion(await readConfigs(), org, def.moduleId, def.formId)
+
+  await publishFormConfiguration(org, params)
+
+  // COV-22: proven only when the exact form reads back at the next config_version.
+  const effect = resolveFormPublishEffect(await readConfigs(), org, def.moduleId, def.formId, priorVersion)
+  if (!effect) throw new Error("Form publish did not read back")
+  return effect
 }

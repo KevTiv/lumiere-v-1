@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   fetchSessionOrganizationId,
   gotoModule,
@@ -111,7 +112,7 @@ test.describe("COV-19 exact activity completion", { tag: ["@p0", "@cov19"] }, ()
     })
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-activities").click()
+    await selectModuleTab(page, "crm", "activities")
     const activityRow = page.getByTestId(`entity-row-${activityId}`)
     await expect(activityRow).toBeVisible({ timeout: 30_000 })
     await activityRow.click()

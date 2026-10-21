@@ -14,6 +14,11 @@ function optionalString(v: unknown): string | undefined {
   return s === "" ? undefined : s
 }
 
+/** An untouched quantity input submits "", which must mean the default single unit, not 0. */
+export function expenseQuantity(v: unknown): number {
+  return v == null || String(v).trim() === "" ? 1 : Number(v)
+}
+
 function requiredTimestamp(v: unknown): CreateExpenseParams["date"] | null {
   if (v == null || String(v).trim() === "") return null
   const d = new Date(String(v))
@@ -53,14 +58,14 @@ function parseU64IdList(raw: unknown): bigint[] {
   if (Array.isArray(raw)) {
     return raw
       .map((x) => optionalBigIntU64(x))
-      .filter((x): x is bigint => x !== undefined)
+      .filter((x): x is bigint => x !== undefined && x > 0n)
   }
   return String(raw)
     .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean)
     .map((s) => optionalBigIntU64(s))
-    .filter((x): x is bigint => x !== undefined)
+    .filter((x): x is bigint => x !== undefined && x > 0n)
 }
 
 /** Parse attachment ids from form; never invent stub id `1`. */
@@ -79,6 +84,14 @@ export function newExpenseReceiptClientRequestId(): string {
     return `rcpt-${crypto.randomUUID()}`
   }
   return `rcpt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+/** Stable command identity supplied to the reducer so a transport retry cannot duplicate a line. */
+export function newExpenseClientRequestId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `expense-${crypto.randomUUID()}`
+  }
+  return `expense-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 export function toCreateExpenseParams(
@@ -106,7 +119,7 @@ export function toCreateExpenseParams(
     name: String(formData.name ?? ""),
     date,
     unitAmount: Number(formData.totalAmount ?? formData.unitAmount ?? 0),
-    quantity: Number(formData.quantity ?? 1),
+    quantity: expenseQuantity(formData.quantity),
     currencyId: parsedCurrencyId,
     description: optionalString(formData.description),
     productId: optionalBigIntU64(formData.productId),
