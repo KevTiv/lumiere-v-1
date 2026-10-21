@@ -6,6 +6,10 @@
     "canonicalization": "json_sorted_keys_semantic_type_refs"
   },
   "operations": {
+    "erp.abandon_bank_statement_settlement": {
+      "name": "abandon_bank_statement_settlement",
+      "shape_fingerprint": "sha256:01cb3a679329c7de8714ca3e2ee5f5d9d637719676b9d7c0fdcdc80b18daf730"
+    },
     "erp.accept_ai_provider_attempt": {
       "name": "accept_ai_provider_attempt",
       "shape_fingerprint": "sha256:f5c4e3ec4296678bad9058f8b830257c7ba900edd4acd31fdd7f0db20d64e10f"
@@ -13,6 +17,10 @@
     "erp.accept_sale_order_quotation": {
       "name": "accept_sale_order_quotation",
       "shape_fingerprint": "sha256:01824a849506b81f964c47a068a49724441a458904555204642e87e3b9960a5a"
+    },
+    "erp.accept_user_invite": {
+      "name": "accept_user_invite",
+      "shape_fingerprint": "sha256:6fa6d6c167a24015f34951d847cd09242bec46039ea704863e8c3b0b91200e38"
     },
     "erp.accrue_sale_commission": {
       "name": "accrue_sale_commission",
@@ -140,7 +148,7 @@
     },
     "erp.add_workflow_human_task_comment": {
       "name": "add_workflow_human_task_comment",
-      "shape_fingerprint": "sha256:7fe2eb4d4c384b9d26f86997d4161c070f33a3299212a1df165e3864543084b6"
+      "shape_fingerprint": "sha256:816db1a3020cd054faaad6b169d05a205eba114048a9973f44c2020a6f93f563"
     },
     "erp.advance_ai_run_checkpoint": {
       "name": "advance_ai_run_checkpoint",
@@ -209,6 +217,10 @@
     "erp.apply_global_migrations": {
       "name": "apply_global_migrations",
       "shape_fingerprint": "sha256:b63c76350efcb363d4bc6bea459be76a792871a8d32d217da072fd6b3818f0ca"
+    },
+    "erp.apply_historical_payment_allocations": {
+      "name": "apply_historical_payment_allocations",
+      "shape_fingerprint": "sha256:50e80a3e94220b39b5285a8cd4534087f6041437fedcb45bb88af0ab50b156e5"
     },
     "erp.apply_hr_integration_intent": {
       "name": "apply_hr_integration_intent",
@@ -520,7 +532,7 @@
     },
     "erp.cancel_payment": {
       "name": "cancel_payment",
-      "shape_fingerprint": "sha256:a720b173c46b904dd80480a36f942be642cff1eaa7278a46f12222e8ba921559"
+      "shape_fingerprint": "sha256:310174089d41a0d60322df27be65c12ce91868868b4182f89f5b28b08db8d848"
     },
     "erp.cancel_payslip": {
       "name": "cancel_payslip",
@@ -580,7 +592,7 @@
     },
     "erp.cancel_workflow": {
       "name": "cancel_workflow",
-      "shape_fingerprint": "sha256:9e06e80c5e17ef2d38c1bd1b31743a5618647f62a0a9b679a49d41d31f087f7b"
+      "shape_fingerprint": "sha256:6870c12529fe19c7aaafe368222913e3f63ebcb824d8a60435f53484ed904967"
     },
     "erp.cancel_workflow_outbox": {
       "name": "cancel_workflow_outbox",
@@ -610,9 +622,17 @@
       "name": "claim_queue_job",
       "shape_fingerprint": "sha256:0a2536500c7b9a96fb8e4f2f37f32920c5afb4935bd2d8472e00cc529b67769d"
     },
+    "erp.claim_reviewed_mail_delivery": {
+      "name": "claim_reviewed_mail_delivery",
+      "shape_fingerprint": "sha256:cc6ab7d782d9fdece65d1c9137b801946d6da655f0b8cb27c3e19f990cb94eec"
+    },
     "erp.claim_workflow_human_task": {
       "name": "claim_workflow_human_task",
-      "shape_fingerprint": "sha256:45865da0d02caf4813495a4fc64591435c7439605747517092022d5b45ea386a"
+      "shape_fingerprint": "sha256:b3a266de4d278fe33d4b294d36e2d273f03730bde1e87996b35c2fb18e81776a"
+    },
+    "erp.cleanup_abandoned_account_move_import": {
+      "name": "cleanup_abandoned_account_move_import",
+      "shape_fingerprint": "sha256:1b61fd65e22b570aca77945cad7f09abff59e2752d69729d60ba794d846385fa"
     },
     "erp.cleanup_stale_proposal_presence": {
       "name": "cleanup_stale_proposal_presence",
@@ -810,6 +830,14 @@
       "name": "configure_contact_identity_verification_authority",
       "shape_fingerprint": "sha256:35d1d80a4c02e423a0af644dcdfc71532331771207d3c330851e610776b8a3c6"
     },
+    "erp.configure_manufacturing_valuation": {
+      "name": "configure_manufacturing_valuation",
+      "shape_fingerprint": "sha256:d59bd871ab39b2fbfd94b4bce420b9546b0c6c72d128b432d9849691a1bca1ee"
+    },
+    "erp.configure_workcenter_cost_rate": {
+      "name": "configure_workcenter_cost_rate",
+      "shape_fingerprint": "sha256:f2645fa39688e36ed22dc0bfdb377caccfa44dbd3aa78aa445ca1b865609c77d"
+    },
     "erp.confirm_account_asset": {
       "name": "confirm_account_asset",
       "shape_fingerprint": "sha256:ded18d9752f5605598f60747c2999537db2132a5e4f4d31e105fd086cd7adf65"
@@ -820,7 +848,7 @@
     },
     "erp.confirm_manufacturing_order": {
       "name": "confirm_manufacturing_order",
-      "shape_fingerprint": "sha256:f1bc6308fc3123bab081e04854fd869b2d3e02e69c453340fe2b0979fee82700"
+      "shape_fingerprint": "sha256:098e26e24d5d80436c24a9c87b6818d0eb513bb5777a9eaa0b72a5a5c89c27c3"
     },
     "erp.confirm_payslip": {
       "name": "confirm_payslip",
@@ -876,7 +904,7 @@
     },
     "erp.convert_purchase_requisition_to_po": {
       "name": "convert_purchase_requisition_to_po",
-      "shape_fingerprint": "sha256:1065e9199b5420f9d4e646b79a7b7c7da4d7a7b8ed786e03bc2d1129c4e1e111"
+      "shape_fingerprint": "sha256:730cab7a413c092f1987469386cbcb23b6f1f1c7f977f3cadbbbaeb82b798c35"
     },
     "erp.correct_ai_decision_case": {
       "name": "correct_ai_decision_case",
@@ -1414,6 +1442,14 @@
       "name": "create_mail_template",
       "shape_fingerprint": "sha256:d8a71dd5523d9a65db72ca8fdb8b33c225929b45447aa86a0e5dd2fac8d10a75"
     },
+    "erp.create_manual_account_invoice": {
+      "name": "create_manual_account_invoice",
+      "shape_fingerprint": "sha256:9ad91b5f01e10604918487f90022b00943758ca8a2a473b84eab28ad81f07a76"
+    },
+    "erp.create_manual_invoice": {
+      "name": "create_manual_invoice",
+      "shape_fingerprint": "sha256:763f3fd6a98dda39289cfb7a0d861f454493ffcb43c77eb201e5f5a6198933f9"
+    },
     "erp.create_manufacturing_order": {
       "name": "create_manufacturing_order",
       "shape_fingerprint": "sha256:fa0e9a3807b2f80d0ec7a6d8ce911ff8e2134ac228e3eefefe90b7f4f2ea3c06"
@@ -1621,6 +1657,10 @@
     "erp.create_purchase_order": {
       "name": "create_purchase_order",
       "shape_fingerprint": "sha256:72c3563be3fe13e2bee2c88145886ed73fcbd6d74dbedb53e034be598ec72d62"
+    },
+    "erp.create_purchase_order_once": {
+      "name": "create_purchase_order_once",
+      "shape_fingerprint": "sha256:fe8389e742aa0a34165a1c65d1e803551480847ff58ec6a7de42004d4e5d7d16"
     },
     "erp.create_purchase_requisition": {
       "name": "create_purchase_requisition",
@@ -1952,7 +1992,7 @@
     },
     "erp.decide_workflow_human_task": {
       "name": "decide_workflow_human_task",
-      "shape_fingerprint": "sha256:9f3fa51a349c856103443065c9025592ea8020dd6af70627a6ed64b43d04520c"
+      "shape_fingerprint": "sha256:66a0e0ca04598edcc244ea06304f9dd9fdeceae7f037903331e3ddede86a1214"
     },
     "erp.delete_account_asset": {
       "name": "delete_account_asset",
@@ -2374,6 +2414,10 @@
       "name": "finish_manufacturing_order",
       "shape_fingerprint": "sha256:78d762e7dedefd9ff9a2aeaccfd450a166419cc0d97b50daacb24cb656a5a4ba"
     },
+    "erp.finish_manufacturing_order_with_tracking": {
+      "name": "finish_manufacturing_order_with_tracking",
+      "shape_fingerprint": "sha256:f35bf48908ce37233c8f905961c689a68f29acab8544e8b85298cb5f3fa45fd5"
+    },
     "erp.finish_workorder": {
       "name": "finish_workorder",
       "shape_fingerprint": "sha256:18f7642243d30cdffbefdd49a4cd8d0a942003c320c20eb53c6a5941e8853005"
@@ -2425,6 +2469,10 @@
     "erp.grant_subscription_entitlement": {
       "name": "grant_subscription_entitlement",
       "shape_fingerprint": "sha256:8d5c6b629554ef55ff3e3befdedf5970bc591449e2cbaa63b1f79f540b3b5eda"
+    },
+    "erp.helpdesk_related_record_read": {
+      "name": "helpdesk_related_record_read",
+      "shape_fingerprint": "sha256:ddc389bc61f57e2049ad8a2884ea052fb70d46d34fe315a6fae76c6d39a78b32"
     },
     "erp.hold_supplier_intake": {
       "name": "hold_supplier_intake",
@@ -2493,6 +2541,10 @@
     "erp.import_country_csv": {
       "name": "import_country_csv",
       "shape_fingerprint": "sha256:829179ebd58342eadad794ccd8cb2bd1e205c5a289fd1f8b848417dd6c6c9928"
+    },
+    "erp.import_csv_tracked": {
+      "name": "import_csv_tracked",
+      "shape_fingerprint": "sha256:d97c34c6e374096c10a6784dfa07f800f75d600b81697dc3718d84fd110157ab"
     },
     "erp.import_currency_csv": {
       "name": "import_currency_csv",
@@ -2708,7 +2760,7 @@
     },
     "erp.invalidate_workflow_human_task": {
       "name": "invalidate_workflow_human_task",
-      "shape_fingerprint": "sha256:37a5918e8e9b7e74dab1849e07441e86953e549331f6235e2e2e98e06916d076"
+      "shape_fingerprint": "sha256:6b63a9516126ca0784a934f09ec4b49b874507459dd89d58eb3cf09db22a7bdd"
     },
     "erp.invoice_po_line": {
       "name": "invoice_po_line",
@@ -2916,7 +2968,7 @@
     },
     "erp.post_payment": {
       "name": "post_payment",
-      "shape_fingerprint": "sha256:d3c6ecef2d8ae78d0829d74ebb25dff6383be8c47586825d2ff9e1edff5d5f04"
+      "shape_fingerprint": "sha256:d090258bc3bbfd02b7139c5e70654b7255dd721c61c5fdecfbd6a7339feffc88"
     },
     "erp.post_payment_transaction": {
       "name": "post_payment_transaction",
@@ -3022,6 +3074,10 @@
       "name": "receive_po_line",
       "shape_fingerprint": "sha256:273ab43f8c5af8e01ae9a4cfa555a52a01986f81bfe8d40032f2942fe8896d63"
     },
+    "erp.receive_po_line_once": {
+      "name": "receive_po_line_once",
+      "shape_fingerprint": "sha256:ed72f39907b8dbea680b43eaaea086c17504aa180cd0908b0d04141ba565f92f"
+    },
     "erp.recognize_amortization_line": {
       "name": "recognize_amortization_line",
       "shape_fingerprint": "sha256:89504b28b03f27217a65d50652c76e18c53767999e9092b6013408e54dac4815"
@@ -3048,7 +3104,7 @@
     },
     "erp.reconcile_account_bank_statement_line": {
       "name": "reconcile_account_bank_statement_line",
-      "shape_fingerprint": "sha256:208d7e38dd6533e0ba35f6c91a0192b4f0c46a112099faa38a01888f34986dbb"
+      "shape_fingerprint": "sha256:54966591ab3c66badf5ae08bfe59c0dd9430490e1a581a1f00a75ced60eb345b"
     },
     "erp.reconcile_ai_provider_attempt": {
       "name": "reconcile_ai_provider_attempt",
@@ -3246,6 +3302,10 @@
       "name": "record_workflow_outbox_result",
       "shape_fingerprint": "sha256:482460a0832ff96b0552f8317e5a54cc1e26e147e05f891bc3fccaf3a0188fca"
     },
+    "erp.recover_ai_provider_attempt": {
+      "name": "recover_ai_provider_attempt",
+      "shape_fingerprint": "sha256:d2c72d17ee3e3344476b43726e8db93bb3456ef88d0bd11b430f7d5ae4b86168"
+    },
     "erp.refresh_capacity_forecast": {
       "name": "refresh_capacity_forecast",
       "shape_fingerprint": "sha256:6361ff5536eaee003d3b0d204b16501fef17aeb2953da5ce687116fe5833484e"
@@ -3364,7 +3424,7 @@
     },
     "erp.release_document_legal_hold": {
       "name": "release_document_legal_hold",
-      "shape_fingerprint": "sha256:758ad7f2f8c0b47b0e189732b12850f0c018279c19355819004e724bddcbaa6d"
+      "shape_fingerprint": "sha256:b1ff97ee92b6e265a3f767f3e2b924103d79c10314d76953302a4a10deed34ce"
     },
     "erp.release_picking_wave": {
       "name": "release_picking_wave",
@@ -3446,6 +3506,10 @@
       "name": "request_expense_policy_exception",
       "shape_fingerprint": "sha256:628ed92461861363397072a9b82bf7c700c0f838eadfb520131d65802cefd917"
     },
+    "erp.request_workflow_subject_snapshot": {
+      "name": "request_workflow_subject_snapshot",
+      "shape_fingerprint": "sha256:5495da63ae66197c23b96b11d0ce55bdc10d9c936aef805d4077b423c69e84c1"
+    },
     "erp.reserve_ai_spend": {
       "name": "reserve_ai_spend",
       "shape_fingerprint": "sha256:7356e80c83ec5d1fbed3b1f4f883d3d8e321dbd5ebe1c56b2cf68a0608682c19"
@@ -3502,6 +3566,10 @@
       "name": "restore_proposal_version",
       "shape_fingerprint": "sha256:4b2ba3d523146b998bec4f4f4684235362fe48818e901a867fca3a37773c1c73"
     },
+    "erp.resubmit_bank_statement_settlement": {
+      "name": "resubmit_bank_statement_settlement",
+      "shape_fingerprint": "sha256:db3b7e46c443e56bb313a3a5c3fe96d7620365d15fae05bfcc9808554cc937ff"
+    },
     "erp.resume_ai_run_checked": {
       "name": "resume_ai_run_checked",
       "shape_fingerprint": "sha256:5301f7bb2eb84963c29c8dc58f4a3a76041738b24a725a3b6c28945ccdebbc32"
@@ -3525,6 +3593,10 @@
     "erp.retry_iot_action": {
       "name": "retry_iot_action",
       "shape_fingerprint": "sha256:57cb86858927a671d4692c164c7fe6f35a96f595da1011507cecc782a59fe408"
+    },
+    "erp.reverse_bank_statement_settlement": {
+      "name": "reverse_bank_statement_settlement",
+      "shape_fingerprint": "sha256:aec70c6436d7b86260786d0333bf7ad7ab04e3b976d6451843e64ee8a57b2b1d"
     },
     "erp.reverse_payment_transaction": {
       "name": "reverse_payment_transaction",
@@ -3678,6 +3750,10 @@
       "name": "run_ai_intelligence_events_tests",
       "shape_fingerprint": "sha256:2071b25e5137007b1b695f0c7974cd3d11b81b2d33bb373ff4a274c52f890a79"
     },
+    "erp.run_ai_spend_recovery_tests": {
+      "name": "run_ai_spend_recovery_tests",
+      "shape_fingerprint": "sha256:1c9cfe0d48de65ca8f44a405095af6626639bd2a1969912b61c824bb79d2a2dc"
+    },
     "erp.run_all_accounting_tests": {
       "name": "run_all_accounting_tests",
       "shape_fingerprint": "sha256:ec15d8a953d26e0748f1b2bfb1ec90d71bff16678d6fe4907b16d8ef24045523"
@@ -3777,6 +3853,10 @@
     "erp.run_analytics_dashboard_company_scope_test": {
       "name": "run_analytics_dashboard_company_scope_test",
       "shape_fingerprint": "sha256:2b8568373546f08061a83e71904a23f561e01f892f8630ee024dfb86dc15f645"
+    },
+    "erp.run_analytics_dashboard_widget_idempotency_test": {
+      "name": "run_analytics_dashboard_widget_idempotency_test",
+      "shape_fingerprint": "sha256:edc58958474ec844d8fd16117182382ad853d452edc4283a6777f5842e70061a"
     },
     "erp.run_c0_organization_ownership_backfill": {
       "name": "run_c_0_organization_ownership_backfill",
@@ -4150,9 +4230,21 @@
       "name": "run_iot_relational_integrity_test",
       "shape_fingerprint": "sha256:4ef9a5a48db9b95950427acc942baf11415ccdd31255900b0c6774f07338366a"
     },
+    "erp.run_manufacturing_actual_cost_valuation_test": {
+      "name": "run_manufacturing_actual_cost_valuation_test",
+      "shape_fingerprint": "sha256:0d473f20e1f7554e76452334769514456003a67af77fc7f1be7983c1eb85f498"
+    },
     "erp.run_manufacturing_bom_byproduct_output_exact_effect_test": {
       "name": "run_manufacturing_bom_byproduct_output_exact_effect_test",
       "shape_fingerprint": "sha256:5d3faa87116ffa6a665fd805a44ec3aa3af606fa813e39a71fc5fee57ed10cb8"
+    },
+    "erp.run_manufacturing_bom_routing_lifecycle_test": {
+      "name": "run_manufacturing_bom_routing_lifecycle_test",
+      "shape_fingerprint": "sha256:a4ed3523f0c3f5a3943eecf8adc30b75f04b2ab1329ae7d656e934a40a3c6427"
+    },
+    "erp.run_manufacturing_bom_to_close_domain_lifecycle_test": {
+      "name": "run_manufacturing_bom_to_close_domain_lifecycle_test",
+      "shape_fingerprint": "sha256:c488183e98e5645fa9174dd58ca5aa945d95b6168df29454196ecc158f6fbf1a"
     },
     "erp.run_manufacturing_consume_materials_cross_org_component_test": {
       "name": "run_manufacturing_consume_materials_cross_org_component_test",
@@ -4161,6 +4253,10 @@
     "erp.run_manufacturing_consume_materials_exact_effect_test": {
       "name": "run_manufacturing_consume_materials_exact_effect_test",
       "shape_fingerprint": "sha256:d3499a6a879919795940b8593e2936aa63714f86341d3909a9de4d365d81c08d"
+    },
+    "erp.run_manufacturing_cost_configuration_scope_test": {
+      "name": "run_manufacturing_cost_configuration_scope_test",
+      "shape_fingerprint": "sha256:e6ac981101f63a56de04d8f0f2209fe0a2ec97865e252be96f9ebbac433bd62c"
     },
     "erp.run_manufacturing_finished_output_scrap_exact_effect_test": {
       "name": "run_manufacturing_finished_output_scrap_exact_effect_test",
@@ -4181,6 +4277,10 @@
     "erp.run_manufacturing_productivity_relational_integrity_test": {
       "name": "run_manufacturing_productivity_relational_integrity_test",
       "shape_fingerprint": "sha256:337a25d625bd908d1bb2c84b29d794a06826bfcb85ec43c2905944894f974e9f"
+    },
+    "erp.run_manufacturing_tracked_output_test": {
+      "name": "run_manufacturing_tracked_output_test",
+      "shape_fingerprint": "sha256:b4e295f0212d76078fc0dddb31a9e621ec20dcdb4cf59d2551571e55165cae12"
     },
     "erp.run_manufacturing_workcenter_create_test": {
       "name": "run_manufacturing_workcenter_create_test",
@@ -4261,6 +4361,10 @@
     "erp.run_purchasing_incoming_picking_test": {
       "name": "run_purchasing_incoming_picking_test",
       "shape_fingerprint": "sha256:de820769ab54df2a59e8ccfc7ffe0df69eb932d9088e2576ce269457b5ace895"
+    },
+    "erp.run_purchasing_keyed_operations_test": {
+      "name": "run_purchasing_keyed_operations_test",
+      "shape_fingerprint": "sha256:3acfce83782bbb15815aba0ebd2dd32de0e241e9b2527a330a0b7321c3da390e"
     },
     "erp.run_purchasing_lot_receive_test": {
       "name": "run_purchasing_lot_receive_test",
@@ -4486,6 +4590,10 @@
       "name": "run_workflow_runtime_tests",
       "shape_fingerprint": "sha256:1e1735d61a21517c67effd1e78e16a73a38333b57398f2e3556e24281bf9bfd5"
     },
+    "erp.run_workflow_subject_snapshot_tests": {
+      "name": "run_workflow_subject_snapshot_tests",
+      "shape_fingerprint": "sha256:018a23d399143380aa9cc6006c880bcaaa66e570c099d18b3891b775fef88cff"
+    },
     "erp.save_import_mapping_template": {
       "name": "save_import_mapping_template",
       "shape_fingerprint": "sha256:392257623d593a5057b036e6a8a83ab98979c7837f04eda25252a3a5515249a6"
@@ -4517,6 +4625,14 @@
     "erp.scrap_finished_manufacturing_output": {
       "name": "scrap_finished_manufacturing_output",
       "shape_fingerprint": "sha256:4c0c2f26e704c65580e56b614dbd3bcd2885ea6b06e2076c6e001bb3bed73b10"
+    },
+    "erp.scrap_manufacturing_material": {
+      "name": "scrap_manufacturing_material",
+      "shape_fingerprint": "sha256:2a96a906514cc0f7ef2ea9bf283d8d92f5f47204092938a73a98fea8fd3c51dc"
+    },
+    "erp.scrap_tracked_manufacturing_output": {
+      "name": "scrap_tracked_manufacturing_output",
+      "shape_fingerprint": "sha256:ce542ffa19bdf37db2409f0ef20c52adb062d493fab96b2c6ecfbcc1d1ef7568"
     },
     "erp.seed_dev_data": {
       "name": "seed_dev_data",
@@ -4634,6 +4750,10 @@
       "name": "set_billing_status",
       "shape_fingerprint": "sha256:4f04b2cac533efa1eacee5045f0cbe28662d1c9f49cf5aa63227b255e5249ca0"
     },
+    "erp.set_bom_operations": {
+      "name": "set_bom_operations",
+      "shape_fingerprint": "sha256:98b0e86ec6db7c1fea9c5ee71751607cf10211597cb6cd7c28994fe9f351f8f0"
+    },
     "erp.set_commodity_price_index": {
       "name": "set_commodity_price_index",
       "shape_fingerprint": "sha256:281abb5dc38d08c8952a9c39f8bcdf06c1f59787649b7161073bbb78c851183a"
@@ -4682,6 +4802,10 @@
       "name": "set_google_drive_conflict_policy",
       "shape_fingerprint": "sha256:bc0d141befaac4f7dc6ce05d48e6dec400bb79d0801ae8e88623552b2b983ce8"
     },
+    "erp.set_helpdesk_related_record": {
+      "name": "set_helpdesk_related_record",
+      "shape_fingerprint": "sha256:d13824f518b15eb4186ce61cafc769aba99ac53a8dcad468a3c1387d9e2a142c"
+    },
     "erp.set_intercompany_rule_active": {
       "name": "set_intercompany_rule_active",
       "shape_fingerprint": "sha256:b2c23ac0e2cf9f16276ac081e7499ec1992b02810ee46d2a718b741143cd7624"
@@ -4689,6 +4813,10 @@
     "erp.set_iot_threshold": {
       "name": "set_iot_threshold",
       "shape_fingerprint": "sha256:948544db0bf9912c3019590c6daf9fe3614b28986e17dba4477912f5e4d9535b"
+    },
+    "erp.set_member_access": {
+      "name": "set_member_access",
+      "shape_fingerprint": "sha256:f71c62a02309ec8fa82c1eacabdd7610a51727c5835782ba64cfeb85bb2948af"
     },
     "erp.set_project_active": {
       "name": "set_project_active",
@@ -4929,6 +5057,10 @@
     "erp.unreconciled_account_bank_statement_line": {
       "name": "unreconciled_account_bank_statement_line",
       "shape_fingerprint": "sha256:4bca3cc278e1dc27e504efa61f4f99b41a97c48e9205cdc90ce18eb7495b7b95"
+    },
+    "erp.unregister_payment_allocations": {
+      "name": "unregister_payment_allocations",
+      "shape_fingerprint": "sha256:7610a6bd7dbad4b7578714a45e804b5f1cdaf77d5657996b76df09c2d0a8377f"
     },
     "erp.unreserve_stock_picking": {
       "name": "unreserve_stock_picking",
@@ -5884,6 +6016,86 @@
       "current_operations_fingerprint": "sha256:73a45e16698b877aee4bb418e0292459a4405e718618c3ff7ca1a45a0ff35432",
       "operation_count": 1427,
       "reason": "release on top of v0.3.84: add none; change the shape of unreserve_stock_picking, update_stock_picking"
+    },
+    {
+      "previous_release": "v0.3.86",
+      "previous_ir_sha256": "sha256:6f7ee6259a0f85fcce7a074caa48d033ea6bf93bd6da8cf278301ae57f997399",
+      "previous_operations_fingerprint": "sha256:73a45e16698b877aee4bb418e0292459a4405e718618c3ff7ca1a45a0ff35432",
+      "current_operations_fingerprint": "sha256:810d98bb268eccb3275d4fe82e4a605d7674933a03b2ed32554423552d4936fe",
+      "operation_count": 1427,
+      "reason": "release on top of v0.3.86: add none; change the shape of release_document_legal_hold"
+    },
+    {
+      "previous_release": "v0.3.87",
+      "previous_ir_sha256": "sha256:5d9346b1e777e9ab3f63af269f3169ca4f0561230dcdb008d5bfeef5ec04e225",
+      "previous_operations_fingerprint": "sha256:810d98bb268eccb3275d4fe82e4a605d7674933a03b2ed32554423552d4936fe",
+      "current_operations_fingerprint": "sha256:3324bce97daa1f9f32abfc999e54abbf31971b50b0a43ec18a0ef042e98ad87c",
+      "operation_count": 1429,
+      "reason": "add the tenant-scoped workflow subject snapshot reducer and its in-database test reducer on top of released v0.3.87; preserve every existing operation shape"
+    },
+    {
+      "previous_release": "v0.3.91",
+      "previous_ir_sha256": "sha256:c01082e4f554944458fdcb1c6f6be25354ba5deff8698a2058fb4559ff8fe1be",
+      "previous_operations_fingerprint": "sha256:3324bce97daa1f9f32abfc999e54abbf31971b50b0a43ec18a0ef042e98ad87c",
+      "current_operations_fingerprint": "sha256:117baf801a8bd353d357f5c04a695b4be3e59d9fd4f5909d4915a9d343ab4fdb",
+      "operation_count": 1433,
+      "reason": "release on top of v0.3.91: add helpdesk_related_record_read, import_csv_tracked, run_analytics_dashboard_widget_idempotency_test, set_helpdesk_related_record; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.99",
+      "previous_ir_sha256": "sha256:813f74098de2220871149ebfd389404f82e4f59a1d65d1b22c877a2e3b39bf4b",
+      "previous_operations_fingerprint": "sha256:117baf801a8bd353d357f5c04a695b4be3e59d9fd4f5909d4915a9d343ab4fdb",
+      "current_operations_fingerprint": "sha256:246cc546a7d4c8caa66e58edfc8b7deb57bf757866c5fa379ab00a983664468a",
+      "operation_count": 1444,
+      "reason": "release on top of v0.3.99: add configure_manufacturing_valuation, configure_workcenter_cost_rate, finish_manufacturing_order_with_tracking, run_manufacturing_actual_cost_valuation_test, run_manufacturing_bom_routing_lifecycle_test, run_manufacturing_bom_to_close_domain_lifecycle_test, run_manufacturing_cost_configuration_scope_test, run_manufacturing_tracked_output_test, scrap_manufacturing_material, scrap_tracked_manufacturing_output, set_bom_operations; change the shape of confirm_manufacturing_order"
+    },
+    {
+      "previous_release": "v0.3.105",
+      "previous_ir_sha256": "sha256:4db7bdcfe4aa9e30ad8b845701d83e961236aa4a93fc8c0701b7e9d029b0af0a",
+      "previous_operations_fingerprint": "sha256:246cc546a7d4c8caa66e58edfc8b7deb57bf757866c5fa379ab00a983664468a",
+      "current_operations_fingerprint": "sha256:b0256ff3294362745bfe373602729ce1f504236aad8f433ba883dec107a20339",
+      "operation_count": 1445,
+      "reason": "release on top of v0.3.105: add denied internal unregister_payment_allocations; update convert_purchase_requisition_to_po for the scheduled replenishment source path"
+    },
+    {
+      "previous_release": "v0.3.106",
+      "previous_ir_sha256": "sha256:1464375a45eac53de135f8c588e9349d61d1b895290856d3928726b3a3090a3d",
+      "previous_operations_fingerprint": "sha256:b0256ff3294362745bfe373602729ce1f504236aad8f433ba883dec107a20339",
+      "current_operations_fingerprint": "sha256:a7671fb5a29419595c45acfeb4591a7df1b091c69486e427cf8d0da9d5d55a5c",
+      "operation_count": 1446,
+      "reason": "COV-08 atomic manual accounting invoice creation and exact payment reversal identity"
+    },
+    {
+      "previous_release": "v0.3.107",
+      "previous_ir_sha256": "sha256:d429d78cadb3a4f36c1777345f9d49dfd947dccd924611911e259bb8ed246e89",
+      "previous_operations_fingerprint": "sha256:a7671fb5a29419595c45acfeb4591a7df1b091c69486e427cf8d0da9d5d55a5c",
+      "current_operations_fingerprint": "sha256:b812cdb909e5802f273497136f93b6027c54cf4a3a49e083ba20617c2b5dfa18",
+      "operation_count": 1448,
+      "reason": "release on top of v0.3.107: add apply_historical_payment_allocations, create_manual_invoice; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.108",
+      "previous_ir_sha256": "sha256:649f4668f4a2e70f68483202e9fe1cf643c100e2aa30eb5a91404eee140c44b9",
+      "previous_operations_fingerprint": "sha256:b812cdb909e5802f273497136f93b6027c54cf4a3a49e083ba20617c2b5dfa18",
+      "current_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
+      "operation_count": 1449,
+      "reason": "release on top of v0.3.108: add cleanup_abandoned_account_move_import; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.109",
+      "previous_ir_sha256": "sha256:7cc56b148646660b0c43d4b3332cb1855c273c84e09ef36eafad1ee5913a2152",
+      "previous_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
+      "current_operations_fingerprint": "sha256:c6c1a33c18c0d7619085bf68d32900965f112a9b94564182a92a0f7fcc189bbb",
+      "operation_count": 1451,
+      "reason": "Complete hosted WorkOS identity and access lifecycle: atomic invitation acceptance, member access updates, editable role metadata and matching source contracts."
+    },
+    {
+      "previous_release": "v0.3.128",
+      "previous_ir_sha256": "sha256:430df27068c8e27a6c6d85499236689809e5ed256a790c2839fcc68f6ff80112",
+      "previous_operations_fingerprint": "sha256:c6c1a33c18c0d7619085bf68d32900965f112a9b94564182a92a0f7fcc189bbb",
+      "current_operations_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
+      "operation_count": 1458,
+      "reason": "release on top of v0.3.128: add abandon_bank_statement_settlement, claim_reviewed_mail_delivery, create_purchase_order_once, receive_po_line_once, resubmit_bank_statement_settlement, reverse_bank_statement_settlement, run_purchasing_keyed_operations_test; change the shape of add_workflow_human_task_comment, cancel_workflow, claim_workflow_human_task, decide_workflow_human_task, invalidate_workflow_human_task, post_payment, reconcile_account_bank_statement_line"
     }
   ]
 }

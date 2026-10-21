@@ -11,6 +11,8 @@
  *   Body: JSON array of arguments
  */
 
+import { isWorkOsEnabled } from '@/lib/auth-mode'
+import { resolveApiServerBaseUrl } from '@/lib/api-server-forward'
 import { stringifyReducerCallBody } from '@lumiere/api-client'
 import type { StdbHttpOptions } from '@lumiere/stdb/server'
 
@@ -63,6 +65,17 @@ export async function callReducer(
   args: unknown[],
   opts?: StdbHttpOptions,
 ): Promise<void> {
+  if (isWorkOsEnabled()) {
+    const base = resolveApiServerBaseUrl()
+    if (!base || !opts?.token) throw new Error('Authenticated API reducer transport is unavailable')
+    const response = await fetch(`${base}/v1/compat/reducer/${encodeURIComponent(reducerName)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${opts.token}`, 'Content-Type': 'application/json' },
+      body: stringifyReducerCallBody(args), cache: 'no-store', redirect: 'error',
+    })
+    if (!response.ok) throw new Error(`API reducer call failed (${response.status})`)
+    return
+  }
   const host = resolveHost(opts?.host)
   const module = resolveModule(opts?.module)
   const token = resolveToken(opts)

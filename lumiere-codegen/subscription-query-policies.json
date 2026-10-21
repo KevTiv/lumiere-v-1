@@ -1159,6 +1159,26 @@
       "predicates": [],
       "order_by": []
     },
+    "mrp-production-costs": {
+      "table": "mrp_production_cost",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-productivity-costs": {
+      "table": "mrp_productivity_cost",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-valuation-configs": {
+      "table": "mrp_valuation_config",
+      "predicates": [],
+      "order_by": []
+    },
+    "mrp-workcenter-cost-rates": {
+      "table": "mrp_workcenter_cost_rate",
+      "predicates": [],
+      "order_by": []
+    },
     "mrp-boms": {
       "table": "mrp_bom",
       "predicates": [],

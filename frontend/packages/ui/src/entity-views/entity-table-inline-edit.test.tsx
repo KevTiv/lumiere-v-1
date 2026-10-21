@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import type { EntityTableConfig } from "../lib/entity-view-types"
 import { RBACProvider } from "../lib/rbac-context"
 import { EntityTable } from "./entity-table"
+import { installSelectDomShims } from "../components/select-test-utils"
 
 const toast = vi.hoisted(() => vi.fn())
 vi.mock("../lib/workflow-toast", () => ({ showWorkflowToast: toast }))
@@ -96,5 +97,43 @@ describe("EntityTable inline edit", () => {
   it("only edits rows its canEdit allows", () => {
     setup(vi.fn())
     expect(screen.getAllByTestId("entity-inline-name")).toHaveLength(1)
+  })
+
+  it("saves a picked select option without committing when the popup takes focus", async () => {
+    installSelectDomShims()
+    const save = vi.fn().mockResolvedValue(undefined)
+    render(
+      <RBACProvider>
+        <EntityTable
+          config={{
+            mode: "table",
+            rowKey: "id",
+            columns: [
+              { key: "id", label: "ID" },
+              {
+                key: "state",
+                label: "State",
+                inlineEdit: {
+                  kind: "select",
+                  options: [
+                    { value: "draft", label: "Draft" },
+                    { value: "done", label: "Done" },
+                  ],
+                  save,
+                },
+              },
+            ],
+          }}
+          data={rows}
+        />
+      </RBACProvider>,
+    )
+    fireEvent.doubleClick(screen.getAllByTestId("entity-inline-state")[0]!)
+    const trigger = screen.getByLabelText("State")
+    fireEvent.keyDown(trigger, { key: "ArrowDown" })
+    fireEvent.blur(trigger)
+    expect(save).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("option", { name: "Draft" }))
+    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: "2" }), "draft"))
   })
 })

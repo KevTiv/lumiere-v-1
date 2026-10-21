@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 
-FUNCTION_RE = re.compile(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+FUNCTION_RE = re.compile(r"\bfn\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*<[^{};]*>)?\s*\(")
 OPERATION_RE = re.compile(r'operation_id\s*:\s*"([^"]+)"')
 COMMIT_CALL = "record_organization_commit("
 COMMIT_DEFINITION = re.compile(r"\bfn\s+record_organization_commit\s*$")
@@ -138,7 +138,7 @@ def _matching_brace(source: str, opening: int) -> int:
 
 def _function_body(source: str, function_name: str) -> tuple[int, str]:
     clean = _strip_comments(source)
-    matches = list(re.finditer(rf"\bfn\s+{re.escape(function_name)}\s*\(", clean))
+    matches = list(re.finditer(rf"\bfn\s+{re.escape(function_name)}(?:\s*<[^{{}};]*>)?\s*\(", clean))
     if len(matches) != 1:
         raise CoverageError(
             f"expected exactly one function {function_name!r}, found {len(matches)}"
@@ -310,6 +310,8 @@ def verify(repo_root: Path, metadata_path: Path, operation_ids_path: Path) -> No
             )
         configured_calls.add(key)
 
+    _validate_dynamic_commit_helpers(repo_root, metadata, locked, configured_calls)
+
     _validate_module_coverage(entries, _canonical_enabled_modules(repo_root))
 
     # Every active helper call in the module must be registered. This catches
@@ -331,6 +333,138 @@ def verify(repo_root: Path, metadata_path: Path, operation_ids_path: Path) -> No
             key = (str(path.relative_to(repo_root)), function)
             if key not in configured_calls:
                 raise CoverageError(f"unregistered C2 commit call at {key[0]}:{function}")
+
+
+def _validate_dynamic_commit_helpers(
+    repo_root: Path,
+    metadata: dict[str, Any],
+    locked: dict[str, str],
+    configured_calls: set[tuple[str, str]],
+) -> None:
+    """Permit only registered, closed operation sets through a scoped dispatcher.
+
+    A dynamic helper cannot invent an operation ID: its commit must copy the
+    declared string parameter, and every call is checked against locked literal
+    IDs (or a local two-literal selector). The ordinary global commit-call scan
+    still registers and checks the helper's direct persistence call.
+    """
+    helpers = metadata.get("dynamic_commit_helpers", [])
+    if not isinstance(helpers, list):
+        raise CoverageError("dynamic_commit_helpers must be an array")
+    for helper in helpers:
+        required = {
+            "source", "function", "operation_id_parameter", "snapshot_type",
+            "method", "change_constructors", "change_helpers", "callers",
+        }
+        if not isinstance(helper, dict) or set(helper) != required:
+            raise CoverageError("dynamic commit helper must declare its exact scope and callers")
+        source_name = helper["source"]
+        function = helper["function"]
+        parameter = helper["operation_id_parameter"]
+        snapshot_type = helper["snapshot_type"]
+        method = helper["method"]
+        for value in (source_name, function, parameter, snapshot_type, method):
+            if not isinstance(value, str) or not value:
+                raise CoverageError("dynamic helper names must be non-empty strings")
+        source_path = Path(source_name)
+        if source_path.is_absolute() or ".." in source_path.parts:
+            raise CoverageError("dynamic helper source must be repository-relative")
+        key = (source_name, function)
+        if key in configured_calls:
+            raise CoverageError(f"duplicate dynamic helper {source_name}:{function}")
+        source = (repo_root / source_path).read_text(encoding="utf-8")
+        start, body = _function_body(source, function)
+        clean_source = _strip_comments(source)
+        impls = list(re.finditer(rf"\bimpl\s+{re.escape(snapshot_type)}\s*\{{", clean_source))
+        if method != function or not any(
+            match.end() <= start <= _matching_brace(clean_source, match.end() - 1)
+            for match in impls
+        ):
+            raise CoverageError("dynamic helper must be the declared snapshot method")
+        signature = _strip_comments(source)[start:].split("{", 1)[0]
+        if not re.search(rf"\b{re.escape(parameter)}\s*:\s*&str\b", signature):
+            raise CoverageError("dynamic helper must declare its string operation-ID parameter")
+        if body.count(COMMIT_CALL) != 1 or OPERATION_RE.findall(body):
+            raise CoverageError("dynamic helper must contain one commit call and no literal operation override")
+        if not re.search(rf"operation_id\s*:\s*{re.escape(parameter)}\s*\.\s*to_string\s*\(\s*\)", body):
+            raise CoverageError("dynamic helper must forward the declared operation-ID parameter")
+        if re.search(rf"\blet\s+(?:mut\s+)?{re.escape(parameter)}\b", body):
+            raise CoverageError("dynamic helper must not shadow its operation-ID parameter")
+        if "OrganizationCommitInput" not in body or "changes" not in body:
+            raise CoverageError("dynamic helper must construct a complete commit input")
+        if ".organization_commit()" in body or ".organization_row_change()" in body:
+            raise CoverageError("dynamic helper must not write commit tables directly")
+        constructors = helper["change_constructors"]
+        change_helpers = helper["change_helpers"]
+        if not isinstance(constructors, list) or not constructors or any(
+            not isinstance(value, str) or not value for value in constructors
+        ) or not isinstance(change_helpers, list) or any(
+            not isinstance(value, str) or not value for value in change_helpers
+        ):
+            raise CoverageError("dynamic helper must declare change constructors and helper names")
+        change_bodies = [body] + [_function_body(source, name)[1] for name in change_helpers]
+        for constructor in constructors:
+            if not any(f"RowChange::{constructor}" in candidate for candidate in change_bodies):
+                raise CoverageError(f"dynamic helper lacks RowChange::{constructor}")
+        callers = helper["callers"]
+        if not isinstance(callers, list) or not callers:
+            raise CoverageError("dynamic helper must declare every operation caller")
+        configured_sites: set[tuple[str, str]] = set()
+        call_pattern = re.compile(rf"\.\s*{re.escape(method)}\s*\(\s*ctx\s*,\s*(\"[^\"]+\"|[A-Za-z_][A-Za-z0-9_]*)\s*\)")
+        for caller in callers:
+            if not isinstance(caller, dict) or set(caller) != {"source", "function", "argument", "operations"}:
+                raise CoverageError("dynamic caller must declare source/function/argument/operations")
+            caller_source = caller["source"]
+            caller_function = caller["function"]
+            argument = caller["argument"]
+            if not all(isinstance(value, str) and value for value in (caller_source, caller_function, argument)):
+                raise CoverageError("dynamic caller names must be non-empty strings")
+            caller_path = Path(caller_source)
+            if caller_path.is_absolute() or ".." in caller_path.parts:
+                raise CoverageError("dynamic caller source must be repository-relative")
+            site = (caller_source, caller_function)
+            if site in configured_sites:
+                raise CoverageError("duplicate dynamic commit caller")
+            configured_sites.add(site)
+            caller_text = (repo_root / caller_path).read_text(encoding="utf-8")
+            _, caller_body = _function_body(caller_text, caller_function)
+            arguments = call_pattern.findall(caller_body)
+            if arguments != [argument]:
+                raise CoverageError(f"{caller_source}:{caller_function} must call the snapshot recorder exactly once with its declared argument")
+            operations = caller["operations"]
+            if not isinstance(operations, dict) or not operations or any(
+                not isinstance(name, str) or not isinstance(identity, str)
+                or locked.get(name) != identity for name, identity in operations.items()
+            ):
+                raise CoverageError("dynamic caller operation IDs must equal locked contract IDs")
+            expected_ids = set(operations.values())
+            if argument.startswith('"'):
+                if expected_ids != {argument[1:-1]}:
+                    raise CoverageError("dynamic caller literal must equal its locked operation ID")
+            else:
+                # Explicitly bounded Rust syntax: a local if/else whose two
+                # branches are operation literals, never a caller-supplied ID.
+                selector = re.search(
+                    rf'\blet\s+{re.escape(argument)}\s*=\s*if\s+[^{{;]+\{{\s*"([^"]+)"\s*\}}\s*else\s*\{{\s*"([^"]+)"\s*\}}\s*;',
+                    caller_body,
+                )
+                bindings = re.findall(rf"\blet\s+(?:mut\s+)?{re.escape(argument)}\b", caller_body)
+                if selector is None or len(bindings) != 1 or set(selector.groups()) != expected_ids:
+                    raise CoverageError("dynamic caller must use a local closed two-literal operation selector")
+        # Scope method scanning to files that name this snapshot type. Every
+        # matching recorder call there must belong to an enumerated caller.
+        for path in sorted((repo_root / "spacetimedb/src").rglob("*.rs")):
+            clean = _strip_comments(path.read_text(encoding="utf-8"))
+            if snapshot_type not in clean:
+                continue
+            for match in re.finditer(rf"\.\s*{re.escape(method)}\s*\(", clean):
+                functions = list(FUNCTION_RE.finditer(clean[:match.start()]))
+                if not functions:
+                    raise CoverageError("dynamic recorder call outside a function")
+                site = (str(path.relative_to(repo_root)), functions[-1].group(1))
+                if site not in configured_sites:
+                    raise CoverageError(f"unregistered dynamic C2 recorder call at {site[0]}:{site[1]}")
+        configured_calls.add(key)
 
 
 def main() -> None:

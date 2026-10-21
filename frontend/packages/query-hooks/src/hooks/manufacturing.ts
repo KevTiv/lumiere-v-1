@@ -13,6 +13,7 @@ import { encodeOptionalString, stdbParamsToJson } from "@lumiere/erp-shared/stdb
 import { useConfirmManufacturingOrder } from "./manufacturing-order-confirmation"
 import { useConsumeMoMaterials, useStartManufacturingOrder } from "./manufacturing-material-consumption"
 import { useFinishManufacturingOrder, useProduceManufacturingOrder } from "./manufacturing-production-close"
+import { useConfigureWorkcenterCostRate } from "./manufacturing-costs"
 import { useFinishWorkorder, useLogWorkcenterProductivity, useStartWorkorder } from "./manufacturing-workorder-execution"
 import { resolveBomByproductEffect, resolveManufacturingScrapEffect, resolveWorkorderQualityEffect } from './partial-slice-effects'
 import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect, type ResolvedOperationEffectOutcome } from './operation-effect'
@@ -780,6 +781,7 @@ export function useManufacturingMutations(organizationId: bigint, companyId: big
     computeBomCost: useComputeBomCost(organizationId, companyId),
     explodeBom: useExplodeBom(organizationId, companyId),
     updateWorkcenter: useUpdateWorkcenter(organizationId, companyId),
+    configureWorkcenterCostRate: useConfigureWorkcenterCostRate(organizationId, companyId),
     logProductivity: useLogWorkcenterProductivity(organizationId),
     importWorkcenterCsv: useImportWorkcenterCsv(organizationId, companyId),
     importBomCsv: useImportBomCsv(organizationId, companyId),

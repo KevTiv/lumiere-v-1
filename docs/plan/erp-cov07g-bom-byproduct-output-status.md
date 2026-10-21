@@ -1,6 +1,6 @@
 # COV-07g — exact BOM byproduct output
 
-**Status:** IMPLEMENTED — runtime acceptance pending
+**Status:** REVIEW — bounded historical browser acceptance passed; full module acceptance open
 **Branch:** `codex/cov07g-bom-byproduct-output`  
 **Stack base:** COV-07f / `codex/cov07f-finished-output-scrap`
 
@@ -33,6 +33,20 @@ the exact primary product move from the expanded finished-move relation.
 - BOM row actions now author a byproduct through the generated reducer input and
   resolve the exact `(BOM, product, company)` row from the registered
   `mrp-bom-byproducts` resource. Duplicate relations fail closed.
-- Exact output browser replay and permission coverage remain runtime acceptance.
-- Run native and browser acceptance during stacked integration. This workspace
-  does not provide `cargo` or SpacetimeDB tooling.
+- `cov07g-bom-byproducts.spec.ts` exercised warehouse UI definition creation
+  and MO finish, exact definition ownership, scaled output move/quant effects,
+  replay rejection and permission preservation in the historical Docker lane.
+  Both runs passed all 46 tests, including COV-07f/g; the second run proved
+  durable projection convergence. See
+  [`cov-runtime-docker-acceptance-2026-10-04.md`](../evidence/cov-runtime-docker-acceptance-2026-10-04.md).
+- The evidence note's 2026-10-07 follow-up passed two PostgreSQL upgrade tests
+  at contracts v0.3.86. It closes the released-migration blocker without adding
+  new byproduct browser proof.
+- Historical confirm/start/produce and BOM/MO creation are fixture setup.
+  Direct result navigation remains open: row submission discards the exact
+  byproduct reference. Lot/serial output and actual accounting valuation remain
+  separate completion-stack slices.
+- Repeat the relevant persisted/browser/projection gates on the final contract
+  pin and immutable completion-stack head. Historical passing tests do not
+  certify that new head or promote the module beyond U2/review; see
+  [`erp-cov07-completion-stack-plan.md`](./erp-cov07-completion-stack-plan.md).

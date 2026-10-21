@@ -74,3 +74,22 @@ unresolved. The existing toolbar action uses this hook.
 
 Becomes IMPLEMENTED when the bounded path and proofs above exist, and ACCEPTED only
 with same-head green CI (plus the contract release, when required).
+
+## U5 closure increment — canonical accounting navigation
+
+- The Timesheets table now renders validation state and the persisted
+  `timesheet_invoice_id`; billed rows link directly to the exact Accounting journal entry.
+- The operator billing action consumes the hook's resolved canonical effect and presents an
+  `Open invoice` success action, preserving the exact result identity instead of requiring a
+  search in Accounting.
+
+Still required for whole-module U5: current-head browser execution beginning with operator
+project/task/timesheet creation under separate logger and validator personas, duplicate-bill
+and ambiguous-response recovery execution, and the shared responsive/accessibility/reconnect
+and launch-manifest gates.
+
+Wave 2 extends `cov10-project-timesheet-validation.spec.ts` through the visible Bill form.
+It proves the exact persisted `timesheet_invoice_id`, the exact scoped Accounting move and
+`Timesheets` origin, then replays billing to prove duplicate denial leaves that relation
+unchanged and replays it as the reader persona to prove authorization denial. Current-head
+runtime execution and the shared certification gates remain required before promotion.

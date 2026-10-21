@@ -27,22 +27,24 @@ import { SkillRegistryPanel } from "./skill-registry-panel"
 
 export { AI_SKILLS_UI_REDUCERS } from "@/lib/ai-skills-ui-reducers"
 
-const createSkillForm: FormConfig = {
+type Translate = ReturnType<typeof useTranslation>["t"]
+
+const createSkillForm = (t: Translate): FormConfig => ({
   id: "ai-skills-create",
-  title: "Create AI Skill",
-  submitLabel: "Create skill",
+  title: t("aiSkills.forms.create.title"),
+  submitLabel: t("aiSkills.actions.createSkill"),
   sections: [
     {
       id: "skill",
       fields: [
-        { id: "skill-key", type: "text", name: "skillKey", label: "Skill key", required: true, width: "1/2" },
-        { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
-        { id: "category", type: "text", name: "category", label: "Category", defaultValue: "custom", width: "1/2" },
+        { id: "skill-key", type: "text", name: "skillKey", label: t("aiSkills.fields.skillKey"), required: true, width: "1/2" },
+        { id: "name", type: "text", name: "name", label: t("aiSkills.fields.name"), required: true, width: "1/2" },
+        { id: "category", type: "text", name: "category", label: t("aiSkills.fields.category"), defaultValue: "custom", width: "1/2" },
         {
           id: "description",
           type: "textarea",
           name: "description",
-          label: "Description",
+          label: t("aiSkills.fields.description"),
           rows: 2,
           width: "full",
         },
@@ -50,7 +52,7 @@ const createSkillForm: FormConfig = {
           id: "prompt-template",
           type: "textarea",
           name: "promptTemplate",
-          label: "Prompt template",
+          label: t("aiSkills.fields.promptTemplate"),
           required: true,
           rows: 4,
           width: "full",
@@ -59,21 +61,21 @@ const createSkillForm: FormConfig = {
           id: "required-tools",
           type: "text",
           name: "requiredTools",
-          label: "Required tools (CSV)",
+          label: t("aiSkills.fields.requiredToolsCsv"),
           width: "1/2",
         },
         {
           id: "optional-tools",
           type: "text",
           name: "optionalTools",
-          label: "Optional tools (CSV)",
+          label: t("aiSkills.fields.optionalToolsCsv"),
           width: "1/2",
         },
         {
           id: "default-max-steps",
           type: "number",
           name: "defaultMaxSteps",
-          label: "Max steps",
+          label: t("aiSkills.fields.maxSteps"),
           defaultValue: 8,
           width: "1/3",
         },
@@ -81,20 +83,20 @@ const createSkillForm: FormConfig = {
           id: "default-max-tool-calls",
           type: "number",
           name: "defaultMaxToolCalls",
-          label: "Max tool calls",
+          label: t("aiSkills.fields.maxToolCalls"),
           defaultValue: 16,
           width: "1/3",
         },
-        { id: "is-active", type: "switch", name: "isActive", label: "Active", defaultValue: true, width: "1/3" },
+        { id: "is-active", type: "switch", name: "isActive", label: t("aiSkills.fields.active"), defaultValue: true, width: "1/3" },
       ],
     },
   ],
-}
+})
 
-const skillConfigForm = (skillId: number, skillName: string): FormConfig => ({
+const skillConfigForm = (t: Translate, skillId: number, skillName: string): FormConfig => ({
   id: "ai-skills-config",
-  title: `Configure ${skillName}`,
-  submitLabel: "Save config",
+  title: t("aiSkills.forms.configure.title", { skillName }),
+  submitLabel: t("aiSkills.actions.saveConfig"),
   sections: [
     {
       id: "config",
@@ -103,17 +105,17 @@ const skillConfigForm = (skillId: number, skillName: string): FormConfig => ({
           id: "skill-id",
           type: "number",
           name: "skillId",
-          label: "Skill ID",
+          label: t("aiSkills.fields.skillId"),
           defaultValue: skillId,
           required: true,
           width: "1/2",
         },
-        { id: "is-enabled", type: "switch", name: "isEnabled", label: "Enabled", defaultValue: true, width: "1/2" },
+        { id: "is-enabled", type: "switch", name: "isEnabled", label: t("aiSkills.fields.enabled"), defaultValue: true, width: "1/2" },
         {
           id: "config-json",
           type: "textarea",
           name: "configJson",
-          label: "Config JSON",
+          label: t("aiSkills.fields.configJson"),
           defaultValue: "{}",
           rows: 4,
           width: "full",
@@ -122,7 +124,7 @@ const skillConfigForm = (skillId: number, skillName: string): FormConfig => ({
           id: "custom-instructions",
           type: "textarea",
           name: "customInstructions",
-          label: "Custom instructions",
+          label: t("aiSkills.fields.customInstructions"),
           rows: 3,
           width: "full",
         },
@@ -131,10 +133,10 @@ const skillConfigForm = (skillId: number, skillName: string): FormConfig => ({
   ],
 })
 
-const setActiveSkillForm = (skillId: number, skillName: string): FormConfig => ({
+const setActiveSkillForm = (t: Translate, skillId: number, skillName: string): FormConfig => ({
   id: "ai-skills-set-active",
-  title: `Set active — ${skillName}`,
-  submitLabel: "Update",
+  title: t("aiSkills.forms.setActive.title", { skillName }),
+  submitLabel: t("aiSkills.actions.update"),
   sections: [
     {
       id: "active",
@@ -143,21 +145,21 @@ const setActiveSkillForm = (skillId: number, skillName: string): FormConfig => (
           id: "skill-id",
           type: "number",
           name: "skillId",
-          label: "Skill ID",
+          label: t("aiSkills.fields.skillId"),
           defaultValue: skillId,
           required: true,
           width: "1/2",
         },
-        { id: "active", type: "switch", name: "active", label: "Active", defaultValue: true, width: "1/2" },
+        { id: "active", type: "switch", name: "active", label: t("aiSkills.fields.active"), defaultValue: true, width: "1/2" },
       ],
     },
   ],
 })
 
-const assignSkillForm: FormConfig = {
+const assignSkillForm = (t: Translate): FormConfig => ({
   id: "ai-skills-assign",
-  title: "Assign Skill to Team Member",
-  submitLabel: "Assign skill",
+  title: t("aiSkills.forms.assign.title"),
+  submitLabel: t("aiSkills.actions.assignSkill"),
   sections: [
     {
       id: "assignment",
@@ -166,28 +168,39 @@ const assignSkillForm: FormConfig = {
           id: "team-member-id",
           type: "number",
           name: "teamMemberId",
-          label: "Team member ID",
+          label: t("aiSkills.fields.teamMemberId"),
           required: true,
           width: "1/2",
         },
-        { id: "skill-id", type: "number", name: "skillId", label: "Skill ID", required: true, width: "1/2" },
+        { id: "skill-id", type: "number", name: "skillId", label: t("aiSkills.fields.skillId"), required: true, width: "1/2" },
         {
           id: "module-hint",
           type: "text",
           name: "moduleHint",
-          label: "Module hint (optional)",
+          label: t("aiSkills.fields.moduleHintOptional"),
           width: "1/2",
         },
-        { id: "is-default", type: "switch", name: "isDefault", label: "Default skill", width: "1/2" },
+        { id: "is-default", type: "switch", name: "isDefault", label: t("aiSkills.fields.defaultSkill"), width: "1/2" },
       ],
     },
   ],
+})
+
+function skillSourceLabel(t: Translate, skill: AiSkillListItem): string {
+  if (skill.source === "bundled_md") return t("aiSkills.sources.localMd")
+  if (skill.is_system) return t("aiSkills.sources.systemStdb")
+  return t("aiSkills.sources.organization")
 }
 
-function skillSourceLabel(skill: AiSkillListItem): string {
-  if (skill.source === "bundled_md") return "Local MD"
-  if (skill.is_system) return "System (STDB)"
-  return "Organization"
+function agentRunStatusLabel(t: Translate, status: string): string {
+  if (status === "running") return t("aiSkills.agentRuns.status.running")
+  if (status === "pending") return t("aiSkills.agentRuns.status.pending")
+  if (status === "awaiting_approval") return t("aiSkills.agentRuns.status.awaitingApproval")
+  if (status === "agent_settled") return t("aiSkills.agentRuns.status.agentSettled")
+  if (status === "completed") return t("aiSkills.agentRuns.status.completed")
+  if (status === "cancelled") return t("aiSkills.agentRuns.status.cancelled")
+  if (status === "failed") return t("aiSkills.agentRuns.status.failed")
+  return status
 }
 
 export function AiSkillsClient({ organizationId }: { organizationId?: number }) {
@@ -234,18 +247,20 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
     const map = new Map<number, string>()
     for (const row of teamMembers) {
       const id = Number(row.id)
-      if (Number.isFinite(id) && id > 0) map.set(id, String(row.name ?? `Member #${id}`))
+      if (Number.isFinite(id) && id > 0) {
+        map.set(id, String(row.name ?? t("aiSkills.labels.memberNumber", { id })))
+      }
     }
     return map
-  }, [teamMembers])
+  }, [teamMembers, t])
 
   const assignSkillPickerForm = useMemo(
     () =>
-      withLinkedPickers(assignSkillForm, {
+      withLinkedPickers(assignSkillForm(t), {
         teamMemberId: recordOptions(teamMembers as unknown as Record<string, unknown>[], (row) => row.name),
         skillId: recordOptions(skills as unknown as Record<string, unknown>[], (row) => row.name),
       }),
-    [teamMembers, skills],
+    [teamMembers, skills, t],
   )
 
   const skillNameById = useMemo(() => {
@@ -260,7 +275,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
     setSyncMessage(null)
     try {
       const response = await syncSkills.mutateAsync()
-      setSyncMessage(`Synced ${response.synced.length} bundled skill(s) to SpacetimeDB.`)
+      setSyncMessage(t("aiSkills.messages.syncSuccess", { count: response.synced.length }))
     } catch (e) {
       setSyncMessage(e instanceof Error ? e.message : String(e))
     }
@@ -318,11 +333,11 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   return (
     <div className="space-y-6">
       <DashboardHeader
-        title="AI Skills"
-        description="Manage org skill playbooks, registry releases, and AI team member assignments. Skills are invoked by the ERP Assistant, not from this page."
+        title={t("aiSkills.title")}
+        description={t("aiSkills.description")}
         actions={[
           {
-            label: "Create skill",
+            label: t("aiSkills.actions.createSkill"),
             testId: "ai-skills-create",
             onClick: () => {
               setSubmitError(null)
@@ -330,7 +345,9 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
             },
           },
           {
-            label: syncSkills.isPending ? "Syncing…" : "Sync bundled skills → STDB",
+            label: syncSkills.isPending
+              ? t("aiSkills.actions.syncing")
+              : t("aiSkills.actions.syncBundledSkills"),
             onClick: () => handleSync(),
             variant: "outline",
           },
@@ -349,7 +366,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
         </p>
       ) : null}
 
-      {isLoading ? <p className="text-sm text-muted-foreground">Loading skills…</p> : null}
+      {isLoading ? <p className="text-sm text-muted-foreground">{t("aiSkills.states.loadingSkills")}</p> : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {sortedSkills.map((skill) => (
@@ -360,12 +377,12 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm font-semibold">{skill.name}</p>
               <span className="rounded bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                {skillSourceLabel(skill)}
+                {skillSourceLabel(t, skill)}
               </span>
             </div>
             <p className="mt-1 font-mono text-[11px] text-muted-foreground">{skill.skill_key}</p>
             <p className="mt-2 text-xs text-muted-foreground">
-              {skill.description ?? `${skill.category} skill`}
+              {skill.description ?? t("aiSkills.labels.categorySkill", { category: skill.category })}
             </p>
             {skill.id > 0 ? (
               <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -380,7 +397,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
                     setModal("active")
                   }}
                 >
-                  Set active
+                  {t("aiSkills.actions.setActive")}
                 </button>
                 <button
                   type="button"
@@ -391,7 +408,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
                     setModal("config")
                   }}
                 >
-                  Configure
+                  {t("aiSkills.actions.configure")}
                 </button>
               </div>
             ) : null}
@@ -408,9 +425,9 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
       <section className="rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4">
           <div>
-            <h2 className="text-base font-semibold">Team member skill assignments</h2>
+            <h2 className="text-base font-semibold">{t("aiSkills.assignments.title")}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Link AI personas to skills they may run by default.
+              {t("aiSkills.assignments.description")}
             </p>
           </div>
           <button
@@ -422,12 +439,12 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
               setModal("assign")
             }}
           >
-            Assign skill
+            {t("aiSkills.actions.assignSkill")}
           </button>
         </div>
         <div className="divide-y divide-border">
           {memberSkills.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-muted-foreground">No skill assignments yet.</p>
+            <p className="px-4 py-6 text-sm text-muted-foreground">{t("aiSkills.assignments.empty")}</p>
           ) : (
             memberSkills.map((row) => {
               const assignmentId = Number(row.id)
@@ -440,12 +457,12 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
                 >
                   <div>
                     <p className="font-medium">
-                      {teamMemberNameById.get(memberId) ?? `Member #${memberId}`} →{" "}
-                      {skillNameById.get(skillId) ?? `Skill #${skillId}`}
+                      {teamMemberNameById.get(memberId) ?? t("aiSkills.labels.memberNumber", { id: memberId })} →{" "}
+                      {skillNameById.get(skillId) ?? t("aiSkills.labels.skillNumber", { id: skillId })}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Assignment #{assignmentId}
-                      {row.isDefault ? " · default" : ""}
+                      {t("aiSkills.labels.assignmentNumber", { id: assignmentId })}
+                      {row.isDefault ? t("aiSkills.labels.defaultSuffix") : ""}
                     </p>
                   </div>
                   <button
@@ -453,11 +470,11 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
                     className="text-xs text-destructive hover:underline"
                     disabled={unassignSkill.isPending}
                     onClick={async () => {
-                      if (!(await confirmDialog({ description: "Remove this skill assignment?" }))) return
+                      if (!(await confirmDialog({ description: t("aiSkills.confirm.removeAssignment") }))) return
                       unassignSkill.mutateAsync(assignmentId).catch((e) => setSubmitError(String(e)))
                     }}
                   >
-                    Unassign
+                    {t("aiSkills.actions.unassign")}
                   </button>
                 </div>
               )
@@ -472,7 +489,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           onOpenChange={(open) => {
             if (!open) closeModal()
           }}
-          config={createSkillForm}
+          config={createSkillForm(t)}
           isPending={isPending}
           closeOnSubmit={false}
           submitError={submitError}
@@ -486,7 +503,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           onOpenChange={(open) => {
             if (!open) closeModal()
           }}
-          config={skillConfigForm(configSkill.id, configSkill.name)}
+          config={skillConfigForm(t, configSkill.id, configSkill.name)}
           isPending={isPending}
           closeOnSubmit={false}
           submitError={submitError}
@@ -514,7 +531,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
           onOpenChange={(open) => {
             if (!open) closeModal()
           }}
-          config={setActiveSkillForm(activeSkillTarget.id, activeSkillTarget.name)}
+          config={setActiveSkillForm(t, activeSkillTarget.id, activeSkillTarget.name)}
           isPending={isPending}
           closeOnSubmit={false}
           submitError={submitError}
@@ -523,20 +540,20 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
       ) : null}
 
       <section className="rounded-xl border border-border bg-card p-4 space-y-3" data-testid="ai-agent-runs-panel">
-        <h2 className="text-base font-semibold">Agent runs</h2>
-        <p className="text-sm text-muted-foreground">Live skill orchestration runs for this organization.</p>
+        <h2 className="text-base font-semibold">{t("aiSkills.agentRuns.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("aiSkills.agentRuns.description")}</p>
         {agentRuns.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No runs yet.</p>
+          <p className="text-sm text-muted-foreground">{t("aiSkills.agentRuns.empty")}</p>
         ) : (
           <ul className="space-y-2">
             {agentRuns.map((run) => (
               <li key={run.id} className="flex items-center justify-between gap-3 rounded border px-3 py-2 text-sm">
                 <div>
-                  <p className="font-medium">{run.run_key || `#${run.id}`}</p>
+                  <p className="font-medium">{run.run_key || t("aiSkills.labels.number", { id: run.id })}</p>
                   <p className="text-xs text-muted-foreground">
-                    {run.status}
+                    {agentRunStatusLabel(t, run.status)}
                     {run.summary ? ` — ${run.summary}` : ""}
-                    {run.step_count != null ? ` (${run.step_count} steps)` : ""}
+                    {run.step_count != null ? t("aiSkills.agentRuns.stepCount", { count: run.step_count }) : ""}
                   </p>
                 </div>
                 {["running", "pending", "awaiting_approval", "agent_settled"].includes(run.status) ? (
@@ -547,7 +564,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
                       void cancelRun.mutateAsync(run.id).catch((e) => setSubmitError(String(e)))
                     }
                   >
-                    Cancel
+                    {t("aiSkills.actions.cancel")}
                   </button>
                 ) : null}
               </li>

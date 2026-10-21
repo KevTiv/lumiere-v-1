@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
@@ -85,7 +86,7 @@ test.describe("CRM opportunity stage workflow", { tag: "@phase-1" }, () => {
     if (initialStageId == null) throw new Error(`opportunity not found after create: ${oppName}`)
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await selectEntityRowByText(page, oppName)
     await waitForEntityActionEnabled(page, "entity-action-change-stage")
     await page.getByTestId("entity-action-change-stage").click()
@@ -157,7 +158,7 @@ test.describe("CRM-006 lead → opportunity → won conversion @p0", { tag: "@p0
     expect(leadId).toBeGreaterThan(0)
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-leads").click()
+    await selectModuleTab(page, "crm", "leads")
     await waitForBffQueryMinRows(page, "/api/query/opportunity-stages")
     await selectEntityRowByText(page, leadName)
     await waitForEntityActionEnabled(page, "entity-action-convert-lead")
@@ -187,7 +188,7 @@ test.describe("CRM-006 lead → opportunity → won conversion @p0", { tag: "@p0
 
     await page.reload()
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await expectSeededText(page, opportunityName, "/api/query/opportunities")
     const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
     expect(opportunityId).toBeGreaterThan(0)

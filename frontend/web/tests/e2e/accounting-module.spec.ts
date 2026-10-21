@@ -5,6 +5,7 @@ import {
   chooseFirstOption,
   chooseSelectOptionByLabel,
   expectNoAppError,
+  expectModuleTabSurface,
   expectSeededText,
   fillField,
   gotoModule,
@@ -18,12 +19,18 @@ import {
 
 const ACCOUNTING_TAB_IDS = [
   "dashboard",
+  "period-close",
   "accounts",
   "journal-entries",
   "invoices",
   "bills",
   "taxes",
   "payments",
+  "payment-operations",
+  "tax-groups",
+  "tax-jurisdictions",
+  "tax-schedules",
+  "tax-deadlines",
   "payment-terms",
   "payment-term-lines",
   "budgets",
@@ -41,14 +48,32 @@ const ACCOUNTING_TAB_IDS = [
   "consolidation",
   "intercompany-rules",
   "intercompany-transactions",
+  "account-journals",
+  "move-lines",
 ] as const
 
-async function assertAccountingTabRenders(page: Page, tabId: string) {
+type AccountingTabId = (typeof ACCOUNTING_TAB_IDS)[number]
+
+async function openAndAssertAccountingTab(page: Page, tabId: AccountingTabId) {
   await openAccountingTab(page, tabId)
+  const tab = page.getByTestId(`module-tab-accounting-${tabId}`)
+
+  await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe(
+    tabId === "dashboard" ? null : tabId,
+  )
+  await expect(tab).toHaveCount(1, { timeout: 30_000 })
+  await expect(tab).toHaveAttribute("aria-selected", "true")
+  await expectModuleTabSurface(page, "accounting", tabId)
+}
+
+async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {
+  await openAndAssertAccountingTab(page, tabId)
   await expectNoAppError(page)
 
   switch (tabId) {
     case "dashboard":
+      await expect(page.getByTestId("accountant-overview")).toBeVisible()
+      await expect(page.getByTestId("accountant-queue-overdue")).toBeVisible()
       await expect(page.getByTestId("quick-action-create_invoice")).toBeVisible()
       break
     case "accounts":
@@ -69,6 +94,16 @@ async function assertAccountingTabRenders(page: Page, tabId: string) {
       break
     case "payments":
       await expect(page.getByTestId("module-create-accounting-payments")).toBeVisible()
+      break
+    case "payment-operations":
+      await expect(page.getByText("Payment accounts", { exact: true })).toBeVisible()
+      await expect(page.getByText("Transactions & reconciliation", { exact: true })).toBeVisible()
+      break
+    case "tax-groups":
+    case "tax-jurisdictions":
+    case "tax-schedules":
+    case "tax-deadlines":
+      await expect(activeTabEntityTable(page)).toBeVisible()
       break
     case "payment-terms":
       await expect(page.getByTestId("module-create-accounting-payment-terms")).toBeVisible()
@@ -101,8 +136,11 @@ async function assertAccountingTabRenders(page: Page, tabId: string) {
     case "account-periods":
       await expect(page.getByTestId("module-create-accounting-account-periods")).toBeVisible()
       break
+    case "period-close":
+      await expect(page.getByTestId("period-close-checklist")).toBeVisible()
+      break
     case "consolidation":
-      await expect(page.getByText("Consolidation Accounts")).toBeVisible()
+      await expect(page.getByText("Consolidation Accounts", { exact: true })).toBeVisible()
       break
     case "fx-revaluation":
       await expect(page.getByText("Foreign exchange revaluation")).toBeVisible()
@@ -115,18 +153,28 @@ async function assertAccountingTabRenders(page: Page, tabId: string) {
       break
     case "intercompany-rules":
     case "intercompany-transactions":
+    case "account-journals":
+    case "move-lines":
       await expect(activeTabEntityTable(page)).toBeVisible()
       break
     default:
-      break
+      tabId satisfies never
   }
 }
 
 test.describe("Accounting module e2e", () => {
   test("renders accounting shell and each tab without errors", { tag: "@p0" }, async ({ page }) => {
-    await gotoModule(page, "/accounting", "accounting")
+    // Exercise every preserved deep link; each is a full navigation with fresh scoped reads.
+    test.setTimeout(240_000)
+    await test.step("Open Accounting and validate workspace navigation", async () => {
+      await gotoModule(page, "/accounting", "accounting")
+      await expect(page.getByRole("navigation", { name: "Accounting workspaces" }).getByRole("link")).toHaveCount(7)
+      await expect(page.getByRole("button", { name: "Advanced / Configuration" })).toBeVisible()
+    }, { timeout: 30_000 })
     for (const tabId of ACCOUNTING_TAB_IDS) {
-      await assertAccountingTabRenders(page, tabId)
+      await test.step(`Accounting workspace: ${tabId}`, async () => {
+        await assertAccountingTabRenders(page, tabId)
+      }, { timeout: 30_000 })
     }
   })
 
@@ -263,7 +311,7 @@ test.describe("Accounting module e2e", () => {
     await expectNoAppError(page)
   })
 
-  test("dashboard quick actions open journal entry, tax, and currency rate forms", async ({ page }) => {
+  test("overview and configuration actions open journal entry, bill, and tax forms", async ({ page }) => {
     await gotoModule(page, "/accounting", "accounting")
     await openAccountingTab(page, "dashboard")
 
@@ -273,28 +321,45 @@ test.describe("Accounting module e2e", () => {
     await jeModal.getByRole("button", { name: /^cancel$/i }).click()
     await expect(jeModal).toBeHidden()
 
-    await page.getByTestId("quick-action-create_tax").click()
-    await expect(page.getByTestId("form-modal-new-tax")).toBeVisible()
-    await page.getByTestId("form-modal-new-tax").getByRole("button", { name: /^cancel$/i }).click()
-    await expect(page.getByTestId("form-modal-new-tax")).toBeHidden()
+    await page.getByTestId("quick-action-create_bill").click()
+    const billModal = page.getByTestId("create-invoice-modal")
+    await expect(billModal).toBeVisible()
+    await expect(billModal.getByRole("heading", { name: "Create Vendor Bill", exact: true })).toBeVisible()
+    await expect(billModal.getByRole("heading", { name: "Vendor bill", exact: true })).toBeVisible()
+    await billModal.getByRole("button", { name: /^cancel$/i }).click()
+    await expect(billModal).toBeHidden()
 
-    await page.getByTestId("quick-action-currency_rate").click()
-    await expect(page.getByTestId("form-modal-new-currency-rate")).toBeVisible()
-    await page
-      .getByTestId("form-modal-new-currency-rate")
-      .getByRole("button", { name: /^cancel$/i })
-      .click()
-    await expect(page.getByTestId("form-modal-new-currency-rate")).toBeHidden()
+    await page.getByTestId("module-workspace-accounting-overflow").click()
+    await page.getByTestId("module-workspace-item-accounting-taxes").click()
+    await expect(page.getByTestId("module-tab-accounting-taxes")).toHaveAttribute("aria-selected", "true")
+    await page.getByTestId("module-create-accounting-taxes").click()
+    const taxModal = page.getByTestId("form-modal-new-tax")
+    await expect(taxModal).toBeVisible()
+    await taxModal.getByRole("button", { name: /^cancel$/i }).click()
+    await expect(taxModal).toBeHidden()
     await expectNoAppError(page)
   })
 
-  test("invoice quick action saves draft when journals exist", async ({ page }) => {
+  test("invoice quick action saves a canonical draft when required references exist", async ({ page }) => {
     await gotoModule(page, "/accounting", "accounting")
     await openAccountingTab(page, "dashboard")
 
     await page.getByTestId("quick-action-create_invoice").click()
     await expect(page.getByTestId("create-invoice-modal")).toBeVisible()
 
+    const partner = page.getByTestId("create-invoice-partner")
+    await partner.click()
+    const firstPartner = page.getByRole("option").first()
+    if ((await firstPartner.count()) === 0) {
+      await page.keyboard.press("Escape")
+      await page.getByTestId("create-invoice-modal").getByRole("button", { name: /^cancel$/i }).click()
+      await expect(page.getByTestId("create-invoice-modal")).toBeHidden()
+      await expectNoAppError(page)
+      return
+    }
+    await firstPartner.click()
+    await page.getByTestId("create-invoice-line-description").fill("Smoke line")
+    await page.getByTestId("create-invoice-line-unit-price").fill("50")
     const saveDraft = page.getByTestId("create-invoice-save-draft")
     if (await saveDraft.isDisabled()) {
       await page.getByTestId("create-invoice-modal").getByRole("button", { name: /^cancel$/i }).click()
@@ -302,10 +367,6 @@ test.describe("Accounting module e2e", () => {
       await expectNoAppError(page)
       return
     }
-
-    await page.getByTestId("create-invoice-partner").fill(smokeName("cust"))
-    await page.getByTestId("create-invoice-line-description").fill("Smoke line")
-    await page.getByTestId("create-invoice-line-unit-price").fill("50")
     await saveDraft.click()
     await expect(page.getByTestId("create-invoice-modal")).toBeHidden()
     await expectNoAppError(page)
@@ -333,10 +394,9 @@ test.describe("Accounting module e2e", () => {
     await openAccountingTab(page, "taxes")
 
     await page.getByTestId("entity-action-csv-tax").click()
-    const csvModal = page.locator('[data-testid^="form-modal-csv-import-"]')
+    const csvModal = page.getByRole("dialog", { name: /import tax rates/i })
     await expect(csvModal).toBeVisible()
-    await csvModal.getByRole("button", { name: /^import$/i }).click()
-    await expect(csvModal.getByText(/this field is required/i)).toBeVisible()
+    await expect(csvModal.getByRole("button", { name: /^import$/i })).toBeDisabled()
 
     await csvModal.getByRole("button", { name: /^cancel$/i }).click()
     await expect(csvModal).toBeHidden()

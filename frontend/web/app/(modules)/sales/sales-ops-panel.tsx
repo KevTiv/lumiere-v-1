@@ -4,14 +4,12 @@ import { useMemo, useState } from 'react'
 import { useErpSession } from '@lumiere/erp-session'
 import { useTranslation } from '@lumiere/i18n'
 import {
-  humanTaskSubjectId,
-  humanTaskSubjectModel,
-  taskStatusTag,
   useApprovalInbox,
   useApproveApprovalRequest,
   useRejectApprovalRequest,
 } from '@lumiere/query-hooks/hooks/approvals'
 import { useRefreshSaleOrderPromiseDates } from '@lumiere/query-hooks/hooks/sales'
+import { resolveSaleOrderApprovalTask } from '@lumiere/query-hooks/hooks/sales-approval-task'
 import {
   useOperatingCompanyBigInt,
   useOperatingCompanyId,
@@ -316,20 +314,22 @@ export function SalesOpsPanel({
     [orders, selectedOrderId],
   )
 
-  const pendingApprovalForSelected = useMemo(() => {
-    if (!selectedOrderId) return null
-    const soId = Number(selectedOrderId)
-    if (!Number.isFinite(soId) || soId <= 0) return null
-    return (
-      (inboxQuery.data ?? []).find((row) => {
-        const status = taskStatusTag(row)
-        if (status !== 'Open' && status !== 'Claimed') return false
-        if ((humanTaskSubjectModel(row) ?? row.model ?? '') !== 'sale_order') return false
-        const resId = humanTaskSubjectId(row) ?? Number(row.resId ?? row.res_id ?? 0)
-        return resId === soId
-      }) ?? null
-    )
-  }, [inboxQuery.data, selectedOrderId])
+  const approvalResolution = useMemo(() => {
+    if (!selectedOrderId || operatingCompanyId == null) return { task: null, error: null }
+    try {
+      return {
+        task: resolveSaleOrderApprovalTask(
+          inboxQuery.data ?? [],
+          { organizationId: BigInt(orgId), companyId: BigInt(operatingCompanyId) },
+          BigInt(selectedOrderId),
+        ),
+        error: null,
+      }
+    } catch (error) {
+      return { task: null, error: error instanceof Error ? error.message : String(error) }
+    }
+  }, [inboxQuery.data, operatingCompanyId, orgId, selectedOrderId])
+  const pendingApprovalForSelected = approvalResolution.task?.row ?? null
 
   const isApprovalRequester = useMemo(() => {
     if (!pendingApprovalForSelected || !identity) return false
@@ -829,9 +829,10 @@ export function SalesOpsPanel({
                 size="sm"
                 variant="ghost"
                 data-testid="sales-ops-open-approvals"
+                disabled={!approvalResolution.task}
                 onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.location.href = `/workflow?tab=approvals&model=sale_order&resId=${encodeURIComponent(selectedOrderId)}`
+                  if (typeof window !== 'undefined' && approvalResolution.task) {
+                    window.location.href = approvalResolution.task.href
                   }
                 }}
               >
@@ -839,6 +840,11 @@ export function SalesOpsPanel({
                   defaultValue: 'Open in Workflow',
                 })}
               </Button>
+              {approvalResolution.error ? (
+                <p role="alert" className="w-full text-xs text-destructive" data-testid="sales-ops-approval-invariant">
+                  {approvalResolution.error}
+                </p>
+              ) : null}
               {isApprovalRequester && (
                 <p
                   className="w-full text-xs text-muted-foreground"

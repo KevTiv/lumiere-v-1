@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { expectNoAppError, gotoModule } from "./helpers"
+import { selectModuleTab, expectNoAppError, gotoModule } from "./helpers"
 
 test.describe("Phase 10 overview smoke", { tag: "@phase-10" }, () => {
   test("overview dashboard renders KPI and chart widgets", async ({ page }) => {
@@ -27,10 +27,10 @@ test.describe("Phase 10 overview smoke", { tag: "@phase-10" }, () => {
 
   test("documents knowledge categories CSV import modal opens and cancels", async ({ page }) => {
     await gotoModule(page, "/documents", "documents")
-    await page.getByTestId("module-tab-documents-knowledge-categories").click()
+    await selectModuleTab(page, "documents", "knowledge-categories")
     await page.getByTestId("entity-action-csv-kb-category-tab").click()
 
-    const csvModal = page.locator('[data-testid^="form-modal-csv-import-"]')
+    const csvModal = page.getByRole("dialog", { name: "Import knowledge categories", exact: true })
     await expect(csvModal).toBeVisible()
     await csvModal.getByRole("button", { name: /^cancel$/i }).click()
     await expect(csvModal).toBeHidden()

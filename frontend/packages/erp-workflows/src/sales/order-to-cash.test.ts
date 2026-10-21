@@ -47,10 +47,13 @@ test("a confirmed order reports every linked delivery and keeps the order as the
   assert.deepEqual(observed.next, { resource: "sale_order", id: "5", module: "sales" })
 })
 
-test("an order left unconfirmed by the approval gate is approval_pending and stays the next record", () => {
-  const observed = observeConfirmedOrder("5", [{ id: 5, state: "Draft" }], [])
+test("an order left unconfirmed is approval_pending only with an exact task identity", () => {
+  const task = { resource: "workflow-human-tasks", id: "71", module: "approvals" }
+  const observed = observeConfirmedOrder("5", [{ id: 5, state: "Draft" }], [], task)
   assert.equal(observed.outcome, "approval_pending")
+  assert.deepEqual(observed.createdRecords, [task])
   assert.deepEqual(observed.next, { resource: "sale_order", id: "5", module: "sales" })
+  assert.deepEqual(observeConfirmedOrder("5", [{ id: 5, state: "Draft" }], []), {})
 })
 
 test("a confirmed order without stock-tracked deliveries falls back to the order", () => {

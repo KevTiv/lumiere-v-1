@@ -268,6 +268,9 @@ export const saleOrdersTableConfig = (
         description: t("sales.salesOrders.emptyState.description"),
         actionLabel: t("sales.salesOrders.emptyState.actionLabel"),
         onAction: options?.onEmptyAction,
+        permission: { resource: "sale_order", action: "create" },
+        secondaryActionId: "csv-sale-orders",
+        learnHint: t("sales.salesOrders.emptyState.hint", { defaultValue: "Start with a quotation: confirming it turns it into a sales order, deliveries and an invoice." }),
       },
     },
   }

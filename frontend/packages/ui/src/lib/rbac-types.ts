@@ -47,7 +47,7 @@ export type KnownResource =
 export type Resource = KnownResource | (string & {})
 
 // Actions that can be performed
-export type Action = "read" | "create" | "update" | "delete" | "manage" | "write"
+export type Action = "read" | "create" | "update" | "delete" | "manage" | "write" | "admin" | "post" | "reconcile" | "reverse" | "cancel"
 
 // Effect of a policy rule
 export type Effect = "allow" | "deny"
@@ -94,6 +94,7 @@ export interface BackendRoleRow {
 
 // User with role assignments
 export interface User {
+  isSuperuser?: boolean
   id: string
   email: string
   name: string
@@ -161,6 +162,11 @@ export interface RBACContext {
   checkPermission: (resource: Resource, action: Action) => PermissionCheckResult
   hasRole: (roleId: string) => boolean
   isAdmin: () => boolean
+  /**
+   * False while the signed-in user's roles/policies are still loading, so `checkPermission` would
+   * deny everyone. Absent means ready. UI that hides controls on denial should not do so until ready.
+   */
+  permissionsReady?: boolean
 }
 
 // Settings module configuration

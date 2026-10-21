@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState } from 'react'
+import { useTranslation } from '@lumiere/i18n'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import type { Mesh } from 'three'
@@ -15,6 +16,7 @@ interface StockItemBoxProps {
 }
 
 export function StockItemBox({ item, position, size = [0.8, 0.8, 0.8] }: StockItemBoxProps) {
+  const { t } = useTranslation()
   const meshRef = useRef<Mesh>(null)
   const [hovered, setHovered] = useState(false)
 
@@ -87,9 +89,9 @@ export function StockItemBox({ item, position, size = [0.8, 0.8, 0.8] }: StockIt
             <p className="font-medium">{item.name}</p>
             <p className="text-muted-foreground text-xs">{item.sku}</p>
             <p className="text-xs mt-1">
-              Qty:{' '}
+              {t('ui.stock3d.quantityAbbreviation')}{' '}
               <span className={isLowStock ? 'text-destructive font-bold' : ''}>{item.quantity}</span>
-              {isLowStock && ' (Low Stock)'}
+              {isLowStock && ` (${t('ui.stock3d.lowStock')})`}
             </p>
           </div>
         </Html>

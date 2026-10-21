@@ -45,6 +45,7 @@ import type { LowStockScanResult } from "@lumiere/erp-shared/ai-low-stock-schema
 import { companyRowsToSelectOptions } from "@/lib/form-lookup"
 
 import { HarnessAuditTrailCard } from "./harness-audit-trail-card"
+import { policyOutcomeLabel, riskClassLabel } from "./enum-labels"
 import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
 
 interface LowStockPanelProps {
@@ -215,10 +216,10 @@ function LowStockResultView({ result }: { result: LowStockScanResult }) {
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={decisionBadgeVariant(decision.outcome)}>
-              {decision.outcome}
+              {policyOutcomeLabel(t, decision.outcome)}
             </Badge>
             {decision.risk && (
-              <Badge variant="outline">{decision.risk}</Badge>
+              <Badge variant="outline">{riskClassLabel(t, decision.risk)}</Badge>
             )}
           </div>
           {decision.reasons.length > 0 && (

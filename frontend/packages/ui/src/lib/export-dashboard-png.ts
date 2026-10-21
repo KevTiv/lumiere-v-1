@@ -1,10 +1,42 @@
 import { toPng } from "html-to-image"
+import {
+  reportExportProvenanceJson,
+  sha256Hex,
+  type ReportExportArtifactProvenance,
+  type ReportExportSourceProvenance,
+} from "./report-export-provenance"
 
 function downloadDataUrl(dataUrl: string, filename: string): void {
   const link = document.createElement("a")
   link.download = filename
   link.href = dataUrl
   link.click()
+}
+
+function downloadText(text: string, filename: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json;charset=utf-8" }))
+  downloadDataUrl(url, filename)
+  URL.revokeObjectURL(url)
+}
+
+async function downloadPngWithProvenance(
+  dataUrl: string,
+  filename: string,
+  provenance?: ReportExportSourceProvenance,
+): Promise<ReportExportArtifactProvenance | undefined> {
+  downloadDataUrl(dataUrl, filename)
+  if (!provenance) return undefined
+  const manifest: ReportExportArtifactProvenance = {
+    ...provenance,
+    exportedAt: new Date().toISOString(),
+    artifact: {
+      filename,
+      mimeType: "image/png",
+      sha256: await sha256Hex(await (await fetch(dataUrl)).arrayBuffer()),
+    },
+  }
+  downloadText(reportExportProvenanceJson(manifest), `${filename}.provenance.json`)
+  return manifest
 }
 
 function sanitizeFilename(name: string): string {
@@ -17,7 +49,8 @@ function sanitizeFilename(name: string): string {
 export async function exportDashboardToPng(
   element: HTMLElement,
   filename = "dashboard",
-): Promise<void> {
+  provenance?: ReportExportSourceProvenance,
+): Promise<ReportExportArtifactProvenance | undefined> {
   const dataUrl = await toPng(element, {
     cacheBust: true,
     pixelRatio: 2,
@@ -25,7 +58,8 @@ export async function exportDashboardToPng(
       ? `hsl(${getComputedStyle(document.documentElement).getPropertyValue("--background")})`
       : undefined,
   })
-  downloadDataUrl(dataUrl, `${sanitizeFilename(filename)}.png`)
+  const artifactName = `${sanitizeFilename(filename)}.png`
+  return downloadPngWithProvenance(dataUrl, artifactName, provenance)
 }
 
 /**
@@ -34,7 +68,8 @@ export async function exportDashboardToPng(
 export async function exportChartToPng(
   element: HTMLElement,
   chartTitle: string,
-): Promise<void> {
+  provenance?: ReportExportSourceProvenance,
+): Promise<ReportExportArtifactProvenance | undefined> {
   const dataUrl = await toPng(element, {
     cacheBust: true,
     pixelRatio: 2,
@@ -42,5 +77,6 @@ export async function exportChartToPng(
       ? `hsl(${getComputedStyle(document.documentElement).getPropertyValue("--card")})`
       : "#ffffff",
   })
-  downloadDataUrl(dataUrl, `${sanitizeFilename(chartTitle)}.png`)
+  const artifactName = `${sanitizeFilename(chartTitle)}.png`
+  return downloadPngWithProvenance(dataUrl, artifactName, provenance)
 }

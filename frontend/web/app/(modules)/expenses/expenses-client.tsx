@@ -1,6 +1,8 @@
 "use client"
 import { accountMoveHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights } from "../../../components/module-insights"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import {
   inlineNumberAbove,
@@ -15,6 +17,7 @@ import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   newExpenseForm,
   newExpenseSheetForm,
   editExpenseForm,
@@ -69,12 +72,21 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useEmployees, type HrEmployee } from "@lumiere/query-hooks/hooks/hr"
+import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import type { ChartValueFormat } from "@lumiere/ui/lib/chart-format"
+import type { TabbedTableRow } from "@lumiere/ui"
+import { approvalBacklog, monthlySpend, spendByCategory } from "./expenses-dashboard-charts"
 import {
+  expenseQuantity,
+  newExpenseClientRequestId,
   newExpenseReceiptClientRequestId,
   parseAttachmentIds,
   toCreateExpenseParams,
   toCreateExpenseSheetParams,
 } from "@/lib/expenses-create-params"
+import { firstFileFromFormValue, uploadDocumentBlob } from "@/lib/document-blob-upload"
 import {
   pricelistRowsToSelectOptions,
   employeeRowsToSelectOptions,
@@ -182,8 +194,13 @@ function ExpensesClientLoaded({
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [timelineSheet, setTimelineSheet] = useState<Record<string, unknown> | null>(null)
 
-  const { data: expensesRaw = [] } = useExpenses(orgId, initialExpenses)
-  const { data: sheetsRaw = [] } = useExpenseSheets(orgId, initialSheets)
+  const expensesQuery = useExpenses(orgId, initialExpenses)
+  const sheetsQuery = useExpenseSheets(orgId, initialSheets)
+  const currenciesQuery = useCurrencies()
+  const expensesState = moduleQueryState(expensesQuery)
+  const sheetsState = moduleQueryState(sheetsQuery)
+  const expensesRaw = canUseModuleData(expensesState) ? expensesQuery.data ?? [] : []
+  const sheetsRaw = canUseModuleData(sheetsState) ? sheetsQuery.data ?? [] : []
   const { data: sheetsToApprove = [] } = useExpenseSheetsToApprove(orgId)
   const { data: missingReceipts = [] } = useExpensesMissingReceipt(orgId)
   const { data: unmatchedCards = [] } = useExpenseCardStatementUnmatched(orgId)
@@ -194,6 +211,8 @@ function ExpensesClientLoaded({
   )
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: employees = [] } = useEmployees(orgId, initialEmployees)
+  const { data: products = [] } = useProducts(orgId)
+  const { data: currencies = [] } = useCurrencies()
   const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
   const { data: perDiemRates = [] } = useExpensePerDiemRates(orgId)
 
@@ -222,26 +241,31 @@ function ExpensesClientLoaded({
         throw new Error("Employee is required to register a receipt")
       }
       const clientRequestId = newExpenseReceiptClientRequestId()
-      const storageKey =
-        formData.storageKey != null && String(formData.storageKey).trim() !== ""
-          ? String(formData.storageKey).trim()
-          : `local:${clientRequestId}`
+      const receiptFile = firstFileFromFormValue(formData.receiptFile)
+      const uploaded = receiptFile
+        ? await uploadDocumentBlob({ file: receiptFile, companyId: operatingCompanyId })
+        : null
+      const storageKey = uploaded?.objectKey ?? String(formData.storageKey ?? "").trim()
+      if (!storageKey) {
+        throw new Error("Choose a receipt file or provide an existing receipt storage key")
+      }
       const receiptId = await createExpenseReceipt.mutateAsync({
         employeeId,
         storageKey,
         clientRequestId,
-        fileName:
+        fileName: uploaded?.fileName ?? (
           formData.fileName != null && String(formData.fileName).trim() !== ""
             ? String(formData.fileName)
-            : undefined,
-        mimeType:
+            : undefined),
+        mimeType: uploaded?.mimetype ?? (
           formData.mimeType != null && String(formData.mimeType).trim() !== ""
             ? String(formData.mimeType)
-            : undefined,
+            : undefined),
+        contentHash: uploaded?.checksum,
       })
       return [receiptId]
     },
-    [createExpenseReceipt],
+    [createExpenseReceipt, operatingCompanyId],
   )
   const submitExpense = useSubmitExpense(orgId)
   const submitExpenseSheet = useSubmitExpenseSheet(orgId, operatingCompanyId)
@@ -358,7 +382,74 @@ function ExpensesClientLoaded({
       return st === "Approved" || st === "Posted" || st === "Done"
     }).length
 
+    const now = new Date()
+    const nowMs = now.getTime()
+    const currencyCodeById = currencyCodeMap(currencies)
+    const productNames = new Map(products.map((product) => [String(product.id), String(product.name ?? "")]))
+    const employeeNames = new Map(employees.map((employee) => [String(employee.id), String(employee.name ?? "")]))
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime()
+    const chartExpenses = expensesRaw.filter((expense) => expense.companyId === operatingCompanyId)
+    const expenseCurrencies = new Set(chartExpenses.map((expense) => currencyCodeById.get(String(expense.currencyId)) ?? ""))
+    const money: ChartValueFormat =
+      expenseCurrencies.size === 1 && [...expenseCurrencies][0]
+        ? { kind: "currency", currency: [...expenseCurrencies][0]! }
+        : { kind: "number" }
+
     return mapDashboardWidgets(moduleConfig, (w) => {
+        if (["exp-monthly-spend", "exp-spend-by-category"].includes(w.id) && (expenseCurrencies.size !== 1 || expenseCurrencies.has(""))) {
+          return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
+        }
+        if (w.type === "combo-chart" && w.id === "exp-monthly-spend") {
+          return { ...w, data: { ...w.data, values: monthlySpend(chartExpenses, now), valueFormat: money } }
+        }
+        if (w.type === "ranked-bars" && w.id === "exp-spend-by-category") {
+          return {
+            ...w,
+            data: {
+              ...w.data,
+              items: spendByCategory(
+                chartExpenses,
+                productNames,
+                { startMs: monthStart, endMs: nowMs },
+                { startMs: lastMonthStart, endMs: monthStart - 1 },
+              ),
+              valueFormat: money,
+              changeLabel: "vs last month",
+            },
+          }
+        }
+        if (w.type === "tabbed-table" && w.id === "exp-approval-backlog") {
+          return {
+            ...w,
+            data: {
+              tabs: [
+                { id: "all", label: "All" },
+                { id: "awaiting-approval", label: "Awaiting approval" },
+                { id: "awaiting-posting", label: "Awaiting posting" },
+              ],
+              columns: [
+                { key: "report", label: "Report" },
+                { key: "employee", label: "Employee" },
+                { key: "submitted", label: "Created" },
+                { key: "ageDays", label: "Age (days)", type: "number", align: "right" },
+                { key: "amount", label: "Amount", type: "currency", currencyKey: "currency", align: "right" },
+                {
+                  key: "status",
+                  label: "Status",
+                  type: "badge",
+                  badgeVariants: { "Awaiting approval": "warning", "Awaiting posting": "info" },
+                },
+              ],
+              rows: approvalBacklog(sheetsRaw, employeeNames, currencyCodeById, nowMs),
+              emptyMessage: "Nothing waiting — every expense report is handled.",
+              onRowClick: (row: TabbedTableRow) => {
+                const sheet = sheetsRaw.find((candidate) => String(candidate.id) === String(row.id))
+                if (sheet) setTimelineSheet(sheet)
+              },
+            },
+          }
+        }
         if (w.type === "stat-cards") {
           return {
             ...w,
@@ -396,6 +487,11 @@ function ExpensesClientLoaded({
   }, [
     expenses,
     sheets,
+    expensesRaw,
+    sheetsRaw,
+    products,
+    employees,
+    currencies,
     sheetsToApprove.length,
     missingReceipts.length,
     unmatchedCards.length,
@@ -419,6 +515,7 @@ function ExpensesClientLoaded({
                   {
                     id: "csv-expenses",
                     label: t("expenses.csvImport.toolbarExpenses"),
+                    permission: { resource: CSV_IMPORT_CONTRACTS.expense.resource, action: "create" },
                     onClick: () => setCsvKind("expense"),
                   },
                 ]),
@@ -460,6 +557,7 @@ function ExpensesClientLoaded({
                 {
                   id: "csv-sheets",
                   label: t("expenses.csvImport.toolbarSheets"),
+                  permission: { resource: CSV_IMPORT_CONTRACTS.expenseSheet.resource, action: "create" },
                   onClick: () => setCsvKind("sheet"),
                 },
                 {
@@ -620,7 +718,10 @@ function ExpensesClientLoaded({
       if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
       const attachmentIds = await resolveAttachmentIds(formData, empRaw)
       const params = toCreateExpenseParams(
-        formData,
+        {
+          ...formData,
+          clientRequestId: formData.clientRequestId ?? newExpenseClientRequestId(),
+        },
         {
           currencyId: pl.currencyId,
           pricelistId: plRaw,
@@ -760,7 +861,7 @@ function ExpensesClientLoaded({
             ? {}
             : {
                 unitAmount: Number(formData.unitAmount ?? 0),
-                quantity: Number(formData.quantity ?? 1),
+                quantity: expenseQuantity(formData.quantity),
               }),
           description:
             formData.description != null && String(formData.description).trim() !== ""
@@ -836,7 +937,9 @@ function ExpensesClientLoaded({
       ) : null}
       <ModuleView
         config={config}
+        dashboardContent={<ModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
+        dataState={{ expenses: expensesState, "expense-sheets": sheetsState }}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
         isPending={isFormMutationPending}
@@ -856,9 +959,14 @@ function ExpensesClientLoaded({
 
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={csvKind === "expense" ? "hr_expense" : "hr_expense_sheet"}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={csvKind === "expense" ? CSV_IMPORT_CONTRACTS.expense : CSV_IMPORT_CONTRACTS.expenseSheet}
+          templateFileName={`${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             if (csvKind === "expense") await csvImports.importExpense.mutateAsync(text)

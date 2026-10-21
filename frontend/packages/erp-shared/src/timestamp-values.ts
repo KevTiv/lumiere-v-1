@@ -38,8 +38,9 @@ export function isoToDate(iso: string): Date | null {
 /**
  * Decode a SpacetimeDB Timestamp object to a Date.
  *
- * Accepts `microsSinceUnixEpoch` (camelCase) and
- * `micros_since_unix_epoch` (snake_case). Returns null for
+ * Accepts `microsSinceUnixEpoch` (camelCase),
+ * `micros_since_unix_epoch` (snake_case), and the canonical HTTP SATS
+ * `__timestamp_micros_since_unix_epoch__` wire key. Returns null for
  * unrecognized shapes.
  */
 export function stdbTimestampToDate(raw: unknown): Date | null {
@@ -48,7 +49,9 @@ export function stdbTimestampToDate(raw: unknown): Date | null {
   if (typeof raw === "object" && raw !== null) {
     const micros =
       (raw as { microsSinceUnixEpoch?: unknown }).microsSinceUnixEpoch ??
-      (raw as { micros_since_unix_epoch?: unknown }).micros_since_unix_epoch
+      (raw as { micros_since_unix_epoch?: unknown }).micros_since_unix_epoch ??
+      (raw as { __timestamp_micros_since_unix_epoch__?: unknown })
+        .__timestamp_micros_since_unix_epoch__
     if (micros != null) return microsToDate(micros as number | bigint | string)
   }
   return null

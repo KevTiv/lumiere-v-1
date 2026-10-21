@@ -21,6 +21,8 @@ import {
   SmartButtons,
   StatusBar,
   buildModuleTabHref,
+  useFormDialog,
+  useRBAC,
   subscriptionAmendmentsTableConfig,
   subscriptionLinesTableConfig,
   subscriptionsTableConfig,
@@ -40,19 +42,23 @@ import { subscriptionRecordLinks } from '@lumiere/query-hooks/hooks/cross-record
 import {
   useSubscriptionAmendments,
   useSubscriptionBillingRuns,
+  useCreateSubscriptionPaymentIntent,
   useSubscriptionLines,
   useSubscriptions,
   type Subscription,
 } from '@lumiere/query-hooks/hooks/subscriptions';
+import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useSubscriptionsModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
+import { currencyOptionsFromRows } from '@/lib/form-lookup';
 import { RecordDocumentAttachments } from '../../../../components/record-document-attachments';
 import { CrossRecordLinks } from '../../../../components/order-handoff-links';
 import { subscriptionStateOf, subscriptionStatusBar } from '../subscription-status';
 import { subscriptionPageActions, type SubscriptionActionId } from '../subscription-actions';
 import { isSubscriptionDialogAction, useSubscriptionActions } from '../use-subscription-actions';
+import { PAYMENT_INTENT_TYPES, newIdempotencyKey, toPaymentIntentParams } from '../subscription-payment-intent';
 
 interface SubscriptionPageClientProps {
   subscriptionId: string;
@@ -93,6 +99,14 @@ function SubscriptionPageLoaded({
   const { data: accountPayments = [], isLoading: paymentsLoading, isError: paymentsError } = useAccountPayments(orgId);
 
   const subscriptionActions = useSubscriptionActions(orgId, operatingCompanyId);
+  const { checkPermission } = useRBAC();
+  const { askForm, formDialog } = useFormDialog();
+  const createPaymentIntent = useCreateSubscriptionPaymentIntent(orgId, operatingCompanyId);
+  const { data: currencies = [] } = useCurrencies();
+  const currencyOptions = useMemo(
+    () => currencyOptionsFromRows(currencies as unknown as Row[]),
+    [currencies],
+  );
 
   const subscription = useMemo(
     () => (subscriptions as unknown as Row[]).find((row) => String(row.id) === subscriptionId),
@@ -219,6 +233,73 @@ function SubscriptionPageLoaded({
     }
     void run(actionLabels[action], () => subscriptionActions.runDirect(action, id));
   };
+  /** Opens a payment intent for this subscription. One idempotency key per dialog, so a retried submit cannot double-create. */
+  const promptPaymentIntent = async () => {
+    const title = t('subscriptions.paymentIntent.create', { defaultValue: 'Create payment intent' });
+    const idempotencyKey = newIdempotencyKey();
+    const subscriptionCurrency = String(subscription.currencyId ?? subscription.currency_id ?? '');
+    const recurringTotal = Number(subscription.recurringTotal ?? subscription.recurring_total ?? 0);
+    const values = await askForm({
+      title,
+      fields: [
+        {
+          id: 'intentType',
+          name: 'intentType',
+          label: t('subscriptions.paymentIntent.intentType', { defaultValue: 'Intent type' }),
+          type: 'select',
+          required: true,
+          defaultValue: 'card_charge',
+          width: '1/2',
+          options: PAYMENT_INTENT_TYPES.map((value) => ({
+            value,
+            label: t(`subscriptions.paymentIntent.types.${value}`, { defaultValue: value }),
+          })),
+        },
+        {
+          id: 'amount',
+          name: 'amount',
+          label: t('subscriptions.paymentIntent.amount', { defaultValue: 'Amount' }),
+          type: 'number',
+          required: true,
+          min: 0,
+          step: 0.01,
+          defaultValue: Number.isFinite(recurringTotal) && recurringTotal > 0 ? recurringTotal : undefined,
+          width: '1/2',
+        },
+        {
+          id: 'currencyId',
+          name: 'currencyId',
+          label: t('subscriptions.paymentIntent.currency', { defaultValue: 'Currency' }),
+          type: 'select',
+          required: true,
+          defaultValue: subscriptionCurrency,
+          options: currencyOptions,
+          width: '1/2',
+        },
+        {
+          id: 'invoiceMoveId',
+          name: 'invoiceMoveId',
+          label: t('subscriptions.paymentIntent.invoiceMoveId', { defaultValue: 'Invoice move ID (optional)' }),
+          type: 'text',
+          inputMode: 'numeric',
+          width: '1/2',
+        },
+      ],
+    });
+    if (values == null) return;
+    const params = toPaymentIntentParams(values, idempotencyKey);
+    if (params == null) {
+      showWorkflowToast({
+        kind: 'error',
+        title: t('subscriptions.paymentIntent.failed', { defaultValue: 'Create payment intent failed' }),
+        description: t('subscriptions.paymentIntent.invalid', {
+          defaultValue: 'Choose an intent type and a currency, and enter an amount above zero (and a valid invoice move ID, if any).',
+        }),
+      });
+      return;
+    }
+    await run(title, () => createPaymentIntent.mutateAsync({ subscriptionId: BigInt(subscriptionId), params }));
+  };
   const headerActions = subscriptionPageActions(state);
   const primaryActions = headerActions.filter((a) => a.primary);
   const moreActions = headerActions.filter((a) => !a.primary);
@@ -261,6 +342,7 @@ function SubscriptionPageLoaded({
       actions={
         <>
           {subscriptionActions.dialogs}
+          {formDialog}
           {primaryActions.map((action) => (
             <Button
               key={action.id}
@@ -272,6 +354,17 @@ function SubscriptionPageLoaded({
               {actionLabels[action.id]}
             </Button>
           ))}
+          {checkPermission('subscription', 'write').allowed ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy || createPaymentIntent.isPending}
+              data-testid="subscription-create-payment-intent"
+              onClick={() => void promptPaymentIntent()}
+            >
+              {t('subscriptions.paymentIntent.create', { defaultValue: 'Create payment intent' })}
+            </Button>
+          ) : null}
           {moreActions.length > 0 ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

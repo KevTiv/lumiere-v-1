@@ -1,6 +1,6 @@
 //! Auth-hardening session tests (Phase 1–2): no anonymous admin, database-bound identity.
 
-use api_server::config::Config;
+use api_server::config::{Config, ReportArtifactStoreConfig};
 use api_server::organization_placement::{
     ConfiguredPlacementResolver, INITIAL_CELL_ID, INITIAL_DURABLE_STORE_ID,
 };
@@ -27,13 +27,16 @@ fn test_config(server_token: Option<&str>, dev_mock_org_id: Option<u64>) -> Conf
         ai_gateway_url: "http://127.0.0.1:3001".into(),
         projection_lag_budget_secs: 300,
         workos_client_id: None,
+        workos_auth: None,
         stdb_credential_encryption_key: None,
         resend_api_key: None,
         resend_from_email: "test@example.com".into(),
         app_url: "http://localhost:3000".into(),
         cookie_secure: false,
         report_renderer_url: None,
-        report_artifact_dir: std::env::temp_dir().join("lumiere-owner-reports-test"),
+        report_artifact_store: ReportArtifactStoreConfig::Local {
+            root: std::env::temp_dir().join("lumiere-owner-reports-test"),
+        },
         document_blob_dir: std::env::temp_dir().join("lumiere-document-blobs-test"),
         owner_report_worker_poll_secs: 15,
         owner_report_worker_name: "test-owner-report-worker".to_string(),
@@ -66,6 +69,54 @@ async fn no_bearer_or_cookie_returns_none_even_with_server_token_configured() {
         .await
         .expect("resolve should not error");
     assert!(session.is_none());
+}
+
+#[tokio::test]
+async fn import_routes_match_real_entity_and_request_paths_before_requiring_auth() {
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+        Router,
+    };
+    use std::sync::Arc;
+    use tower::ServiceExt;
+    use tower_cookies::CookieManagerLayer;
+
+    let state = Arc::new(AppState::new(test_config(None, None)));
+    let app = Router::new()
+        .nest("/v1", api_server::routes::domain_router())
+        .layer(CookieManagerLayer::new())
+        .with_state(state);
+    for (method, path, body) in [
+        (
+            "POST",
+            "/v1/import/hr_payslip",
+            r#"{"csvData":"employee_id,struct_id\n1,2\n"}"#,
+        ),
+        (
+            "GET",
+            "/v1/import/hr_payslip/requests/0123456789abcdef0123456789abcdef?companyId=1",
+            "",
+        ),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(method)
+                    .uri(path)
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "{method} {path}"
+        );
+    }
 }
 
 #[test]

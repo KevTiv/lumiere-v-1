@@ -4,7 +4,7 @@ import { proposalOrderLinks, purchaseOrderLinks, subscriptionRecordLinks } from 
 
 const scope = { organizationId: 1n, companyId: 2n }
 const row = (id: string, extra: Record<string, unknown> = {}) => ({
-  id, organizationId: "1", companyId: "2", ...extra,
+  id, organizationId: "1", companyId: "2", state: "Paid", moveType: "OutInvoice", ...extra,
 })
 
 test("PO zero/one/many receipts and bills preserve every exact ID, excluding foreign scope/returns", () => {
@@ -56,7 +56,8 @@ test("subscription uses billing-run FK and exact reconciled invoice IDs; 0..N is
 test("subscription missing/duplicate exact effects fail closed", () => {
   const run = row("1", { subscriptionId: "10", invoiceMoveId: "20" })
   assert.equal(subscriptionRecordLinks(row("10"), scope, [run], [], []).status, "unavailable")
-  assert.equal(subscriptionRecordLinks(row("10"), scope, [run, { ...run, id: "2" }], [row("20")], []).status, "invariant_failure")
+  assert.deepEqual(subscriptionRecordLinks(row("10"), scope, [run, { ...run, id: "2" }], [row("20")], []).links.map(link => link.id), ["20"])
+  assert.equal(subscriptionRecordLinks(row("10"), scope, [run], [row("20"), row("20")], []).status, "invariant_failure")
   const ambiguousPayment = subscriptionRecordLinks(row("10"), scope, [run], [row("20")], [row("30", { reconciledInvoiceIds: ["20"] }), row("30", { reconciledInvoiceIds: ["20"] })])
   assert.equal(ambiguousPayment.status, "ready")
   if (ambiguousPayment.status === "ready") assert.equal(ambiguousPayment.paymentNotice?.status, "invariant_failure")
@@ -93,4 +94,34 @@ test("duplicate payment reconciliation references fail closed", () => {
   assert.equal(result.status, "ready")
   if (result.status === "ready") assert.equal(result.paymentNotice?.status, "invariant_failure")
   assert.deepEqual(result.links.map(link => link.kind), ["invoice"])
+})
+
+
+test("subscription excludes refunds, cancelled invoices and payments awaiting approval or reversed", () => {
+  const run = row("1", { subscriptionId: "10", invoiceMoveId: "20" })
+  for (const moveType of ["OutRefund", "InInvoice"]) {
+    assert.equal(subscriptionRecordLinks(row("10"), scope, [run], [row("20", { moveType })], []).status, "unavailable")
+  }
+  assert.deepEqual(subscriptionRecordLinks(row("10"), scope, [run], [row("20", { state: "Cancelled" })],
+    [row("30", { reconciledInvoiceIds: ["20"] })]).links, [])
+  const result = subscriptionRecordLinks(row("10"), scope, [run], [row("20")], [
+    row("30", { state: "NotPaid", reconciledInvoiceIds: ["20"] }),
+    row("31", { state: "Reversed", reconciledInvoiceIds: ["20"] }),
+    row("32", { state: { tag: "Paid" }, reconciledInvoiceIds: ["20"] }),
+  ])
+  assert.deepEqual(result.links.map(link => [link.kind, link.id]), [["invoice", "20"], ["payment", "32"]])
+})
+
+test("subscription independently scopes runs, invoice targets, payments and parent with large option IDs", () => {
+  const invoiceId = "9007199254740993"
+  const run = row("1", { subscription_id: { some: "10" }, invoice_move_id: { some: invoiceId } })
+  const result = subscriptionRecordLinks(row("10"), scope, [run, row("2", { subscriptionId: "10", invoiceMoveId: "21", companyId: "3" })],
+    [row(invoiceId), row("21")], [
+      row("9007199254740994", { reconciled_invoice_ids: [invoiceId] }),
+      row("31", { reconciledInvoiceIds: [invoiceId], organizationId: "3" }),
+      row("32", { reconciledInvoiceIds: [invoiceId], companyId: "3" }),
+    ])
+  assert.deepEqual(result.links.map(link => link.id), [invoiceId, "9007199254740994"])
+  assert.equal(subscriptionRecordLinks(row("10", { companyId: "3" }), scope, [run], [row(invoiceId)], []).status, "unavailable")
+  assert.equal(subscriptionRecordLinks(row("10"), scope, [run], [row(invoiceId, { organizationId: "3" })], []).status, "unavailable")
 })
