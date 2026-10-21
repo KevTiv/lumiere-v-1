@@ -24,7 +24,10 @@ use crate::types::{
     PaymentTransactionStatus,
 };
 
-use super::helpers::{create_balanced_customer_invoice, seed_bank_journal};
+use super::helpers::{
+    create_balanced_customer_invoice, create_balanced_customer_invoice_on_account,
+    seed_bank_journal,
+};
 
 fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
     ctx.db
@@ -1015,8 +1018,28 @@ pub fn test_seed_payment_ledger_and_partial_report_balance(
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let (journal_id, _) = seed_bank_journal(ctx, &fixture)?;
     let currency_id = company_currency_id(ctx, fixture.company_id)?;
-    let invoice_id = create_balanced_customer_invoice(ctx, &fixture, 13_750.0, true)?;
-    let settled_invoice_id = create_balanced_customer_invoice(ctx, &fixture, 3_600.0, true)?;
+    let ar_account_id = *fixture
+        .chart_account_ids
+        .get(crate::test_harness::chart_keys::AR)
+        .ok_or("fixture receivable account missing")?;
+    // The helper uses this reference as its creation idempotency key. Separate
+    // invoices in one organization must not replay the first invoice's receipt.
+    let invoice_id = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        13_750.0,
+        ar_account_id,
+        "Seed owner partially allocated invoice",
+        true,
+    )?;
+    let settled_invoice_id = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        3_600.0,
+        ar_account_id,
+        "Seed settled sale-order invoice",
+        true,
+    )?;
     use crate::inventory::product::product;
     use crate::sales::pricelists::{product_pricelist, ProductPricelist};
     use crate::sales::sales_core::{
