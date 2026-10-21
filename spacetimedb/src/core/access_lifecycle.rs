@@ -1,9 +1,8 @@
 //! Transactional membership access changes and invitation completion.
 use crate::core::audit::audit_log;
 use crate::core::permissions::{
-    effective_permission_strings, effective_roles, ensure_delegated_admin_may_assign_role, role,
-    touch_policy_snapshot_for_user, user_role_assignment, validate_sod_for_permissions, Role,
-    UserRoleAssignment,
+    effective_roles, ensure_delegated_admin_may_assign_role, role, touch_policy_snapshot_for_user,
+    user_role_assignment, validate_sod_for_effective_roles, Role, UserRoleAssignment,
 };
 use crate::core::users::{find_user_profile_for_organization, user_organization, UserOrganization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
@@ -223,11 +222,7 @@ pub fn set_member_access(
         ensure_delegated_admin_may_assign_role(ctx, organization_id, &selected)?;
         desired_roles.push(selected);
     }
-    validate_sod_for_permissions(
-        ctx,
-        organization_id,
-        &effective_permission_strings(&desired_roles),
-    )?;
+    validate_sod_for_effective_roles(ctx, organization_id, user_identity, &desired_roles)?;
     if desired_ids.iter().any(|id| !current_ids.contains(id))
         || membership.role_id != params.primary_role_id
     {

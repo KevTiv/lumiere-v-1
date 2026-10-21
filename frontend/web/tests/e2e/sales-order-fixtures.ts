@@ -5,6 +5,7 @@ import { saleOrderHref } from "@lumiere/erp-shared/record-links"
 
 import { matchesOperationResponse } from "./operation-response"
 import {
+  selectModuleTab,
   activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
@@ -19,6 +20,7 @@ import {
   waitForBffQueryMinRows,
   waitForSaleOrderConfirmed,
   waitForSaleOrderLineExists,
+  reloadSettled,
 } from "./helpers"
 
 export const SEEDED_CUSTOMER_NAME = "Acme Corporation"
@@ -31,7 +33,7 @@ type SaleOrderQueryRow = QueryRowFor<"sale-orders">
  */
 export async function createDraftSaleOrder(page: Page, clientRef: string): Promise<number> {
   await gotoModule(page, "/sales", "sales")
-  await page.getByTestId("module-tab-sales-orders").click()
+  await selectModuleTab(page, "sales", "orders")
   await waitForBffQueryMinRows(page, "/api/query/contacts")
   await waitForBffQueryMinRows(page, "/api/query/pricelists")
   await waitForBffQueryMinRows(page, "/api/query/warehouses")
@@ -130,8 +132,8 @@ export interface PickingSnapshot {
 }
 
 /** Every non-return picking of an order (its delivery and any backorders), from the query API. */
-export async function fetchOrderPickings(page: Page, orderId: number): Promise<PickingSnapshot[]> {
-  const res = await page.request.get("/api/query/stock-pickings")
+export async function fetchOrderPickings(page: Page, orderId: number, companyId?: number): Promise<PickingSnapshot[]> {
+  const res = await page.request.get(`/api/query/stock-pickings${companyId == null ? "" : `?companyId=${companyId}`}`)
   if (!res.ok()) return []
   const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
   return (json.data ?? [])
@@ -179,6 +181,7 @@ export async function fetchOrderDeliveredQty(page: Page, orderId: number): Promi
 export async function confirmOrderViaUi(page: Page, orderId: number) {
   // Exact focus also keeps later fixtures operable after the first table page fills.
   await gotoModule(page, saleOrderHref(orderId), "sales")
+  await expect(page.getByTestId("module-tab-sales-orders")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
   await selectEntityRowById(page, orderId)
   await clickEntityActionAndWaitForReducer(page, "entity-action-confirm-orders", "confirm_sales_order")
@@ -188,7 +191,7 @@ export async function confirmOrderViaUi(page: Page, orderId: number) {
 export async function openFulfillmentTab(page: Page) {
   await gotoModule(page, "/sales", "sales")
   const tab = page.getByTestId("module-tab-sales-fulfillment")
-  await tab.click()
+  await selectModuleTab(page, "sales", "fulfillment")
   await expect(tab).toHaveAttribute("aria-selected", "true")
   await expect(page.locator('[role="tabpanel"]:visible').getByTestId("entity-table")).toBeVisible({
     timeout: 30_000,
@@ -253,10 +256,10 @@ export async function expectOrderSummary(
 ) {
   await gotoModule(page, "/sales", "sales")
   if (expected.reload) {
-    await page.reload({ waitUntil: "domcontentloaded" })
+    await reloadSettled(page)
     await gotoModule(page, "/sales", "sales")
   }
-  await page.getByTestId("module-tab-sales-orders").click()
+  await selectModuleTab(page, "sales", "orders")
   const row = activeTabEntityTable(page).getByTestId(`entity-row-${orderId}`)
   await expect(row).toBeVisible({ timeout: 30_000 })
   for (const label of expected.present ?? []) {

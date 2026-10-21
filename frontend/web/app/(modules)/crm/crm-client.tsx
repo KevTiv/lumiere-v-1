@@ -1,5 +1,8 @@
 "use client"
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights, type InsightPeriodRange } from "../../../components/module-insights"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
@@ -351,7 +354,7 @@ function CrmClientLoaded({
   const { t } = useTranslation()
   const router = useRouter()
   const { currentUser } = useRBAC()
-  const runtimeRoleId = runtimeFormRoleId(currentUser)
+  const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const { orgId } = orgBigInts(organizationId)
   const ownerLabelMap = useIdentityLabelMap(organizationId)
 
@@ -426,11 +429,15 @@ function CrmClientLoaded({
   const [workflowSubmitError, setWorkflowSubmitError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
+  const [insightPeriodRange, setInsightPeriodRange] = useState<InsightPeriodRange | null>(null)
 
-  const { data: leads = [], isLoading: leadsLoading } = useLeads(orgId, initialLeads)
-  const { data: opportunities = [], isLoading: opportunitiesLoading } = useOpportunities(orgId, initialOpportunities)
+  const leadsQuery = useLeads(orgId, initialLeads)
+  const { data: leads = [], isLoading: leadsLoading } = leadsQuery
+  const opportunitiesQuery = useOpportunities(orgId, initialOpportunities)
+  const { data: opportunities = [], isLoading: opportunitiesLoading } = opportunitiesQuery
   const { data: opportunityLines = [] } = useOpportunityLines(orgId)
-  const { data: contacts = [], isLoading: contactsLoading } = useContacts(orgId, initialContacts)
+  const contactsQuery = useContacts(orgId, initialContacts)
+  const { data: contacts = [], isLoading: contactsLoading } = contactsQuery
   const { data: contactTags = [] } = useContactTags(orgId)
   const { data: contactCategories = [] } = useContactCategories(orgId)
   const { data: contactSegments = [] } = useContactSegments(orgId)
@@ -1939,12 +1946,14 @@ function CrmClientLoaded({
             create_forecast_snapshot: () => {
               if (!operatingCompanyId || operatingCompanyId === 0n) return
               const now = Date.now()
-              const endMsSafe = endMs > startMs ? endMs : now
+              const snapshotStart = insightPeriodRange?.startMs ?? startMs
+              const snapshotEnd = insightPeriodRange?.endMs ?? endMs
+              const endMsSafe = snapshotEnd > snapshotStart ? snapshotEnd : now
               createForecastSnapshot
                 .mutateAsync({
                   companyId: operatingCompanyId,
                   params: {
-                    periodStart: stbTimestampFromDate(new Date(startMs)),
+                    periodStart: stbTimestampFromDate(new Date(snapshotStart)),
                     periodEnd: stbTimestampFromDate(new Date(endMsSafe)),
                     ownerId: undefined,
                     metadata: undefined,
@@ -2067,7 +2076,7 @@ function CrmClientLoaded({
         }
         return w
           })
-  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, dashboardTimeRange, t, navigateToLeadsByState, opportunityStages, forecastSnapshots, createForecastSnapshot, operatingCompanyId])
+  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, dashboardTimeRange, insightPeriodRange, t, navigateToLeadsByState, opportunityStages, forecastSnapshots, createForecastSnapshot, operatingCompanyId])
 
   const config = useMemo(
     () =>
@@ -2092,7 +2101,8 @@ function CrmClientLoaded({
     [leads, enrichedOpportunities, opportunityLines, contacts, activities, contactTags, contactCategories, contactSegments],
   )
 
-  const { data: kpiCurrencies = [] } = useCurrencies()
+  const currenciesQuery = useCurrencies()
+  const { data: kpiCurrencies = [] } = currenciesQuery
   const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
     () => ({
       opportunities: {
@@ -2456,8 +2466,14 @@ function CrmClientLoaded({
     <>
       <ModuleView
         config={config}
+        dashboardContent={<ModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: moduleQueryState(opportunitiesQuery) }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange} />}
         data={data}
         dataLoading={dataLoading}
+        dataState={{
+          leads: moduleQueryState(leadsQuery),
+          opportunities: moduleQueryState(opportunitiesQuery),
+          contacts: moduleQueryState(contactsQuery),
+        }}
         kpiStrips={kpiStrips}
         entityBoardContext={entityBoardContext}
         onFormSubmit={handleFormSubmit}

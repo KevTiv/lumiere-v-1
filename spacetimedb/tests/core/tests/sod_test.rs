@@ -1,17 +1,23 @@
 //! Segregation-of-duties enforcement (A6) and delegated-admin guards.
+use std::time::Duration;
+
 use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::core::organization::{insert_organization_with_owner, CreateOrganizationParams};
 use crate::core::permissions::{
-    assign_role, create_role, create_sod_conflict_rule, delegated_admin_scope,
-    ensure_resource_fields_writable, grant_delegated_admin_scope, grant_field_permission,
-    grant_permission, revoke_delegated_admin_scope, revoke_role, role, sod_conflict_rule,
-    update_sod_conflict_rule, user_role_assignment, AssignRoleParams, CreateRoleParams,
-    CreateSodConflictRuleParams, FieldPermissionAction, GrantDelegatedAdminScopeParams,
-    GrantFieldPermissionParams, GrantOrgPermissionParams, PermissionAction, PermissionEffect,
-    PermissionSubject, UpdateSodConflictRuleParams,
+    assign_role, build_policy_snapshot_row, create_role, create_sod_conflict_rule,
+    delegated_admin_scope, ensure_resource_fields_writable, grant_delegated_admin_scope,
+    grant_field_permission, grant_permission, revoke_delegated_admin_scope, revoke_role, role,
+    sod_conflict_rule, update_sod_conflict_rule, user_role_assignment, AssignRoleParams,
+    CreateRoleParams, CreateSodConflictRuleParams, FieldPermissionAction,
+    GrantDelegatedAdminScopeParams, GrantFieldPermissionParams, GrantOrgPermissionParams,
+    PermissionAction, PermissionEffect, PermissionSubject, UpdateSodConflictRuleParams,
 };
-use crate::core::users::{add_user_to_organization, AddUserToOrganizationParams};
+use crate::core::users::{
+    add_user_to_organization, find_user_profile_for_organization, user_organization, user_profile,
+    AddUserToOrganizationParams, UserOrganization, UserProfile,
+};
+use crate::helpers::check_permission;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 
 fn seed_sod_org(ctx: &ReducerContext) -> Result<(u64, u64, u64, u64), String> {
@@ -175,8 +181,47 @@ pub fn test_sod_assign_role_blocks_conflicting_roles(ctx: &ReducerContext) -> Re
         },
     ) {
         Ok(()) => return Err("assign_role should reject conflicting SoD permissions".to_string()),
+        Err(msg) if msg.contains("segregation of duties") => {}
+        Err(msg) => return Err(format!("Unexpected assign_role error: {msg}")),
+    }
+
+    let clerk_assignment = ctx
+        .db
+        .user_role_assignment()
+        .role_assign_by_user()
+        .filter(&member)
+        .find(|assignment| {
+            assignment.organization_id == org_id
+                && assignment.role_id == clerk_role_id
+                && assignment.is_active
+        })
+        .ok_or("active clerk assignment not found")?;
+    revoke_role(ctx, org_id, clerk_assignment.id)?;
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&member)
+        .find(|membership| membership.organization_id == org_id)
+        .ok_or("member organization row not found")?;
+    ctx.db.user_organization().id().update(UserOrganization {
+        role_id: clerk_role_id,
+        ..membership
+    });
+
+    match assign_role(
+        ctx,
+        member,
+        approver_role_id,
+        org_id,
+        AssignRoleParams {
+            expires_at_micros: None,
+            metadata: None,
+        },
+    ) {
+        Ok(()) => Err("base-role SoD conflict should reject supplemental role".to_string()),
         Err(msg) if msg.contains("segregation of duties") => Ok(()),
-        Err(msg) => Err(format!("Unexpected assign_role error: {msg}")),
+        Err(msg) => Err(format!("Unexpected base-role SoD error: {msg}")),
     }
 }
 
@@ -270,9 +315,60 @@ pub fn test_field_write_policy_blocks_disallowed_columns(
             subject: PermissionSubject::Role(limited_role.id),
             resource: "contact".to_string(),
             action: FieldPermissionAction::Write,
+            allowed_fields: vec!["name".to_string(), "email".to_string()],
+        },
+    )?;
+
+    create_role(
+        ctx,
+        org_id,
+        CreateRoleParams {
+            name: "Contact Supplemental Name Only".to_string(),
+            description: None,
+            parent_id: None,
+            permissions: vec!["contact:write".to_string()],
+            is_active: true,
+            metadata: None,
+        },
+    )?;
+    let supplemental_role = ctx
+        .db
+        .role()
+        .role_by_org()
+        .filter(&org_id)
+        .find(|role| role.name == "Contact Supplemental Name Only")
+        .ok_or("supplemental field role not found")?;
+    grant_field_permission(
+        ctx,
+        org_id,
+        GrantFieldPermissionParams {
+            subject: PermissionSubject::Role(supplemental_role.id),
+            resource: "contact".to_string(),
+            action: FieldPermissionAction::Write,
             allowed_fields: vec!["name".to_string()],
         },
     )?;
+    ctx.db
+        .user_role_assignment()
+        .insert(crate::core::permissions::UserRoleAssignment {
+            id: 0,
+            user_identity: member,
+            role_id: supplemental_role.id,
+            organization_id: org_id,
+            assigned_by: ctx.sender(),
+            assigned_at: ctx.timestamp,
+            expires_at: None,
+            is_active: true,
+            metadata: Some(r#"{"test":"field-intersection"}"#.to_string()),
+        });
+
+    let effective_roles = crate::core::permissions::effective_roles(ctx, org_id, member)?;
+    if ![limited_role.id, supplemental_role.id]
+        .iter()
+        .all(|id| effective_roles.iter().any(|role| role.id == *id))
+    {
+        return Err("field intersection fixture is missing a target member role".into());
+    }
 
     ensure_resource_fields_writable(
         ctx,
@@ -575,6 +671,198 @@ pub fn test_role_assign_revoke_rejects_replay(ctx: &ReducerContext) -> Result<()
         .ok_or("assignment vanished after replay")?;
     if after_replay != revoked {
         return Err("rejected replay mutated the revoked assignment".to_string());
+    }
+    Ok(())
+}
+
+pub fn test_supplemental_role_authority_filters_stale_assignments(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+
+    let create_test_role = |name: &str, permissions: Vec<String>, is_active: bool| {
+        create_role(
+            ctx,
+            org_id,
+            CreateRoleParams {
+                name: name.to_string(),
+                description: None,
+                parent_id: None,
+                permissions,
+                is_active,
+                metadata: None,
+            },
+        )?;
+        ctx.db
+            .role()
+            .role_by_org()
+            .filter(&org_id)
+            .find(|role| role.name == name)
+            .ok_or_else(|| format!("{name} role not found"))
+    };
+
+    let current_role = create_test_role(
+        "Supplemental current",
+        vec![
+            "supplemental_string:read".to_string(),
+            "supplemental_denied:read".to_string(),
+        ],
+        true,
+    )?;
+    let expired_role = create_test_role(
+        "Supplemental expired",
+        vec!["supplemental_expired:read".to_string()],
+        true,
+    )?;
+    let inactive_role = create_test_role(
+        "Supplemental inactive",
+        vec!["supplemental_inactive:read".to_string()],
+        false,
+    )?;
+
+    grant_permission(
+        ctx,
+        org_id,
+        GrantOrgPermissionParams {
+            subject: PermissionSubject::Role(current_role.id),
+            resource: "supplemental_org_grant".to_string(),
+            action: PermissionAction::Read,
+            effect: PermissionEffect::Allow,
+        },
+    )?;
+    grant_permission(
+        ctx,
+        org_id,
+        GrantOrgPermissionParams {
+            subject: PermissionSubject::Role(current_role.id),
+            resource: "supplemental_denied".to_string(),
+            action: PermissionAction::Read,
+            effect: PermissionEffect::Deny,
+        },
+    )?;
+    grant_field_permission(
+        ctx,
+        org_id,
+        GrantFieldPermissionParams {
+            subject: PermissionSubject::Role(current_role.id),
+            resource: "account_move".to_string(),
+            action: FieldPermissionAction::Read,
+            allowed_fields: vec!["name".to_string()],
+        },
+    )?;
+
+    for (role_id, expires_at) in [
+        (current_role.id, None),
+        (
+            expired_role.id,
+            Some(ctx.timestamp - Duration::from_secs(1)),
+        ),
+        (inactive_role.id, None),
+    ] {
+        ctx.db
+            .user_role_assignment()
+            .insert(crate::core::permissions::UserRoleAssignment {
+                id: 0,
+                user_identity: ctx.sender(),
+                role_id,
+                organization_id: org_id,
+                assigned_by: ctx.sender(),
+                assigned_at: ctx.timestamp,
+                expires_at,
+                is_active: true,
+                metadata: Some(r#"{"test":"supplemental-authority"}"#.to_string()),
+            });
+    }
+    let other = OrgFixture::seed_minimal(ctx)?;
+    let other_owner_role = ctx
+        .db
+        .role()
+        .role_by_org()
+        .filter(&other.organization_id)
+        .find(|role| {
+            role.permissions
+                .iter()
+                .any(|permission| permission == "*:*")
+        })
+        .ok_or("other organization owner role not found")?;
+    ctx.db
+        .user_role_assignment()
+        .insert(crate::core::permissions::UserRoleAssignment {
+            id: 0,
+            user_identity: ctx.sender(),
+            role_id: other_owner_role.id,
+            organization_id: other.organization_id,
+            assigned_by: ctx.sender(),
+            assigned_at: ctx.timestamp,
+            expires_at: None,
+            is_active: true,
+            metadata: Some(r#"{"test":"cross-org-authority"}"#.to_string()),
+        });
+
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|row| row.organization_id == org_id)
+        .ok_or("test membership not found")?;
+    let base_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&membership.role_id)
+        .ok_or("base role not found")?;
+    ctx.db.role().id().update(crate::core::permissions::Role {
+        permissions: vec![],
+        ..base_role
+    });
+    let profile = find_user_profile_for_organization(ctx, ctx.sender(), org_id)
+        .ok_or("test profile not found")?;
+    ctx.db.user_profile().id().update(UserProfile {
+        is_superuser: false,
+        ..profile
+    });
+
+    check_permission(ctx, org_id, "supplemental_string", "read")?;
+    check_permission(ctx, org_id, "supplemental_org_grant", "read")?;
+    if check_permission(ctx, org_id, "supplemental_denied", "read").is_ok() {
+        return Err("explicit org deny did not override role-string allow".to_string());
+    }
+    for resource in [
+        "supplemental_expired",
+        "supplemental_inactive",
+        "cross_org_probe",
+    ] {
+        if check_permission(ctx, org_id, resource, "read").is_ok() {
+            return Err(format!("stale supplemental role granted {resource}"));
+        }
+    }
+
+    let snapshot = build_policy_snapshot_row(ctx, org_id, ctx.sender())?;
+    if !snapshot
+        .role_permissions
+        .contains(&"supplemental_string:read".to_string())
+        || snapshot
+            .role_permissions
+            .contains(&"supplemental_expired:read".to_string())
+        || snapshot
+            .role_permissions
+            .contains(&"supplemental_inactive:read".to_string())
+    {
+        return Err("policy snapshot supplemental permission filtering mismatch".to_string());
+    }
+    if !snapshot
+        .org_permission_grants
+        .iter()
+        .any(|grant| grant.resource == "supplemental_org_grant")
+        || !snapshot
+            .field_permissions
+            .iter()
+            .any(|grant| grant.resource == "account_move")
+    {
+        return Err("supplemental role grants missing from policy snapshot".to_string());
     }
     Ok(())
 }

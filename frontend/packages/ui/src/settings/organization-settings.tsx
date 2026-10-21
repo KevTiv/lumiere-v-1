@@ -52,6 +52,7 @@ import { createCountryForm, createCurrencyForm } from "../lib/settings-platform-
 import { useRBAC } from "@/lib/rbac-context"
 import { cn } from "@/lib/utils"
 import { CountryPackReadinessPanel } from "./country-pack-readiness-panel"
+import { InvoicePersonalizationSettings, type UploadInvoiceLogo } from "./invoice-personalization-settings"
 import {
   Select,
   SelectContent,
@@ -82,7 +83,7 @@ function companyIdFromForm(data: Record<string, unknown>): string {
  * Manages organization-level settings via the upsert_organization_settings reducer.
  * This connects to SpacetimeDB for persistent organization configuration.
  */
-export function OrganizationSettings() {
+export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?: UploadInvoiceLogo } = {}) {
   const { t } = useTranslation()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
@@ -723,6 +724,8 @@ export function OrganizationSettings() {
           </CardContent>
         </Card>
       ) : null}
+
+      {orgReady ? <InvoicePersonalizationSettings organizationId={orgId} companyId={selectedCompanyId || null} companyName={strVal(selectedCompany?.name)} company={selectedCompany} uploadInvoiceLogo={uploadInvoiceLogo} /> : null}
 
       {orgReady && selectedCompanyId ? (
         <CountryPackReadinessPanel

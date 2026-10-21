@@ -19,50 +19,89 @@
     {
       "name": "finish_manufacturing_order_with_tracking",
       "company_paths": [
-        {"path": ["company_id"], "required": true, "nullable": false,
-         "meaning": "legal entity owning the manufacturing order and exact tracked output moves"}
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the manufacturing order and exact tracked output moves"
+        }
       ]
     },
     {
       "name": "scrap_tracked_manufacturing_output",
       "company_paths": [
-        {"path": ["company_id"], "required": true, "nullable": false,
-         "meaning": "legal entity owning the completed manufacturing output and attributed waste move"}
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the completed manufacturing output and attributed waste move"
+        }
       ]
     },
     {
       "name": "scrap_manufacturing_material",
       "company_paths": [
-        {"path": ["company_id"], "required": true, "nullable": false,
-         "meaning": "legal entity owning the in-progress manufacturing order and exact source material quant"}
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the in-progress manufacturing order and exact source material quant"
+        }
       ]
     },
     {
       "name": "set_bom_operations",
       "company_paths": [
-        {"path": ["company_id"], "required": true, "nullable": false,
-         "meaning": "legal entity owning the BOM and every assigned operation"}
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the BOM and every assigned operation"
+        }
       ]
     },
     {
       "name": "configure_workcenter_cost_rate",
       "company_paths": [
-        {"path": ["company_id"], "required": true, "nullable": false,
-         "meaning": "legal entity owning the active workcenter and rate currency"}
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the active workcenter and rate currency"
+        }
       ]
     },
     {
       "name": "configure_manufacturing_valuation",
       "company_paths": [
-        {"path": ["company_id"], "required": true, "nullable": false,
-         "meaning": "legal entity owning the journal, posting accounts and valuation currency"}
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the journal, posting accounts and valuation currency"
+        }
       ]
     },
     {
       "name": "create_account_account",
       "company_paths": [
         {
-          "path": ["params", "company_id"],
+          "path": [
+            "params",
+            "company_id"
+          ],
           "required": true,
           "nullable": false,
           "meaning": "selected legal entity for the account"
@@ -73,7 +112,10 @@
       "name": "create_manual_account_invoice",
       "company_paths": [
         {
-          "path": ["params", "company_id"],
+          "path": [
+            "params",
+            "company_id"
+          ],
           "required": true,
           "nullable": false,
           "meaning": "selected legal entity owning the manual invoice or vendor bill and its journal lines"
@@ -84,7 +126,9 @@
       "name": "cleanup_abandoned_account_move_import",
       "company_paths": [
         {
-          "path": ["company_id"],
+          "path": [
+            "company_id"
+          ],
           "required": true,
           "nullable": false,
           "meaning": "selected legal entity owning every abandoned accounting import parent draft"
@@ -95,7 +139,10 @@
       "name": "apply_historical_payment_allocations",
       "company_paths": [
         {
-          "path": ["params", "company_id"],
+          "path": [
+            "params",
+            "company_id"
+          ],
           "required": true,
           "nullable": false,
           "meaning": "selected legal entity owning the historical payment transaction and every reconstructed document allocation"
@@ -106,7 +153,10 @@
       "name": "create_contact",
       "company_paths": [
         {
-          "path": ["params", "company_id"],
+          "path": [
+            "params",
+            "company_id"
+          ],
           "required": false,
           "nullable": true,
           "meaning": "selected legal entity for the contact"
@@ -123,7 +173,10 @@
       "name": "create_opportunity",
       "company_paths": [
         {
-          "path": ["params", "company_id"],
+          "path": [
+            "params",
+            "company_id"
+          ],
           "required": false,
           "nullable": true,
           "meaning": "selected legal entity for the opportunity"
@@ -134,7 +187,10 @@
       "name": "create_whatsapp_business_account",
       "company_paths": [
         {
-          "path": ["params", "company_id"],
+          "path": [
+            "params",
+            "company_id"
+          ],
           "required": false,
           "nullable": true,
           "meaning": "optional legal entity for the WhatsApp Business account"
@@ -145,10 +201,64 @@
       "name": "delete_company",
       "company_paths": [
         {
-          "path": ["company_id"],
+          "path": [
+            "company_id"
+          ],
           "required": true,
           "nullable": false,
           "meaning": "company being deleted"
+        }
+      ]
+    },
+    {
+      "name": "claim_reviewed_mail_delivery",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the reviewed invoice and exactly claimed outbound message"
+        }
+      ]
+    },
+    {
+      "name": "abandon_bank_statement_settlement",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the bank statement, immutable settlement attempt and expected payment"
+        }
+      ]
+    },
+    {
+      "name": "resubmit_bank_statement_settlement",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the bank statement, immutable settlement attempt and expected payment"
+        }
+      ]
+    },
+    {
+      "name": "reverse_bank_statement_settlement",
+      "company_paths": [
+        {
+          "path": [
+            "company_id"
+          ],
+          "required": true,
+          "nullable": false,
+          "meaning": "legal entity owning the bank statement, immutable settlement attempt and expected payment"
         }
       ]
     }

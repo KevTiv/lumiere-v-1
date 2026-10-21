@@ -5,6 +5,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import type { CreateMrpProductionParams } from "@lumiere/stdb/types"
 
 import {
+  selectModuleTab,
   chooseFirstOption,
   fetchDefaultCompanyId,
   fetchFirstWarehouseId,
@@ -61,7 +62,7 @@ async function createSetupBomViaUi(page: Page): Promise<BomRow> {
   )
 
   await gotoModule(page, "/manufacturing", "manufacturing")
-  await page.getByTestId("module-tab-manufacturing-boms").click()
+  await selectModuleTab(page, "manufacturing", "boms")
   await waitForBffQueryMinRows(page, "/api/query/products")
   await page.getByTestId("module-create-manufacturing-boms").click()
   await expect(page.getByTestId("form-modal-new-bom")).toBeVisible()
@@ -277,9 +278,7 @@ test.describe(
           PERSONA_PASSWORD,
         )
         await gotoModule(warehousePage, "/manufacturing", "manufacturing")
-        await warehousePage
-          .getByTestId("module-tab-manufacturing-orders")
-          .click()
+        await selectModuleTab(warehousePage, "manufacturing", "orders")
 
         const panel = warehousePage.locator('[role="tabpanel"]:visible')
         await panel.getByLabel("Search records").fill(origin)

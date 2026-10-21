@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
+  selectModuleTab,
   chooseFirstOption,
   chooseSelectOptionByLabel,
   fetchAccountIdByCode,
@@ -58,7 +59,7 @@ async function replay(page: Page, request: Request) {
 
 async function selectPayslipAction(page: Page, payslipId: number, actionId: string) {
   await gotoModule(page, "/hr", "hr")
-  await page.getByTestId("module-tab-hr-payslips").click()
+  await selectModuleTab(page, "hr", "payslips")
   const row = page.getByTestId(`entity-row-${payslipId}`)
   await expect(row).toBeVisible({ timeout: 45_000 })
   await row.click()

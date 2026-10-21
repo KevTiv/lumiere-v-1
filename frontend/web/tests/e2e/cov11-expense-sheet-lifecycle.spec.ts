@@ -2,7 +2,7 @@ import { createHash } from "node:crypto"
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
-  callReducerBff,
+  selectModuleTab,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   fetchAccountIdByCode,
@@ -148,7 +148,7 @@ async function openSheetAction(
   actionId: string,
 ) {
   await gotoModule(page, "/expenses", "expenses")
-  await page.getByTestId("module-tab-expenses-expense-sheets").click()
+  await selectModuleTab(page, "expenses", "expense-sheets")
   await selectEntityRowById(page, sheetId)
   const action = page.getByTestId(`entity-action-${actionId}`)
   await expect(action).toBeVisible()
@@ -175,10 +175,17 @@ test.describe(
         "utf8",
       )
       const receiptHash = createHash("sha256").update(receiptBytes).digest("hex")
+      // Repeated runs share a seed employee/date. Keep the positive fixture
+      // distinct under the amount/day/merchant duplicate detector too.
+      const existingAmounts = (await rows(page, "expenses")).map(
+        (row) => Number(row.totalAmount ?? row.total_amount),
+      )
+      let expenseAmount = 73.17
+      while (existingAmounts.some((amount) => Math.abs(amount - expenseAmount) < 0.02)) expenseAmount += 1
 
       // Create the report through the operator form so lookup and company scope
       // are exercised before the lifecycle actions begin.
-      await page.getByTestId("module-tab-expenses-expense-sheets").click()
+      await selectModuleTab(page, "expenses", "expense-sheets")
       await page.getByTestId("module-create-expenses-expense-sheets").click()
       await fillField(page, "name", sheetName)
       await chooseFirstEnabledOption(page, "pricelistId")
@@ -201,12 +208,10 @@ test.describe(
 
       // Upload real bytes through presign -> object store -> complete, then let
       // the expense form register and attach the resulting receipt row.
-      await page.getByTestId("module-tab-expenses-expenses").click()
+      await selectModuleTab(page, "expenses", "expenses")
       await page.getByTestId("module-create-expenses-expenses").click()
       await fillField(page, "name", expenseName)
-      await fillField(page, "totalAmount", "73.17")
-      // A failed attempt leaves real rows behind. Keep a retry's business date
-      // distinct so duplicate detection does not mask the original failure.
+      await fillField(page, "totalAmount", expenseAmount.toFixed(2))
       await fillField(page, "date", isoDate(-test.info().retry))
       await chooseFirstEnabledOption(page, "pricelistId")
       await chooseFirstEnabledOption(page, "employeeId")
@@ -234,12 +239,12 @@ test.describe(
       expect(blobCompleted.ok()).toBe(true)
       expect(receiptRegistered.ok(), await receiptRegistered.text()).toBe(true)
       expect(expenseCreated.ok(), await expenseCreated.text()).toBe(true)
-      const expenseId = scalarQueryId(
-        (await rows(page, "expenses")).find(
-          (row) => row.name === expenseName,
-        )?.id,
+      const expense = (await rows(page, "expenses")).find(
+        (row) => row.name === expenseName,
       )
+      const expenseId = scalarQueryId(expense?.id)
       if (expenseId == null) throw new Error("created expense line not found")
+      expect(Number(expense?.totalAmount ?? expense?.total_amount)).toBe(Number(expenseAmount.toFixed(2)))
       const receipt = (await rows(page, "expense-receipts")).find(
         (row) => String(row.fileName ?? row.file_name ?? "") === receiptFileName,
       )
@@ -291,7 +296,7 @@ test.describe(
         ),
         submitAction.click(),
       ])
-      expect(submitted.ok()).toBe(true)
+      expect(submitted.ok(), await submitted.text()).toBe(true)
       await expect
         .poll(() => sheetSnapshot(page, sheetId))
         .toMatchObject({ state: "Submitted" })
@@ -325,14 +330,14 @@ test.describe(
         )
         if (!existingFinanceEmployee) {
           const financeEmployeeName = smokeName("cov11-finance-approver")
-          await callReducerBff(page, "create_employee", [
+          await callOwnerRaw("create_employee", [
             organizationId,
             {
               company_id: some(companyId),
               name: financeEmployeeName,
               job_id: none,
               department_id: none,
-              employment_type: { tag: "FullTime" },
+              employment_type: { fullTime: [] },
               work_email: some("fixture.finance@example.test"),
               employee_number: none,
               job_title: some("Expense approver"),

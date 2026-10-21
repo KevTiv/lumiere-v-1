@@ -106,6 +106,7 @@ async function expectBillFocus(page: Page, billId: number) {
     url.searchParams.getAll("filter").length === 1 &&
     url.searchParams.get("filter") === `id:${billId}`,
   )
+  await expect(page.getByTestId("module-tab-accounting-journal-entries")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("module-tab-accounting-journal-entries"))
     .toHaveAttribute("aria-selected", "true")
   const table = activeTabEntityTable(page)
@@ -137,9 +138,8 @@ test.describe(
     }) => {
       test.setTimeout(240_000)
       // Matched posting only, not variance correction or manual economic-claim
-      // certification. Default HTTP account-move-lines omits product_id,
-      // quantity and price_unit; PO lines omit invoice_lines. Native tests
-      // own those internals; never request a field-policy bypass here.
+      // certification. Native tests own those internals; never request a
+      // field-policy bypass here.
       // Requires isolated first-org fixtures, stocked untracked laptop,
       // open fiscal period and no human approval gate for this small bill.
       await signIn(page, "test@email.com", PASSWORD)
@@ -190,9 +190,14 @@ test.describe(
         await signIn(accounting, "fixture.finance@example.test", PASSWORD)
         await accounting.goto(`/accounting?tab=journal-entries&filter=id:${exactBillId}`)
         await expectBillFocus(accounting, exactBillId)
+        const accountRead = await accounting.request.get("/api/query/account-accounts")
+        expect(accountRead.ok(), "Finance must read the posting accounts").toBe(true)
         await activeTabEntityTable(accounting).getByTestId(`entity-row-${exactBillId}`).click()
-        const post = accounting.getByRole("dialog").getByRole("button", { name: "Post", exact: true })
-        await expect(post).toBeVisible()
+        // GeneralLedgerView owns the journal-entry dialog, not EntityRecordSheet.
+        const entryDialog = accounting.getByRole("dialog", { name: /^Entry:/ })
+        await expect(entryDialog).toBeVisible()
+        const post = entryDialog.getByTestId("general-ledger-post-move")
+        await expect(post).toBeEnabled()
         const responsePromise = accounting.waitForResponse(
           (response) => matchesOperationResponse(response, "post_invoice"),
           { timeout: 30_000 },

@@ -1,6 +1,16 @@
 {
   "version": 1,
   "operations": {
+    "abandon_bank_statement_settlement": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_settlement_lifecycle.rs: immutable request receipts bind expected payment and attempt; scoped lifecycle guards reject stale requests before financial effects"
+    },
     "accept_sale_order_quotation": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -2011,6 +2021,16 @@
       },
       "evidence": "purchasing/purchase_orders.rs: reducer inserts/appends or performs an unguarded domain mutation"
     },
+    "create_purchase_order_once": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/order_creation_operations.rs: atomic scoped key relation returns the exact purchase order for same-input replay and rejects conflicting reuse"
+    },
     "create_purchase_requisition": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -3081,6 +3101,16 @@
       },
       "evidence": "purchasing/purchase_orders.rs: reducer checks current state or duplicate before transition"
     },
+    "receive_po_line_once": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "idempotent",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "purchasing/receipt_operations.rs: atomic uniquely scoped invocation receipt rejects conflicting reuse and returns same-input replay after current authorization"
+    },
     "recognize_amortization_line": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -3391,6 +3421,16 @@
       },
       "evidence": "proposals/proposals.rs: reducer checks current state or duplicate before transition"
     },
+    "resubmit_bank_statement_settlement": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_settlement_lifecycle.rs: immutable request receipts bind expected payment and attempt; scoped lifecycle guards reject stale requests before financial effects"
+    },
     "resume_subscription": {
       "semantic_kind": "command",
       "client_facing": true,
@@ -3410,6 +3450,16 @@
         "version": 1
       },
       "evidence": "accounting/intercompany.rs: reducer inserts/appends or performs an unguarded domain mutation"
+    },
+    "reverse_bank_statement_settlement": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "accounting/bank_settlement_lifecycle.rs: immutable request receipts bind expected payment and attempt; scoped lifecycle guards reject stale requests before financial effects"
     },
     "reverse_payment_transaction": {
       "semantic_kind": "command",
@@ -3900,6 +3950,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes purchasing test assertions"
+    },
+    "run_purchasing_keyed_operations_test": {
+      "semantic_kind": "test",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/tests/purchasing/mod.rs: denied test reducer invokes keyed purchase-order creation and receipt replay assertions"
     },
     "run_purchasing_lot_receive_test": {
       "semantic_kind": "test",

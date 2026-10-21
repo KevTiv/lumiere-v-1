@@ -19,9 +19,36 @@ pub(crate) fn validate_pilot_money_amount(label: &str, amount: f64) -> Result<()
     Ok(())
 }
 
+/// Convert supported currency values to exact minor units before comparing money.
+pub(crate) fn pilot_money_minor_units(value: f64, decimals: u8) -> Result<i64, String> {
+    validate_pilot_money_amount("accounting amount", value)?;
+    if decimals > 6 {
+        return Err("unsupported accounting currency precision".to_string());
+    }
+    let scaled = value * 10_f64.powi(i32::from(decimals));
+    let rounded = scaled.round();
+    if rounded.abs() > 9_007_199_254_740_991.0
+        // Subtraction of prior allocations leaves bounded binary cancellation
+        // noise (100 - 99.99). Never widen this to a meaningful currency unit.
+        || (scaled - rounded).abs() > 0.000001
+    {
+        return Err("accounting amount is not exact at currency precision".to_string());
+    }
+    Ok(rounded as i64)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{validate_pilot_money_amount, PILOT_MAX_MAJOR_UNITS};
+    use super::{pilot_money_minor_units, validate_pilot_money_amount, PILOT_MAX_MAJOR_UNITS};
+
+    #[test]
+    fn residual_minor_units_allow_binary_cancellation_but_reject_fractional_currency() {
+        assert_eq!(pilot_money_minor_units(100.0 - 99.99, 2), Ok(1));
+        assert_eq!(pilot_money_minor_units(-0.01, 2), Ok(-1));
+        assert!(pilot_money_minor_units(0.001, 2).is_err());
+        assert!(pilot_money_minor_units(f64::NAN, 2).is_err());
+        assert!(pilot_money_minor_units(0.01, 0).is_err());
+    }
 
     #[test]
     fn pilot_money_boundary_accepts_finite_values_inside_limit() {

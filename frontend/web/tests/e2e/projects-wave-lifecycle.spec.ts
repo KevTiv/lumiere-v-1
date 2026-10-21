@@ -8,6 +8,7 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   expectRowActionsOffered,
   callReducerBff,
   callReducerBffResult,
@@ -22,7 +23,7 @@ const some = <T>(value: T) => ({ some: value })
 const none = { none: [] as [] }
 
 async function openProjectsTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-projects-${tabId}`).click()
+  await selectModuleTab(page, "projects", tabId)
 }
 
 async function fetchFirstCompanyId(page: Page): Promise<number> {

@@ -15,6 +15,10 @@ use crate::core::organization::{
     company, create_company, insert_organization_with_owner, organization, CreateCompanyParams,
     CreateOrganizationParams,
 };
+use crate::core::permissions::policy_snapshot;
+use crate::core::persistence::{
+    organization_commit, organization_commit_cursor, organization_row_change,
+};
 use crate::core::reference::{
     country, create_country, create_currency, currency, seed_currency_for_organization,
     CreateCountryParams, CreateCurrencyParams,
@@ -327,8 +331,50 @@ pub fn test_adversarial_tenant_command_matrix(ctx: &ReducerContext) -> Result<()
     // This is intentionally last: the native harness cannot invoke a reducer
     // as a different Identity, but it can prove the same actor loses access
     // immediately after its membership is deactivated.
+    let access_snapshot = || -> Result<String, String> {
+        let mut tables = serde_json::Map::new();
+        macro_rules! capture {
+            ($accessor:ident) => {{
+                let mut rows = ctx
+                    .db
+                    .$accessor()
+                    .iter()
+                    .filter(|row| row.organization_id == org_b)
+                    .map(|row| {
+                        serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&row))
+                            .map_err(|error| {
+                                format!("cannot snapshot {}: {error}", stringify!($accessor))
+                            })
+                    })
+                    .collect::<Result<Vec<_>, String>>()?;
+                rows.sort_by_key(serde_json::Value::to_string);
+                tables.insert(stringify!($accessor).into(), serde_json::Value::Array(rows));
+            }};
+        }
+        capture!(user_organization);
+        capture!(user_profile);
+        capture!(company);
+        capture!(audit_log);
+        capture!(policy_snapshot);
+        capture!(organization_commit);
+        capture!(organization_commit_cursor);
+        capture!(organization_row_change);
+        Ok(serde_json::Value::Object(tables).to_string())
+    };
+    let before_last_admin = access_snapshot()?;
+    let last_admin = remove_user_from_organization(ctx, ctx.sender(), org_b);
+    if !matches!(&last_admin, Err(message) if message.contains("last organization administrator")) {
+        return Err(format!(
+            "Expected last-admin protection, got: {last_admin:?}"
+        ));
+    }
+    if access_snapshot()? != before_last_admin {
+        return Err("Rejected last-admin removal changed membership, profile, audit, policy or commit state".into());
+    }
+
     foreign.seed_additional_admin(ctx)?;
     remove_user_from_organization(ctx, ctx.sender(), org_b)?;
+    let before_inactive_actor = access_snapshot()?;
     let inactive_actor = create_company(
         ctx,
         org_b,
@@ -354,6 +400,12 @@ pub fn test_adversarial_tenant_command_matrix(ctx: &ReducerContext) -> Result<()
         return Err(format!(
             "Expected inactive membership rejection, got: {inactive_actor:?}"
         ));
+    }
+    if access_snapshot()? != before_inactive_actor {
+        return Err(
+            "Inactive-actor command changed company, membership, audit, policy or commit state"
+                .into(),
+        );
     }
 
     Ok(())
