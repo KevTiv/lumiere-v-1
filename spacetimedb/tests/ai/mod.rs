@@ -108,8 +108,14 @@ pub fn run_ai_evidence_provenance_tests(ctx: &ReducerContext) -> Result<(), Stri
                 "sources_round_trip_and_unknowns_stay_unknown",
                 t::test_sources_round_trip_and_unknowns_stay_unknown,
             ),
-            ("recollected_source_stays_unverified", t::test_recollected_source_stays_unverified),
-            ("cross_scope_references_are_denied", t::test_cross_scope_references_are_denied),
+            (
+                "recollected_source_stays_unverified",
+                t::test_recollected_source_stays_unverified,
+            ),
+            (
+                "cross_scope_references_are_denied",
+                t::test_cross_scope_references_are_denied,
+            ),
             (
                 "lineage_reconstructs_after_edit_and_fork",
                 t::test_lineage_reconstructs_after_edit_and_fork,
@@ -155,8 +161,14 @@ pub fn run_workflow_provenance_tests(ctx: &ReducerContext) -> Result<(), String>
     use workflow_provenance_test as t;
     run_scenarios(
         &[
-            ("authority_is_server_resolved", t::test_authority_is_server_resolved),
-            ("generated_workflow_binds_every_step", t::test_generated_workflow_binds_every_step),
+            (
+                "authority_is_server_resolved",
+                t::test_authority_is_server_resolved,
+            ),
+            (
+                "generated_workflow_binds_every_step",
+                t::test_generated_workflow_binds_every_step,
+            ),
             (
                 "invalid_provenance_blocks_and_leaves_no_bindings",
                 t::test_invalid_provenance_blocks_and_leaves_no_bindings,
