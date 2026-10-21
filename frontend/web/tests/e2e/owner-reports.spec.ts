@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 
-import { expectNoAppError, gotoModule } from "./helpers"
+import { selectModuleTab, expectNoAppError, gotoModule } from "./helpers"
 
 /**
  * Phase 1 owner-report smoke (P2-REPORT-01).
@@ -132,7 +132,7 @@ test.describe("Owner reports e2e", { tag: "@dev-fixture" }, () => {
     test.setTimeout(120_000)
 
     await gotoModule(page, "/reports", "reports")
-    await page.getByTestId("module-tab-reports-owner-reports").click()
+    await selectModuleTab(page, "reports", "owner-reports")
 
     const dailyCard = page.getByTestId("owner-report-card-daily_business_summary_v1")
     await expect(dailyCard).toBeVisible({ timeout: 30_000 })

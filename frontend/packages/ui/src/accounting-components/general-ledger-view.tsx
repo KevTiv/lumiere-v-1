@@ -343,6 +343,7 @@ export function GeneralLedgerView({
                     {moveStateStr(selectedMove.state) === 'Draft' && onPostMove && (
                       <Button
                         type="button"
+                        data-testid="general-ledger-post-move"
                         disabled={postMovePending}
                         onClick={() => onPostMove(selectedMove)}
                       >

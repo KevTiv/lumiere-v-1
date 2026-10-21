@@ -7,7 +7,7 @@ import { clearStdbSession } from '@/app/actions/save-stdb-token'
 import { bridgeWorkOsUserToStdbSession } from '@/lib/workos-stdb-bridge'
 
 const callback = handleAuth({
-  returnPathname: '/overview',
+  returnPathname: '/auth/complete',
   baseURL: isWorkOsEnabled() ? workOsRedirectUri() : undefined,
   onSuccess: async ({ accessToken, state }) => {
     // Complete and verify admission before allowing any ERP session access.

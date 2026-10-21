@@ -3,8 +3,10 @@ import { stdbBffCommandPost, type StdbBffCommandInput } from "@lumiere/stdb/comm
 import { resolveManufacturingMaterialEffect } from "@lumiere/query-hooks/hooks/manufacturing-material-consumption"
 import { resolveManufacturingFinishedEffect, type DestinationQuantSnapshot } from "@lumiere/query-hooks/hooks/manufacturing-production-close"
 import { locationOptionsFromQuantsAndTransfers, productRowsToSelectOptions, warehouseRowsToSelectOptions } from "../../lib/form-lookup"
-import { chooseSelectOptionByTriggerValue, fetchDefaultCompanyId, fetchFirstWarehouseId, gotoModule, scalarQueryId, signIn, smokeName, submitForm } from "./helpers"
+import { chooseSelectOptionByTriggerValue, selectModuleTab, fetchDefaultCompanyId, fetchFirstWarehouseId, gotoModule, scalarQueryId, signIn, smokeName, submitForm } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
+import { product as createProductFixture } from "./cov-scheduler-manufacturing-fixtures"
+import { createStockQuantFixture } from "./inventory-quant-fixtures"
 
 type Row = Record<string, unknown>
 const password = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -49,7 +51,7 @@ async function submit(page: Page, formId: string, operation: string) {
 
 async function openRow(page: Page, tab: "orders" | "workorders", recordId: number, origin?: string) {
   await gotoModule(page, "/manufacturing", "manufacturing")
-  await page.getByTestId(`module-tab-manufacturing-${tab}`).click()
+  await selectModuleTab(page, "manufacturing", tab)
   const panel = page.locator('[role="tabpanel"]:visible')
   if (origin) await panel.getByLabel("Search records").fill(origin)
   const row = panel.getByTestId(`entity-row-${recordId}`)
@@ -93,29 +95,21 @@ test.describe("COV-07i one operator-created manufacturing lifecycle", { tag: ["@
     await signIn(page)
     const companyId = await fetchDefaultCompanyId(page)
     const warehouseId = await fetchFirstWarehouseId(page)
-    const [products, transfers, quants, warehouses, centers] = await Promise.all([
-      rows(page, "products"), rows(page, "stock-pickings"), rows(page, "stock-quants"), rows(page, "warehouses"), rows(page, "mrp-workcenters"),
+    const [transfers, warehouses, centers] = await Promise.all([
+      rows(page, "stock-pickings"), rows(page, "warehouses"), rows(page, "mrp-workcenters"),
     ])
-    const eligible = products.filter((product) =>
-      !["lot", "serial"].includes(tag(product.tracking).toLowerCase()) &&
-      String(product.type ?? product.type_).toLowerCase() !== "service" && product.isActive !== false && scalarQueryId(field(product, "uomId", "uom_id")) != null,
-    )
     const picking = transfers.find((row) => scalarQueryId(field(row, "pickingTypeId", "picking_type_id")) != null &&
-      scalarQueryId(field(row, "locationId", "location_id")) != null && scalarQueryId(field(row, "locationDestId", "location_dest_id")) != null &&
-      quants.some((quant) => scalarQueryId(field(quant, "companyId", "company_id")) === companyId &&
-        scalarQueryId(field(quant, "locationId", "location_id")) === scalarQueryId(field(row, "locationId", "location_id")) && Number(quant.quantity) >= 1 &&
-        eligible.some((product) => id(product.id) === scalarQueryId(field(quant, "productId", "product_id"))) &&
-        absent(field(quant, "lotId", "lot_id")) && absent(field(quant, "packageId", "package_id")) && absent(field(quant, "ownerId", "owner_id"))))
+      scalarQueryId(field(row, "locationId", "location_id")) != null && scalarQueryId(field(row, "locationDestId", "location_dest_id")) != null)
     if (!picking) throw new Error("Seed requires picking type and source/destination locations")
     const srcId = id(field(picking, "locationId", "location_id"))
     const destId = id(field(picking, "locationDestId", "location_dest_id"))
     const pickingTypeId = id(field(picking, "pickingTypeId", "picking_type_id"))
-    const component = eligible.find((product) => quants.some((quant) => scalarQueryId(field(quant, "companyId", "company_id")) === companyId &&
-      scalarQueryId(field(quant, "productId", "product_id")) === id(product.id) && scalarQueryId(field(quant, "locationId", "location_id")) === srcId &&
-      Number(quant.quantity) >= 1 && absent(field(quant, "lotId", "lot_id")) && absent(field(quant, "packageId", "package_id")) && absent(field(quant, "ownerId", "owner_id"))))
-    const product = eligible.find((candidate) => component && id(candidate.id) !== id(component.id))
+    const component = await createProductFixture(page)
+    const product = await createProductFixture(page)
+    await createStockQuantFixture(page, companyId, id(component.id), srcId, `cov07i-source-${id(component.id)}`, 10)
+    const [products, quants] = await Promise.all([rows(page, "products"), rows(page, "stock-quants")])
     const center = centers.find((row) => scalarQueryId(field(row, "companyId", "company_id")) === companyId)
-    if (!component || !product || !center) throw new Error("Seed requires two untracked products, available component stock and company workcenter")
+    if (!center) throw new Error("Seed requires a company workcenter")
     const productId = id(product.id)
     const componentId = id(component.id)
     const componentUomId = id(field(component, "uomId", "uom_id"))
@@ -135,7 +129,7 @@ test.describe("COV-07i one operator-created manufacturing lifecycle", { tag: ["@
       await signIn(denied, "fixture.reader@example.test", password)
       const priorBoms = new Set((await rows(page, "mrp-boms")).map((row) => id(row.id)))
       await gotoModule(operator, "/manufacturing", "manufacturing")
-      await operator.getByTestId("module-tab-manufacturing-boms").click()
+      await selectModuleTab(operator, "manufacturing", "boms")
       await operator.getByTestId("module-create-manufacturing-boms").click()
       await select(operator, "productTmplId", productLabel)
       await operator.getByTestId("form-field-productQty").fill("1")
@@ -157,7 +151,7 @@ test.describe("COV-07i one operator-created manufacturing lifecycle", { tag: ["@
 
       const origin = smokeName("cov07i-operator")
       await gotoModule(operator, "/manufacturing", "manufacturing")
-      await operator.getByTestId("module-tab-manufacturing-orders").click()
+      await selectModuleTab(operator, "manufacturing", "orders")
       await operator.getByTestId("module-create-manufacturing-orders").click()
       await select(operator, "productId", productLabel)
       await operator.getByTestId("form-field-productQty").fill("1")

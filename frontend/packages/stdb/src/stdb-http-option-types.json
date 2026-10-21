@@ -845,6 +845,13 @@
   "BankMatchCandidate": {
     "rule_id": "u64"
   },
+  "BankSettlementInvoiceSnapshot": {
+    "sale_order_id": "u64"
+  },
+  "BankSettlementLineSnapshot": {
+    "matching_number_before": "string",
+    "matching_label_before": "string"
+  },
   "BankStatementImport": {
     "file_name": "string",
     "approved_statement_id": "u64",
@@ -858,6 +865,16 @@
     "description": "string",
     "validation_error": "string",
     "created_statement_line_id": "u64"
+  },
+  "BankStatementSettlementAttempt": {
+    "previous_payment_id": "u64",
+    "recovery_key": "string",
+    "recovery_reason": "string",
+    "reversal_request_id": "u64",
+    "closed_at": "timestamp"
+  },
+  "BankStatementSettlementReversal": {
+    "reversal_move_id": "u64"
   },
   "BarcodeNomenclature": {
     "description": "string",
@@ -2370,6 +2387,18 @@
   "CreatePurchaseContractParams": {
     "date_start": "timestamp",
     "date_end": "timestamp",
+    "metadata": "string"
+  },
+  "CreatePurchaseOrderOnceParams": {
+    "origin": "string",
+    "partner_ref": "string",
+    "notes": "string",
+    "date_planned": "timestamp",
+    "payment_term_id": "u64",
+    "fiscal_position_id": "u64",
+    "incoterm_id": "u64",
+    "incoterm_location": "string",
+    "is_quantity_copy": "string",
     "metadata": "string"
   },
   "CreatePurchaseOrderParams": {
@@ -4552,6 +4581,13 @@
     "lot_id": "u64",
     "metadata": "string"
   },
+  "PurchaseReceiptOperation": {
+    "lot_id": "u64",
+    "move_id": "u64",
+    "picking_id": "u64",
+    "continuation_move_id": "u64",
+    "continuation_picking_id": "u64"
+  },
   "PurchaseRequisition": {
     "origin": "string",
     "ordering_date": "timestamp",
@@ -4707,6 +4743,11 @@
     "location_id": "u64",
     "lot_id": "u64",
     "metadata": "string"
+  },
+  "ReceivePoLineOnceParams": {
+    "lot_id": "u64",
+    "expected_move_id": "u64",
+    "expected_picking_id": "u64"
   },
   "RecognizeAmortizationLineParams": {
     "reference": "string",
@@ -5268,6 +5309,9 @@
   },
   "SetHelpdeskRelatedRecordParams": {
     "target": "HelpdeskRelatedRecord"
+  },
+  "SetMemberAccessParams": {
+    "job_title": "string"
   },
   "SetPurchaseApprovalDelegateParams": {
     "metadata": "string"
@@ -5866,6 +5910,10 @@
     "metadata": "option<string>"
   },
   "UpdateAccountMoveLineParams": {
+    "quantity": "f64",
+    "price_unit": "f64",
+    "expected_quantity": "f64",
+    "expected_price_unit": "f64",
     "company_id": "u64",
     "name": "string",
     "debit": "f64",
@@ -6785,7 +6833,8 @@
     "name": "string",
     "description": "string",
     "permissions": "array<string>",
-    "is_active": "bool"
+    "is_active": "bool",
+    "metadata": "string"
   },
   "UpdateSaleOrderLineParams": {
     "product_id": "u64",

@@ -15,6 +15,9 @@ ENV PATH="/root/.local/bin:${PATH}"
 WORKDIR /app
 
 COPY crates/presentation-core crates/presentation-core
+COPY crates/policy-core crates/policy-core
+COPY lumiere-codegen/storage-policy-manifest.json lumiere-codegen/storage-policy-manifest.json
+COPY crates/stdb-auth/assets/resource_registry.json crates/stdb-auth/assets/resource_registry.json
 COPY spacetimedb spacetimedb
 COPY scripts/railway-publish-spacetimedb.sh scripts/railway-publish-spacetimedb.sh
 

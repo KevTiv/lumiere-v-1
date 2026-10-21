@@ -444,7 +444,9 @@ pub fn create_return_order(
             })
         {
             if existing.request_fingerprint != fingerprint {
-                return Err("Return order key was already used with a different request".to_string());
+                return Err(
+                    "Return order key was already used with a different request".to_string()
+                );
             }
             return Ok(());
         }
@@ -747,6 +749,19 @@ pub fn create_credit_note_from_return_order(
         .map(|so| so.currency_id)
         .unwrap_or_else(|| journal.currency_id.unwrap_or(company.currency_id));
 
+    let source_metadata = params.metadata.clone().or_else(|| {
+        return_order.return_reason.as_ref().map(|reason| {
+            serde_json::json!({ "return_order_id": return_order_id, "reason": reason }).to_string()
+        })
+    });
+    let invoice_metadata = crate::documents::invoice_profile::capture_invoice_document_metadata(
+        ctx,
+        organization_id,
+        company_id,
+        Some(partner_invoice_id),
+        source_metadata.as_deref(),
+    )?;
+
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
@@ -800,12 +815,7 @@ pub fn create_credit_note_from_return_order(
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.clone().or_else(|| {
-            return_order
-                .return_reason
-                .clone()
-                .map(|r| format!(r#"{{"return_order_id":{return_order_id},"reason":"{r}"}}"#))
-        }),
+        metadata: Some(invoice_metadata),
     });
 
     let mut amount_untaxed = 0.0f64;

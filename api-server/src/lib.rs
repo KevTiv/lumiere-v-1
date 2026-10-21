@@ -25,6 +25,7 @@ pub mod query_exec;
 pub mod realtime;
 pub mod reports;
 pub mod routes;
+mod rwanda_vsdc;
 pub mod service_identity;
 pub mod session;
 pub mod state;
@@ -77,6 +78,15 @@ pub async fn run_storage_migrations() -> anyhow::Result<()> {
     let config = cold_tier::pg_pool::PgConfig::from_env()?;
     let pool = cold_tier::pg_pool::build_pool(&config)?;
     cold_tier::migrate::ensure_schema(&pool).await
+}
+
+/// Inspect PostgreSQL migration lineage without applying or modifying schema.
+pub async fn audit_storage_migrations() -> anyhow::Result<cold_tier::migrate::MigrationAuditReport>
+{
+    install_rustls_crypto_provider();
+    let config = cold_tier::pg_pool::PgConfig::from_env()?;
+    let pool = cold_tier::pg_pool::build_pool(&config)?;
+    cold_tier::migrate::audit_schema(&pool).await
 }
 
 /// Run one trusted PostgreSQL-to-SpacetimeDB organization reconstruction.

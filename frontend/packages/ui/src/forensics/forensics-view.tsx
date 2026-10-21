@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { WorkspaceTabsList as TabsList, WorkspaceTabsTrigger as TabsTrigger } from "../components/workspace-tabs"
 import {
   Select,
   SelectContent,
@@ -264,7 +265,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="w-fit mb-4">
+        <TabsList className="mb-4">
           <TabsTrigger value="reports" className="gap-2">
             <FileText className="h-4 w-4" />
             {t("forensics.view.tabReports")}

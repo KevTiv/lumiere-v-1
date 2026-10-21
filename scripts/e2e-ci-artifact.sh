@@ -28,6 +28,13 @@ require_file() {
   fi
 }
 
+require_archive() {
+  if [ ! -f "$ARCHIVE" ]; then
+    echo "e2e-ci-artifact: missing archive $ARCHIVE" >&2
+    exit 1
+  fi
+}
+
 verify() {
   local sha
   sha="$(expected_sha "${1:-}")"
@@ -95,6 +102,19 @@ EOF
   echo "[e2e] Packaged exact-commit build artifact for $sha."
 }
 
+verify_archive() (
+  local sha staging
+  sha="$(expected_sha "${1:-}")"
+  require_archive
+  staging="$(mktemp -d "${TMPDIR:-/tmp}/lumiere-e2e-verify.XXXXXX")"
+  trap 'rm -rf "$staging"' EXIT
+
+  # Check the shipped files without replacing the builder's .next output: the
+  # archive omits compiler caches that must survive for the cache-save step.
+  tar -C "$staging" -xzf "$ARCHIVE"
+  E2E_CI_ARTIFACT_ROOT="$staging" "$SCRIPT_DIR/e2e-ci-artifact.sh" verify "$sha"
+)
+
 install_artifact() {
   local sha
   sha="$(expected_sha "${1:-}")"
@@ -102,10 +122,7 @@ install_artifact() {
     echo "e2e-ci-artifact: install is restricted to CI workspaces" >&2
     exit 2
   fi
-  if [ ! -f "$ARCHIVE" ]; then
-    echo "e2e-ci-artifact: missing archive $ARCHIVE" >&2
-    exit 1
-  fi
+  require_archive
   rm -rf "$ARTIFACT_DIR" "$ROOT/$NEXT_REL"
   rm -f "$ROOT/$WASM_REL"
   tar -C "$ROOT" -xzf "$ARCHIVE"
@@ -116,8 +133,9 @@ case "${1:-}" in
   pack) pack "${2:-}" ;;
   install) install_artifact "${2:-}" ;;
   verify) verify "${2:-}" ;;
+  verify-archive) verify_archive "${2:-}" ;;
   *)
-    echo "usage: $0 {pack|install|verify} [git-sha]" >&2
+    echo "usage: $0 {pack|install|verify|verify-archive} [git-sha]" >&2
     exit 2
     ;;
 esac

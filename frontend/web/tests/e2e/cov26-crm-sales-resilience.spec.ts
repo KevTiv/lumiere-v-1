@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 
-import { expectFormModalVisible, expectNoAppError, gotoModule, signIn, waitForBffQueryMinRows } from "./helpers"
+import { expectFormModalVisible, expectNoAppError, gotoModule, scalarQueryId, signIn } from "./helpers"
 
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
 
@@ -69,31 +69,30 @@ test.describe("COV-26 CRM/Sales resilience", { tag: ["@cov03", "@cov04", "@cov26
     test.setTimeout(120_000)
     await signIn(page, "fixture.sales@example.test", PERSONA_PASSWORD)
 
-    await gotoModule(page, "/crm?tab=contacts", "crm")
-    await waitForBffQueryMinRows(page, "/api/query/contacts")
-    await context.setOffline(true)
-    await page.waitForTimeout(500)
-    await context.setOffline(false)
-    const crmRefetch = page.waitForResponse(
-      (response) => response.url().includes("/api/query/contacts") && response.ok(),
-      { timeout: 30_000 },
-    )
-    await page.reload({ waitUntil: "domcontentloaded" })
-    await crmRefetch
-    await expect(page.getByTestId("module-tab-crm-contacts")).toHaveAttribute("aria-selected", "true")
-
-    await gotoModule(page, "/sales?tab=orders", "sales")
-    await waitForBffQueryMinRows(page, "/api/query/sale-orders")
-    await context.setOffline(true)
-    await page.waitForTimeout(500)
-    await context.setOffline(false)
-    const salesRefetch = page.waitForResponse(
-      (response) => response.url().includes("/api/query/sale-orders") && response.ok(),
-      { timeout: 30_000 },
-    )
-    await page.reload({ waitUntil: "domcontentloaded" })
-    await salesRefetch
-    await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
-    await expectNoAppError(page)
+    for (const module of [
+      { href: "/crm", id: "crm", tab: "contacts", resource: "contacts" },
+      { href: "/sales", id: "sales", tab: "orders", resource: "sale-orders" },
+    ]) {
+      const before = await page.request.get(`/api/query/${module.resource}`)
+      expect(before.ok()).toBe(true)
+      const beforeRows = ((await before.json()) as { data?: { id?: unknown }[] }).data ?? []
+      const canonicalId = scalarQueryId(beforeRows[0]?.id)
+      if (canonicalId == null) throw new Error(`${module.resource} requires a canonical fixture row`)
+      await gotoModule(page, `${module.href}?tab=${module.tab}&filter=id:${canonicalId}`, module.id)
+      await expect(page.getByTestId(`entity-row-${canonicalId}`)).toBeVisible()
+      await context.setOffline(true)
+      await page.waitForTimeout(500)
+      await context.setOffline(false)
+      // Reload also prefetches on the server. Fresh SSR/subscription data need
+      // not produce a second browser HTTP request; assert the canonical effect.
+      await page.reload({ waitUntil: "domcontentloaded" })
+      const after = await page.request.get(`/api/query/${module.resource}`)
+      expect(after.ok()).toBe(true)
+      const afterRows = ((await after.json()) as { data?: { id?: unknown }[] }).data ?? []
+      expect(afterRows.map((row) => scalarQueryId(row.id))).toContain(canonicalId)
+      await expect(page.getByTestId(`module-tab-${module.id}-${module.tab}`)).toHaveAttribute("aria-selected", "true")
+      await expect(page.getByTestId(`entity-row-${canonicalId}`)).toBeVisible()
+      await expectNoAppError(page)
+    }
   })
 })

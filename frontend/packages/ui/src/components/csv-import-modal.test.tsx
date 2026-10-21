@@ -28,7 +28,65 @@ async function chooseFile() {
   await waitFor(() => expect((screen.getByRole("button", { name: "Import" }) as HTMLButtonElement).disabled).toBe(false))
 }
 
+async function chooseCsv(text: string, name = "source.csv") {
+  const file = new File([text], name, { type: "text/csv" })
+  Object.defineProperty(file, "text", { value: async () => text })
+  fireEvent.change(screen.getByLabelText("CSV file"), { target: { files: [file] } })
+  await screen.findByRole("region", { name: "Source control totals" })
+}
+
 describe("CSV submission outcomes", () => {
+  it("requires source total review before submitting accounting rows", async () => {
+    const onImport = vi.fn().mockResolvedValue(undefined)
+    render(<CsvImportModal config={config} organizationId={1n} companyId={2n} tableName="account_move_line" onImport={onImport} onClose={vi.fn()} />)
+    const csv = "ref_,debit,credit\nA,25,0\nA,0,25\n"
+    await chooseCsv(csv)
+    expect((screen.getByRole("button", { name: "Import" }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole("checkbox", { name: "I checked these source totals and references." }))
+    fireEvent.click(screen.getByRole("button", { name: "Import" }))
+    await waitFor(() => expect(onImport).toHaveBeenCalledWith(csv))
+  })
+
+  it("blocks invalid source totals and requires review again after replacing the file", async () => {
+    render(<CsvImportModal config={config} tableName="account_move_line" onImport={vi.fn()} onClose={vi.fn()} />)
+    await chooseCsv("debit,credit\n100,0\n0,nope\n")
+    expect((screen.getByRole("checkbox") as HTMLInputElement).disabled).toBe(true)
+    expect((screen.getByRole("button", { name: "Import" }) as HTMLButtonElement).disabled).toBe(true)
+    await chooseCsv("debit,credit\n100,0\n0,100\n")
+    await waitFor(() => expect((screen.getByRole("checkbox") as HTMLInputElement).disabled).toBe(false))
+    fireEvent.click(screen.getByRole("checkbox"))
+    expect((screen.getByRole("button", { name: "Import" }) as HTMLButtonElement).disabled).toBe(false)
+    await chooseCsv("debit,credit\n200,0\n0,200\n")
+    expect((screen.getByRole("checkbox") as HTMLInputElement).checked).toBe(false)
+    expect((screen.getByRole("button", { name: "Import" }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it("prevents legacy accounting continuation under a changed company", async () => {
+    const onImport = vi.fn()
+    const { rerender } = render(<CsvImportModal config={config} organizationId={1n} companyId={2n} tableName="account_move_line" onImport={onImport} onClose={vi.fn()} />)
+    await chooseCsv("debit,credit\n10,0\n0,10\n")
+    fireEvent.click(screen.getByRole("checkbox"))
+    rerender(<CsvImportModal config={config} organizationId={1n} companyId={3n} tableName="account_move_line" onImport={onImport} onClose={vi.fn()} />)
+    expect(screen.getByRole("alert").textContent).toContain("Select and review the source file again")
+    fireEvent.click(screen.getByRole("button", { name: "Import" }))
+    expect(onImport).not.toHaveBeenCalled()
+  })
+
+  it("does not restore an asynchronously read file after its company changes", async () => {
+    let resolveFile!: (text: string) => void
+    const file = new File(["pending"], "pending.csv", { type: "text/csv" })
+    Object.defineProperty(file, "text", { value: () => new Promise<string>((resolve) => { resolveFile = resolve }) })
+    const onImport = vi.fn()
+    const { rerender } = render(<CsvImportModal config={config} organizationId={1n} companyId={2n} tableName="account_move_line" onImport={onImport} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText("CSV file"), { target: { files: [file] } })
+    rerender(<CsvImportModal config={config} organizationId={1n} companyId={3n} tableName="account_move_line" onImport={onImport} onClose={vi.fn()} />)
+    resolveFile("debit,credit\n10,0\n0,10\n")
+    await waitFor(() => expect((screen.getByLabelText("CSV file") as HTMLInputElement).disabled).toBe(false))
+    expect(screen.queryByRole("region", { name: "Source control totals" })).toBeNull()
+    expect((screen.getByRole("button", { name: "Import" }) as HTMLButtonElement).disabled).toBe(true)
+    expect(onImport).not.toHaveBeenCalled()
+  })
+
   it("shows abandoned accounting cleanup history before a new submission", () => {
     render(
       <CsvImportModal

@@ -22,6 +22,7 @@ import {
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import {
+  selectModuleTab,
   fetchDefaultCompanyId,
   fetchFirstWarehouseId,
   fetchSessionOrganizationId,
@@ -328,7 +329,7 @@ async function runWorkorderAction(
   duration?: number,
 ) {
   await gotoModule(page, "/manufacturing", "manufacturing")
-  await page.getByTestId("module-tab-manufacturing-workorders").click()
+  await selectModuleTab(page, "manufacturing", "workorders")
   // Workorders persist no name, so select the exact row by id.
   const panel = page.locator('[role="tabpanel"]:visible')
   const row = panel.getByTestId(`entity-row-${workorderId}`)
@@ -555,9 +556,7 @@ test.describe(
           .toBe(qualityCheckId)
 
         await gotoModule(warehousePage, "/manufacturing", "manufacturing")
-        await warehousePage
-          .getByTestId("module-tab-manufacturing-quality")
-          .click()
+        await selectModuleTab(warehousePage, "manufacturing", "quality")
         await expect(
           warehousePage
             .locator('[role="tabpanel"]:visible')

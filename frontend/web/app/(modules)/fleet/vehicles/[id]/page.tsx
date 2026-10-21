@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { VehiclePageClient } from "./vehicle-page-client"
 
 const SSR_RESOURCES = ["fleet-vehicles"] as const
@@ -15,7 +15,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
     return <VehiclePageClient vehicleId={id} />
   }
 
-  const [vehicles] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [vehicles] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <VehiclePageClient vehicleId={id} initialVehicles={vehicles} organizationId={session.organizationId} />

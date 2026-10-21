@@ -2,9 +2,19 @@
   "version": 1,
   "reducers": [
     {
+      "name": "abandon_bank_statement_settlement",
+      "exposure": "session",
+      "reason": "reviewed bank settlement lifecycle action; exact expected payment, tenant/company and financial capability checks remain reducer-enforced"
+    },
+    {
       "name": "accept_sale_order_quotation",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "accept_user_invite",
+      "exposure": "denied",
+      "reason": "trusted provider-verified invitation acceptance only"
     },
     {
       "name": "accrue_sale_commission",
@@ -567,9 +577,19 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "claim_reviewed_mail_delivery",
+      "exposure": "denied",
+      "reason": "trusted exact-message invoice mail dispatch only; generic session transport cannot claim provider dispatch"
+    },
+    {
       "name": "claim_workflow_human_task",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "cleanup_abandoned_account_move_import",
+      "exposure": "session",
+      "reason": "accounting import recovery action guarded by exact parent-job provenance and reducer-side account_move delete permission"
     },
     {
       "name": "clear_contact_categories",
@@ -586,11 +606,6 @@
       "name": "clear_proposal_presence",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "cleanup_abandoned_account_move_import",
-      "exposure": "session",
-      "reason": "accounting import recovery action guarded by exact parent-job provenance and reducer-side account_move delete permission"
     },
     {
       "name": "clone_workflow_version_to_draft",
@@ -733,6 +748,16 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "configure_manufacturing_valuation",
+      "exposure": "session",
+      "reason": "invoked by the typed manufacturing valuation configuration frontend BFF caller; domain reducer enforces company ownership and accounting authority"
+    },
+    {
+      "name": "configure_workcenter_cost_rate",
+      "exposure": "session",
+      "reason": "invoked by the typed manufacturing workcenter cost configuration frontend BFF caller; domain reducer enforces company ownership and workcenter write authority"
+    },
+    {
       "name": "confirm_account_asset",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -861,11 +886,6 @@
       "name": "create_account_move",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "create_manual_invoice",
-      "exposure": "session",
-      "reason": "invoked by the accounting invoice and bill draft forms"
     },
     {
       "name": "create_account_period",
@@ -1011,21 +1031,6 @@
       "name": "create_bom",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "configure_workcenter_cost_rate",
-      "exposure": "session",
-      "reason": "invoked by the typed manufacturing workcenter cost configuration frontend BFF caller; domain reducer enforces company ownership and workcenter write authority"
-    },
-    {
-      "name": "configure_manufacturing_valuation",
-      "exposure": "session",
-      "reason": "invoked by the typed manufacturing valuation configuration frontend BFF caller; domain reducer enforces company ownership and accounting authority"
-    },
-    {
-      "name": "set_bom_operations",
-      "exposure": "denied",
-      "reason": "BOM routing assignment has no enumerated frontend BFF caller; reducer remains permission-gated in the domain runtime"
     },
     {
       "name": "create_bom_byproduct",
@@ -1433,6 +1438,11 @@
       "reason": "invoked by the Accounting manual invoice and bill workflow"
     },
     {
+      "name": "create_manual_invoice",
+      "exposure": "session",
+      "reason": "invoked by the accounting invoice and bill draft forms"
+    },
+    {
       "name": "create_manufacturing_order",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -1662,6 +1672,11 @@
       "name": "create_purchase_order",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "create_purchase_order_once",
+      "exposure": "session",
+      "reason": "reviewed keyed purchase-order create: producer rechecks current create permission, actor/company scope and exact immutable request identity"
     },
     {
       "name": "create_purchase_requisition",
@@ -2465,6 +2480,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "finish_manufacturing_order_with_tracking",
+      "exposure": "session",
+      "reason": "explicit tracked manufacturing close intent with exact lot and serial attribution"
+    },
+    {
       "name": "finish_workorder",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3155,6 +3175,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "receive_po_line_once",
+      "exposure": "session",
+      "reason": "Purchasing operator keyed receipt workflow; producer rechecks current write permission, scope and exact invocation identity"
+    },
+    {
       "name": "recognize_amortization_line",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3530,6 +3555,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "resubmit_bank_statement_settlement",
+      "exposure": "session",
+      "reason": "reviewed bank settlement lifecycle action; exact expected payment, tenant/company and financial capability checks remain reducer-enforced"
+    },
+    {
       "name": "resume_ai_run_checked",
       "exposure": "denied",
       "reason": "trusted lifecycle gateway only; continuation and capability authority are server-validated"
@@ -3553,6 +3583,11 @@
       "name": "retry_iot_action",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "reverse_bank_statement_settlement",
+      "exposure": "session",
+      "reason": "reviewed bank settlement lifecycle action; exact expected payment, tenant/company and financial capability checks remain reducer-enforced"
     },
     {
       "name": "reverse_payment_transaction",
@@ -3635,6 +3670,36 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "run_manufacturing_actual_cost_valuation_test",
+      "exposure": "denied",
+      "reason": "isolated persisted cost and accounting valuation proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_bom_routing_lifecycle_test",
+      "exposure": "denied",
+      "reason": "isolated persisted routing ownership proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_bom_to_close_domain_lifecycle_test",
+      "exposure": "denied",
+      "reason": "isolated persisted manufacturing lifecycle proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_cost_configuration_scope_test",
+      "exposure": "denied",
+      "reason": "isolated persisted cost configuration authorization proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_manufacturing_tracked_output_test",
+      "exposure": "denied",
+      "reason": "isolated persisted domain proof; never exposed through the session BFF"
+    },
+    {
+      "name": "run_purchasing_keyed_operations_test",
+      "exposure": "denied",
+      "reason": "isolated persisted keyed purchasing replay proof; never exposed through the session BFF"
+    },
+    {
       "name": "run_traceability_report",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3678,36 +3743,6 @@
       "name": "scrap_finished_manufacturing_output",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
-    },
-    {
-      "name": "run_manufacturing_tracked_output_test",
-      "exposure": "denied",
-      "reason": "isolated persisted domain proof; never exposed through the session BFF"
-    },
-    {
-      "name": "run_manufacturing_bom_to_close_domain_lifecycle_test",
-      "exposure": "denied",
-      "reason": "isolated persisted manufacturing lifecycle proof; never exposed through the session BFF"
-    },
-    {
-      "name": "run_manufacturing_bom_routing_lifecycle_test",
-      "exposure": "denied",
-      "reason": "isolated persisted routing ownership proof; never exposed through the session BFF"
-    },
-    {
-      "name": "run_manufacturing_actual_cost_valuation_test",
-      "exposure": "denied",
-      "reason": "isolated persisted cost and accounting valuation proof; never exposed through the session BFF"
-    },
-    {
-      "name": "run_manufacturing_cost_configuration_scope_test",
-      "exposure": "denied",
-      "reason": "isolated persisted cost configuration authorization proof; never exposed through the session BFF"
-    },
-    {
-      "name": "finish_manufacturing_order_with_tracking",
-      "exposure": "session",
-      "reason": "explicit tracked manufacturing close intent with exact lot and serial attribution"
     },
     {
       "name": "scrap_manufacturing_material",
@@ -3810,6 +3845,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "set_bom_operations",
+      "exposure": "denied",
+      "reason": "BOM routing assignment has no enumerated frontend BFF caller; reducer remains permission-gated in the domain runtime"
+    },
+    {
       "name": "set_commodity_price_index",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3868,6 +3908,11 @@
       "name": "set_iot_threshold",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
+    },
+    {
+      "name": "set_member_access",
+      "exposure": "session",
+      "reason": "atomic organization-scoped member access editor"
     },
     {
       "name": "set_project_active",

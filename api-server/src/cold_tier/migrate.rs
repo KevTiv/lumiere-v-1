@@ -20,6 +20,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::ledger;
 use crate::platform_control;
 
+#[path = "migration_audit.rs"]
+mod migration_audit;
+pub use migration_audit::{audit_schema, MigrationAuditReport, MigrationAuditStatus};
+
 /// The table containing the durable migration history.
 pub const MIGRATION_TABLE: &str = platform_control::SCHEMA_MIGRATION_TABLE;
 
@@ -193,6 +197,31 @@ pub const MIGRATIONS: &[Migration] = &[
         change_set: 8,
         phase: MigrationPhase::Expand,
         sql: COUNTRY_PACK_VERSIONING_SQL,
+    },
+    Migration {
+        version: 17,
+        name: "platform_identity_lifecycle",
+        change_set: 9,
+        phase: MigrationPhase::Expand,
+        sql: platform_control::PLATFORM_IDENTITY_LIFECYCLE_DDL,
+    },
+    Migration {
+        version: 18,
+        name: "durable_invite_acceptance_receipts",
+        change_set: 10,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0018_durable_projection_delta.sql"
+        ),
+    },
+    Migration {
+        version: 19,
+        name: "financial_alpha_operations",
+        change_set: 11,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0019_durable_projection_delta.sql"
+        ),
     },
 ];
 

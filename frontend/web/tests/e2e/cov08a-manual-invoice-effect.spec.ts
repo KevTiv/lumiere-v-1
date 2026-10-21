@@ -27,6 +27,15 @@ async function chooseFirstPartner(page: Page): Promise<void> {
   await page.getByRole("option").first().click()
 }
 
+async function openManualInvoice(page: Page): Promise<void> {
+  // Setup readiness is evaluated from several reads after each navigation.
+  // An early click shows a blocking toast; wait for the actual modal to open.
+  await expect(async () => {
+    await page.getByTestId("accountant-overview").getByRole("button", { name: "New invoice", exact: true }).click()
+    await expect(page.getByTestId("create-invoice-modal")).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 60_000 })
+}
+
 async function fillManualInvoice(page: Page, description: string): Promise<void> {
   await chooseFirstPartner(page)
   await page.getByTestId("create-invoice-line-description").fill(description)
@@ -62,8 +71,7 @@ test.describe(
         })
       }, browserRequestUuid)
 
-      await page.getByTestId("quick-action-create_invoice").click()
-      await expect(page.getByTestId("create-invoice-modal")).toBeVisible()
+      await openManualInvoice(page)
       await fillManualInvoice(page, description)
 
       const dispatchPromise = page.waitForResponse(
@@ -164,7 +172,7 @@ test.describe(
           value: () => value,
         })
       }, browserRequestUuid)
-      await page.getByTestId("quick-action-create_invoice").click()
+      await openManualInvoice(page)
       await fillManualInvoice(page, description)
       let replayDispatches = 0
       const countReplay = (request: Request) => {

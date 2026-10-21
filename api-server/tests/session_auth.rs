@@ -71,6 +71,54 @@ async fn no_bearer_or_cookie_returns_none_even_with_server_token_configured() {
     assert!(session.is_none());
 }
 
+#[tokio::test]
+async fn import_routes_match_real_entity_and_request_paths_before_requiring_auth() {
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode},
+        Router,
+    };
+    use std::sync::Arc;
+    use tower::ServiceExt;
+    use tower_cookies::CookieManagerLayer;
+
+    let state = Arc::new(AppState::new(test_config(None, None)));
+    let app = Router::new()
+        .nest("/v1", api_server::routes::domain_router())
+        .layer(CookieManagerLayer::new())
+        .with_state(state);
+    for (method, path, body) in [
+        (
+            "POST",
+            "/v1/import/hr_payslip",
+            r#"{"csvData":"employee_id,struct_id\n1,2\n"}"#,
+        ),
+        (
+            "GET",
+            "/v1/import/hr_payslip/requests/0123456789abcdef0123456789abcdef?companyId=1",
+            "",
+        ),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(method)
+                    .uri(path)
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "{method} {path}"
+        );
+    }
+}
+
 #[test]
 fn alg_none_jwt_payload_is_not_an_authenticated_identity_header() {
     let token = fake_jwt(&format!(r#"{{"identity":"{VALID_IDENTITY_HEX}"}}"#));

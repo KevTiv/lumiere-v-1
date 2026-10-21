@@ -1,7 +1,38 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import type { NextConfig } from "next"
 
 import nextConfig from "./next.config.mjs"
+
+test("webpack preserves Next's React aliases for server and browser rendering", () => {
+  const config: NextConfig = nextConfig
+  for (const isServer of [true, false]) {
+    const aliases = {
+      react: 'next/dist/compiled/react',
+      'react-dom': 'next/dist/compiled/react-dom',
+      'react-dom/server': 'next/dist/compiled/react-dom/server',
+      'react-server-dom-webpack': 'next/dist/compiled/react-server-dom-webpack',
+    }
+    const webpackConfig = { resolve: { alias: aliases } }
+    const result = config.webpack
+      ? config.webpack(webpackConfig, { isServer } as Parameters<NonNullable<NextConfig['webpack']>>[1])
+      : webpackConfig
+    assert.equal(result.resolve.alias, aliases)
+    assert.deepEqual(result.resolve.alias, {
+      react: 'next/dist/compiled/react',
+      'react-dom': 'next/dist/compiled/react-dom',
+      'react-dom/server': 'next/dist/compiled/react-dom/server',
+      'react-server-dom-webpack': 'next/dist/compiled/react-server-dom-webpack',
+    })
+  }
+})
+
+test("Turbopack keeps framework React resolution instead of forcing workspace packages", () => {
+  const config: NextConfig = nextConfig
+  const aliases = config.turbopack?.resolveAlias ?? {}
+  assert.equal(Object.keys(aliases).some((key) => key === 'react' || key.startsWith('react/') || key === 'react-dom' || key.startsWith('react-dom/')), false)
+  assert.ok(config.turbopack?.root)
+})
 
 test("private ERP responses discourage indexing without caching private data", async () => {
   assert.ok(nextConfig.headers)

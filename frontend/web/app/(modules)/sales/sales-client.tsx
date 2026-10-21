@@ -1,5 +1,8 @@
 'use client';
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights } from "../../../components/module-insights"
 
 import { phCapture } from '@/lib/posthog-browser';
 import { useEffect, useMemo, useState, useCallback } from 'react';
@@ -233,6 +236,7 @@ import {
 } from '@/lib/form-lookup';
 import { enumTag } from '@/lib/accounting-post-draft';
 import { saleOrderLineCanBeDeleted } from './sale-order-line-gates';
+import { runtimeFormRoleId } from '@lumiere/ui/lib/runtime-form-role';
 
 function saleOrderState(row: Record<string, unknown>): string {
   const v = row.state;
@@ -368,7 +372,7 @@ function SalesClientLoaded({
   const { t } = useTranslation();
   const router = useRouter();
   const { currentUser } = useRBAC();
-  const runtimeRoleId = currentUser?.roles[0];
+  const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles);
   const { orgId } = orgBigInts(organizationId)
   const { askForm, formDialog } = useFormDialog();
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n;
@@ -403,7 +407,8 @@ function SalesClientLoaded({
   const [openReturnForm, setOpenReturnForm] = useState(false);
   const [createReturnError, setCreateReturnError] = useState<string | null>(null);
 
-  const { data: orders = [], isLoading: ordersLoading } = useSaleOrders(orgId, initialOrders);
+  const ordersQuery = useSaleOrders(orgId, initialOrders);
+  const { data: orders = [], isLoading: ordersLoading } = ordersQuery;
   const { data: orderLines = [] } = useSaleOrderLines(
     orgId,
     initialOrderLines,
@@ -444,14 +449,16 @@ function SalesClientLoaded({
   const { data: products = [] } = useProducts(orgId);
   const { data: productCategories = [] } = useProductCategories(orgId);
   const { data: uoms = [] } = useUoms(orgId);
-  const { data: accountMoves = [] } = useAccountMoves(orgId);
+  const accountMovesQuery = useAccountMoves(orgId);
+  const { data: accountMoves = [] } = accountMovesQuery;
   const { data: accountPayments = [] } = useAccountPayments(orgId);
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
   const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId);
   const { data: partnerCreditHolds = [] } = usePartnerCreditHolds(orgId);
-  const { data: currencies = [] } = useCurrencies();
+  const currenciesQuery = useCurrencies();
+  const { data: currencies = [] } = currenciesQuery;
   const { data: stockPickings = [] } = useStockPickings(orgId, initialStockPickings);
   const { data: stockMoves = [] } = useStockMoves(orgId);
   const { data: returnOrders = [] } = useReturnOrders(orgId, initialReturnOrders);
@@ -1177,6 +1184,15 @@ function SalesClientLoaded({
       }),
     [t, loyaltyProgramFieldOptions, partnerFieldOptions],
   );
+
+  const invoiceCurrencyOptions = useMemo(() => currencies.map((row) => {
+    const code = String(row.code ?? '').trim().toUpperCase();
+    return {
+      value: String(row.id),
+      label: String(row.code ?? row.name ?? row.id),
+      code: /^[A-Z]{3}$/.test(code) ? code : undefined,
+    };
+  }), [currencies]);
 
   const salesInvoices = useMemo(
     () =>
@@ -2094,6 +2110,9 @@ function SalesClientLoaded({
                   invoices={salesInvoices}
                   onSelectInvoice={(inv) => router.push(`/accounting/invoices/${encodeURIComponent(String(inv.id))}`)}
                   onCreateInvoice={() => router.push(buildModuleTabHref('accounting', 'invoices'))}
+                  worklistScope={{ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }}
+                  sourceState={mergeModuleStates([moduleQueryState(accountMovesQuery), moduleQueryState(currenciesQuery)])}
+                  currencyOptions={invoiceCurrencyOptions}
                   onRecalculateTotals={(inv) =>
                     void computeInvoiceTotals
                       .mutateAsync(inv.id as string | number | bigint)
@@ -2246,6 +2265,12 @@ function SalesClientLoaded({
       returnOrderFormConfig,
       salesInvoices,
       router,
+      invoiceCurrencyOptions,
+      accountMovesQuery,
+      currenciesQuery,
+      organizationId,
+      operatingCompanyId,
+      currentUser?.id,
       computeInvoiceTotals,
       loyaltyCardFormConfig,
       t,
@@ -2462,6 +2487,7 @@ function SalesClientLoaded({
     <>
       <ModuleView
         config={config}
+        dashboardContent={<ModuleInsights input={{ module: "sales", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: moduleQueryState(ordersQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataLoading={{ orders: ordersLoading }}
         kpiStrips={kpiStrips}

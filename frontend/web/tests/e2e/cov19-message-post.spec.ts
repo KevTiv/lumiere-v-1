@@ -2,6 +2,7 @@ import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
   fetchSessionOrganizationId,
+  fillField,
   gotoModule,
   scalarQueryId,
   signIn,
@@ -74,7 +75,7 @@ test.describe("COV-19 exact message post", { tag: ["@p0", "@cov19"] }, () => {
     await expect(page.getByTestId("form-modal-new-mail-message")).toBeVisible()
     await page.getByTestId("form-field-model").fill(model)
     await page.getByTestId("form-field-resId").fill(String(resId))
-    await page.getByTestId("form-field-body").fill(body)
+    await fillField(page, "body", body)
     const [accepted] = await Promise.all([
       page.waitForResponse((response) => matchesOperationResponse(response, "post_message"), {
         timeout: 30_000,

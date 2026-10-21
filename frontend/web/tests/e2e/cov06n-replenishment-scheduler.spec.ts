@@ -4,6 +4,7 @@ import { fetchContactIdByName, fetchDefaultCompanyId, gotoModule, scalarQueryId,
 import { command, create, id, location, password, product, rows, value } from "./cov-scheduler-manufacturing-fixtures"
 import { createProductSupplierInfoFixture, createStockQuantFixture, fetchQuantsAtProductLocation } from "./inventory-quant-fixtures"
 import { fetchPickingMoveStates, fetchPickingState, runPickingActionViaInventoryUi } from "./inventory-picking-fixtures"
+import { canonicalOptionValue, canonicalRow } from "./sod-evidence"
 
 function timestamp(millis: number) {
   return { microsSinceUnixEpoch: BigInt(millis) * 1_000n }
@@ -89,7 +90,14 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
       expect(demands).toHaveLength(1)
       const demandId = id(demands[0]!)
       const completedRule = (await rows(page, "replenishment-rules")).find(row => id(row) === ruleId)
-      const demandMetadata = JSON.parse(String(value(completedRule ?? {}, "metadata", "metadata"))) as {
+      expect(typeof completedRule?.metadata).toBe("string")
+      // The registered scheduler readback exposes this summary. Cross-check it
+      // against persisted evidence without substituting SQL for UI transitions.
+      const demandEvidence = await canonicalRow(page, "replenishment-rules", ruleId)
+      expect(scalarQueryId(demandEvidence.company_id)).toBe(companyId)
+      expect(scalarQueryId(demandEvidence.organization_id)).toBe(id(rule, "organizationId", "organization_id"))
+      expect(canonicalOptionValue(demandEvidence.metadata)).toBe(completedRule?.metadata)
+      const demandMetadata = JSON.parse(String(completedRule?.metadata)) as {
         demand_type?: string
         demand_id?: number
         order_qty?: number
@@ -179,7 +187,12 @@ test.describe("COV-06n operator replenishment schedule and cancel", {
       expect(Number(value(buyLines[0]!, "priceUnit", "price_unit"))).toBe(12)
       expect(id(buyLines[0]!, "productId", "product_id")).toBe(id(buyItem))
       const completedBuyRule = (await rows(page, "replenishment-rules")).find(row => id(row) === buyRuleId)
-      const buyMetadata = JSON.parse(String(value(completedBuyRule ?? {}, "metadata", "metadata"))) as {
+      expect(typeof completedBuyRule?.metadata).toBe("string")
+      const buyEvidence = await canonicalRow(page, "replenishment-rules", buyRuleId)
+      expect(scalarQueryId(buyEvidence.company_id)).toBe(companyId)
+      expect(scalarQueryId(buyEvidence.organization_id)).toBe(id(buyRule, "organizationId", "organization_id"))
+      expect(canonicalOptionValue(buyEvidence.metadata)).toBe(completedBuyRule?.metadata)
+      const buyMetadata = JSON.parse(String(completedBuyRule?.metadata)) as {
         demand_type?: string
         demand_id?: number
         order_qty?: number

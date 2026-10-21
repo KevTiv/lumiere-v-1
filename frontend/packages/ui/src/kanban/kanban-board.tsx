@@ -14,11 +14,12 @@ import {
 } from "@dnd-kit/core"
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable"
 import { cn } from "../lib/utils"
+import type { EntityRow } from "../lib/entity-view-types"
 import type { KanbanBoardProps } from "../lib/kanban-board-types"
 import { KanbanColumn } from "./kanban-column"
 import { KanbanDraggableCard } from "./kanban-draggable-card"
 
-export function KanbanBoard({
+export function KanbanBoard<T extends object = EntityRow>({
   columns,
   items,
   getItemId,
@@ -30,7 +31,8 @@ export function KanbanBoard({
   className,
   minColumnHeight,
   onItemClick,
-}: KanbanBoardProps) {
+  onAddItem,
+}: KanbanBoardProps<T>) {
   const [activeId, setActiveId] = useState<string | null>(null)
 
   const sensors = useSensors(
@@ -44,7 +46,7 @@ export function KanbanBoard({
   )
 
   const itemsByColumn = useMemo(() => {
-    const grouped = new Map<string, Record<string, unknown>[]>()
+    const grouped = new Map<string, T[]>()
     for (const column of columns) grouped.set(column.id, [])
     for (const item of visibleItems) {
       const columnId = getColumnId(item)
@@ -92,7 +94,7 @@ export function KanbanBoard({
       onDragEnd={handleDragEnd}
     >
       <div className={cn("overflow-x-auto pb-4", className)}>
-        <div className="flex gap-4 min-h-[420px]">
+        <div className="flex gap-4 min-h-[420px]" data-testid="kanban-board">
           {columns.map((column) => {
             const columnItems = itemsByColumn.get(column.id) ?? []
             return (
@@ -102,6 +104,7 @@ export function KanbanBoard({
                 itemCount={columnItems.length}
                 labels={labels}
                 minHeight={minColumnHeight}
+                onAddItem={onAddItem ? () => onAddItem(column.id) : undefined}
               >
                 {columnItems.map((item) => {
                   const id = getItemId(item)

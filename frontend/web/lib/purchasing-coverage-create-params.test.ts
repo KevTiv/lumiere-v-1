@@ -5,7 +5,7 @@ import {
   toCreatePurchaseBlanketOrderParams,
   toCreateVendorCreditFromPurchaseReturnParams,
 } from "./purchasing-coverage-create-params"
-import { toReceivePoLineArgs } from "./purchasing-create-params"
+import { toCreateBillFromPurchaseOrderParams, toReceivePoLineArgs } from "./purchasing-create-params"
 
 describe("purchasing coverage create params — fail-closed FKs", () => {
   it("returns null when vendor-credit journal/accounts missing", () => {
@@ -54,6 +54,46 @@ describe("purchasing coverage create params — fail-closed FKs", () => {
     assert.equal(params.journalId, 1n)
     assert.equal(params.expenseAccountId, 2n)
     assert.equal(params.payableAccountId, 3n)
+  })
+})
+
+describe("tax/FX vendor-bill form parameters", () => {
+  const valid = {
+    journalId: "1",
+    defaultExpenseAccountId: "2",
+    payableAccountId: "3",
+    invoiceDate: "2026-10-12",
+  }
+
+  it("passes the selected tax and discount through existing line fields", () => {
+    const result = toCreateBillFromPurchaseOrderParams({ ...valid, taxId: "19", discount: "12.5" })
+    assert.ok(result)
+    assert.deepEqual(result.expenseLine.taxIds, [19n])
+    assert.equal(result.expenseLine.discount, 12.5)
+    assert.equal(result.payableLine.discount, 0)
+    assert.deepEqual(result.payableLine.taxIds, [])
+  })
+
+  it("keeps untaxed callers and an explicit no-tax selection", () => {
+    for (const taxId of [undefined, ""]) {
+      const result = toCreateBillFromPurchaseOrderParams({ ...valid, taxId })
+      assert.ok(result)
+      assert.deepEqual(result.expenseLine.taxIds, [])
+      assert.equal(result.expenseLine.discount, 0)
+    }
+  })
+
+  it("rejects malformed tax identities rather than silently dropping them", () => {
+    for (const taxId of ["wrong", "1.5", "-1", "0", 0, true, Number.NaN, Number.POSITIVE_INFINITY, "18446744073709551616"]) {
+      assert.equal(toCreateBillFromPurchaseOrderParams({ ...valid, taxId }), null)
+    }
+  })
+
+  it("rejects discounts outside finite percentage bounds", () => {
+    for (const discount of [-1, 101, Number.NaN, Number.POSITIVE_INFINITY, true, " ", "invalid"]) {
+      assert.equal(toCreateBillFromPurchaseOrderParams({ ...valid, discount }), null)
+    }
+    assert.equal(toCreateBillFromPurchaseOrderParams({ ...valid, discount: 100 })?.expenseLine.discount, 100)
   })
 })
 

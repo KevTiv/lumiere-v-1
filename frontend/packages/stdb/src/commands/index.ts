@@ -16,6 +16,7 @@ export {
   type CrmBffReducerKey,
 } from "./crm-http";
 export {
+  accountingBillCorrectionAvailable,
   ACCOUNTING_BFF_REDUCERS,
   ACCOUNTING_COMMAND_SUBSCRIPTION_HINTS,
   accountingCommandContract,

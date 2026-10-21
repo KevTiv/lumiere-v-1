@@ -37,6 +37,10 @@ const nextConfig = {
   // Keep workspace packages imported by the web app inside the standalone
   // server bundle. The release workflow copies this traced tree verbatim.
   outputFileTracingRoot: path.resolve(__dirname, '../..'),
+  experimental: {
+    // Next 16.1 requires opt-in to write the compiler cache restored by Actions.
+    turbopackFileSystemCacheForBuild: process.env.GITHUB_ACTIONS === 'true',
+  },
   skipTrailingSlashRedirect: true,
   async headers() {
     return [{
@@ -54,23 +58,10 @@ const nextConfig = {
     unoptimized: true,
   },
   transpilePackages: ["@lumiere/ui", "@lumiere/stdb", "@lumiere/presentation-core"],
-  // Force a single React instance across all workspace packages.
-  // @react-three/fiber inside @lumiere/ui would otherwise resolve React from
-  // packages/ui/node_modules, causing "ReactCurrentOwner" undefined errors.
-  webpack: (config) => {
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      react: path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
-    }
-    return config
-  },
+  // Next owns React aliases for each rendering layer. Pointing them at the
+  // workspace package splits React from Next's server renderer during prerender.
   turbopack: {
     root: path.resolve(__dirname, '../..'),
-    resolveAlias: {
-      react: './frontend/web/node_modules/react',
-      'react-dom': './frontend/web/node_modules/react-dom',
-    },
   },
 }
 

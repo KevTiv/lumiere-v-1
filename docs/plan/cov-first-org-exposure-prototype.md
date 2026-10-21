@@ -67,7 +67,7 @@ interface ProductSurfaceDefinition {
 }
 ```
 
-The first-org profile is activated only for the organization ID explicitly configured in server-side `LUMIERE_FIRST_TEST_ORGANIZATION_ID`. There is no "first row" or organization-ID heuristic. If the variable is absent, ordinary product navigation is unchanged; an invalid configured value is rejected. When it matches the current session organization, REVIEW/hidden routes and quick actions are omitted and direct module-route access redirects to the containment page.
+The first-org profile is activated only for the organization ID explicitly configured in server-side `LUMIERE_FIRST_TEST_ORGANIZATION_ID`. There is no "first row" or organization-ID heuristic. If the variable is absent, ordinary product navigation is unchanged; an invalid configured value is rejected. When it matches the current session organization, navigation is limited to Finance and administrator Settings. A small, explicit set of supporting ERP routes remains available for cross-module links launched from Finance; every other unadmitted route redirects to the containment page.
 
 Do not create a second independent navigation hierarchy. The existing navigation catalog should reference the stable `surfaceId` and derive admission metadata from this authority.
 
@@ -86,7 +86,7 @@ Sidebar / command palette
 ProductSurfaceCatalog
            ↓
 module route/layout admission
-  hidden/internal route cannot become a visible first-org feature by direct URL
+  explicit Finance support routes remain linkable; all others stay contained
 ```
 
 Route admission is product gating, not an authorization substitute. Protected API calls still enforce current server policy.
@@ -111,7 +111,7 @@ route without product definition -> fails census or is explicitly framework/inte
 no duplicate href or surface id
 ```
 
-A route may exist in source while hidden for the first organization. That is containment, not U5 completion; the COV backlog remains.
+A route on the Finance support allowlist may remain usable through a Finance workflow while hidden from first-organization navigation. That availability is not U5 completion; the COV backlog remains.
 
 ## 6. Current decisions and explicit review entries
 
@@ -124,7 +124,7 @@ The audit can classify obvious concern families without deciding every product e
 - `/fleet` is the canonical COV-15 Fleet workspace. It now owns the broader vehicle, driver, service and inspection lifecycle.
 - `/map` is a mixed geospatial showcase (Fleet position, warehouse and POS pins), is hidden from the first-org profile, and must receive a separate product owner before admission. It is not a second Fleet workspace authority.
 
-No business/horizontal module in this catalog is relabelled U5 by COV-00B. Current COV routes remain `REVIEW` and fail closed for the configured first organization until their owning COV acceptance revision promotes them. `trackers` and `notebook` retain explicit `BLOCKED: product owner required` ownership rather than an invented policy.
+Finance routes are admitted to alpha navigation. Tasks, Inventory, Workflows, Approvals, Documents, Calendar, and Messages may support Finance deep links without appearing in alpha navigation. Every other `REVIEW`, AI, internal, and showcase route remains fail closed. `trackers` and `notebook` retain explicit `BLOCKED: product owner required` ownership rather than an invented policy.
 
 Do not let an implementation worker make those product decisions implicitly by adding/removing a sidebar link.
 

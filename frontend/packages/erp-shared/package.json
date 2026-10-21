@@ -9,9 +9,10 @@
     ".": "./src/index.ts",
     "./org-scoped": "./src/org-scoped.ts",
     "./stdb-params-json": "./src/stdb-params-json.ts",
-    "./stb-timestamp": "./src/stb-timestamp.ts",
+    "./workflow-delegation": "./src/workflow-delegation.ts",
     "./record-links": "./src/record-links.ts",
     "./accounting-defaults": "./src/accounting-defaults.ts",
+    "./invoice-personalization": "./src/invoice-personalization.ts",
     "./form-coercion": "./src/form-coercion.ts",
     "./create-params-helpers": "./src/create-params-helpers.ts",
     "./accounting-create-params": "./src/accounting-create-params.ts",
@@ -52,16 +53,19 @@
     "./csv-import-transform": "./src/csv-import-transform.ts",
     "./csv-import-bundles": "./src/csv-import-bundles.ts",
     "./accounting-import-reconciliation": "./src/accounting-import-reconciliation.ts",
+    "./payment-allocation-projection": "./src/payment-allocation-projection.ts",
+    "./bank-settlement-lifecycle": "./src/bank-settlement-lifecycle.ts",
     "./outstanding-document-import": "./src/outstanding-document-import.ts",
     "./csv-import-retry": "./src/csv-import-retry.ts",
     "./u64": "./src/u64.ts",
     "./contact-matching": "./src/contact-matching.ts",
     "./timestamp-values": "./src/timestamp-values.ts",
+    "./stb-timestamp": "./src/stb-timestamp.ts",
     "./row-values": "./src/row-values.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/form-coercion.test.ts src/u64.test.ts src/accounting-create-params.test.ts src/accounting-account-classification.test.ts src/accounting-import-reconciliation.test.ts src/outstanding-document-import.test.ts src/manufacturing-create-params.test.ts src/reports-dashboard-params.test.ts src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts src/contact-matching.test.ts src/timestamp-values.test.ts src/row-values.test.ts src/record-links.test.ts"
+    "test": "node --import tsx --test src/form-coercion.test.ts src/u64.test.ts src/accounting-create-params.test.ts src/accounting-account-classification.test.ts src/accounting-import-reconciliation.test.ts src/outstanding-document-import.test.ts src/manufacturing-create-params.test.ts src/reports-dashboard-params.test.ts src/csv-import-transform.test.ts src/csv-import-safety.test.ts src/csv-import-bundles.test.ts src/csv-import-retry.test.ts src/contact-matching.test.ts src/timestamp-values.test.ts src/row-values.test.ts src/record-links.test.ts src/invoice-personalization.test.ts src/payment-allocation-projection.test.ts src/bank-settlement-lifecycle.test.ts"
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",

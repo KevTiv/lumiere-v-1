@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import type { FormConfig } from "../lib/form-types"
 import {
@@ -15,6 +15,8 @@ import { createCsvImportRequest, supportsTrackedCsvImport, type CsvImportRequest
 import { useTrackedCsvImport } from "@lumiere/query-hooks/hooks/tracked-csv-import"
 import { CsvImportResult } from "../import-assistant/csv-import-result"
 import { CsvImportHistory } from "../import-assistant/csv-import-history"
+import { AccountingImportReview } from "../import-assistant/accounting-import-review"
+import { accountingImportReview } from "../lib/accounting-import-review"
 import type { AbandonedAccountingImportCleanupProps } from "../import-assistant/abandoned-accounting-import-cleanup"
 import { Button } from "./button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog"
@@ -37,6 +39,8 @@ export interface CsvImportModalProps {
   templateFileName?: string
   /** Scope import results to this organization and entity. */
   organizationId?: bigint
+  /** Active company also scopes legacy multi-phase accounting imports. */
+  companyId?: bigint
   tableName?: string
   /** Use the dedicated tracked API. Legacy onImport remains supported when absent. */
   trackedImport?: TrackedCsvImportScope
@@ -70,6 +74,7 @@ export function CsvImportModal({
   columns,
   templateFileName = "import-template.csv",
   organizationId,
+  companyId,
   tableName,
   trackedImport,
   abandonedAccountingCleanup,
@@ -83,26 +88,45 @@ export function CsvImportModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [request, setRequest] = useState<CsvImportRequest | null>(null)
+  const [reviewed, setReviewed] = useState(false)
+  const [fileScope, setFileScope] = useState<string | null>(null)
+  const [isReading, setIsReading] = useState(false)
+  const fileReadId = useRef(0)
   const trackedMutation = useTrackedCsvImport()
   const trackSubmission = trackedImport && tableName && supportsTrackedCsvImport(tableName)
+  const scope = `${organizationId ?? ""}:${trackedImport?.companyId ?? companyId ?? ""}:${tableName ?? ""}`
+  const currentScope = useRef(scope)
+  currentScope.current = scope
+  const sourceScopeChanged = fileScope != null && fileScope !== scope
+  const review = useMemo(() => csvText ? accountingImportReview(csvText, tableName) : null, [csvText, tableName])
+  const canSubmit = canSubmitCsvImport(analysis) && !sourceScopeChanged && (!review || (reviewed && !review.issues.length))
 
   const handleFile = async (file: File | undefined) => {
+    const readId = ++fileReadId.current
+    const selectedScope = scope
     setError(null)
     setAnalysis(null)
     setCsvText("")
     setFileName(file?.name ?? "")
+    setReviewed(false)
+    setFileScope(selectedScope)
+    setIsReading(Boolean(file))
     if (!file) return
     try {
       const text = fileReader ? (await fileReader(file)).csvText : await file.text()
+      if (readId !== fileReadId.current || selectedScope !== currentScope.current) return
       setAnalysis(analyzeCsv(text, columns))
       setCsvText(text)
     } catch (cause) {
+      if (readId !== fileReadId.current || selectedScope !== currentScope.current) return
       setError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      if (readId === fileReadId.current) setIsReading(false)
     }
   }
 
   const handleSubmit = async () => {
-    if (!canSubmitCsvImport(analysis)) return
+    if (!canSubmit || isReading || isSubmitting || submitted) return
     setError(null)
     setIsSubmitting(true)
     try {
@@ -139,7 +163,7 @@ export function CsvImportModal({
     }
   }
 
-  const busy = isPending || isSubmitting || trackedMutation.isPending
+  const busy = isPending || isSubmitting || trackedMutation.isPending || isReading
 
   return (
     <Dialog open onOpenChange={(next) => !next && !busy && onClose()}>
@@ -150,8 +174,8 @@ export function CsvImportModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {request ? <CsvImportResult request={request} initialPending={isSubmitting} initialError={error} activeOrganizationId={organizationId} activeCompanyId={trackedImport?.companyId} onNewFile={() => {
-            setRequest(null); setSubmitted(false); setError(null); setAnalysis(null); setCsvText(""); setFileName("")
+          {request ? <CsvImportResult request={request} initialPending={isSubmitting} initialError={error} activeOrganizationId={organizationId} activeCompanyId={trackedImport?.companyId ?? companyId} onNewFile={() => {
+            setRequest(null); setSubmitted(false); setError(null); setAnalysis(null); setCsvText(""); setFileName(""); setReviewed(false); setFileScope(null)
           }} /> : organizationId && (submitted || abandonedAccountingCleanup) ? (
             <CsvImportHistory
               organizationId={organizationId}
@@ -160,6 +184,7 @@ export function CsvImportModal({
             />
           ) : null}
           {!submitted ? <>
+          {sourceScopeChanged ? <p role="alert" className="text-sm text-destructive">{t("accounting.importReview.scopeChanged", { defaultValue: "The organization, company or import target changed. Select and review the source file again before importing." })}</p> : null}
           {trackedImport && !trackSubmission ? <p className="text-sm text-muted-foreground">{t("common.csvImportDialog.manualResultNotice", { defaultValue: "This import uses manual history selection. Its results cannot yet be linked automatically to this file." })}</p> : null}
           <div className="space-y-2">
             <Label htmlFor="csv-import-file">
@@ -222,6 +247,7 @@ export function CsvImportModal({
                   {t("common.csvImportDialog.noRows", { defaultValue: "The file has a header but no data rows." })}
                 </p>
               ) : null}
+              {review && !sourceScopeChanged ? <AccountingImportReview review={review} reviewed={reviewed} onReviewedChange={setReviewed} /> : null}
               <div className="max-h-56 overflow-auto rounded-md border">
                 <Table>
                   <TableHeader>
@@ -257,7 +283,7 @@ export function CsvImportModal({
           <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
             {submitted ? t("common.close", { defaultValue: "Close" }) : config.cancelLabel ?? t("common.cancel")}
           </Button>
-          {!submitted ? <Button type="button" disabled={busy || !canSubmitCsvImport(analysis)} onClick={() => void handleSubmit()}>
+          {!submitted ? <Button type="button" disabled={busy || !canSubmit} onClick={() => void handleSubmit()}>
             {config.submitLabel ?? t("common.csvImportDialog.submit", { defaultValue: "Import" })}
           </Button> : null}
         </DialogFooter>
