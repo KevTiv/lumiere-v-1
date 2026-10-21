@@ -64,16 +64,17 @@ jobs:
         run: python3 -m unittest discover -s scripts/tests -p 'test_ci_change_scope.py'
       - name: Test domain aggregate certification execution
         run: python3 -m unittest discover -s scripts/tests -p 'test_e2e_domain_aggregates.py'
+      - name: Test complete Playwright shard coverage
+        run: python3 -m unittest discover -s scripts/tests -p 'test_playwright_shards.py'
 
   plan:
     name: Plan E2E matrix
     needs: scope
     runs-on: ubuntu-latest
     outputs:
-      configs: ${{ steps.plan.outputs.configs }}
+      configs: ${{ steps.balance.outputs.configs }}
     steps:
       - uses: actions/checkout@v4
-        if: github.event_name == 'pull_request'
         with:
           fetch-depth: 0
       - name: Test E2E target selector
@@ -159,6 +160,19 @@ jobs:
               ;;
           esac
           echo "configs=${configs}" >> "$GITHUB_OUTPUT"
+      - id: balance
+        name: Balance complete suites by observed file duration
+        env:
+          MATRIX_CONFIGS: ${{ steps.plan.outputs.configs }}
+        run: |
+          python3 scripts/ci-playwright-shards.py --matrix "$MATRIX_CONFIGS" \
+            --github-output "$GITHUB_OUTPUT" --report .ci/playwright-shard-plan.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playwright-shard-plan-${{ github.run_id }}
+          path: .ci/playwright-shard-plan.json
+          retention-days: 7
+          if-no-files-found: error
 
   build-e2e:
     name: Build exact-commit E2E artifacts
@@ -426,16 +440,32 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      # Caches the downloaded browser binary only (keyed on the pinned
-      # playwright version in the lockfile); system deps from --with-deps
-      # still install every run since apt state isn't persisted across
-      # runners, but that step is fast — the browser download is what's slow.
+      - name: Identify installed Playwright browser revisions
+        id: playwright-browsers
+        working-directory: frontend/web
+        run: node scripts/playwright-browser-cache-key.mjs
+
+      - name: Test Playwright performance helpers
+        if: matrix.config.slot == '1' || matrix.config.suite == 'targeted'
+        working-directory: frontend/web
+        run: |
+          node scripts/playwright-browser-cache-key.test.mjs
+          node --import tsx scripts/playwright-timing-reporter.test.ts
+
+      - name: Verify planned coverage against Playwright discovery
+        if: matrix.config.balanced == true && matrix.config.slot == '1'
+        env:
+          MATRIX_CONFIGS: ${{ needs.plan.outputs.configs }}
+        run: python3 scripts/verify-playwright-shards.py --matrix "$MATRIX_CONFIGS"
+
+      # The actual installed browser revisions define this cache. Unrelated
+      # frontend dependencies and contract pins do not invalidate Chromium.
       - name: Cache Playwright browsers
         id: cache-playwright
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          key: ${{ steps.playwright-browsers.outputs.key }}
 
       - name: Install Playwright Chromium
         working-directory: frontend/web
@@ -490,7 +520,12 @@ jobs:
           E2E_SUITE: ${{ matrix.config.suite }}
           E2E_CLEAR_DB: ${{ matrix.config.clear_db }}
           E2E_SPEC_FILES: ${{ matrix.config.specs || '' }}
-          E2E_SHARD: ${{ matrix.config.shard || '' }}
+          E2E_SHARD: ${{ matrix.config.balanced != true && matrix.config.shard || '' }}
+          # One worker preserves shared-fixture ordering within each isolated DB.
+          E2E_WORKERS: '1'
+          E2E_PARTITION: ${{ matrix.config.shard || '1/1' }}
+          E2E_BROWSER_READY: '1'
+          PLAYWRIGHT_TIMINGS_OUTPUT: playwright-timings.json
           # One bounded certification run for the COV-06 scheduler stack; only
           # shard 1 pays for the heavyweight aggregate reducer.
           E2E_RUN_INVENTORY_AGGREGATE: ${{ github.event_name == 'pull_request' && github.head_ref == 'claude/cov06n-scheduler-readback' && (matrix.config.suite == 'targeted' || matrix.config.slot == '1') && '1' || '0' }}
@@ -526,6 +561,15 @@ jobs:
               fi
             done
           fi
+
+      - name: Upload Playwright timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-timings-${{ matrix.config.suite }}-${{ matrix.config.slot || '1' }}
+          path: frontend/web/playwright-timings.json
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Upload Playwright report
         if: failure()
