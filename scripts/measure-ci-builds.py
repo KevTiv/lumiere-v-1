@@ -195,6 +195,22 @@ def api(repository, endpoint):
     return json.loads(subprocess.check_output(["gh", "api", f"repos/{repository}/{endpoint}"], text=True))
 
 
+def collect_inventory(repository):
+    inventory = {"errors": []}
+    try:
+        inventory["usage"] = api(repository, "actions/cache/usage")
+        entries = []
+        for page in range(1, 11):
+            batch = api(repository, f"actions/caches?per_page=100&page={page}&sort=last_accessed_at&direction=desc")
+            entries.extend(batch["actions_caches"])
+            if len(entries) >= batch["total_count"] or not batch["actions_caches"]:
+                break
+        inventory.update(entries=entries, total_count=batch["total_count"], truncated=len(entries) < batch["total_count"])
+    except subprocess.CalledProcessError:
+        inventory["errors"].append({"error": "cache inventory unavailable; eviction is unconfirmed"})
+    return inventory
+
+
 def collect(repository, limit, log_limit):
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
         raise ValueError("expected owner/repository")
@@ -228,18 +244,8 @@ def collect(repository, limit, log_limit):
             except subprocess.CalledProcessError:
                 errors.append({"job": job["id"], "error": "log unavailable"})
     # Inventory is read-only. Report access failures without losing timings.
-    inventory = {"errors": errors}
-    try:
-        inventory["usage"] = api(repository, "actions/cache/usage")
-        entries = []
-        for page in range(1, 11):
-            batch = api(repository, f"actions/caches?per_page=100&page={page}&sort=last_accessed_at&direction=desc")
-            entries.extend(batch["actions_caches"])
-            if len(entries) >= batch["total_count"] or not batch["actions_caches"]:
-                break
-        inventory.update(entries=entries, total_count=batch["total_count"], truncated=len(entries) < batch["total_count"])
-    except subprocess.CalledProcessError:
-        inventory["errors"].append({"error": "cache inventory unavailable; eviction is unconfirmed"})
+    inventory = collect_inventory(repository)
+    inventory["errors"].extend(errors)
     # Captured at collection end: queued/running job observations are still not
     # simultaneous, so this timestamp is an upper bound for their elapsed time.
     snapshot["captured_at"] = datetime.now(timezone.utc).isoformat()
@@ -254,11 +260,17 @@ def main():
     parser.add_argument("--snapshot", type=Path, help="saved snapshot; no network requests")
     parser.add_argument("--cache-observations", type=Path)
     parser.add_argument("--cache-inventory", type=Path)
+    parser.add_argument("--inventory-only", action="store_true", help="read cache inventory without scanning runs or logs")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if not 1 <= args.limit <= 100 or not 0 <= args.log_limit <= 100:
         parser.error("limit must be 1–100 and log-limit 0–100")
-    if args.snapshot:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repository):
+        parser.error("expected owner/repository")
+    if args.inventory_only:
+        snapshot = {"repository": args.repository, "captured_at": datetime.now(timezone.utc).isoformat(), "samples": []}
+        logs, inventory = [], collect_inventory(args.repository)
+    elif args.snapshot:
         snapshot = json.loads(args.snapshot.read_text())
         logs = json.loads(args.cache_observations.read_text()) if args.cache_observations else []
         inventory = json.loads(args.cache_inventory.read_text()) if args.cache_inventory else None

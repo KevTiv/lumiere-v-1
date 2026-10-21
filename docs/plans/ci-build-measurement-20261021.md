@@ -133,3 +133,37 @@ The initial raw snapshot and filtered observations are retained in the task
 workspace at `/workspace/ci-build-measurement-20261021/`; generated JSON is kept
 out of the source repository. Six focused tests cover incomplete/cancelled jobs,
 duplicate jobs, successful-step timing, cache log filtering, and pagination.
+
+## Follow-up implementation on this branch
+
+The runtime Dockerfile now uses pinned `cargo-chef 0.1.73` with three build
+stages sharing the same Rust base: chef tools, source planner, and builder.
+The planner produces a dependency recipe; the builder cooks only that recipe
+before copying application sources. Both dependency cooks select the exact
+same packages, nine binaries, default features, locked dependencies, and release
+profile as the final application build. The existing final application compile,
+immutable image tags, provenance, SBOM, dispatcher and runtime image stay intact.
+The real verified contracts and generated bindings are restored after cooking
+before `api-server/build.rs` runs. Recipe changes invalidate dependencies;
+implementation-only edits still rebuild local crates and link real binaries.
+
+An isolated real compilation fixture verified that source edits keep the recipe
+stable, third-party `itoa` remains `Fresh`, real build-script output and changed
+application code execute, and profile/dependency changes invalidate the recipe.
+The fixture uses the same optimized/LTO release configuration. It is a correctness
+proof, not a production speed benchmark. Reproduce with pinned cargo-chef on PATH
+and cached itoa 1.0.17/1.0.18:
+
+```sh
+python3 scripts/tests/rust-runtime-dependency-cache.test.py --output /tmp/dependency-cache-proof
+```
+
+The runtime workflow now also captures a read-only cache inventory per run,
+including aggregate bytes and entries grouped by ref. This allows the PR itself
+to supply retention evidence before the manual measurement workflow reaches main.
+Inventory failure is reported explicitly and does not change the build gate.
+No automatic deletion or cache-key broadening is introduced. Workspace API cache
+inventory access returned `Forbidden`; current retention/eviction remains pending
+this hosted job. Full runtime Docker validation and actual production speed
+comparison require the hosted image build: the local workspace had under 3 GiB
+free, insufficient for a Rust base image and full release compilation.

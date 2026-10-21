@@ -1,4 +1,5 @@
 import importlib.util
+import subprocess
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -29,6 +30,18 @@ def snapshot(*jobs):
 
 
 class MeasurementTests(unittest.TestCase):
+    def test_cache_inventory_reports_scope_sizes_and_denied_access(self):
+        inventory = {"usage": {"active_caches_count": 2, "active_caches_size_in_bytes": 30},
+                     "entries": [{"ref": "refs/heads/main", "size_in_bytes": 10},
+                                 {"ref": "refs/pull/1/merge", "size_in_bytes": 20}], "truncated": False}
+        result = M.analyse(snapshot(), [], inventory)
+        self.assertEqual(result["cache_inventory"]["by_ref"]["refs/heads/main"]["bytes"], 10)
+        self.assertEqual(result["cache_inventory"]["by_ref"]["refs/pull/1/merge"]["entries"], 1)
+        with patch.object(M, "api", side_effect=subprocess.CalledProcessError(1, "gh")):
+            denied = M.collect_inventory("owner/repo")
+        self.assertIn("unconfirmed", denied["errors"][0]["error"])
+        self.assertFalse(M.analyse(snapshot(), [], denied)["cache_inventory"]["available"])
+
     def test_bad_timestamps_and_p90(self):
         self.assertIsNone(M.seconds(None, END))
         self.assertIsNone(M.seconds(END, START))
