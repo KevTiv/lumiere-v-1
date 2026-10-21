@@ -890,7 +890,7 @@ e2e-docker:
 	'
 
 e2e-smoke:
-	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" E2E_PREBUILT="$(E2E_PREBUILT)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(value E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" E2E_PREBUILT="$(E2E_PREBUILT)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \

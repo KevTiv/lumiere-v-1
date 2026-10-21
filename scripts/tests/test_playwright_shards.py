@@ -100,6 +100,32 @@ class PlaywrightShardTests(unittest.TestCase):
                 self.assertEqual(trace.read_text() if trace.exists() else "",
                                  "" if ready == "1" else "exec playwright install chromium\n")
 
+    def test_make_preserves_balanced_regex_filters_through_both_shells(self):
+        import json
+        recipe = (ROOT / "Makefile").read_text().split("\ne2e-smoke:\n", 1)[1]
+        prefix = recipe.splitlines()[0].split(" /bin/bash -c '", 1)[0]
+        filters = planner.balance(self.matrix(1), [
+            "tests/e2e/auth-lifecycle.spec.ts", "tests/e2e/other.spec.ts"], {})[0]["specs"]
+        # Execute the real recipe's env handoff and argument-selection block,
+        # replacing service startup and Playwright with an argv witness.
+        selection = recipe.split('\t\tPW_ARGS=(--workers "$$E2E_WORKERS");', 1)[1]
+        selection = selection.split('\t\tif [ -n "$${E2E_SHARD:-}" ]', 1)[0]
+        witness = (prefix + " /bin/bash -c 'set -eu; PW_ARGS=(); \\\n" + selection +
+                   '\t\tpython3 -c "import json,sys; print(json.dumps(sys.argv[1:]))" "$${PW_ARGS[@]}"\'\n')
+        for source in ("environment", "command-line"):
+            with self.subTest(source=source):
+                env = {**os.environ, "E2E_SUITE": "full", "E2E_REQUIRE_AI": "0"}
+                args = ["make", "--silent", "-f", "-", "witness"]
+                if source == "environment":
+                    env["E2E_SPEC_FILES"] = filters
+                else:
+                    env.pop("E2E_SPEC_FILES", None)
+                    args.append("E2E_SPEC_FILES=" + filters)
+                result = subprocess.run(args, input="SHELL := /bin/bash\nwitness:\n" + witness,
+                                        env=env, text=True, capture_output=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout), ["--grep-invert", "@ai-live", *filters.split()])
+
 
 if __name__ == "__main__":
     unittest.main()
