@@ -53,8 +53,9 @@ the default because tests can mutate shared ERP fixtures.
   separate from frontend source/packages/public assets/lockfiles/dotenv files.
   STDB fingerprints include the in-module tests and fixture tooling.
 - A local production frontend build is reusable only when its fingerprint and
-  recorded `BUILD_ID` match. A failed build clears its stamp. CI always invokes
-  the production build; it only reuses compiler intermediates.
+  recorded `BUILD_ID` match. A failed build clears its stamp. CI can reuse a
+  completed exact-commit archive; otherwise the frontend build reuses only
+  compiler intermediates.
 - `CONTRACTS_STAGING_DIR` follows the API build script's convention: relative
   paths resolve from `api-server/`. No raw environment values are printed by
   the fingerprint helper. Local stamps are under gitignored `.tmp/e2e/`.
@@ -129,7 +130,94 @@ The build-generation test uses an already compiled `serde_json` dependency in
 run the regular dependency/codegen tests first; CI does this automatically.
 It does not replace a full API compiler check.
 
-## Measurement and remaining work
+## E2E build reuse and cache correctness
+
+The E2E builder produces one exact-commit archive for all isolated shards. Its
+whole-build cache remains keyed by `github.sha`; shards verify that commit and
+the packaged file checksums before starting services.
+
+The October 2026 follow-up adds reuse below that archive boundary:
+
+- The compiled development-reducer WASM module has a separate exact cache key.
+  `scripts/build-fingerprint.py stdb-wasm` hashes module sources and fixtures,
+  local crates, embedded policy data, Cargo manifests and configuration, the
+  workflow recipe, compiler/CLI/optimizer versions, and relevant build flags.
+  Frontend, browser-test, and API edits alone do not invalidate that module.
+  Both restored and newly built modules pass `wasm-tools validate`; there are
+  no fallback restore keys. The release profile is unchanged.
+- The native `api-server` and `storage-migrate` executables have a separate
+  exact-input cache. `scripts/build-fingerprint.py api-ci` includes the actual
+  local Cargo packages, verified contracts and staging, embedded policy and
+  migration files, build configuration and recipe, compiler/linker versions,
+  and hosted runner image identity. Frontend and browser-test edits alone do
+  not invalidate these executables. Both binaries must match an inert JSON
+  manifest's fingerprint and checksums and pass native ELF/executable checks
+  before a restored bundle replaces either output. The helper never invokes
+  the server or migration executable for validation. This CI cache deliberately
+  requires the existing native `target/debug` layout.
+  On a miss, the workflow removes the two old executables, builds both, verifies
+  that the input fingerprint is still unchanged, and stages the complete
+  bundle before saving it. Successful API builds are saved before the frontend
+  build, even when a later step fails. The final shared archive still contains
+  the current commit's identity and full file checksums.
+- Verified contracts are prepared before Rust cache metadata is collected.
+  Repeated vendor preparation and `make contracts-staging-from-pinned` preserve
+  unchanged contents and modification times while repairing changed, missing,
+  or stale files. Archive provenance and IR validations still run each time.
+- The builder verifies its archive in a temporary directory with
+  `scripts/e2e-ci-artifact.sh verify-archive`. This preserves `.next/cache` for
+  the existing post-job cache save. GitHub Actions also explicitly enables
+  production filesystem caching in the pinned Next 16.1 release, which writes
+  `.next/cache/turbopack`. The frontend build helper rejects missing or empty
+  compiler-cache output before recording a successful build. Shards still
+  install the archive normally and do not require compiler caches.
+- A new PR commit or branch push cancels the entire superseded E2E run,
+  including older shards. Explicit manual runs have independent concurrency
+  groups. Suite selection, worker counts, and required gates are unchanged.
+
+The form-configuration helper also waits for the actual
+`publish_form_configuration` response and canonical configuration readback.
+Publication/query failures surface directly instead of becoming swallowed
+timeouts and refresh loops.
+
+The first PR run's [E2E builder](https://github.com/KevTiv/lumiere-v-1/actions/runs/39259934323/job/118084757463)
+took 16m24s. The [subsequent builder](https://github.com/KevTiv/lumiere-v-1/actions/runs/39273733081/job/118132599785)
+took 7m08s after restoring the compiled WASM module, validating it, and skipping
+module compilation. That builder also successfully saved the Next compiler
+cache. It still spent 3m21s compiling API binaries, which motivates the separate
+API cache. The API cache's first fill and later hit need separate CI measurements;
+editing the workflow or fingerprint recipe also invalidates the WASM key once.
+These are builder timings, not end-to-end browser-suite timings.
+
+A local production-cache check on October 19 used the real frontend build helper
+with `CI=true`, `GITHUB_ACTIONS=true`, Node 22.23.3, pnpm 10.31.0, Next 16.1.6,
+and four available CPU cores. Two consecutive successful builds took 64.44s
+cold and 10.09s warm; Next reported compilation phases of 48s and 2.6s. The
+compiler cache occupied approximately 680 MiB. These timings exclude GitHub
+cache transfer and artifact packaging, so measure the full CI job separately.
+
+Focused regression checks:
+
+```sh
+python3 -B -m unittest discover -s scripts/tests
+bash scripts/tests/rust-runtime-image-contract.test.sh
+cd frontend/web
+node --import tsx --test tests/e2e/operation-response.test.ts
+```
+
+The production Rust Docker builder now copies only the required contract
+preparation helpers, rather than the entire scripts directory and Makefile.
+The dispatcher is copied directly into the final runtime stage. Unrelated CI
+script edits therefore do not invalidate the expensive release compilation
+layer. The first build with the changed Docker recipe may still compile; real
+Rust source changes still invalidate the combined dependency/application layer.
+The existing runtime-image contract gate checks these input boundaries.
+
+Production Docker dependency layers, E2E shard balance, and API cache transfer
+cost still need separate measurements. Full service startup and authenticated
+browser execution remain CI checks.
+
+## Earlier measurement and remaining work
 
 Baseline: main [CI run 33911593756](https://github.com/KevTiv/lumiere-v-1/actions/runs/33911593756),
 commit `4c5ea33b05d9f423334917949f284fdc117fb028`, September 4, 2026:
@@ -147,11 +235,11 @@ The Rust job included 1m41s STDB checking and 4m33s API test compilation/executi
 Collect comparable warm/cold run timings, queue time, cache transfer time, and
 total runner minutes before claiming a percentage improvement.
 
-The following are **not completed by these changes**:
+The September changes left the following work. Shared E2E build artifacts are
+now implemented as described above; the other items still need separate work:
 
-1. Build-once application artifacts shared by isolated E2E shards. First define
-   commit/target/toolchain/feature/environment provenance and separate fixture
-   creation from compilation. Do not multiply full builds for each shard.
+1. Keep application artifacts shared by isolated E2E shards, with exact-commit
+   verification and fixture creation separated from compilation.
 2. Higher E2E worker counts: require persisted fixture-isolation tests first.
 3. Realtime/SDK crate extraction: compact contracts are now selected explicitly,
    but the API library still requires full bindings. Workspace feature

@@ -11,16 +11,19 @@ use crate::inventory::quality::{
     create_workorder_quality_check, fail_workorder_quality_check, pass_quality_check, quality_check,
 };
 use crate::inventory::stock::{stock_move, stock_quant};
-use crate::inventory::warehouse::{create_stock_location, stock_location, warehouse, CreateStockLocationParams};
+use crate::inventory::warehouse::{
+    create_stock_location, stock_location, warehouse, CreateStockLocationParams,
+};
 use crate::manufacturing::bill_of_materials::{
     create_bom, create_bom_byproduct, mrp_bom, mrp_bom_byproduct, mrp_bom_line, BomLineInput,
     CreateBomByproductParams, CreateBomParams, MrpBomLine,
 };
 use crate::manufacturing::manufacturing_orders::{
     confirm_manufacturing_order, consume_mo_materials, create_manufacturing_order,
-    create_workorder, finish_manufacturing_order, mrp_production, mrp_workorder,
-    produce_manufacturing_order, scrap_finished_manufacturing_output, start_manufacturing_order, start_workorder, finish_workorder, CreateMrpProductionParams,
-    CreateWorkorderParams, MrpProduction, MrpWorkorder,
+    create_workorder, finish_manufacturing_order, finish_workorder, mrp_production, mrp_workorder,
+    produce_manufacturing_order, scrap_finished_manufacturing_output, start_manufacturing_order,
+    start_workorder, update_manufacturing_order, CreateMrpProductionParams, CreateWorkorderParams,
+    MrpProduction, MrpWorkorder, UpdateManufacturingOrderParams,
 };
 use crate::manufacturing::work_centers::{
     create_loss_category, create_workcenter, log_workcenter_productivity, mrp_loss_category,
@@ -33,98 +36,148 @@ use crate::types::{BomType, MoState, WorkorderState};
 pub fn test_bom_byproduct_output_exact_effect(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
-    let primary = ctx.db.product().id().find(&fixture.product_id).ok_or("primary product missing")?;
-    create_product(ctx, fixture.organization_id, CreateProductParams {
-        name: "COV-07G Byproduct".to_string(),
-        categ_id: primary.categ_id,
-        type_: "storable".to_string(),
-        uom_id: primary.uom_id,
-        uom_po_id: primary.uom_po_id,
-        standard_price: 2.0,
-        list_price: 3.0,
-        currency_id: fixture.currency_id,
-        default_code: Some("COV-07G-BYPRODUCT".to_string()),
-        barcode: None,
-        description: None,
-        sale_ok: Some(false),
-        purchase_ok: Some(false),
-        display_name: None,
-        cost_method: None,
-        valuation: None,
-        volume: None,
-        weight: None,
-        can_be_expensed: None,
-        available_in_pos: None,
-        invoicing_policy: None,
-        expense_policy: None,
-        priority: None,
-        is_published: None,
-        description_purchase: None,
-        description_sale: None,
-        service_type: None,
-        service_tracking: None,
-        image_1920_url: None,
-        image_128_url: None,
-        color: None,
-        responsible_id: None,
-        pricelist_id: None,
-        description_picking: None,
-        description_pickingout: None,
-        description_pickingin: None,
-        location_id: None,
-        warehouse_id: Some(fixture.warehouse_id),
-        tracking: None,
-        has_configurable_attributes: None,
-        taxes_id: None,
-        supplier_taxes_id: None,
-        route_ids: None,
-        route_from_categ_ids: None,
-        property_account_income_id: None,
-        property_account_expense_id: None,
-        variant_attribute_ids: None,
-        attribute_line_ids: None,
-        metadata: None,
-    })?;
-    let byproduct_id = ctx.db.product().product_by_org().filter(&fixture.organization_id)
+    let primary = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("primary product missing")?;
+    create_product(
+        ctx,
+        fixture.organization_id,
+        CreateProductParams {
+            name: "COV-07G Byproduct".to_string(),
+            categ_id: primary.categ_id,
+            type_: "storable".to_string(),
+            uom_id: primary.uom_id,
+            uom_po_id: primary.uom_po_id,
+            standard_price: 2.0,
+            list_price: 3.0,
+            currency_id: fixture.currency_id,
+            default_code: Some("COV-07G-BYPRODUCT".to_string()),
+            barcode: None,
+            description: None,
+            sale_ok: Some(false),
+            purchase_ok: Some(false),
+            display_name: None,
+            cost_method: None,
+            valuation: None,
+            volume: None,
+            weight: None,
+            can_be_expensed: None,
+            available_in_pos: None,
+            invoicing_policy: None,
+            expense_policy: None,
+            priority: None,
+            is_published: None,
+            description_purchase: None,
+            description_sale: None,
+            service_type: None,
+            service_tracking: None,
+            image_1920_url: None,
+            image_128_url: None,
+            color: None,
+            responsible_id: None,
+            pricelist_id: None,
+            description_picking: None,
+            description_pickingout: None,
+            description_pickingin: None,
+            location_id: None,
+            warehouse_id: Some(fixture.warehouse_id),
+            tracking: None,
+            has_configurable_attributes: None,
+            taxes_id: None,
+            supplier_taxes_id: None,
+            route_ids: None,
+            route_from_categ_ids: None,
+            property_account_income_id: None,
+            property_account_expense_id: None,
+            variant_attribute_ids: None,
+            attribute_line_ids: None,
+            metadata: None,
+        },
+    )?;
+    let byproduct_id = ctx
+        .db
+        .product()
+        .product_by_org()
+        .filter(&fixture.organization_id)
         .find(|p| p.default_code.as_deref() == Some("COV-07G-BYPRODUCT"))
-        .ok_or("byproduct missing")?.id;
-    create_bom(ctx, fixture.organization_id, CreateBomParams {
-        company_id: Some(fixture.company_id),
-        type_: BomType::Manufacture,
-        product_id: fixture.product_id,
-        product_qty: 1.0,
-        product_uom_id: primary.uom_id,
-        ready_to_produce: "all_available".to_string(),
-        consumption: "flexible".to_string(),
-        sequence: 10,
-        lines: vec![],
-        picking_type_id: None,
-        location_src_id: Some(fixture.location_id),
-        location_dest_id: Some(fixture.location_id),
-        warehouse_id: Some(fixture.warehouse_id),
-        routing_id: None,
-        metadata: None,
-    })?;
-    let bom = ctx.db.mrp_bom().mrp_bom_by_product().filter(&fixture.product_id)
-        .find(|b| b.organization_id == fixture.organization_id && b.company_id == fixture.company_id)
+        .ok_or("byproduct missing")?
+        .id;
+    create_bom(
+        ctx,
+        fixture.organization_id,
+        CreateBomParams {
+            company_id: Some(fixture.company_id),
+            type_: BomType::Manufacture,
+            product_id: fixture.product_id,
+            product_qty: 1.0,
+            product_uom_id: primary.uom_id,
+            ready_to_produce: "all_available".to_string(),
+            consumption: "flexible".to_string(),
+            sequence: 10,
+            lines: vec![],
+            picking_type_id: None,
+            location_src_id: Some(fixture.location_id),
+            location_dest_id: Some(fixture.location_id),
+            warehouse_id: Some(fixture.warehouse_id),
+            routing_id: None,
+            metadata: None,
+        },
+    )?;
+    let bom = ctx
+        .db
+        .mrp_bom()
+        .mrp_bom_by_product()
+        .filter(&fixture.product_id)
+        .find(|b| {
+            b.organization_id == fixture.organization_id && b.company_id == fixture.company_id
+        })
         .ok_or("BOM missing")?;
-    create_bom_byproduct(ctx, fixture.organization_id, bom.id, CreateBomByproductParams {
-        product_id: byproduct_id,
-        product_qty: 0.5,
-        product_uom_id: primary.uom_id,
-        cost_share: 20.0,
-        sequence: 2,
-        metadata: None,
-    })?;
-    if create_bom_byproduct(ctx, fixture.organization_id, bom.id, CreateBomByproductParams {
-        product_id: byproduct_id, product_qty: 0.5, product_uom_id: primary.uom_id,
-        cost_share: 20.0, sequence: 2, metadata: None,
-    }).is_ok() {
+    create_bom_byproduct(
+        ctx,
+        fixture.organization_id,
+        bom.id,
+        CreateBomByproductParams {
+            product_id: byproduct_id,
+            product_qty: 0.5,
+            product_uom_id: primary.uom_id,
+            cost_share: 20.0,
+            sequence: 2,
+            metadata: None,
+        },
+    )?;
+    if create_bom_byproduct(
+        ctx,
+        fixture.organization_id,
+        bom.id,
+        CreateBomByproductParams {
+            product_id: byproduct_id,
+            product_qty: 0.5,
+            product_uom_id: primary.uom_id,
+            cost_share: 20.0,
+            sequence: 2,
+            metadata: None,
+        },
+    )
+    .is_ok()
+    {
         return Err("duplicate BOM byproduct was accepted".to_string());
     }
-    let definition = ctx.db.mrp_bom_byproduct().mrp_bom_byproduct_by_bom().filter(&bom.id)
-        .next().ok_or("byproduct definition missing")?;
-    let owned = ctx.db.mrp_bom().id().find(&bom.id).ok_or("BOM disappeared")?;
+    let definition = ctx
+        .db
+        .mrp_bom_byproduct()
+        .mrp_bom_byproduct_by_bom()
+        .filter(&bom.id)
+        .next()
+        .ok_or("byproduct definition missing")?;
+    let owned = ctx
+        .db
+        .mrp_bom()
+        .id()
+        .find(&bom.id)
+        .ok_or("BOM disappeared")?;
     if owned.byproduct_ids != vec![definition.id] || definition.product_id != byproduct_id {
         return Err("BOM byproduct ownership mismatch".to_string());
     }
@@ -134,22 +187,119 @@ pub fn test_bom_byproduct_output_exact_effect(ctx: &ReducerContext) -> Result<()
     start_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
     produce_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id, 1.0)?;
     finish_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
-    let finished = ctx.db.mrp_production().id().find(&mo.id).ok_or("MO missing after finish")?;
+    let finished = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo.id)
+        .ok_or("MO missing after finish")?;
     if finished.move_finished_ids.len() != 2 || finished.move_finished_count != 2 {
         return Err("MO did not own primary and byproduct moves".to_string());
     }
-    let byproduct_moves: Vec<_> = finished.move_finished_ids.iter().filter_map(|id| ctx.db.stock_move().id().find(id))
-        .filter(|mv| mv.product_id == byproduct_id).collect();
-    if byproduct_moves.len() != 1 || byproduct_moves[0].production_id != Some(mo.id)
-        || !byproduct_moves[0].is_done || (byproduct_moves[0].quantity_done - 0.5).abs() > 1e-9
-        || (byproduct_moves[0].cost_share - 20.0).abs() > 1e-9 {
+    let byproduct_moves: Vec<_> = finished
+        .move_finished_ids
+        .iter()
+        .filter_map(|id| ctx.db.stock_move().id().find(id))
+        .filter(|mv| mv.product_id == byproduct_id)
+        .collect();
+    if byproduct_moves.len() != 1
+        || byproduct_moves[0].production_id != Some(mo.id)
+        || !byproduct_moves[0].is_done
+        || (byproduct_moves[0].quantity_done - 0.5).abs() > 1e-9
+        || (byproduct_moves[0].cost_share - 20.0).abs() > 1e-9
+    {
         return Err("exact byproduct move mismatch".to_string());
     }
-    let quants: Vec<_> = ctx.db.stock_quant().quant_by_product().filter(&byproduct_id)
-        .filter(|q| q.organization_id == fixture.organization_id && q.company_id == fixture.company_id
-            && q.location_id == fixture.location_id).collect();
+    let quants: Vec<_> = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&byproduct_id)
+        .filter(|q| {
+            q.organization_id == fixture.organization_id
+                && q.company_id == fixture.company_id
+                && q.location_id == fixture.location_id
+        })
+        .collect();
     if quants.len() != 1 || (quants[0].quantity - 0.5).abs() > 1e-9 {
         return Err("byproduct quant did not converge exactly".to_string());
+    }
+    Ok(())
+}
+
+pub fn test_update_manufacturing_order_draft_only(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let mo = create_test_production(ctx, &fixture, "MFG-UPDATE-DRAFT")?;
+    let new_finish = mo.date_planned_start + Duration::from_secs(7_200);
+
+    update_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        UpdateManufacturingOrderParams {
+            product_qty: Some(3.0),
+            date_planned_start: None,
+            date_planned_finished: Some(new_finish),
+            date_deadline: Some(Some(new_finish)),
+            origin: None,
+            metadata: Some(None),
+        },
+    )?;
+    let updated = ctx
+        .db
+        .mrp_production()
+        .id()
+        .find(&mo.id)
+        .ok_or("MO missing after update")?;
+    if (updated.product_qty - 3.0).abs() > 1e-9 || (updated.product_uom_qty - 3.0).abs() > 1e-9 {
+        return Err("update did not persist product_qty".to_string());
+    }
+    if updated.date_planned_finished != new_finish || updated.date_deadline != Some(new_finish) {
+        return Err("update did not persist planned dates".to_string());
+    }
+    if updated.origin != mo.origin || updated.metadata.is_some() {
+        return Err("update did not preserve origin / clear metadata".to_string());
+    }
+
+    if update_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        UpdateManufacturingOrderParams {
+            product_qty: Some(0.0),
+            date_planned_start: None,
+            date_planned_finished: None,
+            date_deadline: None,
+            origin: None,
+            metadata: None,
+        },
+    )
+    .is_ok()
+    {
+        return Err("update accepted a non-positive product_qty".to_string());
+    }
+
+    confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
+    if update_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        UpdateManufacturingOrderParams {
+            product_qty: Some(5.0),
+            date_planned_start: None,
+            date_planned_finished: None,
+            date_deadline: None,
+            origin: None,
+            metadata: None,
+        },
+    )
+    .is_ok()
+    {
+        return Err("update accepted a non-Draft manufacturing order".to_string());
     }
     Ok(())
 }
@@ -158,54 +308,149 @@ pub fn test_finished_output_scrap_exact_effect(ctx: &ReducerContext) -> Result<(
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let mo = create_test_production(ctx, &fixture, "COV-07F-SCRAP")?;
-    create_stock_location(ctx, fixture.organization_id, CreateStockLocationParams {
-        name: "COV-07F Scrap".to_string(),
-        usage: "inventory".to_string(),
-        location_category: "scrap".to_string(),
-        parent_path: "/".to_string(),
-        child_left: 0, child_right: 0, scrap_location: true, return_location: false,
-        active: true, posx: 0.0, posy: 0.0, posz: 0.0,
-        cyclic_inventory_frequency: 0, location_id: None, complete_name: None,
-        valuation_in_account_id: None, valuation_out_account_id: None,
-        comment: None, barcode: None, last_inventory_date: None, next_inventory_date: None,
-        metadata: None,
-    })?;
-    let scrap_location_id = ctx.db.stock_location().iter()
+    create_stock_location(
+        ctx,
+        fixture.organization_id,
+        CreateStockLocationParams {
+            name: "COV-07F Scrap".to_string(),
+            usage: "inventory".to_string(),
+            location_category: "scrap".to_string(),
+            parent_path: "/".to_string(),
+            child_left: 0,
+            child_right: 0,
+            scrap_location: true,
+            return_location: false,
+            active: true,
+            posx: 0.0,
+            posy: 0.0,
+            posz: 0.0,
+            cyclic_inventory_frequency: 0,
+            location_id: None,
+            complete_name: None,
+            valuation_in_account_id: None,
+            valuation_out_account_id: None,
+            comment: None,
+            barcode: None,
+            last_inventory_date: None,
+            next_inventory_date: None,
+            metadata: None,
+        },
+    )?;
+    let scrap_location_id = ctx
+        .db
+        .stock_location()
+        .iter()
         .find(|loc| loc.organization_id == fixture.organization_id && loc.name == "COV-07F Scrap")
-        .ok_or("scrap location missing")?.id;
-    if scrap_finished_manufacturing_output(ctx, fixture.organization_id, fixture.company_id, mo.id, scrap_location_id, 0.25, "one".to_string()).is_ok() {
+        .ok_or("scrap location missing")?
+        .id;
+    if scrap_finished_manufacturing_output(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        scrap_location_id,
+        0.25,
+        "one".to_string(),
+    )
+    .is_ok()
+    {
         return Err("draft MO permitted scrap".to_string());
     }
     confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
     start_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
     produce_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id, 1.0)?;
     finish_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
-    let source = ctx.db.stock_quant().quant_by_product().filter(&mo.product_id)
-        .find(|q| q.organization_id == fixture.organization_id && q.company_id == fixture.company_id
-            && q.location_id == mo.location_dest_id && q.lot_id.is_none())
+    let source = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&mo.product_id)
+        .find(|q| {
+            q.organization_id == fixture.organization_id
+                && q.company_id == fixture.company_id
+                && q.location_id == mo.location_dest_id
+                && q.lot_id.is_none()
+        })
         .ok_or("source quant missing")?;
     let before = source.quantity;
-    scrap_finished_manufacturing_output(ctx, fixture.organization_id, fixture.company_id, mo.id, scrap_location_id, 0.25, "one".to_string())?;
-    let effects: Vec<_> = ctx.db.stock_move().iter()
-        .filter(|mv| mv.production_id == Some(mo.id) && mv.scrapped).collect();
-    if effects.len() != 1 || !effects[0].is_done || effects[0].state != "done"
+    scrap_finished_manufacturing_output(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        scrap_location_id,
+        0.25,
+        "one".to_string(),
+    )?;
+    let effects: Vec<_> = ctx
+        .db
+        .stock_move()
+        .iter()
+        .filter(|mv| mv.production_id == Some(mo.id) && mv.scrapped)
+        .collect();
+    if effects.len() != 1
+        || !effects[0].is_done
+        || effects[0].state != "done"
         || (effects[0].quantity_done - 0.25).abs() > 1e-9
         || effects[0].location_id != mo.location_dest_id
-        || effects[0].location_dest_id != scrap_location_id {
+        || effects[0].location_dest_id != scrap_location_id
+    {
         return Err("scrap move did not converge to one exact MO-owned effect".to_string());
     }
-    let source_after = ctx.db.stock_quant().id().find(&source.id).ok_or("source quant missing after scrap")?;
-    let dest: Vec<_> = ctx.db.stock_quant().quant_by_product().filter(&mo.product_id)
-        .filter(|q| q.organization_id == fixture.organization_id && q.company_id == fixture.company_id && q.location_id == scrap_location_id).collect();
-    if (source_after.quantity - (before - 0.25)).abs() > 1e-9 || dest.len() != 1
-        || (dest[0].quantity - 0.25).abs() > 1e-9 {
+    let source_after = ctx
+        .db
+        .stock_quant()
+        .id()
+        .find(&source.id)
+        .ok_or("source quant missing after scrap")?;
+    let dest: Vec<_> = ctx
+        .db
+        .stock_quant()
+        .quant_by_product()
+        .filter(&mo.product_id)
+        .filter(|q| {
+            q.organization_id == fixture.organization_id
+                && q.company_id == fixture.company_id
+                && q.location_id == scrap_location_id
+        })
+        .collect();
+    if (source_after.quantity - (before - 0.25)).abs() > 1e-9
+        || dest.len() != 1
+        || (dest[0].quantity - 0.25).abs() > 1e-9
+    {
         return Err("scrap quants did not converge exactly".to_string());
     }
-    if scrap_finished_manufacturing_output(ctx, fixture.organization_id, fixture.company_id, mo.id, scrap_location_id, 0.25, "one".to_string()).is_ok()
-        || scrap_finished_manufacturing_output(ctx, fixture.organization_id, fixture.company_id, mo.id, scrap_location_id, 0.8, "two".to_string()).is_ok() {
+    if scrap_finished_manufacturing_output(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        mo.id,
+        scrap_location_id,
+        0.25,
+        "one".to_string(),
+    )
+    .is_ok()
+        || scrap_finished_manufacturing_output(
+            ctx,
+            fixture.organization_id,
+            fixture.company_id,
+            mo.id,
+            scrap_location_id,
+            0.8,
+            "two".to_string(),
+        )
+        .is_ok()
+    {
         return Err("scrap replay or over-production scrap was accepted".to_string());
     }
-    if ctx.db.stock_move().iter().filter(|mv| mv.production_id == Some(mo.id) && mv.scrapped).count() != 1 {
+    if ctx
+        .db
+        .stock_move()
+        .iter()
+        .filter(|mv| mv.production_id == Some(mo.id) && mv.scrapped)
+        .count()
+        != 1
+    {
         return Err("rejected scrap changed the effect set".to_string());
     }
     Ok(())
@@ -216,44 +461,124 @@ pub fn test_workorder_quality_gate(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let center = create_test_workcenter(ctx, &fixture, "COV-07E Workcenter", true)?;
     let production = create_test_production(ctx, &fixture, "COV-07E-MO")?;
-    confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, production.id)?;
-    start_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, production.id)?;
+    confirm_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        production.id,
+    )?;
+    start_manufacturing_order(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        production.id,
+    )?;
     let wo = create_test_workorder(ctx, &fixture, production.id, center.id, "COV-07E Quality")?;
     start_workorder(ctx, fixture.organization_id, fixture.company_id, wo.id)?;
-    create_workorder_quality_check(ctx, fixture.organization_id, fixture.company_id, wo.id, "Output inspection".to_string())?;
-    let checks: Vec<_> = ctx.db.quality_check().iter().filter(|check| check.workorder_id == Some(wo.id)).collect();
+    create_workorder_quality_check(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        wo.id,
+        "Output inspection".to_string(),
+    )?;
+    let checks: Vec<_> = ctx
+        .db
+        .quality_check()
+        .iter()
+        .filter(|check| check.workorder_id == Some(wo.id))
+        .collect();
     if checks.len() != 1 || checks[0].production_id != Some(production.id) {
         return Err("required check did not link exact workorder and MO".to_string());
     }
     let check_id = checks[0].id;
-    if create_workorder_quality_check(ctx, fixture.organization_id, fixture.company_id, wo.id, "Replay".to_string()).is_ok()
-        || finish_workorder(ctx, fixture.organization_id, fixture.company_id, wo.id).is_ok() {
+    if create_workorder_quality_check(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        wo.id,
+        "Replay".to_string(),
+    )
+    .is_ok()
+        || finish_workorder(ctx, fixture.organization_id, fixture.company_id, wo.id).is_ok()
+    {
         return Err("pending check or creation replay escaped gate".to_string());
     }
-    pass_quality_check(ctx, fixture.organization_id, fixture.company_id, check_id, None, None, None)?;
-    if pass_quality_check(ctx, fixture.organization_id, fixture.company_id, check_id, None, None, None).is_ok() {
+    pass_quality_check(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        check_id,
+        None,
+        None,
+        None,
+    )?;
+    if pass_quality_check(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        check_id,
+        None,
+        None,
+        None,
+    )
+    .is_ok()
+    {
         return Err("quality pass replay succeeded".to_string());
     }
-    let after_pass = ctx.db.mrp_workorder().id().find(&wo.id).ok_or("workorder missing")?;
-    if after_pass.check_ids != vec![check_id] || after_pass.quality_check_todo || after_pass.quality_check_fail
-        || after_pass.quality_state.as_deref() != Some("pass") {
+    let after_pass = ctx
+        .db
+        .mrp_workorder()
+        .id()
+        .find(&wo.id)
+        .ok_or("workorder missing")?;
+    if after_pass.check_ids != vec![check_id]
+        || after_pass.quality_check_todo
+        || after_pass.quality_check_fail
+        || after_pass.quality_state.as_deref() != Some("pass")
+    {
         return Err("quality pass projection mismatch".to_string());
     }
     finish_workorder(ctx, fixture.organization_id, fixture.company_id, wo.id)?;
 
     let failed = create_test_workorder(ctx, &fixture, production.id, center.id, "COV-07E Failed")?;
     start_workorder(ctx, fixture.organization_id, fixture.company_id, failed.id)?;
-    create_workorder_quality_check(ctx, fixture.organization_id, fixture.company_id, failed.id, "Failure inspection".to_string())?;
-    let failed_check = ctx.db.quality_check().iter().find(|check| check.workorder_id == Some(failed.id)).ok_or("failed check missing")?;
-    fail_workorder_quality_check(ctx, fixture.organization_id, fixture.company_id, failed_check.id, "Inspection failed".to_string())?;
+    create_workorder_quality_check(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        failed.id,
+        "Failure inspection".to_string(),
+    )?;
+    let failed_check = ctx
+        .db
+        .quality_check()
+        .iter()
+        .find(|check| check.workorder_id == Some(failed.id))
+        .ok_or("failed check missing")?;
+    fail_workorder_quality_check(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        failed_check.id,
+        "Inspection failed".to_string(),
+    )?;
     if finish_workorder(ctx, fixture.organization_id, fixture.company_id, failed.id).is_ok()
-        || fail_workorder_quality_check(ctx, fixture.organization_id, fixture.company_id, failed_check.id, "Replay".to_string()).is_ok() {
+        || fail_workorder_quality_check(
+            ctx,
+            fixture.organization_id,
+            fixture.company_id,
+            failed_check.id,
+            "Replay".to_string(),
+        )
+        .is_ok()
+    {
         return Err("failed quality permitted finish or replay".to_string());
     }
     Ok(())
 }
 
-fn create_test_workcenter(
+pub(crate) fn create_test_workcenter(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     name: &str,
@@ -300,7 +625,7 @@ fn create_test_production(
     create_test_production_with_bom(ctx, fixture, origin, None)
 }
 
-fn create_test_production_with_bom(
+pub(crate) fn create_test_production_with_bom(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     origin: &str,
@@ -358,13 +683,22 @@ fn create_test_production_with_bom(
     Ok(production)
 }
 
-fn create_test_workorder(
+pub(crate) fn create_test_workorder(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     production_id: u64,
     workcenter_id: u64,
     name: &str,
 ) -> Result<MrpWorkorder, String> {
+    // Setup-only insertion identity: two workorders may share their center,
+    // so selecting the first row at that center returns the wrong fixture.
+    let before_ids: HashSet<_> = ctx
+        .db
+        .mrp_workorder()
+        .mrp_workorder_by_production()
+        .filter(&production_id)
+        .map(|workorder| workorder.id)
+        .collect();
     create_workorder(
         ctx,
         fixture.organization_id,
@@ -384,12 +718,28 @@ fn create_test_workorder(
         },
     )?;
 
-    ctx.db
+    let mut created: Vec<_> = ctx
+        .db
         .mrp_workorder()
         .mrp_workorder_by_production()
         .filter(&production_id)
-        .find(|workorder| workorder.workcenter_id == workcenter_id)
-        .ok_or_else(|| format!("workorder {name} missing after create"))
+        .filter(|workorder| !before_ids.contains(&workorder.id))
+        .collect();
+    if created.len() != 1 {
+        return Err(format!(
+            "workorder {name}: expected exactly one inserted fixture, got {}",
+            created.len()
+        ));
+    }
+    let workorder = created.pop().ok_or("inserted workorder disappeared")?;
+    if workorder.organization_id != fixture.organization_id
+        || workorder.company_id != fixture.company_id
+        || workorder.production_id != production_id
+        || workorder.workcenter_id != workcenter_id
+    {
+        return Err(format!("workorder {name}: inserted fixture scope mismatch"));
+    }
+    Ok(workorder)
 }
 
 fn create_test_loss_category(
@@ -801,12 +1151,9 @@ pub fn test_consume_materials_rejects_cross_org_component(
     Ok(())
 }
 
-
 /// COV-07b: material consumption owns an exact raw-move set, closes every
 /// consumed move, reports the true move count, and is idempotent on replay.
-pub fn test_consume_materials_exact_effect_and_replay(
-    ctx: &ReducerContext,
-) -> Result<(), String> {
+pub fn test_consume_materials_exact_effect_and_replay(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let product = ctx
@@ -925,9 +1272,7 @@ pub fn test_consume_materials_exact_effect_and_replay(
         .mrp_production()
         .mrp_production_by_org()
         .filter(&fixture.organization_id)
-        .filter(|production| {
-            production.origin.as_deref() == Some("COV-07B-EXACT-MATERIALS")
-        })
+        .filter(|production| production.origin.as_deref() == Some("COV-07B-EXACT-MATERIALS"))
         .collect();
     if productions.len() != 1 {
         return Err(format!(
@@ -1050,25 +1395,16 @@ pub fn test_consume_materials_exact_effect_and_replay(
     Ok(())
 }
 
-
 /// COV-07c: production quantity is state/remaining bounded; one finish owns one
 /// exact terminal move and one exact destination-quant increment; replay cannot
 /// duplicate either effect.
-pub fn test_production_output_and_finish_exact_effect(
-    ctx: &ReducerContext,
-) -> Result<(), String> {
+pub fn test_production_output_and_finish_exact_effect(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let mo = create_test_production(ctx, &fixture, "COV-07C-OUTPUT-CLOSE")?;
 
-    if produce_manufacturing_order(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        mo.id,
-        1.0,
-    )
-    .is_ok()
+    if produce_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id, 1.0)
+        .is_ok()
     {
         return Err("produce accepted a Draft manufacturing order".to_string());
     }
@@ -1076,14 +1412,8 @@ pub fn test_production_output_and_finish_exact_effect(
     confirm_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
     start_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
 
-    if produce_manufacturing_order(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        mo.id,
-        1.5,
-    )
-    .is_ok()
+    if produce_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id, 1.5)
+        .is_ok()
     {
         return Err("produce accepted quantity above the remaining MO quantity".to_string());
     }
@@ -1100,13 +1430,7 @@ pub fn test_production_output_and_finish_exact_effect(
         return Err("rejected overproduction changed MO quantity/state".to_string());
     }
 
-    produce_manufacturing_order(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        mo.id,
-        1.0,
-    )?;
+    produce_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id, 1.0)?;
 
     let produced = ctx
         .db
@@ -1123,14 +1447,8 @@ pub fn test_production_output_and_finish_exact_effect(
         ));
     }
 
-    if produce_manufacturing_order(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        mo.id,
-        0.1,
-    )
-    .is_ok()
+    if produce_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id, 0.1)
+        .is_ok()
     {
         return Err("produce accepted a second output after ToClose".to_string());
     }
@@ -1158,12 +1476,7 @@ pub fn test_production_output_and_finish_exact_effect(
     let destination_quant_id = destination_candidates_before[0].id;
     let destination_qty_before = destination_candidates_before[0].quantity;
 
-    finish_manufacturing_order(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        mo.id,
-    )?;
+    finish_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id)?;
 
     let finished = ctx
         .db
@@ -1224,14 +1537,7 @@ pub fn test_production_output_and_finish_exact_effect(
         return Err("destination quant did not converge by exact finished quantity".to_string());
     }
 
-    if finish_manufacturing_order(
-        ctx,
-        fixture.organization_id,
-        fixture.company_id,
-        mo.id,
-    )
-    .is_ok()
-    {
+    if finish_manufacturing_order(ctx, fixture.organization_id, fixture.company_id, mo.id).is_ok() {
         return Err("finish replay was accepted after MO reached Done".to_string());
     }
 
@@ -1241,8 +1547,7 @@ pub fn test_production_output_and_finish_exact_effect(
         .id()
         .find(&mo.id)
         .ok_or("MO missing after finish replay")?;
-    if replayed.move_finished_ids != finished.move_finished_ids
-        || replayed.move_finished_count != 1
+    if replayed.move_finished_ids != finished.move_finished_ids || replayed.move_finished_count != 1
     {
         return Err("finish replay changed the owned finished-move set".to_string());
     }
@@ -1261,16 +1566,12 @@ pub fn test_production_output_and_finish_exact_effect(
     Ok(())
 }
 
-
 /// COV-07d: one MO-owned workorder executes through Start → productivity →
 /// Finish with the same exact parent/workcenter/productivity relations.
-pub fn test_workorder_execution_exact_effect(
-    ctx: &ReducerContext,
-) -> Result<(), String> {
+pub fn test_workorder_execution_exact_effect(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
-    let workcenter =
-        create_test_workcenter(ctx, &fixture, "COV-07D Workcenter", true)?;
+    let workcenter = create_test_workcenter(ctx, &fixture, "COV-07D Workcenter", true)?;
     let production = create_test_production(ctx, &fixture, "COV-07D-MO")?;
 
     confirm_manufacturing_order(

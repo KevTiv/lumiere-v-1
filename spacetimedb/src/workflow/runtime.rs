@@ -776,6 +776,9 @@ pub fn cancel_workflow(
         &params.correlation_id,
         params.causation_id,
     );
+    crate::accounting::bank_settlement_lifecycle::synchronize_cancelled_bank_workflow(
+        ctx, updated.id,
+    )?;
     Ok(())
 }
 

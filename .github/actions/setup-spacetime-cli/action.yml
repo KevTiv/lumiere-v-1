@@ -24,7 +24,16 @@ runs:
       run: |
         curl -sSf https://install.spacetimedb.com | sh -s -- -y
         "$HOME/.local/bin/spacetime" version install "${{ inputs.version }}"
-        "$HOME/.local/bin/spacetime" version use "${{ inputs.version }}"
+
+    # The cache contains binaries, while the version manager's selection is
+    # stored separately. A cache hit must still select the requested version.
+    - name: Select pinned spacetime CLI
+      shell: bash
+      env:
+        SPACETIME_CLI_VERSION: ${{ inputs.version }}
+      run: |
+        "$HOME/.local/bin/spacetime" version use "$SPACETIME_CLI_VERSION"
+        "$HOME/.local/bin/spacetime" --version
 
     - name: Add spacetime CLI to PATH
       shell: bash

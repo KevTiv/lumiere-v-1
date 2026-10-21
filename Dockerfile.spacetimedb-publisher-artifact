@@ -1,0 +1,17 @@
+# syntax=docker/dockerfile:1
+# CI supplies the exact-source compiled module; Railway never compiles Rust here.
+FROM debian:bookworm-slim
+ARG SPACETIMEDB_VERSION=2.8.2
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates curl jq \
+  && rm -rf /var/lib/apt/lists/* \
+  && curl -sSf https://install.spacetimedb.com | sh -s -- -y \
+  && /root/.local/bin/spacetime version install "${SPACETIMEDB_VERSION}" \
+  && /root/.local/bin/spacetime version use "${SPACETIMEDB_VERSION}"
+ENV PATH="/root/.local/bin:${PATH}"
+WORKDIR /app
+COPY .ci/contracts-module.wasm /app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm
+COPY scripts/railway-publish-spacetimedb.sh /app/scripts/railway-publish-spacetimedb.sh
+RUN test -s /app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm \
+  && chmod 0755 /app/scripts/railway-publish-spacetimedb.sh
+CMD ["/app/scripts/railway-publish-spacetimedb.sh"]

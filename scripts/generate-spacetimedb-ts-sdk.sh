@@ -55,3 +55,6 @@ fi
 # Keep the committed contract artifact byte-stable across CLI versions that
 # disagree only about extra blank lines at end of file.
 perl -0pi -e 's/\n+\z/\n/' "$INDEX"
+
+# HTTP Option metadata is derived from the same complete generated snapshot.
+python3 "$ROOT/scripts/generate-stdb-http-option-metadata.py" --types "$OUT_DIR/types.ts"

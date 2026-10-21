@@ -10,7 +10,7 @@ import type {
 import type { Timestamp } from "spacetimedb"
 
 import { formValue as field } from "./form-coercion"
-import { stbTimestampFromDate } from "./stb-timestamp"
+import { stbTimestampFromValue } from "./stb-timestamp"
 
 function parseU64(v: unknown, fallback: bigint): bigint {
   if (typeof v === 'bigint' && v >= 0n) return v
@@ -33,10 +33,7 @@ function parseHierarchyLevel(v: unknown, fallback = 2): number {
 }
 
 function timestampFromDateField(v: unknown): Timestamp | null {
-  if (v == null || String(v).trim() === '') return null
-  const d = new Date(String(v))
-  if (Number.isNaN(d.getTime())) return null
-  return stbTimestampFromDate(d)
+  return stbTimestampFromValue(v)
 }
 
 function toReportType(raw: unknown): ReportType {

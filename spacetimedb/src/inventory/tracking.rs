@@ -681,14 +681,13 @@ pub fn reserve_serial(
     organization_id: u64,
     serial_id: u64,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_production_serial", "write")?;
     let serial = ctx
         .db
         .stock_production_serial()
         .id()
         .find(&serial_id)
         .ok_or("Serial not found")?;
-
-    check_permission(ctx, organization_id, "stock_production_serial", "write")?;
 
     if serial.organization_id != organization_id {
         return Err("Serial does not belong to this organization".to_string());
@@ -736,14 +735,13 @@ pub fn use_serial(
     organization_id: u64,
     serial_id: u64,
 ) -> Result<(), String> {
+    check_permission(ctx, organization_id, "stock_production_serial", "write")?;
     let serial = ctx
         .db
         .stock_production_serial()
         .id()
         .find(&serial_id)
         .ok_or("Serial not found")?;
-
-    check_permission(ctx, organization_id, "stock_production_serial", "write")?;
 
     if serial.organization_id != organization_id {
         return Err("Serial does not belong to this organization".to_string());

@@ -5,7 +5,7 @@ type Row = EntityRow
 
 /**
  * Render workflow actions as table toolbar actions. State gating comes from `canPresent`;
- * enabled when any selected row qualifies; dispatch runs `prepare` per qualifying row and hands the result to the action's `execute`.
+ * enabled when any selected row qualifies; dispatch runs `prepare` per qualifying row and hands the result to the action's `execute`, and settles once every row has.
  * Actions without `prepare` (form-backed) are not table-dispatchable and are skipped.
  */
 export function workflowActionsToEntityActions(
@@ -35,13 +35,19 @@ export function workflowActionsToEntityActions(
             ? { title: action.label, ...options.confirmation }
             : undefined,
         requiresSelection: true,
+        selection: "multiple" as const,
         isApplicable: (rows: Row[]) => canPresentToAny(action, rows),
-        onClick: (rows: Row[]) => {
-          for (const row of rows) {
-            if (!action.canPresent(row)) continue
-            action
-              .execute(prepare(row), { navigateToNext: rows.length === 1 })
-              .catch((error: unknown) => options.onError?.(error, action))
+        onClick: async (rows: Row[]) => {
+          const outcomes = await Promise.allSettled(
+            rows
+              .filter((row) => action.canPresent(row))
+              .map((row) => action.execute(prepare(row), { navigateToNext: rows.length === 1 })),
+          )
+          for (const outcome of outcomes) {
+            if (outcome.status !== "rejected") continue
+            // The workflow runner has already told the surface (its `notify` port), so rethrowing
+            // would show the same failure in a second toast. `onError` is for extra handling.
+            options.onError?.(outcome.reason, action)
           }
         },
       },

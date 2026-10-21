@@ -12,10 +12,12 @@ export function decodeIdentityHexFromStdbToken(token: string): string | undefine
     const json = JSON.parse(
       Buffer.from(b64 + pad, 'base64').toString('utf8'),
     ) as Record<string, unknown>
-    const sub = json['sub']
-    if (typeof sub === 'string') return sub.replace(/^0x/i, '')
-    const id = json['identity']
-    if (typeof id === 'string') return id.replace(/^0x/i, '')
+    for (const claim of ['hex_identity', 'identity', 'sub']) {
+      const value = json[claim]
+      if (typeof value !== 'string') continue
+      const normalized = value.replace(/^0x/i, '').toLowerCase()
+      if (/^[0-9a-f]{64}$/.test(normalized)) return normalized
+    }
     return undefined
   } catch {
     return undefined

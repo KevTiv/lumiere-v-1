@@ -4,9 +4,11 @@ import { useRef } from "react"
 import { Download, FileDown } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card"
 import { Button } from "../components/button"
+import { Skeleton } from "../components/skeleton"
 import type { DashboardWidget, WidgetType } from "../lib/dashboard-types"
 import { exportChartToPng } from "../lib/export-dashboard-png"
 import { downloadCsv, widgetDataToCsv } from "../lib/export-csv"
+import type { ReportExportSourceProvenance } from "../lib/report-export-provenance"
 import { KPIWidget } from "./widgets/kpi-widget"
 import { AreaChartWidget } from "./widgets/area-chart-widget"
 import { LineChartWidget } from "./widgets/line-chart-widget"
@@ -25,11 +27,65 @@ import { ActivityRingWidget } from "./widgets/activity-ring-widget"
 import { CountdownWidget } from "./widgets/countdown-widget"
 import { IosTileWidget } from "./widgets/ios-tile-widget"
 import { QuickActionsWidget } from "./widgets/quick-actions-widget"
+import { workspaceStyles } from "../lib/workspace-styles"
+import { TabbedTableWidget } from "./widgets/tabbed-table-widget"
+import { ComboTrendChart } from "../charts/combo-trend-chart"
+import { StepAnomalyChart } from "../charts/step-anomaly-chart"
+import { RankedBarList } from "../charts/ranked-bar-list"
+import { SegmentedShareBar } from "../charts/segmented-share-bar"
+import { RadialGauge } from "../charts/radial-gauge"
 
 interface WidgetRendererProps {
   widget: DashboardWidget
   widthClass: string
   testId?: string
+  /** While the module's data loads, show a placeholder instead of zeros. */
+  isLoading?: boolean
+  exportProvenance?: ReportExportSourceProvenance
+  /** Domain-specific wording for legitimate zero-valued series. */
+  emptyMessage?: string
+}
+
+/** A chart with no points, or only zero values, renders as an empty frame. */
+function chartIsEmpty(widget: DashboardWidget): boolean {
+  switch (widget.type) {
+    case "area-chart":
+    case "line-chart":
+    case "bar-chart": {
+      const names = widget.data.series.map((series) => series.name)
+      return !widget.data.values.some((point) =>
+        names.some((name) => Number(point[name] ?? 0) !== 0),
+      )
+    }
+    case "funnel-chart":
+      return !widget.data.stages.some((stage) => stage.value !== 0)
+    case "combo-chart": {
+      const keys = [...widget.data.bars.map((bar) => bar.key), widget.data.line.key]
+      return !widget.data.values.some((point) => keys.some((key) => Number(point[key] ?? 0) !== 0))
+    }
+    case "step-chart":
+      return !widget.data.values.some((point) => Number(point[widget.data.series.key] ?? 0) !== 0)
+    case "ranked-bars":
+      return !widget.data.items.some((item) => item.value > 0)
+    case "share-bar":
+      return !widget.data.rows.some((row) => Object.values(row.values).some((value) => value > 0))
+    case "radial-gauge":
+      return !(widget.data.max > 0)
+    default:
+      return false
+  }
+}
+
+/** The widget's own empty-state wording, when it sets one. */
+function emptyLabelOf(widget: DashboardWidget): string | undefined {
+  switch (widget.type) {
+    case "donut-chart":
+    case "ranked-bars":
+    case "share-bar":
+      return widget.data.emptyLabel
+    default:
+      return undefined
+  }
 }
 
 const CHART_WIDGET_TYPES = new Set<WidgetType>([
@@ -38,16 +94,51 @@ const CHART_WIDGET_TYPES = new Set<WidgetType>([
   "bar-chart",
   "donut-chart",
   "funnel-chart",
+  "combo-chart",
+  "step-chart",
+  "ranked-bars",
+  "share-bar",
+  "radial-gauge",
 ])
 
-export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRendererProps) {
+export function DashboardWidgetRenderer({ widget, widthClass, testId, isLoading = false, exportProvenance, emptyMessage }: WidgetRendererProps) {
   const chartRef = useRef<HTMLDivElement>(null)
   const useCard = widget.useCard !== false
   const isChart = CHART_WIDGET_TYPES.has(widget.type)
-  const canExportCsv = isChart || widget.type === "table"
+  const canExportCsv = (isChart && widget.type !== "radial-gauge") || widget.type === "table" || widget.type === "tabbed-table"
 
   const renderContent = () => {
+    if (isLoading && widget.type !== "quick-actions" && widget.type !== "custom") {
+      return (
+        <Skeleton
+          className={isChart ? "h-56 w-full" : "h-16 w-full"}
+          data-testid={testId ? `${testId}-loading` : undefined}
+        />
+      )
+    }
+    if (isChart && chartIsEmpty(widget)) {
+      return (
+        <div className="flex h-56 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+          {emptyMessage ?? emptyLabelOf(widget) ?? "No data for this period yet."}
+        </div>
+      )
+    }
     switch (widget.type) {
+      case "diagnostic":
+        return (
+          <div
+            className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive"
+            role="alert"
+            data-testid="dashboard-widget-diagnostic"
+          >
+            <p>{widget.data.message}</p>
+            {widget.data.rejectedRows != null ? (
+              <p className="text-xs">
+                {widget.data.rejectedRows} source {widget.data.rejectedRows === 1 ? "row was" : "rows were"} rejected.
+              </p>
+            ) : null}
+          </div>
+        )
       case "kpi":
         return <KPIWidget data={widget.data} />
       case "area-chart":
@@ -84,6 +175,18 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
         return <IosTileWidget data={widget.data} />
       case "quick-actions":
         return <QuickActionsWidget data={widget.data} />
+      case "combo-chart":
+        return <ComboTrendChart {...widget.data} />
+      case "step-chart":
+        return <StepAnomalyChart {...widget.data} />
+      case "ranked-bars":
+        return <RankedBarList {...widget.data} />
+      case "share-bar":
+        return <SegmentedShareBar {...widget.data} />
+      case "radial-gauge":
+        return <RadialGauge {...widget.data} />
+      case "tabbed-table":
+        return <TabbedTableWidget data={widget.data} />
       case "custom": {
         const CustomComponent = widget.component
         return <CustomComponent data={widget.data} />
@@ -95,11 +198,11 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
 
   const handleChartExport = async () => {
     if (!chartRef.current) return
-    await exportChartToPng(chartRef.current, widget.title || widget.id)
+    await exportChartToPng(chartRef.current, widget.title || widget.id, exportProvenance)
   }
 
   const handleCsvExport = () => {
-    const csv = widgetDataToCsv(widget)
+    const csv = widgetDataToCsv(widget, exportProvenance)
     if (csv !== null) downloadCsv(widget.title || widget.id, csv)
   }
 
@@ -137,7 +240,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
       <div className={widthClass} data-testid={testId}>
         <div className="mb-3 flex items-center justify-between gap-2">
           {widget.title ? (
-            <h3 className="text-sm font-medium text-muted-foreground">{widget.title}</h3>
+            <h3 className={workspaceStyles.sectionTitle}>{widget.title}</h3>
           ) : (
             <span />
           )}
@@ -154,7 +257,7 @@ export function DashboardWidgetRenderer({ widget, widthClass, testId }: WidgetRe
     <div className={widthClass} data-testid={testId}>
       <Card className="h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
-          <CardTitle className="text-sm font-semibold">{widget.title}</CardTitle>
+          <CardTitle className={workspaceStyles.sectionTitle}>{widget.title}</CardTitle>
           {isChart || canExportCsv ? (
             <div className="flex shrink-0 items-center gap-1">{exportButtons}</div>
           ) : null}

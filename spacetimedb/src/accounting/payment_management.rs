@@ -457,6 +457,7 @@ fn post_ledger_payment(
         company_id,
         name: None,
         move_id: None,
+        reversal_move_id: None,
         payment_type,
         partner_type: transaction.partner_type.clone(),
         partner_id: transaction.partner_id,
@@ -1782,6 +1783,13 @@ pub fn allocate_payment_transaction(
     {
         return Err("payment transaction does not match organization and company".to_string());
     }
+    if let Some(payment_id) = transaction.account_payment_id {
+        crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
+            ctx,
+            organization_id,
+            payment_id,
+        )?;
+    }
     let payload_fingerprint = format!("{params:?}");
     if replayed_result(
         ctx,
@@ -2241,6 +2249,11 @@ pub fn reverse_payment_transaction_impl(
     let original_account_payment_id = original
         .account_payment_id
         .ok_or("Original transaction has no linked ledger payment")?;
+    crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
+        ctx,
+        organization_id,
+        original_account_payment_id,
+    )?;
 
     let account = ctx
         .db

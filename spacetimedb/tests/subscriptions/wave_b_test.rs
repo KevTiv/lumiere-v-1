@@ -701,23 +701,24 @@ pub fn test_pay_subscription_invoice_clears_residual(ctx: &ReducerContext) -> Re
     let (bank_journal_id, bank_account_id) =
         crate::accounting_tests::helpers::seed_bank_journal(ctx, &fixture)?;
 
+    let payment_params = ApplySubscriptionInvoicePaymentParams {
+        invoice_move_id,
+        payment_journal_id: bank_journal_id,
+        bank_account_id,
+        receivable_account_id: ar_id,
+        amount: None,
+        payment_date: None,
+        cogs_account_id: income_id,
+        inventory_account_id: income_id,
+        ref_: Some(format!("SUB-PAY-REF-{sub_id}")),
+        memo: Some("Wave B pay".into()),
+    };
     pay_subscription_invoice(
         ctx,
         org_id,
         company_id,
         sub_id,
-        ApplySubscriptionInvoicePaymentParams {
-            invoice_move_id,
-            payment_journal_id: bank_journal_id,
-            bank_account_id,
-            receivable_account_id: ar_id,
-            amount: None,
-            payment_date: None,
-            cogs_account_id: income_id,
-            inventory_account_id: income_id,
-            ref_: Some(format!("SUB-PAY-REF-{sub_id}")),
-            memo: Some("Wave B pay".into()),
-        },
+        payment_params.clone(),
     )?;
 
     let inv = ctx
@@ -737,6 +738,38 @@ pub fn test_pay_subscription_invoice_clears_residual(ctx: &ReducerContext) -> Re
             "invoice residual should be ~0 after pay, got {}",
             inv.amount_residual
         ));
+    }
+    let paid_state = inv.payment_state.clone();
+    let paid_write_date = inv.write_date;
+    match pay_subscription_invoice(
+        ctx,
+        org_id,
+        company_id,
+        sub_id,
+        payment_params,
+    ) {
+        Err(error)
+            if error.contains("paid")
+                || error.contains("residual")
+                || error.contains("payment") => {}
+        Err(error) => {
+            return Err(format!(
+                "unexpected subscription-payment replay error: {error}"
+            ))
+        }
+        Ok(()) => return Err("subscription-payment replay unexpectedly succeeded".into()),
+    }
+    let replayed = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&invoice_move_id)
+        .ok_or("invoice after payment replay")?;
+    if replayed.payment_state != paid_state
+        || replayed.amount_residual.abs() > 0.01
+        || replayed.write_date != paid_write_date
+    {
+        return Err("subscription-payment replay changed the canonical invoice".into());
     }
 
     Ok(())

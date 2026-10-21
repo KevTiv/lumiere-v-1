@@ -7,6 +7,10 @@ export interface Timestamp {
 
 export interface AccountMove {
   id: bigint | number | string
+  /** Read projections must retain explicit scope; missing scope is not the active company. */
+  organizationId?: bigint | number | string
+  companyId?: bigint | number | string
+  currencyId?: bigint | number | string
   name?: string | null
   state?: unknown          // stringified: "Draft" | "Posted" | "Cancelled"
   paymentState?: unknown   // stringified: "Paid" | "InPayment" | "Partial" | "NotPaid"

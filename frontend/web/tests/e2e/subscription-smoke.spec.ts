@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   expectNoAppError,
   fillField,
   gotoModule,
@@ -24,7 +25,7 @@ test.describe("STDB subscription cache", { tag: "@phase-11" }, () => {
     })
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-contacts").click()
+    await selectModuleTab(page, "crm", "contacts")
     await waitForBffQueryMinRows(page, "/api/query/contacts")
 
     await page.getByTestId("module-create-crm-contacts").click()

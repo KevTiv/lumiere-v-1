@@ -120,13 +120,26 @@ def verify_contract(root: Path, manifest: dict[str, Any], contracts: Path) -> No
     require(contract_version_file.read_text(encoding="utf-8").strip() == version, "CONTRACT_VERSION does not match manifest")
 
     lock_path = root / "Cargo.lock"
-    require(lock_path.is_file(), "Cargo.lock is required to bind the immutable contract revision")
+    require(lock_path.is_file(), "Cargo.lock is required")
     lock = lock_path.read_text(encoding="utf-8")
-    package_match = re.search(r'(?ms)^\[\[package\]\]\s+name = "lumiere-contracts"\s+version = "([^"]+)"\s+source = "([^"]+)"', lock)
+    package_match = re.search(
+        r'(?ms)^\[\[package\]\]\s+name = "lumiere-contracts"\s+version = "([^"]+)"(?=\s)',
+        lock,
+    )
     require(package_match is not None, "Cargo.lock has no lumiere-contracts package entry")
-    locked_version, locked_source = package_match.groups()
-    require(locked_version == version, "Cargo.lock lumiere-contracts version does not match manifest")
-    require(f"?tag={tag}#{revision}" in locked_source, "Cargo.lock does not pin the manifest tag and immutable revision")
+    require(package_match.group(1) == version, "Cargo.lock lumiere-contracts version does not match manifest")
+
+    archive = root / "vendor" / f"lumiere-contracts-rust-{version}.tar.gz"
+    checksum_file = root / "vendor" / f"lumiere-contracts-rust-{version}.sha256"
+    require(archive.is_file(), "vendored lumiere-contracts archive is missing")
+    require(checksum_file.is_file(), "vendored lumiere-contracts checksum is missing")
+    checksum_fields = checksum_file.read_text(encoding="utf-8").strip().split()
+    require(
+        len(checksum_fields) == 2
+        and checksum_fields[0] == sha256(archive)
+        and checksum_fields[1] == archive.name,
+        "vendored lumiere-contracts archive checksum does not match",
+    )
 
 
 def verify_operation_history(root: Path, contracts: Path, manifest: dict[str, Any]) -> None:
@@ -228,6 +241,44 @@ def verify_pg(root: Path, contracts: Path, manifest: dict[str, Any]) -> None:
     ]
     require(versions == list(range(1, catalog_version + 1)), "application PostgreSQL migration catalog version does not match manifest")
 
+    # Releases that freeze migration 1 list every durable migration they ship.
+    # Releases before the migration ledger have no such list.
+    durable_migrations = schema.get("migrations")
+    if durable_migrations is not None:
+        require(
+            isinstance(durable_migrations, list) and durable_migrations,
+            "durable PG schema manifest migrations must be a non-empty list",
+        )
+        first = durable_migrations[0]
+        require(
+            isinstance(first, dict)
+            and first.get("version") == migration.get("version")
+            and first.get("checksum") == digest,
+            "durable PG schema manifest baseline migration does not match the release manifest",
+        )
+        previous_version = 0
+        for entry in durable_migrations:
+            require(isinstance(entry, dict), "durable PG migration entry must be an object")
+            version = entry.get("version")
+            require(
+                isinstance(version, int) and version > previous_version,
+                "durable PG migrations must have strictly increasing versions",
+            )
+            previous_version = version
+            require(
+                entry.get("state") == "released",
+                f"durable PG migration {version} is still pending; promote it into lumiere-codegen/pg-migration-ledger",
+            )
+            entry_path = relative_path(contracts, entry.get("sql_file"), f"durable PG migration {version} sql_file")
+            require(
+                entry.get("checksum") == f"sha256:{sha256(entry_path)}",
+                f"durable PG migration {version} checksum does not match its SQL",
+            )
+            require(
+                version in versions,
+                f"durable PG migration {version} is missing from the application migration catalog",
+            )
+
 
 def verify_services(root: Path, manifest: dict[str, Any]) -> None:
     services = object_field(manifest, "services", dict)
@@ -281,7 +332,7 @@ def resolve_contracts_checkout(root: Path) -> Path:
         result = subprocess.run(["bash", str(resolver)], cwd=root, capture_output=True, text=True, check=False)
     except OSError as error:
         fail(f"could not resolve lumiere-contracts checkout: {error}")
-    require(result.returncode == 0 and result.stdout.strip(), "could not resolve the fetched lumiere-contracts checkout")
+    require(result.returncode == 0 and result.stdout.strip(), "could not resolve the vendored lumiere-contracts release")
     return Path(result.stdout.strip()).resolve()
 
 

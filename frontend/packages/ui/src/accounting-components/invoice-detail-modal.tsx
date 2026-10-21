@@ -1,61 +1,41 @@
 "use client"
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-  TableFooter,
-} from "@/components/ui/table"
-import {
-  Send,
-  Download,
-  Printer,
-  DollarSign,
-  Building,
-  FileText,
-  Clock,
-  CheckCircle2,
-  Calculator,
-} from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Archive, ArrowRight, Calculator, CheckCircle2, Clock, Download, FileText, MoreHorizontal, Send } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { invoiceStatusBadgeClass } from "../lib/theme-colors"
 import type { AccountMove } from "../lib/accounting-types"
 import { microsSinceEpochToDate, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { useTranslation } from "@lumiere/i18n"
+import { formatInvoiceMoney, InvoiceDocument, readInvoiceDocumentContent } from "./invoice-document"
+import type { InvoiceDocumentSnapshot } from "@lumiere/erp-shared/invoice-personalization"
+import type { ModuleDataState } from "../lib/module-data-state"
+import { ModuleDataNotice } from "../pages/module-data-notice"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null, long = false): string {
   if (!ts) return "—"
-  const ms = Number(ts.microsSinceUnixEpoch) / 1000
-  return new Date(ms).toLocaleDateString("en-US", long
+  return new Date(Number(ts.microsSinceUnixEpoch) / 1000).toLocaleDateString(undefined, long
     ? { month: "long", day: "numeric", year: "numeric" }
-    : { month: "short", day: "numeric", year: "numeric" }
-  )
+    : { month: "short", day: "numeric", year: "numeric" })
 }
 
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount)
-
 function moveStateStr(state: unknown): string {
-  if (state != null && typeof state === "object" && "tag" in state) {
-    return String((state as { tag: string }).tag)
-  }
+  if (state != null && typeof state === "object" && "tag" in state) return String((state as { tag: string }).tag)
   return String(state ?? "")
 }
 
 interface InvoiceDetailModalProps {
-  invoice: AccountMove | null
+  invoice: (AccountMove & { metadata?: string | null }) | null
   open: boolean
   onClose: () => void
+  currencyCode?: string
+  currencyId?: string
+  draftPersonalization?: InvoiceDocumentSnapshot | null
+  draftPersonalizationState?: ModuleDataState
+  organizationId?: number
   onPostDraft?: () => void
   onCreateCreditNote?: () => void
   onRecordPayment?: () => void
@@ -71,289 +51,61 @@ interface InvoiceDetailModalProps {
   sendEmailPending?: boolean
 }
 
-export function InvoiceDetailModal({
-  invoice,
-  open,
-  onClose,
-  onPostDraft,
-  onCreateCreditNote,
-  onRecordPayment,
-  onRecalculateTotals,
-  onDownloadPdf,
-  onArchivePdf,
-  onSendEmail,
-  postDraftPending,
-  recordPaymentPending,
-  recalculateTotalsPending,
-  downloadPdfPending,
-  archivePdfPending,
-  sendEmailPending,
-}: InvoiceDetailModalProps) {
+export function InvoiceDetailModal({ invoice, open, onClose, currencyCode, currencyId, draftPersonalization, draftPersonalizationState, organizationId, onPostDraft, onCreateCreditNote, onRecordPayment, onRecalculateTotals, onDownloadPdf, onArchivePdf, onSendEmail, postDraftPending, recordPaymentPending, recalculateTotalsPending, downloadPdfPending, archivePdfPending, sendEmailPending }: InvoiceDetailModalProps) {
   const { t } = useTranslation()
-
-  const getStatusBadge = (move: AccountMove) => {
-    const state = moveStateStr(move.state)
-    const paymentState = moveStateStr(move.paymentState)
-    if (state === "Cancelled") {
-      return { label: t("accounting.states.cancelled"), cls: invoiceStatusBadgeClass.cancelled }
-    }
-    if (state === "Draft") {
-      return { label: t("accounting.states.draft"), cls: invoiceStatusBadgeClass.draft }
-    }
-    if (paymentState === "Paid") {
-      return { label: t("accounting.states.paid"), cls: invoiceStatusBadgeClass.paid }
-    }
-    if ((move.amountResidual ?? 0) > 0 && move.invoiceDateDue) {
-      const due = microsSinceEpochToDate(move.invoiceDateDue)
-      if (due != null && due < new Date()) {
-        return { label: t("accounting.states.overdue"), cls: invoiceStatusBadgeClass.overdue }
-      }
-    }
-    if (paymentState === "InPayment") {
-      return { label: t("accounting.states.partial"), cls: invoiceStatusBadgeClass.partial }
-    }
-    return { label: t("accounting.states.sent"), cls: invoiceStatusBadgeClass.sent }
-  }
-
   if (!invoice) return null
+  const state = moveStateStr(invoice.state)
+  const paymentState = moveStateStr(invoice.paymentState)
+  const isDraft = state === "Draft"
+  const isPosted = state === "Posted"
+  const moveType = moveStateStr(invoice.moveType)
+  const isBill = moveType === "InInvoice" || moveType === "InRefund"
+  const outgoing = moveType === "OutInvoice" || moveType === "OutRefund"
+  const documentContent = readInvoiceDocumentContent(invoice.metadata, organizationId, outgoing)
+  const personalization = outgoing && isDraft && draftPersonalization ? draftPersonalization : documentContent.personalization
+  const draftProfileReady = !outgoing || draftPersonalizationState == null || draftPersonalizationState.status === "ready"
+  const due = microsSinceEpochToDate(invoice.invoiceDateDue)
+  const daysUntilDue = due ? Math.ceil((due.getTime() - Date.now()) / 86_400_000) : null
+  const balance = invoice.amountResidual ?? 0
+  const currency = { code: currencyCode, id: currencyId }
+  const money = (value: number | null | undefined) => formatInvoiceMoney(value, currency)
+  const paid = invoice.amountTotal != null && invoice.amountResidual != null
+    ? invoice.amountTotal - invoice.amountResidual : null
+  const canRecordPayment = Boolean(onRecordPayment) && isPosted && balance > 0
+  const canCreateCreditNote = Boolean(onCreateCreditNote) && isPosted && moveType === "OutInvoice"
+  const status = state === "Cancelled" ? "cancelled" : isDraft ? "draft" : paymentState === "Paid" ? "paid"
+    : balance > 0 && daysUntilDue !== null && daysUntilDue < 0 ? "overdue" : paymentState === "InPayment" || paymentState === "Partial" ? "partial" : "sent"
+  const hasMoreActions = Boolean(onSendEmail || onArchivePdf || (isDraft && moveTypeIsInvoiceOrRefund(invoice.moveType) && onRecalculateTotals))
 
-  const { label, cls } = getStatusBadge(invoice)
-  const stateStr = moveStateStr(invoice.state)
-  const isDraft = stateStr === "Draft"
-  const isPosted = stateStr === "Posted"
-  const moveType =
-    invoice.moveType != null && typeof invoice.moveType === "object" && "tag" in invoice.moveType
-      ? String((invoice.moveType as { tag: string }).tag)
-      : String(invoice.moveType ?? "")
-  const canCreateCreditNote =
-    Boolean(onCreateCreditNote) && isPosted && moveType === "OutInvoice"
-  const canRecordPayment =
-    Boolean(onRecordPayment) && isPosted && (invoice.amountResidual ?? 0) > 0
-
-  const getDaysUntilDue = () => {
-    const due = microsSinceEpochToDate(invoice.invoiceDateDue)
-    if (due == null) return null
-    return Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-  }
-  const daysUntilDue = getDaysUntilDue()
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="invoice-detail-modal">
-        <DialogHeader className="pb-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <DialogTitle className="text-2xl">{invoice.name}</DialogTitle>
-              <p className="text-muted-foreground mt-1">{invoice.invoicePartnerDisplayName ?? `Partner #${invoice.partnerId}`}</p>
-            </div>
-            <Badge className={cn("text-sm", cls)}>{label}</Badge>
-          </div>
-        </DialogHeader>
-
-        {/* Quick Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              type="button"
-              disabled={!onSendEmail || sendEmailPending}
-              onClick={() => onSendEmail?.()}
-            >
-              <Send className="h-4 w-4" />{t("accounting.invoices.invoiceActions.send")}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              type="button"
-              disabled={!onDownloadPdf || downloadPdfPending}
-              onClick={() => onDownloadPdf?.()}
-            >
-              <Download className="h-4 w-4" />{t("accounting.invoices.invoiceActions.download")}
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2" type="button" disabled={!onDownloadPdf || downloadPdfPending} onClick={() => onDownloadPdf?.()}>
-              <Printer className="h-4 w-4" />{t("accounting.invoices.invoiceActions.print")}
-            </Button>
-            {onArchivePdf ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                type="button"
-                disabled={archivePdfPending}
-                onClick={() => onArchivePdf()}
-              >
-                Archive to Documents
-              </Button>
-            ) : null}
-            {isDraft &&
-              moveTypeIsInvoiceOrRefund(invoice.moveType) &&
-              onRecalculateTotals && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  disabled={recalculateTotalsPending}
-                  onClick={() => onRecalculateTotals()}
-                >
-                  <Calculator className="h-4 w-4" />
-                  {t("accounting.invoices.invoiceActions.recalculateTotals")}
-                </Button>
-              )}
-            {isDraft && onPostDraft && (
-              <Button
-                type="button"
-                size="sm"
-                className="gap-2"
-                data-testid="invoice-detail-post-draft"
-                disabled={postDraftPending}
-                onClick={() => onPostDraft()}
-              >
-                {t("accounting.invoices.invoiceActions.postDraft")}
-              </Button>
-            )}
-            {canCreateCreditNote && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                data-testid="invoice-detail-create-credit-note"
-                onClick={() => onCreateCreditNote?.()}
-              >
-                {t("accounting.invoices.invoiceActions.createCreditNote")}
-              </Button>
-            )}
-          </div>
-          {canRecordPayment && (
-            <Button
-              type="button"
-              size="sm"
-              className="gap-2"
-              disabled={recordPaymentPending}
-              onClick={() => onRecordPayment?.()}
-            >
-              <DollarSign className="h-4 w-4" />{t("accounting.invoices.invoiceActions.recordPayment")}
-            </Button>
-          )}
-        </div>
-
-        <div className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card><CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-info/10"><DollarSign className="h-5 w-5 text-info" /></div>
-                <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.totalAmount")}</p><p className="text-xl font-bold">{formatCurrency(invoice.amountTotal ?? 0)}</p></div>
-              </div>
-            </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-success/10"><CheckCircle2 className="h-5 w-5 text-success" /></div>
-                <div><p className="text-sm text-muted-foreground">{t("accounting.invoices.amountPaid")}</p><p className="text-xl font-bold text-success">{formatCurrency((invoice.amountTotal ?? 0) - (invoice.amountResidual ?? 0))}</p></div>
-              </div>
-            </CardContent></Card>
-            <Card><CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className={cn("p-2 rounded-lg", (invoice.amountResidual ?? 0) > 0 ? "bg-warning/10" : "bg-muted")}>
-                  <Clock className={cn("h-5 w-5", (invoice.amountResidual ?? 0) > 0 ? "text-warning" : "text-muted-foreground")} />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{t("accounting.invoices.balanceDue")}</p>
-                  <p className={cn("text-xl font-bold", (invoice.amountResidual ?? 0) > 0 ? "text-warning" : "text-muted-foreground")}>
-                    {formatCurrency(invoice.amountResidual ?? 0)}
-                  </p>
-                </div>
-              </div>
-            </CardContent></Card>
-          </div>
-
-          {/* Partner & Dates */}
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.billTo")}</h4>
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <Building className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="font-medium">{invoice.invoicePartnerDisplayName ?? `Partner #${invoice.partnerId}`}</p>
-                  {invoice.ref && <p className="text-sm text-muted-foreground">Ref: {invoice.ref}</p>}
-                </div>
-              </div>
-            </div>
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.dates")}</h4>
-              <div className="space-y-3 p-4 rounded-lg bg-muted/50">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{t("accounting.invoices.issueDate")}</span>
-                  <span className="font-medium">{formatTimestamp(invoice.invoiceDate, true)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">{t("accounting.invoices.dueDate")}</span>
-                  <span className="font-medium">{formatTimestamp(invoice.invoiceDateDue, true)}</span>
-                </div>
-                {(invoice.amountResidual ?? 0) > 0 && daysUntilDue !== null && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">{t("accounting.invoices.daysUntilDue")}</span>
-                    <Badge variant={daysUntilDue < 0 ? "destructive" : daysUntilDue <= 7 ? "default" : "secondary"}>
-                      {daysUntilDue < 0
-                        ? t("accounting.invoices.daysOverdue", { count: Math.abs(daysUntilDue) })
-                        : t("accounting.invoices.daysRemaining", { count: daysUntilDue })}
-                    </Badge>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Amounts breakdown */}
-          <div>
-            <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.amounts")}</h4>
-            <div className="border rounded-lg">
-              <Table>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="text-muted-foreground">{t("accounting.invoices.subtotalExclTax")}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(invoice.amountUntaxed ?? 0)}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-muted-foreground">{t("accounting.forms.newInvoice.summary.tax")}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(invoice.amountTax ?? 0)}</TableCell>
-                  </TableRow>
-                </TableBody>
-                <TableFooter>
-                  <TableRow className="bg-muted/50">
-                    <TableCell className="font-bold">{t("accounting.forms.newInvoice.summary.total")}</TableCell>
-                    <TableCell className="text-right font-bold text-lg">{formatCurrency(invoice.amountTotal ?? 0)}</TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
-            </div>
-          </div>
-
-          {/* Notes / Narration */}
-          {invoice.invoiceOrigin && (
-            <div>
-              <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.origin")}</h4>
-              <p className="text-sm p-3 rounded-lg bg-muted/50">{invoice.invoiceOrigin}</p>
-            </div>
-          )}
-
-          {/* Activity */}
-          <div>
-            <h4 className="text-sm font-medium text-muted-foreground mb-2">{t("accounting.invoices.activity")}</h4>
-            <div className="flex items-start gap-4 p-4 rounded-lg bg-muted/50">
-              <div className="p-2 rounded-full bg-info/10"><FileText className="h-4 w-4 text-info" /></div>
-              <div>
-                <p className="font-medium">{t("accounting.invoices.invoiceCreated")}</p>
-                <p className="text-sm text-muted-foreground">{t("accounting.invoices.createdOn", { date: formatTimestamp(invoice.createDate) })}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
+  return <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+    <DialogContent className="flex max-h-[94dvh] max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-6xl" data-testid="invoice-detail-modal">
+      <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 sm:px-6">
+        <div className="flex flex-wrap items-center gap-3"><DialogTitle className="break-words text-xl font-semibold tracking-tight">{invoice.name || (isBill ? "Vendor bill" : "Invoice")}</DialogTitle><Badge className={invoiceStatusBadgeClass[status]}>{t(`accounting.states.${status}`)}</Badge></div>
+        <DialogDescription>{invoice.invoicePartnerDisplayName ?? `Partner #${invoice.partnerId}`}</DialogDescription>
+      </DialogHeader>
+      <div className="grid min-h-0 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 bg-muted/30 p-4 sm:p-6">{isDraft && outgoing ? <><ModuleDataNotice state={draftPersonalizationState} /><p className="mb-3 text-xs text-muted-foreground">Posting captures the latest company invoice settings shown in this review.</p></> : null}<InvoiceDocument title={isBill ? "Vendor bill" : moveType === "OutRefund" ? "Credit note" : "Invoice"} reference={invoice.name} partnerLabel={isBill ? "Vendor" : t("accounting.invoices.billTo")} partner={invoice.invoicePartnerDisplayName ?? `Partner #${invoice.partnerId}`} date={formatTimestamp(invoice.invoiceDate, true)} dueDate={formatTimestamp(invoice.invoiceDateDue, true)} currency={currency} subtotal={invoice.amountUntaxed ?? null} tax={invoice.amountTax ?? null} total={invoice.amountTotal ?? null} personalization={personalization} notes={documentContent.notes} personalizationError={documentContent.personalizationError} draft={isDraft} />{invoice.ref ? <p className="mt-3 break-words text-xs text-muted-foreground">Reference: {invoice.ref}</p> : null}</div>
+        <aside className="order-first space-y-6 border-b p-5 lg:order-none lg:border-b-0 lg:border-l lg:p-6">
+          <section>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("accounting.invoices.balanceDue")}</p><p className={cn("mt-2 break-words text-2xl font-semibold tabular-nums", invoice.amountResidual == null ? "text-muted-foreground" : balance > 0 ? "text-foreground" : "text-success")}>{money(invoice.amountResidual)}</p>
+            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground"><CheckCircle2 className="size-4 shrink-0" />{t("accounting.invoices.amountPaid")}: {money(paid)}</div>
+            {balance > 0 && daysUntilDue !== null ? <div className="mt-3 flex items-center gap-2 text-xs"><Clock className="size-4 shrink-0 text-muted-foreground" /><span>{daysUntilDue < 0 ? t("accounting.invoices.daysOverdue", { count: Math.abs(daysUntilDue) }) : t("accounting.invoices.daysRemaining", { count: daysUntilDue })}</span></div> : null}
+          </section>
+          <section className="space-y-3 border-t pt-5"><h3 className="text-sm font-semibold">Next action</h3><p className="text-xs leading-relaxed text-muted-foreground">{isDraft ? "Review the document, then post it to the ledger." : canRecordPayment ? "Record a payment to reduce the outstanding balance." : state === "Cancelled" ? "This document has been cancelled." : invoice.amountResidual != null && balance <= 0 ? "No outstanding balance remains on this document." : "Review this document’s status and available actions."}</p>
+            {isDraft && onPostDraft ? <Button type="button" className="w-full justify-between" data-testid="invoice-detail-post-draft" disabled={postDraftPending || !draftProfileReady || Boolean(documentContent.personalizationError)} onClick={onPostDraft}>{t("accounting.invoices.invoiceActions.postDraft")}<ArrowRight className="size-4" /></Button> : null}
+            {canRecordPayment ? <Button type="button" className="w-full justify-between" disabled={recordPaymentPending} onClick={onRecordPayment}>{t("accounting.invoices.invoiceActions.recordPayment")}<ArrowRight className="size-4" /></Button> : null}
+            {onDownloadPdf ? <Button type="button" variant="outline" className="w-full justify-start gap-2" disabled={downloadPdfPending} onClick={onDownloadPdf}><Download className="size-4" />{t("accounting.invoices.invoiceActions.download")}</Button> : null}
+            {canCreateCreditNote ? <Button type="button" variant="ghost" className="w-full justify-start gap-2" data-testid="invoice-detail-create-credit-note" onClick={onCreateCreditNote}><FileText className="size-4" />{t("accounting.invoices.invoiceActions.createCreditNote")}</Button> : null}
+            {hasMoreActions ? <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" variant="outline" className="w-full justify-between">More actions<MoreHorizontal className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end">
+              {onSendEmail ? <DropdownMenuItem disabled={sendEmailPending} onSelect={onSendEmail}><Send />Review email</DropdownMenuItem> : null}
+              {onArchivePdf ? <DropdownMenuItem disabled={archivePdfPending} onSelect={onArchivePdf}><Archive />Archive to Documents</DropdownMenuItem> : null}
+              {isDraft && moveTypeIsInvoiceOrRefund(invoice.moveType) && onRecalculateTotals ? <DropdownMenuItem disabled={recalculateTotalsPending} onSelect={onRecalculateTotals}><Calculator />{t("accounting.invoices.invoiceActions.recalculateTotals")}</DropdownMenuItem> : null}
+            </DropdownMenuContent></DropdownMenu> : null}
+          </section>
+          {invoice.invoiceOrigin ? <section className="border-t pt-5"><h3 className="text-xs font-medium text-muted-foreground">{t("accounting.invoices.origin")}</h3><p className="mt-2 break-words text-sm">{invoice.invoiceOrigin}</p></section> : null}
+          <section className="border-t pt-5"><h3 className="text-xs font-medium text-muted-foreground">{t("accounting.invoices.activity")}</h3><p className="mt-2 text-sm">{t("accounting.invoices.invoiceCreated")}</p><p className="mt-1 text-xs text-muted-foreground">{t("accounting.invoices.createdOn", { date: formatTimestamp(invoice.createDate) })}</p></section>
+        </aside>
+      </div>
+    </DialogContent>
+  </Dialog>
 }

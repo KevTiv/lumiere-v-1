@@ -11,6 +11,7 @@ export type FieldType =
   | "url"
   | "textarea"
   | "select"
+  | "multiselect"
   | "checkbox"
   | "switch"
   | "radio"
@@ -68,11 +69,19 @@ export interface TextareaField extends BaseField {
 export interface SelectField extends BaseField {
   type: "select"
   defaultValue?: string
+  /** Type to narrow the options: for a list of linked records too long to scroll. */
+  searchable?: boolean
   options: ReadonlyArray<{
     value: string
     label: string
     disabled?: boolean
   }>
+}
+
+export interface MultiSelectField extends BaseField {
+  type: "multiselect"
+  defaultValue?: string[]
+  options: SelectField["options"]
 }
 
 export interface CheckboxField extends BaseField {
@@ -127,6 +136,7 @@ export type FormField =
   | NumberField
   | TextareaField
   | SelectField
+  | MultiSelectField
   | CheckboxField
   | SwitchField
   | RadioField
@@ -163,6 +173,11 @@ export interface FormConfig {
   onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
   onCancel?: () => void
 }
+
+/** Values at the existing dynamic form submission boundary, also used by local previews. */
+export type FormValues = Parameters<NonNullable<FormConfig["onSubmit"]>>[0]
+
+export type FormPreviewRenderer = (values: FormValues) => import("react").ReactNode
 
 export interface AiFormAssistConfig {
   enabled?: boolean

@@ -16,7 +16,16 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use stdb_client::{ReducerCall, StdbClient};
 
-use crate::{harness::audit::PolicyDecision, tools::types::ToolOutput};
+use crate::{
+    harness::{
+        action_draft_bridge::{
+            ActionDraftControlOutcome, ActionDraftRequestIdentity, ActionDraftResolution,
+            ActionDraftWait,
+        },
+        audit::PolicyDecision,
+    },
+    tools::types::ToolOutput,
+};
 
 const MAX_EVIDENCE_RERETRIEVALS: u32 = 2;
 const MAX_GENERATION_REPAIRS: u32 = 2;
@@ -153,6 +162,17 @@ pub(crate) struct GovernedProgramOutcome {
     pub generation_output_tokens: u32,
 }
 
+impl GovernedProgramOutcome {
+    /// Content is releasable only after the governed answer gate completes.
+    /// `final_content` may also retain a protected review candidate for later
+    /// adjudication and must never be used directly by a route.
+    pub(crate) fn released_content(&self) -> Option<&str> {
+        matches!(&self.stop, GovernedProgramStop::Completed)
+            .then(|| self.final_content.as_deref())
+            .flatten()
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 enum NodeValue {
     Json(Value),
@@ -177,8 +197,82 @@ struct PendingApprovalCheckpoint {
     node_id: String,
     capability: String,
     reason: String,
+    #[serde(default)]
+    wait: Option<ActionDraftWait>,
+    /// Kept only to decode checkpoints written before exact wait identity was
+    /// persisted. Legacy checkpoints never auto-resume from this id alone.
+    #[serde(default)]
     draft_id: Option<u64>,
     next_node: String,
+}
+
+fn legacy_approval_migration_error(pending: &PendingApprovalCheckpoint) -> String {
+    let draft = pending
+        .draft_id
+        .map(|draft_id| format!("draft #{draft_id}"))
+        .unwrap_or_else(|| "an unknown draft".to_string());
+    format!(
+        "legacy awaiting-approval checkpoint for {draft} lacks exact request correlation; cancel this run and recreate the request"
+    )
+}
+
+fn legacy_approval_migration_stop(pending: &PendingApprovalCheckpoint) -> GovernedProgramStop {
+    GovernedProgramStop::Denied(legacy_approval_migration_error(pending))
+}
+
+#[cfg(test)]
+mod approval_checkpoint_tests {
+    use super::*;
+
+    #[test]
+    fn exact_wait_identity_survives_checkpoint_restart() {
+        let identity = ActionDraftRequestIdentity::new(7, 8, 41, "request-9").expect("identity");
+        let wait = ActionDraftWait::for_payload(
+            identity,
+            &json!({"capability": "create_sale_order", "arguments": {"company_id": 8}}),
+            73,
+        )
+        .expect("wait");
+        let checkpoint = PendingApprovalCheckpoint {
+            node_id: "approval".to_string(),
+            capability: "create_sale_order".to_string(),
+            reason: "human approval required".to_string(),
+            wait: Some(wait.clone()),
+            draft_id: Some(wait.draft_id),
+            next_node: "complete".to_string(),
+        };
+
+        let encoded = serde_json::to_string(&checkpoint).expect("serialize checkpoint");
+        let restored: PendingApprovalCheckpoint =
+            serde_json::from_str(&encoded).expect("restore checkpoint");
+
+        assert_eq!(restored.wait, Some(wait));
+        assert_eq!(restored.draft_id, Some(73));
+    }
+
+    #[test]
+    fn legacy_draft_id_checkpoint_requires_terminal_cancel_and_recreate() {
+        let restored: PendingApprovalCheckpoint = serde_json::from_value(json!({
+            "node_id": "approval",
+            "capability": "create_sale_order",
+            "reason": "human approval required",
+            "draft_id": 73,
+            "next_node": "complete"
+        }))
+        .expect("decode legacy checkpoint");
+
+        assert!(restored.wait.is_none());
+        assert_eq!(restored.draft_id, Some(73));
+        assert_eq!(
+            legacy_approval_migration_error(&restored),
+            "legacy awaiting-approval checkpoint for draft #73 lacks exact request correlation; cancel this run and recreate the request"
+        );
+        assert!(matches!(
+            legacy_approval_migration_stop(&restored),
+            GovernedProgramStop::Denied(reason)
+                if reason.contains("cancel this run and recreate")
+        ));
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1191,13 +1285,9 @@ impl GovernedProgramExecutor<'_> {
         let max_steps = graph.nodes.len().saturating_mul(16).max(32);
 
         if let Some(pending) = pending_approval {
-            let Some(draft_id) = pending.draft_id else {
+            let Some(wait) = pending.wait else {
                 return Ok(outcome(
-                    GovernedProgramStop::PendingApproval {
-                        capability: pending.capability,
-                        reason: pending.reason,
-                        draft_id: None,
-                    },
+                    legacy_approval_migration_stop(&pending),
                     None,
                     values,
                     trace,
@@ -1205,9 +1295,25 @@ impl GovernedProgramExecutor<'_> {
                     capability_calls,
                 ));
             };
-            match self.capabilities.approval_status(draft_id).await? {
-                super::governed_services::ApprovalStatus::Approved {
-                    execution_record_id,
+            let draft_id = wait.draft_id;
+            let current_identity = ActionDraftRequestIdentity::new(
+                context.organization_id,
+                context.company_id,
+                context.run_id,
+                &wait.identity.request_id,
+            )
+            .context("build current approval resume identity")?;
+            match self
+                .capabilities
+                .approval_status(&wait, &current_identity)
+                .await?
+            {
+                ActionDraftControlOutcome::Resume {
+                    resolution:
+                        ActionDraftResolution::Approved {
+                            execution_record_id,
+                        },
+                    ..
                 } => {
                     values.insert(
                         pending.node_id.clone(),
@@ -1233,7 +1339,11 @@ impl GovernedProgramExecutor<'_> {
                     });
                     current = pending.next_node;
                 }
-                super::governed_services::ApprovalStatus::Pending => {
+                ActionDraftControlOutcome::Wait { .. }
+                | ActionDraftControlOutcome::Resume {
+                    resolution: ActionDraftResolution::Pending,
+                    ..
+                } => {
                     return Ok(outcome(
                         GovernedProgramStop::PendingApproval {
                             capability: pending.capability,
@@ -1247,7 +1357,10 @@ impl GovernedProgramExecutor<'_> {
                         capability_calls,
                     ));
                 }
-                super::governed_services::ApprovalStatus::Rejected(reason) => {
+                ActionDraftControlOutcome::Resume {
+                    resolution: ActionDraftResolution::Rejected { reason },
+                    ..
+                } => {
                     return Ok(outcome(
                         GovernedProgramStop::Denied(reason),
                         None,
@@ -1542,7 +1655,8 @@ impl GovernedProgramExecutor<'_> {
                                     node_id: node.id.clone(),
                                     capability: request.capability.clone(),
                                     reason: request.reason.clone(),
-                                    draft_id: request.draft_id,
+                                    wait: request.wait.clone(),
+                                    draft_id: request.draft_id(),
                                     next_node,
                                 }),
                                 "awaiting_approval",
@@ -1550,9 +1664,9 @@ impl GovernedProgramExecutor<'_> {
                             .await?;
                             return Ok(outcome(
                                 GovernedProgramStop::PendingApproval {
+                                    draft_id: request.draft_id(),
                                     capability: request.capability,
                                     reason: request.reason,
-                                    draft_id: request.draft_id,
                                 },
                                 None,
                                 values,
@@ -1661,7 +1775,8 @@ impl GovernedProgramExecutor<'_> {
                                     node_id: node.id.clone(),
                                     capability: request.capability.clone(),
                                     reason: request.reason.clone(),
-                                    draft_id: request.draft_id,
+                                    wait: request.wait.clone(),
+                                    draft_id: request.draft_id(),
                                     next_node,
                                 }),
                                 "awaiting_approval",
@@ -1669,9 +1784,9 @@ impl GovernedProgramExecutor<'_> {
                             .await?;
                             return Ok(outcome(
                                 GovernedProgramStop::PendingApproval {
+                                    draft_id: request.draft_id(),
                                     capability: request.capability,
                                     reason: request.reason,
-                                    draft_id: request.draft_id,
                                 },
                                 None,
                                 values,
@@ -1993,7 +2108,8 @@ impl GovernedProgramExecutor<'_> {
                                             node_id: node.id.clone(),
                                             capability: request.capability.clone(),
                                             reason: request.reason.clone(),
-                                            draft_id: request.draft_id,
+                                            wait: request.wait.clone(),
+                                            draft_id: request.draft_id(),
                                             next_node,
                                         }),
                                         "awaiting_approval",
@@ -2001,9 +2117,9 @@ impl GovernedProgramExecutor<'_> {
                                     .await?;
                                     return Ok(outcome(
                                         GovernedProgramStop::PendingApproval {
+                                            draft_id: request.draft_id(),
                                             capability: request.capability,
                                             reason: request.reason,
-                                            draft_id: request.draft_id,
                                         },
                                         None,
                                         values,
@@ -2257,7 +2373,8 @@ impl GovernedProgramExecutor<'_> {
                         node_id: node.id.clone(),
                         capability: request.capability.clone(),
                         reason: request.reason.clone(),
-                        draft_id: request.draft_id,
+                        wait: request.wait.clone(),
+                        draft_id: request.draft_id(),
                         next_node,
                     };
                     self.checkpoint(
@@ -2278,9 +2395,9 @@ impl GovernedProgramExecutor<'_> {
                     .await?;
                     return Ok(outcome(
                         GovernedProgramStop::PendingApproval {
+                            draft_id: request.draft_id(),
                             capability: request.capability,
                             reason: request.reason,
-                            draft_id: request.draft_id,
                         },
                         None,
                         values,
@@ -3844,7 +3961,7 @@ mod threshold_gate_tests {
     }
 
     #[tokio::test]
-    async fn a_generated_answer_with_ungrounded_figures_completes_qualified() {
+    async fn a_generated_answer_with_ungrounded_figures_requires_review() {
         let recorder = RecordingIntelligenceRecorder::default();
         let outcome = run_with_real_gate(
             &generate_graph(),
@@ -3853,19 +3970,20 @@ mod threshold_gate_tests {
             &recorder,
         )
         .await;
-        assert!(matches!(outcome.stop, GovernedProgramStop::Completed));
-        let content = outcome.final_content.unwrap();
-        assert!(content.contains("Revenue was $9,999.99"));
-        assert!(content.contains("Limitations of this answer:"));
-        assert!(content.contains("9,999.99"));
+        assert!(matches!(
+            outcome.stop,
+            GovernedProgramStop::ReviewRequired(_)
+        ));
+        // The candidate remains available to the protected reviewer workflow,
+        // but the stop state prevents it from being released as a completed answer.
         assert_eq!(
-            outcome.trace.last().unwrap().summary,
-            "generated answer admitted with limitations"
+            outcome.final_content.as_deref(),
+            Some("Revenue was $9,999.99 this quarter.")
         );
     }
 
     #[tokio::test]
-    async fn a_generated_answer_without_material_figures_is_admitted_plainly() {
+    async fn a_claimless_generated_answer_requires_review() {
         let recorder = RecordingIntelligenceRecorder::default();
         let outcome = run_with_real_gate(
             &generate_graph(),
@@ -3874,8 +3992,14 @@ mod threshold_gate_tests {
             &recorder,
         )
         .await;
-        assert!(matches!(outcome.stop, GovernedProgramStop::Completed));
-        assert_eq!(outcome.final_content.unwrap(), "3 orders shipped in 2024.");
+        assert!(matches!(
+            outcome.stop,
+            GovernedProgramStop::ReviewRequired(_)
+        ));
+        assert_eq!(
+            outcome.final_content.as_deref(),
+            Some("3 orders shipped in 2024.")
+        );
     }
 
     #[tokio::test]

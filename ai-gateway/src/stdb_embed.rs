@@ -87,17 +87,20 @@ impl LumiereStdbExt for StdbClient {
         &self,
         limit: u32,
     ) -> anyhow::Result<Vec<PendingEmbedJob>> {
-        let sql = format!(
-            "SELECT id, organization_id, input_hash, payload FROM queue_job \
-             WHERE queue_name = 'embedding' AND status = 'Pending' \
-             LIMIT {limit}"
-        );
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        let sql = "SELECT id, organization_id, input_hash, payload, status FROM queue_job \
+             WHERE queue_name = 'embedding'";
         let rows = self
             .query_sql(&sql)
             .await
             .map_err(|e| anyhow::anyhow!("{e}"))?;
         let mut jobs = Vec::new();
         for row in rows {
+            if string_field(&row, "status", "status").as_deref() != Some("Pending") {
+                continue;
+            }
             let job_id = match u64_field(&row, "id", "id") {
                 Some(v) => v,
                 None => continue,
@@ -124,6 +127,9 @@ impl LumiereStdbExt for StdbClient {
                 input_hash,
                 payload,
             });
+            if jobs.len() >= limit as usize {
+                break;
+            }
         }
         Ok(jobs)
     }

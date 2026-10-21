@@ -45,6 +45,8 @@ import type { LowStockScanResult } from "@lumiere/erp-shared/ai-low-stock-schema
 import { companyRowsToSelectOptions } from "@/lib/form-lookup"
 
 import { HarnessAuditTrailCard } from "./harness-audit-trail-card"
+import { policyOutcomeLabel, riskClassLabel } from "./enum-labels"
+import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
 
 interface LowStockPanelProps {
   organizationId: bigint
@@ -198,6 +200,7 @@ export function LowStockPanel({
 function LowStockResultView({ result }: { result: LowStockScanResult }) {
   const { t } = useTranslation()
   const { decision } = result.decision
+  const itemsPager = usePagedRows(result.items)
 
   return (
     <div className="flex flex-col gap-4">
@@ -213,10 +216,10 @@ function LowStockResultView({ result }: { result: LowStockScanResult }) {
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={decisionBadgeVariant(decision.outcome)}>
-              {decision.outcome}
+              {policyOutcomeLabel(t, decision.outcome)}
             </Badge>
             {decision.risk && (
-              <Badge variant="outline">{decision.risk}</Badge>
+              <Badge variant="outline">{riskClassLabel(t, decision.risk)}</Badge>
             )}
           </div>
           {decision.reasons.length > 0 && (
@@ -268,7 +271,7 @@ function LowStockResultView({ result }: { result: LowStockScanResult }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {result.items.map((item) => (
+                      {itemsPager.pageRows.map((item) => (
                         <tr key={item.productId} className="border-b last:border-0">
                           <td className="py-2 pr-4 font-mono text-xs">{item.sku || "—"}</td>
                           <td className="py-2 pr-4">{item.name}</td>
@@ -278,6 +281,7 @@ function LowStockResultView({ result }: { result: LowStockScanResult }) {
                       ))}
                     </tbody>
                   </table>
+                  <TablePager {...itemsPager} />
                 </div>
               )}
             </CardContent>

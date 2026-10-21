@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request, type Response } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
@@ -10,6 +11,7 @@ import {
   smokeName,
 } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
+import { actorIdentity, canonicalRow, sessionActor } from "./sod-evidence"
 
 // COV-09 — see docs/plan/erp-cov09-hr-leave-approval-status.md.
 const PERSONA_PASSWORD = process.env.E2E_FIRST_ORG_PERSONA_PASSWORD ?? "Password123$"
@@ -96,7 +98,7 @@ async function leaveSnapshot(page: Page, leaveId: number) {
 /** Select one leave in HR → Leaves and run a toolbar action; returns the operation response. */
 async function runLeaveAction(page: Page, leaveId: number, actionId: string, reducer: string): Promise<Response> {
   await gotoModule(page, "/hr", "hr")
-  await page.getByTestId("module-tab-hr-leaves").click()
+  await selectModuleTab(page, "hr", "leaves")
   const leaveRow = page.getByTestId(`entity-row-${leaveId}`)
   await expect(leaveRow).toBeVisible({ timeout: 30_000 })
   await leaveRow.click()
@@ -200,6 +202,8 @@ test.describe("COV-09 exact leave submit → approve / refuse", { tag: ["@p0", "
       employment_type: none,
       user_id: some({ __identity__: `0x${approverIdentity}` }),
     }])
+    const linkedEmployee = await canonicalRow(page, "employees", approverEmployeeId)
+    expect(actorIdentity(linkedEmployee.userId ?? linkedEmployee.user_id)).toBe(await sessionActor(approverPage))
 
     const nowMicros = Date.now() * 1000
     const createLeave = async (employee: number, name: string) => {
@@ -239,6 +243,8 @@ test.describe("COV-09 exact leave submit → approve / refuse", { tag: ["@p0", "
       const approved = await runLeaveAction(approverPage, toApprove, "approve-leave", "approve_leave")
       expect(approved.ok()).toBe(true)
       await expect.poll(() => leaveSnapshot(page, toApprove)).toEqual(snapshot(toApprove, "Validated"))
+      const approvedRow = await canonicalRow(page, "leave-requests", toApprove)
+      expect(actorIdentity(approvedRow.firstApproverId ?? approvedRow.first_approver_id)).toBe(approverIdentity)
       const staleApprove = await replay(approverPage, approved.request())
       expect(staleApprove.status()).toBe(422)
       expect(await leaveSnapshot(page, toApprove)).toEqual(snapshot(toApprove, "Validated"))
@@ -251,18 +257,22 @@ test.describe("COV-09 exact leave submit → approve / refuse", { tag: ["@p0", "
       expect(await leaveSnapshot(page, toRefuse)).toEqual(snapshot(toRefuse, "Refused"))
 
       // Separation of duties: the approver cannot approve their own leave.
+      const beforeSelfApproval = await canonicalRow(page, "leave-requests", ownLeave)
       const selfApproval = await runLeaveAction(approverPage, ownLeave, "approve-leave", "approve_leave")
       expect(selfApproval.status()).toBe(422)
       expect(await leaveSnapshot(page, ownLeave)).toEqual(snapshot(ownLeave, "Confirm"))
+      expect(await canonicalRow(page, "leave-requests", ownLeave)).toEqual(beforeSelfApproval)
 
       await signIn(readerPage, "fixture.reader@example.test", PERSONA_PASSWORD)
       for (const [request, leaveId, state] of [
         [approved.request(), toApprove, "Validated"],
         [refused.request(), toRefuse, "Refused"],
       ] as const) {
+        const beforeDenial = await canonicalRow(page, "leave-requests", leaveId)
         const denied = await replay(readerPage, request)
         expect(denied.status()).toBe(403)
         expect(await leaveSnapshot(page, leaveId)).toEqual(snapshot(leaveId, state))
+        expect(await canonicalRow(page, "leave-requests", leaveId)).toEqual(beforeDenial)
       }
     } finally {
       await readerContext.close()

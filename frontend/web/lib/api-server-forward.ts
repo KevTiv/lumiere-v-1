@@ -14,6 +14,8 @@
  * `signout`, which may fall back to WorkOS AuthKit + `clearStdbSession` when not proxied.
  */
 
+import { isWorkOsEnabled } from "./auth-mode"
+
 import { type NextRequest, NextResponse } from "next/server"
 
 const PASSTHROUGH_HEADERS = [
@@ -55,9 +57,34 @@ export async function forwardToApiServerIfEnabled(request: NextRequest): Promise
     if (v) headers.set(name, v)
   }
 
+  if (isWorkOsEnabled()) {
+    const { workOsRedirectUri } = await import('./workos-config')
+    // Browser cookies are consumed by AuthKit, never forwarded to Rust. Explicit
+    // caller credentials keep precedence, including malformed/rejected credentials.
+    headers.delete('cookie')
+    headers.delete('x-stdb-identity')
+    if (!request.headers.has('authorization')) {
+      const { withAuth } = await import('@workos-inc/authkit-nextjs')
+      const session = await withAuth()
+      if (session.accessToken) headers.set('authorization', `Bearer ${session.accessToken}`)
+    }
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+      const origin = request.headers.get('origin')
+      const site = request.headers.get('sec-fetch-site')
+      const expectedOrigin = new URL(workOsRedirectUri()).origin
+      // Sealed browser sessions authenticate same-origin requests only.
+      if (!request.headers.has('authorization') &&
+          ((origin !== null && origin !== expectedOrigin) || (site !== null && site !== 'same-origin' && site !== 'none'))) {
+        return NextResponse.json({ error: 'Cross-origin request rejected' }, { status: 403 })
+      }
+    }
+  }
+
   const init: RequestInit = {
     method: request.method,
     headers,
+    cache: 'no-store',
+    redirect: 'manual',
   }
 
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -79,6 +106,10 @@ export async function forwardToApiServerIfEnabled(request: NextRequest): Promise
   const out = new Headers(res.headers)
   out.delete("transfer-encoding")
   out.delete("connection")
+  if (isWorkOsEnabled()) {
+    out.delete('set-cookie')
+    out.set('Cache-Control', 'private, no-store')
+  }
 
   return new NextResponse(res.body, {
     status: res.status,

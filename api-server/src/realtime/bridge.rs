@@ -21,6 +21,7 @@ pub(super) fn spawn_subscription_bridge(
     sdk_tx: UnboundedSender<String>,
 ) {
     std::thread::spawn(move || {
+        let socket_closed = sdk_tx.clone();
         let sdk_tx_err = sdk_tx.clone();
         let conn_result: Result<DbConnection, spacetimedb_sdk::Error> = DbConnection::builder()
             .with_uri(&stdb_uri)
@@ -82,8 +83,15 @@ pub(super) fn spawn_subscription_bridge(
                 return;
             }
         };
-        if let Err(e) = rt.block_on(conn.run_async()) {
-            tracing::debug!("realtime run_async: {e:?}");
-        }
+        rt.block_on(async {
+            tokio::select! {
+                result = conn.run_async() => {
+                    if let Err(error) = result { tracing::debug!("realtime run_async: {error:?}"); }
+                }
+                _ = socket_closed.closed() => {
+                    let _ = conn.disconnect();
+                }
+            }
+        });
     });
 }

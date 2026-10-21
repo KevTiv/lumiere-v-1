@@ -2,6 +2,7 @@
 
 import type { TableWidget as TableWidgetType } from "../../lib/dashboard-types"
 import { cn } from "../../lib/utils"
+import { TablePager, usePagedRows } from "../../components/table-pager"
 
 function alignmentClass(align?: "left" | "center" | "right") {
   if (align === "right") return "text-right"
@@ -10,6 +11,7 @@ function alignmentClass(align?: "left" | "center" | "right") {
 }
 
 export function TableWidget({ data }: { data: TableWidgetType["data"] }) {
+  const rowsPager = usePagedRows(data.rows)
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full">
@@ -29,7 +31,7 @@ export function TableWidget({ data }: { data: TableWidgetType["data"] }) {
           </tr>
         </thead>
         <tbody>
-          {data.rows.map((row, rowIndex) => (
+          {rowsPager.pageRows.map((row, rowIndex) => (
             <tr
               key={rowIndex}
               className="border-b border-border/70 transition-colors last:border-0 hover:bg-muted/35"
@@ -46,6 +48,7 @@ export function TableWidget({ data }: { data: TableWidgetType["data"] }) {
           ))}
         </tbody>
       </table>
+      <TablePager {...rowsPager} />
     </div>
   )
 }

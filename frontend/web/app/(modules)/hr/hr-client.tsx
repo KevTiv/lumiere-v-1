@@ -1,5 +1,8 @@
 "use client"
+import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -29,6 +32,7 @@ import {
   employeeDetailConfig,
   leaveDetailConfig,
   contractDetailConfig,
+  leaveAllocationsTableConfig,
   employeeStatusBadges,
   leaveRequestStatusBadges,
   contractStatusBadges,
@@ -38,11 +42,16 @@ import {
   previousPeriodMs,
   timeRangeToMs,
 } from "@lumiere/ui"
-import type { EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
+import { allocationOptionalColumns, mapAllocationRows } from "@lumiere/query-hooks/hooks/hr-allocations"
+import { HrOffboardingPanel } from "./hr-offboarding-panel"
+import { HrStatutoryIdsPanel } from "./hr-statutory-ids-panel"
+import type { QueryResourceState } from "@lumiere/api-client"
+import type { EntityAction, EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
 import type { QueryRows } from "@lumiere/query-hooks/http"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
 import { useHrModuleSubscription } from "@/lib/module-subscription-hooks"
 import { groupBy } from "@/lib/utils"
+import { hrStpProviderState } from "@/lib/hr-stp-availability"
 import {
   useEmployees,
   useDepartments,
@@ -54,6 +63,9 @@ import {
   useHrIntegrationIntentsPending,
   useJobPositions,
   useLeaveTypes,
+  useLeaveAllocations,
+  useOffboardingChecklists,
+  useStatutoryIds,
   usePayrollStructures,
   useSalaryRules,
   useAttendance,
@@ -90,7 +102,6 @@ import {
   useConfirmPayslip,
   useCancelPayslip,
   useCreatePayrollExportIntent,
-  useCreateHrIntegrationIntent,
   usePostPayslip,
   useHrCsvImportMutations,
   useOnboardingTemplates,
@@ -167,6 +178,12 @@ function isPendingLeaveState(state: unknown): boolean {
 
 function payslipState(row: Record<string, unknown>): string {
   return String(row.state ?? row.State ?? "")
+}
+
+function hrRowState(row: Record<string, unknown>): string {
+  const value = row.state ?? row.State
+  if (value && typeof value === "object" && "tag" in value) return String((value as { tag: unknown }).tag)
+  return String(value ?? "")
 }
 
 function employeeRowId(row: Record<string, unknown>): number {
@@ -399,17 +416,32 @@ function HrClientLoaded({
   const [rowActionError, setRowActionError] = useState<string | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
 
-  const { data: employees = [], isLoading: employeesLoading } = useEmployees(orgId, initialEmployees)
+  const employeesQuery = useEmployees(orgId, initialEmployees)
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
-  const { data: leaves = [], isLoading: leavesLoading } = useLeaveRequests(orgId, initialLeaves)
+  const leavesQuery = useLeaveRequests(orgId, initialLeaves)
   const { data: leavesToApprove = [] } = useLeavesToApprove(orgId)
-  const { data: contracts = [], isLoading: contractsLoading } = useContracts(orgId, initialContracts)
-  const { data: payslips = [] } = usePayslips(orgId, initialPayslips)
+  const contractsQuery = useContracts(orgId, initialContracts)
+  const payslipsQuery = usePayslips(orgId, initialPayslips)
+  const employeesState = moduleQueryState(employeesQuery)
+  const leavesState = moduleQueryState(leavesQuery)
+  const contractsState = moduleQueryState(contractsQuery)
+  const payslipsState = moduleQueryState(payslipsQuery)
+  const employees = canUseModuleData(employeesState) ? employeesQuery.data ?? [] : []
+  const leaves = canUseModuleData(leavesState) ? leavesQuery.data ?? [] : []
+  const contracts = canUseModuleData(contractsState) ? contractsQuery.data ?? [] : []
+  const payslips = canUseModuleData(payslipsState) ? payslipsQuery.data ?? [] : []
   const { data: payslipsToExport = [] } = usePayslipsToExport(orgId)
   const { data: hrIntegrationIntentsPending = [] } = useHrIntegrationIntentsPending(orgId)
   const { data: jobPositions = [] } = useJobPositions(orgId)
   const { data: applicants = [] } = useApplicants(orgId)
   const { data: leaveTypes = [] } = useLeaveTypes(orgId)
+  const {
+    data: leaveAllocations = [],
+    isLoading: leaveAllocationsLoading,
+    isError: leaveAllocationsError,
+  } = useLeaveAllocations(orgId)
+  const offboardingQuery = useOffboardingChecklists(orgId)
+  const statutoryIdsQuery = useStatutoryIds(orgId)
   const { data: payrollStructures = [] } = usePayrollStructures(orgId)
   const { data: salaryRules = [] } = useSalaryRules(orgId)
   const { data: onboardingTemplates = [] } = useOnboardingTemplates(orgId)
@@ -449,7 +481,6 @@ function HrClientLoaded({
   const confirmPayslip = useConfirmPayslip(orgId, operatingCompanyId)
   const cancelPayslip = useCancelPayslip(orgId, operatingCompanyId)
   const createPayrollExportIntent = useCreatePayrollExportIntent(orgId, operatingCompanyId)
-  const createHrIntegrationIntent = useCreateHrIntegrationIntent(orgId, operatingCompanyId)
   const postPayslip = usePostPayslip(orgId, operatingCompanyId)
   const createOnboardingTemplate = useCreateOnboardingTemplate(orgId, operatingCompanyId)
   const csvImports = useHrCsvImportMutations(orgId)
@@ -458,12 +489,7 @@ function HrClientLoaded({
 
   const addCsvToolbar = (
     ec: EntityViewConfig,
-    actions: Array<{
-      id: string
-      label: string
-      requiresSelection?: boolean
-      onClick: (selectedRows: Record<string, unknown>[]) => void
-    }>,
+    actions: EntityAction[],
   ): EntityViewConfig => {
     if (ec.view.mode !== "table") return ec
     // No HR tab opens an editor on row click, so let the table's default apply:
@@ -491,6 +517,7 @@ function HrClientLoaded({
       for (const row of rows) await fn(row)
     } catch (e) {
       setToolbarError(e instanceof Error ? e.message : String(e))
+      throw e
     }
   }
 
@@ -583,12 +610,18 @@ function HrClientLoaded({
     [t, departmentFieldOptions],
   )
 
+  // Employee, structure and contract are number fields in the config, so they become searchable pickers here.
   const payslipFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newPayslipForm(t), {
-        structId: payrollStructureFieldOptions,
+      withLinkedPickers(newPayslipForm(t), {
+        employeeId: recordOptions(employees as Record<string, unknown>[], (row) => row.name ?? row.workEmail ?? row.workPhone),
+        structId: recordOptions(
+          (payrollStructures as Record<string, unknown>[]).filter((row) => row.isActive !== false && row.isActive !== 0),
+          (row) => row.name,
+        ),
+        contractId: recordOptions(contracts as Record<string, unknown>[], (row) => row.name),
       }),
-    [t, payrollStructureFieldOptions],
+    [t, employees, payrollStructures, contracts],
   )
 
   const salaryRuleFormConfig = useMemo(
@@ -669,6 +702,16 @@ function HrClientLoaded({
     [contractFormConfig],
   )
 
+  const allocationRows = useMemo(
+    () =>
+      mapAllocationRows(
+        leaveAllocations as Record<string, unknown>[],
+        employees as unknown as Record<string, unknown>[],
+        leaveTypes as unknown as Record<string, unknown>[],
+      ),
+    [leaveAllocations, employees, leaveTypes],
+  )
+
   const employeeRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = employeeStatusBadges(t)
     return {
@@ -678,6 +721,7 @@ function HrClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: employeeDetailConfig(t),
       auditTableName: "hr_employee",
+      discussion: {},
       customTabs: [
         {
           id: "onboarding",
@@ -701,9 +745,52 @@ function HrClientLoaded({
             />
           ),
         },
+        // Hidden entirely when the user cannot read the resource.
+        ...(offboardingQuery.data?.status === "denied"
+          ? []
+          : [
+              {
+                id: "offboarding",
+                label: t("hr.offboarding.tab", { defaultValue: "Offboarding" }),
+                content: (record: Record<string, unknown>) => (
+                  <HrOffboardingPanel
+                    state={offboardingQuery.data as QueryResourceState<Record<string, unknown>> | undefined}
+                    isLoading={offboardingQuery.isLoading}
+                    isError={offboardingQuery.isError}
+                    employeeId={employeeRowId(record)}
+                  />
+                ),
+              },
+            ]),
+        ...(statutoryIdsQuery.data?.status === "denied"
+          ? []
+          : [
+              {
+                id: "statutory-ids",
+                label: t("hr.statutoryIds.tab", { defaultValue: "Statutory IDs" }),
+                content: (record: Record<string, unknown>) => (
+                  <HrStatutoryIdsPanel
+                    state={statutoryIdsQuery.data as QueryResourceState<Record<string, unknown>> | undefined}
+                    isLoading={statutoryIdsQuery.isLoading}
+                    isError={statutoryIdsQuery.isError}
+                    employeeId={employeeRowId(record)}
+                  />
+                ),
+              },
+            ]),
       ],
     }
-  }, [t, orgId, operatingCompanyId])
+  }, [
+    t,
+    orgId,
+    operatingCompanyId,
+    offboardingQuery.data,
+    offboardingQuery.isLoading,
+    offboardingQuery.isError,
+    statutoryIdsQuery.data,
+    statutoryIdsQuery.isLoading,
+    statutoryIdsQuery.isError,
+  ])
 
   const leaveRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = leaveRequestStatusBadges(t)
@@ -714,6 +801,7 @@ function HrClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: leaveDetailConfig(t),
       auditTableName: "hr_leave",
+      discussion: {},
       customTabs: [
         {
           id: "approval",
@@ -733,6 +821,7 @@ function HrClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: contractDetailConfig(t),
       auditTableName: "hr_contract",
+      discussion: {},
       customTabs: [
         {
           id: "compensation",
@@ -895,7 +984,13 @@ function HrClientLoaded({
               return { ...w, data: { ...(w.data as Record<string, unknown>), values } }
             }
             if (w.id === "hr-leave-usage") {
-              const byType = groupBy(leaves, (l) => `Type ${String(l.leaveTypeId ?? "0").slice(-4)}`)
+              const leaveTypeNames = new Map(
+                (leaveTypes as Record<string, unknown>[]).map((lt) => [String(lt.id), String(lt.name ?? "")]),
+              )
+              const byType = groupBy(
+                leaves,
+                (l) => leaveTypeNames.get(String(l.leaveTypeId ?? "")) || "Unspecified",
+              )
               const colors = ["#6366f1", "#f59e0b", "#22c55e", "#8b5cf6"]
               const totalDays = leaves.reduce((s, l) => s + Number(l.numberOfDays ?? 0), 0)
               const metrics = Object.entries(byType)
@@ -955,6 +1050,7 @@ function HrClientLoaded({
               })
   }, [
     employees,
+    leaveTypes,
     departments,
     leaves,
     leavesToApprove,
@@ -981,10 +1077,6 @@ function HrClientLoaded({
       ({
         ...moduleConfig,
         tabs: [
-          orgChartTab,
-          performanceTab,
-          benefitsTab,
-          recruitmentTab,
           ...withDashboardSections(moduleConfig, liveSections).tabs.map((tab) => {
           if (tab.id === "recruitment") return null
           if (tab.id === "departments" && tab.entityConfig) {
@@ -1029,29 +1121,57 @@ function HrClientLoaded({
                   id: "submit-leave",
                   label: "Submit",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => submitLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Draft"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Submit" }),
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => submitLeave.mutateAsync(row.id as string | number)),
                 },
                 {
                   id: "approve-leave",
                   label: "Approve",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => approveLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Confirm", "ValidatedOne"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Approve" }),
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => approveLeave.mutateAsync(row.id as string | number)),
                 },
                 {
                   id: "refuse-leave",
                   label: "Refuse",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => refuseLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Confirm", "ValidatedOne"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Refuse" }),
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => refuseLeave.mutateAsync(row.id as string | number)),
                 },
                 {
                   id: "reset-leave",
                   label: "Reset to draft",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "leave", (row) => resetLeave.mutateAsync(row.id as string | number)),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Refused", "Confirm", "ValidatedOne"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Reset to draft" }),
+                  onClick: (rows) => runSelectedRows(rows, "leave", (row) => resetLeave.mutateAsync(row.id as string | number)),
                 },
               ]),
                 openCreateLeaveRequest,
               ),
+            }
+          }
+          if (tab.id === "leave-allocations") {
+            const cols = allocationOptionalColumns(allocationRows)
+            return {
+              ...tab,
+              entityConfig: leaveAllocationsTableConfig(t, {
+                employeeOptions: employeeRowsToSelectOptions(employees as unknown as Record<string, unknown>[]),
+                leaveTypeOptions: leaveTypeRowsToSelectOptions(leaveTypes as unknown as Record<string, unknown>[]),
+                showPeriod: cols.period,
+                showValidity: cols.validity,
+                showState: cols.state,
+                emptyMessage: leaveAllocationsError
+                  ? t("hr.leaveAllocations.loadError", { defaultValue: "Could not load leave allocations." })
+                  : undefined,
+              }),
             }
           }
           if (tab.id === "attendance" && tab.entityConfig) {
@@ -1085,19 +1205,28 @@ function HrClientLoaded({
                   id: "open-contract",
                   label: "Open",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => openContract.mutateAsync(Number(row.id))),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["New"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Open" }),
+                  onClick: (rows) => runSelectedRows(rows, "contract", (row) => openContract.mutateAsync(Number(row.id))),
                 },
                 {
                   id: "expire-contract",
                   label: "Expire",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => expireContract.mutateAsync({ contractId: Number(row.id) })),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["Open"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Expire" }),
+                  onClick: (rows) => runSelectedRows(rows, "contract", (row) => expireContract.mutateAsync({ contractId: Number(row.id) })),
                 },
                 {
                   id: "cancel-contract",
                   label: "Cancel",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "contract", (row) => cancelContract.mutateAsync(Number(row.id))),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => ["New", "Open"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Cancel" }),
+                  onClick: (rows) => runSelectedRows(rows, "contract", (row) => cancelContract.mutateAsync(Number(row.id))),
                 },
               ]),
                 openCreateContract,
@@ -1128,6 +1257,8 @@ function HrClientLoaded({
                   id: "approve-payslip",
                   label: "Approve for export",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Draft"),
                   onClick: (rows) => {
                     setToolbarError(null)
                     const draftRows = rows.filter((row) => payslipState(row) === "Draft")
@@ -1141,8 +1272,10 @@ function HrClientLoaded({
                 },
                 {
                   id: "create-stp-intent",
-                  label: "Create STP intent",
+                  label: "STP unavailable",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
                   onClick: (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
@@ -1150,62 +1283,48 @@ function HrClientLoaded({
                       setToolbarError("Select Verify (approved) payslips for STP integration.")
                       return
                     }
-                    void (async () => {
-                      try {
-                        for (const row of verifyRows) {
-                          const payslipId = Number(row.id)
-                          await createHrIntegrationIntent.mutateAsync({
-                            intentKind: "stp",
-                            idempotencyKey: `stp-${payslipId}-${Date.now()}`,
-                            payslipId,
-                            payload: JSON.stringify({
-                              payslipId,
-                              exportStatus: "sent",
-                              submissionId: `stp-stub-${payslipId}`,
-                            }),
-                          })
-                        }
-                      } catch (e) {
-                        setToolbarError(e instanceof Error ? e.message : String(e))
-                      }
-                    })()
+                    setToolbarError(hrStpProviderState().reason)
                   },
                 },
                 {
                   id: "export-payslip",
                   label: "Create export intent",
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
+                  successMessage: t("common.actionCompleted", { action: "Create export intent" }),
+                  onClick: async (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
                     if (verifyRows.length === 0) {
                       setToolbarError("Select Verify (approved) payslips to export.")
                       return
                     }
-                    void (async () => {
-                      try {
-                        for (const row of verifyRows) {
-                          const payslipId = Number(row.id)
-                          await createPayrollExportIntent.mutateAsync({
+                    try {
+                      for (const row of verifyRows) {
+                        const payslipId = Number(row.id)
+                        await createPayrollExportIntent.mutateAsync({
+                          payslipId,
+                          idempotencyKey: `payslip-export-${payslipId}-${Date.now()}`,
+                          payload: JSON.stringify({
                             payslipId,
-                            idempotencyKey: `payslip-export-${payslipId}-${Date.now()}`,
-                            payload: JSON.stringify({
-                              payslipId,
-                              grossWage: row.grossWage ?? row.gross_wage,
-                              netWage: row.netWage ?? row.net_wage,
-                            }),
-                          })
-                        }
-                      } catch (e) {
-                        setToolbarError(e instanceof Error ? e.message : String(e))
+                            grossWage: row.grossWage ?? row.gross_wage,
+                            netWage: row.netWage ?? row.net_wage,
+                          }),
+                        })
                       }
-                    })()
+                    } catch (e) {
+                      setToolbarError(e instanceof Error ? e.message : String(e))
+                      throw e
+                    }
                   },
                 },
                 {
                   id: "post-payslip",
                   label: "Post to GL",
                   requiresSelection: true,
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
                   onClick: (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
@@ -1221,7 +1340,10 @@ function HrClientLoaded({
                   id: "cancel-payslip",
                   label: "Cancel",
                   requiresSelection: true,
-                  onClick: (rows) => void runSelectedRows(rows, "payslip", (row) => cancelPayslip.mutateAsync(Number(row.id))),
+                  selection: "multiple",
+                  isApplicable: (rows) => rows.every((row) => !["Cancelled", "Done"].includes(hrRowState(row))),
+                  successMessage: t("common.actionCompleted", { action: "Cancel" }),
+                  onClick: (rows) => runSelectedRows(rows, "payslip", (row) => cancelPayslip.mutateAsync(Number(row.id))),
                 },
               ]),
             }
@@ -1303,16 +1425,78 @@ function HrClientLoaded({
               createAction: "createOnboardingTemplate",
             }
           }
+          if (tab.id === "employees" && tab.entityConfig) {
+            return {
+              ...tab,
+              entityConfig: withInlineEdits(tab.entityConfig, {
+                name: {
+                  kind: "text",
+                  save: async (row, value) => {
+                    const name = String(value).trim()
+                    if (!name) throw new Error(t("hr.inlineEdit.nameRequired", { defaultValue: "An employee needs a name" }))
+                    await updateEmployee.mutateAsync({ employeeId: Number(row.id), params: { name } })
+                  },
+                },
+                jobTitle: {
+                  kind: "text",
+                  save: async (row, value) => {
+                    const jobTitle = String(value).trim()
+                    if (!jobTitle) throw new Error(t("hr.inlineEdit.jobTitleRequired", { defaultValue: "Enter a job title" }))
+                    await updateEmployee.mutateAsync({ employeeId: Number(row.id), params: { jobTitle } })
+                  },
+                },
+              }),
+            }
+          }
           return tab
         }).filter((tab): tab is NonNullable<typeof tab> => tab != null),
+          orgChartTab,
+          performanceTab,
+          benefitsTab,
+          recruitmentTab,
+          {
+            // Work queues and workforce-planning counters, kept off the header.
+            id: "operations",
+            label: t("hr.operationsTab", { defaultValue: "Operations" }),
+            type: "custom" as const,
+            description: t("hr.operationsTabDescription", {
+              defaultValue: "Approval and export queues, workforce planning",
+            }),
+            customContent: (
+              <div className="space-y-4">
+                <HrOpsQueuePanel
+                  leavesToApprove={leavesToApprove.length}
+                  payslipsToExport={payslipsToExport.length}
+                  hrIntegrationIntentsPending={hrIntegrationIntentsPending.length}
+                />
+                <HrAdvancedWfmPanel
+                  laborCostSnapshots={laborCostSnapshots.length}
+                  shiftOptJobs={shiftOptJobs.length}
+                  globalAssignments={globalAssignments.length}
+                  capacityForecast={hrCapacityForecast.length}
+                />
+              </div>
+            ),
+          },
         ],
       }) as ModuleConfig,
     [
       moduleConfig,
+      allocationRows,
+      leaveAllocationsError,
+      employees,
+      leaveTypes,
       orgChartTab,
       performanceTab,
       benefitsTab,
       recruitmentTab,
+      leavesToApprove.length,
+      payslipsToExport.length,
+      hrIntegrationIntentsPending.length,
+      laborCostSnapshots.length,
+      shiftOptJobs.length,
+      globalAssignments.length,
+      hrCapacityForecast.length,
       liveSections,
       employeeFormConfig,
       leaveFormConfig,
@@ -1343,6 +1527,7 @@ function HrClientLoaded({
       buildEditJobPositionForm,
       buildEditContractForm,
       buildEditLeaveTypeForm,
+      updateEmployee,
     ],
   )
 
@@ -1356,13 +1541,14 @@ function HrClientLoaded({
       "job-positions": jobPositions as unknown as Record<string, unknown>[],
       recruitment: recruitmentPositions as unknown as Record<string, unknown>[],
       "leave-types": leaveTypes as unknown as Record<string, unknown>[],
+      "leave-allocations": allocationRows as unknown as Record<string, unknown>[],
       "payroll-structures": payrollStructures as unknown as Record<string, unknown>[],
       "salary-rules": salaryRules as unknown as Record<string, unknown>[],
       "onboarding-templates": onboardingTemplates as unknown as Record<string, unknown>[],
       attendance: attendance as unknown as Record<string, unknown>[],
       "compensation-events": compensationEvents as unknown as Record<string, unknown>[],
     }),
-    [employees, departments, leaves, contracts, payslips, jobPositions, recruitmentPositions, leaveTypes, payrollStructures, salaryRules, onboardingTemplates, attendance, compensationEvents]
+    [employees, departments, leaves, contracts, payslips, jobPositions, recruitmentPositions, leaveTypes, allocationRows, payrollStructures, salaryRules, onboardingTemplates, attendance, compensationEvents]
   )
 
   const handleFormSubmit = async (
@@ -1459,13 +1645,19 @@ function HrClientLoaded({
     cancelPayslip.isPending ||
     Object.values(csvImports).some((m) => m.isPending)
 
-  const dataLoading = useMemo(
+  const dataState = useMemo(
     () => ({
-      employees: employeesLoading,
-      leaves: leavesLoading,
-      contracts: contractsLoading,
+      employees: employeesState,
+      leaves: leavesState,
+      contracts: contractsState,
+      payslips: payslipsState,
     }),
-    [employeesLoading, leavesLoading, contractsLoading],
+    [employeesState, leavesState, contractsState, payslipsState],
+  )
+
+  const dataLoading = useMemo(
+    () => ({ "leave-allocations": leaveAllocationsLoading }),
+    [leaveAllocationsLoading],
   )
 
   return (
@@ -1475,20 +1667,10 @@ function HrClientLoaded({
           {toolbarError}
         </p>
       ) : null}
-      <HrOpsQueuePanel
-        leavesToApprove={leavesToApprove.length}
-        payslipsToExport={payslipsToExport.length}
-        hrIntegrationIntentsPending={hrIntegrationIntentsPending.length}
-      />
-      <HrAdvancedWfmPanel
-        laborCostSnapshots={laborCostSnapshots.length}
-        shiftOptJobs={shiftOptJobs.length}
-        globalAssignments={globalAssignments.length}
-        capacityForecast={hrCapacityForecast.length}
-      />
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         dataLoading={dataLoading}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
@@ -1628,42 +1810,45 @@ function HrClientLoaded({
       ) : null}
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={{ resource: "hr_resource", department: "hr_department", job_position: "hr_job_position", employee: "hr_employee", contract: "hr_contract", leave_type: "hr_leave_type", leave: "hr_leave", payroll_structure: "hr_payroll_structure", salary_rule: "hr_salary_rule", payslip: "hr_payslip" }[csvKind]}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             switch (csvKind) {
-                case "resource":
-                  await csvImports.importResource.mutateAsync(text)
-                  break
-                case "department":
-                  await csvImports.importDepartment.mutateAsync(text)
-                  break
-                case "job_position":
-                  await csvImports.importJobPosition.mutateAsync(text)
-                  break
-                case "employee":
-                  await csvImports.importEmployee.mutateAsync(text)
-                  break
-                case "contract":
-                  await csvImports.importContract.mutateAsync(text)
-                  break
-                case "leave_type":
-                  await csvImports.importLeaveType.mutateAsync(text)
-                  break
-                case "leave":
-                  await csvImports.importLeave.mutateAsync(text)
-                  break
-                case "payroll_structure":
-                  await csvImports.importPayrollStructure.mutateAsync(text)
-                  break
-                case "salary_rule":
-                  await csvImports.importSalaryRule.mutateAsync(text)
-                  break
-                case "payslip":
-                  await csvImports.importPayslip.mutateAsync(text)
-                  break
+              case "resource":
+                await csvImports.importResource.mutateAsync(text)
+                break
+              case "department":
+                await csvImports.importDepartment.mutateAsync(text)
+                break
+              case "job_position":
+                await csvImports.importJobPosition.mutateAsync(text)
+                break
+              case "employee":
+                await csvImports.importEmployee.mutateAsync(text)
+                break
+              case "contract":
+                await csvImports.importContract.mutateAsync(text)
+                break
+              case "leave_type":
+                await csvImports.importLeaveType.mutateAsync(text)
+                break
+              case "leave":
+                await csvImports.importLeave.mutateAsync(text)
+                break
+              case "payroll_structure":
+                await csvImports.importPayrollStructure.mutateAsync(text)
+                break
+              case "salary_rule":
+                await csvImports.importSalaryRule.mutateAsync(text)
+                break
+              case "payslip":
+                await csvImports.importPayslip.mutateAsync(text)
+                break
               default:
                 break
             }
