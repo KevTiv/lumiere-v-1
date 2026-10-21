@@ -63,7 +63,10 @@ test.describe("Parity phase 5 — chatter mutations", { tag: ["@dev-fixture", "@
     // Posting is complete only after the composer clears and the persisted
     // message appears exactly once in the timeline, outside the editor.
     await expect(dialog.getByTestId("record-chatter-note")).toHaveText("")
-    await expect(dialog.locator('textarea[data-slot="textarea"]')).toHaveValue("")
+    const noteBridge = dialog.locator(
+      '[data-slot="rich-text-panel"]:has([data-testid="record-chatter-note"]) + textarea[data-slot="textarea"]',
+    )
+    await expect(noteBridge).toHaveValue("")
     const postedNote = dialog.getByRole("listitem").filter({
       has: page.getByText(noteBody, { exact: true }),
     })
