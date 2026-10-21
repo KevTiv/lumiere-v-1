@@ -1,48 +1,64 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import type { NextConfig } from "next"
 
 import nextConfig from "./next.config.mjs"
 
-test("Next forwards typed operation paths to api-server", async () => {
-  const previous = process.env.LUMIERE_API_SERVER_URL
-  process.env.LUMIERE_API_SERVER_URL = "http://127.0.0.1:8082/"
-  try {
-    assert.ok(nextConfig.rewrites)
-    const result = await nextConfig.rewrites()
-    const rewrites = Array.isArray(result) ? result : result.afterFiles ?? []
-    assert.deepEqual(
-      rewrites.find((rewrite) => rewrite.source === "/api/operations/:path*"),
-      {
-        source: "/api/operations/:path*",
-        destination: "http://127.0.0.1:8082/v1/operations/:path*",
-      },
-    )
-  } finally {
-    if (previous === undefined) delete process.env.LUMIERE_API_SERVER_URL
-    else process.env.LUMIERE_API_SERVER_URL = previous
+test("webpack preserves Next's React aliases for server and browser rendering", () => {
+  const config: NextConfig = nextConfig
+  for (const isServer of [true, false]) {
+    const aliases = {
+      react: 'next/dist/compiled/react',
+      'react-dom': 'next/dist/compiled/react-dom',
+      'react-dom/server': 'next/dist/compiled/react-dom/server',
+      'react-server-dom-webpack': 'next/dist/compiled/react-server-dom-webpack',
+    }
+    const webpackConfig = { resolve: { alias: aliases } }
+    const result = config.webpack
+      ? config.webpack(webpackConfig, { isServer } as Parameters<NonNullable<NextConfig['webpack']>>[1])
+      : webpackConfig
+    assert.equal(result.resolve.alias, aliases)
+    assert.deepEqual(result.resolve.alias, {
+      react: 'next/dist/compiled/react',
+      'react-dom': 'next/dist/compiled/react-dom',
+      'react-dom/server': 'next/dist/compiled/react-dom/server',
+      'react-server-dom-webpack': 'next/dist/compiled/react-server-dom-webpack',
+    })
   }
 })
 
-test("Next forwards the explicit reducer compatibility path to api-server", async () => {
-  const previous = process.env.LUMIERE_API_SERVER_URL
-  process.env.LUMIERE_API_SERVER_URL = "http://127.0.0.1:8082/"
+test("Turbopack keeps framework React resolution instead of forcing workspace packages", () => {
+  const config: NextConfig = nextConfig
+  const aliases = config.turbopack?.resolveAlias ?? {}
+  assert.equal(Object.keys(aliases).some((key) => key === 'react' || key.startsWith('react/') || key === 'react-dom' || key.startsWith('react-dom/')), false)
+  assert.ok(config.turbopack?.root)
+})
+
+test("private ERP responses discourage indexing without caching private data", async () => {
+  assert.ok(nextConfig.headers)
+  const headers = await nextConfig.headers()
+  assert.deepEqual(headers, [{
+    source: '/:path*',
+    headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' }],
+  }])
+})
+
+test('API routes always use the runtime BFF, including builds without WorkOS configuration', async () => {
+  const previousClient = process.env.WORKOS_CLIENT_ID
+  const previousApi = process.env.LUMIERE_API_SERVER_URL
   try {
-    assert.ok(nextConfig.rewrites)
-    const result = await nextConfig.rewrites()
-    const rewrites = Array.isArray(result) ? result : result.afterFiles ?? []
-    assert.deepEqual(
-      rewrites.find((rewrite) => rewrite.source === "/api/compat/reducer/:path*"),
-      {
-        source: "/api/compat/reducer/:path*",
-        destination: "http://127.0.0.1:8082/v1/compat/reducer/:path*",
-      },
-    )
-    assert.equal(
-      rewrites.some((rewrite) => rewrite.source === "/api/call/:path*"),
-      false,
-    )
+    process.env.LUMIERE_API_SERVER_URL = 'http://api.internal'
+    for (const clientId of [undefined, 'client_test']) {
+      if (clientId === undefined) delete process.env.WORKOS_CLIENT_ID
+      else process.env.WORKOS_CLIENT_ID = clientId
+      const result = await nextConfig.rewrites!()
+      const rewrites = Array.isArray(result) ? result : result.afterFiles ?? []
+      assert.equal(rewrites.some((entry) => entry.source.startsWith('/api/')), false)
+    }
   } finally {
-    if (previous === undefined) delete process.env.LUMIERE_API_SERVER_URL
-    else process.env.LUMIERE_API_SERVER_URL = previous
+    if (previousClient === undefined) delete process.env.WORKOS_CLIENT_ID
+    else process.env.WORKOS_CLIENT_ID = previousClient
+    if (previousApi === undefined) delete process.env.LUMIERE_API_SERVER_URL
+    else process.env.LUMIERE_API_SERVER_URL = previousApi
   }
 })

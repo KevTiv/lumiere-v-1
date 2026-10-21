@@ -1,6 +1,6 @@
-@import '@lumiere/ui/app-theme.css';
 @import 'tailwindcss';
 @import 'tw-animate-css';
+@import '@lumiere/ui/app-theme.css';
 
 @source "../../packages/ui/src";
 

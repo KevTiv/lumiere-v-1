@@ -107,6 +107,16 @@ pub fn employee_audit_json(emp: &super::employees::HrEmployee) -> String {
     .to_string()
 }
 
+fn pii_read_audit_table(table_name: &str) -> &'static str {
+    match table_name {
+        "hr_employee" => "hr_employee",
+        "hr_contract" => "hr_contract",
+        "hr_payslip" => "hr_payslip",
+        "hr_statutory_id" => "hr_statutory_id",
+        _ => "hr_employee",
+    }
+}
+
 // ── Reducers ──────────────────────────────────────────────────────────────────
 
 /// Record a sensitive HR/comp read (invoked from BFF after HTTP SQL queries).
@@ -143,12 +153,7 @@ pub fn log_hr_pii_read(
     let purpose = params.purpose.clone();
     let resource_key = params.resource_key.clone();
     let audit_fields_json = fields_json.clone();
-    let audit_table: &'static str = match params.table_name.as_str() {
-        "hr_employee" => "hr_employee",
-        "hr_contract" => "hr_contract",
-        "hr_payslip" => "hr_payslip",
-        _ => "hr_employee",
-    };
+    let audit_table = pii_read_audit_table(&params.table_name);
     let changed_fields = params.fields_accessed.clone();
 
     ctx.db.hr_pii_access_log().insert(HrPiiAccessLog {
@@ -184,4 +189,22 @@ pub fn log_hr_pii_read(
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pii_read_audit_table;
+
+    #[test]
+    fn statutory_id_reads_keep_their_own_audit_record_namespace() {
+        assert_eq!(pii_read_audit_table("hr_statutory_id"), "hr_statutory_id");
+    }
+
+    #[test]
+    fn existing_pii_read_audit_tables_and_fallback_are_preserved() {
+        for table in ["hr_employee", "hr_contract", "hr_payslip"] {
+            assert_eq!(pii_read_audit_table(table), table);
+        }
+        assert_eq!(pii_read_audit_table("unknown"), "hr_employee");
+    }
 }

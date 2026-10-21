@@ -5,11 +5,19 @@ import { AmbiguousOperationEffectError } from "./operation-effect"
 import {
   resolveActiveRoleAssignmentEffect,
   resolveRevokedRoleAssignmentEffect,
+  roleAssignmentIsCurrent,
   type RoleAssignmentProjection,
 } from "./auth-role-assignment"
 
 const ALICE = "ab".repeat(32)
 const BOB = "cd".repeat(32)
+
+test('role expiry uses the same strict current boundary as server authorization', () => {
+  assert.equal(roleAssignmentIsCurrent({ isActive: true, expiresAt: { microsSinceUnixEpoch: '100' } }, 100n), false)
+  assert.equal(roleAssignmentIsCurrent({ isActive: true, expiresAt: { some: { __timestamp_micros_since_unix_epoch__: '101' } } }, 100n), true)
+  assert.equal(roleAssignmentIsCurrent({ isActive: true, expiresAt: 'malformed' }, 100n), false)
+  assert.equal(roleAssignmentIsCurrent({ isActive: false }, 100n), false)
+})
 
 const row = (
   id: bigint,

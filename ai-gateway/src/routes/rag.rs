@@ -1618,7 +1618,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn live_snapshot_answers_stand_alone_and_disclose_no_passage() {
+    async fn live_snapshot_traceability_alone_does_not_admit_generated_prose() {
         // The actor holds no evidence grant: no passage was authorized.
         let access = FakeAccess::new(5, 4096).with_passage(7, BODY);
         *access.grant.lock().unwrap() = Err("no grant");
@@ -1639,8 +1639,11 @@ mod tests {
             &access,
         )
         .await;
-        assert_eq!(released.verification.outcome, TextAnswerOutcome::Admitted);
-        assert_eq!(released.answer, "Order #42 totals $1,250.50.");
+        assert_eq!(
+            released.verification.outcome,
+            TextAnswerOutcome::RequiresReview
+        );
+        assert!(released.answer.contains("withheld"));
         assert!(!released.provenance.persisted);
         assert_eq!(sink.calls.load(Ordering::SeqCst), 0);
         assert_eq!(access.grant_calls.load(Ordering::SeqCst), 0);

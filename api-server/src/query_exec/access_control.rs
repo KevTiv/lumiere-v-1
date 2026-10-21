@@ -8,15 +8,82 @@ use stdb_client::StdbClient;
 
 pub(crate) async fn read_roles(
     client: &StdbClient,
+    organization_id: u64,
     field_access: Option<&FieldAccessContext>,
 ) -> Result<Vec<Value>, ApiError> {
-    let full_sql = "SELECT * FROM role WHERE is_active = true";
-    if let Ok(rows) = client.query_sql(full_sql).await {
-        return Ok(rows);
+    let sql = roles_sql(organization_id, field_access)?;
+    client.query_sql(&sql).await.map_err(ApiError::internal)
+}
+
+fn roles_sql(
+    organization_id: u64,
+    field_access: Option<&FieldAccessContext>,
+) -> Result<String, ApiError> {
+    let mut columns =
+        resolve_http_sql_columns("roles", field_access).map_err(ApiError::Internal)?;
+    // This identity/bootstrap resource also feeds RBACBridge and role management.
+    // Keep their existing permission descriptors, but never fetch SELECT * or
+    // roles from another tenant. Descriptors do not grant the actor those roles.
+    columns.push("permissions".into());
+    let mut filter = String::new();
+    if let Some(access) = field_access {
+        if access.organization_id != organization_id {
+            return Err(ApiError::Forbidden(
+                "Role organization scope changed".into(),
+            ));
+        }
+        if !stdb_auth::permission_allowed(access, "role", "read") {
+            let mut ids = access.role_ids.clone();
+            ids.push(access.role_id);
+            ids.sort_unstable();
+            ids.dedup();
+            filter.push_str(&format!(
+                " AND ({})",
+                ids.iter()
+                    .map(|id| format!("id = {id}"))
+                    .collect::<Vec<_>>()
+                    .join(" OR ")
+            ));
+        }
+    }
+    Ok(format!(
+        "SELECT {} FROM role WHERE organization_id = {organization_id} AND is_active = true{filter}",
+        columns.join(", ")
+    ))
+}
+
+#[cfg(test)]
+mod role_scope_tests {
+    use super::*;
+
+    #[test]
+    fn role_queries_are_tenant_scoped_and_keep_the_existing_rbac_descriptors() {
+        for organization_id in [42, 99] {
+            let sql = roles_sql(organization_id, None).unwrap();
+            assert!(sql.ends_with(&format!(
+                "FROM role WHERE organization_id = {organization_id} AND is_active = true"
+            )));
+            assert!(!sql.contains("SELECT *"));
+            assert!(sql.contains("permissions"));
+            assert!(!sql.contains("metadata"));
+            assert!(sql.contains("id, organization_id"));
+        }
     }
 
-    let sql = stdb_auth::select_roles_active_sql(field_access).map_err(ApiError::Internal)?;
-    client.query_sql(&sql).await.map_err(ApiError::internal)
+    #[test]
+    fn role_hydration_limits_non_administrators_to_their_effective_role_set() {
+        let access = FieldAccessContext {
+            organization_id: 42,
+            role_id: 7,
+            role_ids: vec![9, 7],
+            role_permissions: vec!["contact:read".into()],
+            ..Default::default()
+        };
+        let sql = roles_sql(42, Some(&access)).unwrap();
+        assert!(sql.ends_with("AND (id = 7 OR id = 9)"));
+        assert!(!sql.contains("SELECT *"));
+        assert!(roles_sql(43, Some(&access)).is_err());
+    }
 }
 
 pub(crate) async fn read_user_roles(

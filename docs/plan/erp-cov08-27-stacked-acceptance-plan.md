@@ -5,6 +5,23 @@ status page with the contract disposition, D/A/O/E proof, stale/retry and denial
 effect preservation, and an explicit accepted or pending statement. A track is
 not promoted to U5 merely because one bounded slice is accepted.
 
+The 2026-10-03 same-head run for COV-05 through COV-10 and COV-13 through
+COV-25 is recorded in
+[`cov05-10-cov13-25-runtime-acceptance-2026-10-03.md`](../evidence/cov05-10-cov13-25-runtime-acceptance-2026-10-03.md).
+The run completed but is not accepted: all 43 requested browser tests failed.
+
+The 2026-10-04 repair reruns pass the browser lane (45 COV tests plus setup) on
+the same tree, natively
+([`cov-runtime-browser-acceptance-2026-10-04.md`](../evidence/cov-runtime-browser-acceptance-2026-10-04.md))
+and on the Docker stack
+([`cov-runtime-docker-acceptance-2026-10-04.md`](../evidence/cov-runtime-docker-acceptance-2026-10-04.md)).
+The projection defect (`mrp_bom` `type`/`type_`) is fixed and the Docker run
+converged all organizations with the projection worker attached. Runtime
+acceptance stays at `REVIEW` for the remaining coverage limits. The contracts
+`v0.3.81` released-migration regression is closed on `v0.3.86`: migration 1 is
+restored and Docker PostgreSQL upgrade proof applies the index through authored
+migration 11 without changing the recorded migration 1 checksum.
+
 ## Required PR completion card
 
 1. **Boundary:** one named operator transition and its canonical effect.

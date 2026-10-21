@@ -11,7 +11,7 @@ use crate::{
     orchestrator::{
         intelligence_router::run_catalogued_generation_surface,
         model_configuration::StdbModelConfigurationStore,
-        skill_loader::{complete_run, create_generation_surface_run},
+        skill_loader::{complete_run, create_generation_surface_run, set_run_wait_state},
         spend_admission::StdbSpendLedger,
     },
     state::AppState,
@@ -501,9 +501,20 @@ pub async fn post_suggest(
     let total_tokens = program
         .generation_input_tokens
         .saturating_add(program.generation_output_tokens);
-    let generated = program.final_content.as_deref().ok_or_else(|| {
-        AppError::Internal("governed form generation produced no final content".into())
-    })?;
+    let Some(generated) = program.released_content() else {
+        set_run_wait_state(
+            state.stdb.as_ref(),
+            req.org_id,
+            req.company_id,
+            run.run_id,
+            "agent_settled",
+        )
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
+        return Err(AppError::Unavailable(
+            "generated form suggestions require review before release".into(),
+        ));
+    };
     let text = generated;
     let model_json: Value = match serde_json::from_str(clean_json_response(text)) {
         Ok(value) => value,

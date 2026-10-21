@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import { useTranslation } from '@lumiere/i18n'
 import { Html } from '@react-three/drei'
 import type { StorageSlot } from './types'
 import { useWarehouse3DContext } from './warehouse-3d-context'
@@ -11,6 +12,7 @@ interface EmptySlotProps {
 }
 
 export function EmptySlot({ slot, size = [0.8, 0.8, 0.8] }: EmptySlotProps) {
+  const { t } = useTranslation()
   const [hovered, setHovered] = useState(false)
 
   const { selectedSlotId, viewMode, setSelectedSlot } = useWarehouse3DContext()
@@ -77,11 +79,15 @@ export function EmptySlot({ slot, size = [0.8, 0.8, 0.8] }: EmptySlotProps) {
           style={{ pointerEvents: 'none' }}
         >
           <div className="bg-popover text-popover-foreground px-3 py-2 rounded-lg shadow-lg border border-border text-sm whitespace-nowrap">
-            <p className="font-medium">Empty Slot</p>
+            <p className="font-medium">{t('ui.stock3d.emptySlot.title')}</p>
             <p className="text-muted-foreground text-xs">
-              Row {slot.row + 1}, Col {slot.column + 1}, Level {slot.level + 1}
+              {t('ui.stock3d.locationCoordinates', {
+                row: slot.row + 1,
+                column: slot.column + 1,
+                level: slot.level + 1,
+              })}
             </p>
-            <p className="text-xs text-success mt-1">Click to add item</p>
+            <p className="text-xs text-success mt-1">{t('ui.stock3d.emptySlot.addItemHint')}</p>
           </div>
         </Html>
       )}

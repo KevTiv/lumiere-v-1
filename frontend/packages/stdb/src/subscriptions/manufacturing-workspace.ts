@@ -11,6 +11,7 @@ export const MANUFACTURING_WORKSPACE_RESOURCE_KEYS = [
   "mrp-routing-workcenters",
   "mrp-workcenters",
   "mrp-workorders",
+  "products",
   "quality-checks",
 ] as const;
 

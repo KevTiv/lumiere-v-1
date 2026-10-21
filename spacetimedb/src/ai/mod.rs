@@ -32,6 +32,7 @@ pub mod run_review;
 pub mod skill_registry;
 pub mod skills;
 pub mod spend;
+pub mod spend_reads;
 pub mod workflow_provenance;
 
 pub use action_drafts::*;
@@ -56,4 +57,5 @@ pub use run_review::*;
 pub use skill_registry::*;
 pub use skills::*;
 pub use spend::*;
+pub use spend_reads::*;
 pub use workflow_provenance::*;

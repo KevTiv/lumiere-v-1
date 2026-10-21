@@ -15,6 +15,7 @@ import {
   useCreateActivity,
 } from "@lumiere/query-hooks/hooks/crm"
 import { finalizeCreateActivityParams } from "@lumiere/query-hooks/hooks/crm-params-merge"
+import type { CrmActivityTarget } from "@lumiere/stdb/types"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -35,6 +36,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { showWorkflowToast } from "../lib/workflow-toast"
+import {
+  ChatterAttachmentPicker,
+  useChatterAttachments,
+  useChatterUploader,
+} from "./chatter-attachments"
 import {
   formatTimelineDate,
   mergeRecordTimeline,
@@ -62,6 +69,14 @@ function messageTypeLabel(v: unknown): string {
   return s || "message"
 }
 
+function reportError(error: unknown, title: string) {
+  showWorkflowToast({
+    kind: "error",
+    title,
+    description: error instanceof Error ? error.message : String(error),
+  })
+}
+
 function parseAttachmentIds(raw: string): bigint[] {
   return raw
     .split(/[,\s]+/)
@@ -73,13 +88,12 @@ function parseAttachmentIds(raw: string): bigint[] {
 /**
  * CRM-RI-015: maps this component's free-text `resModel` host record onto the
  * backend's typed `CrmActivityTarget`. The chatter is mounted on records
- * outside that enum (e.g. `activity` itself), so an unsupported model yields
- * `undefined` — a legitimately unattached activity — rather than a rejected write.
+ * outside that enum (e.g. `activity` itself), so unsupported models have no scheduler.
  */
 function crmActivityTargetFor(
   resModel: string,
   resId: bigint,
-): { tag: "Contact" | "Lead" | "Opportunity"; value: bigint } | undefined {
+): CrmActivityTarget | undefined {
   switch (resModel.trim().toLowerCase()) {
     case "contact":
       return { tag: "Contact", value: resId }
@@ -87,6 +101,16 @@ function crmActivityTargetFor(
       return { tag: "Lead", value: resId }
     case "opportunity":
       return { tag: "Opportunity", value: resId }
+    case "sale_order":
+      return { tag: "SaleOrder", value: resId }
+    case "purchase_order":
+      return { tag: "PurchaseOrder", value: resId }
+    case "account_move":
+      return { tag: "AccountMove", value: resId }
+    case "hr_employee":
+      return { tag: "Employee", value: resId }
+    case "stock_picking":
+      return { tag: "StockPicking", value: resId }
     default:
       return undefined
   }
@@ -138,6 +162,8 @@ export function CrmRecordChatter({
     }>
   >([])
   const [following, setFollowing] = useState(false)
+  const upload = useChatterUploader(organizationId)
+  const attachments = useChatterAttachments(upload, { resModel, resId })
 
   const reloadMessages = useCallback(() => {
     if (!organizationId || !resModel) {
@@ -297,11 +323,23 @@ export function CrmRecordChatter({
     const body = noteBody.trim()
     if (!body || !identity) return
     let attachmentIds: bigint[] = []
-    if (attachmentIdsRaw.trim()) {
+    if (upload) {
+      try {
+        setBusy(true)
+        const uploaded = await attachments.uploadAll()
+        if (!uploaded) {
+          reportError(new Error(t("crm.chatter.attachmentsFailed", { defaultValue: "Some files failed to upload. Remove them or retry." })), t("crm.chatter.postNote"))
+          return
+        }
+        attachmentIds = uploaded
+      } finally {
+        setBusy(false)
+      }
+    } else if (attachmentIdsRaw.trim()) {
       try {
         attachmentIds = parseAttachmentIds(attachmentIdsRaw)
       } catch {
-        window.alert(t("crm.chatter.attachmentIdsInvalid"))
+        reportError(new Error(t("crm.chatter.attachmentIdsInvalid")), t("crm.chatter.postNote"))
         return
       }
     }
@@ -317,9 +355,10 @@ export function CrmRecordChatter({
       })
       setNoteBody("")
       setAttachmentIdsRaw("")
+      attachments.reset()
       reloadMessages()
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.postNote"))
     } finally {
       setBusy(false)
     }
@@ -330,6 +369,8 @@ export function CrmRecordChatter({
     if (!summary || !activityDeadline || !activityTypeId) return
     const d = new Date(activityDeadline)
     if (Number.isNaN(d.getTime())) return
+    const target = crmActivityTargetFor(resModel, resId)
+    if (!target) return
     try {
       setBusy(true)
       const params = finalizeCreateActivityParams({
@@ -337,11 +378,7 @@ export function CrmRecordChatter({
         summary,
         note: activityNote.trim() || undefined,
         dateDeadline: stbTimestampFromDate(d),
-        // CRM-RI-015: activities take a typed, server-validated target. Only
-        // these three CRM entities are supported by the backend
-        // `CrmActivityTarget` enum; for any other host record the activity is
-        // logged unattached rather than sent with a value that cannot persist.
-        target: crmActivityTargetFor(resModel, resId),
+        target,
       })
       await createActivity.mutateAsync(params)
       setActivitySummary("")
@@ -349,7 +386,7 @@ export function CrmRecordChatter({
       setActivityDeadline("")
       reloadActivities()
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.scheduleActivity"))
     } finally {
       setBusy(false)
     }
@@ -361,7 +398,7 @@ export function CrmRecordChatter({
       await completeActivity.mutateAsync(activityId)
       reloadActivities()
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.markDone"))
     } finally {
       setBusy(false)
     }
@@ -377,12 +414,16 @@ export function CrmRecordChatter({
         await subscribeToRecord(org, resModel, resId, [...FOLLOW_SUBTYPES])
       }
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e))
+      reportError(e, t("crm.chatter.follow"))
     } finally {
       setBusy(false)
       reloadFollower()
     }
   }
+
+  // The backend attaches activities only to contacts, leads and opportunities. On any other
+  // record a scheduled activity would be saved unattached and never show here, so don't offer it.
+  const canScheduleActivities = crmActivityTargetFor(resModel, resId) !== undefined
 
   const heading = useMemo(() => {
     if (recordTitle?.trim()) return recordTitle.trim()
@@ -422,12 +463,21 @@ export function CrmRecordChatter({
           className="resize-y min-h-[4.5rem]"
           data-testid="record-chatter-note"
         />
-        <input
-          className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
-          placeholder={t("crm.chatter.attachmentIdsPlaceholder")}
-          value={attachmentIdsRaw}
-          onChange={(e) => setAttachmentIdsRaw(e.target.value)}
-        />
+        {upload ? (
+          <ChatterAttachmentPicker
+            items={attachments.items}
+            onAdd={attachments.add}
+            onRemove={attachments.remove}
+            disabled={busy}
+          />
+        ) : (
+          <input
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+            placeholder={t("crm.chatter.attachmentIdsPlaceholder")}
+            value={attachmentIdsRaw}
+            onChange={(e) => setAttachmentIdsRaw(e.target.value)}
+          />
+        )}
         <Button
           type="button"
           size="sm"
@@ -439,6 +489,7 @@ export function CrmRecordChatter({
         </Button>
       </div>
 
+      {canScheduleActivities ? (
       <div className="space-y-3 rounded-md border p-3 bg-muted/20">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           {t("crm.chatter.logActivity")}
@@ -501,6 +552,7 @@ export function CrmRecordChatter({
           {t("crm.chatter.scheduleActivity")}
         </Button>
       </div>
+      ) : null}
 
       <div className="border-t pt-3 space-y-2 max-h-72 overflow-y-auto">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">

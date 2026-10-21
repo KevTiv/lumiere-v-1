@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   canonicalContactPairIds,
   chooseSelectOptionByLabel,
   expectNoAppError,
@@ -58,7 +59,7 @@ test.describe("CRM duplicate merge", { tag: ["@phase-4", "@crm"] }, () => {
     const [pairIdA, pairIdB] = canonicalContactPairIds(survivorId, sourceId)
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-duplicates").click()
+    await selectModuleTab(page, "crm", "duplicates")
     await expect(page.getByTestId("crm-duplicate-contacts")).toBeVisible()
 
     const pairTestId = `crm-duplicate-pair-${pairIdA}-${pairIdB}`
@@ -83,15 +84,15 @@ test.describe("CRM duplicate merge", { tag: ["@phase-4", "@crm"] }, () => {
 
     await expect
       .poll(async () => {
-        await page.getByTestId("module-tab-crm-contacts").click()
-        await page.getByTestId("module-tab-crm-duplicates").click()
+        await selectModuleTab(page, "crm", "contacts")
+        await selectModuleTab(page, "crm", "duplicates")
         return !(await page.getByTestId(pairTestId).isVisible().catch(() => false))
       }, { timeout: 30_000 })
       .toBe(true)
 
     await expect(page.getByTestId("crm-duplicates-empty")).toBeVisible()
 
-    await page.getByTestId("module-tab-crm-contacts").click()
+    await selectModuleTab(page, "crm", "contacts")
     await expect(page.getByText(nameA).first()).toBeVisible({ timeout: 30_000 })
     await expectNoAppError(page)
   })

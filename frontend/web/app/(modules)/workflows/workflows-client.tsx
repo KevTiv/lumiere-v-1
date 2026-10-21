@@ -22,6 +22,8 @@ import {
   usePublishWorkflowVersion,
   useCloneWorkflowVersionToDraft,
   useRetireWorkflowVersion,
+  useStartWorkflow,
+  useSignalWorkflow,
   useImportWorkflowCsv,
   useCancelWorkflow,
   useSimulateWorkflow,
@@ -37,6 +39,7 @@ import type { Workflow, WorkflowInstance } from "@lumiere/query-hooks/hooks/work
 import { toCreateWorkflowParams } from "@lumiere/erp-shared/workflows-create-params"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { withLinkedPickers, workflowVersionOptions } from "@/lib/linked-options"
 import { instanceStateTag, versionStatusTag } from "@/lib/workflow-enum"
 import {
   WorkflowsRowDialog,
@@ -205,6 +208,8 @@ function WorkflowsClientLoaded({
   const publishVersion = usePublishWorkflowVersion(orgId, operatingCompanyId)
   const cloneVersion = useCloneWorkflowVersionToDraft(orgId, operatingCompanyId)
   const retireVersion = useRetireWorkflowVersion(orgId, operatingCompanyId)
+  const startWorkflow = useStartWorkflow(orgId)
+  const signalWorkflow = useSignalWorkflow(orgId)
   const importWorkflowCsv = useImportWorkflowCsv(orgId)
   const cancelWorkflow = useCancelWorkflow(orgId)
   const simulateWorkflow = useSimulateWorkflow(orgId)
@@ -216,7 +221,7 @@ function WorkflowsClientLoaded({
   const cancelTimer = useCancelWorkflowTimer(orgId)
   const cancelOutbox = useCancelWorkflowOutbox(orgId)
 
-  const migrationPlanForm = useMemo<FormConfig>(
+  const migrationPlanBaseForm = useMemo<FormConfig>(
     () => ({
       id: "create-migration-plan",
       title: "New migration plan",
@@ -264,6 +269,18 @@ function WorkflowsClientLoaded({
     }),
     [],
   )
+
+  const migrationPlanForm = useMemo<FormConfig>(() => {
+    const pickers = workflowVersionOptions(
+      workflows as unknown as Record<string, unknown>[],
+      versionsRaw as unknown as Record<string, unknown>[],
+    )
+    return withLinkedPickers(migrationPlanBaseForm, {
+      workflowId: pickers.workflowId,
+      sourceWorkflowVersionId: pickers.versionId,
+      targetWorkflowVersionId: pickers.versionId,
+    })
+  }, [migrationPlanBaseForm, workflows, versionsRaw])
 
   const liveSections = useMemo(() => {
     const published = versions.filter((v) => v.statusTag === "Published").length
@@ -455,6 +472,7 @@ function WorkflowsClientLoaded({
         }}
       />
       <WorkflowsRowDialog
+        key={rowDialog ? `${rowDialog.tabId}-${String(rowDialog.row.id)}` : "closed"}
         open={rowDialog !== null}
         onOpenChange={(open) => !open && setRowDialog(null)}
         tabId={rowDialog?.tabId ?? null}
@@ -462,10 +480,14 @@ function WorkflowsClientLoaded({
         t={t}
         decisionEvents={eventsRaw as Record<string, unknown>[]}
         activePlans={activePlans}
+        workflowEdges={edgesRaw as Record<string, unknown>[]}
+        operatingCompanyId={operatingCompanyId}
         mutations={{
           publishVersion,
           cloneVersion,
           retireVersion,
+          startWorkflow,
+          signalWorkflow,
           cancelWorkflow,
           simulateWorkflow,
           setPlanActive,

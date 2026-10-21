@@ -22,6 +22,7 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   expectNoAppError,
   fetchSessionOrganizationId,
@@ -118,9 +119,9 @@ async function fetchFirstCompanyId(page: Page): Promise<number> {
 test.describe("Analytics lifecycle e2e @analytics", () => {
   test("analytics module renders and exposes dashboard + widget creation @p0", async ({ page }) => {
     await gotoModule(page, "/reports", "reports")
-    await page.getByTestId("module-tab-reports-dashboards").click()
+    await selectModuleTab(page, "reports", "dashboards")
     await expect(page.getByTestId("module-create-reports-dashboards")).toBeVisible()
-    await page.getByTestId("module-tab-reports-dashboard-widgets").click()
+    await selectModuleTab(page, "reports", "dashboard-widgets")
     await expect(page.getByTestId("module-create-reports-dashboard-widgets")).toBeVisible()
     await expectNoAppError(page)
   })
@@ -263,13 +264,13 @@ test.describe("Analytics lifecycle e2e @analytics", () => {
 
     await page.reload()
     await gotoModule(page, "/reports", "reports")
-    await page.getByTestId("module-tab-reports-dashboards").click()
+    await selectModuleTab(page, "reports", "dashboards")
     await expect(page.getByText(dashboardName).first()).toBeVisible({ timeout: 45_000 })
 
-    await page.getByTestId("module-tab-reports-dashboard-widgets").click()
+    await selectModuleTab(page, "reports", "dashboard-widgets")
     await expect(page.getByText(widgetName).first()).toBeVisible({ timeout: 45_000 })
 
-    await page.getByTestId("module-tab-reports-scheduled-reports").click()
+    await selectModuleTab(page, "reports", "scheduled-reports")
     await expect(page.getByText(scheduleName).first()).toBeVisible({ timeout: 45_000 })
     await expectNoAppError(page)
   })

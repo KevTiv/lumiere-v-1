@@ -33,7 +33,7 @@ test("returns canonical record ref for the unique exact effect", () => {
   assert.deepEqual(result, {
     resource: "sale-orders",
     id: "11",
-    href: "/sales?orderId=11",
+    href: "/sales?tab=orders&filter=id%3A11",
     opportunityId: "7",
     companyId: "3",
   })

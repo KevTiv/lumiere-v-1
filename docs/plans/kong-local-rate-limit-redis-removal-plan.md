@@ -273,26 +273,26 @@ Retention and aggregation may later support:
 
 ### R0 — inventory Redis use
 
-- [ ] inventory every Redis reference in compose, Kong configuration, environment files, docs and application code;
-- [ ] classify each reference as Kong rate limiting, obsolete scaffolding, or another real dependency;
-- [ ] prove whether any non-Kong production code still requires Redis;
+- [x] inventory every Redis reference in compose, Kong configuration, environment files, docs and application code;
+- [x] classify each reference as Kong rate limiting, obsolete scaffolding, or another real dependency;
+- [x] prove whether any non-Kong production code still requires Redis;
 - [ ] explicitly record any exception before removal.
 
 ### R1 — migrate Kong to local counters
 
-- [ ] replace `policy: redis` with `policy: local` for all current Kong rate-limiting plugins;
-- [ ] remove `redis.host`, `redis.port`, `redis.timeout` configuration;
-- [ ] retain existing per-route thresholds initially;
-- [ ] keep request-size limiting unchanged;
-- [ ] add tests/config validation proving Kong starts without Redis;
+- [x] replace `policy: redis` with `policy: local` for all current Kong rate-limiting plugins;
+- [x] remove `redis.host`, `redis.port`, `redis.timeout` configuration;
+- [x] retain existing per-route thresholds initially;
+- [x] keep request-size limiting unchanged;
+- [x] add tests/config validation proving the Kong configuration renders without Redis;
 - [ ] verify rate-limit headers/429 behavior for representative routes.
 
 ### R2 — remove Redis infrastructure
 
-- [ ] remove Redis service/volume from development and production compose/config;
-- [ ] remove Redis environment variables/secrets;
-- [ ] remove Redis health checks and deployment dependencies;
-- [ ] update local-development docs and production runbooks;
+- [x] remove Redis service/volume from development and production compose/config;
+- [x] remove Redis environment variables/secrets;
+- [x] remove Redis health checks and deployment dependencies;
+- [x] update local-development docs and production runbooks;
 - [ ] prove clean bootstrap with Redis absent.
 
 ### R3 — formalize STDB business admission controls

@@ -1,4 +1,6 @@
 import type { TFunction } from "i18next"
+import Link from "next/link"
+import { createElement } from "react"
 import type { EntityViewConfig } from "./entity-view-types"
 
 export const posTerminalsAdminTableConfig = (t: TFunction): EntityViewConfig => ({
@@ -41,7 +43,15 @@ export const posConfigsAdminTableConfig = (t: TFunction): EntityViewConfig => ({
   },
 })
 
-export const posSessionsAdminTableConfig = (t: TFunction): EntityViewConfig => ({
+export type PosSessionsAdminTableConfigOptions = {
+  /** Where a session has a page of its own: its name then links to it. */
+  recordHref?: (row: Record<string, unknown>) => string | undefined
+}
+
+export const posSessionsAdminTableConfig = (
+  t: TFunction,
+  options?: PosSessionsAdminTableConfigOptions,
+): EntityViewConfig => ({
   id: "pos-sessions-admin-table",
   title: t("pos.admin.sessions.title"),
   description: t("pos.admin.sessions.description"),
@@ -52,11 +62,50 @@ export const posSessionsAdminTableConfig = (t: TFunction): EntityViewConfig => (
     searchPlaceholder: t("pos.admin.sessions.searchPlaceholder"),
     searchKeys: ["name", "state"],
     columns: [
-      { key: "name", label: t("pos.admin.sessions.columns.name"), width: "min-w-32" },
+      {
+        key: "name",
+        label: t("pos.admin.sessions.columns.name"),
+        width: "min-w-32",
+        ...(options?.recordHref
+          ? {
+              render: (_value: unknown, row: Record<string, unknown>) => {
+                const shown = String(row.name ?? "").trim()
+                const href = options.recordHref?.(row)
+                if (!shown || !href) return shown || "—"
+                const linkProps = {
+                  href,
+                  className: "font-medium text-primary hover:underline",
+                  "data-testid": `pos-session-link-${String(row.id)}`,
+                }
+                return createElement(Link, linkProps, shown)
+              },
+            }
+          : {}),
+      },
       { key: "configId", label: t("pos.admin.sessions.columns.configId"), width: "min-w-20" },
       { key: "state", label: t("pos.admin.sessions.columns.state"), type: "badge", width: "min-w-24" },
       { key: "orderCount", label: t("pos.admin.sessions.columns.orderCount"), type: "number", align: "right" },
     ],
     emptyMessage: t("pos.admin.sessions.emptyMessage"),
+  },
+})
+
+export const posOrdersTableConfig = (t: TFunction): EntityViewConfig => ({
+  id: "pos-orders-table",
+  title: t("pos.orders.title", { defaultValue: "Orders" }),
+  view: {
+    mode: "table",
+    rowKey: "id",
+    searchable: true,
+    searchPlaceholder: t("pos.orders.searchPlaceholder", { defaultValue: "Search orders" }),
+    searchKeys: ["reference", "state", "partner"],
+    columns: [
+      { key: "reference", label: t("pos.orders.columns.reference", { defaultValue: "Reference" }), width: "min-w-32" },
+      { key: "state", label: t("pos.orders.columns.state", { defaultValue: "State" }), type: "badge", width: "min-w-24" },
+      { key: "amountTotal", label: t("pos.orders.columns.total", { defaultValue: "Total" }), type: "currency", align: "right" },
+      { key: "partner", label: t("pos.orders.columns.partner", { defaultValue: "Customer" }), width: "min-w-24" },
+      { key: "dateOrder", label: t("pos.orders.columns.date", { defaultValue: "Date" }), type: "datetime", width: "min-w-36" },
+    ],
+    emptyMessage: t("pos.orders.emptyMessage", { defaultValue: "No orders in this session" }),
   },
 })

@@ -130,8 +130,10 @@ pub(super) fn authorized_resources(
         .iter()
         .map(|resource| resource.trim())
         .filter(|resource| {
-            bootstrap_realtime_resource(resource)
-                || has_resource_read_permission(Some(field_access), resource)
+            !stdb_auth::resource_read_denied(field_access, resource)
+                && (bootstrap_realtime_resource(resource)
+                    || stdb_auth::session_read_resource(resource)
+                    || has_resource_read_permission(Some(field_access), resource))
         })
         .map(str::to_owned)
         .collect())

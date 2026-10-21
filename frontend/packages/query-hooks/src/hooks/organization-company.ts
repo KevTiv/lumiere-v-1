@@ -5,7 +5,7 @@
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 import { apiFetch } from "../http"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
+import { encodeOptionalString, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { ClearablePatch } from "@lumiere/erp-shared/accounting-create-params"
 import type {
   CreateCompanyParams,
@@ -51,6 +51,9 @@ export type CountryPackDefinitionRow = {
   name: string
   region: string
   version: string
+  acceptanceStatus: string
+  effectiveFrom?: unknown
+  effectiveTo?: unknown
   isActive: boolean
   metadata?: string | null
 }
@@ -59,10 +62,74 @@ export type CompanyCountryPackRow = {
   id: bigint | number | string
   companyId: bigint | number | string
   packKey: string
+  pinnedPackVersion: string
   enabled: boolean
   configuration?: string | null
   activatedAt?: unknown
   updatedAt?: unknown
+}
+
+type CountryPackDefinitionWireRow = {
+  packKey?: unknown
+  pack_key?: unknown
+  countryCode?: unknown
+  country_code?: unknown
+  name?: unknown
+  region?: unknown
+  version?: unknown
+  acceptanceStatus?: unknown
+  acceptance_status?: unknown
+  effectiveFrom?: unknown
+  effective_from?: unknown
+  effectiveTo?: unknown
+  effective_to?: unknown
+  isActive?: unknown
+  is_active?: unknown
+  metadata?: unknown
+}
+
+type CompanyCountryPackWireRow = {
+  id?: bigint | number | string
+  companyId?: bigint | number | string
+  company_id?: bigint | number | string
+  packKey?: unknown
+  pack_key?: unknown
+  pinnedPackVersion?: unknown
+  pinned_pack_version?: unknown
+  enabled?: unknown
+  configuration?: unknown
+  activatedAt?: unknown
+  activated_at?: unknown
+  updatedAt?: unknown
+  updated_at?: unknown
+}
+
+function countryPackDefinitionFromWire(row: CountryPackDefinitionWireRow): CountryPackDefinitionRow {
+  return {
+    packKey: String(row.packKey ?? row.pack_key ?? ""),
+    countryCode: String(row.countryCode ?? row.country_code ?? ""),
+    name: String(row.name ?? ""),
+    region: String(row.region ?? ""),
+    version: String(row.version ?? ""),
+    acceptanceStatus: String(row.acceptanceStatus ?? row.acceptance_status ?? "unknown"),
+    effectiveFrom: row.effectiveFrom ?? row.effective_from,
+    effectiveTo: row.effectiveTo ?? row.effective_to,
+    isActive: Boolean(row.isActive ?? row.is_active),
+    metadata: row.metadata == null ? null : String(row.metadata),
+  }
+}
+
+function companyCountryPackFromWire(row: CompanyCountryPackWireRow): CompanyCountryPackRow {
+  return {
+    id: row.id ?? "",
+    companyId: row.companyId ?? row.company_id ?? "",
+    packKey: String(row.packKey ?? row.pack_key ?? ""),
+    pinnedPackVersion: String(row.pinnedPackVersion ?? row.pinned_pack_version ?? ""),
+    enabled: Boolean(row.enabled),
+    configuration: row.configuration == null ? null : String(row.configuration),
+    activatedAt: row.activatedAt ?? row.activated_at,
+    updatedAt: row.updatedAt ?? row.updated_at,
+  }
 }
 
 export function useCountryPackCatalog(enabled = true) {
@@ -71,8 +138,8 @@ export function useCountryPackCatalog(enabled = true) {
     queryFn: async () => {
       const response = await apiFetch("/api/country-packs/catalog")
       if (!response.ok) throw new Error(await parseCallError(response))
-      const body = (await response.json()) as { data?: CountryPackDefinitionRow[] }
-      return body.data ?? []
+      const body = (await response.json()) as { data?: CountryPackDefinitionWireRow[] }
+      return (body.data ?? []).map(countryPackDefinitionFromWire)
     },
     enabled,
     staleTime: 300_000,
@@ -85,8 +152,8 @@ export function useCompanyCountryPacks(companyId: bigint, enabled = true) {
     queryFn: async () => {
       const response = await apiFetch(`/api/country-packs/${companyId}`)
       if (!response.ok) throw new Error(await parseCallError(response))
-      const body = (await response.json()) as { data?: CompanyCountryPackRow[] }
-      return body.data ?? []
+      const body = (await response.json()) as { data?: CompanyCountryPackWireRow[] }
+      return (body.data ?? []).map(companyCountryPackFromWire)
     },
     enabled: enabled && companyId > 0n,
     staleTime: 30_000,
@@ -202,7 +269,7 @@ export function useSetCompanyVerticalPack() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (args: { companyId: bigint; organizationId: number; packKey: "distributor_wholesaler"; enabled: boolean; configuration?: string }) => {
-      const { urlPath, init } = stdbBffCommandPost("set_company_vertical_pack", { companyId: args.companyId, params: stdbParamsToJson({ packKey: args.packKey, enabled: args.enabled, configuration: args.configuration }, "SetCompanyVerticalPackParams") })
+      const { urlPath, init } = stdbBffCommandPost("set_company_vertical_pack", { companyId: args.companyId, params: stdbParamsToJson({ packKey: args.packKey, enabled: args.enabled, configuration: encodeOptionalString(args.configuration) }, "SetCompanyVerticalPackParams") })
       const response = await apiFetch(urlPath, init)
       if (!response.ok) throw new Error(await parseCallError(response))
       return args.organizationId
