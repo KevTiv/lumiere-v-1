@@ -9334,6 +9334,28 @@
     }
   },
   "documents": {
+    "designer": {
+      "createAction": "Design template",
+      "copyAction": "Customize a copy",
+      "createTitle": "Design a template",
+      "copyTitle": "Customize a template copy",
+      "copyName": "{{name}} (copy)",
+      "description": "Design reusable page layouts or text for editor fields.",
+      "tableDescription": "Reusable document layouts and text templates.",
+      "kind": "Template type",
+      "richText": "Text for editor fields",
+      "document": "Document layout",
+      "save": "Save template",
+      "saveCopy": "Save template copy",
+      "saved": "Template saved",
+      "required": "Enter a template name.",
+      "scopeError": "This template is no longer available in the current company.",
+      "selectSupported": "Select a template created with the visual designer.",
+      "discardDescription": "Your template changes have not been saved.",
+      "changeKindTitle": "Start a different template type?",
+      "changeKindDescription": "The current design will be cleared. Your template name will be kept.",
+      "changeKindConfirm": "Start new design"
+    },
     "documents": {
       "title": "Documents",
       "description": "Files, attachments, and managed documents",

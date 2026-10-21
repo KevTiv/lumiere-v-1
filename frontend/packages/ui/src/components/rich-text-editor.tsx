@@ -29,6 +29,7 @@ import {
   serializeRichTextMarkdown,
 } from "@lumiere/ui/lib/rich-text-extensions"
 import { Popover, PopoverContent, PopoverTrigger } from "@lumiere/ui/components/popover"
+import { RichTextTemplatePicker } from "@lumiere/ui/components/rich-text-template-picker"
 
 type RichTextEditorProps = {
   /** Controlled Markdown value. */
@@ -191,7 +192,15 @@ function LinkControl({ editor, disabled }: { editor: Editor; disabled: boolean }
   )
 }
 
-function RichTextToolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
+function RichTextToolbar({
+  editor,
+  disabled,
+  maxLength,
+}: {
+  editor: Editor
+  disabled: boolean
+  maxLength?: number
+}) {
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
@@ -221,6 +230,11 @@ function RichTextToolbar({ editor, disabled }: { editor: Editor; disabled: boole
       aria-label="Text formatting"
       className="flex min-h-9 items-center overflow-x-auto border-b border-border/70 bg-muted/30 px-1.5 py-1"
     >
+      <RichTextTemplatePicker
+        editor={editor}
+        disabled={disabled}
+        maxLength={maxLength}
+      />
       <ToolbarButton label="Heading 1" active={state.h1} disabled={disabled} onClick={() => chain().toggleHeading({ level: 1 }).run()}>
         <Heading1 />
       </ToolbarButton>
@@ -414,7 +428,13 @@ function RichTextEditor({
         className
       )}
     >
-      {editor && !readOnly ? <RichTextToolbar editor={editor} disabled={!editable} /> : null}
+      {editor && !readOnly ? (
+        <RichTextToolbar
+          editor={editor}
+          disabled={!editable}
+          maxLength={maxLength}
+        />
+      ) : null}
       {editor ? (
         <EditorContent editor={editor} />
       ) : (

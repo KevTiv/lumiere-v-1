@@ -15,12 +15,66 @@ import { responseErrorMessage as parseCallError } from "@lumiere/api-client/resp
 
 export type DocumentTemplateRow = {
   id: number | string
+  organizationId?: number | string
+  organization_id?: number | string
+  companyId?: number | string | null
+  company_id?: number | string | null
   name?: string
   model?: string
   reportType?: string
   report_type?: string
+  bodyHtml?: string
+  body_html?: string
+  metadata?: string | null
+  isDefault?: boolean
+  is_default?: boolean
   isActive?: boolean
   is_active?: boolean
+}
+
+type TemplateScopeId = number | string | bigint
+
+export type DocumentTemplatesScope = {
+  identity?: string | null
+  companyId?: TemplateScopeId | null
+}
+
+function templateScopeId(value: unknown): string | null {
+  if (typeof value === "number" && (!Number.isSafeInteger(value) || value <= 0)) return null
+  if (typeof value !== "number" && typeof value !== "string" && typeof value !== "bigint") return null
+  const text = String(value)
+  if (!/^[1-9]\d{0,19}$/.test(text)) return null
+  return BigInt(text) <= 18446744073709551615n ? text : null
+}
+
+function validTemplateScope(scope: DocumentTemplatesScope): boolean {
+  return typeof scope.identity === "string" && scope.identity !== "unknown" && scope.identity.trim().length > 0 &&
+    (scope.companyId === null || templateScopeId(scope.companyId) !== null)
+}
+
+/** Preserve the legacy invalidation prefix while separating signed-in company contexts. */
+export function documentTemplatesQueryKey(organizationId: number, scope?: DocumentTemplatesScope) {
+  const prefix = ["document-templates", String(organizationId)] as const
+  return scope === undefined ? prefix : [...prefix, {
+    identity: scope.identity ?? null,
+    companyId: scope.companyId === null ? null : templateScopeId(scope.companyId) ?? "invalid",
+  }] as const
+}
+
+/** Organization defaults and the active company's templates are visible; absent scope fails closed. */
+export function documentTemplateMatchesScope(
+  row: DocumentTemplateRow,
+  organizationId: TemplateScopeId,
+  companyId: TemplateScopeId | null | undefined,
+): boolean {
+  if (!row || typeof row !== "object") return false
+  const organization = templateScopeId(organizationId)
+  if (organization === null || (companyId !== null && templateScopeId(companyId) === null)) return false
+  if (templateScopeId(row.organizationId ?? row.organization_id) !== organization) return false
+  const rowCompany = row.companyId !== undefined ? row.companyId : row.company_id
+  if (rowCompany === null) return true
+  const normalizedRowCompany = templateScopeId(rowCompany)
+  return normalizedRowCompany !== null && normalizedRowCompany === templateScopeId(companyId)
 }
 
 export type MailTemplateRow = {
@@ -32,16 +86,18 @@ export type MailTemplateRow = {
   is_active?: boolean
 }
 
-export function useDocumentTemplates(organizationId: number, enabled = true) {
+export function useDocumentTemplates(organizationId: number, enabled = true, scope?: DocumentTemplatesScope) {
   return useQuery({
-    queryKey: ["document-templates", String(organizationId)],
-    queryFn: async () => {
-      const r = await apiFetch("/api/query/document-templates")
+    queryKey: documentTemplatesQueryKey(organizationId, scope),
+    queryFn: async ({ signal }) => {
+      if (scope !== undefined && (!validTemplateScope(scope) || templateScopeId(organizationId) === null)) return []
+      const r = await apiFetch("/api/query/document-templates", { signal })
       if (!r.ok) throw new Error(await parseCallError(r))
       const j = (await r.json()) as { data?: DocumentTemplateRow[] }
-      return j.data ?? []
+      const rows = j.data ?? []
+      return scope === undefined ? rows : rows.filter((row) => documentTemplateMatchesScope(row, organizationId, scope.companyId))
     },
-    enabled: enabled && organizationId > 0,
+    enabled: enabled && templateScopeId(organizationId) !== null && (scope === undefined || validTemplateScope(scope)),
   })
 }
 
@@ -66,11 +122,19 @@ export function documentTemplateCreateRequest(
   return stdbBffCommandPost("create_document_template", { companyId, params: stdbParamsToJson(params, "CreateDocumentTemplateParams") })
 }
 
-export function useCreateDocumentTemplate(organizationId: number) {
+export function useCreateDocumentTemplate(
+  organizationId: number,
+  companyId: StdbBffCommandInput<"create_document_template">["companyId"] = null,
+  scope?: DocumentTemplatesScope,
+) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Partial<CreateDocumentTemplateParams>) => {
-      const { urlPath, init } = documentTemplateCreateRequest(params)
+      if (scope !== undefined && (!validTemplateScope(scope) || templateScopeId(organizationId) === null ||
+        (companyId === null ? scope.companyId !== null : templateScopeId(companyId) !== templateScopeId(scope.companyId)))) {
+        throw new Error("The template's organization or company is no longer available.")
+      }
+      const { urlPath, init } = documentTemplateCreateRequest(params, companyId)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

@@ -7,6 +7,7 @@ export default defineConfig({
   resolve: {
     // Mirrors the `@/…` paths in tsconfig.json that the components use.
     alias: [
+      { find: /^@lumiere\/ui\/(.*)$/, replacement: src("$1") },
       { find: /^@\/components\/ui\/(.*)$/, replacement: src("components/$1") },
       { find: /^@\/lib\/(.*)$/, replacement: src("lib/$1") },
     ],

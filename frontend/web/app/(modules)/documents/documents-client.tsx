@@ -2,8 +2,9 @@
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -33,6 +34,7 @@ import type { EntityAction, EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -113,6 +115,7 @@ import { documentNameFromFile, toBrowserFiles, toBrowserFolders } from "./file-b
 import { FileBrowser } from "@lumiere/ui"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { documentFolderCanBeDeleted } from "./document-folder-gates"
+import { DocumentTemplateDesignerDialog, customizableDocumentTemplate, type DocumentTemplateDesignSource } from "./document-template-designer-dialog"
 import {
   canDeleteKnowledgeCategory,
   canRemoveArticleMember,
@@ -274,6 +277,15 @@ function DocumentsClientLoaded({
   const moduleConfig = useMemo(() => documentsModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const session = useErpSession()
+  const { checkPermission, currentUser, permissionsReady } = useRBAC()
+  const templateScope = useMemo(() => ({ identity: session.identity, companyId: session.activeCompanyId }), [session.identity, session.activeCompanyId])
+  const templateScopeReady = session.organizationId === organizationId && session.activeCompanyReady === true && Boolean(session.identity) && session.identity !== "unknown" &&
+    (session.activeCompanyId === null || (typeof session.activeCompanyId === "number" && Number.isSafeInteger(session.activeCompanyId) && session.activeCompanyId > 0 && session.companyIds?.includes(session.activeCompanyId) === true))
+  const templatePermissionsReady = permissionsReady && currentUser?.id === session.identity
+  const templateScopeKey = JSON.stringify([organizationId, session.organizationId, session.identity, templateScopeReady, session.activeCompanyId])
+  const [templateDesigner, setTemplateDesigner] = useState<{ scopeKey: string; template?: DocumentTemplateDesignSource } | null>(null)
+  useEffect(() => { setTemplateDesigner(null) }, [templateScopeKey])
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvKind, setCsvKind] = useState<"knowledge_category" | "knowledge_article" | null>(null)
   const [processingToolbarError, setProcessingToolbarError] = useState<string | null>(null)
@@ -298,7 +310,13 @@ function DocumentsClientLoaded({
   const { data: folders = [] } = useDocumentFolders(orgId, initialFolders)
   const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs)
   const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights)
-  const { data: documentTemplates = [] } = useDocumentTemplates(organizationId)
+  const canReadTemplates = templateScopeReady && templatePermissionsReady && checkPermission("document_template", "read").allowed
+  const { data: documentTemplateRows = [] } = useDocumentTemplates(
+    organizationId,
+    canReadTemplates,
+    templateScope,
+  )
+  const documentTemplates = canReadTemplates ? documentTemplateRows : []
   const { data: mailTemplates = [] } = useMailTemplates(organizationId)
   const { data: aiAgents = [] } = useAiAgents(organizationId, organizationId > 0)
   const createDocument = useCreateDocument(orgId, operatingCompanyId)
@@ -624,6 +642,43 @@ function DocumentsClientLoaded({
         return w
           })
   }, [documents, articles, moduleConfig, t, documentFormConfig, knowledgeArticleFormConfig])
+
+  const templateDesignerActions = useMemo<EntityAction[]>(() => {
+    const companyId = session.activeCompanyId
+    if (!templateScopeReady || typeof companyId !== "number" || !templatePermissionsReady) return []
+    return [
+      {
+        id: "design-document-template",
+        label: t("documents.designer.createAction", { defaultValue: "Design template" }),
+        permission: { resource: "document_template", action: "create" },
+        onClick: () => {
+          if (!checkPermission("document_template", "create").allowed) throw new Error(t("erpWorkflow.errors.permission_denied"))
+          setDocumentToolbarError(null)
+          setTemplateDesigner({ scopeKey: templateScopeKey })
+        },
+      },
+      {
+        id: "customize-document-template-copy",
+        label: t("documents.designer.copyAction", { defaultValue: "Customize a copy" }),
+        requiresSelection: true,
+        selection: "single",
+        permission: { resource: "document_template", action: "create" },
+        isApplicable: (rows) => {
+          if (rows.length !== 1) return false
+          const row = documentTemplates.find((template) => String(template.id) === String(rows[0]?.id))
+          return Boolean(row && customizableDocumentTemplate(row, organizationId, companyId))
+        },
+        onClick: (rows) => {
+          if (!checkPermission("document_template", "create").allowed) throw new Error(t("erpWorkflow.errors.permission_denied"))
+          const row = rows.length === 1 ? documentTemplates.find((template) => String(template.id) === String(rows[0]?.id)) : undefined
+          const source = row ? customizableDocumentTemplate(row, organizationId, companyId) : null
+          if (!source) throw new Error(t("documents.designer.selectSupported", { defaultValue: "Select a template created with the visual designer." }))
+          setDocumentToolbarError(null)
+          setTemplateDesigner({ scopeKey: templateScopeKey, template: source })
+        },
+      },
+    ]
+  }, [session.activeCompanyId, templateScopeReady, templatePermissionsReady, t, checkPermission, templateScopeKey, documentTemplates, organizationId])
 
   const config = useMemo(
     () => ({
@@ -1003,9 +1058,26 @@ function DocumentsClientLoaded({
           }
         }
         if (tab.id === "document-templates" && tab.entityConfig) {
+          const entityConfig = withTableActions(tab.entityConfig, templateDesignerActions, true)
           return {
             ...tab,
             createForm: documentTemplateFormConfig,
+            entityConfig: entityConfig.view.mode === "table" ? {
+              ...entityConfig,
+              description: t("documents.designer.tableDescription", { defaultValue: "Reusable document layouts and text templates." }),
+              view: {
+                ...entityConfig.view,
+                columns: entityConfig.view.columns.map((column) => column.key === "reportType" ? {
+                  ...column,
+                  label: t("documents.designer.kind", { defaultValue: "Template type" }),
+                  render: (value: unknown) => value === "lumiere-rich-text-template-v1"
+                    ? t("documents.designer.richText", { defaultValue: "Text for editor fields" })
+                    : value === "lumiere-document-layout-v1"
+                      ? t("documents.designer.document", { defaultValue: "Document layout" })
+                      : String(value ?? ""),
+                } : column),
+              },
+            } : entityConfig,
           }
         }
         if (tab.id === "mail-templates" && tab.entityConfig) {
@@ -1139,6 +1211,9 @@ function DocumentsClientLoaded({
       knowledgeArticleFormConfig,
       knowledgeCategoryFormConfig,
       documentFolderFormConfig,
+      documentTemplateFormConfig,
+      mailTemplateFormConfig,
+      templateDesignerActions,
       processingJobFormConfig,
       folders,
     ],
@@ -1299,6 +1374,16 @@ function DocumentsClientLoaded({
       ) : null}
       {formDialog}
       {confirmDialogNode}
+      {templateDesigner && templateDesigner.scopeKey === templateScopeKey && templateScopeReady && session.identity && typeof session.activeCompanyId === "number" ? (
+        <DocumentTemplateDesignerDialog
+          key={`${templateDesigner.scopeKey}:${templateDesigner.template?.row.id ?? "new"}`}
+          organizationId={organizationId}
+          companyId={session.activeCompanyId}
+          identity={session.identity}
+          template={templateDesigner.template}
+          onClose={() => setTemplateDesigner(null)}
+        />
+      ) : null}
       <ModuleView
         config={{
           ...config,
