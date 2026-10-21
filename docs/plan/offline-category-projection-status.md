@@ -28,7 +28,9 @@ without JavaScript precision loss. SQLite `INTEGER` holds the IR's bounded u32
 sequence; u64 IDs use `TEXT`.
 
 The Node SQLite adapter supports file-backed restart and offline reads on Node
-22.13+/24. Browser OPFS, Tauri and native adapters are not implemented here.
+22.13+/24. The stacked browser slice adds OPFS storage; see
+[`offline-browser-storage-status.md`](offline-browser-storage-status.md).
+Tauri and native adapters remain unimplemented.
 No app route or existing React Query hook is switched to the new repository.
 
 ## Snapshot/pull contract
@@ -110,6 +112,7 @@ checks; they do not certify a live server feed or installed desktop/PWA experien
 
 The server snapshot and durable replay implementation is now in the stacked
 server-feed slice. Complete its live authorization/concurrent mutation/reconnect
-gate before admitting an installed experience. Then add one actual browser/Tauri
-adapter and read-only application adoption. Only after those gates should
+gate before admitting an installed experience. Browser OPFS storage is implemented
+in the next stacked slice. Read-only application adoption remains next; Tauri is
+a later runtime. Only after those gates should
 ChangeSet capture and admin review begin.

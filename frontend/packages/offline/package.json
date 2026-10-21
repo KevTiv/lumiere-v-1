@@ -5,17 +5,23 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./node-sqlite": "./src/node-sqlite.ts"
+    "./node-sqlite": "./src/node-sqlite.ts",
+    "./browser": "./src/browser.ts",
+    "./opfs-sqlite": "./src/opfs-sqlite.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/*.test.ts"
+    "test": "node --import tsx --test src/*.test.ts",
+    "test:browser": "playwright test"
   },
   "dependencies": {
-    "drizzle-orm": "0.44.7"
+    "drizzle-orm": "0.44.7",
+    "@sqlite.org/sqlite-wasm": "3.53.4-build1"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@playwright/test": "1.59.1",
+    "esbuild": "0.27.7",
     "tsx": "^4.20.5",
     "typescript": "^5.9.0"
   }

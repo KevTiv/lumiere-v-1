@@ -1,8 +1,8 @@
 import { DatabaseSync } from "node:sqlite";
-import type { SqliteConnection } from "./sqlite.ts";
+import { sqliteTransaction, type SqliteConnection } from "./sqlite.ts";
 
 /** Node 22.13+/24 file-backed adapter for local tools and integration tests.
- * Browser OPFS and Tauri adapters implement the same port in later slices.
+ * Browser OPFS uses the same port; Tauri/native adapters remain later slices.
  */
 export function openNodeSqlite(
   filename: string,
@@ -20,15 +20,7 @@ export function openNodeSqlite(
         string | number | null
       >[],
     transaction<T>(work: () => T): T {
-      database.exec("BEGIN IMMEDIATE");
-      try {
-        const result = work();
-        database.exec("COMMIT");
-        return result;
-      } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
-      }
+      return sqliteTransaction((sql) => database.exec(sql), work);
     },
     close: () => database.close(),
   };
