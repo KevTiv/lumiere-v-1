@@ -13,7 +13,7 @@ use crate::inventory::product::product;
 use crate::inventory::stock::{require_product_in_org, require_warehouse_in_org_and_company};
 use crate::manufacturing::relations::{require_uom_compatible, require_uom_in_org};
 use crate::purchasing::purchase_orders::{
-    add_purchase_order_line, create_purchase_order, purchase_order, purchase_order_line,
+    add_purchase_order_line, create_purchase_order_record, purchase_order, purchase_order_line,
     AddPurchaseOrderLineParams, CreatePurchaseOrderParams,
 };
 use crate::purchasing::require_purchasing_ri_phase0_unsafe_actions_enabled;
@@ -692,7 +692,7 @@ pub fn release_blanket_to_po(
     }
 
     let origin = format!("blanket:{blanket_order_id}");
-    create_purchase_order(
+    let po_id = create_purchase_order_record(
         ctx,
         organization_id,
         CreatePurchaseOrderParams {
@@ -720,17 +720,12 @@ pub fn release_blanket_to_po(
         },
     )?;
 
+    // The release owns the exact PO it just created; never rediscover it as the newest match.
     let po = ctx
         .db
         .purchase_order()
-        .iter()
-        .filter(|p| {
-            p.organization_id == organization_id
-                && p.company_id == company_id
-                && p.partner_id == blanket.partner_id
-                && p.origin.as_deref() == Some(origin.as_str())
-        })
-        .max_by_key(|p| p.id)
+        .id()
+        .find(&po_id)
         .ok_or("Purchase order not found after blanket release")?;
 
     for (line, quantity) in &release_lines {
@@ -786,7 +781,6 @@ pub fn release_blanket_to_po(
         });
 
     let release_count = blanket.release_count.saturating_add(1);
-    let po_id = po.id;
     ctx.db
         .purchase_blanket_order()
         .id()
@@ -1240,22 +1234,26 @@ pub fn set_purchase_approval_delegate(
     params: SetPurchaseApprovalDelegateParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
-    require_purchasing_ri_phase0_unsafe_actions_enabled(ctx, organization_id)?;
+    if params.is_active {
+        require_purchasing_ri_phase0_unsafe_actions_enabled(ctx, organization_id)?;
+    }
     require_advanced_company(ctx, organization_id, company_id)?;
-    require_organization_identity(
-        ctx,
-        organization_id,
-        company_id,
-        params.principal_identity,
-        "principal",
-    )?;
-    require_organization_identity(
-        ctx,
-        organization_id,
-        company_id,
-        params.delegate_identity,
-        "delegate",
-    )?;
+    if params.is_active {
+        require_organization_identity(
+            ctx,
+            organization_id,
+            company_id,
+            params.principal_identity,
+            "principal",
+        )?;
+        require_organization_identity(
+            ctx,
+            organization_id,
+            company_id,
+            params.delegate_identity,
+            "delegate",
+        )?;
+    }
     if params.principal_identity == params.delegate_identity {
         return Err("principal and delegate must be different users".to_string());
     }
@@ -1265,6 +1263,90 @@ pub fn set_purchase_approval_delegate(
             && row.company_id == company_id
             && row.principal_identity == params.principal_identity
     });
+
+    // This public Purchasing contract is a compatibility adapter. Only the
+    // workflow engine's effective-dated records grant decision authority.
+    use crate::workflow::authorization::{
+        create_workflow_delegation, revoke_workflow_delegation, workflow_delegation,
+        CreateWorkflowDelegationParams,
+    };
+    if params.is_active {
+        if existing
+            .as_ref()
+            .is_some_and(|row| row.is_active && row.delegate_identity != params.delegate_identity)
+        {
+            return Err("revoke the existing Purchasing delegate before replacing it".to_string());
+        }
+        let metadata: serde_json::Value = serde_json::from_str(
+            params
+                .metadata
+                .as_deref()
+                .ok_or("delegation start, end and reason are required")?,
+        )
+        .map_err(|_| "delegation metadata must be valid JSON".to_string())?;
+        let timestamp = |key: &str| -> Result<Timestamp, String> {
+            let micros = metadata
+                .get(key)
+                .and_then(|value| value.as_str())
+                .and_then(|value| value.parse::<i64>().ok())
+                .ok_or_else(|| {
+                    format!("delegation {key} must contain exact timestamp microseconds")
+                })?;
+            Ok(Timestamp::from_micros_since_unix_epoch(micros))
+        };
+        let reason = metadata
+            .get("reason")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|reason| !reason.is_empty())
+            .ok_or("delegation reason is required")?;
+        create_workflow_delegation(
+            ctx,
+            organization_id,
+            company_id,
+            CreateWorkflowDelegationParams {
+                delegator_identity: params.principal_identity,
+                delegatee_identity: params.delegate_identity,
+                role_id: None,
+                valid_from: timestamp("valid_from_micros")?,
+                valid_until: timestamp("valid_until_micros")?,
+                reason: Some(reason.to_string()),
+            },
+        )?;
+    } else {
+        let ids: Vec<_> = ctx
+            .db
+            .workflow_delegation()
+            .iter()
+            .filter(|row| {
+                row.organization_id == organization_id
+                    && row.company_id == company_id
+                    && row.is_active
+                    && row.delegator_identity == params.principal_identity
+                    && row.delegatee_identity == params.delegate_identity
+            })
+            .map(|row| row.id)
+            .collect();
+        // Validate revocation authority even when no canonical grant exists.
+        let sender = find_user_profile_for_organization(ctx, ctx.sender(), organization_id)
+            .ok_or("delegation revoker profile not found")?;
+        if !sender.is_active
+            || (!sender.is_superuser
+                && ctx.sender() != params.principal_identity
+                && ctx.sender() != params.delegate_identity)
+        {
+            return Err("only a delegation party or superuser may revoke it".to_string());
+        }
+        if existing
+            .as_ref()
+            .is_some_and(|row| row.is_active && row.delegate_identity != params.delegate_identity)
+        {
+            return Err("revocation must name the current Purchasing delegate".to_string());
+        }
+        for id in ids {
+            revoke_workflow_delegation(ctx, organization_id, id)?;
+        }
+    }
 
     if let Some(row) = existing {
         let record_id = row.id;

@@ -1,3 +1,5 @@
+import { workflowDelegationMetadata } from "@lumiere/erp-shared/workflow-delegation"
+
 export const PURCHASING_CONFIGURATION_KINDS = [
   "contract",
   "scorecard",
@@ -49,7 +51,7 @@ export type PurchasingConfigurationSubmission =
         principalIdentity: string
         delegateIdentity: string
         isActive: boolean
-        metadata: null
+        metadata: string | null
       }
     }
   | {
@@ -196,14 +198,17 @@ export function buildPurchasingConfigurationSubmission(
         values,
         "principalIdentity",
         "Principal identity",
-      )
+      ).replace(/^0x/i, "").toLowerCase()
       const delegateIdentity = required(
         values,
         "delegateIdentity",
         "Delegate identity",
-      )
+      ).replace(/^0x/i, "").toLowerCase()
       if (principalIdentity === delegateIdentity) {
         throw new Error("Principal and delegate must be different users")
+      }
+      if (!/^[0-9a-f]{64}$/.test(principalIdentity) || !/^[0-9a-f]{64}$/.test(delegateIdentity)) {
+        throw new Error("Principal and delegate must be valid identities")
       }
       return {
         kind,
@@ -211,7 +216,9 @@ export function buildPurchasingConfigurationSubmission(
           principalIdentity,
           delegateIdentity,
           isActive: values.isActive === true,
-          metadata: null,
+          metadata: values.isActive === true
+            ? workflowDelegationMetadata(String(values.validFrom ?? ""), String(values.validUntil ?? ""), String(values.reason ?? ""))
+            : null,
         },
       }
     }

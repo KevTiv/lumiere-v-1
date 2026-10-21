@@ -1,7 +1,14 @@
 "use client"
 
+import { useMemo } from "react"
+import {
+  projectPaymentAllocations,
+  type PaymentAllocationCollection,
+  type PaymentAllocationRow,
+} from "@lumiere/erp-shared/payment-allocation-projection"
 
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { stringifyReducerCommandBody } from "@lumiere/api-client"
 import type {
   AccountAccountTypeQueryRow,
   AccountAccountQueryRow,
@@ -40,6 +47,7 @@ import type {
   CreatePaymentFeeParams,
   CreatePaymentParams,
   CreatePaymentTransactionParams,
+  ApplyHistoricalPaymentAllocationsParams as GeneratedApplyHistoricalPaymentAllocationsParams,
   CrossoveredBudget,
   DeleteAccountMoveLineParams,
   DeprecateAccountAccountParams,
@@ -62,13 +70,73 @@ import {
   useTypedStdbQuery,
 } from "../stdb"
 import { stdbInvalidationFor } from "@lumiere/contracts/stdb-reducer-invalidation"
+import { useCurrencies } from "../settings"
 import {
   POST_PAYMENT_AFFECTS,
   RECONCILE_PAYMENT_AFFECTS,
   workflowErrorFromResponse,
 } from "@lumiere/erp-workflows"
 
-import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
+import {
+  httpResponseError,
+  responseErrorMessage as parseCallError,
+} from "@lumiere/api-client/response-error"
+
+/** Generated reducer input retained as the public UI boundary for one payment batch. */
+export type ApplyHistoricalPaymentAllocationsParams =
+  GeneratedApplyHistoricalPaymentAllocationsParams
+
+/** One document allocation within an atomic historical-payment batch. */
+export type HistoricalPaymentAllocationInput =
+  ApplyHistoricalPaymentAllocationsParams["allocations"][number]
+
+const HISTORICAL_PAYMENT_ALLOCATION_RESOURCES = [
+  "payment-reconciliations",
+  "payment-transactions",
+  "account-payments",
+  "account-moves",
+  "account-move-lines",
+] as const
+
+/**
+ * Apply a posted historical payment to one or more original-total documents.
+ *
+ * The Rust BFF injects organization scope from the authenticated session. The
+ * generated params retain company scope and are encoded with the same SATS
+ * conventions as named reducer commands.
+ */
+export async function applyHistoricalPaymentAllocationsCommand(
+  params: ApplyHistoricalPaymentAllocationsParams,
+): Promise<void> {
+  const response = await apiFetch("/api/accounting/historical-payment-allocations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: stringifyReducerCommandBody({
+      params: stdbParamsToJson(params, "ApplyHistoricalPaymentAllocationsParams"),
+    }),
+  })
+  if (!response.ok) {
+    throw await httpResponseError(
+      response,
+      "Failed to apply historical payment allocations",
+    )
+  }
+}
+
+export function useApplyHistoricalPaymentAllocations(
+  organizationId: bigint | number,
+) {
+  const qc = useQueryClient()
+  return useMutation<void, Error, ApplyHistoricalPaymentAllocationsParams>({
+    mutationFn: applyHistoricalPaymentAllocationsCommand,
+    onSuccess: () =>
+      invalidateStdbQueryResources(
+        qc,
+        organizationId,
+        HISTORICAL_PAYMENT_ALLOCATION_RESOURCES,
+      ),
+  })
+}
 export function useAccountPaymentTerms(
   organizationId: bigint,
   options?: { staleTime?: number; enabled?: boolean },
@@ -98,16 +166,47 @@ export function usePaymentFees(organizationId: bigint) {
   return useTypedStdbQuery("payment-fees", organizationId)
 }
 
-export function usePaymentTransactions(organizationId: bigint) {
-  return useTypedStdbQuery("payment-transactions", organizationId)
+export function usePaymentTransactions(organizationId: bigint, options?: { staleTime?: number; enabled?: boolean }) {
+  return useTypedStdbQuery("payment-transactions", organizationId, options)
 }
 
-export function usePaymentReconciliations(organizationId: bigint) {
-  return useTypedStdbQuery("payment-reconciliations", organizationId)
+export function usePaymentReconciliations(organizationId: bigint, options?: { staleTime?: number; enabled?: boolean }) {
+  return useTypedStdbQuery("payment-reconciliations", organizationId, options)
 }
 
-export function usePaymentReversals(organizationId: bigint) {
-  return useTypedStdbQuery("payment-reversals", organizationId)
+export function usePaymentReversals(organizationId: bigint, options?: { staleTime?: number; enabled?: boolean }) {
+  return useTypedStdbQuery("payment-reversals", organizationId, options)
+}
+
+function allocationRead(query: {
+  data?: readonly PaymentAllocationRow[]
+  isLoading: boolean
+  isError: boolean
+  error: unknown
+  refetch: () => unknown
+}): PaymentAllocationCollection {
+  if (query.isError) {
+    const status = query.error && typeof query.error === "object" && "status" in query.error ? query.error.status : undefined
+    return { rows: [], state: { status: status === 401 || status === 403 ? "denied" : "error", onRetry: () => { void query.refetch() } } }
+  }
+  if (query.isLoading || !query.data) return { rows: [], state: { status: "loading" } }
+  return { rows: query.data, state: { status: "ready" } }
+}
+
+/** Cached resource reads shared with the workspace; failed sources never become zero balances. */
+export function usePaymentAllocationBalances(organizationId: bigint, companyId: bigint) {
+  const options = { enabled: organizationId > 0n && companyId > 0n }
+  const payments = useAccountPayments(organizationId, options)
+  const moves = useTypedStdbQuery("account-moves", organizationId, options)
+  const moveLines = useTypedStdbQuery("account-move-lines", organizationId, options)
+  const transactions = usePaymentTransactions(organizationId, options)
+  const reversals = usePaymentReversals(organizationId, options)
+  const currencies = useCurrencies()
+  return useMemo(() => projectPaymentAllocations({
+    organizationId, companyId,
+    payments: allocationRead(payments), moves: allocationRead(moves), moveLines: allocationRead(moveLines),
+    transactions: allocationRead(transactions), reversals: allocationRead(reversals), currencies: allocationRead(currencies),
+  }), [organizationId, companyId, payments, moves, moveLines, transactions, reversals, currencies])
 }
 
 export function useCreatePaymentAccount(organizationId: bigint) {
@@ -152,7 +251,7 @@ export function useAllocatePaymentTransaction(organizationId: bigint) {
     mutationFn: async (params) => {
       const { urlPath, init } = stdbBffCommandPost("allocate_payment_transaction", { params: stdbParamsToJson(params, "AllocatePaymentParams") })
       const response = await apiFetch(urlPath, init)
-      if (!response.ok) throw new Error(await parseCallError(response))
+      if (!response.ok) throw await httpResponseError(response, "Unable to allocate the payment")
     },
     onSuccess: () => invalidateOperationalPaymentQueries(qc, organizationId),
   })

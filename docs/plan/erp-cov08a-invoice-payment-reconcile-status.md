@@ -48,3 +48,46 @@ COV-08a becomes **ACCEPTED** only when the PR head records all of the following:
 
 Until those artifacts exist on the same PR head, the truthful disposition is
 **IMPLEMENTED — runtime acceptance pending**.
+
+## Wave 2 acceptance evidence (2026-10-13)
+
+**State:** IMPLEMENTED in the `codex/cov-u5-closure-wave2` working tree; not yet
+accepted on an immutable head.
+
+Payment cancellation now treats reconciliation as an owned, reversible effect.
+`unregister_payment_allocations` validates permission, organization/company,
+Posted state, open period, and matching identity before mutation; restores the
+invoice/bill and payment-line residuals plus linked sales-order totals; clears
+the payment's reconciliation references; and rejects replay or a line subsequently
+owned by another payment. `cancel_payment` performs that unwind and the exact
+posted journal reversal atomically, so a reconciled payment cannot be cancelled
+while leaving a settled invoice behind.
+
+The reducer harness now includes
+`test_reconciled_payment_unwind_and_cancel_exact_effect` for signed residual and
+line-identity restoration, organization/company denial, permission denial,
+replay preservation, and one exact reversal, plus
+`test_payment_allocation_unwind_blocked_in_closed_period` for closed-period
+unregister/cancel rejection with unchanged payment, invoice, and line snapshots.
+The existing `test_cancel_payment_audited` continues to prove exact debit/credit
+inversion and duplicate-cancel rejection. All cases are wired into the Accounting
+aggregate reducers. `cargo check --lib` completed successfully on this working
+tree (warnings only), and `git diff --check` passed for the four Accounting files.
+
+Remaining acceptance blockers are explicit:
+
+1. Run and persist the Accounting reducer harness on the immutable current head;
+   compilation alone is not runtime acceptance, and these Wave 2 cases have not
+   yet been published/executed against a clean SpacetimeDB target.
+2. Add an operator-visible cancel/unwind action and focused Playwright proof for
+   exact residual restoration, one reversal, stale replay, reader denial, and
+   unchanged canonical snapshots. The existing browser path proves registration,
+   not cancellation, and `unregister_payment_allocations` has no generated
+   frontend command binding yet. If that explicit reducer is exposed, regenerate,
+   release, and pin its contract delta first.
+3. Record same-head CI and browser evidence. The current implementation is an
+   uncommitted working-tree delta over head `9bdf9a9d5bcd`, not a certifiable
+   current-head artifact.
+4. Program-level U5 remains gated by COV-26 and COV-27: COV-26 is still REVIEW
+   with public hosted-application certification deferred, while COV-27 remains
+   SCAFFOLDED with its all-module launch manifest and ratchets unimplemented.

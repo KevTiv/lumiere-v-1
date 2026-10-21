@@ -1006,9 +1006,13 @@ mod tests {
             provenance.claims[1].verification,
             ClaimVerification::NoSupportCited
         );
-        // The unsupported claim still qualifies the answer; recording changed nothing.
+        // Recording preserves the unsupported inference, but an unsupported
+        // material claim cannot be released as merely qualified prose.
         assert!(
-            matches!(report.outcome, AnswerAdmissionOutcome::Qualified { .. }),
+            matches!(
+                report.outcome,
+                AnswerAdmissionOutcome::RequiresReview { .. }
+            ),
             "{:?}",
             report.outcome
         );

@@ -8,6 +8,7 @@ use crate::accounting::fiscal_periods::{account_period, close_account_period};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, bill_timesheets, BillTimesheetsParams,
 };
+use crate::core::audit::audit_log;
 use crate::hr::employees::{create_employee, hr_employee, CreateEmployeeParams};
 use crate::projects::projects::{create_project, project_project, CreateProjectParams};
 use crate::projects::tasks::{create_task, project_task, CreateTaskParams};
@@ -42,7 +43,7 @@ fn seed_sale_journal(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u64, 
             name: format!("PSA Sale {company_id}"),
             code: journal_code.clone(),
             type_: JournalType::Sale,
-            currency_id: Some(1),
+            currency_id: Some(fixture.currency_id),
             default_account_id: Some(revenue_id),
             suspense_account_id: None,
             loss_account_id: None,
@@ -134,7 +135,7 @@ fn seed_billable_project(
             description: None,
             active: true,
             sequence: 1,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             partner_id: Some(fixture.partner_id),
             partner_email: None,
             partner_phone: None,
@@ -281,7 +282,7 @@ fn log_billable_hours(
             name: name.to_string(),
             date: ctx.timestamp,
             unit_amount: hours,
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             employee_cost: Some(cost),
             sell_rate: Some(sell_rate),
             timesheet_invoice_type: Some("billable".into()),
@@ -633,6 +634,38 @@ fn expect_timesheet_rejected_unchanged(
     op: impl FnOnce() -> Result<(), String>,
 ) -> Result<(), String> {
     let before = timesheet_row(ctx, timesheet_id)?;
+    let effects = || {
+        let mut audits: Vec<_> = ctx
+            .db
+            .audit_log()
+            .iter()
+            .filter(|row| {
+                row.organization_id == before.organization_id
+                    && row.table_name == "project_timesheet"
+                    && row.record_id == timesheet_id
+            })
+            .map(|row| row.id)
+            .collect();
+        audits.sort_unstable();
+        let mut moves: Vec<_> = ctx
+            .db
+            .account_move()
+            .iter()
+            .filter(|row| row.organization_id == before.organization_id)
+            .map(|row| row.id)
+            .collect();
+        moves.sort_unstable();
+        let mut lines: Vec<_> = ctx
+            .db
+            .account_move_line()
+            .iter()
+            .filter(|row| row.organization_id == before.organization_id)
+            .map(|row| row.id)
+            .collect();
+        lines.sort_unstable();
+        (audits, moves, lines)
+    };
+    let before_effects = effects();
     match op() {
         Ok(()) => return Err(format!("{label}: must be rejected")),
         Err(message) if message.contains(expected) => {}
@@ -640,6 +673,11 @@ fn expect_timesheet_rejected_unchanged(
     }
     if timesheet_row(ctx, timesheet_id)? != before {
         return Err(format!("{label}: rejected call mutated the timesheet"));
+    }
+    if effects() != before_effects {
+        return Err(format!(
+            "{label}: rejected call changed audit or accounting effects"
+        ));
     }
     Ok(())
 }

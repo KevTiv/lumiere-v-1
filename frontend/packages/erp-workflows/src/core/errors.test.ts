@@ -9,8 +9,13 @@ test("statuses map onto the taxonomy", () => {
   assert.equal(classifyHttpFailure(422, "x"), "validation")
   assert.equal(classifyHttpFailure(409, "Order is locked"), "conflict")
   assert.equal(classifyHttpFailure(409, "Picking already validated"), "already_applied")
-  assert.equal(classifyHttpFailure(503, "x"), "retryable_transport")
-  assert.equal(classifyHttpFailure(500, "x"), "server_failure")
+  for (let status = 500; status <= 599; status++) {
+    assert.equal(classifyHttpFailure(status, "x"), "outcome_unknown")
+    const error = workflowErrorFromResponse(status, "x", "fallback")
+    assert.equal(error.retryable, false)
+    assert.equal(toWorkflowError(error, { idempotent: true }).retryable, true)
+  }
+  assert.equal(classifyHttpFailure(600, "x"), "server_failure")
 })
 test("response bodies surface the server message", () => {
   const json = workflowErrorFromResponse(422, '{"error":"Order has expired"}', "fallback")
@@ -31,6 +36,8 @@ test("a dropped connection is outcome_unknown unless the write is idempotent", (
 test("workflow errors pass through unchanged", () => {
   const original = new WorkflowError("conflict", "x", { status: 409 })
   assert.equal(toWorkflowError(original), original)
+  const unresolved = new WorkflowError("outcome_unknown", "canonical effect unresolved")
+  assert.equal(toWorkflowError(unresolved, { idempotent: true }), unresolved)
 })
 
 test("real reducer rejections arrive as 422 and stay plain rejections, not conflicts or replays", () => {
@@ -64,7 +71,7 @@ test("a server rejection refreshes the view, a client-side check does not", () =
   assert.ok(!client.rejectedByServer)
   assert.ok(!client.needsRefresh)
 
-  // Permission and server faults say nothing about the record being out of date.
+  // Permission denial is definite; server faults require canonical reconciliation.
   assert.ok(!workflowErrorFromResponse(403, "permission denied", "x").needsRefresh)
-  assert.ok(!workflowErrorFromResponse(500, "boom", "x").needsRefresh)
+  assert.ok(workflowErrorFromResponse(500, "boom", "x").needsRefresh)
 })

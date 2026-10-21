@@ -1,6 +1,7 @@
 //! R5: proposal → SO convert derives UoM from product; missing product fail-closed.
 use spacetimedb::{Identity, ReducerContext, Table};
 
+use crate::core::audit::audit_log;
 use crate::core::organization::company;
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::core::reference::{create_uom, uom, CreateUomParams};
@@ -682,6 +683,38 @@ pub fn test_award_approval_rejects_self_and_replay(ctx: &ReducerContext) -> Resu
     let expect_rejected_unchanged =
         |label: &str, expected: &str, op: &dyn Fn() -> Result<(), String>| {
             let before = proposal_row(ctx, id)?;
+            let effects = || {
+                let mut audits: Vec<_> = ctx
+                    .db
+                    .audit_log()
+                    .iter()
+                    .filter(|row| {
+                        row.organization_id == org
+                            && row.table_name == "proposal"
+                            && row.record_id == id
+                    })
+                    .map(|row| row.id)
+                    .collect();
+                audits.sort_unstable();
+                let mut orders: Vec<_> = ctx
+                    .db
+                    .sale_order()
+                    .iter()
+                    .filter(|row| row.organization_id == org)
+                    .map(|row| row.id)
+                    .collect();
+                orders.sort_unstable();
+                let mut commits: Vec<_> = ctx
+                    .db
+                    .organization_commit()
+                    .iter()
+                    .filter(|row| row.organization_id == org)
+                    .map(|row| row.id)
+                    .collect();
+                commits.sort();
+                (audits, orders, commits)
+            };
+            let before_effects = effects();
             match op() {
                 Ok(()) => return Err(format!("{label}: must be rejected")),
                 Err(message) if message.contains(expected) => {}
@@ -689,6 +722,11 @@ pub fn test_award_approval_rejects_self_and_replay(ctx: &ReducerContext) -> Resu
             }
             if proposal_row(ctx, id)? != before {
                 return Err(format!("{label}: rejected call mutated the proposal"));
+            }
+            if effects() != before_effects {
+                return Err(format!(
+                    "{label}: rejected call changed audit, order or durable effects"
+                ));
             }
             Ok(())
         };

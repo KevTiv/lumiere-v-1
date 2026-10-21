@@ -21,6 +21,8 @@ pub fn run_fleet_relational_integrity_test(ctx: &ReducerContext) -> Result<(), S
         .map_err(|e| format!("driver_id_relations: {e}"))?;
     relational_integrity_test::test_service_type_id_relations(ctx)
         .map_err(|e| format!("service_type_id_relations: {e}"))?;
+    relational_integrity_test::test_update_fleet_vehicle_details(ctx)
+        .map_err(|e| format!("update_fleet_vehicle_details: {e}"))?;
     Ok(())
 }
 
@@ -37,6 +39,8 @@ pub fn run_fleet_gap_fixes_test(ctx: &ReducerContext) -> Result<(), String> {
 pub fn run_fleet_lifecycle_test(ctx: &ReducerContext) -> Result<(), String> {
     lifecycle_test::test_history_is_immutable_and_idempotent(ctx)
         .map_err(|e| format!("history_is_immutable_and_idempotent: {e}"))?;
+    lifecycle_test::test_service_cost_respects_period_lock(ctx)
+        .map_err(|e| format!("service_cost_period_lock: {e}"))?;
     lifecycle_test::test_history_rejects_invalid_scope_and_values(ctx)
         .map_err(|e| format!("history_rejects_invalid_scope_and_values: {e}"))?;
     Ok(())

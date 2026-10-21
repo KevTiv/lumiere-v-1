@@ -559,6 +559,16 @@ pub fn create_sale_order(
     organization_id: u64,
     params: CreateSaleOrderParams,
 ) -> Result<(), String> {
+    create_sale_order_record(ctx, organization_id, params).map(|_| ())
+}
+
+/// Creates a sale order and returns its id, so callers that build on the new order own its
+/// identity instead of rediscovering it by scanning for the newest matching row.
+pub(crate) fn create_sale_order_record(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreateSaleOrderParams,
+) -> Result<u64, String> {
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     check_permission(ctx, organization_id, "sale_order", "create")?;
 
@@ -831,7 +841,7 @@ pub fn create_sale_order(
         },
     );
 
-    Ok(())
+    Ok(order.id)
 }
 
 /// Create draft outgoing pickings and stock moves for deliverable SO lines (MVP fulfillment path).

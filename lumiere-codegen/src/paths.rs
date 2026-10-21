@@ -43,6 +43,7 @@ pub struct Paths {
     pub codec_manifest_out: PathBuf,
     pub projection_codec_manifest_out: PathBuf,
     pub durable_migration_dir: PathBuf,
+    pub durable_migration_ledger_dir: PathBuf,
     pub durable_migration_manifest_out: PathBuf,
     pub hydration_policies_json: PathBuf,
     pub hydration_manifest_out: PathBuf,
@@ -152,6 +153,7 @@ impl Paths {
             codec_manifest_out: staging_manifests.join("codec-manifest.json"),
             projection_codec_manifest_out: staging_manifests.join("projection-codec-manifest.json"),
             durable_migration_dir: staging_manifests.join("pg_ddl/migrations"),
+            durable_migration_ledger_dir: manifest_dir.join("pg-migration-ledger"),
             durable_migration_manifest_out: staging_manifests
                 .join("durable-pg-schema-manifest.json"),
             hydration_policies_json: manifest_dir.join("hydration-policies.json"),

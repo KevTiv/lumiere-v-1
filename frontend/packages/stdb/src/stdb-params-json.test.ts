@@ -21,6 +21,47 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(keyed.idempotency_key, { some: "return-1" })
   })
 
+  it("encodes complete update_role compatibility params for revocation and clearing", () => {
+    for (const permissions of [["organization:read"], []]) {
+      assert.deepEqual(encodeReducerCallArgs("update_role", [7, {
+        permissions: { some: permissions },
+      }]), [7, {
+        permissions: { some: permissions },
+        name: { none: [] },
+        description: { none: [] },
+        is_active: { none: [] },
+        metadata: { none: [] },
+      }])
+    }
+  })
+
+  it("encodes requisition line optional fields for typed commands and compat calls", () => {
+    const params = {
+      lines: [
+        { productId: 7n, productUom: 1n, productUomQty: 2, name: "Laptop", sequence: 10 },
+        { productId: 8n, productUom: 1n, productUomQty: 1 },
+      ],
+    }
+    const expected = [
+      { product_id: 7, product_uom: 1, product_uom_qty: 2, name: { some: "Laptop" }, sequence: { some: 10 } },
+      { product_id: 8, product_uom: 1, product_uom_qty: 1, name: { none: [] }, sequence: { none: [] } },
+    ]
+    assert.deepEqual(stdbParamsToJson(params, "CreatePurchaseRequisitionParams").lines, expected)
+    const encoded = encodeReducerCallArgs("create_purchase_requisition", [1, params])
+    assert.deepEqual((encoded[1] as Record<string, unknown>).lines, expected)
+  })
+
+  it("preserves optional permission-list presence, including an explicit clear", () => {
+    for (const permissions of [["contact:read"], []]) {
+      assert.deepEqual(stdbParamsToJson({ permissions }, "UpdateRoleParams").permissions, { some: permissions })
+      assert.deepEqual(stdbParamsToJson({ permissions }, "CreateRoleParams").permissions, permissions)
+      assert.deepEqual(stdbParamsToJson({ permissions: { some: permissions } }, "UpdateRoleParams").permissions, { some: permissions })
+    }
+    assert.deepEqual(stdbParamsToJson({}, "UpdateRoleParams").permissions, { none: [] })
+    assert.deepEqual(stdbParamsToJson({ permissions: null }, "UpdateRoleParams").permissions, { none: [] })
+    assert.deepEqual(stdbParamsToJson({ roleIds: [1n, 2n] }), { role_ids: [1, 2] })
+  })
+
   it("fills every Option field of nested BOM lines", () => {
     const params = stdbParamsToJson(
       {
@@ -38,6 +79,18 @@ describe("stdbParamsToJson", () => {
         child_bom_id: { none: [] },
         metadata: { none: [] },
       },
+    ])
+  })
+
+  it("fills every Option field of nested purchase requisition lines", () => {
+    const params = stdbParamsToJson(
+      {
+        lines: [{ productId: 7n, productUom: 1n, productUomQty: 2, name: "Bolts", sequence: 10 }],
+      },
+      "CreatePurchaseRequisitionParams",
+    )
+    assert.deepEqual(params.lines, [
+      { product_id: 7, product_uom: 1, product_uom_qty: 2, name: { some: "Bolts" }, sequence: { some: 10 } },
     ])
   })
 
@@ -85,6 +138,89 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(out.phone, { none: [] })
   })
 
+  it("preserves zero and negative scalar Option values", () => {
+    const validation = stdbParamsToJson(
+      { minLength: 0, min: -25.5, max: 0 },
+      "FieldValidation",
+    )
+    assert.deepEqual(validation.min_length, { some: 0 })
+    assert.deepEqual(validation.min, { some: -25.5 })
+    assert.deepEqual(validation.max, { some: 0 })
+    assert.deepEqual(validation.max_length, { none: [] })
+    const update = stdbParamsToJson(
+      { expectedRevenue: 0, probability: 0 },
+      "UpdateOpportunityParams",
+    )
+    assert.deepEqual(update.expected_revenue, { some: 0 })
+    assert.deepEqual(update.probability, { some: 0 })
+  })
+
+  it("distinguishes optional u64 counters from relation IDs", () => {
+    for (const durationMs of [0, 0n, 25n]) {
+      const out = stdbParamsToJson({ durationMs }, "AppendAiChatMessageParams")
+      assert.deepEqual(out.duration_ms, { some: Number(durationMs) })
+    }
+    for (const companyId of [0, 0n, -1, -1n]) {
+      const out = stdbParamsToJson({ companyId }, "CreateContactParams")
+      assert.deepEqual(out.company_id, { none: [] })
+    }
+  })
+
+  it("honors explicitly encoded presence for numeric values and relation IDs", () => {
+    assert.deepEqual(
+      stdbParamsToJson({ companyId: { some: 0n } }, "CreateContactParams").company_id,
+      { some: 0 },
+    )
+    const out = stdbParamsToJson(
+      { min: { some: -5 }, max: { some: 0 }, minLength: { none: [] } },
+      "FieldValidation",
+    )
+    assert.deepEqual(out.min, { some: -5 })
+    assert.deepEqual(out.max, { some: 0 })
+    assert.deepEqual(out.min_length, { none: [] })
+  })
+
+  it("serializes signed optional integers without losing zero or negative values", () => {
+    for (const value of [0n, -1n, -1_700_000_000_000_000n]) {
+      for (const expectedUpdatedAtMicros of [value, { some: value }]) {
+        const out = stdbParamsToJson({ expectedUpdatedAtMicros }, "PublishFormConfigurationParams")
+        assert.deepEqual(out.expected_updated_at_micros, { some: Number(value) })
+      }
+    }
+    assert.throws(
+      () => stdbParamsToJson({ expectedUpdatedAtMicros: -9_007_199_254_740_992n }, "PublishFormConfigurationParams"),
+      /exceeds Number.MAX_SAFE_INTEGER/,
+    )
+  })
+
+  it("preserves nested form validation bounds and false options", () => {
+    const out = encodeReducerCallArgs("publish_form_configuration", [7, {
+      fields: [{ validation: { required: false, minLength: 0, min: -5, max: 0 } }],
+      roleConfigs: [],
+    }])[1] as Record<string, unknown>
+    const field = (out.fields as Record<string, unknown>[])[0]
+    assert.deepEqual(field.validation, {
+      required: false,
+      min_length: { some: 0 },
+      max_length: { none: [] },
+      min: { some: -5 },
+      max: { some: 0 },
+      pattern: { none: [] },
+      message: { none: [] },
+    })
+    assert.deepEqual(
+      stdbParamsToJson({ active: false }, "UpdateAccountTaxParams").active,
+      { some: false },
+    )
+  })
+
+  it("does not send a row-only asset field in the create contract", () => {
+    const out = stdbParamsToJson({ name: "Machine" }, "CreateAccountAssetParams")
+    assert.equal("salvage_move_id" in out, false)
+    assert.deepEqual(out.depreciation_schedule, { none: [] })
+    assert.deepEqual(stdbParamsToJson({}, "AccountAsset").salvage_move_id, { none: [] })
+  })
+
   it("wraps an end-contact-role reason as an optional string", () => {
     const out = stdbParamsToJson(
       { reason: "test correction" },
@@ -106,6 +242,52 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.tag_ids, [])
     assert.deepEqual(params.phone, { none: [] })
     assert.deepEqual(params.stage_id, { none: [] })
+  })
+
+  it("encodeReducerCallArgs SATS-encodes CreateAccountAccountParams fixtures", () => {
+    const encoded = encodeReducerCallArgs("create_account_account", [
+      9,
+      {
+        company_id: 28,
+        code: "PTESTD",
+        name: "Permission test debit account",
+        user_type_id: 7,
+        currency_id: null,
+        internal_type: { tag: "Expense" },
+        internal_group: { tag: "Expense" },
+        group_id: null,
+        reconcile: false,
+        tax_ids: [],
+        note: null,
+        opening_debit: 0,
+        opening_credit: 0,
+        allowed_journal_ids: [],
+        non_trade: false,
+        is_off_balance: false,
+        metadata: JSON.stringify({ test: "auth-permission-enforcement" }),
+      },
+    ])
+
+    assert.equal(encoded[0], 9)
+    assert.deepEqual(encoded[1], {
+      company_id: { some: 28 },
+      code: "PTESTD",
+      name: "Permission test debit account",
+      user_type_id: 7,
+      currency_id: { none: [] },
+      internal_type: { some: { expense: [] } },
+      internal_group: { some: { expense: [] } },
+      group_id: { none: [] },
+      reconcile: false,
+      tax_ids: [],
+      note: { none: [] },
+      opening_debit: 0,
+      opening_credit: 0,
+      allowed_journal_ids: [],
+      non_trade: false,
+      is_off_balance: false,
+      metadata: { some: JSON.stringify({ test: "auth-permission-enforcement" }) },
+    })
   })
 
   it("encodeReducerCallArgs SATS-encodes convert_lead_to_customer params", () => {
@@ -209,6 +391,22 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.sale_order_id, { some: 8 })
     assert.deepEqual(params.return_reason, { some: "defective" })
     assert.deepEqual(line.sale_order_line_id, { none: [] })
+    assert.equal(line.product_id, 3)
+  })
+
+  it("stdbParamsToJson SATS-encodes nested purchase requisition line Option fields", () => {
+    const params = stdbParamsToJson({
+      lines: [{
+        productId: 3n,
+        productUom: 1n,
+        productUomQty: 2,
+        name: "Operator requisition",
+        sequence: 10,
+      }],
+    }, "CreatePurchaseRequisitionParams")
+    const line = (params.lines as Record<string, unknown>[])[0]
+    assert.deepEqual(line.name, { some: "Operator requisition" })
+    assert.deepEqual(line.sequence, { some: 10 })
     assert.equal(line.product_id, 3)
   })
 
@@ -519,6 +717,83 @@ describe("stdbParamsToJson", () => {
       active: false,
     })
   })
+
+  it("encodes subscription invoice option fields", () => {
+    assert.deepEqual(
+      stdbParamsToJson(
+        {
+          invoiceDate: { microsSinceUnixEpoch: 1_790_985_600_000_000n },
+          billingRunKey: "run-41",
+          incomeAccountId: 807n,
+          receivableAccountId: 805n,
+        },
+        "GenerateSubscriptionInvoiceParams",
+      ),
+      {
+        invoice_date: {
+          __timestamp_micros_since_unix_epoch__: 1_790_985_600_000_000,
+        },
+        billing_run_key: { some: "run-41" },
+        journal_id: { none: [] },
+        income_account_id: 807,
+        receivable_account_id: 805,
+        tax_account_id: { none: [] },
+      },
+    )
+  })
+
+  it("emits every optional subscription payment field", () => {
+    assert.deepEqual(
+      stdbParamsToJson(
+        {
+          invoiceMoveId: 41n,
+          paymentJournalId: 7n,
+          bankAccountId: 1200n,
+          receivableAccountId: 805n,
+          cogsAccountId: 808n,
+          inventoryAccountId: 809n,
+        },
+        "ApplySubscriptionInvoicePaymentParams",
+      ),
+      {
+        invoice_move_id: 41,
+        payment_journal_id: 7,
+        bank_account_id: 1200,
+        receivable_account_id: 805,
+        amount: { none: [] },
+        payment_date: { none: [] },
+        cogs_account_id: 808,
+        inventory_account_id: 809,
+        ref: { none: [] },
+        memo: { none: [] },
+      },
+    )
+  })
+})
+
+describe("workflow subject snapshot reducer params", () => {
+  it("encodes the generated params struct with SATS snake_case fields", () => {
+    assert.deepEqual(
+      encodeReducerCallArgs("request_workflow_subject_snapshot", [
+        2n,
+        3n,
+        {
+          subjectModel: "sale_order",
+          subjectId: 5n,
+          workflowVersionId: 7n,
+        },
+      ]),
+      [
+        2n,
+        3n,
+        {
+          subject_model: "sale_order",
+          subject_id: 5,
+          workflow_version_id: 7,
+        },
+      ],
+    )
+  })
 })
 
 describe("encodeTaggedUnitEnum", () => {
@@ -602,5 +877,17 @@ describe("camelToSnakeIdentifier", () => {
   it("handles numeric image field suffixes", () => {
     assert.equal(camelToSnakeIdentifier("image1920Url"), "image_1920_url")
     assert.equal(camelToSnakeIdentifier("image128Url"), "image_128_url")
+  })
+
+  it("preserves the generated 1K acronym boundary", () => {
+    assert.equal(camelToSnakeIdentifier("costPer1KTokens"), "cost_per_1k_tokens")
+    assert.equal(
+      camelToSnakeIdentifier("inputCostPer1KMicrounits"),
+      "input_cost_per_1k_microunits",
+    )
+    assert.equal(
+      camelToSnakeIdentifier("outputCostPer1KMicrounits"),
+      "output_cost_per_1k_microunits",
+    )
   })
 })

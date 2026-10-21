@@ -5,7 +5,7 @@ mod admin;
 mod ai_capabilities;
 mod ai_certifications;
 mod ai_evidence;
-mod auth;
+pub(crate) mod auth;
 mod billing;
 mod bootstrap;
 mod country_packs;
@@ -23,6 +23,7 @@ mod presentation;
 mod proposals;
 pub(crate) mod queries;
 pub(crate) mod reports;
+mod rwanda_statutory_readiness;
 mod sales;
 mod session;
 mod settings;
@@ -65,6 +66,7 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(reports::router())
         .merge(country_packs::router())
         .merge(statutory_adapters::router())
+        .merge(rwanda_statutory_readiness::router())
         .merge(vertical_packs::router())
         .merge(whatsapp_webhooks::router())
 }

@@ -18,6 +18,7 @@ use crate::inventory::warehouse::warehouse;
 use crate::manufacturing::manufacturing_orders::{
     mrp_workorder, require_workorder_execution_scope, MrpWorkorder,
 };
+use crate::manufacturing::effects::ManufacturingEffectSnapshot;
 use serde_json;
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -426,6 +427,7 @@ pub fn create_workorder_quality_check(
     }) {
         return Err("Work order already has a quality check".to_string());
     }
+    let effects = ManufacturingEffectSnapshot::capture(ctx, &mo)?;
     let row = ctx.db.quality_check().insert(QualityCheck {
         id: 0,
         organization_id,
@@ -481,7 +483,22 @@ pub fn create_workorder_quality_check(
         new_values: Some(serde_json::json!({"workorder_id": workorder_id, "production_id": mo.id}).to_string()),
         changed_fields: vec!["workorder_id".to_string(), "production_id".to_string()], metadata: None,
     });
+    effects.record(ctx, "erp.create_workorder_quality_check")?;
     Ok(())
+}
+
+fn manufacturing_quality_effects(
+    ctx: &ReducerContext,
+    check: &QualityCheck,
+) -> Result<Option<ManufacturingEffectSnapshot>, String> {
+    let Some(workorder_id) = check.workorder_id else { return Ok(None); };
+    let (wo, mo) = require_workorder_execution_scope(
+        ctx, check.organization_id, check.company_id, workorder_id,
+    )?;
+    if check.production_id != Some(mo.id) || !wo.check_ids.contains(&check.id) {
+        return Err("Quality check does not match workorder ownership".to_string());
+    }
+    Ok(Some(ManufacturingEffectSnapshot::capture(ctx, &mo)?))
 }
 
 fn sync_workorder_quality(ctx: &ReducerContext, check: &QualityCheck, state: &str) -> Result<(), String> {
@@ -526,6 +543,7 @@ pub fn fail_workorder_quality_check(
     if note.trim().is_empty() {
         return Err("Failure note is required".to_string());
     }
+    let effects = manufacturing_quality_effects(ctx, &check)?;
     sync_workorder_quality(ctx, &check, "fail")?;
     ctx.db.quality_check().id().update(QualityCheck {
         quality_state: "fail".to_string(), status: "completed".to_string(),
@@ -538,6 +556,9 @@ pub fn fail_workorder_quality_check(
         new_values: Some(serde_json::json!({"quality_state": "fail", "status": "completed"}).to_string()),
         changed_fields: vec!["quality_state".to_string(), "status".to_string()], metadata: None,
     });
+    if let Some(effects) = effects {
+        effects.record(ctx, "erp.fail_workorder_quality_check")?;
+    }
     Ok(())
 }
 
@@ -638,6 +659,7 @@ pub fn pass_quality_check(
         "pass".to_string()
     };
 
+    let effects = manufacturing_quality_effects(ctx, &record)?;
     sync_workorder_quality(ctx, &record, &new_quality_state)?;
 
     ctx.db.quality_check().id().update(QualityCheck {
@@ -678,6 +700,9 @@ pub fn pass_quality_check(
         },
     );
 
+    if let Some(effects) = effects {
+        effects.record(ctx, "erp.pass_quality_check")?;
+    }
     Ok(())
 }
 

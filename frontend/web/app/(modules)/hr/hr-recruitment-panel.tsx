@@ -2,15 +2,10 @@
 
 import { useMemo, useState } from "react"
 
+import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
 import { Input } from "@lumiere/ui/components/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@lumiere/ui/components/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 import type { QueryRows } from "@lumiere/query-hooks/http"
 import {
   useApplicants,
@@ -19,14 +14,7 @@ import {
   useUpdateHrApplicant,
 } from "@lumiere/query-hooks/hooks/hr"
 
-const STAGES = [
-  "applied",
-  "screening",
-  "interview",
-  "offer",
-  "hired",
-  "rejected",
-] as const
+const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"] as const
 
 function rowId(row: Record<string, unknown>): number {
   return Number(row.id ?? row.Id ?? 0)
@@ -37,11 +25,9 @@ interface HrRecruitmentPanelProps {
   companyId: bigint
 }
 
-/** Recruitment tab — open positions + applicant pipeline stub. */
-export function HrRecruitmentPanel({
-  organizationId,
-  companyId,
-}: HrRecruitmentPanelProps) {
+/** Recruitment tab — open positions and the persisted applicant pipeline. */
+export function HrRecruitmentPanel({ organizationId, companyId }: HrRecruitmentPanelProps) {
+  const { t } = useTranslation()
   const { data: jobs = [] } = useJobPositions(organizationId)
   const { data: applicants = [] } = useApplicants(organizationId)
   const createApplicant = useCreateHrApplicant(organizationId, companyId)
@@ -52,11 +38,21 @@ export function HrRecruitmentPanel({
   const [jobId, setJobId] = useState("")
   const [error, setError] = useState<string | null>(null)
 
+  const stageLabels: Record<(typeof STAGES)[number], string> = {
+    applied: t("hr.recruitment.stages.applied", { defaultValue: "Applied" }),
+    screening: t("hr.recruitment.stages.screening", {
+      defaultValue: "Screening",
+    }),
+    interview: t("hr.recruitment.stages.interview", {
+      defaultValue: "Interview",
+    }),
+    offer: t("hr.recruitment.stages.offer", { defaultValue: "Offer" }),
+    hired: t("hr.recruitment.stages.hired", { defaultValue: "Hired" }),
+    rejected: t("hr.recruitment.stages.rejected", { defaultValue: "Rejected" }),
+  }
+
   const recruitJobs = useMemo(
-    () =>
-      (jobs as QueryRows).filter(
-        (j) => String((j as Record<string, unknown>).state ?? "") === "recruit",
-      ),
+    () => (jobs as QueryRows).filter((j) => String((j as Record<string, unknown>).state ?? "") === "recruit"),
     [jobs],
   )
 
@@ -65,16 +61,24 @@ export function HrRecruitmentPanel({
     try {
       await fn()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed")
+      setError(e instanceof Error ? e.message : t("hr.recruitment.actionFailed", { defaultValue: "Action failed" }))
     }
   }
 
   return (
     <div className="flex flex-col gap-6 p-4">
       <section className="space-y-2">
-        <h3 className="text-sm font-medium">Open positions (recruit)</h3>
+        <h3 className="text-sm font-medium">
+          {t("hr.recruitment.openPositions", {
+            defaultValue: "Open positions (recruit)",
+          })}
+        </h3>
         {recruitJobs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No positions in recruit state.</p>
+          <p className="text-sm text-muted-foreground">
+            {t("hr.recruitment.noOpenPositions", {
+              defaultValue: "No positions in recruit state.",
+            })}
+          </p>
         ) : (
           <ul className="text-sm space-y-1">
             {recruitJobs.map((j) => {
@@ -90,23 +94,31 @@ export function HrRecruitmentPanel({
       </section>
 
       <section className="space-y-3 border-t pt-4">
-        <h3 className="text-sm font-medium">Add applicant</h3>
+        <h3 className="text-sm font-medium">{t("hr.recruitment.addApplicant", { defaultValue: "Add applicant" })}</h3>
         <div className="flex flex-wrap gap-2 items-end">
           <Input
-            placeholder="Name"
+            placeholder={t("hr.recruitment.namePlaceholder", {
+              defaultValue: "Name",
+            })}
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="max-w-xs"
           />
           <Input
-            placeholder="Email"
+            placeholder={t("hr.recruitment.emailPlaceholder", {
+              defaultValue: "Email",
+            })}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="max-w-xs"
           />
           <Select value={jobId} onValueChange={setJobId}>
             <SelectTrigger className="w-[220px]">
-              <SelectValue placeholder="Job position" />
+              <SelectValue
+                placeholder={t("hr.recruitment.jobPlaceholder", {
+                  defaultValue: "Job position",
+                })}
+              />
             </SelectTrigger>
             <SelectContent>
               {recruitJobs.map((j) => {
@@ -135,18 +147,29 @@ export function HrRecruitmentPanel({
               })
             }
           >
-            Add
+            {t("hr.recruitment.add", { defaultValue: "Add" })}
           </Button>
         </div>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        {error ? (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
       </section>
 
       <section className="space-y-2 border-t pt-4">
         <h3 className="text-sm font-medium">
-          Applicants ({(applicants as QueryRows).length})
+          {t("hr.recruitment.applicantCount", {
+            defaultValue: "Applicants ({{count}})",
+            count: (applicants as QueryRows).length,
+          })}
         </h3>
         {(applicants as QueryRows).length === 0 ? (
-          <p className="text-sm text-muted-foreground">No applicants yet.</p>
+          <p className="text-sm text-muted-foreground">
+            {t("hr.recruitment.noApplicants", {
+              defaultValue: "No applicants yet.",
+            })}
+          </p>
         ) : (
           <ul className="space-y-2 text-sm">
             {(applicants as QueryRows).map((a) => {
@@ -154,15 +177,15 @@ export function HrRecruitmentPanel({
               const id = rowId(row)
               const stage = String(row.stage ?? "applied")
               return (
-                <li
-                  key={id}
-                  className="flex flex-wrap items-center gap-2 justify-between border rounded-md px-3 py-2"
-                >
+                <li key={id} className="flex flex-wrap items-center gap-2 justify-between border rounded-md px-3 py-2">
                   <span>
                     {String(row.name ?? "—")}
                     {row.email ? ` · ${String(row.email)}` : ""}
-                    {" · job #"}
-                    {String(row.job_position_id ?? row.jobPositionId ?? "—")}
+                    {" · "}
+                    {t("hr.recruitment.jobReference", {
+                      defaultValue: "job #{{id}}",
+                      id: String(row.job_position_id ?? row.jobPositionId ?? "—"),
+                    })}
                   </span>
                   <Select
                     value={stage}
@@ -181,7 +204,7 @@ export function HrRecruitmentPanel({
                     <SelectContent>
                       {STAGES.map((s) => (
                         <SelectItem key={s} value={s}>
-                          {s}
+                          {stageLabels[s]}
                         </SelectItem>
                       ))}
                     </SelectContent>

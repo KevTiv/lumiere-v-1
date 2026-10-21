@@ -18,13 +18,14 @@ use crate::helpers::{
     calculate_tax, check_permission, next_doc_number, write_audit_log_v2, AuditLogParams,
 };
 use crate::hr::employees::hr_department;
-use crate::inventory::product::{product, product_variant, Product};
+use crate::inventory::inventory_close::assert_inventory_writable;
+use crate::inventory::product::{product, product_supplier_info, product_variant, Product};
 use crate::inventory::tracking::stock_production_lot;
 use crate::manufacturing::relations::{require_uom_compatible, require_uom_in_org};
 use crate::sales::oms_extensions::{account_fiscal_position, account_incoterm};
-use crate::types::TaxTypeUse;
 use crate::types::{
     ExclusiveMode, IsQuantityCopy, LineState, PoInvoiceStatus, PoState, RequisitionState,
+    TaxAmountType, TaxTypeUse,
 };
 use crate::workflow::action_registry::{
     GuardedActionInput, GuardedActionKey, GUARDED_ACTION_SCHEMA_VERSION,
@@ -273,6 +274,21 @@ pub struct AddPurchaseOrderLineParams {
     pub metadata: Option<String>,
 }
 
+/// Narrow service contract used only by automatic Inventory replenishment.
+/// Unlike the interactive reducers, the caller cannot supply arbitrary reverse
+/// relations, tax/accounting links, or impersonated audit identities.
+pub(crate) struct ReplenishmentPurchaseDemandParams {
+    pub company_id: u64,
+    pub rule_id: u64,
+    pub partner_id: u64,
+    pub product_id: u64,
+    pub uom_id: u64,
+    pub quantity: f64,
+    pub price_unit: f64,
+    pub currency_id: u64,
+    pub date_planned: Option<Timestamp>,
+}
+
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct UpdatePurchaseOrderParams {
     pub origin: Option<String>,
@@ -353,6 +369,26 @@ fn validate_order_in_organization(
     organization_id: u64,
     order_id: u64,
 ) -> Result<PurchaseOrder, String> {
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        order.company_id,
+        ctx.sender(),
+    )?;
+    Ok(order)
+}
+
+/// Load an order through its tenant-owned parent without applying interactive
+/// company membership. Crate-internal service paths use this only after their
+/// own narrow authorization and relation checks have established company
+/// scope; user-facing reducers must continue to use
+/// `validate_order_in_organization`.
+fn load_order_in_organization(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<PurchaseOrder, String> {
     let order = ctx
         .db
         .purchase_order()
@@ -384,6 +420,12 @@ fn require_requisition_in_organization(
         return Err("Purchase requisition does not belong to this organization".to_string());
     }
     require_company_in_organization(ctx, organization_id, requisition.company_id)?;
+    crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        requisition.company_id,
+        ctx.sender(),
+    )?;
     Ok(requisition)
 }
 
@@ -476,6 +518,44 @@ fn require_purchase_taxes(
         }
     }
     Ok(())
+}
+
+fn purchase_line_amounts(
+    ctx: &ReducerContext,
+    tax_ids: &[u64],
+    gross: f64,
+) -> Result<(f64, f64, f64), String> {
+    let taxes: Vec<_> = tax_ids
+        .iter()
+        .map(|tax_id| {
+            ctx.db
+                .account_tax()
+                .id()
+                .find(tax_id)
+                .ok_or_else(|| "Purchase tax not found".to_string())
+        })
+        .collect::<Result<_, _>>()?;
+    if taxes
+        .iter()
+        .all(|tax| tax.amount_type == TaxAmountType::Percent && tax.amount >= 0.0)
+    {
+        let rules: Vec<_> = taxes
+            .iter()
+            .map(|tax| crate::accounting::bill_economics::PercentageTax {
+                id: tax.id,
+                rate: tax.amount,
+                included: tax.price_include,
+            })
+            .collect();
+        let economics = crate::accounting::bill_economics::percentage_tax_amounts(gross, &rules)?;
+        return Ok((
+            economics.subtotal,
+            economics.taxes.values().sum(),
+            economics.total,
+        ));
+    }
+    let tax = calculate_tax(ctx, tax_ids, gross);
+    Ok((gross, tax, gross + tax))
 }
 
 fn require_product_variant_for_product(
@@ -772,7 +852,28 @@ pub fn create_purchase_order(
     organization_id: u64,
     params: CreatePurchaseOrderParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "purchase_order", "create")?;
+    create_purchase_order_record(ctx, organization_id, params).map(|_| ())
+}
+
+/// Creates a purchase order and returns its id, so callers that build on the new order own its
+/// identity instead of rediscovering it by scanning for the newest matching row.
+pub(crate) fn create_purchase_order_record(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreatePurchaseOrderParams,
+) -> Result<u64, String> {
+    create_purchase_order_record_impl(ctx, organization_id, params, true)
+}
+
+fn create_purchase_order_record_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: CreatePurchaseOrderParams,
+    enforce_user_permission: bool,
+) -> Result<u64, String> {
+    if enforce_user_permission {
+        check_permission(ctx, organization_id, "purchase_order", "create")?;
+    }
 
     if let Some(ref iqc) = params.is_quantity_copy {
         IsQuantityCopy::from_str(iqc)?;
@@ -875,7 +976,7 @@ pub fn create_purchase_order(
     );
 
     log::info!("Purchase order {} created", order.id);
-    Ok(())
+    Ok(order.id)
 }
 
 /// Send purchase order to vendor (change state from Draft to Sent)
@@ -1585,9 +1686,25 @@ pub fn add_purchase_order_line(
     order_id: u64,
     params: AddPurchaseOrderLineParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "purchase_order_line", "create")?;
+    add_purchase_order_line_impl(ctx, organization_id, order_id, params, true).map(|_| ())
+}
 
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+fn add_purchase_order_line_impl(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+    params: AddPurchaseOrderLineParams,
+    enforce_user_permission: bool,
+) -> Result<u64, String> {
+    if enforce_user_permission {
+        check_permission(ctx, organization_id, "purchase_order_line", "create")?;
+    }
+
+    let order = if enforce_user_permission {
+        validate_order_in_organization(ctx, organization_id, order_id)?
+    } else {
+        load_order_in_organization(ctx, organization_id, order_id)?
+    };
 
     if order.state != PoState::Draft {
         return Err("Can only add lines to draft purchase orders".to_string());
@@ -1626,8 +1743,8 @@ pub fn add_purchase_order_line(
         params.lot_id,
     )?;
 
-    let subtotal = params.quantity * params.price_unit;
-    let tax = calculate_tax(ctx, &params.tax_ids, subtotal);
+    let (subtotal, tax, total) =
+        purchase_line_amounts(ctx, &params.tax_ids, params.quantity * params.price_unit)?;
     let company_id = order.company_id;
 
     let line = ctx.db.purchase_order_line().insert(PurchaseOrderLine {
@@ -1646,7 +1763,7 @@ pub fn add_purchase_order_line(
         product_template_id: None,
         price_unit: params.price_unit,
         price_subtotal: subtotal,
-        price_total: subtotal + tax,
+        price_total: total,
         price_tax: tax,
         order_id,
         account_analytic_id: params.account_analytic_id,
@@ -1684,10 +1801,14 @@ pub fn add_purchase_order_line(
         ..order
     });
 
-    compute_purchase_order_line_totals(ctx, organization_id, order_id)?;
-    compute_purchase_order_totals(ctx, organization_id, order_id)?;
-    update_po_receipt_status(ctx, organization_id, order_id)?;
-    update_po_invoice_status(ctx, organization_id, order_id)?;
+    // The line mutation above is already authorized: either by the public
+    // reducer's create permission or by the narrow scheduled-replenishment
+    // service boundary. Derived-state refreshes must not re-enter interactive
+    // RBAC, because scheduled reducers execute as the scheduler identity.
+    refresh_purchase_order_line_totals(ctx, organization_id, order_id)?;
+    refresh_purchase_order_totals(ctx, organization_id, order_id)?;
+    refresh_po_receipt_status(ctx, organization_id, order_id)?;
+    refresh_po_invoice_status(ctx, organization_id, order_id)?;
 
     write_audit_log_v2(
         ctx,
@@ -1713,7 +1834,109 @@ pub fn add_purchase_order_line(
     );
 
     log::info!("Line added to purchase order {}", order_id);
-    Ok(())
+    Ok(line.id)
+}
+
+/// Create the exact draft PO and line authorized by an automatic replenishment
+/// rule. This is deliberately one atomic, crate-internal operation: scheduled
+/// reducers have no interactive membership, while the narrow input shape and
+/// supplier relation below prevent the service path from becoming a generic
+/// RBAC bypass. Audit ownership remains `ctx.sender()` (the scheduler actor).
+pub(crate) fn create_replenishment_purchase_demand(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: ReplenishmentPurchaseDemandParams,
+) -> Result<(u64, u64), String> {
+    crate::core::reconstruction::require_writes_unfenced(ctx, organization_id)?;
+    require_company_in_organization(ctx, organization_id, params.company_id)?;
+    assert_inventory_writable(ctx, organization_id, params.company_id)?;
+
+    if !params.quantity.is_finite() || params.quantity <= 0.0 {
+        return Err("Replenishment purchase quantity must be positive and finite".to_string());
+    }
+    if !params.price_unit.is_finite() || params.price_unit < 0.0 {
+        return Err("Replenishment purchase price must be non-negative and finite".to_string());
+    }
+
+    // Service authorization is bounded to a real active supplier relation for
+    // this tenant/company/product/currency. Header and line helpers below then
+    // revalidate vendor, product, UOM, currency, and every persisted relation.
+    let supplier_authorized = ctx.db.product_supplier_info().iter().any(|info| {
+        info.organization_id == organization_id
+            && info.is_active
+            && info.partner_id == params.partner_id
+            && (info.product_id == Some(params.product_id)
+                || info.product_tmpl_id == Some(params.product_id))
+            && info.currency_id == params.currency_id
+            && (info.company_id.is_none() || info.company_id == Some(params.company_id))
+    });
+    if !supplier_authorized {
+        return Err(
+            "No active company-compatible supplier relation authorizes this replenishment demand"
+                .to_string(),
+        );
+    }
+
+    let service_metadata = Some(
+        serde_json::json!({
+            "replenishment_rule_id": params.rule_id,
+            "service_path": "scheduled_replenishment",
+            "service_actor": ctx.sender().to_string(),
+        })
+        .to_string(),
+    );
+    let order_id = create_purchase_order_record_impl(
+        ctx,
+        organization_id,
+        CreatePurchaseOrderParams {
+            company_id: Some(params.company_id),
+            partner_id: params.partner_id,
+            currency_id: params.currency_id,
+            origin: Some(format!("REPLENISH-{}", params.rule_id)),
+            partner_ref: Some(format!("RPL-{}", params.rule_id)),
+            notes: Some("Auto replenishment purchase demand".to_string()),
+            date_planned: params.date_planned,
+            payment_term_id: None,
+            fiscal_position_id: None,
+            incoterm_id: None,
+            incoterm_location: None,
+            user_id: None,
+            invoice_ids: vec![],
+            picking_ids: vec![],
+            message_follower_ids: vec![],
+            message_ids: vec![],
+            activity_ids: vec![],
+            is_quantity_copy: None,
+            metadata: service_metadata.clone(),
+        },
+        false,
+    )?;
+
+    let line_id = add_purchase_order_line_impl(
+        ctx,
+        organization_id,
+        order_id,
+        AddPurchaseOrderLineParams {
+            product_id: params.product_id,
+            quantity: params.quantity,
+            uom_id: params.uom_id,
+            price_unit: params.price_unit,
+            discount: 0.0,
+            tax_ids: vec![],
+            name: Some(format!("Replenish product {}", params.product_id)),
+            sequence: Some(10),
+            display_type: None,
+            product_variant_id: None,
+            account_analytic_id: None,
+            date_planned: params.date_planned,
+            propagate_cancel: Some(true),
+            lot_id: None,
+            metadata: service_metadata,
+        },
+        false,
+    )?;
+
+    Ok((order_id, line_id))
 }
 
 /// Remove a line from a purchase order
@@ -1827,17 +2050,20 @@ pub fn update_purchase_order_line(
         lot_id,
     )?;
 
-    let subtotal = quantity * price_unit;
-    // Preserve existing tax when caller omits tax_ids (do not wipe to []).
-    let tax = match &params.tax_ids {
-        Some(ids) => calculate_tax(ctx, ids, subtotal),
-        None => {
-            if line.price_subtotal.abs() > f64::EPSILON {
-                subtotal * (line.price_tax / line.price_subtotal)
-            } else {
-                line.price_tax
+    // Tax identities are not retained on legacy PO lines. Repricing a taxed
+    // line without explicit identities would manufacture new aggregate evidence.
+    let (subtotal, tax, total) = match &params.tax_ids {
+        Some(ids) => purchase_line_amounts(ctx, ids, quantity * price_unit)?,
+        None if params.quantity.is_some() || params.price_unit.is_some() => {
+            if line.price_tax.abs() > 1e-8 {
+                return Err(
+                    "Taxed PO line repricing requires explicit purchase tax identities".into(),
+                );
             }
+            let subtotal = quantity * price_unit;
+            (subtotal, 0.0, subtotal)
         }
+        None => (line.price_subtotal, line.price_tax, line.price_total),
     };
 
     let date_planned = params.date_planned.or(line.date_planned);
@@ -1857,7 +2083,7 @@ pub fn update_purchase_order_line(
         price_unit,
         price_subtotal: subtotal,
         price_tax: tax,
-        price_total: subtotal + tax,
+        price_total: total,
         date_planned,
         product_variant_id,
         account_analytic_id,
@@ -1972,8 +2198,16 @@ pub fn compute_purchase_order_line_totals(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order_line", "write")?;
+    validate_order_in_organization(ctx, organization_id, order_id)?;
+    refresh_purchase_order_line_totals(ctx, organization_id, order_id)
+}
 
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+fn refresh_purchase_order_line_totals(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
     let lines: Vec<_> = ctx
         .db
         .purchase_order_line()
@@ -2031,8 +2265,16 @@ pub fn compute_purchase_order_totals(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
+    validate_order_in_organization(ctx, organization_id, order_id)?;
+    refresh_purchase_order_totals(ctx, organization_id, order_id)
+}
 
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+fn refresh_purchase_order_totals(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
 
     let lines: Vec<_> = ctx
         .db
@@ -2092,8 +2334,16 @@ pub fn update_po_receipt_status(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
+    validate_order_in_organization(ctx, organization_id, order_id)?;
+    refresh_po_receipt_status(ctx, organization_id, order_id)
+}
 
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+fn refresh_po_receipt_status(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
 
     let lines: Vec<_> = ctx
         .db
@@ -2143,7 +2393,69 @@ pub fn update_po_receipt_status(
     Ok(())
 }
 
-/// Update purchase order invoice status based on invoiced quantities.
+/// Coverage of currently received quantities, not ordered fulfillment (receipt_status).
+/// Per-line comparison prevents an overbilled line from hiding another unbilled line.
+/// This derived status does not replace three-way-match/overbilling validation.
+fn invoice_status_for_received_quantities(
+    quantities: impl IntoIterator<Item = (f64, f64)>,
+) -> PoInvoiceStatus {
+    let mut any_invoiced = false;
+    let mut all_received_covered = true;
+    for (received, invoiced) in quantities {
+        any_invoiced |= invoiced > 0.0;
+        all_received_covered &= received <= invoiced;
+    }
+    if !any_invoiced {
+        PoInvoiceStatus::No
+    } else if all_received_covered {
+        PoInvoiceStatus::Invoiced
+    } else {
+        PoInvoiceStatus::Partial
+    }
+}
+
+#[cfg(test)]
+mod invoice_status_tests {
+    use super::{invoice_status_for_received_quantities, PoInvoiceStatus};
+
+    #[test]
+    fn later_receipt_reopens_current_cycle_invoice_coverage() {
+        for (received, invoiced, expected) in [
+            (0.0, 0.0, PoInvoiceStatus::No),
+            (4.0, 0.0, PoInvoiceStatus::No),
+            (4.0, 4.0, PoInvoiceStatus::Invoiced),
+            (10.0, 4.0, PoInvoiceStatus::Partial),
+            (10.0, 10.0, PoInvoiceStatus::Invoiced),
+        ] {
+            assert_eq!(
+                invoice_status_for_received_quantities([(received, invoiced)]),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn coverage_is_per_line_not_aggregate_netting() {
+        assert_eq!(
+            invoice_status_for_received_quantities([]),
+            PoInvoiceStatus::No
+        );
+        assert_eq!(
+            invoice_status_for_received_quantities([(4.0, 0.0), (6.0, 0.0)]),
+            PoInvoiceStatus::No
+        );
+        assert_eq!(
+            invoice_status_for_received_quantities([(4.0, 8.0), (4.0, 0.0)]),
+            PoInvoiceStatus::Partial
+        );
+        assert_eq!(
+            invoice_status_for_received_quantities([(4.0, 4.0), (0.0, 0.0)]),
+            PoInvoiceStatus::Invoiced
+        );
+    }
+}
+
+/// Update purchase order invoice status based on currently received quantities.
 #[reducer]
 pub fn update_po_invoice_status(
     ctx: &ReducerContext,
@@ -2151,26 +2463,26 @@ pub fn update_po_invoice_status(
     order_id: u64,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order", "write")?;
+    validate_order_in_organization(ctx, organization_id, order_id)?;
 
-    let order = validate_order_in_organization(ctx, organization_id, order_id)?;
+    refresh_po_invoice_status(ctx, organization_id, order_id)
+}
 
-    let lines: Vec<_> = ctx
-        .db
-        .purchase_order_line()
-        .purchase_order_line_by_order()
-        .filter(&order_id)
-        .collect();
+/// Internal derived-state refresh after an already-authorized domain mutation.
+pub(crate) fn refresh_po_invoice_status(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    order_id: u64,
+) -> Result<(), String> {
+    let order = load_order_in_organization(ctx, organization_id, order_id)?;
 
-    let total_ordered: f64 = lines.iter().map(|l| l.product_qty).sum();
-    let total_invoiced: f64 = lines.iter().map(|l| l.qty_invoiced).sum();
-
-    let invoice_status = if lines.is_empty() || total_invoiced <= 0.0 {
-        PoInvoiceStatus::No
-    } else if total_invoiced >= total_ordered && total_ordered > 0.0 {
-        PoInvoiceStatus::Invoiced
-    } else {
-        PoInvoiceStatus::Partial
-    };
+    let invoice_status = invoice_status_for_received_quantities(
+        ctx.db
+            .purchase_order_line()
+            .purchase_order_line_by_order()
+            .filter(&order_id)
+            .map(|line| (line.qty_received, line.qty_invoiced)),
+    );
 
     let company_id = order.company_id;
     let old_invoice_status = format!("{:?}", order.invoice_status);
@@ -2284,8 +2596,8 @@ pub fn receive_po_line(
 
     check_permission(ctx, organization_id, "purchase_order_line", "write")?;
 
-    if qty <= 0.0 {
-        return Err("Received quantity must be greater than zero".to_string());
+    if !qty.is_finite() || qty <= 0.0 {
+        return Err("Received quantity must be finite and greater than zero".to_string());
     }
 
     let line = ctx
@@ -2418,6 +2730,7 @@ pub fn receive_po_line(
         let match_state =
             compute_line_match_state(&line_after, qty_match_tolerance_for_order(&order_after));
         persist_line_match_state(ctx, &order_after, line_after);
+        refresh_po_invoice_status(ctx, organization_id, order_id)?;
 
         write_audit_log_v2(
             ctx,
@@ -2469,6 +2782,7 @@ pub fn receive_po_line(
 
     update_po_receipt_status(ctx, organization_id, order_id)?;
     compute_purchase_order_totals(ctx, organization_id, order_id)?;
+    refresh_po_invoice_status(ctx, organization_id, order_id)?;
 
     write_audit_log_v2(
         ctx,
@@ -2510,8 +2824,8 @@ pub fn invoice_po_line(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "purchase_order_line", "write")?;
 
-    if qty <= 0.0 {
-        return Err("Invoiced quantity must be greater than zero".to_string());
+    if !qty.is_finite() || qty <= 0.0 {
+        return Err("Invoiced quantity must be finite and greater than zero".to_string());
     }
 
     let line = ctx
@@ -2828,6 +3142,10 @@ pub fn submit_purchase_requisition(
         return Err("Purchase requisition must be in Draft state to submit".to_string());
     }
 
+    if requisition_lines(ctx, requisition_id).is_empty() {
+        return Err("Purchase requisition must have lines before submission".to_string());
+    }
+
     ctx.db
         .purchase_requisition()
         .id()
@@ -2872,6 +3190,12 @@ pub fn approve_purchase_requisition(
         return Err("Purchase requisition must be in InProgress state to approve".to_string());
     }
 
+    // A requisition is created on behalf of `user_id`; `create_uid` records
+    // who inserted it. Neither actor may approve the spend they initiated.
+    if requisition.user_id == ctx.sender() || requisition.create_uid == ctx.sender() {
+        return Err("Purchase requisition requires an independent approver".to_string());
+    }
+
     ctx.db
         .purchase_requisition()
         .id()
@@ -2891,7 +3215,7 @@ pub fn approve_purchase_requisition(
             record_id: requisition_id,
             action: "UPDATE",
             old_values: Some("InProgress".to_string()),
-            new_values: Some("Open".to_string()),
+            new_values: Some("Approved".to_string()),
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
@@ -2906,7 +3230,7 @@ pub fn approve_purchase_requisition(
 pub fn convert_purchase_requisition_to_po(
     ctx: &ReducerContext,
     organization_id: u64,
-    _company_id: u64,
+    company_id: u64,
     requisition_id: u64,
 ) -> Result<(), String> {
     use crate::core::organization::company;
@@ -2915,7 +3239,9 @@ pub fn convert_purchase_requisition_to_po(
     check_permission(ctx, organization_id, "purchase_requisition", "write")?;
 
     let requisition = require_requisition_in_organization(ctx, organization_id, requisition_id)?;
-    let company_id = requisition.company_id;
+    if requisition.company_id != company_id {
+        return Err("Purchase requisition does not belong to the requested company".to_string());
+    }
     if !matches!(requisition.state, RequisitionState::Approved) {
         return Err("Purchase requisition must be Approved to convert to a PO".to_string());
     }
@@ -2931,6 +3257,35 @@ pub fn convert_purchase_requisition_to_po(
         );
     }
 
+    let origin = format!("requisition:{requisition_id}");
+    let existing_orders: Vec<_> = ctx
+        .db
+        .purchase_order()
+        .iter()
+        .filter(|order| {
+            order.organization_id == organization_id
+                && order.company_id == company_id
+                && order.origin.as_deref() == Some(origin.as_str())
+        })
+        .collect();
+    if existing_orders.len() > 1 {
+        return Err(format!(
+            "Multiple purchase orders already match requisition {}",
+            requisition_id
+        ));
+    }
+    if let Some(existing) = existing_orders.first() {
+        if requisition.purchase_ids.contains(&existing.id) {
+            // Lost-response retry: the canonical PO and owning relation already
+            // committed, so return the original outcome without duplicating it.
+            return Ok(());
+        }
+        return Err(format!(
+            "Purchase order {} has requisition origin {} but is missing from the requisition relation",
+            existing.id, requisition_id
+        ));
+    }
+
     let company_row = ctx
         .db
         .company()
@@ -2938,7 +3293,6 @@ pub fn convert_purchase_requisition_to_po(
         .find(&company_id)
         .ok_or("Company not found")?;
 
-    let origin = format!("requisition:{requisition_id}");
     create_purchase_order(
         ctx,
         organization_id,
@@ -2967,18 +3321,21 @@ pub fn convert_purchase_requisition_to_po(
         },
     )?;
 
-    let po = ctx
-        .db
-        .purchase_order()
-        .iter()
-        .filter(|p| {
-            p.organization_id == organization_id
-                && p.company_id == company_id
-                && p.partner_id == vendor_id
-                && p.origin.as_deref() == Some(origin.as_str())
-        })
-        .max_by_key(|p| p.id)
+    let mut created_orders = ctx.db.purchase_order().iter().filter(|p| {
+        p.organization_id == organization_id
+            && p.company_id == company_id
+            && p.partner_id == vendor_id
+            && p.origin.as_deref() == Some(origin.as_str())
+    });
+    let po = created_orders
+        .next()
         .ok_or("Purchase order not found after requisition conversion")?;
+    if created_orders.next().is_some() {
+        return Err(format!(
+            "Multiple purchase orders match requisition {} after conversion",
+            requisition_id
+        ));
+    }
 
     for line in &req_lines {
         let price_unit =

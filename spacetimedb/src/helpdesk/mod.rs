@@ -1,3 +1,4 @@
+pub mod related_records;
 pub mod tickets;
 
 pub use tickets::{

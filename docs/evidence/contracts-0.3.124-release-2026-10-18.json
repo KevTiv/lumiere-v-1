@@ -1,0 +1,462 @@
+{
+  "status": "PASS",
+  "scope": "Read-only semantic validation of immutable first union snapshot; final clean-provenance regeneration remains root-owned",
+  "union": {
+    "path": "/tmp/alpha-pr230-union124-first-ir.json",
+    "source_commit": "109a694c30e5ed57d6c7f110f2fa50148efb03d5",
+    "source_dirty": false,
+    "artifact_sha256": "d58b4179555470efb4fa1ebb400312dd714b734a00930a997b0b129ed8dd7869",
+    "schema_hash": "sha256:892176e43f0f4e1f6966ccf59dbd9023dc0a91e29cde88d6f580fcb2a85d4ca2",
+    "counts": {
+      "operations": 1458,
+      "resources": 371,
+      "tables": 515,
+      "types": 1398
+    },
+    "operation_set_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
+    "wasm_sha256": "472afa0cb002215de2a81872e5c8c0f82eedae359357cd80bc0cd2cd83c3959e"
+  },
+  "baseline_122": {
+    "contracts_commit": "b2c43fd99b5e0938da3f9a33908d0029cabb9163",
+    "pin": {
+      "artifact_sha256": "0656e152af761f88c2bbfd4693029196bdc3f7e0bd32af63d3ec248f92157213",
+      "ir_version": 2,
+      "path": "ir/lumiere-contract-ir-v2.json",
+      "schema_hash": "sha256:af93dcf3cfbaa629257deea922fe9b5b0fb3843cf4c3227bf4ef48d9edd25217",
+      "source_commit": "44848106c3aa763c456844a4346ea717e59369e0",
+      "source_repository": "https://github.com/KevTiv/lumiere-v-1.git"
+    },
+    "archive_sha256": "56a5f223d36f0169bc25a4b925332a25afc9d2793f5926d30969d524bc5495af"
+  },
+  "baseline_123": {
+    "contracts_commit": "355c98d34415b268804d4399c9bb3670036fe1d3",
+    "pin": {
+      "artifact_sha256": "058376eec556dd0aeadb74bfef11f7432f273ac70975d7e2a0cba3ed33c55f4e",
+      "ir_version": 2,
+      "path": "ir/lumiere-contract-ir-v2.json",
+      "schema_hash": "sha256:7f64f6aedd23c1c324ad77d6ef8550b12ff60803c36da9571fe2783e2c139af6",
+      "source_commit": "834500364eba29a29840a4539a689ffe409cc13c",
+      "source_repository": "https://github.com/KevTiv/lumiere-v-1"
+    },
+    "archive_sha256": "56bc80b60e270800e67d5052c984fb790edd216d1a70a9014185e7ffa3d8b753",
+    "source_catalog_checksum": "sha256:5bdd2c0634e6e65da2859a9d6f8c32503078103da13ad15394602a735ba8360d"
+  },
+  "normalization": "Only numeric typespace references are replaced with stable type names; type entry allocation index omitted. All other structure, order, fields and policy metadata compared.",
+  "deltas_vs_122": {
+    "operations": {
+      "missing": [],
+      "added": [],
+      "changed": []
+    },
+    "resources": {
+      "missing": [],
+      "added": [],
+      "changed": [
+        "payslips",
+        "payslips-to-export"
+      ]
+    },
+    "tables": {
+      "missing": [],
+      "added": [],
+      "changed": []
+    },
+    "types": {
+      "missing": [],
+      "added": [],
+      "changed": [
+        [
+          "SetMemberAccessParams"
+        ]
+      ]
+    }
+  },
+  "deltas_vs_123": {
+    "operations": {
+      "missing": [],
+      "added": [
+        "abandon_bank_statement_settlement",
+        "claim_reviewed_mail_delivery",
+        "create_purchase_order_once",
+        "receive_po_line_once",
+        "resubmit_bank_statement_settlement",
+        "reverse_bank_statement_settlement",
+        "run_purchasing_keyed_operations_test"
+      ],
+      "changed": [
+        "add_workflow_human_task_comment",
+        "cancel_workflow",
+        "claim_workflow_human_task",
+        "decide_workflow_human_task",
+        "invalidate_workflow_human_task",
+        "post_payment",
+        "reconcile_account_bank_statement_line"
+      ]
+    },
+    "resources": {
+      "missing": [],
+      "added": [
+        "purchase-order-creations",
+        "purchase-receipt-operations"
+      ],
+      "changed": [
+        "account-accounts",
+        "account-move-lines",
+        "account-moves",
+        "account-payments",
+        "account-periods",
+        "account-taxes",
+        "audit-log",
+        "bank-statement-lines",
+        "bank-statements",
+        "documents",
+        "expenses",
+        "financial-reports",
+        "mail-messages",
+        "payment-reversals",
+        "payment-transactions",
+        "purchase-order-lines",
+        "purchase-order-lines-over-billed",
+        "purchase-requisitions",
+        "purchase-rfq-bids",
+        "purchase-rfqs",
+        "replenishment-rules",
+        "sale-orders",
+        "saved-reports",
+        "subscription-lines",
+        "supplier-intakes",
+        "tax-groups",
+        "workflow-instances"
+      ]
+    },
+    "tables": {
+      "missing": [],
+      "added": [
+        "bank_statement_settlement_attempt",
+        "bank_statement_settlement_reversal",
+        "purchase_order_creation_operation",
+        "purchase_receipt_operation"
+      ],
+      "changed": []
+    },
+    "types": {
+      "missing": [],
+      "added": [
+        [
+          "AbandonBankStatementSettlementParams"
+        ],
+        [
+          "BankSettlementInvoiceSnapshot"
+        ],
+        [
+          "BankSettlementLineSnapshot"
+        ],
+        [
+          "BankSettlementSaleOrderDelta"
+        ],
+        [
+          "BankStatementSettlementAttempt"
+        ],
+        [
+          "BankStatementSettlementReversal"
+        ],
+        [
+          "CreatePurchaseOrderOnceParams"
+        ],
+        [
+          "PurchaseOrderCreationOperation"
+        ],
+        [
+          "PurchaseReceiptOperation"
+        ],
+        [
+          "ReceivePoLineOnceParams"
+        ],
+        [
+          "ResubmitBankStatementSettlementParams"
+        ],
+        [
+          "ReverseBankStatementSettlementParams"
+        ]
+      ],
+      "changed": [
+        [
+          "GuardedActionKey"
+        ],
+        [
+          "UpdateAccountMoveLineParams"
+        ]
+      ]
+    }
+  },
+  "strict_assertions": {
+    "all_122_identity_sets_exact": true,
+    "all_122_operations_exact": true,
+    "all_122_tables_exact": true,
+    "all_122_types_exact_except_reviewed_member_access_field": true,
+    "all_other_1397_type_definitions_exact_122": true,
+    "SetMemberAccessParams_exact_123_definition": true,
+    "expected_access_revision_required_U64_at_exact_123_position": true,
+    "UpdateAccountMoveLineParams_exact_122_with_four_optional_F64_fields": true,
+    "GuardedActionKey_exact_122_including_bank_reversal": true,
+    "only_resource_delta_vs_122_is_hr_payroll_alias_on_two_payslip_resources": true,
+    "persistence_exact_122": true,
+    "no_123_operation_resource_table_type_identity_dropped": true,
+    "seven_changed_123_shared_operations_are_alpha_invalidation_supersets": true,
+    "stale_123_subscription_active_field_not_reintroduced": true
+  },
+  "postgres": {
+    "catalog_version": 20,
+    "catalog_checksum": "sha256:1ffe92904e13f853eff37a16d4a7a4e7ec080469f69d623982f6b1fb2fe2a9d5",
+    "catalog_entries_exact_122": [
+      {
+        "version": 1,
+        "name": "durable_projection",
+        "change_set": 1,
+        "phase": "expand",
+        "sql_sha256": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab"
+      },
+      {
+        "version": 2,
+        "name": "cold_pos_order",
+        "change_set": 1,
+        "phase": "expand",
+        "sql_sha256": "sha256:369b60d54130dfcea4a70c5456dba23d7b10c71f68ae77934155e17829611f8a"
+      },
+      {
+        "version": 3,
+        "name": "organization_projection_watermark",
+        "change_set": 1,
+        "phase": "expand",
+        "sql_sha256": "sha256:254ddf9944df96f95054b6a15cd9e1dbed498f44c674af323e7cececa4d91925"
+      },
+      {
+        "version": 4,
+        "name": "organization_projection_quarantine",
+        "change_set": 1,
+        "phase": "expand",
+        "sql_sha256": "sha256:5902244140d17042c7c4f0d1afcc234bd4b5558f9176c5f379aa05eb86041ffb"
+      },
+      {
+        "version": 5,
+        "name": "organization_projection_status",
+        "change_set": 1,
+        "phase": "expand",
+        "sql_sha256": "sha256:7e86006283dccb526ade2348fa3185b242e8ec6f201f0d85ade643fde233300a"
+      },
+      {
+        "version": 6,
+        "name": "archive_transfer",
+        "change_set": 1,
+        "phase": "expand",
+        "sql_sha256": "sha256:8112f3f0d8c50fa1e90a4c62226334efc290658f17a7062a8de7fefec2b3757a"
+      },
+      {
+        "version": 7,
+        "name": "platform_control",
+        "change_set": 1,
+        "phase": "expand",
+        "sql_sha256": "sha256:dc9d7bf0bd2f9e454ff9a9d6f4e91fab82f77a7d91f0ce6ae2b9462dd2723713"
+      },
+      {
+        "version": 8,
+        "name": "platform_reset_token_binding",
+        "change_set": 2,
+        "phase": "expand",
+        "sql_sha256": "sha256:4f486fd2eb6bd087fd77859ad2ebadd47b7991d2433adb2ff9ffb8abbf7299cd"
+      },
+      {
+        "version": 9,
+        "name": "organization_commit_protocol_upgrade",
+        "change_set": 2,
+        "phase": "expand",
+        "sql_sha256": "sha256:de074e339da00d0b4f592f2515942ba87c1c1bb141f234482f5124292e22521d"
+      },
+      {
+        "version": 10,
+        "name": "organization_commit_cursor_backfill",
+        "change_set": 2,
+        "phase": "project_backfill",
+        "sql_sha256": "sha256:1f8c6b0c80406d75ac707b5ad7d62c08bd2c9224f52c6b7cb78164da756de101"
+      },
+      {
+        "version": 11,
+        "name": "durable_projection_delta",
+        "change_set": 3,
+        "phase": "expand",
+        "sql_sha256": "sha256:15e0a40dc9c99df670e6d4e2a970541ac11ee4c39fd6357d3d10dee03d193080"
+      },
+      {
+        "version": 12,
+        "name": "workflow_subject_snapshot_projection",
+        "change_set": 4,
+        "phase": "expand",
+        "sql_sha256": "sha256:ea4cc157bc6750ccfee3f6645d51491c6c87480048e185f97dcdfd34489acde1"
+      },
+      {
+        "version": 13,
+        "name": "helpdesk_related_record_projection",
+        "change_set": 5,
+        "phase": "expand",
+        "sql_sha256": "sha256:a06969f4217bd58dba68cc5291fab2699a1252e6c9269e3bc86e3eb2cd4f719e"
+      },
+      {
+        "version": 14,
+        "name": "manufacturing_actual_cost_projection",
+        "change_set": 6,
+        "phase": "expand",
+        "sql_sha256": "sha256:cf436ddd59cf2e2105bc7639ce4d8b1a3a3cd7906383a4e01fba60a2d595b84c"
+      },
+      {
+        "version": 15,
+        "name": "account_payment_reversal_identity",
+        "change_set": 7,
+        "phase": "expand",
+        "sql_sha256": "sha256:37d2a92ba194b6ebf66e44e08dbbe67036288122babd2eec6e4d0bdf93ad30ab"
+      },
+      {
+        "version": 16,
+        "name": "country_pack_versioning",
+        "change_set": 8,
+        "phase": "expand",
+        "sql_sha256": "sha256:981775dd9367ceade3bfb596e70d98b192551e1709d914e33be1acbdcd7db33b"
+      },
+      {
+        "version": 17,
+        "name": "purchasing_keyed_operations",
+        "change_set": 9,
+        "phase": "expand",
+        "sql_sha256": "sha256:f9c3f61b1058be93c55d019df9bb9274da739eeaf980c300f6abc2cc8db6ff4c"
+      },
+      {
+        "version": 18,
+        "name": "durable_invite_acceptance_receipts",
+        "change_set": 10,
+        "phase": "expand",
+        "sql_sha256": "sha256:5c7a4b494dab5c4beb43d69159a11420c8536a102e2b74a598d19b9cea712789"
+      },
+      {
+        "version": 19,
+        "name": "bank_statement_settlement_lifecycle",
+        "change_set": 11,
+        "phase": "expand",
+        "sql_sha256": "sha256:7bb7d3fae3e39ea01a76e9ead0704156da8cc500fefd7b04ceb7942149fc24dc"
+      },
+      {
+        "version": 20,
+        "name": "platform_identity_lifecycle",
+        "change_set": 12,
+        "phase": "expand",
+        "sql_sha256": "sha256:ad8823e85c47ed369fe231f8e4f457602fe336780e00f9ae53ee2e9d7b7b7572"
+      }
+    ],
+    "catalog_source_block_exact_122": true,
+    "catalog1_to16_exact_123": true,
+    "frozen_ledger_json_exact_122": true,
+    "pending_version": 21,
+    "all_frozen_and_shared_published_sql_bytes_equal": {
+      "manifests/pg_ddl/cold_pos_order.sql": {
+        "sha256": "369b60d54130dfcea4a70c5456dba23d7b10c71f68ae77934155e17829611f8a",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/migrations/0001_durable_projection.sql": {
+        "sha256": "5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/migrations/0011_durable_projection_delta.sql": {
+        "sha256": "15e0a40dc9c99df670e6d4e2a970541ac11ee4c39fd6357d3d10dee03d193080",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/migrations/0012_durable_projection_delta.sql": {
+        "sha256": "ea4cc157bc6750ccfee3f6645d51491c6c87480048e185f97dcdfd34489acde1",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/migrations/0013_durable_projection_delta.sql": {
+        "sha256": "a06969f4217bd58dba68cc5291fab2699a1252e6c9269e3bc86e3eb2cd4f719e",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/migrations/0014_durable_projection_delta.sql": {
+        "sha256": "cf436ddd59cf2e2105bc7639ce4d8b1a3a3cd7906383a4e01fba60a2d595b84c",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/migrations/0015_durable_projection_delta.sql": {
+        "sha256": "37d2a92ba194b6ebf66e44e08dbbe67036288122babd2eec6e4d0bdf93ad30ab",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/migrations/0017_durable_projection_delta.sql": {
+        "sha256": "f9c3f61b1058be93c55d019df9bb9274da739eeaf980c300f6abc2cc8db6ff4c",
+        "shared_with_123": false
+      },
+      "manifests/pg_ddl/migrations/0018_durable_projection_delta.sql": {
+        "sha256": "5c7a4b494dab5c4beb43d69159a11420c8536a102e2b74a598d19b9cea712789",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/migrations/0019_durable_projection_delta.sql": {
+        "sha256": "7bb7d3fae3e39ea01a76e9ead0704156da8cc500fefd7b04ceb7942149fc24dc",
+        "shared_with_123": false
+      },
+      "manifests/pg_ddl/organization_commit.sql": {
+        "sha256": "6feaf438980a22ff89397ee8cc38555e0ac2b6be9f7f5a3440045fa3d2240b83",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/organization_projection_quarantine.sql": {
+        "sha256": "5902244140d17042c7c4f0d1afcc234bd4b5558f9176c5f379aa05eb86041ffb",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/organization_projection_status.sql": {
+        "sha256": "7e86006283dccb526ade2348fa3185b242e8ec6f201f0d85ade643fde233300a",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/organization_projection_watermark.sql": {
+        "sha256": "254ddf9944df96f95054b6a15cd9e1dbed498f44c674af323e7cececa4d91925",
+        "shared_with_123": true
+      },
+      "manifests/pg_ddl/organization_row_change.sql": {
+        "sha256": "103e59b08e7f8246a475d7cf135ccd1f9f95582c5171aac81283ca0229a0a673",
+        "shared_with_123": true
+      }
+    },
+    "new_123_only_sql": [],
+    "new_pg_migration_required": false,
+    "main_17_platform_equals_canonical_20_sql": true,
+    "deployment_gate": "A database recording main123 platform_identity_lifecycle at17 conflicts with canonical122/union124 purchasing_keyed_operations at17. Do not rewrite migration identities/checksums or auto-adopt; actual history/schema evidence and separately reviewed transition required.",
+    "generated_sql_path_set_exact_122": true,
+    "unexpected_generated_sql_files": []
+  },
+  "checks": {
+    "strict_ir_verifier": "verify-contract-ir: valid v2 sha256:892176e43f0f4e1f6966ccf59dbd9023dc0a91e29cde88d6f580fcb2a85d4ca2 (1458 operations, 371 resources, 515 tables, 1398 types)",
+    "operation_history_verifier": "verify-operation-history: valid 1458 operations",
+    "no_source_or_staging_mutations": true
+  },
+  "published_release": {
+    "version": "0.3.124",
+    "commit": "9ae2450ef6e4efc01e624b9f2d8b638eb76b5e50",
+    "tag": "v0.3.124",
+    "tag_object": "723247af2e8c214be1e5319aad18c3a35b777ae7",
+    "pin": {
+      "artifact_sha256": "111d4c54b60bcb989c3e8ca841a044973c44d406670a9c1320a6ec6523eafd4d",
+      "ir_version": 2,
+      "path": "ir/lumiere-contract-ir-v2.json",
+      "schema_hash": "sha256:892176e43f0f4e1f6966ccf59dbd9023dc0a91e29cde88d6f580fcb2a85d4ca2",
+      "source_commit": "eda388077b8ed8e00acb9943aae1b6bd1f500e56",
+      "source_repository": "https://github.com/KevTiv/lumiere-v-1.git"
+    }
+  },
+  "release_validation": {
+    "rust_all_features": "passed",
+    "typescript_typecheck": "passed",
+    "typescript_build": "passed",
+    "generated_artifact_check": "passed",
+    "package_codec_tests": {
+      "passed": 2,
+      "failed": 0
+    },
+    "fresh_runtime_runners": [
+      "run_all_core_tests",
+      "run_all_platform_tests",
+      "run_presentation_draft_tests"
+    ],
+    "development_wasm_sha256": "472afa0cb002215de2a81872e5c8c0f82eedae359357cd80bc0cd2cd83c3959e",
+    "production_or_certification_evidence": false
+  }
+}

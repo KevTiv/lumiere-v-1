@@ -3,6 +3,8 @@ import {
   mapDashboardWidgets,
   withDashboardSections,
 } from '@lumiere/ui/lib/dashboard-sections';
+import { withInlineEdits } from '@lumiere/ui/lib/with-inline-edits';
+import { inlineNumberAtLeast, requiredInlineText } from '@/lib/inline-edit-params';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
@@ -61,15 +63,26 @@ import {
   previousPeriodMs,
   timeRangeToMs,
 } from '@lumiere/ui';
+import { formNumber, formText, recordOptions, useFormDialog } from '@lumiere/ui';
 import type {
   EntityTableConfig,
   EntityViewConfig,
   EntityRecordSheetConfig,
   FormConfig,
+  FormField,
   ModuleConfig,
 } from '@lumiere/ui';
 import { inventoryModuleConfig } from '@/lib/module-dashboard-configs';
 import { useModuleTab } from '@/hooks/use-module-tab';
+import { recordOptions as linkedRecordOptions, withLinkedPickers } from '@/lib/linked-options';
+import {
+  ProductPackagingTab,
+  ProductVariantsTab,
+  ProductVendorPricesTab,
+} from './product-record-read-tabs';
+import { packagingOptionLabel, vendorPriceOptionLabel } from './product-record-tabs';
+import { canReleaseWave } from './picking-wave-actions';
+import { canConfirmPackage, canDonePackage } from './stock-package-actions';
 import { useInventoryModuleSubscription } from '@/lib/module-subscription-hooks';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow';
@@ -79,8 +92,12 @@ import { useReplenishmentExecutionWorkflow } from '@lumiere/query-hooks/hooks/re
 import { useSerialReserveWorkflow } from '@lumiere/query-hooks/hooks/serial-reserve-workflow';
 import { useSerialUseWorkflow } from '@lumiere/query-hooks/hooks/serial-use-workflow';
 import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
-import { planPartialDelivery } from '@lumiere/erp-workflows';
+import { planPartialDelivery, variantTag } from '@lumiere/erp-workflows';
+import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
+import type { KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
+import { transferKpis } from './transfer-kpis';
 import { groupBy } from '@/lib/utils';
+import { transferRecordHref } from './transfer-record';
 import { InventoryOpsPanel } from './inventory-ops-panel';
 import {
   useProducts,
@@ -96,6 +113,9 @@ import {
   useQualityTeams,
   useStockCycleCounts,
   usePickingWaves,
+  useStockPackages,
+  useConfirmStockPackage,
+  useDoneStockPackage,
   useWarehouseTasks,
   useStockRoutes,
   useStockRules,
@@ -167,6 +187,8 @@ import {
   useRunTraceabilityReport,
   // Replenishment
   useCreateReplenishmentRule,
+  useScheduleReplenishmentRun,
+  useCancelReplenishmentRun,
   // Picking waves
   useCreatePickingWave,
   useConfirmPickingWave,
@@ -215,6 +237,8 @@ import {
   useCreateProductSupplierInfo,
   useUpdateProductSupplierInfo,
   useCreateProductPackaging,
+  useProductPackagings,
+  useProductSupplierInfos,
   useUpdateProductPackaging,
   useRestoreProductCategory,
   useUpsertWarehouseGeo,
@@ -228,7 +252,9 @@ import {
   useImportStockQuantCsv,
   useImportLotCsv,
   useUpdateWhatsappQualityScore,
+  useStockInventories,
 } from '@lumiere/query-hooks/hooks/inventory';
+import { useIotDevices } from '@lumiere/query-hooks/hooks/iot';
 import { usePricelists, type ProductPricelist } from '@lumiere/query-hooks/hooks/sales';
 import { useContacts } from '@lumiere/query-hooks/hooks/crm';
 import { useDocuments } from '@lumiere/query-hooks/hooks/documents';
@@ -237,6 +263,23 @@ import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use
 import { inventoryProductPrimaryLabel } from '@lumiere/stdb/read-models';
 
 type ScalarId = bigint | number | string;
+
+/** Swaps number fields that ask for a record id for searchable pickers (via `withLinkedPickers`). */
+function recordPickerFields(
+  fields: FormField[],
+  options: Record<string, ReturnType<typeof linkedRecordOptions>>,
+): FormField[] {
+  const picked = withLinkedPickers(
+    { id: 'record-picker', title: '', sections: [{ id: 'main', fields }] } as FormConfig,
+    options,
+  );
+  return picked.sections[0].fields;
+}
+
+/** Lower-cased state/status of a row (handles `{tag}` enum values), for action gating. */
+function rowState(row: Record<string, unknown>, key = 'state'): string {
+  return variantTag(row[key]).toLowerCase();
+}
 
 type InventoryCsvImportKind =
   | 'uomCategory'
@@ -435,6 +478,7 @@ function InventoryClientLoaded({
 }: InventoryClientLoadedProps) {
   useInventoryModuleSubscription();
   const { t } = useTranslation();
+  const { askForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
   const selectedOperatingCompanyId =
     useDefaultOperatingCompanyBigInt(organizationId);
@@ -479,7 +523,9 @@ function InventoryClientLoaded({
     () => [
       ...inventoryModuleConfig(t).tabs.map((tab) => tab.id),
       'cycle-wizard',
+      'location-tree',
       'quality-alerts',
+      '3d-view',
     ],
     [t],
   );
@@ -513,6 +559,8 @@ function InventoryClientLoaded({
     initialProductCategories,
   );
   const { data: uoms = [] } = useUoms(orgId, initialUoms);
+  const { data: stockInventories = [] } = useStockInventories(orgId);
+  const { data: iotDevices = [] } = useIotDevices(orgId);
   const { data: stockQuants = [], isLoading: stockQuantsLoading } =
     useStockQuants(orgId, initialStockQuants);
   const { data: transfers = [], isLoading: transfersLoading } =
@@ -538,6 +586,7 @@ function InventoryClientLoaded({
     initialStockCycleCounts,
   );
   const { data: pickingWaves = [] } = usePickingWaves(orgId);
+  const { data: stockPackages = [] } = useStockPackages(orgId);
   const { data: warehouseTasks = [] } = useWarehouseTasks(orgId);
   const { data: stockRoutes = [] } = useStockRoutes(orgId);
   const { data: stockRules = [] } = useStockRules(orgId);
@@ -564,6 +613,8 @@ function InventoryClientLoaded({
   const { data: orgUsers = [] } = useOrgUsers();
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists);
   const { data: contacts = [] } = useContacts(orgId);
+  const { data: productSupplierInfos = [] } = useProductSupplierInfos(orgId);
+  const { data: productPackagings = [] } = useProductPackagings(orgId);
   const { data: erpDocuments = [] } = useDocuments(orgId);
   const csvImports = {
     importUomCategory: useImportUomCategoryCsv(orgId),
@@ -649,6 +700,15 @@ function InventoryClientLoaded({
     if (fromApi.length > 0) return fromApi;
     return [{ value: '', label: t('common.lookup.noVendors'), disabled: true }];
   }, [contacts, t]);
+
+  const vendorNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const contact of contacts as Record<string, unknown>[]) {
+      const name = String(contact.displayName ?? contact.name ?? '').trim();
+      if (contact.id != null && name) map.set(String(contact.id), name);
+    }
+    return map;
+  }, [contacts]);
 
   const documentSelectOptions = useMemo(
     () =>
@@ -1104,6 +1164,8 @@ function InventoryClientLoaded({
   const createPickingWave = useCreatePickingWave(orgId, operatingCompanyId);
   const confirmPickingWave = useConfirmPickingWave(orgId, operatingCompanyId);
   const completePickingWave = useCompletePickingWave(orgId, operatingCompanyId);
+  const confirmStockPackage = useConfirmStockPackage(orgId, operatingCompanyId);
+  const doneStockPackage = useDoneStockPackage(orgId, operatingCompanyId);
 
   // Product category hooks
   const createProductCategory = useCreateProductCategory(
@@ -1164,6 +1226,14 @@ function InventoryClientLoaded({
     operatingCompanyId,
     workflowSurface,
   );
+  const scheduleReplenishmentRun = useScheduleReplenishmentRun(
+    orgId,
+    operatingCompanyId,
+  );
+  const cancelReplenishmentRun = useCancelReplenishmentRun(
+    orgId,
+    operatingCompanyId,
+  );
   const createStockQuant = useCreateStockQuant(orgId, {
     companyId: operatingCompanyId ?? undefined,
   });
@@ -1206,31 +1276,91 @@ function InventoryClientLoaded({
   const upsertWarehouseGeo = useUpsertWarehouseGeo(orgId);
   const updateWhatsappQualityScore = useUpdateWhatsappQualityScore(orgId);
 
-  const promptText = (message: string, defaultValue = ''): string | null => {
-    if (typeof window === 'undefined') return null;
-    const raw = window.prompt(message, defaultValue);
-    if (raw == null) return null;
-    const text = raw.trim();
-    return text === '' ? null : text;
-  };
+  // Field labels for the action dialogs below.
+  const lbl = useMemo(
+    () => ({
+      product: t('inventory.byRecord.product', { defaultValue: 'Product' }),
+      uom: t('inventory.byRecord.uom', { defaultValue: 'Unit of measure' }),
+      fromUom: t('inventory.byRecord.fromUom', { defaultValue: 'From unit' }),
+      toUom: t('inventory.byRecord.toUom', { defaultValue: 'To unit' }),
+      category: t('inventory.byRecord.uomCategory', { defaultValue: 'Category' }),
+      sourceLocation: t('inventory.byRecord.sourceLocation', { defaultValue: 'Source location' }),
+      destLocation: t('inventory.byRecord.destLocation', { defaultValue: 'Destination location' }),
+      location: t('inventory.byRecord.location', { defaultValue: 'Location' }),
+      quarantineLocation: t('inventory.byRecord.quarantineLocation', { defaultValue: 'Quarantine location' }),
+      inventory: t('inventory.byRecord.inventoryCount', { defaultValue: 'Inventory count' }),
+      device: t('inventory.byRecord.device', { defaultValue: 'IoT device' }),
+      rule: t('inventory.byRecord.barcodeRule', { defaultValue: 'Barcode rule' }),
+      status: t('inventory.byRecord.status', { defaultValue: 'Status' }),
+      failReason: t('inventory.byRecord.failReason', { defaultValue: 'Reason for failure' }),
+      whatsappAccount: t('inventory.byRecord.whatsappAccountId', { defaultValue: 'WhatsApp account ID' }),
+      qualityRating: t('inventory.byRecord.qualityRating', { defaultValue: 'Quality rating' }),
+    }),
+    [t],
+  );
 
-  const promptScalarId = (message: string): ScalarId | null =>
-    promptText(message);
+  // UoM categories have no list query yet, so offer the categories of the
+  // units that already exist, named after their first few units.
+  const uomCategoryOptions = useMemo(() => {
+    const unitsByCategory = new Map<string, string[]>();
+    for (const uom of uoms as Record<string, unknown>[]) {
+      const categoryId = String(uom.categoryId ?? uom.category_id ?? '');
+      if (categoryId === '') continue;
+      unitsByCategory.set(categoryId, [
+        ...(unitsByCategory.get(categoryId) ?? []),
+        String(uom.name ?? uom.id),
+      ]);
+    }
+    return [...unitsByCategory].map(([value, names]) => ({
+      value,
+      label: names.slice(0, 3).join(', ') + (names.length > 3 ? '…' : ''),
+    }));
+  }, [uoms]);
 
-  const promptNumber = (message: string, defaultValue = '0'): number | null => {
-    const raw = promptText(message, defaultValue);
-    if (raw == null) return null;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : null;
-  };
+  const stockInventoryOptions = useMemo(
+    () =>
+      recordOptions(stockInventories as Record<string, unknown>[], (inv) =>
+        inv.state
+          ? `${String(inv.name ?? `#${inv.id}`)} (${String(inv.state)})`
+          : String(inv.name ?? `#${inv.id}`),
+      ),
+    [stockInventories],
+  );
 
-  const promptOptionalNumber = (message: string): number | undefined => {
-    if (typeof window === 'undefined') return undefined;
-    const raw = window.prompt(message);
-    if (raw == null || raw.trim() === '') return undefined;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : undefined;
-  };
+  const iotDeviceOptions = useMemo(
+    () =>
+      recordOptions(iotDevices as Record<string, unknown>[], (device) =>
+        String(device.name ?? `#${device.id}`),
+      ),
+    [iotDevices],
+  );
+
+  const barcodeRuleOptions = useMemo(
+    () =>
+      recordOptions(barcodeRules as Record<string, unknown>[], (rule) =>
+        String(rule.name ?? `#${rule.id}`),
+      ),
+    [barcodeRules],
+  );
+
+  const stockInventoryStateOptions = useMemo(
+    () =>
+      (['draft', 'confirm', 'validate', 'cancel'] as const).map((state) => ({
+        value: state,
+        label: t(`inventory.inventoryAdjustments.states.${state}`),
+      })),
+    [t],
+  );
+
+  const warehouseTaskStatusOptions = useMemo(
+    () => [
+      { value: 'pending', label: t('inventory.byRecord.taskPending', { defaultValue: 'Pending' }) },
+      { value: 'in_progress', label: t('inventory.byRecord.taskInProgress', { defaultValue: 'In progress' }) },
+      { value: 'done', label: t('inventory.byRecord.taskDone', { defaultValue: 'Done' }) },
+      { value: 'cancelled', label: t('inventory.byRecord.taskCancelled', { defaultValue: 'Cancelled' }) },
+    ],
+    [t],
+  );
 
   const stockOnHandLocationOptions = useMemo(() => {
     const opts = locations.map((loc) => ({
@@ -1401,17 +1531,42 @@ function InventoryClientLoaded({
       onEmptyAction: openCreateProduct,
     });
     const view = base.view as EntityTableConfig;
-    return {
-      ...base,
-      view: {
-        ...view,
-        emptyState: {
-          ...view.emptyState,
-          onAction: openCreateProduct,
+    return withInlineEdits(
+      {
+        ...base,
+        view: {
+          ...view,
+          emptyState: {
+            ...view.emptyState,
+            onAction: openCreateProduct,
+          },
         },
       },
-    };
-  }, [t, openCreateProduct]);
+      {
+        name: {
+          kind: 'text',
+          save: async (row, value) => {
+            const name = requiredInlineText(
+              value,
+              t('inventory.inlineEdit.nameRequired', { defaultValue: 'A product needs a name' }),
+            );
+            await updateProduct.mutateAsync({ productId: row.id as string | number, params: { name } });
+          },
+        },
+        standardPrice: {
+          kind: 'number',
+          save: async (row, value) => {
+            const standardPrice = inlineNumberAtLeast(
+              value,
+              0,
+              t('inventory.inlineEdit.priceInvalid', { defaultValue: 'Enter a price of 0 or more' }),
+            );
+            await updateProduct.mutateAsync({ productId: row.id as string | number, params: { standardPrice } });
+          },
+        },
+      },
+    );
+  }, [t, openCreateProduct, updateProduct]);
 
   const stockEntityConfig = useMemo((): EntityViewConfig => {
     const base = stockQuantsTableConfig(t, {
@@ -1480,8 +1635,28 @@ function InventoryClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig: productDetailConfig(t),
       auditTableName: 'product',
+      discussion: {},
+      customTabs: [
+        {
+          id: 'variants',
+          label: t('inventory.productTabs.variants.title', { defaultValue: 'Variants' }),
+          content: (record) => <ProductVariantsTab orgId={orgId} record={record} />,
+        },
+        {
+          id: 'vendor-prices',
+          label: t('inventory.productTabs.vendors.title', { defaultValue: 'Vendor prices' }),
+          content: (record) => (
+            <ProductVendorPricesTab orgId={orgId} record={record} vendorNameById={vendorNameById} />
+          ),
+        },
+        {
+          id: 'packaging',
+          label: t('inventory.productTabs.packaging.title', { defaultValue: 'Packaging' }),
+          content: (record) => <ProductPackagingTab orgId={orgId} record={record} />,
+        },
+      ],
     };
-  }, [t]);
+  }, [t, orgId, vendorNameById]);
 
   const stockQuantRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const baseDetail = stockQuantDetailConfig(t);
@@ -1597,6 +1772,8 @@ function InventoryClientLoaded({
       statusBadgeLabels: status.badgeLabels,
       detailConfig,
       auditTableName: 'stock_picking',
+      discussion: {},
+      openHref: transferRecordHref,
       customTabs: [
         {
           id: 'moves',
@@ -1966,24 +2143,42 @@ function InventoryClientLoaded({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => {
-                if (typeof window === 'undefined') return;
-                const zid = window.prompt(
-                  t('inventory.z3dActions.zoneIdPrompt'),
-                );
-                if (zid == null || zid.trim() === '') return;
-                const zoneId = Number(zid);
-                if (!Number.isFinite(zoneId)) return;
-                const color = window.prompt(
-                  'Color hex (optional, leave empty to skip)',
-                );
-                void updateWarehouse3dZone.mutateAsync({
-                  zoneId,
-                  params:
-                    color != null && color.trim() !== ''
-                      ? { color: color.trim() }
-                      : {},
+              onClick={async () => {
+                const values = await askForm({
+                  title: t('inventory.z3dActions.editZone'),
+                  fields: [
+                    {
+                    id: 'zoneId',
+                    name: 'zoneId',
+                    label: t('inventory.byRecord.zone', { defaultValue: 'Zone' }),
+                    type: 'select',
+                    required: true,
+                    options: recordOptions(zones, (zone) => zone.name || `#${zone.id}`),
+                  },
+                    {
+                      id: 'color',
+                      name: 'color',
+                      label: t('inventory.byRecord.color', { defaultValue: 'Color (hex)' }),
+                      type: 'text',
+                      placeholder: '#3b82f6',
+                    },
+                  ],
                 });
+                if (!values) return;
+                const color = formText(values.color);
+                try {
+                  await updateWarehouse3dZone.mutateAsync({
+                    zoneId: Number(values.zoneId),
+                    params: color ? { color } : {},
+                  });
+                } catch (error) {
+                  showWorkflowToast({
+                    kind: 'error',
+                    title: t('inventory.z3dActions.editZone'),
+                    description:
+                      error instanceof Error ? error.message : undefined,
+                  });
+                }
               }}
             >
               {t('inventory.z3dActions.editZone')}
@@ -1992,18 +2187,29 @@ function InventoryClientLoaded({
               type="button"
               variant="destructive"
               size="sm"
-              onClick={() => {
-                if (typeof window === 'undefined') return;
-                const zid = window.prompt(
-                  t('inventory.z3dActions.zoneIdPrompt'),
-                );
-                if (zid == null || zid.trim() === '') return;
-                const zoneId = Number(zid);
-                if (!Number.isFinite(zoneId)) return;
-                if (
-                  window.confirm(t('inventory.z3dActions.deleteZone') + '?')
-                ) {
-                  void deleteWarehouse3dZone.mutateAsync(zoneId);
+              onClick={async () => {
+                const values = await askForm({
+                  title: t('inventory.z3dActions.deleteZone'),
+                  submitLabel: t('inventory.byRecord.deactivate', { defaultValue: 'Deactivate' }),
+                  fields: [{
+                    id: 'zoneId',
+                    name: 'zoneId',
+                    label: t('inventory.byRecord.zone', { defaultValue: 'Zone' }),
+                    type: 'select',
+                    required: true,
+                    options: recordOptions(zones, (zone) => zone.name || `#${zone.id}`),
+                  }],
+                });
+                if (!values) return;
+                try {
+                  await deleteWarehouse3dZone.mutateAsync(Number(values.zoneId));
+                } catch (error) {
+                  showWorkflowToast({
+                    kind: 'error',
+                    title: t('inventory.z3dActions.deleteZone'),
+                    description:
+                      error instanceof Error ? error.message : undefined,
+                  });
                 }
               }}
             >
@@ -2221,17 +2427,17 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.productActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id == null) return;
-                    if (
-                      typeof window !== 'undefined' &&
-                      window.confirm(
-                        t('inventory.productActions.confirmDelete'),
-                      )
-                    ) {
-                      void deleteProduct.mutateAsync(id);
-                    }
+                    await deleteProduct.mutateAsync(id);
                   },
                 },
                 {
@@ -2288,22 +2494,40 @@ function InventoryClientLoaded({
                   label: t('inventory.productActions.updatePricing'),
                   icon: Pencil,
                   requiresSelection: true,
-                  onClick: (rows) => {
-                    const productId = rows[0]?.id as ScalarId | undefined;
+                  onClick: async (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined;
+                    const productId = row?.id as ScalarId | undefined;
                     if (productId == null) return;
-                    const standardPrice = promptOptionalNumber(
-                      t('inventory.productActions.standardPricePrompt'),
-                    );
-                    const listPrice = promptOptionalNumber(
-                      t('inventory.productActions.listPricePrompt'),
-                    );
+                    const values = await askForm({
+                      title: t('inventory.productActions.updatePricing'),
+                      fields: [
+                        {
+                          id: 'standardPrice',
+                          name: 'standardPrice',
+                          label: t('inventory.productActions.standardPricePrompt'),
+                          type: 'number',
+                          min: 0,
+                          step: 0.01,
+                          defaultValue: formNumber(row?.standardPrice),
+                        },
+                        {
+                          id: 'listPrice',
+                          name: 'listPrice',
+                          label: t('inventory.productActions.listPricePrompt'),
+                          type: 'number',
+                          min: 0,
+                          step: 0.01,
+                          defaultValue: formNumber(row?.listPrice),
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const standardPrice = formNumber(values.standardPrice);
+                    const listPrice = formNumber(values.listPrice);
                     if (standardPrice == null && listPrice == null) return;
-                    void updateProductPricing.mutateAsync({
+                    await updateProductPricing.mutateAsync({
                       productId,
-                      params: {
-                        standardPrice: standardPrice,
-                        listPrice: listPrice,
-                      },
+                      params: { standardPrice, listPrice },
                     });
                   },
                 },
@@ -2312,23 +2536,36 @@ function InventoryClientLoaded({
                   label: t('inventory.productActions.updateInventoryData'),
                   icon: PackageOpen,
                   requiresSelection: true,
-                  onClick: (rows) => {
-                    const productId = rows[0]?.id as ScalarId | undefined;
+                  onClick: async (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined;
+                    const productId = row?.id as ScalarId | undefined;
                     if (productId == null) return;
-                    const qtyAvailable = promptOptionalNumber(
-                      t('inventory.productActions.qtyAvailablePrompt'),
-                    );
-                    const virtualAvailable = promptOptionalNumber(
-                      t('inventory.productActions.virtualAvailablePrompt'),
-                    );
-                    if (qtyAvailable == null && virtualAvailable == null)
-                      return;
-                    void updateProductInventoryData.mutateAsync({
+                    const values = await askForm({
+                      title: t('inventory.productActions.updateInventoryData'),
+                      fields: [
+                        {
+                          id: 'qtyAvailable',
+                          name: 'qtyAvailable',
+                          label: t('inventory.productActions.qtyAvailablePrompt'),
+                          type: 'number',
+                          defaultValue: formNumber(row?.qtyAvailable),
+                        },
+                        {
+                          id: 'virtualAvailable',
+                          name: 'virtualAvailable',
+                          label: t('inventory.productActions.virtualAvailablePrompt'),
+                          type: 'number',
+                          defaultValue: formNumber(row?.virtualAvailable),
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const qtyAvailable = formNumber(values.qtyAvailable);
+                    const virtualAvailable = formNumber(values.virtualAvailable);
+                    if (qtyAvailable == null && virtualAvailable == null) return;
+                    await updateProductInventoryData.mutateAsync({
                       productId,
-                      params: {
-                        qtyAvailable: qtyAvailable,
-                        virtualAvailable: virtualAvailable,
-                      },
+                      params: { qtyAvailable, virtualAvailable },
                     });
                   },
                 },
@@ -2336,24 +2573,29 @@ function InventoryClientLoaded({
                   id: 'update-product-variant',
                   label: t('inventory.productActions.updateVariantById'),
                   requiresSelection: false,
-                  onClick: () => {
-                    const variantId = promptScalarId(
-                      t('inventory.productActions.variantIdPrompt'),
-                    );
-                    if (variantId == null) return;
-                    const name = promptText(
-                      t('inventory.productActions.variantNamePrompt'),
-                    );
-                    const standardPrice = promptOptionalNumber(
-                      t('inventory.productActions.standardPricePrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.productActions.updateVariantById'),
+                      fields: [
+                        {
+                          id: 'recordId',
+                          name: 'recordId',
+                          label: t('inventory.byRecord.variantId', { defaultValue: 'Variant ID' }),
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        },
+                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text' },
+                        { id: 'standardPrice', name: 'standardPrice', label: t('inventory.byRecord.standardPrice', { defaultValue: 'Standard price' }), type: 'number', min: 0, step: 0.01 },
+                      ],
+                    });
+                    if (!values) return;
+                    const name = formText(values.name);
+                    const standardPrice = formNumber(values.standardPrice);
                     if (name == null && standardPrice == null) return;
-                    void updateProductVariant.mutateAsync({
-                      variantId,
-                      params: {
-                        name: name ?? undefined,
-                        standardPrice: standardPrice,
-                      },
+                    await updateProductVariant.mutateAsync({
+                      variantId: Number(values.recordId),
+                      params: { name, standardPrice },
                     });
                   },
                 },
@@ -2361,12 +2603,22 @@ function InventoryClientLoaded({
                   id: 'create-uom-category',
                   label: t('inventory.uomActions.createCategory'),
                   requiresSelection: false,
-                  onClick: () => {
-                    const name = promptText(
-                      t('inventory.uomActions.categoryNamePrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.uomActions.createCategory'),
+                      fields: [
+                        {
+                          id: 'name',
+                          name: 'name',
+                          label: t('inventory.uomActions.categoryNamePrompt'),
+                          type: 'text',
+                          required: true,
+                        },
+                      ],
+                    });
+                    const name = formText(values?.name);
                     if (name == null) return;
-                    void createUomCategory.mutateAsync({
+                    await createUomCategory.mutateAsync({
                       name,
                       description: null,
                       sequence: 10,
@@ -2378,20 +2630,52 @@ function InventoryClientLoaded({
                   id: 'create-uom',
                   label: t('inventory.uomActions.createUom'),
                   requiresSelection: false,
-                  onClick: () => {
-                    const categoryId = promptScalarId(
-                      t('inventory.uomActions.categoryIdPrompt'),
-                    );
-                    const name = promptText(
-                      t('inventory.uomActions.uomNamePrompt'),
-                    );
-                    const symbol = promptText(
-                      t('inventory.uomActions.symbolPrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.uomActions.createUom'),
+                      fields: [
+                        uomCategoryOptions.length > 0
+                          ? {
+                              id: 'categoryId',
+                              name: 'categoryId',
+                              label: lbl.category,
+                              type: 'select',
+                              required: true,
+                              options: uomCategoryOptions,
+                            }
+                          : {
+                              // No units exist yet, so there is nothing to pick from.
+                              id: 'categoryId',
+                              name: 'categoryId',
+                              label: t('inventory.uomActions.categoryIdPrompt'),
+                              type: 'number',
+                              required: true,
+                              min: 1,
+                            },
+                        {
+                          id: 'name',
+                          name: 'name',
+                          label: t('inventory.uomActions.uomNamePrompt'),
+                          type: 'text',
+                          required: true,
+                        },
+                        {
+                          id: 'symbol',
+                          name: 'symbol',
+                          label: t('inventory.uomActions.symbolPrompt'),
+                          type: 'text',
+                          required: true,
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const categoryId = formNumber(values.categoryId);
+                    const name = formText(values.name);
+                    const symbol = formText(values.symbol);
                     if (categoryId == null || name == null || symbol == null)
                       return;
-                    void createUom.mutateAsync({
-                      category_id: Number(categoryId),
+                    await createUom.mutateAsync({
+                      category_id: categoryId,
                       name,
                       symbol,
                       factor: 1,
@@ -2407,32 +2691,52 @@ function InventoryClientLoaded({
                   id: 'create-uom-conversion',
                   label: t('inventory.uomActions.createConversion'),
                   requiresSelection: false,
-                  onClick: () => {
-                    const categoryId = promptScalarId(
-                      t('inventory.uomActions.categoryIdPrompt'),
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.uomActions.createConversion'),
+                      description: t('inventory.byRecord.uomConversionHint', {
+                        defaultValue: 'Both units must be in the same category.',
+                      }),
+                      fields: [
+                        {
+                          id: 'fromUomId',
+                          name: 'fromUomId',
+                          label: lbl.fromUom,
+                          type: 'select',
+                          required: true,
+                          options: uomFieldOptions,
+                        },
+                        {
+                          id: 'toUomId',
+                          name: 'toUomId',
+                          label: lbl.toUom,
+                          type: 'select',
+                          required: true,
+                          options: uomFieldOptions,
+                        },
+                        {
+                          id: 'factor',
+                          name: 'factor',
+                          label: t('inventory.uomActions.factorPrompt'),
+                          type: 'number',
+                          required: true,
+                          defaultValue: 1,
+                          step: 0.000001,
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const fromUom = (uoms as Record<string, unknown>[]).find(
+                      (u) => String(u.id) === String(values.fromUomId),
                     );
-                    const fromUomId = promptScalarId(
-                      t('inventory.uomActions.fromUomIdPrompt'),
-                    );
-                    const toUomId = promptScalarId(
-                      t('inventory.uomActions.toUomIdPrompt'),
-                    );
-                    const factor = promptNumber(
-                      t('inventory.uomActions.factorPrompt'),
-                      '1',
-                    );
-                    if (
-                      categoryId == null ||
-                      fromUomId == null ||
-                      toUomId == null ||
-                      factor == null
-                    )
-                      return;
-                    void createUomConversion.mutateAsync({
-                      categoryId,
+                    const categoryId = fromUom?.categoryId ?? fromUom?.category_id;
+                    const factor = formNumber(values.factor);
+                    if (categoryId == null || factor == null) return;
+                    await createUomConversion.mutateAsync({
+                      categoryId: categoryId as ScalarId,
                       params: {
-                        from_uom_id: Number(fromUomId),
-                        to_uom_id: Number(toUomId),
+                        from_uom_id: Number(values.fromUomId),
+                        to_uom_id: Number(values.toUomId),
                         factor,
                         product_id: null,
                         is_active: true,
@@ -2445,28 +2749,33 @@ function InventoryClientLoaded({
                   id: 'update-supplier-line',
                   label: t('inventory.productActions.updateSupplierLineById'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const raw = window.prompt(
-                      t('inventory.productActions.supplierLineIdPrompt'),
-                    );
-                    if (raw == null || raw.trim() === '') return;
-                    const supplierInfoId = Number(raw);
-                    if (!Number.isFinite(supplierInfoId)) return;
-                    const priceS = window.prompt('New price (empty to skip)');
-                    const minS = window.prompt('New min qty (empty to skip)');
-                    void updateProductSupplierInfo.mutateAsync({
-                      supplierInfoId,
-                      params: {
-                        price:
-                          priceS != null && priceS.trim() !== ''
-                            ? Number(priceS)
-                            : undefined,
-                        minQty:
-                          minS != null && minS.trim() !== ''
-                            ? Number(minS)
-                            : undefined,
-                      },
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.productActions.updateSupplierLineById'),
+                      fields: recordPickerFields(
+                        [
+                          {
+                            id: 'recordId',
+                            name: 'recordId',
+                            label: t('inventory.byRecord.supplierLineId', { defaultValue: 'Supplier line ID' }),
+                            type: 'number',
+                            required: true,
+                            min: 1,
+                          },
+                          { id: 'price', name: 'price', label: t('inventory.byRecord.price', { defaultValue: 'Price' }), type: 'number', min: 0, step: 0.01 },
+                          { id: 'minQty', name: 'minQty', label: t('inventory.byRecord.minQty', { defaultValue: 'Minimum quantity' }), type: 'number', min: 0 },
+                        ],
+                        {
+                          recordId: linkedRecordOptions(productSupplierInfos as Record<string, unknown>[], (row) =>
+                            vendorPriceOptionLabel(row, vendorNameById, productLabelById),
+                          ),
+                        },
+                      ),
+                    });
+                    if (!values) return;
+                    await updateProductSupplierInfo.mutateAsync({
+                      supplierInfoId: Number(values.recordId),
+                      params: { price: formNumber(values.price), minQty: formNumber(values.minQty) },
                     });
                   },
                 },
@@ -2474,23 +2783,32 @@ function InventoryClientLoaded({
                   id: 'update-packaging-row',
                   label: t('inventory.productActions.updatePackagingById'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const raw = window.prompt(
-                      t('inventory.productActions.packagingIdPrompt'),
-                    );
-                    if (raw == null || raw.trim() === '') return;
-                    const packagingId = Number(raw);
-                    if (!Number.isFinite(packagingId)) return;
-                    const name = window.prompt('New name (empty to skip)');
-                    void updateProductPackaging.mutateAsync({
-                      packagingId,
-                      params: {
-                        name:
-                          name != null && name.trim() !== ''
-                            ? name.trim()
-                            : undefined,
-                      },
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.productActions.updatePackagingById'),
+                      fields: recordPickerFields(
+                        [
+                          {
+                            id: 'recordId',
+                            name: 'recordId',
+                            label: t('inventory.byRecord.packagingId', { defaultValue: 'Packaging ID' }),
+                            type: 'number',
+                            required: true,
+                            min: 1,
+                          },
+                          { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text', required: true },
+                        ],
+                        {
+                          recordId: linkedRecordOptions(productPackagings as Record<string, unknown>[], (row) =>
+                            packagingOptionLabel(row, productLabelById),
+                          ),
+                        },
+                      ),
+                    });
+                    if (!values) return;
+                    await updateProductPackaging.mutateAsync({
+                      packagingId: Number(values.recordId),
+                      params: { name: formText(values.name) },
                     });
                   },
                 },
@@ -2529,17 +2847,17 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.warehouseActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id == null) return;
-                    if (
-                      typeof window !== 'undefined' &&
-                      window.confirm(
-                        t('inventory.warehouseActions.confirmDelete'),
-                      )
-                    ) {
-                      void deleteWarehouse.mutateAsync(id);
-                    }
+                    await deleteWarehouse.mutateAsync(id);
                   },
                 },
                 {
@@ -2547,36 +2865,49 @@ function InventoryClientLoaded({
                   label: t('inventory.warehouseActions.setGeo'),
                   icon: Route,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
-                    const latS = window.prompt(
-                      t('inventory.warehouseActions.geoLatPrompt'),
-                      '0',
-                    );
-                    const lngS = window.prompt(
-                      t('inventory.warehouseActions.geoLngPrompt'),
-                      '0',
-                    );
-                    if (latS == null || lngS == null) return;
-                    const latitude = Number(latS);
-                    const longitude = Number(lngS);
-                    if (
-                      !Number.isFinite(latitude) ||
-                      !Number.isFinite(longitude)
-                    )
-                      return;
-                    const address = window.prompt(
-                      t('inventory.warehouseActions.geoAddressPrompt'),
-                    );
-                    void upsertWarehouseGeo.mutateAsync({
+                    if (id == null) return;
+                    const values = await askForm({
+                      title: t('inventory.warehouseActions.setGeo'),
+                      fields: [
+                        {
+                          id: 'latitude',
+                          name: 'latitude',
+                          label: t('inventory.warehouseActions.geoLatPrompt'),
+                          type: 'number',
+                          required: true,
+                          min: -90,
+                          max: 90,
+                          width: '1/2',
+                        },
+                        {
+                          id: 'longitude',
+                          name: 'longitude',
+                          label: t('inventory.warehouseActions.geoLngPrompt'),
+                          type: 'number',
+                          required: true,
+                          min: -180,
+                          max: 180,
+                          width: '1/2',
+                        },
+                        {
+                          id: 'address',
+                          name: 'address',
+                          label: t('inventory.warehouseActions.geoAddressPrompt'),
+                          type: 'text',
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const latitude = formNumber(values.latitude);
+                    const longitude = formNumber(values.longitude);
+                    if (latitude == null || longitude == null) return;
+                    await upsertWarehouseGeo.mutateAsync({
                       warehouseId: id,
                       latitude,
                       longitude,
-                      address:
-                        address && address.trim() !== ''
-                          ? address.trim()
-                          : null,
+                      address: formText(values.address) ?? null,
                     });
                   },
                 },
@@ -2598,45 +2929,76 @@ function InventoryClientLoaded({
                   label: t('inventory.stockMoveActions.create'),
                   icon: Plus,
                   requiresSelection: false,
-                  onClick: () => {
-                    const productId = promptScalarId(
-                      t('inventory.stockMoveActions.productIdPrompt'),
-                    );
-                    const productUom = promptScalarId(
-                      t('inventory.stockMoveActions.uomIdPrompt'),
-                    );
-                    const locationId = promptScalarId(
-                      t('inventory.stockMoveActions.locationIdPrompt'),
-                    );
-                    const locationDestId = promptScalarId(
-                      t('inventory.stockMoveActions.locationDestIdPrompt'),
-                    );
-                    const qty = promptNumber(
-                      t('inventory.stockMoveActions.quantityPrompt'),
-                      '1',
-                    );
-                    if (
-                      productId == null ||
-                      productUom == null ||
-                      locationId == null ||
-                      locationDestId == null ||
-                      qty == null
-                    ) {
-                      return;
-                    }
-                    void createStockMove.mutateAsync(
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.stockMoveActions.create'),
+                      fields: [
+                        {
+                          id: 'productId',
+                          name: 'productId',
+                          label: lbl.product,
+                          type: 'select',
+                          required: true,
+                          options: productSelectOptions,
+                        },
+                        {
+                          id: 'productUom',
+                          name: 'productUom',
+                          label: lbl.uom,
+                          type: 'select',
+                          required: true,
+                          options: uomFieldOptions,
+                        },
+                        {
+                          id: 'locationId',
+                          name: 'locationId',
+                          label: lbl.sourceLocation,
+                          type: 'select',
+                          required: true,
+                          options: stockOnHandLocationOptions,
+                          width: '1/2',
+                        },
+                        {
+                          id: 'locationDestId',
+                          name: 'locationDestId',
+                          label: lbl.destLocation,
+                          type: 'select',
+                          required: true,
+                          options: stockOnHandLocationOptions,
+                          width: '1/2',
+                        },
+                        {
+                          id: 'quantity',
+                          name: 'quantity',
+                          label: t('inventory.stockMoveActions.quantityPrompt'),
+                          type: 'number',
+                          required: true,
+                          defaultValue: 1,
+                          min: 0,
+                          width: '1/2',
+                        },
+                        {
+                          id: 'name',
+                          name: 'name',
+                          label: t('inventory.stockMoveActions.namePrompt'),
+                          type: 'text',
+                          defaultValue: 'Manual Stock Move',
+                          width: '1/2',
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const quantity = formNumber(values.quantity);
+                    if (quantity == null) return;
+                    await createStockMove.mutateAsync(
                       toCreateStockMoveParams({
                         companyId: operatingCompanyId,
-                        name:
-                          promptText(
-                            t('inventory.stockMoveActions.namePrompt'),
-                            'Manual Stock Move',
-                          ) ?? 'Manual Stock Move',
-                        productId: Number(productId),
-                        productUom: Number(productUom),
-                        quantity: qty,
-                        locationId: Number(locationId),
-                        locationDestId: Number(locationDestId),
+                        name: formText(values.name) ?? 'Manual Stock Move',
+                        productId: Number(values.productId),
+                        productUom: Number(values.productUom),
+                        quantity,
+                        locationId: Number(values.locationId),
+                        locationDestId: Number(values.locationDestId),
                       }),
                     );
                   },
@@ -2646,9 +3008,12 @@ function InventoryClientLoaded({
                   label: t('inventory.stockMoveActions.confirm'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.stockMoveActions.confirm') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void confirmStockMove.mutateAsync(id);
+                    if (id != null) await confirmStockMove.mutateAsync(id);
                   },
                 },
                 {
@@ -2656,9 +3021,12 @@ function InventoryClientLoaded({
                   label: t('inventory.stockMoveActions.assign'),
                   icon: UserCircle2,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['confirmed'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.stockMoveActions.assign') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void assignStockMove.mutateAsync(id);
+                    if (id != null) await assignStockMove.mutateAsync(id);
                   },
                 },
                 {
@@ -2666,23 +3034,33 @@ function InventoryClientLoaded({
                   label: t('inventory.stockMoveActions.done'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['assigned'].includes(rowState(row, 'state'))),
+                  onClick: async (rows) => {
                     const row = rows[0] as Record<string, unknown> | undefined;
                     const id = row?.id as ScalarId | undefined;
                     if (id == null) return;
                     const def = Number(
                       row?.productUomQty ?? row?.product_uom_qty ?? 1,
                     );
-                    const q =
-                      typeof window !== 'undefined'
-                        ? window.prompt(
-                            t('inventory.stockMoveActions.quantityDonePrompt'),
-                            String(def),
-                          )
-                        : null;
-                    const qty = q != null && q !== '' ? Number(q) : def;
-                    if (!Number.isFinite(qty)) return;
-                    void doneStockMove.mutateAsync({
+                    const values = await askForm({
+                      title: t('inventory.stockMoveActions.done'),
+                      fields: [
+                        {
+                          id: 'quantityDone',
+                          name: 'quantityDone',
+                          label: t('inventory.stockMoveActions.quantityDonePrompt'),
+                          type: 'number',
+                          required: true,
+                          min: 0,
+                          defaultValue: Number.isFinite(def) ? def : 1,
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const qty = formNumber(values.quantityDone);
+                    if (qty == null) return;
+                    await doneStockMove.mutateAsync({
                       moveId: id,
                       quantityDone: qty,
                     });
@@ -2694,9 +3072,12 @@ function InventoryClientLoaded({
                   icon: XCircle,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => !['done', 'cancel', 'cancelled'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.stockMoveActions.cancel') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void cancelStockMove.mutateAsync(id);
+                    if (id != null) await cancelStockMove.mutateAsync(id);
                   },
                 },
               ],
@@ -2725,10 +3106,10 @@ function InventoryClientLoaded({
                   label: t('inventory.stockActions.reserve'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void reserveQuant.mutateAsync({
+                      await reserveQuant.mutateAsync({
                         quantId: id,
                         reserveQty: 1,
                       });
@@ -2739,10 +3120,10 @@ function InventoryClientLoaded({
                   label: t('inventory.stockActions.unreserve'),
                   icon: XCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void unreserveQuant.mutateAsync({
+                      await unreserveQuant.mutateAsync({
                         quantId: id,
                         unreserveQty: 1,
                       });
@@ -2753,17 +3134,27 @@ function InventoryClientLoaded({
                   label: t('inventory.stockActions.setQuantity'),
                   icon: Pencil,
                   requiresSelection: true,
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
-                    const q = window.prompt(
-                      t('inventory.stockActions.quantityPrompt'),
-                      '0',
-                    );
-                    if (q == null) return;
-                    const qty = Number(q);
-                    if (!Number.isFinite(qty)) return;
-                    void updateStockQuantQuantity.mutateAsync({
+                  onClick: async (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined;
+                    const id = row?.id as ScalarId | undefined;
+                    if (id == null) return;
+                    const values = await askForm({
+                      title: t('inventory.stockActions.setQuantity'),
+                      fields: [
+                        {
+                          id: 'quantity',
+                          name: 'quantity',
+                          label: t('inventory.stockActions.quantityPrompt'),
+                          type: 'number',
+                          required: true,
+                          defaultValue: formNumber(row?.quantity) ?? 0,
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const qty = formNumber(values.quantity);
+                    if (qty == null) return;
+                    await updateStockQuantQuantity.mutateAsync({
                       quantId: id,
                       quantity: qty,
                     });
@@ -2788,13 +3179,23 @@ function InventoryClientLoaded({
                   label: t('inventory.stockInventoryActions.create'),
                   icon: Plus,
                   requiresSelection: false,
-                  onClick: () => {
-                    const name = promptText(
-                      t('inventory.stockInventoryActions.namePrompt'),
-                      'Cycle Count',
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.stockInventoryActions.create'),
+                      fields: [
+                        {
+                          id: 'name',
+                          name: 'name',
+                          label: t('inventory.stockInventoryActions.namePrompt'),
+                          type: 'text',
+                          required: true,
+                          defaultValue: 'Cycle Count',
+                        },
+                      ],
+                    });
+                    const name = formText(values?.name);
                     if (name == null || operatingCompanyId == null) return;
-                    void createStockInventory.mutateAsync({
+                    await createStockInventory.mutateAsync({
                       company_id: Number(operatingCompanyId),
                       name,
                       location_ids: [],
@@ -2815,23 +3216,61 @@ function InventoryClientLoaded({
                   label: t('inventory.stockInventoryActions.addLine'),
                   icon: ListChecks,
                   requiresSelection: false,
-                  onClick: () => {
-                    const inventoryId = promptScalarId(
-                      t('inventory.stockInventoryActions.inventoryIdPrompt'),
-                    );
-                    const productId = promptScalarId(
-                      t('inventory.stockInventoryActions.productIdPrompt'),
-                    );
-                    const uomId = promptScalarId(
-                      t('inventory.stockInventoryActions.uomIdPrompt'),
-                    );
-                    const locationId = promptScalarId(
-                      t('inventory.stockInventoryActions.locationIdPrompt'),
-                    );
-                    const qty = promptNumber(
-                      t('inventory.stockInventoryActions.productQtyPrompt'),
-                      '0',
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.stockInventoryActions.addLine'),
+                      fields: [
+                        {
+                          id: 'inventoryId',
+                          name: 'inventoryId',
+                          label: lbl.inventory,
+                          type: 'select',
+                          required: true,
+                          options: stockInventoryOptions,
+                        },
+                        {
+                          id: 'productId',
+                          name: 'productId',
+                          label: lbl.product,
+                          type: 'select',
+                          required: true,
+                          options: productSelectOptions,
+                        },
+                        {
+                          id: 'uomId',
+                          name: 'uomId',
+                          label: lbl.uom,
+                          type: 'select',
+                          required: true,
+                          options: uomFieldOptions,
+                          width: '1/2',
+                        },
+                        {
+                          id: 'locationId',
+                          name: 'locationId',
+                          label: lbl.location,
+                          type: 'select',
+                          required: true,
+                          options: stockOnHandLocationOptions,
+                          width: '1/2',
+                        },
+                        {
+                          id: 'qty',
+                          name: 'qty',
+                          label: t('inventory.stockInventoryActions.productQtyPrompt'),
+                          type: 'number',
+                          required: true,
+                          min: 0,
+                          defaultValue: 0,
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const inventoryId = formText(values.inventoryId);
+                    const productId = formText(values.productId);
+                    const uomId = formText(values.uomId);
+                    const locationId = formText(values.locationId);
+                    const qty = formNumber(values.qty);
                     if (
                       inventoryId == null ||
                       productId == null ||
@@ -2840,7 +3279,7 @@ function InventoryClientLoaded({
                       qty == null
                     )
                       return;
-                    void createStockInventoryLine.mutateAsync({
+                    await createStockInventoryLine.mutateAsync({
                       inventoryId,
                       params: {
                         product_id: Number(productId),
@@ -2880,16 +3319,34 @@ function InventoryClientLoaded({
                   label: t('inventory.stockInventoryActions.setState'),
                   icon: Pencil,
                   requiresSelection: false,
-                  onClick: () => {
-                    const inventoryId = promptScalarId(
-                      t('inventory.stockInventoryActions.inventoryIdPrompt'),
-                    );
-                    const newState = promptText(
-                      t('inventory.stockInventoryActions.statePrompt'),
-                      'confirm',
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.stockInventoryActions.setState'),
+                      fields: [
+                        {
+                          id: 'inventoryId',
+                          name: 'inventoryId',
+                          label: lbl.inventory,
+                          type: 'select',
+                          required: true,
+                          options: stockInventoryOptions,
+                        },
+                        {
+                          id: 'newState',
+                          name: 'newState',
+                          label: t('inventory.stockInventoryActions.statePrompt'),
+                          type: 'select',
+                          required: true,
+                          defaultValue: 'confirm',
+                          options: stockInventoryStateOptions,
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const inventoryId = formText(values.inventoryId);
+                    const newState = formText(values.newState);
                     if (inventoryId == null || newState == null) return;
-                    void updateStockInventoryState.mutateAsync({
+                    await updateStockInventoryState.mutateAsync({
                       inventoryId,
                       newState,
                     });
@@ -2899,9 +3356,12 @@ function InventoryClientLoaded({
                   id: 'process-adjustment',
                   label: t('inventory.adjustmentActions.process'),
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.adjustmentActions.process') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void processAdjustment.mutateAsync(id);
+                    if (id != null) await processAdjustment.mutateAsync(id);
                   },
                 },
               ],
@@ -2928,25 +3388,36 @@ function InventoryClientLoaded({
                   label: t('common.edit'),
                   icon: Pencil,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const row = rows[0] as Record<string, unknown> | undefined;
                     const locationId = row?.id as ScalarId | undefined;
                     if (locationId == null) return;
-                    const name = promptText(
-                      t('inventory.locationActions.namePrompt'),
-                      String(row?.name ?? ''),
-                    );
-                    const barcode = promptText(
-                      t('inventory.locationActions.barcodePrompt'),
-                      String(row?.barcode ?? ''),
-                    );
+                    const values = await askForm({
+                      title: t('common.edit'),
+                      fields: [
+                        {
+                          id: 'name',
+                          name: 'name',
+                          label: t('inventory.locationActions.namePrompt'),
+                          type: 'text',
+                          defaultValue: String(row?.name ?? ''),
+                        },
+                        {
+                          id: 'barcode',
+                          name: 'barcode',
+                          label: t('inventory.locationActions.barcodePrompt'),
+                          type: 'text',
+                          defaultValue: String(row?.barcode ?? ''),
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const name = formText(values.name);
+                    const barcode = formText(values.barcode);
                     if (name == null && barcode == null) return;
-                    void updateStockLocation.mutateAsync({
+                    await updateStockLocation.mutateAsync({
                       locationId,
-                      params: {
-                        name: name ?? undefined,
-                        barcode: barcode ?? undefined,
-                      },
+                      params: { name, barcode },
                     });
                   },
                 },
@@ -2955,9 +3426,10 @@ function InventoryClientLoaded({
                   label: t('common.delete'),
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void deleteStockLocation.mutateAsync(id);
+                    if (id != null) await deleteStockLocation.mutateAsync(id);
                   },
                 },
               ],
@@ -2983,20 +3455,37 @@ function InventoryClientLoaded({
                   label: t('inventory.lotActions.create'),
                   icon: Plus,
                   requiresSelection: false,
-                  onClick: () => {
-                    const name = promptText(
-                      t('inventory.lotActions.namePrompt'),
-                    );
-                    const productId = promptScalarId(
-                      t('inventory.lotActions.productIdPrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.lotActions.create'),
+                      fields: [
+                        {
+                          id: 'name',
+                          name: 'name',
+                          label: t('inventory.lotActions.namePrompt'),
+                          type: 'text',
+                          required: true,
+                        },
+                        {
+                          id: 'productId',
+                          name: 'productId',
+                          label: lbl.product,
+                          type: 'select',
+                          required: true,
+                          options: productSelectOptions,
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const name = formText(values.name);
+                    const productId = formText(values.productId);
                     if (
                       name == null ||
                       productId == null ||
                       operatingCompanyId == null
                     )
                       return;
-                    void createStockProductionLot.mutateAsync({
+                    await createStockProductionLot.mutateAsync({
                       companyId: BigInt(operatingCompanyId),
                       name,
                       productId: BigInt(Number(productId)),
@@ -3022,18 +3511,29 @@ function InventoryClientLoaded({
                   label: t('inventory.lotActions.editNote'),
                   icon: Pencil,
                   requiresSelection: true,
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
-                    const note = window.prompt(
-                      t('inventory.lotActions.notePrompt'),
-                    );
-                    if (note == null) return;
-                    void updateStockProductionLot.mutateAsync({
+                  onClick: async (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined;
+                    const id = row?.id as ScalarId | undefined;
+                    if (id == null) return;
+                    const values = await askForm({
+                      title: t('inventory.lotActions.editNote'),
+                      fields: [
+                        {
+                          id: 'note',
+                          name: 'note',
+                          label: t('inventory.lotActions.notePrompt'),
+                          type: 'textarea',
+                          rows: 3,
+                          defaultValue: String(row?.note ?? ''),
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    await updateStockProductionLot.mutateAsync({
                       lotId: id,
                       params: {
                         companyId: undefined,
-                        note: note.trim() !== '' ? note : undefined,
+                        note: formText(values.note),
                       },
                     });
                   },
@@ -3044,14 +3544,17 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.lotActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
-                    if (
-                      window.confirm(t('inventory.lotActions.confirmDelete'))
-                    ) {
-                      void deleteStockProductionLot.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteStockProductionLot.mutateAsync(id);
                   },
                 },
               ],
@@ -3072,20 +3575,37 @@ function InventoryClientLoaded({
                   label: t('inventory.serialActions.create'),
                   icon: Plus,
                   requiresSelection: false,
-                  onClick: () => {
-                    const name = promptText(
-                      t('inventory.serialActions.namePrompt'),
-                    );
-                    const productId = promptScalarId(
-                      t('inventory.serialActions.productIdPrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.serialActions.create'),
+                      fields: [
+                        {
+                          id: 'name',
+                          name: 'name',
+                          label: t('inventory.serialActions.namePrompt'),
+                          type: 'text',
+                          required: true,
+                        },
+                        {
+                          id: 'productId',
+                          name: 'productId',
+                          label: lbl.product,
+                          type: 'select',
+                          required: true,
+                          options: productSelectOptions,
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const name = formText(values.name);
+                    const productId = formText(values.productId);
                     if (
                       name == null ||
                       productId == null ||
                       operatingCompanyId == null
                     )
                       return;
-                    void createStockProductionSerial.mutateAsync({
+                    await createStockProductionSerial.mutateAsync({
                       companyId: BigInt(operatingCompanyId),
                       name,
                       productId: BigInt(Number(productId)),
@@ -3122,10 +3642,12 @@ function InventoryClientLoaded({
                   label: t('inventory.productionSerials.actions.reserve'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['free'].includes(rowState(row, 'state'))),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void reserveSerial.reserve(
+                      await reserveSerial.reserve(
                         { serialId: String(id) },
                         { navigateToNext: true },
                       );
@@ -3136,10 +3658,12 @@ function InventoryClientLoaded({
                   label: t('inventory.productionSerials.actions.markInUse'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['reserved'].includes(rowState(row, 'state'))),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void useSerial.markInUse(
+                      await useSerial.markInUse(
                         { serialId: String(id) },
                         { navigateToNext: true },
                       );
@@ -3150,18 +3674,29 @@ function InventoryClientLoaded({
                   label: t('inventory.serialActions.editNote'),
                   icon: Pencil,
                   requiresSelection: true,
-                  onClick: (rows) => {
-                    const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
-                    const note = window.prompt(
-                      t('inventory.serialActions.notePrompt'),
-                    );
-                    if (note == null) return;
-                    void updateStockProductionSerial.mutateAsync({
+                  onClick: async (rows) => {
+                    const row = rows[0] as Record<string, unknown> | undefined;
+                    const id = row?.id as ScalarId | undefined;
+                    if (id == null) return;
+                    const values = await askForm({
+                      title: t('inventory.serialActions.editNote'),
+                      fields: [
+                        {
+                          id: 'note',
+                          name: 'note',
+                          label: t('inventory.serialActions.notePrompt'),
+                          type: 'textarea',
+                          rows: 3,
+                          defaultValue: String(row?.note ?? ''),
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    await updateStockProductionSerial.mutateAsync({
                       serialId: id,
                       params: {
                         companyId: undefined,
-                        note: note.trim() !== '' ? note : undefined,
+                        note: formText(values.note),
                       },
                     });
                   },
@@ -3172,14 +3707,17 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.serialActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
-                    if (
-                      window.confirm(t('inventory.serialActions.confirmDelete'))
-                    ) {
-                      void deleteStockProductionSerial.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteStockProductionSerial.mutateAsync(id);
                   },
                 },
               ],
@@ -3246,10 +3784,13 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.pass'),
                   icon: ShieldCheck,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => !['completed'].includes(rowState(row, 'status'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.qualityActions.pass') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void passQualityCheck.mutateAsync({ checkId: id });
+                      await passQualityCheck.mutateAsync({ checkId: id });
                   },
                 },
                 {
@@ -3258,12 +3799,16 @@ function InventoryClientLoaded({
                   icon: AlertTriangle,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => !['completed'].includes(rowState(row, 'status'))),
+                  onClick: async (rows) => {
                     const row = rows[0];
                     const id = row?.id;
                     const productId = row?.productId;
                     const companyId = row?.companyId;
                     const lotId = row?.lotId;
+                    if (id == null || productId == null || companyId == null)
+                      return;
                     const quarantineWarehouse = warehouses.find(
                       (w) => w.whQcStockLocId != null,
                     );
@@ -3273,39 +3818,48 @@ function InventoryClientLoaded({
                     // (wh_qc_stock_loc_id is create-only, never set by seed data
                     // or update_warehouse) — ask the operator which location the
                     // failed stock quarantines to.
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.fail'),
+                      submitLabel: t('inventory.qualityActions.fail'),
+                      fields: [
+                        ...(configuredQuarantineLocationId == null
+                          ? [
+                              {
+                                id: 'quarantineLocationId',
+                                name: 'quarantineLocationId',
+                                label: lbl.quarantineLocation,
+                                type: 'select' as const,
+                                required: true,
+                                options: stockOnHandLocationOptions,
+                              },
+                            ]
+                          : []),
+                        {
+                          id: 'reason',
+                          name: 'reason',
+                          label: lbl.failReason,
+                          type: 'textarea' as const,
+                          rows: 3,
+                        },
+                      ],
+                    });
+                    if (!values) return;
                     const quarantineLocationId =
                       configuredQuarantineLocationId ??
-                      promptScalarId(
-                        t('inventory.qualityActions.quarantineLocationPrompt'),
-                      );
-                    const reason =
-                      typeof window !== 'undefined'
-                        ? window.prompt(
-                            t('inventory.qualityActions.failReason'),
-                          )
-                        : null;
-                    if (
-                      id != null &&
-                      productId != null &&
-                      companyId != null &&
-                      quarantineLocationId != null
-                    ) {
-                      void failQualityCheck.fail(
-                        {
-                          checkId: String(id),
-                          productId: String(productId),
-                          lotId: lotId != null ? String(lotId) : undefined,
-                          companyId: String(companyId),
-                          quarantineLocationId: String(quarantineLocationId),
-                          qtyFailed: 1,
-                          note:
-                            reason && reason.trim() !== ''
-                              ? reason.trim()
-                              : undefined,
-                        },
-                        { navigateToNext: true },
-                      );
-                    }
+                      formText(values.quarantineLocationId);
+                    if (quarantineLocationId == null) return;
+                    await failQualityCheck.fail(
+                      {
+                        checkId: String(id),
+                        productId: String(productId),
+                        lotId: lotId != null ? String(lotId) : undefined,
+                        companyId: String(companyId),
+                        quarantineLocationId: String(quarantineLocationId),
+                        qtyFailed: 1,
+                        note: formText(values.reason),
+                      },
+                      { navigateToNext: true },
+                    );
                   },
                 },
                 {
@@ -3313,9 +3867,12 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.startCheck'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['draft'].includes(rowState(row, 'status'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.qualityActions.startCheck') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void startQualityCheck.mutateAsync(id);
+                    if (id != null) await startQualityCheck.mutateAsync(id);
                   },
                 },
                 {
@@ -3323,17 +3880,25 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.linkDevice'),
                   icon: ScanLine,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const checkId = rows[0]?.id as ScalarId | undefined;
-                    if (checkId == null || typeof window === 'undefined')
-                      return;
-                    const dev = window.prompt(
-                      t('inventory.qualityActions.deviceIdPrompt'),
-                    );
-                    if (dev == null || dev.trim() === '') return;
-                    const deviceId = Number(dev);
-                    if (!Number.isFinite(deviceId)) return;
-                    void linkDeviceToQualityCheck.mutateAsync({
+                    if (checkId == null) return;
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.linkDevice'),
+                      fields: [
+                        {
+                          id: 'deviceId',
+                          name: 'deviceId',
+                          label: lbl.device,
+                          type: 'select',
+                          required: true,
+                          options: iotDeviceOptions,
+                        },
+                      ],
+                    });
+                    const deviceId = formNumber(values?.deviceId);
+                    if (deviceId == null) return;
+                    await linkDeviceToQualityCheck.mutateAsync({
                       deviceId,
                       checkId,
                     });
@@ -3343,19 +3908,31 @@ function InventoryClientLoaded({
                   id: 'add-alert-reason',
                   label: t('inventory.qualityActions.addAlertReason'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const name = window.prompt(
-                      t('inventory.qualityActions.alertReasonNamePrompt'),
-                    );
-                    if (name == null || name.trim() === '') return;
-                    const desc = window.prompt(
-                      t('inventory.qualityActions.alertReasonDescPrompt'),
-                    );
-                    void createQualityAlertReason.mutateAsync({
-                      name: name.trim(),
-                      description:
-                        desc && desc.trim() !== '' ? desc.trim() : null,
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.addAlertReason'),
+                      fields: [
+                        {
+                          id: 'name',
+                          name: 'name',
+                          label: t('inventory.qualityActions.alertReasonNamePrompt'),
+                          type: 'text',
+                          required: true,
+                        },
+                        {
+                          id: 'description',
+                          name: 'description',
+                          label: t('inventory.qualityActions.alertReasonDescPrompt'),
+                          type: 'textarea',
+                          rows: 3,
+                        },
+                      ],
+                    });
+                    const name = formText(values?.name);
+                    if (name == null) return;
+                    await createQualityAlertReason.mutateAsync({
+                      name,
+                      description: formText(values?.description) ?? null,
                     });
                   },
                 },
@@ -3363,25 +3940,25 @@ function InventoryClientLoaded({
                   id: 'update-alert-reason',
                   label: t('inventory.qualityActions.updateAlertReason'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const rid = window.prompt(
-                      t('inventory.qualityActions.reasonIdPrompt'),
-                    );
-                    if (rid == null || rid.trim() === '') return;
-                    const reasonId = Number(rid);
-                    if (!Number.isFinite(reasonId)) return;
-                    const name = window.prompt(
-                      t('inventory.qualityActions.newReasonNamePrompt'),
-                    );
-                    void updateQualityAlertReason.mutateAsync({
-                      reasonId,
-                      params: {
-                        name:
-                          name != null && name.trim() !== ''
-                            ? name.trim()
-                            : null,
-                      },
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.updateAlertReason'),
+                      fields: [
+                        {
+                          id: 'recordId',
+                          name: 'recordId',
+                          label: t('inventory.byRecord.reasonId', { defaultValue: 'Alert reason ID' }),
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        },
+                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text', required: true },
+                      ],
+                    });
+                    if (!values) return;
+                    await updateQualityAlertReason.mutateAsync({
+                      reasonId: Number(values.recordId),
+                      params: { name: formText(values.name) ?? null },
                     });
                   },
                 },
@@ -3390,38 +3967,49 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.deleteAlertReason'),
                   variant: 'destructive',
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const rid = window.prompt(
-                      t('inventory.qualityActions.reasonIdPrompt'),
-                    );
-                    if (rid == null || rid.trim() === '') return;
-                    const reasonId = Number(rid);
-                    if (!Number.isFinite(reasonId)) return;
-                    if (window.confirm(t('common.delete') + '?')) {
-                      void deleteQualityAlertReason.mutateAsync(reasonId);
-                    }
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.deleteAlertReason'),
+                      submitLabel: t('common.delete'),
+                      fields: [{
+                          id: 'recordId',
+                          name: 'recordId',
+                          label: t('inventory.byRecord.reasonId', { defaultValue: 'Alert reason ID' }),
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        }],
+                    });
+                    if (!values) return;
+                    await deleteQualityAlertReason.mutateAsync(Number(values.recordId));
                   },
                 },
                 {
                   id: 'add-team-member',
                   label: t('inventory.qualityActions.addTeamMember'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const tid = window.prompt(
-                      t('inventory.qualityActions.teamIdPrompt'),
-                    );
-                    if (tid == null || tid.trim() === '') return;
-                    const teamId = Number(tid);
-                    if (!Number.isFinite(teamId)) return;
-                    const hex = window.prompt(
-                      t('inventory.qualityActions.memberIdentityPrompt'),
-                    );
-                    if (hex == null || hex.trim() === '') return;
-                    void addMemberToQualityTeam.mutateAsync({
-                      teamId,
-                      memberIdentityHex: hex.trim(),
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.addTeamMember'),
+                      fields: [{
+                          id: 'teamId',
+                          name: 'teamId',
+                          label: t('inventory.byRecord.team', { defaultValue: 'Quality team' }),
+                          type: 'select',
+                          required: true,
+                          options: recordOptions(qualityTeams as Record<string, unknown>[], (row) => String(row.name ?? row.id)),
+                        }, {
+                          id: 'member',
+                          name: 'member',
+                          label: t('inventory.byRecord.member', { defaultValue: 'Member identity' }),
+                          type: 'text',
+                          required: true,
+                        }],
+                    });
+                    if (!values) return;
+                    await addMemberToQualityTeam.mutateAsync({
+                      teamId: Number(values.teamId),
+                      memberIdentityHex: String(values.member).trim(),
                     });
                   },
                 },
@@ -3430,24 +4018,29 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.updatePoint'),
                   icon: Pencil,
                   requiresSelection: false,
-                  onClick: () => {
-                    const pointId = promptScalarId(
-                      t('inventory.qualityActions.pointIdPrompt'),
-                    );
-                    if (pointId == null) return;
-                    const name = promptText(
-                      t('inventory.qualityActions.pointNamePrompt'),
-                    );
-                    const testType = promptText(
-                      t('inventory.qualityActions.testTypePrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.updatePoint'),
+                      fields: [
+                        {
+                          id: 'recordId',
+                          name: 'recordId',
+                          label: t('inventory.byRecord.pointId', { defaultValue: 'Quality point ID' }),
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        },
+                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text' },
+                        { id: 'testType', name: 'testType', label: t('inventory.byRecord.testType', { defaultValue: 'Test type' }), type: 'text' },
+                      ],
+                    });
+                    if (!values) return;
+                    const name = formText(values.name);
+                    const testType = formText(values.testType);
                     if (name == null && testType == null) return;
-                    void updateQualityPoint.mutateAsync({
-                      pointId,
-                      params: {
-                        name: name ?? undefined,
-                        testType: testType ?? undefined,
-                      },
+                    await updateQualityPoint.mutateAsync({
+                      pointId: Number(values.recordId),
+                      params: { name, testType },
                     });
                   },
                 },
@@ -3456,24 +4049,29 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.updateTeam'),
                   icon: Pencil,
                   requiresSelection: false,
-                  onClick: () => {
-                    const teamId = promptScalarId(
-                      t('inventory.qualityActions.teamIdPrompt'),
-                    );
-                    if (teamId == null) return;
-                    const name = promptText(
-                      t('inventory.qualityActions.teamNamePrompt'),
-                    );
-                    const email = promptText(
-                      t('inventory.qualityActions.teamEmailPrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.updateTeam'),
+                      fields: [
+                        {
+                          id: 'teamId',
+                          name: 'teamId',
+                          label: t('inventory.byRecord.team', { defaultValue: 'Quality team' }),
+                          type: 'select',
+                          required: true,
+                          options: recordOptions(qualityTeams as Record<string, unknown>[], (row) => String(row.name ?? row.id)),
+                        },
+                        { id: 'name', name: 'name', label: t('inventory.byRecord.name', { defaultValue: 'Name' }), type: 'text' },
+                        { id: 'email', name: 'email', label: t('inventory.byRecord.email', { defaultValue: 'Email' }), type: 'email' },
+                      ],
+                    });
+                    if (!values) return;
+                    const name = formText(values.name);
+                    const email = formText(values.email);
                     if (name == null && email == null) return;
-                    void updateQualityTeam.mutateAsync({
-                      teamId,
-                      params: {
-                        name: name ?? undefined,
-                        email: email ?? undefined,
-                      },
+                    await updateQualityTeam.mutateAsync({
+                      teamId: Number(values.teamId),
+                      params: { name, email },
                     });
                   },
                 },
@@ -3482,21 +4080,29 @@ function InventoryClientLoaded({
                   label: t('inventory.qualityActions.removeTeamMember'),
                   variant: 'destructive',
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const tid = window.prompt(
-                      t('inventory.qualityActions.teamIdPrompt'),
-                    );
-                    if (tid == null || tid.trim() === '') return;
-                    const teamId = Number(tid);
-                    if (!Number.isFinite(teamId)) return;
-                    const hex = window.prompt(
-                      t('inventory.qualityActions.memberIdentityPrompt'),
-                    );
-                    if (hex == null || hex.trim() === '') return;
-                    void removeMemberFromQualityTeam.mutateAsync({
-                      teamId,
-                      memberIdentityHex: hex.trim(),
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.qualityActions.removeTeamMember'),
+                      submitLabel: t('common.remove', { defaultValue: 'Remove' }),
+                      fields: [{
+                          id: 'teamId',
+                          name: 'teamId',
+                          label: t('inventory.byRecord.team', { defaultValue: 'Quality team' }),
+                          type: 'select',
+                          required: true,
+                          options: recordOptions(qualityTeams as Record<string, unknown>[], (row) => String(row.name ?? row.id)),
+                        }, {
+                          id: 'member',
+                          name: 'member',
+                          label: t('inventory.byRecord.member', { defaultValue: 'Member identity' }),
+                          type: 'text',
+                          required: true,
+                        }],
+                    });
+                    if (!values) return;
+                    await removeMemberFromQualityTeam.mutateAsync({
+                      teamId: Number(values.teamId),
+                      memberIdentityHex: String(values.member).trim(),
                     });
                   },
                 },
@@ -3529,28 +4135,52 @@ function InventoryClientLoaded({
                   label: t('inventory.replenishmentActions.executeRule'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  confirm: {
+                    title: t('inventory.replenishmentActions.executeRule'),
+                    description: `${t('inventory.replenishmentActions.executeRule')}\n${t('inventory.replenishmentActions.executeRuleHint')}`,
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
+                    if (id == null) return;
                     if (
-                      window.confirm(
-                        `${t('inventory.replenishmentActions.executeRule')}\n${t('inventory.replenishmentActions.executeRuleHint')}`,
-                      )
+                      typeof globalThis.crypto === 'undefined' ||
+                      typeof globalThis.crypto.randomUUID !== 'function'
                     ) {
-                      if (
-                        typeof globalThis.crypto === 'undefined' ||
-                        typeof globalThis.crypto.randomUUID !== 'function'
-                      ) {
-                        return;
-                      }
-                      void executeReplenishmentRule.execute(
-                        {
-                          ruleId: String(id),
-                          idempotencyKey: globalThis.crypto.randomUUID(),
-                        },
-                        { navigateToNext: true },
-                      );
+                      return;
                     }
+                    await executeReplenishmentRule.execute(
+                      {
+                        ruleId: String(id),
+                        idempotencyKey: globalThis.crypto.randomUUID(),
+                      },
+                      { navigateToNext: true },
+                    );
+                  },
+                },
+                {
+                  id: 'schedule-replenishment-run',
+                  label: t('inventory.replenishmentActions.scheduleRun'),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  isApplicable: (rows) => rows.every((row) => row.active === true),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.replenishmentActions.scheduleRun') }),
+                  onClick: async (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null)
+                      await scheduleReplenishmentRun.mutateAsync(id);
+                  },
+                },
+                {
+                  id: 'cancel-replenishment-run',
+                  label: t('inventory.replenishmentActions.cancelSchedule'),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  successMessage: t('common.actionCompleted', { action: t('inventory.replenishmentActions.cancelSchedule') }),
+                  onClick: async (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) await cancelReplenishmentRun.mutateAsync(id);
                   },
                 },
               ],
@@ -3576,9 +4206,11 @@ function InventoryClientLoaded({
                   label: t('inventory.pickingWaveActions.confirm'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) => rows.length === 1 && canReleaseWave(rows[0]),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.pickingWaveActions.confirm') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void confirmPickingWave.mutateAsync(id);
+                    if (id != null) await confirmPickingWave.mutateAsync(id);
                   },
                 },
                 {
@@ -3586,9 +4218,56 @@ function InventoryClientLoaded({
                   label: t('inventory.pickingWaveActions.complete'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['in_progress'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.pickingWaveActions.complete') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void completePickingWave.mutateAsync(id);
+                    if (id != null) await completePickingWave.mutateAsync(id);
+                  },
+                },
+              ],
+            },
+          },
+        };
+      }
+      // Stock package actions
+      if (tab.id === 'stock-packages') {
+        return {
+          ...tab,
+          entityConfig: {
+            ...tab.entityConfig,
+            view: {
+              ...v,
+              actions: [
+                {
+                  id: 'confirm-package',
+                  label: t('inventory.stockPackageActions.confirm', { defaultValue: 'Confirm package' }),
+                  icon: CheckCircle,
+                  requiresSelection: true,
+                  permission: { resource: 'stock_picking', action: 'update' },
+                  isApplicable: (rows) => rows.length === 1 && canConfirmPackage(rows[0]),
+                  successMessage: t('common.actionCompleted', {
+                    action: t('inventory.stockPackageActions.confirm', { defaultValue: 'Confirm package' }),
+                  }),
+                  onClick: async (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) await confirmStockPackage.mutateAsync(id);
+                  },
+                },
+                {
+                  id: 'done-package',
+                  label: t('inventory.stockPackageActions.done', { defaultValue: 'Mark package done' }),
+                  icon: ListChecks,
+                  requiresSelection: true,
+                  permission: { resource: 'stock_picking', action: 'update' },
+                  isApplicable: (rows) => rows.length === 1 && canDonePackage(rows[0]),
+                  successMessage: t('common.actionCompleted', {
+                    action: t('inventory.stockPackageActions.done', { defaultValue: 'Mark package done' }),
+                  }),
+                  onClick: async (rows) => {
+                    const id = rows[0]?.id as ScalarId | undefined;
+                    if (id != null) await doneStockPackage.mutateAsync(id);
                   },
                 },
               ],
@@ -3621,32 +4300,42 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.categoryActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (
-                      id != null &&
-                      typeof window !== 'undefined' &&
-                      window.confirm(
-                        t('inventory.categoryActions.confirmDelete'),
-                      )
-                    ) {
-                      void deleteProductCategory.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteProductCategory.mutateAsync(id);
                   },
                 },
                 {
                   id: 'restore-category',
                   label: t('inventory.categoryActions.restoreById'),
                   requiresSelection: false,
-                  onClick: () => {
-                    if (typeof window === 'undefined') return;
-                    const raw = window.prompt(
-                      t('inventory.categoryActions.categoryIdPrompt'),
+                  onClick: async () => {
+                    const deleted = (productCategories as Record<string, unknown>[]).filter(
+                      (row) => row.deletedAt != null || row.deleted_at != null,
                     );
-                    if (raw == null || raw.trim() === '') return;
-                    const categoryId = Number(raw);
-                    if (!Number.isFinite(categoryId)) return;
-                    void restoreProductCategory.mutateAsync(categoryId);
+                    const values = await askForm({
+                      title: t('inventory.categoryActions.restoreById'),
+                      fields: [
+                        {
+                          id: 'categoryId',
+                          name: 'categoryId',
+                          label: t('inventory.byRecord.category', { defaultValue: 'Archived category' }),
+                          type: 'select',
+                          required: true,
+                          options: recordOptions(deleted, (row) => String(row.name ?? row.id)),
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    await restoreProductCategory.mutateAsync(Number(values.categoryId));
                   },
                 },
               ],
@@ -3669,15 +4358,17 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.routeActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (
-                      id != null &&
-                      typeof window !== 'undefined' &&
-                      window.confirm(t('inventory.routeActions.confirmDelete'))
-                    ) {
-                      void deleteStockRoute.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteStockRoute.mutateAsync(id);
                   },
                 },
               ],
@@ -3700,15 +4391,17 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.ruleActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (
-                      id != null &&
-                      typeof window !== 'undefined' &&
-                      window.confirm(t('inventory.ruleActions.confirmDelete'))
-                    ) {
-                      void deleteStockRule.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteStockRule.mutateAsync(id);
                   },
                 },
               ],
@@ -3730,16 +4423,41 @@ function InventoryClientLoaded({
                   label: t('inventory.barcodeActions.setWhatsappQualityScore'),
                   icon: ScanLine,
                   requiresSelection: false,
-                  onClick: () => {
-                    const accountId = promptScalarId(
-                      t('inventory.barcodeActions.whatsappAccountIdPrompt'),
-                    );
-                    const qualityScore = promptText(
-                      t('inventory.barcodeActions.whatsappQualityScorePrompt'),
-                      'UNKNOWN',
-                    );
+                  onClick: async () => {
+                    // WhatsApp accounts have no list query yet, so the account is
+                    // still identified by its id.
+                    const values = await askForm({
+                      title: t('inventory.barcodeActions.setWhatsappQualityScore'),
+                      fields: [
+                        {
+                          id: 'accountId',
+                          name: 'accountId',
+                          label: lbl.whatsappAccount,
+                          type: 'number',
+                          required: true,
+                          min: 1,
+                        },
+                        {
+                          id: 'qualityScore',
+                          name: 'qualityScore',
+                          label: lbl.qualityRating,
+                          type: 'select',
+                          required: true,
+                          defaultValue: 'UNKNOWN',
+                          options: [
+                            { value: 'GREEN', label: 'GREEN' },
+                            { value: 'YELLOW', label: 'YELLOW' },
+                            { value: 'RED', label: 'RED' },
+                            { value: 'UNKNOWN', label: 'UNKNOWN' },
+                          ],
+                        },
+                      ],
+                    });
+                    if (!values) return;
+                    const accountId = formText(values.accountId);
+                    const qualityScore = formText(values.qualityScore);
                     if (accountId == null || qualityScore == null) return;
-                    void updateWhatsappQualityScore.mutateAsync({
+                    await updateWhatsappQualityScore.mutateAsync({
                       accountId,
                       qualityScore,
                     });
@@ -3751,17 +4469,17 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t('inventory.barcodeActions.confirmDelete'),
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (
-                      id != null &&
-                      typeof window !== 'undefined' &&
-                      window.confirm(
-                        t('inventory.barcodeActions.confirmDelete'),
-                      )
-                    ) {
-                      void deleteBarcodeRule.mutateAsync(id);
-                    }
+                    if (id == null) return;
+                    await deleteBarcodeRule.mutateAsync(id);
                   },
                 },
               ],
@@ -3788,12 +4506,22 @@ function InventoryClientLoaded({
                   label: t('inventory.barcodeNomenclatures.actions.create'),
                   icon: Plus,
                   requiresSelection: false,
-                  onClick: () => {
-                    const name = promptText(
-                      t('inventory.barcodeNomenclatures.actions.namePrompt'),
-                    );
+                  onClick: async () => {
+                    const values = await askForm({
+                      title: t('inventory.barcodeNomenclatures.actions.create'),
+                      fields: [
+                        {
+                          id: 'name',
+                          name: 'name',
+                          label: t('inventory.barcodeNomenclatures.actions.namePrompt'),
+                          type: 'text',
+                          required: true,
+                        },
+                      ],
+                    });
+                    const name = formText(values?.name);
                     if (name == null) return;
-                    void createBarcodeNomenclature.mutateAsync({
+                    await createBarcodeNomenclature.mutateAsync({
                       name,
                       description: null,
                       is_default: false,
@@ -3808,16 +4536,26 @@ function InventoryClientLoaded({
                   label: t('common.edit'),
                   icon: Pencil,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const row = rows[0] as Record<string, unknown> | undefined;
                     const nomenclatureId = row?.id as ScalarId | undefined;
                     if (nomenclatureId == null) return;
-                    const name = promptText(
-                      t('inventory.barcodeNomenclatures.actions.namePrompt'),
-                      String(row?.name ?? ''),
-                    );
+                    const values = await askForm({
+                      title: t('common.edit'),
+                      fields: [
+                        {
+                          id: 'name',
+                          name: 'name',
+                          label: t('inventory.barcodeNomenclatures.actions.namePrompt'),
+                          type: 'text',
+                          required: true,
+                          defaultValue: String(row?.name ?? ''),
+                        },
+                      ],
+                    });
+                    const name = formText(values?.name);
                     if (name == null) return;
-                    void updateBarcodeNomenclature.mutateAsync({
+                    await updateBarcodeNomenclature.mutateAsync({
                       nomenclatureId,
                       params: { name, isActive: true },
                     });
@@ -3828,13 +4566,25 @@ function InventoryClientLoaded({
                   label: t('inventory.barcodeNomenclatures.actions.addRule'),
                   icon: Plus,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const nomenclatureId = rows[0]?.id as ScalarId | undefined;
-                    const ruleId = promptScalarId(
-                      t('inventory.barcodeNomenclatures.actions.ruleIdPrompt'),
-                    );
-                    if (nomenclatureId == null || ruleId == null) return;
-                    void addRuleToNomenclature.mutateAsync({
+                    if (nomenclatureId == null) return;
+                    const values = await askForm({
+                      title: t('inventory.barcodeNomenclatures.actions.addRule'),
+                      fields: [
+                        {
+                          id: 'ruleId',
+                          name: 'ruleId',
+                          label: lbl.rule,
+                          type: 'select',
+                          required: true,
+                          options: barcodeRuleOptions,
+                        },
+                      ],
+                    });
+                    const ruleId = formText(values?.ruleId);
+                    if (ruleId == null) return;
+                    await addRuleToNomenclature.mutateAsync({
                       nomenclatureId,
                       ruleId,
                     });
@@ -3845,17 +4595,25 @@ function InventoryClientLoaded({
                   label: t('inventory.barcodeNomenclatures.actions.removeRule'),
                   icon: Pencil,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const nomenclatureId = rows[0]?.id as ScalarId | undefined;
-                    if (nomenclatureId == null || typeof window === 'undefined')
-                      return;
-                    const raw = window.prompt(
-                      t('inventory.barcodeNomenclatures.actions.ruleIdPrompt'),
-                    );
-                    if (raw == null || raw.trim() === '') return;
-                    const ruleId = Number(raw.trim());
-                    if (!Number.isFinite(ruleId)) return;
-                    void removeRuleFromNomenclature.mutateAsync({
+                    if (nomenclatureId == null) return;
+                    const values = await askForm({
+                      title: t('inventory.barcodeNomenclatures.actions.removeRule'),
+                      fields: [
+                        {
+                          id: 'ruleId',
+                          name: 'ruleId',
+                          label: lbl.rule,
+                          type: 'select',
+                          required: true,
+                          options: barcodeRuleOptions,
+                        },
+                      ],
+                    });
+                    const ruleId = formNumber(values?.ruleId);
+                    if (ruleId == null) return;
+                    await removeRuleFromNomenclature.mutateAsync({
                       nomenclatureId,
                       ruleId,
                     });
@@ -3867,21 +4625,22 @@ function InventoryClientLoaded({
                   icon: Trash2,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
-                    const nomenclatureId = rows[0]?.id as ScalarId | undefined;
-                    if (nomenclatureId == null || typeof window === 'undefined')
-                      return;
-                    if (
-                      window.confirm(
-                        t(
+                  successMessage: t('common.actionCompleted', { action: t('common.delete') }),
+                  confirm: {
+                    title: t('common.delete'),
+                    description: t(
                           'inventory.barcodeNomenclatures.actions.confirmDelete',
                         ),
-                      )
-                    ) {
-                      void deleteBarcodeNomenclature.mutateAsync(
-                        nomenclatureId,
-                      );
-                    }
+                    confirmLabel: t('common.confirm'),
+                    cancelLabel: t('common.cancel'),
+                  },
+                  onClick: async (rows) => {
+                    const nomenclatureId = rows[0]?.id as ScalarId | undefined;
+                    if (nomenclatureId == null)
+                      return;
+                    await deleteBarcodeNomenclature.mutateAsync(
+                      nomenclatureId,
+                    );
                   },
                 },
               ],
@@ -3902,12 +4661,15 @@ function InventoryClientLoaded({
                   label: t('inventory.traceabilityReports.actions.runSelected'),
                   icon: Play,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  isApplicable: (rows) =>
+                    rows.every((row) => ['draft'].includes(rowState(row, 'state'))),
+                  successMessage: t('common.actionCompleted', { action: t('inventory.traceabilityReports.actions.runSelected') }),
+                  onClick: async (rows) => {
                     const row = rows[0] as Record<string, unknown> | undefined;
                     const id = row?.id as ScalarId | undefined;
                     if (id == null || String(row?.state ?? '') !== 'draft')
                       return;
-                    void runTraceabilityReport.mutateAsync(id);
+                    await runTraceabilityReport.mutateAsync(id);
                   },
                 },
               ],
@@ -3929,9 +4691,10 @@ function InventoryClientLoaded({
                   label: t('inventory.taskActions.start'),
                   icon: CheckCircle,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('inventory.taskActions.start') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void startWarehouseTask.mutateAsync(id);
+                    if (id != null) await startWarehouseTask.mutateAsync(id);
                   },
                 },
                 {
@@ -3939,10 +4702,11 @@ function InventoryClientLoaded({
                   label: t('inventory.taskActions.complete'),
                   icon: ListChecks,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('inventory.taskActions.complete') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
                     if (id != null)
-                      void completeWarehouseTask.mutateAsync({
+                      await completeWarehouseTask.mutateAsync({
                         taskId: id,
                         result: {},
                       });
@@ -3954,9 +4718,10 @@ function InventoryClientLoaded({
                   icon: XCircle,
                   variant: 'destructive',
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  successMessage: t('common.actionCompleted', { action: t('inventory.taskActions.cancel') }),
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) void cancelWarehouseTask.mutateAsync(id);
+                    if (id != null) await cancelWarehouseTask.mutateAsync(id);
                   },
                 },
                 {
@@ -3964,16 +4729,27 @@ function InventoryClientLoaded({
                   label: t('inventory.taskActions.setStatus'),
                   icon: Pencil,
                   requiresSelection: true,
-                  onClick: (rows) => {
+                  onClick: async (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id == null || typeof window === 'undefined') return;
-                    const st = window.prompt(
-                      t('inventory.taskActions.statusPrompt'),
-                    );
-                    if (st == null || st.trim() === '') return;
-                    void updateWarehouseTaskStatus.mutateAsync({
+                    if (id == null) return;
+                    const values = await askForm({
+                      title: t('inventory.taskActions.setStatus'),
+                      fields: [
+                        {
+                          id: 'status',
+                          name: 'status',
+                          label: lbl.status,
+                          type: 'select',
+                          required: true,
+                          options: warehouseTaskStatusOptions,
+                        },
+                      ],
+                    });
+                    const newStatus = formText(values?.status);
+                    if (newStatus == null) return;
+                    await updateWarehouseTaskStatus.mutateAsync({
                       taskId: id,
-                      newStatus: st.trim(),
+                      newStatus,
                     });
                   },
                 },
@@ -4020,6 +4796,7 @@ function InventoryClientLoaded({
           if (tab.id === 'quality') return withTransferActions(tab);
           if (tab.id === 'replenishment') return withTransferActions(tab);
           if (tab.id === 'picking-waves') return withTransferActions(tab);
+          if (tab.id === 'stock-packages') return withTransferActions(tab);
           if (tab.id === 'product-categories') return withTransferActions(tab);
           if (tab.id === 'routes') return withTransferActions(tab);
           if (tab.id === 'rules') return withTransferActions(tab);
@@ -4092,6 +4869,8 @@ function InventoryClientLoaded({
     // Picking waves
     confirmPickingWave,
     completePickingWave,
+    confirmStockPackage,
+    doneStockPackage,
     // Product categories
     deleteProductCategory,
     // Stock routes and rules
@@ -4110,6 +4889,8 @@ function InventoryClientLoaded({
     cancelWarehouseTask,
     updateWarehouseTaskStatus,
     executeReplenishmentRule,
+    scheduleReplenishmentRun,
+    cancelReplenishmentRun,
     startQualityCheck,
     openQualityAlert,
     solveQualityAlert,
@@ -4130,15 +4911,27 @@ function InventoryClientLoaded({
     restoreProductCategory,
     updateProductSupplierInfo,
     updateProductPackaging,
+    productSupplierInfos,
+    productPackagings,
+    vendorNameById,
+    productLabelById,
     stockQuantFormConfig,
     traceRecordFormConfig,
     useSerial,
     removeRuleFromNomenclature,
     runTraceabilityReport,
-    promptText,
-    promptScalarId,
-    promptNumber,
-    promptOptionalNumber,
+    askForm,
+    lbl,
+    operatingCompanyId,
+    uoms,
+    uomCategoryOptions,
+    stockInventoryOptions,
+    stockInventoryStateOptions,
+    iotDeviceOptions,
+    barcodeRuleOptions,
+    warehouseTaskStatusOptions,
+    productSelectOptions,
+    stockOnHandLocationOptions,
     // Data dependencies for form configs
     products,
     qualityTeamOptions,
@@ -4197,6 +4990,7 @@ function InventoryClientLoaded({
       quality: qualityChecks as unknown as Record<string, unknown>[],
       'cycle-counts': cycleCounts as unknown as Record<string, unknown>[],
       'picking-waves': pickingWaves as unknown as Record<string, unknown>[],
+      'stock-packages': stockPackages as unknown as Record<string, unknown>[],
       'warehouse-tasks': warehouseTasks as unknown as Record<string, unknown>[],
       routes: stockRoutes as unknown as Record<string, unknown>[],
       rules: stockRules as unknown as Record<string, unknown>[],
@@ -4244,6 +5038,7 @@ function InventoryClientLoaded({
       qualityChecks,
       cycleCounts,
       pickingWaves,
+      stockPackages,
       warehouseTasks,
       stockRoutes,
       stockRules,
@@ -4257,6 +5052,16 @@ function InventoryClientLoaded({
       serialLotTraceability,
       stockTraceabilityReports,
     ],
+  );
+
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      transfers: {
+        tiles: transferKpis(data.transfers, { t, now: new Date(), currencyCodeById: new Map() }),
+        loading: transfersLoading,
+      },
+    }),
+    [data.transfers, transfersLoading, t],
   );
 
   const handleFormSubmit = async (
@@ -4586,6 +5391,7 @@ function InventoryClientLoaded({
 
   return (
     <>
+      {formDialog}
       {/* key={operatingCompanyId} forces React to remount ModuleView when the operating company
           changes, preventing stale inventory rows from a previous company leaking into the new view. */}
       <ModuleView
@@ -4599,6 +5405,7 @@ function InventoryClientLoaded({
           stock: stockQuantsLoading,
           transfers: transfersLoading,
         }}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
         activeTab={activeTab}
@@ -5119,6 +5926,9 @@ function InventoryClientLoaded({
       ) : null}
       {csvKind && csvKind !== 'product' && csvFormConfig ? (
         <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={{ uomCategory: "uom_category", uom: "uom", productCategory: "product_category", product: "product", productVariant: "product_variant", warehouse: "warehouse", stockLocation: "stock_location", stockQuant: "stock_quant", lot: "stock_production_lot" }[csvKind]}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
@@ -5140,19 +5950,6 @@ function InventoryClientLoaded({
               await csvImports.importStockQuant.mutateAsync(text);
             else if (csvKind === 'lot')
               await csvImports.importLot.mutateAsync(text);
-            else if (csvKind === 'product') {
-              const pl = pricelists.find(
-                (p) =>
-                  p.currencyId != null && String(p.currencyId).trim() !== '',
-              );
-              if (pl == null || pl.currencyId == null) {
-                throw new Error(t('inventory.csvImport.noPricelistCurrency'));
-              }
-              await csvImports.importProduct.mutateAsync({
-                csvData: text,
-                currencyId: Number(pl.currencyId),
-              });
-            }
           }}
         />
       ) : null}

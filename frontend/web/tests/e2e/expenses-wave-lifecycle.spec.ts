@@ -10,9 +10,12 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
+  expectRowActionsOffered,
   callReducerBff,
   callReducerOwner,
   callReducerBffResult,
+  chooseFirstSelectOptionByTrigger,
   chooseSelectOptionByLabel,
   expectNoAppError,
   fetchAccountIdByCode,
@@ -32,12 +35,12 @@ const some = <T>(value: T) => ({ some: value })
 const none = { none: [] as [] }
 
 async function openExpensesTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-expenses-${tabId}`).click()
+  await selectModuleTab(page, "expenses", tabId)
 }
 
 test.describe("Expenses wave lifecycle e2e @expenses", () => {
   test("toolbar actions and capture/ops panels render @p0", async ({ page }) => {
-    await gotoModule(page, "/expenses", "expenses")
+    await gotoModule(page, "/expenses?tab=operations", "expenses")
 
     await expect(page.getByTestId("expenses-capture-panel")).toBeVisible()
     await expect(page.getByTestId("expenses-capture-submit")).toBeVisible()
@@ -46,15 +49,13 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
     await expectNoAppError(page)
 
     await openExpensesTab(page, "expense-sheets")
-    await expect(page.getByTestId("entity-action-submit-sheets")).toBeVisible()
-    await expect(page.getByTestId("entity-action-post-sheets")).toBeVisible()
-    await expect(page.getByTestId("entity-action-reimburse-sheets")).toBeVisible()
+    await expectRowActionsOffered(page, ["submit-sheets", "post-sheets", "reimburse-sheets"])
     await expectNoAppError(page)
   })
 
   test("dashboard New Report opens create sheet form @p0", async ({ page }) => {
     await gotoModule(page, "/expenses", "expenses")
-    await page.getByTestId("module-tab-expenses-dashboard").click()
+    await selectModuleTab(page, "expenses", "dashboard")
     const newReport = page.getByRole("button", { name: /New Report/i }).first()
     await expect(newReport).toBeVisible()
     await newReport.click()
@@ -63,15 +64,13 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
   })
 
   test("capture panel queues delayed-sync expense @p0", async ({ page }) => {
-    await gotoModule(page, "/expenses", "expenses")
+    await gotoModule(page, "/expenses?tab=operations", "expenses")
     await expect(page.getByTestId("expenses-capture-panel")).toBeVisible()
 
     const employee = page.getByTestId("expenses-capture-employee")
     const pricelist = page.getByTestId("expenses-capture-pricelist")
-    await expect(employee.locator("option")).not.toHaveCount(1, { timeout: 30_000 })
-    await employee.selectOption({ index: 1 })
-    await expect(pricelist.locator("option")).not.toHaveCount(1, { timeout: 30_000 })
-    await pricelist.selectOption({ index: 1 })
+    await chooseFirstSelectOptionByTrigger(page, employee)
+    await chooseFirstSelectOptionByTrigger(page, pricelist)
 
     const name = smokeName("capture")
     await page.getByTestId("expenses-capture-name").fill(name)
@@ -83,7 +82,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
   })
 
   test("ops FX fee + allocations form from expense row @p0", async ({ page }) => {
-    await gotoModule(page, "/expenses", "expenses")
+    await gotoModule(page, "/expenses?tab=operations", "expenses")
     // Wave D/E ops surface: FX fee on statement create (post advance covered in domain tests).
     await expect(page.getByTestId("expenses-ops-panel")).toBeVisible()
     await expect(page.getByTestId("expenses-ops-amount")).toBeVisible()
@@ -193,7 +192,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
       { orgId: organizationId, currencyId },
     )
     await page.reload()
-    await gotoModule(page, "/expenses", "expenses")
+    await gotoModule(page, "/expenses?tab=operations", "expenses")
     await expect(page.getByTestId("expenses-capture-item-conflict")).toBeVisible()
     await expect(page.getByTestId("expenses-capture-retry")).toBeVisible()
     await expect(page.getByTestId("expenses-capture-discard")).toBeVisible()
@@ -202,7 +201,7 @@ test.describe("Expenses wave lifecycle e2e @expenses", () => {
   })
 
   test("ops panel can create card statement line @expenses", async ({ page }) => {
-    await gotoModule(page, "/expenses", "expenses")
+    await gotoModule(page, "/expenses?tab=operations", "expenses")
     await expect(page.getByTestId("expenses-ops-panel")).toBeVisible()
     const ref = smokeName("stmt")
     await page.getByTestId("expenses-ops-external-ref").fill(ref)

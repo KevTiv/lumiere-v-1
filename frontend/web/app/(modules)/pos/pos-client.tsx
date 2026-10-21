@@ -16,7 +16,8 @@ import {
   type FormConfig,
 } from "@lumiere/ui"
 import type { PosFormAction } from "@lumiere/ui"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@lumiere/ui/components/tabs"
+import { Tabs, TabsContent } from "@lumiere/ui/components/tabs"
+import { WorkspaceTabsList as TabsList, WorkspaceTabsTrigger as TabsTrigger } from "@lumiere/ui/components/workspace-tabs"
 import { Button } from "@lumiere/ui/components/button"
 import { posModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePosModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -29,6 +30,7 @@ import {
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePosLoyaltyPrograms } from "@lumiere/query-hooks/hooks/sales"
 import { usePOS } from "./use-pos"
+import { posSessionHref } from "./pos-session"
 import type { PosConfig, PosSession, PosTerminal, Product } from "@lumiere/stdb/types"
 
 interface PosClientProps {
@@ -65,7 +67,6 @@ function PosClientLoaded({
   const moduleConfig = useMemo(() => posModuleConfig(t), [t])
   const [activeTab, setActiveTab] = useState("register")
   const [posAction, setPosAction] = useState<PosFormAction | null>(null)
-
   const pos = usePOS(
     orgId,
     operatingCompanyId,
@@ -134,7 +135,11 @@ function PosClientLoaded({
   ]
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div
+      className="flex h-full flex-col gap-4"
+      data-testid="module-view-pos"
+      data-hydrated={pos.isHydrated ? "true" : "false"}
+    >
       <DashboardHeader title={moduleConfig.title} description={moduleConfig.description} />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col">
@@ -182,7 +187,7 @@ function PosClientLoaded({
 
           <EntityView config={posTerminalsAdminTableConfig(t)} data={pos.terminals} />
           <EntityView config={posConfigsAdminTableConfig(t)} data={pos.configs} />
-          <EntityView config={posSessionsAdminTableConfig(t)} data={pos.sessions} />
+          <EntityView config={posSessionsAdminTableConfig(t, { recordHref: posSessionHref })} data={pos.sessions} />
         </TabsContent>
       </Tabs>
 

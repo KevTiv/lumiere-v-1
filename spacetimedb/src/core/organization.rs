@@ -13,8 +13,8 @@ use crate::core::country_pack::{
 use crate::core::permissions::{role, user_role_assignment, Role, UserRoleAssignment};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::reference::{
-    currency, require_active_currency_by_id, require_active_currency_for_organization,
-    seed_currency_for_organization,
+    country, currency, require_active_currency_by_id, require_active_currency_for_organization,
+    seed_country_catalog_for_organization, seed_currency_for_organization,
 };
 use crate::core::users::{
     ensure_user_profile_for_organization, find_user_profile_for_identity, user_organization,
@@ -40,7 +40,7 @@ pub struct CompanyScopeParams {
 }
 
 /// Params for creating an organization.
-/// Scope: no scope param (any authenticated user can create an org).
+/// Scope: no scope param (server-approved alpha founders only).
 #[derive(SpacetimeType, Clone, Debug)]
 pub struct CreateOrganizationParams {
     pub name: String,
@@ -293,6 +293,18 @@ pub(crate) fn insert_organization_with_owner(
     ctx: &ReducerContext,
     params: CreateOrganizationParams,
 ) -> Result<(Organization, Role), String> {
+    let has_membership_history = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .next()
+        .is_some();
+    crate::core::alpha_admission::require_alpha_founder(
+        &ctx.sender().to_hex().to_string(),
+        has_membership_history,
+    )?;
+
     if params.name.is_empty() {
         return Err("Organization name cannot be empty".to_string());
     }
@@ -381,8 +393,8 @@ pub(crate) fn insert_organization_with_owner(
     Ok((org, owner_role))
 }
 
-/// Create a new top-level Organization. No permission check — any authenticated
-/// user can create an org (they become its first admin via the bootstrap below).
+/// Create a new top-level Organization for a server-approved alpha founder.
+/// Admission and the single-organization quota are enforced at the shared insert.
 #[spacetimedb::reducer]
 pub fn create_organization(
     ctx: &ReducerContext,
@@ -545,6 +557,7 @@ pub fn bootstrap_new_tenant(
         },
     );
 
+    seed_country_catalog_for_organization(ctx, org.id)?;
     record_bootstrap_organization_commit(ctx, org.id)?;
 
     Ok(())
@@ -584,6 +597,21 @@ fn record_bootstrap_organization_commit(
         changes.push(RowChange::upsert_stdb_row(
             "currency",
             serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut countries: Vec<_> = ctx
+        .db
+        .country()
+        .country_by_organization()
+        .filter(&organization_id)
+        .collect();
+    countries.sort_by(|left, right| left.organization_code_key.cmp(&right.organization_code_key));
+    for row in countries {
+        changes.push(RowChange::upsert_stdb_row(
+            "country",
+            serde_json::json!({"organization_code_key": row.organization_code_key}),
             &row,
         )?);
     }

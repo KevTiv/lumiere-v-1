@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   activeTabEntityTable,
   assertModuleTabs,
   expectNoAppError,
@@ -38,7 +39,7 @@ test.describe("ERP phase-7 finance smoke @phase-7", () => {
     test.setTimeout(120_000)
 
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-invoices").click()
+    await selectModuleTab(page, "sales", "invoices")
     await expect(page.getByText(/total invoices|invoices/i).first()).toBeVisible({ timeout: 30_000 })
 
     await expectSeededText(page, "INV/2024/00001", "/api/query/account-moves")

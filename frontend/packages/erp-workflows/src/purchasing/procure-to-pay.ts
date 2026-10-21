@@ -8,6 +8,8 @@
 
 import { firstNonNullKey, type RowValueMap } from "@lumiere/erp-shared/row-values"
 import { recordAction, type ExecuteAction, type WorkflowAction } from "../core/action"
+import { singleAddedId } from "../core/effect-delta"
+import { WorkflowError } from "../core/errors"
 import { recordRef } from "../core/record-ref"
 import { rowId, variantTag } from "../core/row"
 import type { ObservedTransition } from "../core/transition"
@@ -152,39 +154,74 @@ export function observeConfirmedPurchaseOrder(orderId: string, orders: readonly 
   }
 }
 
-/** The reducer appends each new PO to the requisition's `purchase_ids`, so the last is the one just created. */
-export function observeConvertedRequisition(
+/** Canonical requisition-owned PO relation, normalized for pre/post effect comparison. */
+export function requisitionPurchaseIds(
   requisitionId: string,
   requisitions: readonly RowValueMap[],
+): string[] | undefined {
+  const requisition = findRow(requisitions, requisitionId)
+  return requisition ? idList(requisition, "purchaseIds", "purchase_ids") : undefined
+}
+
+/**
+ * The reducer appends each new PO to the requisition's `purchase_ids`. The caller snapshots that
+ * relation before dispatch; the PO is the one new id after readback, never the last entry.
+ */
+export function observeConvertedRequisition(
+  requisitionId: string,
+  purchaseIdsBefore: readonly string[],
+  requisitions: readonly RowValueMap[],
 ): ObservedTransition {
-  const last = idList(findRow(requisitions, requisitionId) ?? {}, "purchaseIds", "purchase_ids").at(-1)
-  if (!last) return {}
-  const order = orderRef(last)
-  return { outcome: "applied", createdRecords: [order], next: order }
-}
-
-/** The RFQ an awarded PO came from: `award_purchase_rfq_bid` stamps `metadata.rfq_id`. */
-export function poSourceRfqId(order: RowValueMap): string | undefined {
-  const metadata = firstNonNullKey(order, "metadata")
-  if (typeof metadata !== "string") return undefined
-  try {
-    const id = (JSON.parse(metadata) as { rfq_id?: unknown }).rfq_id
-    return id == null ? undefined : String(id)
-  } catch {
-    return undefined
-  }
-}
-
-/** The newest PO stamped with this RFQ is the one the award just created. */
-export function observeAwardedRfq(rfqId: string, orders: readonly RowValueMap[]): ObservedTransition {
-  const created = orders
-    .filter((row) => poSourceRfqId(row) === rfqId)
-    .map(rowId)
-    .sort((a, b) => Number(a) - Number(b))
-    .at(-1)
+  const created = singleAddedId(purchaseIdsBefore, requisitionPurchaseIds(requisitionId, requisitions))
   if (!created) return {}
   const order = orderRef(created)
   return { outcome: "applied", createdRecords: [order], next: order }
+}
+
+/**
+ * The RFQ an awarded PO came from. `award_purchase_rfq_bid` stamps both the projected
+ * `origin` relation and `metadata.rfq_id`; conflicting stamps are unresolved.
+ */
+export function poSourceRfqId(order: RowValueMap): string | undefined {
+  const origin = firstNonNullKey(order, "origin")
+  const originMatch = typeof origin === "string" ? /^rfq:([0-9]+)$/.exec(origin) : null
+  const originRfqId = originMatch?.[1]
+
+  const metadata = firstNonNullKey(order, "metadata")
+  let metadataRfqId: string | undefined
+  if (typeof metadata === "string") {
+    try {
+      const id = (JSON.parse(metadata) as { rfq_id?: unknown }).rfq_id
+      if (typeof id === "string" || typeof id === "number" || typeof id === "bigint") {
+        metadataRfqId = String(id)
+      }
+    } catch {
+      // The projected origin remains authoritative when metadata is not readable.
+    }
+  }
+
+  if (originRfqId && metadataRfqId && originRfqId !== metadataRfqId) return undefined
+  return originRfqId ?? metadataRfqId
+}
+
+/**
+ * An RFQ is awarded once: `award_purchase_rfq_bid` records the PO it created on the RFQ's own
+ * `purchase_order_id`. The award is confirmed only when that exact RFQ reads back awarded and the
+ * PO it names exists and carries the same strict RFQ source stamp.
+ */
+export function observeAwardedRfq(
+  rfqId: string,
+  rfqs: readonly RowValueMap[],
+  orders: readonly RowValueMap[],
+): ObservedTransition {
+  const rfq = findRow(rfqs, rfqId)
+  if (!rfq || String(firstNonNullKey(rfq, "state") ?? "") !== "awarded") return {}
+  const poId = firstNonNullKey(rfq, "purchaseOrderId", "purchase_order_id")
+  if (poId == null) return {}
+  const order = findRow(orders, String(poId))
+  if (!order || poSourceRfqId(order) !== rfqId) return {}
+  const ref = orderRef(String(poId))
+  return { outcome: "applied", createdRecords: [ref], next: ref }
 }
 
 /** Canonical PO-owned bill relation, normalized for pre/post effect comparison. */
@@ -209,19 +246,12 @@ export function observeCreatedBill(
   invoiceIdsBefore: readonly string[],
   orders: readonly RowValueMap[],
 ): ObservedTransition {
-  const invoiceIdsAfter = purchaseOrderInvoiceIds(orderId, orders)
-  if (!invoiceIdsAfter) return {}
-
-  const after = new Set(invoiceIdsAfter)
-  if (invoiceIdsBefore.some((id) => !after.has(id))) return {}
-
-  const before = new Set(invoiceIdsBefore)
-  const created = invoiceIdsAfter.filter((id) => !before.has(id))
-  if (created.length !== 1) return {}
+  const created = singleAddedId(invoiceIdsBefore, purchaseOrderInvoiceIds(orderId, orders))
+  if (!created) return {}
 
   const bill = recordRef(
     invoiceWorkflow.resource,
-    created[0],
+    created,
     invoiceWorkflow.module,
     purchaseOrderWorkflow.module,
   )
@@ -233,11 +263,20 @@ export interface ReceiptTarget {
   pickingId: string
 }
 
+/** Both canonical projections must agree; truthy values are never boolean proof. */
+function receiptDone(move: RowValueMap): boolean | undefined {
+  const done = firstNonNullKey(move, "isDone", "is_done")
+  const state = firstNonNullKey(move, "state")
+  if (typeof done !== "boolean" || typeof state !== "string") return undefined
+  if (done !== (state === "done")) return undefined
+  return done
+}
+
 /**
  * Resolve the exact open stock move that a receive command is about to advance.
  *
- * Zero matches is valid for service/legacy lines and lets the reducer decide. Multiple matches
- * are deliberately unresolved: neither the client nor the reducer may choose an arbitrary row.
+ * Zero matches leaves receipt proof unresolved; it does not establish a service line or success.
+ * Multiple matches or malformed identities fail closed with a typed conflict.
  */
 export function resolveOpenReceiptTarget(
   lineId: string,
@@ -246,35 +285,46 @@ export function resolveOpenReceiptTarget(
   const matches = moves.flatMap((move) => {
     const line = firstNonNullKey(move, "purchaseLineId", "purchase_line_id")
     const pickingId = firstNonNullKey(move, "pickingId", "picking_id")
-    const done =
-      Boolean(firstNonNullKey(move, "isDone", "is_done")) ||
-      String(firstNonNullKey(move, "state") ?? "") === "done"
+    if (line == null || String(line) !== lineId) return []
+    const done = receiptDone(move)
+    if (done === undefined) {
+      throw new WorkflowError("conflict", `Receipt move for purchase line ${lineId} has invalid or contradictory done evidence`)
+    }
     const cancelled = String(firstNonNullKey(move, "state") ?? "") === "cancel"
-    if (line == null || String(line) !== lineId || pickingId == null || done || cancelled) return []
+    if (done || cancelled) return []
+    const moveId = firstNonNullKey(move, "id")
+    const isValidId = (id: unknown) =>
+      (typeof id === "string" && /^[1-9]\d*$/.test(id)) ||
+      (typeof id === "number" && Number.isSafeInteger(id) && id > 0) ||
+      (typeof id === "bigint" && id > 0n)
+    if (!isValidId(moveId) || !isValidId(pickingId)) {
+      throw new WorkflowError("conflict", `Open receipt move for purchase line ${lineId} has an invalid identity`)
+    }
     return [{ moveId: rowId(move), pickingId: String(pickingId) }]
   })
-  return matches.length === 1 ? matches[0] : undefined
+  if (matches.length > 1) {
+    throw new WorkflowError("conflict", `Multiple open receipt moves match purchase line ${lineId}`)
+  }
+  return matches[0]
 }
 
 /**
  * Observe only the move/picking identity captured before dispatch. A later/higher-id move can
- * never replace it in the semantic result. Non-stock (service) lines have no target and stay put.
+ * never replace it in the semantic result. An absent target provides no receipt proof.
  */
 export function observeReceivedLine(
   lineId: string,
   target: ReceiptTarget | undefined,
   moves: readonly RowValueMap[],
 ): ObservedTransition {
-  if (!target) return { outcome: "applied" }
+  if (!target) return {}
 
   const move = moves.find((candidate) => rowId(candidate) === target.moveId)
   if (!move) return {}
 
   const line = firstNonNullKey(move, "purchaseLineId", "purchase_line_id")
   const pickingId = firstNonNullKey(move, "pickingId", "picking_id")
-  const done =
-    Boolean(firstNonNullKey(move, "isDone", "is_done")) ||
-    String(firstNonNullKey(move, "state") ?? "") === "done"
+  const done = receiptDone(move)
 
   if (
     line == null ||
@@ -365,7 +415,7 @@ export interface AwardRfqBidInput {
   bidId: string
 }
 
-/** Presented against an RFQ bid row; the current prompt-driven flow dispatches the collected ids through `execute`. */
+/** Presented against an RFQ bid row or typed award form; both dispatch the selected ids through `execute`. */
 export function awardRfqBidAction(options: {
   label: string
   execute: ExecuteAction<AwardRfqBidInput>

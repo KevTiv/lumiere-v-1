@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   createAiActionDraftTask,
   expectNoAppError,
   fetchDefaultCompanyId,
@@ -295,7 +296,7 @@ test.describe("Pre-tenant mobile and network resilience", { tag: pretenantTags("
     test.setTimeout(120_000)
     const contactName = smokeName("pt-m07-contact")
     await page.goto("/crm")
-    await page.getByTestId("module-tab-crm-contacts").click()
+    await selectModuleTab(page, "crm", "contacts")
     await waitForBffQueryMinRows(page, "/api/query/contacts")
 
     await context.setOffline(true)
