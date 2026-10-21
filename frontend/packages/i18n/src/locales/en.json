@@ -12990,6 +12990,10 @@
         "centralEuropean": "Central European (UTC+1)"
       },
       "saveChanges": "Save Changes",
+      "saveSuccess": "Profile updated",
+      "saveError": "Could not update profile",
+      "managedByProvider": "Your avatar and password are managed by your sign-in provider.",
+      "notificationsUnavailable": "Notification preferences are not available yet.",
       "security": "Security",
       "securityDesc": "Manage your password and security settings",
       "currentPassword": "Current Password",
