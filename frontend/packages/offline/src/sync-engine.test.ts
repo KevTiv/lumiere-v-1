@@ -217,10 +217,10 @@ for (const [name, response] of [
     ]),
   ],
   [
-    "duplicate sequence",
+    "sequence at or before the checkpoint",
     pull([
-      { sequence: "11", operation: "delete", id: "1" },
-      { sequence: "11", operation: "delete", id: "2" },
+      { sequence: "10", operation: "delete", id: "1" },
+      { sequence: "10", operation: "delete", id: "2" },
     ]),
   ],
   [

@@ -14,6 +14,7 @@ pub mod hr_integration_worker;
 pub mod integration_worker;
 pub mod metrics;
 mod middleware;
+pub(crate) mod offline;
 pub mod organization_placement;
 pub mod owner_report_worker;
 pub mod platform_control;

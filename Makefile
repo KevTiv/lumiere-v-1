@@ -1197,6 +1197,7 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 	$(MAKE) check-stdb-http-option-metadata
 	@git add -N \
 		frontend/packages/offline/src/generated/product-category.ts \
+		api-server/src/offline/generated_category.rs \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
 		frontend/packages/stdb/src/stdb-http-option-fields.json \
@@ -1208,6 +1209,7 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 		2>/dev/null || true
 	@git diff --exit-code -- \
 		frontend/packages/offline/src/generated/product-category.ts \
+		api-server/src/offline/generated_category.rs \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
 		frontend/packages/stdb/src/stdb-http-option-fields.json \

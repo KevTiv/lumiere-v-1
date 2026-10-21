@@ -40,6 +40,7 @@ mod drain;
 mod relations;
 mod source;
 mod status;
+pub(crate) use decode::{parse_change, parse_commit};
 
 /// Read a bounded set of organization cursors and apply each exact next commit.
 pub use drain::{drain_batch, drain_batch_with_budget};

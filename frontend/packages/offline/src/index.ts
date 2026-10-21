@@ -1,6 +1,11 @@
 export type { CategoryRepository } from "./projection-store.ts";
 export { ProjectionStore } from "./projection-store.ts";
 export { SyncEngine, type SyncResult } from "./sync-engine.ts";
+export {
+  connectCategoryTransport,
+  ProjectionResetError,
+  type HttpProjectionOptions,
+} from "./http-transport.ts";
 export type {
   Change,
   ProjectionScope,

@@ -5,6 +5,7 @@ import {
   projectionResource,
 } from "./generated/product-category.ts";
 import { ProjectionStore, type ProjectionChange } from "./projection-store.ts";
+import { ProjectionResetError } from "./http-transport.ts";
 
 const MAX_BATCH_SIZE = 1000;
 
@@ -42,9 +43,14 @@ export class SyncEngine {
   /** Repeated callers share the same request. Cancellation belongs to its initiating caller. */
   sync(signal?: AbortSignal): Promise<SyncResult> {
     if (!this.#active) {
-      this.#active = this.#sync(signal).finally(() => {
-        this.#active = undefined;
-      });
+      this.#active = this.#sync(signal)
+        .catch((error: unknown) => {
+          if (error instanceof ProjectionResetError) this.#store.clear();
+          throw error;
+        })
+        .finally(() => {
+          this.#active = undefined;
+        });
     }
     return this.#active;
   }
@@ -123,7 +129,11 @@ export class SyncEngine {
             : ["sequence", "operation", "id"],
         );
         const sequence = BigInt(u64(change.sequence));
-        if (sequence <= lastSequence || sequence > BigInt(nextCursor))
+        if (
+          sequence <= BigInt(cursor) ||
+          sequence < lastSequence ||
+          sequence > BigInt(nextCursor)
+        )
           throw new Error("Unordered projection change");
         lastSequence = sequence;
         return value.operation === "upsert"

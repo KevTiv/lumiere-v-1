@@ -2,6 +2,7 @@
 ///                         Warehouse, StockLocation, StockQuant, StockProductionLot
 use spacetimedb::{ReducerContext, Table};
 
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{
     begin_import_job, finish_import_job, record_import_created_id, record_import_error,
@@ -31,6 +32,7 @@ pub fn import_product_category_csv(
         None,
         rows.len() as u32,
     );
+    let mut changes = Vec::new();
     let mut imported = 0u32;
     let mut errors = 0u32;
 
@@ -46,7 +48,7 @@ pub fn import_product_category_csv(
 
         let parent_id = opt_u64(col(&headers, row, "parent_id"));
 
-        ctx.db.product_category().insert(ProductCategory {
+        let category = ctx.db.product_category().insert(ProductCategory {
             id: 0,
             organization_id,
             name: name.clone(),
@@ -60,9 +62,25 @@ pub fn import_product_category_csv(
             write_date: ctx.timestamp,
             metadata: opt_str(col(&headers, row, "metadata")),
         });
+        changes.push(RowChange::upsert_stdb_row(
+            "product_category",
+            serde_json::json!({"id": category.id}),
+            &category,
+        )?);
         imported += 1;
     }
 
+    if !changes.is_empty() {
+        record_organization_commit(
+            ctx,
+            OrganizationCommitInput {
+                organization_id,
+                operation_id: "erp.import_product_category_csv".into(),
+                correlation_id: format!("category-import:{}", job.id),
+                changes,
+            },
+        )?;
+    }
     finish_import_job(ctx, job, imported, errors);
     log::info!(
         "Import product_category: imported={}, errors={}",
