@@ -8,7 +8,7 @@ use axum::{
     Router,
 };
 
-mod accounting;
+pub(crate) mod accounting;
 mod attachment;
 mod financial;
 mod pivot;

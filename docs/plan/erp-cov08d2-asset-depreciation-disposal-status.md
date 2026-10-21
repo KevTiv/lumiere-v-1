@@ -1,50 +1,66 @@
 # COV-08d2 — Fixed-asset depreciation board and disposal exact effects
 
-**Status:** SCAFFOLDED — implementation pending  
+**Status:** IMPLEMENTED — runtime acceptance pending  
+**Branch:** `codex/cov08d2-asset-depreciation-disposal`  
 **Module/surface:** Accounting / Assets  
 **Plan target:** COV-08 assets  
-**Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
+**Base:** current `main` after #112 landed the COV-08a–d accounting stack
 
-## Bounded path (to implement)
+## Bounded path
 
-Operator surface: /accounting → Fixed assets
+Operator surface: `/accounting` → Fixed assets.
 
-Existing operations (already reachable from the frontend command layer):
+This slice completes two existing operations through the visible Fixed Assets
+surface:
 
-- `compute_depreciation_board` — hook: `frontend/packages/query-hooks/src/hooks/accounting/assets.ts`
-- `dispose_account_asset` — hook: `frontend/packages/query-hooks/src/hooks/accounting/assets.ts`
+- `compute_depreciation_board` — one Running asset creates one canonical,
+  company-scoped depreciation-line set;
+- `dispose_account_asset` — the same asset reads back as `Removed`.
 
-Canonical resources: account-assets, depreciation-lines
+The depreciation reducer no longer deletes and recreates unposted rows on a
+stale replay. It now requires a Running asset, rejects an already-computed
+board, persists the exact board IDs and sequence on the asset, and leaves the
+canonical rows unchanged on replay.
 
 ## Effect contract
 
-Depreciation: the exact set of `depreciation-lines` rows for the asset id (0..N, replay must not duplicate). Disposal: same asset id reads back `Removed`.
+Depreciation resolves only the exact `depreciation-lines` rows whose
+`asset_id` is the selected asset, whose company matches the active company and
+whose sequence is unique and contiguous. Duplicate row identity or sequence is
+an invariant failure.
 
-Implementation pattern: wrap the mutation's readback with `resolveUniqueEffect` /
-`executeOperationWithCanonicalReadback` from
-`frontend/packages/query-hooks/src/hooks/operation-effect.ts` (see COV-08c and
-COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
+Disposal resolves only the same company-scoped asset ID in `Removed` state.
+The bounded slice does **not** claim disposal-journal-move identity; proving
+that downstream journal relation remains a separate contract-expansion task if
+it is required by a later Finance certification slice.
 
 ## Contract disposition
 
-**Contract release possibly required.** state-only disposal readback (`account-assets.state` = Removed) and depreciation lines (`depreciation-lines` by asset_id) need no release; proving the disposal journal move identity needs the asset→move relation exposed on `account-assets`
+**Generated contract delta: none expected.** The existing `account-assets`
+projection exposes `id`, `company_id` and `state`; the existing
+`depreciation-lines` projection exposes `id`, `asset_id`, `company_id`
+and `sequence`. No operation signature or resource shape changes in this
+slice.
 
-Contract releases are automatic: pushing the registry or reducer change runs `.github/workflows/release-contracts.yml`, which publishes the next lumiere-contracts version and pins it on the branch. Pull its pin commit before continuing.
+## D/A/O/E proof
 
-## Prerequisites / decisions
-
-Stack on #103 (COV-08d confirm/close).
-
-## D/A/O/E proof checklist
-
-| Gate | Required proof | State |
+| Gate | Proof in this branch | Acceptance condition |
 | --- | --- | --- |
-| D | Native domain test: transition, replay rejection leaving the row unchanged, invariant/denial cases | TODO |
-| A | Generated operation keeps permission + organization/company scope; reader persona denied (403) | TODO |
-| O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | TODO — `frontend/web/tests/e2e/cov08d2-asset-depreciation-disposal.spec.ts` |
-| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | TODO |
+| D | `fixed_assets_test.rs::test_depreciation_board_and_disposal_are_single_exact_effect` proves one 12-line board, persisted board identity, replay rejection with an unchanged line/asset snapshot, disposal to Removed, and unchanged disposal replay. It is wired into `run_all_accounting_tests`. | Native Accounting suite passes. |
+| A | Existing session operations keep `account_asset:write` permission and organization/company scope. The browser proof replays the captured disposal request as `fixture.reader` and requires 403 with no effect change. | Writer succeeds once; reader is denied before mutation. |
+| O | `cov08d2-asset-depreciation-disposal.spec.ts` confirms the fixture asset, then drives **Compute Depreciation** and **Dispose Selected** through the Fixed Assets UI. | Focused Playwright path passes. |
+| E | `resolveAccountAssetDepreciationBoardEffect` requires exact asset/company identity plus unique contiguous row identity/sequence; disposal reuses exact same-asset state readback. Unit coverage includes scope/gap/ambiguity cases. Browser proof preserves the exact board and asset snapshot after 422 stale replays and 403 denial. | Unit, native and browser proof are green on one head. |
 
-## Acceptance
+## Accepted-plan statement
 
-Becomes IMPLEMENTED when the bounded path and proofs above exist, and ACCEPTED only
-with same-head green CI (plus the contract release, when required).
+COV-08d2 becomes **ACCEPTED** only when the branch head records all of the
+following:
+
+1. contract generation completes with no generated contract delta;
+2. query-hooks unit/typecheck and i18n checks pass;
+3. `run_all_accounting_tests` passes on a live stack;
+4. the focused COV-08d2 Playwright proof passes;
+5. branch CI is green on that same head.
+
+Until those artifacts exist, the truthful disposition is **IMPLEMENTED —
+runtime acceptance pending**.

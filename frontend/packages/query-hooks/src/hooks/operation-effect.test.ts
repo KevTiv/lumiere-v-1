@@ -35,6 +35,28 @@ test("returns AlreadyApplied without dispatch when exact effect already exists",
   assert.equal(dispatches, 0)
 })
 
+
+test("can skip pre-dispatch resolution for non-replayable commands", async () => {
+  let reads = 0
+  let dispatches = 0
+  const outcome = await executeOperationWithCanonicalReadback({
+    resolveBeforeDispatch: false,
+    resolveEffect: async () => {
+      reads += 1
+      return ref("pre-existing")
+    },
+    dispatch: async () => {
+      dispatches += 1
+      return { kind: "accepted" }
+    },
+    wait: noWait,
+  })
+
+  assert.equal(dispatches, 1)
+  assert.equal(reads, 1)
+  assert.equal(outcome.kind, "converged")
+})
+
 test("returns Converged only after canonical readback resolves the resulting record", async () => {
   let reads = 0
   let dispatches = 0

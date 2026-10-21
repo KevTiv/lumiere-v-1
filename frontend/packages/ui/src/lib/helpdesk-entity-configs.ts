@@ -1,5 +1,6 @@
 import type { TFunction } from "i18next"
 import type { EntityViewConfig } from "./entity-view-types"
+import { withReadOnlyStateBoard } from "./entity-state-board"
 
 /** Matches SpacetimeDB `HelpdeskTicketState` variant names. */
 const ticketStateBadges = (t: TFunction) => ({
@@ -76,6 +77,12 @@ export const helpdeskTicketsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "createdAt", label: t("helpdesk.tickets.columns.createdAt"), type: "date" },
     ],
     emptyMessage: t("helpdesk.tickets.emptyMessage"),
+    emptyState: {
+      title: t("helpdesk.tickets.emptyMessage"),
+      description: t("helpdesk.tickets.emptyState.description", { defaultValue: "Tickets track every customer request from first contact to resolution, so nothing gets lost." }),
+      permission: { resource: "helpdesk_ticket", action: "create" },
+      learnHint: t("helpdesk.tickets.emptyState.hint", { defaultValue: "Assign tickets to a team and SLAs will time them for you." }),
+    },
   },
 })
 
@@ -150,3 +157,19 @@ export const helpdeskEntityConfigs = (t: TFunction): Record<string, EntityViewCo
   "helpdesk-stages-table": helpdeskStagesTableConfig(t),
   "helpdesk-slas-table": helpdeskSlasTableConfig(t),
 })
+
+/** Read-only board of tickets by state; moving a ticket stays a workflow action. */
+export const helpdeskTicketsWithBoard = (t: TFunction, config: EntityViewConfig): EntityViewConfig =>
+  withReadOnlyStateBoard(t, config, {
+    groupKey: "state",
+    card: {
+      titleKey: "name",
+      fields: [
+        { key: "partnerName", label: t("helpdesk.tickets.columns.partnerName") },
+        { key: "priority", label: t("helpdesk.tickets.columns.priority"), type: "badge", ...priorityBadges(t) },
+      ],
+      footerFields: [
+        { key: "slaDeadline", label: t("helpdesk.tickets.columns.slaDeadline"), type: "date" },
+      ],
+    },
+  })

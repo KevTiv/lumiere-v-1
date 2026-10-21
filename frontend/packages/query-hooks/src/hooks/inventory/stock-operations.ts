@@ -8,6 +8,12 @@ import { workflowErrorFromResponse } from "@lumiere/erp-workflows"
 import { callStdbOperation } from "../stdb"
 import { scalarToU64 as toScalarU64, type ScalarId } from "@lumiere/erp-shared/u64"
 
+import { dispatchNamedOperation } from '../../operation-dispatch'
+import {
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+} from '../operation-effect'
+import { resolveReplenishmentScheduleEffect } from '../partial-slice-effects'
 
 // ── Shared helpers ───────────────────────────────────────────────────────────
 import {
@@ -226,6 +232,15 @@ export function useStockMoves(
   return useQuery<StockMove[]>({
     ...stockMovesQueryOptions(organizationId),
     initialData: coalesceQueryInitialData(initialData),
+  });
+}
+
+/** Read-only list served by the authorized HTTP query path (`/api/query/stock-move-lines`). */
+export function useStockMoveLines(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['stock-move-lines', rqBigIntKey(organizationId)],
+    queryFn: () => fetchQueryList('/api/query/stock-move-lines', 'Failed to read stock move lines'),
+    staleTime: 30_000,
   });
 }
 
@@ -1293,5 +1308,92 @@ export function useCreateReplenishmentRule(
   });
 }
 
-// ── Picking Wave ─────────────────────────────────────────────────────────────
+export function useReplenishmentRunJobs(organizationId: bigint) {
+  return useQuery<QueryRows>({
+    queryKey: ['replenishment-run-jobs', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList(
+        '/api/query/replenishment-run-jobs',
+        'Failed to fetch replenishment run jobs',
+      ),
+    staleTime: 30_000,
+  });
+}
 
+export function useScheduleReplenishmentRun(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (rawRuleId: ScalarId) => {
+      if (companyId <= 0n) throw new Error('A selected company is required');
+      const ruleId = toScalarU64(rawRuleId);
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveReplenishmentScheduleEffect(
+            await fetchQueryList(
+              '/api/query/replenishment-run-jobs',
+              'Failed to read replenishment schedule',
+            ),
+            organizationId,
+            companyId,
+            ruleId,
+          ),
+        dispatch: async () => {
+          return dispatchNamedOperation(
+            'schedule_replenishment_run',
+            { companyId, ruleId },
+            'Failed to schedule replenishment run',
+          );
+        },
+        afterDispatch: () =>
+          qc.invalidateQueries({
+            queryKey: ['replenishment-run-jobs', rqBigIntKey(organizationId)],
+          }),
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      });
+      return requireResolvedOperationEffect(outcome);
+    },
+  });
+}
+
+export function useCancelReplenishmentRun(
+  organizationId: bigint,
+  companyId: bigint,
+) {
+  const qc = useQueryClient();
+  return useMutation<void, Error, ScalarId>({
+    mutationFn: async (rawRuleId) => {
+      if (companyId <= 0n) throw new Error('A selected company is required');
+      const ruleId = toScalarU64(rawRuleId);
+      await dispatchNamedOperation(
+        'cancel_replenishment_run',
+        { companyId, ruleId },
+        'Failed to cancel replenishment run',
+      );
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        const effect = resolveReplenishmentScheduleEffect(
+          await fetchQueryList(
+            '/api/query/replenishment-run-jobs',
+            'Failed to read replenishment schedule',
+          ),
+          organizationId,
+          companyId,
+          ruleId,
+        );
+        if (!effect) return;
+        if (attempt < 5)
+          await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+      throw new Error('Replenishment schedule cancellation is not yet visible');
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ['replenishment-run-jobs', rqBigIntKey(organizationId)],
+      }),
+  });
+}
+
+// ── Picking Wave ─────────────────────────────────────────────────────────────

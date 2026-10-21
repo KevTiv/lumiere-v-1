@@ -23,6 +23,8 @@ interface HelpdeskTicketDialogProps {
   onCloseTicket: () => void | Promise<void>
   onReopenTicket: () => void | Promise<void>
   isBusy?: boolean
+  /** Notes and followers for the ticket, shown under the form. */
+  discussion?: React.ReactNode
 }
 
 export function HelpdeskTicketDialog({
@@ -34,6 +36,7 @@ export function HelpdeskTicketDialog({
   onCloseTicket,
   onReopenTicket,
   isBusy,
+  discussion,
 }: HelpdeskTicketDialogProps) {
   const { t } = useTranslation()
   const canClose = stateTag !== "Closed" && stateTag !== "Cancelled"
@@ -73,6 +76,12 @@ export function HelpdeskTicketDialog({
             onSubmit={onSave}
             onCancel={() => onOpenChange(false)}
           />
+          {discussion ? (
+            <section className="mt-6 border-t border-border/50 pt-5" data-testid="helpdesk-ticket-discussion">
+              <h3 className="mb-3 text-sm font-medium">{t("helpdesk.discussion", { defaultValue: "Discussion" })}</h3>
+              {discussion}
+            </section>
+          ) : null}
         </div>
 
         {(canClose || canReopen) && (

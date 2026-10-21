@@ -4,7 +4,7 @@ import test from "node:test"
 import { createFakeCompletionPorts } from "../testing"
 import { WorkflowError, workflowErrorFromResponse, type WorkflowErrorKind } from "./errors"
 import { recordRef } from "./record-ref"
-import { completeTransition, newCorrelationId, type TransitionSpec } from "./transition"
+import { completeTransition, newCorrelationId, type ObservedTransition, type TransitionSpec } from "./transition"
 
 const failing = (kind: WorkflowErrorKind, status?: number): TransitionSpec<string> => ({
   id: "test.fail",
@@ -12,13 +12,18 @@ const failing = (kind: WorkflowErrorKind, status?: number): TransitionSpec<strin
     throw new WorkflowError(kind, `${kind} happened`, { status })
   },
   affects: ["sale-orders"],
+  noReadback: "test fixture",
 })
-const succeeding = (overrides: Partial<TransitionSpec<string>> = {}): TransitionSpec<string> => ({
-  id: "test.ok",
-  command: async () => undefined,
-  affects: ["sale-orders", "stock-pickings"],
-  ...overrides,
-})
+const succeeding = ({
+  command = async () => undefined,
+  observe,
+}: {
+  command?: (input: string) => Promise<void>
+  observe?: (input: string) => Promise<ObservedTransition>
+} = {}): TransitionSpec<string> => {
+  const base = { id: "test.ok", command, affects: ["sale-orders", "stock-pickings"] }
+  return observe ? { ...base, observe } : { ...base, noReadback: "test fixture" }
+}
 
 test("a stale or conflicting write did not commit but still refreshes what the user was looking at", async () => {
   for (const kind of ["stale_revision", "conflict", "not_found"] as const) {
@@ -60,7 +65,7 @@ test("a failed refresh is reported as not refreshed, and the original error stil
 test("a successful run logs the outcome, duration, affected resources and created record ids", async () => {
   const fake = createFakeCompletionPorts()
   const invoice = recordRef("account_move", 41, "accounting", "sales")
-  await completeTransition(succeeding({ observe: async () => ({ createdRecords: [invoice] }) }), "5", fake.ports)
+  await completeTransition(succeeding({ observe: async () => ({ outcome: "applied", createdRecords: [invoice] }) }), "5", fake.ports)
   const [event] = fake.events
   assert.equal(event?.status, "applied")
   assert.equal(event?.transitionId, "test.ok")
@@ -75,6 +80,18 @@ test("an approval hand-off is logged as approval_pending, not applied", async ()
   const fake = createFakeCompletionPorts()
   await completeTransition(succeeding({ observe: async () => ({ outcome: "approval_pending" }) }), "5", fake.ports)
   assert.equal(fake.events[0]?.status, "approval_pending")
+})
+
+test("an unconfirmed readback is logged as a failed outcome_unknown run, not applied", async () => {
+  for (const observe of [async () => ({}), async () => { throw new Error("readback failed") }]) {
+    const fake = createFakeCompletionPorts()
+    await assert.rejects(completeTransition(succeeding({ observe }), "5", fake.ports))
+    assert.equal(fake.events.length, 1)
+    assert.equal(fake.events[0]?.status, "failed")
+    assert.equal(fake.events[0]?.errorKind, "outcome_unknown")
+    assert.equal(fake.events[0]?.refreshed, true)
+    assert.deepEqual(fake.events[0]?.affectedResources, ["sale-orders", "stock-pickings"])
+  }
 })
 
 test("a failed run logs the failure kind and HTTP status", async () => {
@@ -120,6 +137,7 @@ test("a stale session's rejected command refreshes the view it was working from"
   const fake = createFakeCompletionPorts()
   const spec: TransitionSpec<string> = {
     id: "sales.order.confirm",
+    noReadback: "test fixture",
     affects: ["sale-orders", "stock-pickings"],
     command: async () => {
       throw workflowErrorFromResponse(422, '{"error":"Sale order must be in Draft, Sent, or ToApprove"}', "x")

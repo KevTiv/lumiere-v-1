@@ -738,6 +738,9 @@ pub fn assign_ticket(
     }
     // HLP-006: agent must be a member of the ticket's own team.
     require_team_member(ctx, organization_id, ticket.team_id, agent_id)?;
+    if ticket.user_id == Some(agent_id) && ticket.state == HelpdeskTicketState::InProgress {
+        return Err("Ticket is already assigned to this agent".to_string());
+    }
     ctx.db.helpdesk_ticket().id().update(HelpdeskTicket {
         user_id: Some(agent_id),
         state: HelpdeskTicketState::InProgress,
@@ -776,6 +779,9 @@ pub fn close_ticket(
     if ticket.organization_id != organization_id {
         return Err("Ticket belongs to a different organization".to_string());
     }
+    if ticket.state == HelpdeskTicketState::Closed {
+        return Err("Ticket is already closed".to_string());
+    }
     ctx.db.helpdesk_ticket().id().update(HelpdeskTicket {
         state: HelpdeskTicketState::Closed,
         closed_at: Some(ctx.timestamp),
@@ -813,6 +819,11 @@ pub fn reopen_ticket(
         .ok_or("Ticket not found")?;
     if ticket.organization_id != organization_id {
         return Err("Ticket belongs to a different organization".to_string());
+    }
+    if ticket.state != HelpdeskTicketState::Closed
+        && ticket.state != HelpdeskTicketState::Cancelled
+    {
+        return Err("Only closed or cancelled tickets can be reopened".to_string());
     }
     ctx.db.helpdesk_ticket().id().update(HelpdeskTicket {
         state: HelpdeskTicketState::InProgress,

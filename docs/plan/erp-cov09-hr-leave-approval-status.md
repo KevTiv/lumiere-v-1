@@ -68,3 +68,43 @@ Needs an HR manager persona distinct from the employee persona in the first-org 
 
 Becomes IMPLEMENTED when the bounded path and proofs above exist, and ACCEPTED only
 with same-head green CI (plus the contract release, when required).
+
+## U5 closure increment — payroll approval and GL handoff
+
+- `confirm_payslip` now denies an employee approving their own payslip by resolving the
+  payslip's employee and comparing its linked `user_id` with the authenticated caller.
+  `test_payslip_approval_rejects_self_approval` proves the denial leaves the Draft row
+  unchanged.
+- Confirm, post and cancel hooks now use canonical cache-independent readback of the exact
+  organization/company/payslip identity. Ambiguous transport outcomes are reconciled and are
+  never automatically redispatched.
+- Payroll posting is successful only after the exact payslip is `Done`, carries a non-null
+  `account_move_id`, and that exact scoped account move exists. This supplies the canonical
+  employee-to-payroll-to-GL result reference.
+- The cancel hook's transposed `companyId`/`payslipId` payload was corrected.
+
+Still required for whole-module U5: current-head browser execution of employee → contract →
+payslip → distinct-person approval → post/export, sensitive-field denied-reader proof, and
+the shared responsive/accessibility/reconnect and launch-manifest gates.
+
+Wave 2 adds that browser proof in `cov09-hr-payroll-lifecycle.spec.ts`: the primary employee,
+contract and payslip records are created through visible forms; the seeded `hr-project`
+persona approves and posts; the approval response is deliberately lost after commit and the
+hook converges through exact readback; a duplicate post retains one exact GL relation; and
+the reader persona is denied compensation fields (or the whole payslip feed) and the posting operation. Same-head runtime
+execution and the shared certification gates remain required before promotion.
+## STP fail-closed boundary (2026-10-13)
+
+The prior visible STP action fabricated `stp-stub-*` submission ids, and native
+intent processing could fabricate `stub:<kind>:<id>` result references. Both
+synthetic-success paths are removed. Until a real provider adapter is configured,
+the visible action reports STP as unavailable and dispatches no operation.
+
+Native statutory intent processing now persists a canonical `failed` outcome
+with an unavailable-provider error. A statutory result cannot become `sent` or
+`applied` without a non-empty provider `external_ref` or `result_ref`. The native
+test `test_statutory_integration_requires_canonical_provider_result` covers the
+unavailable transition, rejected reference-free success with an unchanged row,
+and exact recovery after a canonical provider receipt. The browser lifecycle
+asserts the unavailable action emits no create-intent request. HR remains non-U5
+until the provider adapter and these proofs run in the release environment.

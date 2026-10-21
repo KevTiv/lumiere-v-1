@@ -1,49 +1,60 @@
 # COV-08e — Finance module certification over 08a–d
 
-**Status:** SCAFFOLDED — implementation pending  
+**Status:** IMPLEMENTED — runtime acceptance pending  
+**Branch:** `codex/cov08e-finance-certification`  
+**Stack base:** `codex/cov08d2-asset-depreciation-disposal`  
 **Module/surface:** Accounting / Finance  
-**Plan target:** COV-08 certification  
-**Scaffold source:** [`erp-cov08-27-scaffold.md`](./erp-cov08-27-scaffold.md)
+**Plan target:** COV-08 certification
 
-## Bounded path (to implement)
+## Bounded path
 
-Operator surface: /accounting, /reports
+COV-08e closes the Finance sequence with one visible
+`Exported → Archived` financial-report transition while retaining the
+same-head COV-08a–d proofs from the stacked branch.
 
-Existing operations (already reachable from the frontend command layer):
+Operator surface: `/reports` → Financial reports.
 
-- `archive_financial_report` — hook: `frontend/packages/query-hooks/src/hooks/reports.ts`
+- `archive_financial_report` remains the write boundary.
+- Canonical readback is the same `financial-reports.id`, organization and
+  company in `Archived` state.
+- No newest-row, name or timestamp correlation is permitted.
 
-Canonical resources: financial-reports, account-moves, account-periods, account-assets
+## Implementation
 
-## Effect contract
-
-Certification slice: re-runs the 08a–d proofs on one seeded company and adds one financial-report state readback (`financial-reports.state`).
-
-Implementation pattern: wrap the mutation's readback with `resolveUniqueEffect` /
-`executeOperationWithCanonicalReadback` from
-`frontend/packages/query-hooks/src/hooks/operation-effect.ts` (see COV-08c and
-COV-08d for the minimal form). Never correlate by newest row, name or timestamp.
+- `useArchiveFinancialReport` now uses
+  `executeOperationWithCanonicalReadback` and returns only after the exact
+  scoped report reads back as Archived.
+- `resolveArchivedFinancialReportEffect` fails closed on identity, scope,
+  state and duplicate-row ambiguity.
+- The persisted trial-balance lifecycle now continues through archive, rejects
+  wrong-company archive and stale archive replay, and proves both leave the
+  canonical report unchanged.
+- The COV-08e browser proof creates/generates/exports fixture data via trusted
+  setup calls, then drives Archive through the visible Reports UI and preserves
+  the exact snapshot after 422 stale replay and 403 reader denial.
 
 ## Contract disposition
 
-**No generated contract delta expected.** `financial-reports` exposes id, organization_id, company_id, state
+**Generated contract delta: none expected.** `financial-reports` already
+projects `id`, `organization_id`, `company_id` and `state`, and
+`archive_financial_report` already has the required session operation shape.
 
+## D/A/O/E proof
 
-
-## Prerequisites / decisions
-
-08a–d accepted; contracts v0.3.55 for 08b/COV-05 registry changes.
-
-## D/A/O/E proof checklist
-
-| Gate | Required proof | State |
+| Gate | Proof in this branch | Acceptance condition |
 | --- | --- | --- |
-| D | Native domain test: transition, replay rejection leaving the row unchanged, invariant/denial cases | TODO |
-| A | Generated operation keeps permission + organization/company scope; reader persona denied (403) | TODO |
-| O | Playwright drives the transition through the visible UI action (setup calls allowed only for fixtures) | TODO — `frontend/web/tests/e2e/cov08e-finance-certification.spec.ts` |
-| E | Exact-effect resolver unit test (state/scope/identity/ambiguity) and browser snapshot preserved after stale (422) and denied (403) replay | TODO |
+| D | `test_trial_balance_summary_balances` now certifies Generate → Export → Archive, wrong-company rejection, stale archive rejection and unchanged canonical row/audit count. | `run_all_accounting_tests` passes. |
+| A | Existing `financial_report:write` permission remains first; reducer validates organization/company. Browser replay as `fixture.reader` requires 403. | Writer succeeds once; reader and wrong company fail without mutation. |
+| O | `cov08e-finance-certification.spec.ts` drives the visible **Archive** action in `/reports` → Financial reports. | Focused Playwright proof passes. |
+| E | `reports-financial-archive.test.ts` covers exact identity/scope/state and ambiguity; browser proof requires the same report snapshot after 422 and 403. | Unit/native/browser evidence green on one head. |
 
-## Acceptance
+## Finance certification statement
 
-Becomes IMPLEMENTED when the bounded path and proofs above exist, and ACCEPTED only
-with same-head green CI (plus the contract release, when required).
+COV-08e certifies the bounded COV-08 sequence only when the same stacked head
+has green evidence for COV-08a, 08b, 08c, 08d/08d2 and this archive proof.
+Existing green evidence is not rewritten as accepted merely because this
+follow-on branch contains it.
+
+Until `run_all_accounting_tests`, the focused COV-08 browser lane and branch
+CI pass on this head, the truthful disposition is **IMPLEMENTED — runtime
+acceptance pending**.

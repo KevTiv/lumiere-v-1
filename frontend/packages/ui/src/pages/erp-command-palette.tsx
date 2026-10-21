@@ -8,8 +8,11 @@ import {
   BookMarked,
 } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import { useRBAC } from "@/lib/rbac-context"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
+import { isRecordSearchQuery } from "../lib/record-search"
+import { RecordSearchResults, type RecordSearchSummary } from "./erp-command-palette-records"
 import { isFirstOrgSurfaceAdmitted } from "../lib/product-surface-catalog"
 import {
   Command,
@@ -23,20 +26,39 @@ import {
 } from "../components/command"
 
 export interface ErpCommandPaletteProps {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   onOpenAIChat?: () => void
   onOpenNotebook?: () => void
   onOpenJournal?: () => void
   /** Apply the fail-closed first-test-organization product admission profile. */
   firstOrgProfile?: boolean
+  /** Record page of a model (e.g. `recordPageHref`); models with no page fall back to their module tab. */
+  recordHref?: (model: string, id: string) => string | undefined
 }
 
 export function ErpCommandPalette({
+  open: controlledOpen,
+  onOpenChange,
   onOpenAIChat,
   onOpenNotebook,
   onOpenJournal,
   firstOrgProfile = false,
+  recordHref,
 }: ErpCommandPaletteProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setOpenState] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const [search, setSearch] = useState("")
+  const [recordSummary, setRecordSummary] = useState<RecordSearchSummary | null>(null)
+  const { organizationId } = useErpSession()
+  const setOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
+    const value = typeof next === "function" ? next(open) : next
+    setOpenState(value)
+    onOpenChange?.(value)
+    // The next opening starts from an empty query.
+    setSearch("")
+    setRecordSummary(null)
+  }, [onOpenChange, open])
   const router = useRouter()
   const { checkPermission, isAdmin } = useRBAC()
   const { t } = useTranslation()
@@ -63,17 +85,35 @@ export function ErpCommandPalette({
     [checkPermission, navGroups],
   )
 
+  // Record reads start only while the palette is open and the query is long enough, and only
+  // for modules the user can read (the same gate as the module list above).
+  const recordSearchActive =
+    open && organizationId != null && organizationId > 0 && isRecordSearchQuery(search)
+  const allowedResourceKey = accessibleNavGroups
+    .flatMap((group) => group.items.map((item) => item.resource))
+    .sort()
+    .join("\n")
+  const allowedResources = useMemo(() => new Set(allowedResourceKey.split("\n")), [allowedResourceKey])
+  useEffect(() => {
+    if (!recordSearchActive) setRecordSummary(null)
+  }, [recordSearchActive])
+  const resolveRecordHref = useCallback(
+    (model: string, id: string) => recordHref?.(model, id),
+    [recordHref],
+  )
+  const showEmpty = !recordSearchActive || (recordSummary != null && !recordSummary.loading && !recordSummary.failed && recordSummary.count === 0)
+
   const runAction = useCallback((action: () => void) => {
     setOpen(false)
     action()
-  }, [])
+  }, [setOpen])
 
   const navigate = useCallback(
     (href: string) => {
       setOpen(false)
       router.push(href)
     },
-    [router],
+    [router, setOpen],
   )
 
   useEffect(() => {
@@ -86,7 +126,7 @@ export function ErpCommandPalette({
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
+  }, [setOpen])
 
   const visibleAiChat = quickActionIsVisible("ai-assistant") ? onOpenAIChat : undefined
   const visibleNotebook = quickActionIsVisible("notebook") ? onOpenNotebook : undefined
@@ -98,13 +138,28 @@ export function ErpCommandPalette({
       open={open}
       onOpenChange={setOpen}
       title="Command Palette"
-      description="Search modules and quick actions"
+      description="Search modules, quick actions and records"
       data-testid="erp-command-palette"
     >
       <Command>
-        <CommandInput placeholder="Search modules and actions..." />
+        <CommandInput
+          placeholder={t("commandPalette.placeholder", { defaultValue: "Search modules, actions and records..." })}
+          value={search}
+          onValueChange={setSearch}
+        />
         <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
+          {showEmpty ? <CommandEmpty>No results found.</CommandEmpty> : null}
+
+          {recordSearchActive && organizationId != null ? (
+            <RecordSearchResults
+              organizationId={BigInt(organizationId)}
+              query={search}
+              allowedResources={allowedResources}
+              recordHref={resolveRecordHref}
+              onNavigate={navigate}
+              onSummary={setRecordSummary}
+            />
+          ) : null}
 
           {hasQuickActions ? (
             <>

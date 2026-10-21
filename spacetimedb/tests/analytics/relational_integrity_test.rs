@@ -1,12 +1,16 @@
 //! ANL-004/ANL-005: dashboard company-scope validation on create, and
 //! cross-company widget-add rejection.
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{ReducerContext, Table, Timestamp};
 
 use crate::analytics::dashboards::{
     add_widget_to_dashboard, create_dashboard, create_dashboard_widget, dashboard,
     dashboard_widget, CreateDashboardParams, CreateDashboardWidgetParams,
 };
-use crate::analytics::reports::{record_generated_owner_report, RecordGeneratedOwnerReportParams};
+use crate::analytics::reports::{
+    create_report_template, create_scheduled_report, record_generated_owner_report,
+    record_report_run, report_template, scheduled_report, CreateReportTemplateParams,
+    CreateScheduledReportParams, RecordGeneratedOwnerReportParams,
+};
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -19,7 +23,7 @@ fn seed_sibling_company(ctx: &ReducerContext, fixture: &OrgFixture) -> Result<u6
         CreateCompanyParams {
             name: "Analytics Iso Company B".to_string(),
             code: format!("ANL-CB-{}", fixture.company_id),
-            currency_id: 1,
+            currency_id: fixture.currency_id,
             fiscal_year_end_month: 12,
             fiscal_year_end_day: 31,
             is_parent: false,
@@ -211,6 +215,94 @@ pub fn test_cross_company_widget_add_rejected(ctx: &ReducerContext) -> Result<()
     Ok(())
 }
 
+/// COV-26: a producer-owned creation request key creates at most one widget.
+pub fn test_dashboard_widget_create_request_is_idempotent(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let metadata = Some(format!(
+        "lumiere.dashboard-widget.create/v1:analytics-test-{}",
+        fixture.organization_id
+    ));
+    let params = CreateDashboardWidgetParams {
+        name: "COV-26 Idempotent Widget".to_string(),
+        widget_type: WidgetType::Kpi,
+        model: "sale_order".to_string(),
+        fields: vec![],
+        position_x: 0,
+        position_y: 0,
+        width: 4,
+        height: 4,
+        is_active: true,
+        domain: None,
+        group_by: None,
+        aggregation: Some("Count".to_string()),
+        chart_type: None,
+        sort_order: None,
+        limit: Some(10),
+        refresh_interval: None,
+        configuration: None,
+        metadata: metadata.clone(),
+    };
+
+    create_dashboard_widget(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        params.clone(),
+    )?;
+    create_dashboard_widget(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        params.clone(),
+    )?;
+
+    let rows: Vec<_> = ctx
+        .db
+        .dashboard_widget()
+        .widget_by_org()
+        .filter(&fixture.organization_id)
+        .filter(|widget| widget.metadata == metadata)
+        .collect();
+    if rows.len() != 1 {
+        return Err(format!(
+            "creation request should resolve to one widget, found {}",
+            rows.len()
+        ));
+    }
+
+    let mut conflicting = params;
+    conflicting.name = "COV-26 Conflicting Widget".to_string();
+    let rejected = create_dashboard_widget(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        conflicting,
+    );
+    match rejected {
+        Err(ref error) if error.contains("reused with different input") => {}
+        other => {
+            return Err(format!(
+                "request-key conflict should be rejected, got {other:?}"
+            ))
+        }
+    }
+
+    let row = ctx
+        .db
+        .dashboard_widget()
+        .id()
+        .find(&rows[0].id)
+        .ok_or("idempotent dashboard widget disappeared")?;
+    if row.name != "COV-26 Idempotent Widget" {
+        return Err("rejected request-key conflict changed the widget".to_string());
+    }
+
+    Ok(())
+}
+
 pub fn test_generated_owner_report_records_ordered_commit(
     ctx: &ReducerContext,
 ) -> Result<(), String> {
@@ -270,6 +362,282 @@ pub fn test_generated_owner_report_records_ordered_commit(
         return Err(format!(
             "owner report commit row order mismatch: {tables:?}"
         ));
+    }
+    Ok(())
+}
+
+/// COV-20: recording a run advances the schedule exactly once; a replay, an
+/// inactive schedule and an owner-report schedule are rejected unchanged.
+pub fn test_record_report_run_is_exact_and_replay_safe(ctx: &ReducerContext) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let org_id = fixture.organization_id;
+
+    create_report_template(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        CreateReportTemplateParams {
+            name: "COV-20 template".to_string(),
+            model: "sale_order".to_string(),
+            report_type: "qweb-pdf".to_string(),
+            orientation: "portrait".to_string(),
+            margin_top: 10.0,
+            margin_bottom: 10.0,
+            margin_left: 10.0,
+            margin_right: 10.0,
+            header_line: false,
+            footer_line: false,
+            attachment_use: false,
+            multi_company: false,
+            is_active: true,
+            description: None,
+            template_content: None,
+            paper_format: None,
+            print_report_name: None,
+            attachment: None,
+            metadata: None,
+        },
+    )?;
+    let template = ctx
+        .db
+        .report_template()
+        .iter()
+        .find(|t| t.organization_id == org_id && t.name == "COV-20 template")
+        .ok_or("template missing")?;
+
+    let first_next = Timestamp::from_micros_since_unix_epoch(1_800_000_000_000_000);
+    let params = |name: &str, is_active: bool| CreateScheduledReportParams {
+        name: name.to_string(),
+        report_template_id: Some(template.id),
+        owner_report_key: None,
+        timezone: None,
+        model: "sale_order".to_string(),
+        frequency: "daily".to_string(),
+        hour: 6,
+        minute: 0,
+        attachment_format: "pdf".to_string(),
+        next_run: first_next,
+        is_active,
+        recipients: vec!["ops@example.test".to_string()],
+        recipient_identities: vec![],
+        description: None,
+        domain: None,
+        day_of_week: None,
+        day_of_month: None,
+        subject: None,
+        body: None,
+        metadata: None,
+    };
+    create_scheduled_report(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        params("COV-20 daily", true),
+    )?;
+    create_scheduled_report(
+        ctx,
+        org_id,
+        Some(fixture.company_id),
+        params("COV-20 paused", false),
+    )?;
+    let find = |name: &str| {
+        ctx.db
+            .scheduled_report()
+            .iter()
+            .find(|r| r.organization_id == org_id && r.name == name)
+            .ok_or_else(|| format!("{name} missing"))
+    };
+    let daily = find("COV-20 daily")?;
+    if daily.run_count != 0 || daily.last_run.is_some() {
+        return Err("new schedule must start with no runs".to_string());
+    }
+
+    let second_next = Timestamp::from_micros_since_unix_epoch(1_800_086_400_000_000);
+    record_report_run(ctx, org_id, daily.id, second_next)?;
+    let ran = find("COV-20 daily")?;
+    if ran.run_count != 1 || ran.last_run.is_none() || ran.next_run != second_next {
+        return Err(
+            "run must bump run_count once, stamp last_run and advance next_run".to_string(),
+        );
+    }
+
+    for stale in [second_next, first_next] {
+        let err = record_report_run(ctx, org_id, daily.id, stale)
+            .err()
+            .ok_or("expected stale/replayed next_run to be rejected")?;
+        if !err.contains("later than the current next_run") {
+            return Err(format!("unexpected stale-run error: {err}"));
+        }
+    }
+    let after_replay = find("COV-20 daily")?;
+    if after_replay.run_count != 1 || after_replay.write_date != ran.write_date {
+        return Err("rejected replay changed the schedule".to_string());
+    }
+
+    let paused = find("COV-20 paused")?;
+    let err = record_report_run(ctx, org_id, paused.id, second_next)
+        .err()
+        .ok_or("expected inactive schedule run to be rejected")?;
+    if !err.contains("inactive") || find("COV-20 paused")?.run_count != 0 {
+        return Err(format!("inactive schedule must reject unchanged: {err}"));
+    }
+    Ok(())
+}
+
+/// COV-20: stored widget definitions are validated at write time and a
+/// rejected definition is never persisted.
+pub fn test_dashboard_widget_definition_validated_at_write(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let base = |name: &str| CreateDashboardWidgetParams {
+        name: name.to_string(),
+        widget_type: WidgetType::Kpi,
+        model: "sale_order".to_string(),
+        fields: vec![],
+        position_x: 0,
+        position_y: 0,
+        width: 4,
+        height: 4,
+        is_active: true,
+        domain: None,
+        group_by: None,
+        aggregation: None,
+        chart_type: None,
+        sort_order: None,
+        limit: None,
+        refresh_interval: None,
+        configuration: None,
+        metadata: None,
+    };
+    let count = |ctx: &ReducerContext| {
+        ctx.db
+            .dashboard_widget()
+            .iter()
+            .filter(|w| w.organization_id == fixture.organization_id)
+            .count()
+    };
+
+    let bad: Vec<(&str, CreateDashboardWidgetParams, &str)> = vec![
+        (
+            "not-json",
+            CreateDashboardWidgetParams {
+                domain: Some("{oops".into()),
+                ..base("COV20 bad json")
+            },
+            "not valid JSON",
+        ),
+        (
+            "array",
+            CreateDashboardWidgetParams {
+                domain: Some("[1]".into()),
+                ..base("COV20 bad array")
+            },
+            "JSON object",
+        ),
+        (
+            "empty-op",
+            CreateDashboardWidgetParams {
+                domain: Some(r#"{"state":{}}"#.into()),
+                ..base("COV20 empty op")
+            },
+            "no operator",
+        ),
+        (
+            "bad-op",
+            CreateDashboardWidgetParams {
+                domain: Some(r#"{"state":{"$regex":"x"}}"#.into()),
+                ..base("COV20 bad op")
+            },
+            "Unsupported",
+        ),
+        (
+            "in-scalar",
+            CreateDashboardWidgetParams {
+                domain: Some(r#"{"state":{"$in":"a"}}"#.into()),
+                ..base("COV20 in scalar")
+            },
+            "array",
+        ),
+        (
+            "gt-text",
+            CreateDashboardWidgetParams {
+                domain: Some(r#"{"amount":{"$gt":"abc"}}"#.into()),
+                ..base("COV20 gt text")
+            },
+            "numeric",
+        ),
+        (
+            "sort-dir",
+            CreateDashboardWidgetParams {
+                sort_order: Some(r#"{"amount":"sideways"}"#.into()),
+                ..base("COV20 sort dir")
+            },
+            "asc or desc",
+        ),
+        (
+            "sort-multi",
+            CreateDashboardWidgetParams {
+                sort_order: Some(r#"{"a":"asc","b":"desc"}"#.into()),
+                ..base("COV20 sort multi")
+            },
+            "exactly one",
+        ),
+        (
+            "binding",
+            CreateDashboardWidgetParams {
+                configuration: Some(r#"{"version":2,"timeField":"date"}"#.into()),
+                ..base("COV20 binding")
+            },
+            "binding",
+        ),
+        (
+            "freeform-config",
+            CreateDashboardWidgetParams {
+                configuration: Some(r#"{"stacked":true}"#.into()),
+                ..base("COV20 freeform config")
+            },
+            "binding",
+        ),
+        (
+            "config-not-json",
+            CreateDashboardWidgetParams {
+                configuration: Some("nope".into()),
+                ..base("COV20 config junk")
+            },
+            "binding",
+        ),
+    ];
+    for (label, params, expect) in bad {
+        let before = count(ctx);
+        let err = create_dashboard_widget(ctx, fixture.organization_id, None, params)
+            .err()
+            .ok_or_else(|| format!("{label}: malformed definition was accepted"))?;
+        if !err.contains(expect) {
+            return Err(format!("{label}: unexpected rejection: {err}"));
+        }
+        if count(ctx) != before {
+            return Err(format!("{label}: rejected definition was persisted"));
+        }
+    }
+
+    create_dashboard_widget(
+        ctx,
+        fixture.organization_id,
+        None,
+        CreateDashboardWidgetParams {
+            domain: Some(r#"{"state":{"$in":["sale","done"]},"amount":{"$gte":10}}"#.into()),
+            sort_order: Some(r#"{"amount":"desc"}"#.into()),
+            configuration: Some(
+                r#"{"version":1,"timeField":"date_order","measureField":"amount_total","missingTimestampPolicy":"reject","missingMeasurePolicy":"reject"}"#.into(),
+            ),
+            ..base("COV20 valid")
+        },
+    )?;
+    if count(ctx) != 1 {
+        return Err("the valid definition must persist".to_string());
     }
     Ok(())
 }

@@ -19,7 +19,7 @@
 //! - `pub enum TypeName { Variant, ... }` → enum types
 
 use anyhow::{bail, Context, Result};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
@@ -34,14 +34,21 @@ use crate::cold_tier::schema_ir::{
 
 /// Parse all `*_table.rs` and `*_type.rs` files in `bindings_dir` and return
 /// the complete schema manifest.
-pub fn parse_bindings(bindings_dir: &Path) -> Result<LumiereSchemaManifest> {
+pub fn parse_bindings(
+    bindings_dir: &Path,
+    excluded_relations: &BTreeSet<String>,
+) -> Result<LumiereSchemaManifest> {
     // Pass 1: scan every *_type.rs to build a map of type-name → kind.
     // This is needed to resolve field types like `MoveType` → Enum.
     let type_kind_map =
         scan_type_kinds(bindings_dir).context("scanning *_type.rs files for kind map")?;
 
     // Pass 2: parse every *_table.rs to collect table descriptors.
-    let table_infos = parse_table_files(bindings_dir).context("parsing *_table.rs files")?;
+    let table_infos = parse_table_files(bindings_dir)
+        .context("parsing *_table.rs files")?
+        .into_iter()
+        .filter(|info| !excluded_relations.contains(&info.sql_name))
+        .collect::<Vec<_>>();
 
     // Pass 3: for each table, parse the corresponding *_type.rs for column info.
     let mut tables: Vec<GeneratedTableSchema> = Vec::with_capacity(table_infos.len());

@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ContextTabsList, ContextTabsTrigger } from "../components/context-tabs"
 import {
   Search,
   Plus,
@@ -40,6 +41,8 @@ import {
   PiggyBank,
   Receipt,
   Upload,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -50,6 +53,7 @@ import {
 import type { AccountAccount } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
 import { toast } from "sonner"
+import { TablePager, usePagedRows } from "../components/table-pager"
 
 type DisplayGroup = AccountTypeGroup
 
@@ -114,17 +118,33 @@ function accountOpeningBalance(account: AccountAccount): number {
     : 0
 }
 
+/**
+ * Debit-normal groups (assets, expenses) carry positive balances and
+ * credit-normal groups (liabilities, equity, income) negative ones. Only a
+ * balance on the wrong side is worth highlighting.
+ */
+function isAbnormalBalance(group: DisplayGroup, balance: number): boolean {
+  if (group === "asset" || group === "expense") return balance < 0
+  if (group === "liability" || group === "equity" || group === "income") return balance > 0
+  return false
+}
+
 type TFunction = ReturnType<typeof useTranslation>["t"]
 
 interface AccountsTableProps {
   accounts: AccountAccount[]
   t: TFunction
   onAccountClick?: (account: AccountAccount) => void
+  onToggleDeprecated?: (account: AccountAccount) => void | Promise<void>
+  onEdit?: (account: AccountAccount) => void | Promise<void>
 }
 
-function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
+function AccountsTable({ accounts, t, onAccountClick, onToggleDeprecated, onEdit }: AccountsTableProps) {
+  const accountsPager = usePagedRows(accounts)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
   return (
-    <Table>
+    <>
+      <Table>
       <TableHeader>
         <TableRow>
           <TableHead className="w-20">{t("accounting.accounts.code")}</TableHead>
@@ -138,7 +158,7 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
       <TableBody>
         {accounts.length === 0 ? (
           <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">{t("accounting.accounts.noResults")}</TableCell></TableRow>
-        ) : accounts.map((account) => {
+        ) : accountsPager.pageRows.map((account) => {
           const group = getDisplayGroup(account)
           const conf = groupConfig[group]
           return (
@@ -160,7 +180,7 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
                   {conf.icon}{t(conf.labelKey as any)}
                 </Badge>
               </TableCell>
-              <TableCell className={cn("font-medium", accountOpeningBalance(account) < 0 ? "text-destructive" : "")}>
+              <TableCell className={cn("font-medium tabular-nums", isAbnormalBalance(group, accountOpeningBalance(account)) && "text-destructive")}>
                 {formatCurrency(accountOpeningBalance(account))}
               </TableCell>
               <TableCell>
@@ -169,15 +189,56 @@ function AccountsTable({ accounts, t, onAccountClick }: AccountsTableProps) {
                 </Badge>
               </TableCell>
               <TableCell>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <Edit className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    title={onEdit ? t("accounting.accounts.rowActions.edit", { defaultValue: "Edit account" }) : undefined}
+                    aria-label={onEdit ? t("accounting.accounts.rowActions.edit", { defaultValue: "Edit account" }) : undefined}
+                    data-testid={`account-edit-${String(account.id)}`}
+                    onClick={onEdit ? (event) => {
+                      event.stopPropagation()
+                      void onEdit(account)
+                    } : undefined}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  {onToggleDeprecated ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      disabled={togglingId === String(account.id)}
+                      title={account.deprecated === true
+                        ? t("accounting.accounts.rowActions.reactivate", { defaultValue: "Reactivate account" })
+                        : t("accounting.accounts.rowActions.deprecate", { defaultValue: "Deprecate account" })}
+                      aria-label={account.deprecated === true
+                        ? t("accounting.accounts.rowActions.reactivate", { defaultValue: "Reactivate account" })
+                        : t("accounting.accounts.rowActions.deprecate", { defaultValue: "Deprecate account" })}
+                      data-testid={`account-toggle-deprecated-${String(account.id)}`}
+                      onClick={async (event) => {
+                        event.stopPropagation()
+                        setTogglingId(String(account.id))
+                        try {
+                          await onToggleDeprecated(account)
+                        } finally {
+                          setTogglingId(null)
+                        }
+                      }}
+                    >
+                      {account.deprecated === true ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                    </Button>
+                  ) : null}
+                </div>
               </TableCell>
             </TableRow>
           )
         })}
       </TableBody>
-    </Table>
+      </Table>
+      <TablePager {...accountsPager} />
+    </>
   )
 }
 
@@ -187,6 +248,16 @@ interface ChartOfAccountsViewProps {
   onImportAccountsCsv?: () => void
   /** Click account row to open GL move-line drilldown. */
   onAccountClick?: (account: AccountAccount) => void
+  /**
+   * When set, each row gets a deprecate / reactivate button. The caller owns confirmation,
+   * the mutation and its toasts, and only passes this when the user may write accounts.
+   */
+  onToggleDeprecated?: (account: AccountAccount) => void | Promise<void>
+  /**
+   * When set, the row's edit button opens it for editing. The caller owns the form, the mutation
+   * and its toasts, and only passes this when the user may write accounts.
+   */
+  onEdit?: (account: AccountAccount) => void | Promise<void>
   /** When set, shows a second top-level tab (e.g. account types & groups). */
   chartStructureContent?: ReactNode
 }
@@ -196,6 +267,8 @@ export function ChartOfAccountsView({
   onCreate,
   onImportAccountsCsv,
   onAccountClick,
+  onToggleDeprecated,
+  onEdit,
   chartStructureContent,
 }: ChartOfAccountsViewProps) {
   const { t } = useTranslation()
@@ -286,7 +359,7 @@ export function ChartOfAccountsView({
             </TabsList>
             {tabGroups.map(({ value, accounts: tabAccounts }) => (
               <TabsContent key={value} value={value}>
-                <AccountsTable accounts={tabAccounts} t={t} onAccountClick={onAccountClick} />
+                <AccountsTable accounts={tabAccounts} t={t} onAccountClick={onAccountClick} onToggleDeprecated={onToggleDeprecated} onEdit={onEdit} />
               </TabsContent>
             ))}
           </Tabs>
@@ -395,10 +468,10 @@ export function ChartOfAccountsView({
   if (chartStructureContent) {
     return (
       <Tabs defaultValue="accounts" className="flex flex-col gap-6">
-        <TabsList>
-          <TabsTrigger value="accounts">{t("accounting.accounts.coasTab")}</TabsTrigger>
-          <TabsTrigger value="structure">{t("accounting.chartStructure.tabLabel")}</TabsTrigger>
-        </TabsList>
+        <ContextTabsList>
+          <ContextTabsTrigger value="accounts">{t("accounting.accounts.coasTab")}</ContextTabsTrigger>
+          <ContextTabsTrigger value="structure">{t("accounting.chartStructure.tabLabel")}</ContextTabsTrigger>
+        </ContextTabsList>
         <TabsContent value="accounts" className="mt-0">
           {main}
         </TabsContent>

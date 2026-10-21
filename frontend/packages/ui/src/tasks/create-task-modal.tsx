@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import {
   Dialog,
   DialogContent,
@@ -69,6 +70,27 @@ export function CreateTaskModal({
   onCreate,
   teamMembers,
 }: CreateTaskModalProps) {
+  const { t } = useTranslation()
+  const typeLabels: Record<TaskType, string> = {
+    task: t("tasks.types.task"),
+    bug: t("tasks.types.bug"),
+    feature: t("tasks.types.feature"),
+    story: t("tasks.types.story"),
+    epic: t("tasks.types.epic"),
+  }
+  const priorityLabels: Record<TaskPriority, string> = {
+    low: t("tasks.priorities.low"),
+    medium: t("tasks.priorities.medium"),
+    high: t("tasks.priorities.high"),
+    urgent: t("tasks.priorities.urgent"),
+  }
+  const statusLabels: Record<TaskStatus, string> = {
+    backlog: t("tasks.statuses.backlog"),
+    todo: t("tasks.statuses.todo"),
+    "in-progress": t("tasks.statuses.in-progress"),
+    review: t("tasks.statuses.review"),
+    done: t("tasks.statuses.done"),
+  }
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [type, setType] = useState<TaskType>("task")
@@ -93,7 +115,7 @@ export function CreateTaskModal({
       assigneeId: assigneeId || undefined,
       assigneeName: assignee?.name,
       reporterId: "user-1",
-      reporterName: "Current User",
+      reporterName: t("tasks.identity.currentUser"),
       labels: labels
         .split(",")
         .map((l) => l.trim())
@@ -118,16 +140,16 @@ export function CreateTaskModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Create New Task</DialogTitle>
+          <DialogTitle>{t("tasks.create.title")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
           {/* Title */}
           <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
+            <Label htmlFor="title">{t("tasks.fields.requiredTitle")}</Label>
             <Input
               id="title"
-              placeholder="Enter task title"
+              placeholder={t("tasks.create.titlePlaceholder")}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -135,10 +157,10 @@ export function CreateTaskModal({
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t("tasks.fields.description")}</Label>
             <Textarea
               id="description"
-              placeholder="Enter task description"
+              placeholder={t("tasks.create.descriptionPlaceholder")}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -148,19 +170,19 @@ export function CreateTaskModal({
           {/* Type and Priority */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Type</Label>
+              <Label>{t("tasks.fields.type")}</Label>
               <Select value={type} onValueChange={(v) => setType(v as TaskType)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(taskTypeConfig) as TaskType[]).map((t) => (
-                    <SelectItem key={t} value={t}>
+                  {(Object.keys(taskTypeConfig) as TaskType[]).map((taskType) => (
+                    <SelectItem key={taskType} value={taskType}>
                       <div className="flex items-center gap-2">
-                        <span className={taskTypeConfig[t].color.replace("bg-", "text-")}>
-                          {typeIcons[t]}
+                        <span className={taskTypeConfig[taskType].color.replace("bg-", "text-")}>
+                          {typeIcons[taskType]}
                         </span>
-                        {taskTypeConfig[t].label}
+                        {typeLabels[taskType]}
                       </div>
                     </SelectItem>
                   ))}
@@ -169,7 +191,7 @@ export function CreateTaskModal({
             </div>
 
             <div className="space-y-2">
-              <Label>Priority</Label>
+              <Label>{t("tasks.fields.priority")}</Label>
               <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -181,7 +203,7 @@ export function CreateTaskModal({
                         <span className={priorityConfig[p].color}>
                           {priorityIcons[p]}
                         </span>
-                        {priorityConfig[p].label}
+                        {priorityLabels[p]}
                       </div>
                     </SelectItem>
                   ))}
@@ -193,7 +215,7 @@ export function CreateTaskModal({
           {/* Status and Assignee */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label>{t("tasks.fields.status")}</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -203,7 +225,7 @@ export function CreateTaskModal({
                     <SelectItem key={col.id} value={col.id}>
                       <div className="flex items-center gap-2">
                         <div className={cn("w-2 h-2 rounded-full", col.color)} />
-                        {col.title}
+                        {statusLabels[col.id]}
                       </div>
                     </SelectItem>
                   ))}
@@ -212,13 +234,13 @@ export function CreateTaskModal({
             </div>
 
             <div className="space-y-2">
-              <Label>Assignee</Label>
+              <Label>{t("tasks.fields.assignee")}</Label>
               <Select value={assigneeId} onValueChange={setAssigneeId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select assignee" />
+                  <SelectValue placeholder={t("tasks.assignee.select")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  <SelectItem value="unassigned">{t("tasks.assignee.unassigned")}</SelectItem>
                   {teamMembers.map((member) => (
                     <SelectItem key={member.id} value={member.id}>
                       <div className="flex items-center gap-2">
@@ -242,7 +264,7 @@ export function CreateTaskModal({
           {/* Due Date and Story Points */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="dueDate">Due Date</Label>
+              <Label htmlFor="dueDate">{t("tasks.fields.dueDate")}</Label>
               <Input
                 id="dueDate"
                 type="date"
@@ -252,7 +274,7 @@ export function CreateTaskModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="storyPoints">Story Points</Label>
+              <Label htmlFor="storyPoints">{t("tasks.fields.storyPoints")}</Label>
               <Input
                 id="storyPoints"
                 type="number"
@@ -266,10 +288,10 @@ export function CreateTaskModal({
 
           {/* Labels */}
           <div className="space-y-2">
-            <Label htmlFor="labels">Labels (comma-separated)</Label>
+            <Label htmlFor="labels">{t("tasks.fields.labelsCommaSeparated")}</Label>
             <Input
               id="labels"
-              placeholder="frontend, bug-fix, urgent"
+              placeholder={t("tasks.create.labelsPlaceholder")}
               value={labels}
               onChange={(e) => setLabels(e.target.value)}
             />
@@ -278,10 +300,10 @@ export function CreateTaskModal({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSubmit} disabled={!title.trim()}>
-            Create Task
+            {t("tasks.actions.create")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -9,16 +9,17 @@ use std::collections::BTreeSet;
 
 use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
-use crate::ai::capability_grants::provision_owner_ai_capability_grants;
 use crate::accounting::fiscal_periods::{
     accounting_ownership_backfill_issue, accounting_ownership_backfill_run,
     AccountingOwnershipBackfillIssue, AccountingOwnershipBackfillRun,
 };
+use crate::ai::capability_grants::provision_owner_ai_capability_grants;
 use crate::core::auth::{password_reset_token, user_credential};
 use crate::core::cold_tier_identity::cold_tier_service_identity;
 use crate::core::country_pack::{country_pack_definition, country_pack_tax_rule};
 use crate::core::organization::organization;
 use crate::core::permissions::{role, sod_conflict_rule, Role, SodConflictRule};
+use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::core::reference::{country, currency};
 use crate::core::users::{
     find_user_profile_for_identity, find_user_profile_for_organization, user_organization,
@@ -33,6 +34,7 @@ pub const MIGRATION_COUNTRY_PACK_CATALOG: u64 = 1;
 pub const MIGRATION_HR_COUNTRY_PACK_LEAVE_CATALOG: u64 = 4;
 pub const MIGRATION_ORG_FORM_CONFIGS: u64 = 2;
 pub const MIGRATION_ORG_FINANCE_SOD: u64 = 3;
+pub const MIGRATION_ORG_COUNTRY_CATALOG: u64 = 5;
 
 fn seed_finance_sod_presets(ctx: &ReducerContext, organization_id: u64) {
     let presets = [
@@ -853,9 +855,21 @@ fn apply_org_migration(
         return Ok(());
     }
 
+    let mut changes = Vec::new();
     match version {
         MIGRATION_ORG_FORM_CONFIGS => run_seed_organization_form_configs(ctx, organization_id)?,
         MIGRATION_ORG_FINANCE_SOD => seed_finance_sod_presets(ctx, organization_id),
+        MIGRATION_ORG_COUNTRY_CATALOG => {
+            for row in
+                crate::core::reference::seed_country_catalog_for_organization(ctx, organization_id)?
+            {
+                changes.push(RowChange::upsert_stdb_row(
+                    "country",
+                    serde_json::json!({"organization_code_key": row.organization_code_key}),
+                    &row,
+                )?);
+            }
+        }
         _ => return Err(format!("unknown org migration version {version}")),
     }
 
@@ -883,6 +897,22 @@ fn apply_org_migration(
         },
     );
 
+    if version == MIGRATION_ORG_COUNTRY_CATALOG {
+        changes.push(RowChange::upsert_stdb_row(
+            "org_schema_migration",
+            serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+        record_organization_commit(
+            ctx,
+            OrganizationCommitInput {
+                organization_id,
+                operation_id: "erp.apply_org_migrations".to_string(),
+                correlation_id: format!("country-catalog-v1:{organization_id}"),
+                changes,
+            },
+        )?;
+    }
     Ok(())
 }
 
@@ -935,7 +965,10 @@ pub(crate) fn backfill_owner_ai_capability_grants_for_organization(
                 && candidate.is_active
                 && candidate.is_system
                 && candidate.name.eq_ignore_ascii_case("owner")
-                && candidate.permissions.iter().any(|permission| permission == "*:*")
+                && candidate
+                    .permissions
+                    .iter()
+                    .any(|permission| permission == "*:*")
         })
         .min_by_key(|candidate| candidate.id)
         .ok_or_else(|| "active system owner role with full access was not found".to_string())?;
@@ -960,6 +993,12 @@ pub fn apply_org_migrations(ctx: &ReducerContext, organization_id: u64) -> Resul
         organization_id,
         MIGRATION_ORG_FINANCE_SOD,
         "seed_finance_sod_presets",
+    )?;
+    apply_org_migration(
+        ctx,
+        organization_id,
+        MIGRATION_ORG_COUNTRY_CATALOG,
+        "seed_onboarding_country_catalog",
     )
 }
 

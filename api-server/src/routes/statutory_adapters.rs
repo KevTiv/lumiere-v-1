@@ -25,6 +25,72 @@ use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct AdapterRegistration {
+    pack_key: &'static str,
+    document_types: &'static [&'static str],
+    status: &'static str,
+    external_certification_required: bool,
+}
+
+const ADAPTERS: &[AdapterRegistration] = &[
+    AdapterRegistration {
+        pack_key: "au",
+        document_types: &["bas"],
+        status: "stub",
+        external_certification_required: false,
+    },
+    AdapterRegistration {
+        pack_key: "nz",
+        document_types: &["gst_return"],
+        status: "stub",
+        external_certification_required: false,
+    },
+    AdapterRegistration {
+        pack_key: "za",
+        document_types: &["vat201"],
+        status: "stub",
+        external_certification_required: false,
+    },
+    AdapterRegistration {
+        pack_key: "sg",
+        document_types: &["iras"],
+        status: "stub",
+        external_certification_required: false,
+    },
+    AdapterRegistration {
+        pack_key: "br",
+        document_types: &["nfe"],
+        status: "stub",
+        external_certification_required: false,
+    },
+    AdapterRegistration {
+        pack_key: "my",
+        document_types: &["peppol"],
+        status: "stub",
+        external_certification_required: false,
+    },
+    AdapterRegistration {
+        pack_key: "id",
+        document_types: &["coretax"],
+        status: "stub",
+        external_certification_required: false,
+    },
+    AdapterRegistration {
+        pack_key: "rw",
+        document_types: &["ebm_invoice", "vat_return"],
+        status: "review_required",
+        external_certification_required: true,
+    },
+];
+
+fn adapter_registration(pack_key: &str) -> Option<AdapterRegistration> {
+    ADAPTERS
+        .iter()
+        .copied()
+        .find(|adapter| adapter.pack_key == pack_key)
+}
+
 #[derive(Debug, Deserialize)]
 pub struct StatutoryExportRequest {
     pub pack_key: String,
@@ -46,17 +112,19 @@ async fn list_adapters(
         .ok_or(ApiError::Unauthorized)?;
     let _organization_id = require_org(&session)?;
 
-    Ok(Json(json!({
-        "data": [
-            { "pack_key": "au", "document_types": ["bas"], "status": "stub" },
-            { "pack_key": "nz", "document_types": ["gst_return"], "status": "stub" },
-            { "pack_key": "za", "document_types": ["vat201"], "status": "stub" },
-            { "pack_key": "sg", "document_types": ["iras"], "status": "stub" },
-            { "pack_key": "br", "document_types": ["nfe"], "status": "stub" },
-            { "pack_key": "my", "document_types": ["peppol"], "status": "stub" },
-            { "pack_key": "id", "document_types": ["coretax"], "status": "stub" },
-        ]
-    })))
+    let data: Vec<_> = ADAPTERS
+        .iter()
+        .map(|adapter| {
+            json!({
+                "pack_key": adapter.pack_key,
+                "document_types": adapter.document_types,
+                "status": adapter.status,
+                "external_certification_required": adapter.external_certification_required,
+            })
+        })
+        .collect();
+
+    Ok(Json(json!({ "data": data })))
 }
 
 async fn export_statutory(
@@ -90,10 +158,17 @@ async fn export_statutory(
     let _context = context.with_company_scope(vec![company_id])?;
 
     // Adapter registry stub — concrete NF-e / BAS / IRAS clients plug in here.
+    // Rwanda is registered for discovery and integration planning, but fails closed
+    // until RRA has certified the VSDC integration and the country pack is accepted.
+    if pack == "rw" {
+        return Err(ApiError::Conflict(
+            "Rwanda statutory export requires accepted country-pack rules and RRA VSDC certification"
+                .into(),
+        ));
+    }
     let adapter_status = match pack.as_str() {
-        "au" | "nz" | "za" | "sg" | "br" | "ar" | "cl" | "my" | "id" | "th" | "ph" => {
-            "accepted_stub"
-        }
+        "ar" | "cl" | "th" | "ph" => "accepted_stub",
+        _ if adapter_registration(&pack).is_some() => "accepted_stub",
         _ => {
             return Err(ApiError::BadRequest(format!(
                 "no statutory adapter registered for pack_key '{pack}'"
@@ -122,4 +197,22 @@ pub fn router() -> Router<Arc<AppState>> {
             "/statutory-adapters/:pack_key/export",
             post(export_statutory),
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rwanda_adapter_is_discoverable_but_review_gated() {
+        let adapter = adapter_registration("rw").expect("Rwanda adapter registration");
+        assert_eq!(adapter.status, "review_required");
+        assert_eq!(adapter.document_types, ["ebm_invoice", "vat_return"]);
+        assert!(adapter.external_certification_required);
+    }
+
+    #[test]
+    fn unknown_adapter_is_not_registered() {
+        assert!(adapter_registration("unknown").is_none());
+    }
 }

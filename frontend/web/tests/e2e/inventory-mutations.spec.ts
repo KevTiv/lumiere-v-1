@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   chooseFirstOption,
   expectNoAppError,
   expectRecordAbsentFromQuery,
@@ -16,6 +17,7 @@ import {
   submitForm,
   waitForBffQueryMinRows,
   waitForEntityActionEnabled,
+  acceptEntityActionConfirm,
 } from "./helpers"
 
 test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] }, () => {
@@ -30,7 +32,7 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
     const updatedName = `${productName}-updated`
 
     await gotoModule(page, "/inventory", "inventory")
-    await page.getByTestId("module-tab-inventory-products").click()
+    await selectModuleTab(page, "inventory", "products")
     await waitForBffQueryMinRows(page, "/api/query/product-categories")
     await waitForBffQueryMinRows(page, "/api/query/uoms")
     await waitForBffQueryMinRows(page, "/api/query/pricelists")
@@ -106,18 +108,13 @@ test.describe("Inventory update/delete mutations", { tag: ["@p0", "@phase-2"] },
     await selectEntityRowById(page, categoryId)
     await waitForEntityActionEnabled(page, "entity-action-delete-category")
 
-    page.once("dialog", (dialog) => {
-      expect(dialog.type()).toBe("confirm")
-      void dialog.accept()
-    })
-
-    const [deleteCategoryRes] = await Promise.all([
-      page.waitForResponse(
-        (res) => matchesOperationResponse(res, "delete_product_category") && res.ok(),
-        { timeout: 30_000 },
-      ),
-      page.getByTestId("entity-action-delete-category").click(),
-    ])
+    const deleteCategoryResponse = page.waitForResponse(
+      (res) => matchesOperationResponse(res, "delete_product_category") && res.ok(),
+      { timeout: 30_000 },
+    )
+    await page.getByTestId("entity-action-delete-category").click()
+    await acceptEntityActionConfirm(page)
+    const deleteCategoryRes = await deleteCategoryResponse
     expect(deleteCategoryRes.ok()).toBe(true)
 
     await expectRecordAbsentFromQuery(page, "/api/query/product-categories", (row) =>

@@ -1,9 +1,9 @@
 # COV-06n Replenishment scheduler
 
 **Package:** `COV-06n`
-**Disposition:** `IMPLEMENTED` (backend only, readback field added) — uncompiled; contract release, frontend wiring and runtime acceptance pending
-**Stacked base:** PR #76 / `codex/cov06m-replenishment-transfer-demand`
-**Operator proof:** native domain test only — no browser proof in this slice (see below)
+**Disposition:** `IMPLEMENTED` — scheduled transfer and supplier-backed buy demand wired; runtime acceptance pending
+**Stacked base:** current COV/U5 certification head
+**Operator proof:** `frontend/web/tests/e2e/cov06n-replenishment-scheduler.spec.ts` (persisted-timer execution plus warehouse UI lifecycle)
 
 This is the larger, differently-shaped task flagged throughout COV-06h/j/k/l/m: `ReplenishmentRule.next_run` was an inert timestamp — every execution stamped it, but nothing ever consumed it, so a rule only ever ran when a user clicked "execute." This slice gives it an actual recurring schedule.
 
@@ -26,23 +26,32 @@ one active replenishment rule
 - `schedule_replenishment_run(organization_id, company_id, rule_id)`: validates the rule (org/company/active), fails closed if a job already exists for that rule (`replenishment_run_job_by_rule` index) rather than silently creating a duplicate, and inserts one job at `rule.next_run` (or one day out if unset).
 - `cancel_replenishment_run(organization_id, company_id, rule_id)`: removes all pending jobs for the rule. A rule with none is a no-op success, not an error.
 - `run_scheduled_replenishment(job)`: if the rule was deleted or deactivated since scheduling, runs as a no-op and does not reschedule (the fired job row itself is auto-deleted by SpacetimeDB regardless, per this codebase's scheduled-table convention). Otherwise executes the rule with a deterministic job-scoped idempotency key (`scheduled:<ruleId>:<scheduledId>`) and inserts the next job from the rule's freshly-updated `next_run`.
+- Scheduled internal-transfer demand creation now uses Inventory-private system helpers for the exact picking and move. Those helpers retain reconstruction write-fence, organization/company, product, location, and inventory-close validation while omitting only interactive user RBAC, which a scheduled reducer cannot satisfy. The picking returned by insertion is used directly; there is no name-based rediscovery race.
 - Added a native domain test (`test_replenishment_scheduled_run_reschedules`, wired into `run_inventory_replenishment_demand_test`) proving: scheduling an already-scheduled rule fails closed; firing a job (simulated as the real scheduler would — delete-then-invoke) both executes the rule and inserts exactly one new job with a different id (not a mutation of the fired one); cancelling removes it; cancelling an unscheduled rule is a no-op success.
 - **Found while writing the test**: the warehouse persona fixture had no `replenishment_rule` permission at all. `execute_replenishment_rule`, `schedule_replenishment_run`, and `cancel_replenishment_run` all check for it — meaning COV-06h's and COV-06m's own browser proofs (`executeReplenishmentRuleViaUi`, driven by the warehouse persona) would have failed with 403 had they actually been run. Neither has been executed against a live stack yet (both are still `IMPLEMENTED`, pending the same runtime proof this slice is also pending), so this was caught before it could surface as a real failure. Fixed by adding `replenishment_rule:*` to the warehouse persona fixture.
 
-## Frontend readback decision (resolved)
+## Frontend/readback
 
-`ReplenishmentRunJob` stays private, like every other scheduled job table in the module (`sales_sla_escalation_job`, `tax_deadline_status_job`, `helpdesk_sla_check_job`, `document_retention_purge_job`). Instead of exposing it as a first public scheduled table, the rule carries the exact readback: `ReplenishmentRule.scheduled_run_job_id: Option<u64>` (`#[default(None::<u64>)]`, trailing column) holds the `scheduled_id` of the rule's pending job, or `None` when the rule is not opted in.
+`replenishment_run_job` is registered as `replenishment-run-jobs`. Inventory now
+offers schedule and cancel actions for a selected rule. Schedule resolves the
+unique scoped job by `rule_id`; cancel polls for canonical absence and fails if
+the row does not disappear within the bounded readback window.
 
-- `schedule_replenishment_run` sets it to the inserted job's id.
-- `cancel_replenishment_run` clears it.
-- `run_scheduled_replenishment` points it at the freshly inserted next job, or clears it when the rule was deactivated since scheduling.
-- The native test now asserts the pointer after schedule, after a scheduled run (follows the new job id), and after cancel.
-
-## Still required before the UI slice (COV-06o)
-
-1. **Not compiled or regenerated in this change.** The authoring environment could not reach `static.crates.io`, so `cargo check` and `make codegen` did not run. Compile and run `run_inventory_replenishment_demand_test` first.
-2. **Contract release: yes.** The table gained a column, so the generated bindings, `replenishment-rules` projection (add `scheduled_run_job_id`) and IR must be regenerated. The push runs `.github/workflows/release-contracts.yml`; pull the pin commit it pushes.
-3. Then wire schedule/cancel in the inventory UI with a typed workflow that resolves the exact rule row and checks `scheduled_run_job_id` (set after schedule, `None` after cancel), plus stale/read-only denial proofs, following the other COV-06 slices.
+The COV-06n browser proof now starts with stock only at a source location and an
+empty destination. It schedules through the selected rule UI, waits for the
+real persisted timer, and proves one exact `INT-RPL-<ruleId>` draft picking,
+one exact move, and the rule's canonical `demand_type`, `demand_id`, and
+`order_qty` metadata. A warehouse persona then visibly confirms, assigns, and
+validates that same picking, proving the same move reaches done and the
+destination quant reaches 20. The proof also covers duplicate-schedule retry,
+reader cancellation denial, recurring-job replacement, and visible cancel.
+The same scenario then schedules a supplier-backed empty-location rule and
+proves the persisted timer creates exactly one draft PO and one line, with the
+rule metadata's `demand_id` resolving to that PO. Purchasing exposes only a
+narrow crate-internal replenishment service operation: it requires an active
+company-compatible supplier relation, reuses the normal vendor/product/UOM and
+header/line relation validation, honors reconstruction and inventory-close
+write fences, and records the scheduler identity as the PO/line audit actor.
 
 ## Runtime validation required
 
@@ -51,8 +60,12 @@ spacetime publish <db> --clear-database -y --module-path spacetimedb
 spacetime call <db> run_all_inventory_tests
 ```
 
-Do not mark this slice `ACCEPTED` until that runtime proof passes — this is also the first real exercise of `run_all_inventory_tests` and the browser proofs across COV-06h through COV-06n, none of which have been run against a live stack yet.
+Do not mark this slice `ACCEPTED` until the native suite and the COV-06n browser
+spec pass against a freshly published current-head stack.
 
 ## Next bounded work
 
-COV-06o: after the contracts release above, add the UI action to schedule/cancel a rule's auto-run and the typed workflow/browser proof.
+Run the persisted scheduler and browser proof on the released contract head.
+COV-06's receiving, backorder, cycle-count, lot, and serial operator proofs
+remain distributed across their focused specs rather than one consolidated
+browser scenario.

@@ -1,6 +1,7 @@
 //! Helpdesk domain test suite — invoke via `run_helpdesk_*_test` reducers.
 //! First-ever test coverage for this module (previously zero, matching
 //! AI/Analytics/IoT's state before their own first suites).
+pub mod related_record_test;
 pub mod relational_integrity_test;
 
 use spacetimedb::ReducerContext;
@@ -11,10 +12,14 @@ pub fn run_helpdesk_relational_integrity_test(ctx: &ReducerContext) -> Result<()
         .map_err(|e| format!("csv_import_rejects_bad_fks: {e}"))?;
     relational_integrity_test::test_cross_team_assignment_rejected(ctx)
         .map_err(|e| format!("cross_team_assignment_rejected: {e}"))?;
+    relational_integrity_test::test_ticket_lifecycle_is_exact_and_replay_safe(ctx)
+        .map_err(|e| format!("ticket_lifecycle_exact_effect: {e}"))?;
     relational_integrity_test::test_sla_reached_is_system_only(ctx)
         .map_err(|e| format!("sla_reached_is_system_only: {e}"))?;
     relational_integrity_test::test_cross_org_ticket_rejected(ctx)
         .map_err(|e| format!("cross_org_ticket_rejected: {e}"))?;
+    related_record_test::test_related_record_scope_and_clear(ctx)
+        .map_err(|e| format!("related_record_scope_and_clear: {e}"))?;
     Ok(())
 }
 

@@ -9,8 +9,8 @@ use crate::accounting::fiscal_periods::ensure_accounting_period_open_for_date;
 use crate::accounting::idempotency::{record_result, replayed_result};
 use crate::accounting::journal_entries::{
     account_move, account_move_line, insert_draft_account_move_line,
-    is_receivable_or_payable_line_type, reconcile_payment_with_invoice, AccountMove,
-    AccountMoveLine, AddAccountMoveLineParams,
+    is_receivable_or_payable_line_type, reconcile_payment_with_invoice_impl,
+    require_invoice_not_bank_payment, AccountMove, AccountMoveLine, AddAccountMoveLineParams,
 };
 use crate::accounting::relations::{
     require_active_account, require_active_currency_id, require_active_journal,
@@ -19,6 +19,7 @@ use crate::accounting::relations::{
 use crate::accounting::tax_management::account_tax;
 use crate::core::organization::{company, require_company_in_organization};
 use crate::helpers::{check_permission, next_doc_number, write_audit_log_v2, AuditLogParams};
+use crate::sales::sales_core::{sale_order, SaleOrder};
 use crate::types::{
     AccountMoveState, AccountTypeInternal, MoveType, PartnerType, PaymentState, PaymentType,
     TaxAmountType, TaxTypeUse,
@@ -41,14 +42,17 @@ use crate::workflow::approval_gate::{
     index(accessor = payment_by_partner, btree(columns = [partner_id])),
     index(accessor = payment_by_state, btree(columns = [state]))
 )]
+#[derive(Clone)]
 pub struct AccountPayment {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
-    pub name: Option<String>,      // "PAY-0001" — set on post
-    pub move_id: Option<u64>,      // Linked AccountMove (set on post)
+    pub name: Option<String>, // "PAY-0001" — set on post
+    pub move_id: Option<u64>, // Linked AccountMove (set on post)
+    /// Exact posted reversal created by `cancel_payment`; at most one per payment.
+    pub reversal_move_id: Option<u64>,
     pub payment_type: PaymentType, // InBound (customer pays) | OutBound (we pay supplier)
     pub partner_type: PartnerType, // Customer | Supplier
     pub partner_id: u64,
@@ -259,13 +263,17 @@ pub(crate) fn insert_balanced_payment_lines_and_post(
     let partner_id = payment.partner_id;
     let payment_id = payment.id;
     let liquidity_account_id = resolve_payment_liquidity_account(ctx, payment)?;
-    let preferred_clearing = preferred_clearing_account_for_partner(
-        ctx,
-        payment.organization_id,
-        payment.company_id,
-        partner_id,
-        &payment_type,
-    );
+    let preferred_clearing =
+        crate::accounting::bank_reconciliation::bank_payment_clearing_account(ctx, payment)?
+            .or_else(|| {
+                preferred_clearing_account_for_partner(
+                    ctx,
+                    payment.organization_id,
+                    payment.company_id,
+                    partner_id,
+                    &payment_type,
+                )
+            });
     let (clearing_account_id, clearing_label) = resolve_payment_clearing_account(
         ctx,
         payment.organization_id,
@@ -509,6 +517,7 @@ pub fn create_payment(
         company_id: params.company_id,
         name: None,
         move_id: None,
+        reversal_move_id: None,
         payment_type: params.payment_type,
         partner_type: params.partner_type,
         partner_id: params.partner_id,
@@ -597,6 +606,7 @@ pub fn post_payment_impl(
         payment.partner_id,
         "payment partner",
     )?;
+    crate::accounting::bank_reconciliation::bank_payment_clearing_account(ctx, &payment)?;
 
     if !skip_approval_check {
         if matches!(
@@ -658,6 +668,7 @@ pub fn post_payment_impl(
                 metadata: None,
             },
         );
+        super::bank_settlement_lifecycle::payment_posted(ctx, payment_id)?;
         return Ok(());
     }
 
@@ -767,10 +778,396 @@ pub fn post_payment_impl(
             metadata: None,
         },
     );
+    super::bank_settlement_lifecycle::payment_posted(ctx, payment_id)?;
     Ok(())
 }
 
-/// Cancel a posted payment. Sets state to Reversed.
+fn reverse_posted_payment_move(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+    original_move_id: u64,
+) -> Result<u64, String> {
+    reverse_posted_payment_move_at(ctx, payment, original_move_id, ctx.timestamp)
+}
+
+pub(super) fn reverse_posted_payment_move_at(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+    original_move_id: u64,
+    date: Timestamp,
+) -> Result<u64, String> {
+    let original = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&original_move_id)
+        .ok_or("Payment journal move not found")?;
+    if original.organization_id != payment.organization_id
+        || original.company_id != payment.company_id
+        || original.state != AccountMoveState::Posted
+    {
+        return Err("Payment journal move is not posted in payment scope".to_string());
+    }
+    let original_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&original_move_id)
+        .collect();
+    if original_lines.len() < 2 {
+        return Err("Payment journal move must have at least two lines".to_string());
+    }
+    let debit: f64 = original_lines.iter().map(|line| line.debit).sum();
+    let credit: f64 = original_lines.iter().map(|line| line.credit).sum();
+    if (debit - credit).abs() > 0.01 {
+        return Err("Payment journal move is not balanced".to_string());
+    }
+
+    ensure_accounting_period_open_for_date(ctx, payment.company_id, date)?;
+    let reversal = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        name: next_doc_number(ctx, payment.organization_id, "PAYREV"),
+        ref_: Some(format!("Reversal of payment move {original_move_id}")),
+        state: AccountMoveState::Draft,
+        date,
+        invoice_origin: Some(format!("account-payment:{}", payment.id)),
+        posted_before: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some(
+            serde_json::json!({
+                "reverses_payment_move_id": original_move_id,
+                "account_payment_id": payment.id,
+            })
+            .to_string(),
+        ),
+        ..original
+    });
+    for (index, line) in original_lines.into_iter().enumerate() {
+        let inserted = insert_draft_account_move_line(
+            ctx,
+            &reversal,
+            payment_line_params(
+                line.account_id,
+                format!("Reversal: {}", line.name),
+                line.credit,
+                line.debit,
+                (index + 1) as u32,
+                payment.partner_id,
+                payment.id,
+            ),
+        )?;
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            parent_state: AccountMoveState::Posted,
+            amount_residual: 0.0,
+            amount_residual_currency: 0.0,
+            is_matching: true,
+            ..inserted
+        });
+    }
+    let reversal_id = reversal.id;
+    ctx.db.account_move().id().update(AccountMove {
+        state: AccountMoveState::Posted,
+        posted_before: true,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..reversal
+    });
+    Ok(reversal_id)
+}
+
+fn unwind_payment_allocations(
+    ctx: &ReducerContext,
+    payment: &AccountPayment,
+) -> Result<Vec<u64>, String> {
+    if payment.state != PaymentState::Paid {
+        return Err("Only posted payments can have allocations unwound".to_string());
+    }
+    let payment_move_id = payment
+        .move_id
+        .ok_or("Posted payment is missing linked journal move")?;
+    let payment_move = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&payment_move_id)
+        .ok_or("Payment journal move not found")?;
+    if payment_move.organization_id != payment.organization_id
+        || payment_move.company_id != payment.company_id
+        || payment_move.state != AccountMoveState::Posted
+    {
+        return Err("Payment journal move is not posted in payment scope".to_string());
+    }
+
+    let mut invoice_ids = payment.reconciled_invoice_ids.clone();
+    invoice_ids.extend(payment.reconciled_bill_ids.iter().copied());
+    invoice_ids.sort_unstable();
+    if invoice_ids.is_empty() {
+        return Err("Payment has no reconciled allocations to unwind".to_string());
+    }
+    if invoice_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err("Payment allocation identity is duplicated".to_string());
+    }
+
+    ensure_accounting_period_open_for_date(ctx, payment.company_id, ctx.timestamp)?;
+
+    // Validate the complete effect set before the first mutation. The current
+    // matching model stores one owner on each line, so an allocation can only
+    // be unwound when every changed invoice line is still owned by this payment.
+    let mut plans = Vec::with_capacity(invoice_ids.len());
+    for invoice_id in &invoice_ids {
+        let invoice = ctx
+            .db
+            .account_move()
+            .id()
+            .find(invoice_id)
+            .ok_or_else(|| format!("Reconciled invoice/bill {invoice_id} not found"))?;
+        if invoice.organization_id != payment.organization_id
+            || invoice.company_id != payment.company_id
+        {
+            return Err(format!(
+                "Reconciled invoice/bill {invoice_id} does not match payment scope"
+            ));
+        }
+        if invoice.state != AccountMoveState::Posted {
+            return Err(format!(
+                "Reconciled invoice/bill {invoice_id} is not posted"
+            ));
+        }
+        let matching_number = format!("MATCH-{payment_move_id}-{invoice_id}");
+        let lines: Vec<_> = ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(invoice_id)
+            .filter(|line| {
+                is_receivable_or_payable_line_type(line.account_internal_type.as_deref())
+            })
+            .collect();
+        if lines.is_empty() {
+            return Err(format!(
+                "Reconciled invoice/bill {invoice_id} has no receivable/payable lines"
+            ));
+        }
+        if lines.iter().any(|line| {
+            line.matching_number
+                .as_deref()
+                .is_some_and(|owner| owner != matching_number)
+        }) {
+            return Err(format!(
+                "Reconciled invoice/bill {invoice_id} has allocations owned by another payment"
+            ));
+        }
+        let applied: f64 = lines
+            .iter()
+            .filter(|line| line.matching_number.as_deref() == Some(matching_number.as_str()))
+            .map(|line| (line.balance.abs() - line.amount_residual.abs()).max(0.0))
+            .sum();
+        if applied <= 0.01 {
+            return Err(format!(
+                "Reconciled invoice/bill {invoice_id} has no effect owned by this payment"
+            ));
+        }
+        plans.push((invoice, lines, matching_number, applied));
+    }
+
+    let accepted_matching_numbers: Vec<_> = plans
+        .iter()
+        .map(|(_, _, matching_number, _)| matching_number.as_str())
+        .collect();
+    let payment_lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .filter(|line| is_receivable_or_payable_line_type(line.account_internal_type.as_deref()))
+        .collect();
+    if payment_lines.is_empty()
+        || payment_lines.iter().any(|line| {
+            line.matching_number
+                .as_deref()
+                .is_some_and(|owner| !accepted_matching_numbers.contains(&owner))
+        })
+    {
+        return Err("Payment clearing lines do not match its recorded allocations".to_string());
+    }
+
+    for (invoice, lines, matching_number, applied) in plans {
+        for line in lines
+            .iter()
+            .filter(|line| line.matching_number.as_deref() == Some(matching_number.as_str()))
+        {
+            ctx.db.account_move_line().id().update(AccountMoveLine {
+                amount_residual: line.balance,
+                amount_residual_currency: line.balance,
+                matching_number: None,
+                matching_label: None,
+                is_matching: false,
+                write_uid: Some(ctx.sender()),
+                write_date: Some(ctx.timestamp),
+                ..line.clone()
+            });
+        }
+        let restored_residual: f64 = ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(&invoice.id)
+            .filter(|line| {
+                is_receivable_or_payable_line_type(line.account_internal_type.as_deref())
+            })
+            .map(|line| line.amount_residual.abs())
+            .sum();
+        let restored_state = if restored_residual + 0.01 >= invoice.amount_total.abs() {
+            PaymentState::NotPaid
+        } else {
+            PaymentState::Partial
+        };
+        if let Some(sale_order_id) = invoice.sale_order_id {
+            if let Some(order) = ctx.db.sale_order().id().find(&sale_order_id) {
+                if order.organization_id != payment.organization_id
+                    || order.company_id != payment.company_id
+                {
+                    return Err("Invoice sale order does not match payment scope".to_string());
+                }
+                ctx.db.sale_order().id().update(SaleOrder {
+                    amount_paid: (order.amount_paid - applied).max(0.0),
+                    amount_residual: (order.amount_residual + applied).min(order.amount_total),
+                    write_uid: ctx.sender(),
+                    write_date: ctx.timestamp,
+                    ..order
+                });
+            }
+        }
+        ctx.db.account_move().id().update(AccountMove {
+            amount_residual: restored_residual,
+            amount_residual_signed: restored_residual,
+            payment_state: restored_state,
+            invoice_has_outstanding: restored_residual > 0.01,
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            ..invoice
+        });
+        write_audit_log_v2(
+            ctx,
+            payment.organization_id,
+            AuditLogParams {
+                company_id: Some(payment.company_id),
+                table_name: "account_move",
+                record_id: invoice.id,
+                action: "UNRECONCILE",
+                old_values: Some(
+                    serde_json::json!({
+                        "payment_move_id": payment_move_id,
+                        "matching_number": matching_number,
+                    })
+                    .to_string(),
+                ),
+                new_values: Some(
+                    serde_json::json!({ "amount_residual": restored_residual }).to_string(),
+                ),
+                changed_fields: vec!["payment_state".to_string(), "amount_residual".to_string()],
+                metadata: None,
+            },
+        );
+    }
+
+    for line in payment_lines {
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            amount_residual: line.balance.abs(),
+            amount_residual_currency: line.balance.abs(),
+            matching_number: None,
+            matching_label: None,
+            is_matching: false,
+            write_uid: Some(ctx.sender()),
+            write_date: Some(ctx.timestamp),
+            ..line
+        });
+    }
+    let restored_payment_residual: f64 = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .filter(|line| is_receivable_or_payable_line_type(line.account_internal_type.as_deref()))
+        .map(|line| line.amount_residual.abs())
+        .sum();
+    ctx.db.account_move().id().update(AccountMove {
+        amount_residual: restored_payment_residual,
+        amount_residual_signed: restored_payment_residual,
+        payment_state: PaymentState::Paid,
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        ..payment_move
+    });
+    let current_payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment.id)
+        .ok_or("Payment disappeared during allocation unwind")?;
+    ctx.db.account_payment().id().update(AccountPayment {
+        reconciled_invoice_ids: vec![],
+        reconciled_bill_ids: vec![],
+        ..current_payment
+    });
+    write_audit_log_v2(
+        ctx,
+        payment.organization_id,
+        AuditLogParams {
+            company_id: Some(payment.company_id),
+            table_name: "account_payment",
+            record_id: payment.id,
+            action: "UNREGISTER_FROM_INVOICES",
+            old_values: Some(
+                serde_json::json!({
+                    "reconciled_invoice_ids": payment.reconciled_invoice_ids,
+                    "reconciled_bill_ids": payment.reconciled_bill_ids,
+                })
+                .to_string(),
+            ),
+            new_values: Some(serde_json::json!({ "invoice_ids": invoice_ids }).to_string()),
+            changed_fields: vec![
+                "reconciled_invoice_ids".to_string(),
+                "reconciled_bill_ids".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+    Ok(invoice_ids)
+}
+
+/// Explicitly unwind every invoice/bill allocation owned by a posted payment.
+/// The reducer is all-or-nothing and refuses lines subsequently matched by a
+/// different payment rather than overwriting another allocation.
+#[reducer]
+pub fn unregister_payment_allocations(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment_id: u64,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "payment", "reconcile")?;
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("Payment not found")?;
+    if payment.organization_id != organization_id {
+        return Err("Payment belongs to a different organization".to_string());
+    }
+    crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
+        ctx,
+        organization_id,
+        payment_id,
+    )?;
+    unwind_payment_allocations(ctx, &payment)?;
+    Ok(())
+}
+
+/// Cancel a payment. Posted payments receive one exact, posted reversing move.
 #[reducer]
 pub fn cancel_payment(
     ctx: &ReducerContext,
@@ -787,12 +1184,34 @@ pub fn cancel_payment(
     if payment.organization_id != organization_id {
         return Err("Payment belongs to a different organization".to_string());
     }
+    crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
+        ctx,
+        organization_id,
+        payment_id,
+    )?;
     if payment.state == PaymentState::Reversed {
         return Err("Payment is already cancelled".to_string());
     }
+    if !payment.reconciled_invoice_ids.is_empty() || !payment.reconciled_bill_ids.is_empty() {
+        unwind_payment_allocations(ctx, &payment)?;
+    }
+    let payment = ctx
+        .db
+        .account_payment()
+        .id()
+        .find(&payment_id)
+        .ok_or("Payment disappeared after allocation unwind")?;
+    let reversal_move_id = match payment.move_id {
+        Some(move_id) if payment.state == PaymentState::Paid => {
+            Some(reverse_posted_payment_move(ctx, &payment, move_id)?)
+        }
+        Some(_) => return Err("Only posted payment moves can be reversed".to_string()),
+        None => None,
+    };
     let old_state = format!("{:?}", payment.state);
     ctx.db.account_payment().id().update(AccountPayment {
         state: PaymentState::Reversed,
+        reversal_move_id,
         ..payment
     });
     write_audit_log_v2(
@@ -804,7 +1223,14 @@ pub fn cancel_payment(
             record_id: payment_id,
             action: "CANCEL",
             old_values: Some(serde_json::json!({ "state": old_state }).to_string()),
-            new_values: Some(serde_json::json!({ "state": "Reversed" }).to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "state": "Reversed",
+                    "reversal_move_id": reversal_move_id,
+                    "reverses_move_id": payment.move_id,
+                })
+                .to_string(),
+            ),
             changed_fields: vec!["state".to_string()],
             metadata: None,
         },
@@ -816,6 +1242,41 @@ pub fn cancel_payment(
 /// Appends invoice IDs to reconciled_invoice_ids or reconciled_bill_ids.
 #[reducer]
 pub fn register_payment_on_invoice(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment_id: u64,
+    invoice_ids: Vec<u64>,
+    is_bill: bool,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "payment", "reconcile")?;
+    crate::accounting::bank_reconciliation::require_payment_not_bank_linked(
+        ctx,
+        organization_id,
+        payment_id,
+    )?;
+    register_payment_on_invoice_impl(ctx, organization_id, payment_id, invoice_ids, is_bill)
+}
+
+/// Only the bank workflow can allocate its posted payment, after rechecking the
+/// immutable receipt and the entire original statement selection.
+pub(super) fn register_bank_settlement_on_invoices(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    payment_id: u64,
+    invoice_ids: Vec<u64>,
+    is_bill: bool,
+) -> Result<(), String> {
+    crate::accounting::bank_reconciliation::validate_bank_settlement_registration(
+        ctx,
+        organization_id,
+        payment_id,
+        &invoice_ids,
+        is_bill,
+    )?;
+    register_payment_on_invoice_impl(ctx, organization_id, payment_id, invoice_ids, is_bill)
+}
+
+fn register_payment_on_invoice_impl(
     ctx: &ReducerContext,
     organization_id: u64,
     payment_id: u64,
@@ -842,6 +1303,7 @@ pub fn register_payment_on_invoice(
 
     // Company/org guard before mutating residuals or reconciled_* lists.
     for inv_id in &invoice_ids {
+        require_invoice_not_bank_payment(ctx, organization_id, *inv_id)?;
         let invoice = ctx
             .db
             .account_move()
@@ -885,7 +1347,7 @@ pub fn register_payment_on_invoice(
 
     // Settle residual in the same txn — register without reconcile left AR open.
     for inv_id in &invoice_ids {
-        reconcile_payment_with_invoice(ctx, organization_id, payment_move_id, *inv_id)?;
+        reconcile_payment_with_invoice_impl(ctx, organization_id, payment_move_id, *inv_id)?;
     }
 
     write_audit_log_v2(

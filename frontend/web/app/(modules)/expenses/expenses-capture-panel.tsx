@@ -13,6 +13,13 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { Button } from "@lumiere/ui"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { expenseRateRowsToSelectOptions } from "@/lib/form-lookup"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 import {
@@ -313,35 +320,33 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-xs space-y-1">
           <span>{t("expenses.forms.newExpense.fields.employeeId")}</span>
-          <select
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-            data-testid="expenses-capture-employee"
-          >
-            <option value="">{t("expenses.forms.newExpense.fields.employeePlaceholder")}</option>
-            {employees.map((e) => (
-              <option key={String(e.id)} value={String(e.id)}>
-                {String(e.name ?? e.id)}
-              </option>
-            ))}
-          </select>
+          <Select value={employeeId} onValueChange={setEmployeeId}>
+            <SelectTrigger data-testid="expenses-capture-employee">
+              <SelectValue placeholder={t("expenses.forms.newExpense.fields.employeePlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {employees.map((e) => (
+                <SelectItem key={String(e.id)} value={String(e.id)}>
+                  {String(e.name ?? e.id)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <label className="text-xs space-y-1">
           <span>{t("expenses.forms.newExpense.fields.pricelistId")}</span>
-          <select
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={pricelistId}
-            onChange={(e) => setPricelistId(e.target.value)}
-            data-testid="expenses-capture-pricelist"
-          >
-            <option value="">{t("expenses.forms.newExpense.fields.pricelistPlaceholder")}</option>
-            {pricelists.map((p) => (
-              <option key={String(p.id)} value={String(p.id)}>
-                {String(p.name ?? p.id)}
-              </option>
-            ))}
-          </select>
+          <Select value={pricelistId} onValueChange={setPricelistId}>
+            <SelectTrigger data-testid="expenses-capture-pricelist">
+              <SelectValue placeholder={t("expenses.forms.newExpense.fields.pricelistPlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {pricelists.map((p) => (
+                <SelectItem key={String(p.id)} value={String(p.id)}>
+                  {String(p.name ?? p.id)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <label className="text-xs space-y-1 sm:col-span-2">
           <span>{t("expenses.forms.newExpense.fields.name")}</span>
@@ -373,32 +378,38 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
         </label>
         <label className="text-xs space-y-1">
           <span>{t("expenses.forms.newExpense.fields.lineKind")}</span>
-          <select
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+          <Select
             value={lineKind}
-            onChange={(e) => setLineKind(e.target.value as ExpenseCapturePayload["lineKind"])}
+            onValueChange={(v) => setLineKind(v as ExpenseCapturePayload["lineKind"])}
           >
-            <option value="Standard">{t("expenses.forms.newExpense.fields.lineKindStandard")}</option>
-            <option value="Mileage">{t("expenses.forms.newExpense.fields.lineKindMileage")}</option>
-            <option value="PerDiem">{t("expenses.forms.newExpense.fields.lineKindPerDiem")}</option>
-          </select>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Standard">{t("expenses.forms.newExpense.fields.lineKindStandard")}</SelectItem>
+              <SelectItem value="Mileage">{t("expenses.forms.newExpense.fields.lineKindMileage")}</SelectItem>
+              <SelectItem value="PerDiem">{t("expenses.forms.newExpense.fields.lineKindPerDiem")}</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <label className="text-xs space-y-1">
           <span>{t("expenses.forms.newExpense.fields.paymentMode")}</span>
-          <select
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
+          <Select
             value={paymentMode}
-            onChange={(e) =>
-              setPaymentMode(e.target.value as "OutOfPocket" | "CorporateCard")
-            }
+            onValueChange={(v) => setPaymentMode(v as "OutOfPocket" | "CorporateCard")}
           >
-            <option value="OutOfPocket">
-              {t("expenses.forms.newExpense.fields.paymentModeOutOfPocket")}
-            </option>
-            <option value="CorporateCard">
-              {t("expenses.forms.newExpense.fields.paymentModeCorporateCard")}
-            </option>
-          </select>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="OutOfPocket">
+                {t("expenses.forms.newExpense.fields.paymentModeOutOfPocket")}
+              </SelectItem>
+              <SelectItem value="CorporateCard">
+                {t("expenses.forms.newExpense.fields.paymentModeCorporateCard")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         {lineKind === "Mileage" ? (
           <>
@@ -414,23 +425,24 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
             </label>
             <label className="text-xs space-y-1">
               <span>{t("expenses.forms.newExpense.fields.mileageRateId")}</span>
-              <select
-                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                value={mileageRateId}
-                onChange={(e) => setMileageRateId(e.target.value)}
-                data-testid="expenses-capture-mileage-rate"
-              >
-                <option value="">
-                  {mileageRateOptions.length === 0
-                    ? t("expenses.forms.newExpense.fields.noMileageRates")
-                    : t("expenses.forms.newExpense.fields.rateIdPlaceholder")}
-                </option>
-                {mileageRateOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              <Select value={mileageRateId} onValueChange={setMileageRateId}>
+                <SelectTrigger data-testid="expenses-capture-mileage-rate">
+                  <SelectValue
+                    placeholder={
+                      mileageRateOptions.length === 0
+                        ? t("expenses.forms.newExpense.fields.noMileageRates")
+                        : t("expenses.forms.newExpense.fields.rateIdPlaceholder")
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {mileageRateOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
           </>
         ) : null}
@@ -448,23 +460,24 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
             </label>
             <label className="text-xs space-y-1">
               <span>{t("expenses.forms.newExpense.fields.perDiemRateId")}</span>
-              <select
-                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                value={perDiemRateId}
-                onChange={(e) => setPerDiemRateId(e.target.value)}
-                data-testid="expenses-capture-per-diem-rate"
-              >
-                <option value="">
-                  {perDiemRateOptions.length === 0
-                    ? t("expenses.forms.newExpense.fields.noPerDiemRates")
-                    : t("expenses.forms.newExpense.fields.rateIdPlaceholder")}
-                </option>
-                {perDiemRateOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              <Select value={perDiemRateId} onValueChange={setPerDiemRateId}>
+                <SelectTrigger data-testid="expenses-capture-per-diem-rate">
+                  <SelectValue
+                    placeholder={
+                      perDiemRateOptions.length === 0
+                        ? t("expenses.forms.newExpense.fields.noPerDiemRates")
+                        : t("expenses.forms.newExpense.fields.rateIdPlaceholder")
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {perDiemRateOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
           </>
         ) : null}

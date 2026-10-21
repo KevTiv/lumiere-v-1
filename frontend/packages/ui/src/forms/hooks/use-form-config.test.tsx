@@ -1,6 +1,6 @@
 import { renderHook, act, waitFor } from "@testing-library/react"
 import { describe, it, expect, vi } from "vitest"
-import { useFormConfiguration } from "./use-form-config"
+import { organizationUsersToFieldOptions, useFormConfiguration } from "./use-form-config"
 
 vi.mock("@lumiere/erp-session", () => ({
   useErpSession: () => ({ identity: null, connected: false, organizationId: undefined }),
@@ -8,6 +8,7 @@ vi.mock("@lumiere/erp-session", () => ({
 
 vi.mock("@lumiere/stdb/browser-http", () => ({
   stdbBrowserQuery: vi.fn().mockResolvedValue([]),
+  stdbBrowserQueryOrganizationUsers: vi.fn().mockResolvedValue([]),
 }))
 
 vi.mock("@lumiere/stdb/client-ui-bridge", () => ({
@@ -142,6 +143,36 @@ describe("useFormConfiguration", () => {
     expect(result.current.config).toBeNull()
   })
 
+  it("resolves to no runtime overlay when the query proves no row and no registry default exists", async () => {
+    const { result } = renderHook(() =>
+      useFormConfiguration({ moduleId: "crm", formId: "edit-contact", organizationId: 1 })
+    )
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.error).toBeNull()
+    expect(result.current.config).toBeNull()
+    expect(result.current.dbConfigurationId).toBe(0)
+  })
+
+  it("still reports a failed query for a form without a registry default", async () => {
+    const { stdbBrowserQuery } = await import("@lumiere/stdb/browser-http")
+    vi.mocked(stdbBrowserQuery).mockRejectedValueOnce(new Error("query failed"))
+
+    const { result } = renderHook(() =>
+      useFormConfiguration({ moduleId: "crm", formId: "edit-contact", organizationId: 1 })
+    )
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false)
+    })
+
+    expect(result.current.error).toBeTruthy()
+    expect(result.current.config).toBeNull()
+  })
+
   it("should parse field options correctly", async () => {
     const { result } = renderHook(() => useFormConfiguration(defaultOptions))
 
@@ -174,5 +205,23 @@ describe("useFormConfiguration", () => {
       expect(result.current.isLoading).toBe(false)
     })
     expect(result.current.config).not.toBeNull()
+  })
+})
+
+describe("organizationUsersToFieldOptions", () => {
+  it("uses canonical identities, server labels, deduplication, and deterministic ordering", () => {
+    expect(
+      organizationUsersToFieldOptions([
+        { identity: "0xBBBB", name: "Zoe" },
+        { identity: "", identityHex: "aaaa", name: "", email: "amy@example.com" },
+        { user_identity: "0xBBBB", name: "Duplicate" },
+        { identity: "cccccccccccc", name: "" },
+        { name: "Missing identity" },
+      ]),
+    ).toEqual([
+      { value: "aaaa", label: "amy@example.com" },
+      { value: "cccccccccccc", label: "cccccccc…" },
+      { value: "bbbb", label: "Zoe" },
+    ])
   })
 })

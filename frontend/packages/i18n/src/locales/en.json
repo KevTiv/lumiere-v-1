@@ -1,10 +1,180 @@
 {
+  "moduleInsights": {
+    "overview": "Overview",
+    "insights": "Insights",
+    "actions": "Action queues",
+    "sections": "Overview sections",
+    "currency": "Analysis currency",
+    "unknownCurrency": "Currency details unavailable",
+    "period": "Analysis period",
+    "lastDays": "Last {{count}} days",
+    "comparedWith": "compared with",
+    "utc": "UTC calendar days; today is still in progress.",
+    "currentHint": "Current state, independent of the period selector.",
+    "previous": "Previous period",
+    "noBaseline": "No previous-period baseline",
+    "vsPrevious": "versus previous period",
+    "records": "Records",
+    "browseRecords": "Browse records",
+    "moreQueues": "More operational queues",
+    "forecastHint": "Forecast snapshots use the selected analysis period and the company's canonical forecast scope. Changing the analysis currency does not convert or narrow the snapshot.",
+    "month": "Month",
+    "state": "State",
+    "zero": "All amounts or counts in this selection are zero.",
+    "viewData": "View chart data",
+    "distributionHint": "Current record counts by state, independent of the period selector. Company scope and any currency selection still apply.",
+    "queueHint": "Current work in the selected scope. Choose a queue to review its exact records; changing the analysis period does not change the queue.",
+    "firstFive": "Preview: up to five records, ordered by exact record ID. Browse the workspace for the complete list.",
+    "queueEmpty": "No records in this selection.",
+    "recent": "Recent records",
+    "recentHint": "Up to five latest records by creation or order date, including all states in this scope. Not limited to the analysis period.",
+    "source": {
+      "loading": "Loading this insight…",
+      "denied": "You do not have access to this insight's source.",
+      "partial": "This insight needs complete, readable source fields. No partial totals are shown.",
+      "error": "This insight's source could not be loaded. Cached figures are hidden."
+    },
+    "states": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "toapprove": "Awaiting approval",
+      "sale": "Confirmed",
+      "done": "Completed",
+      "cancelled": "Cancelled",
+      "open": "Open",
+      "won": "Won",
+      "lost": "Lost",
+      "overdue": "Past deadline",
+      "purchase": "Confirmed",
+      "late": "Late receipts",
+      "submitted": "Submitted",
+      "approved": "Approved",
+      "posted": "Posted",
+      "refused": "Refused",
+      "generated": "Generated",
+      "exported": "Exported",
+      "archived": "Archived"
+    },
+    "workspaces": {
+      "ops": "Operations",
+      "operations": "Operations",
+      "deliveries": "Deliveries",
+      "returns": "Returns",
+      "commission-plans": "Commission plans",
+      "leads": "Leads",
+      "activities": "Activities",
+      "contacts": "Contacts",
+      "requisitions": "Purchase agreements",
+      "vendors": "Vendors",
+      "lines": "Order lines",
+      "inbox": "Receipt and card inbox",
+      "expenses": "Expense lines",
+      "statements": "Financial statements",
+      "trial-balance": "Trial balance",
+      "scheduled-reports": "Scheduled reports",
+      "dashboards": "Saved dashboards"
+    },
+    "modules": {
+      "sales": {
+        "title": "Sales overview",
+        "description": "Understand order activity, then move the next customer decision forward.",
+        "currentValue": "Open quotation value",
+        "currentCount": "Open quotations",
+        "periodValue": "Confirmed order value",
+        "periodCount": "Confirmed orders placed",
+        "trend": "Confirmed order trends",
+        "measure": "Order value",
+        "distribution": "Orders by current state",
+        "trendHint": "Confirmed and completed order totals by order month, clipped to the selected period. Partial months are not extrapolated.",
+        "basis": "Order totals include tax. Quotations are draft or sent orders. Confirmed order value is grouped by order date and current state, not a historical booking snapshot, recognized revenue, invoiced AR or cash received. Currencies are never combined.",
+        "browse": "Browse orders in this currency"
+      },
+      "crm": {
+        "title": "CRM overview",
+        "description": "See the opportunity pipeline and keep the next relationship action in view.",
+        "currentValue": "Open pipeline value",
+        "currentCount": "Open opportunities",
+        "periodValue": "New opportunity value",
+        "periodCount": "New opportunities",
+        "trend": "Opportunity creation trends",
+        "measure": "Expected value",
+        "distribution": "Opportunity outcomes",
+        "trendHint": "Expected value of opportunities created in the selected period that are currently open or won. Lost opportunities are excluded; partial months are not extrapolated.",
+        "basis": "Pipeline is the current unweighted expected value, not committed sales or a historical pipeline snapshot. Only opportunities explicitly assigned to this company and currency are included. Organization-level unassigned opportunities are excluded. Currencies are never combined.",
+        "browse": "Browse opportunities in this currency"
+      },
+      "purchasing": {
+        "title": "Purchasing overview",
+        "description": "See purchasing commitments and focus on approvals and late receipts.",
+        "currentValue": "Open confirmed PO value",
+        "currentCount": "Open confirmed POs",
+        "periodValue": "Confirmed PO value placed",
+        "periodCount": "Confirmed POs placed",
+        "trend": "Purchase order trends",
+        "measure": "PO value",
+        "distribution": "Purchase orders by current state",
+        "trendHint": "Confirmed and completed PO totals by order month, clipped to the selected period. Partial months are not extrapolated.",
+        "basis": "PO totals include tax. Open confirmed POs are currently in the Purchase state. These are current document commitments grouped by order date, not billed expenses, cash paid or historical commitments. Late receipt queues exclude fully received orders; no on-time delivery rate is inferred. Currencies are never combined.",
+        "browse": "Browse POs in this currency"
+      },
+      "expenses": {
+        "title": "Expenses overview",
+        "description": "Understand expense report activity and keep employee claims moving.",
+        "currentValue": "Submitted report value",
+        "currentCount": "Submitted reports",
+        "periodValue": "Report value created",
+        "periodCount": "Reports created",
+        "trend": "Expense report trends",
+        "measure": "Report value",
+        "distribution": "Expense reports by current state",
+        "trendHint": "Submitted, approved, posted and completed report totals by creation month. Draft and refused reports are excluded; partial months are not extrapolated.",
+        "basis": "Figures use expense report headers only, not report headers plus expense lines. They describe current document states grouped by creation date, not approval-date history, ledger spend or reimbursement cash. Receipt/card review remains in the operations workspace. Currencies are never combined.",
+        "browse": "Browse reports in this currency"
+      },
+      "reports": {
+        "title": "Reporting overview",
+        "description": "See reporting activity and find drafts or prepared outputs to review.",
+        "currentValue": "Prepared outputs",
+        "currentCount": "Drafts to review",
+        "periodValue": "Reports created",
+        "periodCount": "Prepared reports created",
+        "trend": "Report creation trends",
+        "measure": "Reports created",
+        "distribution": "Reports by current state",
+        "trendHint": "Financial report header counts by creation month, not the reports' covered accounting periods. Partial months are not extrapolated.",
+        "basis": "Prepared outputs are currently generated or exported reports. Counts span currencies within the selected company; no financial amounts, different report periods, snapshots or ledger lines are added together. Exported is a recorded state, not proof of recipient delivery. Statements, trial balances, schedules and saved dashboards retain their existing workspaces.",
+        "browse": "Browse financial reports"
+      }
+    }
+  },
+  "workspaceShell": {
+    "preferences": "Workspace preferences",
+    "preferencesDescription": "Make this workspace comfortable for you.",
+    "appearance": "Appearance",
+    "contentWidth": "Content width",
+    "centered": "Centered",
+    "fullWidth": "Full width",
+    "navigation": "Navigation",
+    "expanded": "Expanded",
+    "compact": "Compact",
+    "comfortable": "Comfortable",
+    "density": "Table density",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "toggleNavigation": "Toggle navigation",
+    "closeNavigation": "Close navigation",
+    "expandNavigation": "Expand navigation",
+    "collapseNavigation": "Collapse navigation",
+    "search": "Search modules and records"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
     "edit": "Edit",
     "delete": "Delete",
     "confirm": "Confirm",
+    "confirmAction": "Confirm action",
     "loading": "Loading...",
     "search": "Search",
     "export": "Export",
@@ -12,6 +182,7 @@
     "settings": "Settings",
     "back": "Back",
     "next": "Next",
+    "actionCompleted": "{{action}} completed",
     "active": "Active",
     "inactive": "Inactive",
     "none": "None",
@@ -69,6 +240,12 @@
       "max": "Maximum value is {{max}}",
       "invalidFormat": "Invalid format",
       "invalidEmail": "Invalid email address"
+    },
+    "form": {
+      "unavailableSelection": "Unavailable selection: {{value}}"
+    },
+    "formPreview": {
+      "label": "Preview"
     },
     "formSubmit": {
       "busy": "Please wait — another request is still in progress.",
@@ -153,7 +330,100 @@
       "jobHistoryTitle": "Recent import jobs",
       "rollbackImport": "Rollback import",
       "rollbackComplete": "This import was rolled back.",
-      "rollbackFailed": "Rollback failed"
+      "rollbackFailed": "Rollback failed",
+      "abandonedDraftsTitle": "Abandoned journal import drafts",
+      "abandonedDraftsDescription": "These imports created journal entry headers but did not complete their line phase. Cleanup removes only unchanged, empty drafts; the server refuses entries with lines or accounting activity.",
+      "parentPhaseOnly": "Parent phase only",
+      "cleanupEmptyDrafts": "Clean up empty drafts",
+      "cleanupRefused": "Cleanup was refused: {{message}}",
+      "cleanupConfirmTitle": "Clean up empty imported drafts?",
+      "cleanupConfirmDescription": "Import job #{{jobId}} will be checked again before cleanup. Only its original empty draft journal entries can be removed. Any changed, posted, secured, paid, or non-empty entry stops the entire cleanup.",
+      "cleanupConfirmAction": "Clean up drafts"
+    },
+    "audit": "Audit",
+    "overview": "Overview",
+    "remove": "Remove",
+    "entityView": {
+      "board": "Board",
+      "emptyColumn": "No records",
+      "table": "Table",
+      "toggleLabel": "Switch view",
+      "boardSearch": "Search cards",
+      "list": "List",
+      "otherColumn": "Other",
+      "pivot": "Summary",
+      "pivotChartTitle": "{{measure}} by group",
+      "pivotColumnsBy": "Columns",
+      "pivotCount": "Count",
+      "pivotEmpty": "Not set",
+      "pivotGroupBy": "Group by",
+      "pivotMixedCurrencies": "These records use more than one currency ({{currencies}}). Totals add the amounts as they are, without converting.",
+      "pivotNoData": "No records to summarise",
+      "pivotNone": "None",
+      "pivotTotal": "Total",
+      "pivotExportCsv": "Export CSV",
+      "export": "Export",
+      "exportTruncated": "Export limited to the first {{max}} rows",
+      "exportDone": "Exported {{count}} rows",
+      "exportDone_one": "Exported {{count}} row",
+      "exportDone_other": "Exported {{count}} rows",
+      "firstTime": {
+        "readOnly": "You have read-only access. Ask an administrator to add the first record.",
+        "title": "No records yet"
+      },
+      "noResults": {
+        "clear": "Clear filters",
+        "description": "Try a different search or clear the filters.",
+        "title": "No matching records"
+      }
+    },
+    "retry": "Retry",
+    "recordsDenied": "You do not have access to these records.",
+    "recordsPartial": "Some records could not be refreshed. Displayed records may be out of date.",
+    "recordsUnavailable": "Records could not be loaded.",
+    "discardChanges": {
+      "navigate": "You have edits that were not saved. They will be lost if you leave this page.",
+      "description": "You have edits that were not saved. They will be lost if you close this form.",
+      "discard": "Discard",
+      "keep": "Keep editing",
+      "title": "Discard changes?"
+    },
+    "loadFailed": "Could not load this list",
+    "loadFailedHint": "Try again in a moment.",
+    "csvImportDialog": {
+      "checkResult": "Check results",
+      "correctedFileNotice": "Submit a corrected file as a new submission. Retrying this reference preserves its original result.",
+      "downloadTemplate": "Download template",
+      "errorsRestricted": "Your permissions do not include all row error details.",
+      "exactResult": "Results for this file submission",
+      "failure": "Import failed",
+      "fileLabel": "CSV file",
+      "spreadsheetFileLabel": "CSV or Excel file",
+      "historyEmpty": "No matching import jobs are visible yet. History refreshes while this dialog is open.",
+      "historyFailed": "Import history or row errors could not be loaded. Refresh to try again. The file may already have been imported; do not resubmit it to check.",
+      "historyLimit": "History includes up to 100 recent jobs and 500 recent row errors across the organization. Some errors may no longer be available here.",
+      "historyNotice": "The file was submitted. This organization's recent import history may include other users' imports. Select a job to review its results; jobs are not automatically linked to this file.",
+      "importAnotherFile": "Import another file",
+      "loadingErrors": "Loading row errors…",
+      "manualResultNotice": "This import uses manual history selection. Its results cannot yet be linked automatically to this file.",
+      "missingColumns": "Missing required columns: {{columns}}",
+      "noRows": "The file has a header but no data rows.",
+      "outcomeUnknown": "Import outcome not verified",
+      "outcomeUnknownDescription": "The server accepted {{file}}, but no exact import job was returned. Review import history before you retry.",
+      "recoveryNotice": "The server may already have imported this file. Retry keeps the same submission reference and cannot create a second import. Avoid starting a new submission until this result is known.",
+      "refreshHistory": "Refresh history",
+      "requestReference": "Submission reference: {{requestId}}",
+      "retrySameSubmission": "Retry same submission",
+      "rowCount": "{{count}} rows found",
+      "rowError": "Row {{row}}: {{message}}",
+      "scopeChanged": "The active organization or company changed. Return to the original scope to check this submission.",
+      "selectJob": "Import job",
+      "selectJobPrompt": "Select a job to review",
+      "submit": "Import",
+      "success": "Import submitted",
+      "successDescription": "{{count}} rows from {{file}} were sent. Rows the server rejects are listed in the import job history.",
+      "unknownColumns": "These columns are not used and will be ignored: {{columns}}",
+      "viewJob": "View import job"
     }
   },
   "navigation": {
@@ -197,7 +467,8 @@
     "aiAssistant": "AI Assistant",
     "noRole": "No Role",
     "signOut": "Sign out",
-    "erpSystem": "ERP System",
+    "signedIn": "Signed in",
+    "erpSystem": "Lumiere ERP",
     "companySwitcher": {
       "switchCompany": "Switch company",
       "current": "Active",
@@ -216,7 +487,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "erpSystem": "ERP System",
+    "erpSystem": "Lumiere ERP",
     "vsLastMonth": "vs last month",
     "timeRange": {
       "today": "Today",
@@ -649,13 +920,158 @@
     }
   },
   "accounting": {
+    "insights": {
+      "title": "Financial overview",
+      "description": "Understand the numbers, then act on what needs attention.",
+      "insightsTitle": "Accounting insights",
+      "queuesTitle": "Action queues",
+      "sections": "Accounting overview sections",
+      "currency": "Analysis currency",
+      "currencyUnavailable": "Currency unavailable",
+      "period": "Analysis period",
+      "lastDays": "Last {{count}} days",
+      "comparedWith": "compared with",
+      "utcHint": "UTC calendar days; today is still in progress.",
+      "openInvoices": "Invoice balances outstanding",
+      "openBills": "Bill balances outstanding",
+      "currentBalanceHint": "Current posted-document balance, independent of the period selector.",
+      "postedInvoices": "Posted invoice total",
+      "postedBills": "Posted bill total",
+      "previous": "Previous period",
+      "vsPrevious": "vs previous period",
+      "noBaseline": "No previous-period baseline",
+      "basisHint": "Invoice and bill totals include tax and exclude credit notes. These are document measures, not recognized revenue, expenses, net ledger balances or cash flow. Currencies are never combined.",
+      "invoices": "Invoices",
+      "bills": "Bills",
+      "planned": "Planned",
+      "actual": "Actual",
+      "trendTitle": "Posted invoice and bill trends",
+      "trendHint": "Monthly posted document amounts within the selected period. Partial months are not extrapolated.",
+      "agingTitle": "AR/AP aging",
+      "agingHint": "Current unpaid posted invoices and bills by UTC days overdue. Not due includes documents due today. Credit notes are excluded; this view is independent of the period selector.",
+      "current": "Not due",
+      "undated": "No due date",
+      "daysOverdue": "Days overdue",
+      "budgetTitle": "Budget versus actual",
+      "budgetHint": "Whole-budget canonical planned and actual amounts for confirmed, validated or completed budgets overlapping the selected period. Not prorated; draft and cancelled budgets are excluded.",
+      "budgetCurrencyHint": "Select the company currency ({{currency}}) to view budgets.",
+      "budgetChartLimit": "Chart and chart exports show the first eight eligible budgets in name order. The data table includes every eligible budget.",
+      "budget": "Budget",
+      "variance": "Actual minus planned",
+      "month": "Month",
+      "viewData": "View chart data",
+      "zeroAmounts": "All plotted amounts are zero for this view.",
+      "noBudgets": "No confirmed, validated or completed budgets overlap this period.",
+      "loading": "Loading financial data…",
+      "denied": "Access restricted. Financial figures and exports are hidden.",
+      "partial": "Complete financial data is unavailable. Figures and exports are hidden.",
+      "error": "Unable to load financial data. Cached figures and exports are hidden.",
+      "retry": "Retry",
+      "browse": "Browse accounting records",
+      "browseInvoices": "Browse invoices in this currency",
+      "browseBills": "Browse bills in this currency",
+      "browseBudgets": "Open budgets"
+    },
+    "overview": {
+      "overdue": "Overdue receivables",
+      "overdueHint": "Posted invoices with an outstanding balance",
+      "draftInvoices": "Draft customer invoices",
+      "draftInvoicesHint": "Review details before posting",
+      "draftBills": "Draft vendor bills",
+      "draftBillsHint": "Check supplier details and line items",
+      "bankLines": "Unreconciled bank lines",
+      "bankLinesHint": "Match statement activity to your records",
+      "unlinkedPayments": "Payments without invoice links",
+      "unlinkedPaymentsHint": "Posted payments with no linked invoices or bills",
+      "deadlines": "Tax deadlines",
+      "deadlinesHint": "Due in the next 30 days or overdue, including organization deadlines",
+      "periods": "Open accounting periods",
+      "periodsHint": "Select a period in the close checklist to check readiness",
+      "loading": "Loading…",
+      "denied": "Access restricted",
+      "partial": "Complete data unavailable",
+      "error": "Unable to load",
+      "retry": "Retry",
+      "receivables": "Accounts receivable",
+      "noReceivables": "No open receivables",
+      "receivablesHint": "Outstanding on posted customer invoices",
+      "payables": "Accounts payable",
+      "noPayables": "No open payables",
+      "payablesHint": "Outstanding on posted vendor bills",
+      "noOverdue": "No overdue invoices",
+      "overdueSummaryHint": "Follow up on unpaid balances",
+      "bankSummaryHint": "Review statement matches",
+      "workspace": "Company workspace",
+      "title": "Accounting",
+      "deskTitle": "Your accounting desk",
+      "currency": "Currency",
+      "currencyUnspecified": "Currency unspecified",
+      "activityTitle": "Document activity",
+      "activityHint": "Posted invoices and vendor bills over the past six months",
+      "activityPosted": "Posted documents",
+      "activityInvoices": "Customer invoices",
+      "activityBills": "Vendor bills",
+      "activityEmpty": "No posted documents in this period",
+      "activityAccessible": "Monthly posted document counts. Expand monthly counts below for exact values.",
+      "activityPeriodHint": "Calendar months in UTC; the current month includes documents dated through today.",
+      "activityTable": "View monthly counts",
+      "activityMonth": "Month",
+      "description": "Keep balances in view and the next task within reach.",
+      "newJournalEntry": "Journal entry",
+      "newBill": "New bill",
+      "newInvoice": "New invoice",
+      "attention": "Needs attention",
+      "attentionHint": "Choose a queue to review its records.",
+      "queueClear": "Nothing waiting in this queue",
+      "queueClearHint": "New items appear here as your accounting work progresses.",
+      "due": "Due",
+      "reviewRecord": "Review record",
+      "showAll": "Show all records",
+      "noOutstanding": "No outstanding balance",
+      "liveWorkspace": "Current company workspace",
+      "openWorkspace": "Open workspace",
+      "recent": "Recent invoices and bills",
+      "recentHint": "Open a document to review its details and next action.",
+      "noRecent": "Your invoices and bills will appear here.",
+      "glAccounts": "GL Accounts",
+      "totalAccounts": "Total accounts",
+      "openInvoices": "Open Invoices",
+      "unpaid": "Unpaid",
+      "outstanding": "${{amount}} outstanding",
+      "draftEntries": "Draft Entries",
+      "awaitingPosting": "Awaiting posting",
+      "cashFlow": "Cash Flow Position",
+      "budgetVsActual": "Budget vs Actual",
+      "unallocatedPayments": "Payments with funds to allocate",
+      "unallocatedPaymentsHint": "Remaining funds on posted payments, including partially allocated payments"
+    },
+    "manualInvoice": {
+      "invoiceTitle": "Invoice",
+      "billTitle": "Vendor bill"
+    },
+    "workspaces": {
+      "label": "Accounting workspaces",
+      "configuration": "Advanced / Configuration",
+      "overview": "Overview",
+      "receivables": "Receivables",
+      "payables": "Payables",
+      "taxSetup": "Taxes",
+      "groupAccounting": "Group accounting"
+    },
     "title": "Accounting",
     "csvImport": {
       "toolbarAccounts": "Import accounts (CSV)",
       "toolbarMoves": "Import entries (CSV)",
+      "toolbarOutstandingDocuments": "Import outstanding invoices and bills",
+      "toolbarHistoricalDocumentsForPaymentReplay": "Import originals for payment replay",
       "toolbarMoveLines": "Import lines (CSV)",
       "accountsTitle": "Import chart of accounts (CSV)",
       "movesTitle": "Import journal entries (CSV)",
+      "movesBundleDescription": "Upload one CSV with repeated journal references and balanced debit and credit lines. Use move_name for the journal entry name and line_name for each line label. Each reference creates one draft entry, then its lines are linked automatically; completion is reported only after both tracked import jobs succeed.",
+      "outstandingDocumentsTitle": "Import outstanding invoices and vendor bills",
+      "outstandingDocumentsDescription": "Use this at cutover to create draft customer invoices and vendor bills for the unpaid amount only. The original source total and paid-to-date amount are kept in audit metadata; historical payment transactions are not recreated by this import.",
+      "historicalDocumentsForPaymentReplayTitle": "Import original invoices and bills for payment replay",
+      "historicalDocumentsForPaymentReplayDescription": "Import and post each original invoice or bill at its full source total, then apply its paid-to-date amount from the posted payment_transaction_id shown in Payment Operations. Alpha accepts one aggregate historical payment transaction per document; one transaction may cover up to 500 rows. The payment must use source historical_accounting_import, have an operator-supplied positive numeric migration batch reference, occur no later than its documents, and equal its rows' paid-to-date total. If a bill needs approval, complete it and retry the exact same file. Reconcile every opening residual before accepting the cutover.",
       "moveLinesTitle": "Import journal entry lines (CSV)",
       "taxTitle": "Import tax rates (CSV)",
       "toolbarTaxRates": "Import taxes (CSV)",
@@ -669,10 +1085,13 @@
     "dashboard": {
       "accountsReceivable": "Accounts Receivable",
       "accountsPayable": "Accounts Payable",
+      "bankOpeningBalances": "Bank opening balances",
       "cashBalance": "Cash Balance",
       "revenueMTD": "Revenue MTD",
       "revenue": "Revenue",
       "invoicesIssued": "Invoices Issued",
+      "keyAccountOpeningBalances": "Key account opening balances",
+      "postedInvoiceTotal": "Posted invoice total",
       "paymentsReceived": "Payments Received"
     },
     "accounts": {
@@ -693,7 +1112,22 @@
         "deprecated": "Deprecated",
         "active": "Active"
       },
-      "coasTab": "Accounts"
+      "coasTab": "Accounts",
+      "rowActions": {
+        "deprecate": "Deprecate account",
+        "deprecateConfirm": "Deprecated accounts are marked as retired. You can reactivate the account later.",
+        "noCompany": "No company is available for this account.",
+        "reactivate": "Reactivate account",
+        "edit": "Edit account"
+      },
+      "edit": {
+        "deprecated": "Deprecated",
+        "internalType": "Account type",
+        "invalid": "Enter a code and a name.",
+        "note": "Note",
+        "reconcile": "Allow reconciliation",
+        "unchanged": "Nothing to change."
+      }
     },
     "glDrilldown": {
       "title": "{{code}} — {{name}}",
@@ -729,11 +1163,13 @@
         },
         "bankRecon": {
           "title": "Bank reconciliation reviewed",
-          "description": "{{count}} unreconciled bank statement line(s) remaining."
+          "description": "{{count}} unreconciled bank statement line(s) remaining.",
+          "scopeUnavailable": "Bank statement ownership cannot be resolved for this period."
         },
         "draftMoves": {
           "title": "Draft moves cleared",
-          "description": "{{count}} draft journal entry(ies) still open."
+          "description": "{{count}} draft journal entry(ies) still open.",
+          "scopeUnavailable": "Journal entry company or period ownership is unavailable."
         },
         "trialBalance": {
           "title": "Trial balance generated",
@@ -745,9 +1181,16 @@
         },
         "closePeriod": {
           "title": "Close accounting period",
-          "description": "{{count}} period(s) still open — close when ready."
+          "description": "{{count}} period(s) still open — close when ready.",
+          "selectPeriod": "Select an accounting period to review close readiness."
         }
-      }
+      },
+      "targetPeriod": {
+        "label": "Accounting period",
+        "placeholder": "Select a period to evaluate"
+      },
+      "exactPeriod": "Reviewing company {{company}} · {{from}} to {{to}}. Report evidence must cover these exact dates.",
+      "sourceLoading": "Loading the source records needed for this check."
     },
     "chartStructure": {
       "tabLabel": "Chart structure",
@@ -790,10 +1233,29 @@
       "payment": "Payment",
       "postEntry": "Post",
       "cancelEntry": "Cancel",
-      "recalculateInvoiceTotals": "Recalculate totals"
+      "recalculateInvoiceTotals": "Recalculate totals",
+      "states": {
+        "cancelled": "Cancelled",
+        "draft": "Draft",
+        "posted": "Posted"
+      },
+      "types": {
+        "entry": "Journal Entry",
+        "inInvoice": "Vendor Bill",
+        "inRefund": "Vendor Credit",
+        "outInvoice": "Customer Invoice",
+        "outRefund": "Credit Note"
+      }
     },
     "invoices": {
       "title": "Invoices",
+      "creditNote": "Credit note",
+      "total": "Total",
+      "amountDue": "Amount due",
+      "documentPreview": "Document preview",
+      "pdfHint": "Download the PDF for the printable document.",
+      "vendor": "Vendor",
+      "recordDetails": "Record details",
       "ar": "Customer Invoices",
       "ap": "Vendor Bills",
       "dueDate": "Due Date",
@@ -804,7 +1266,7 @@
       "totalInvoices": "Total Invoices",
       "totalInvoiced": "Total Invoiced",
       "outstandingBalance": "Outstanding Balance",
-      "allStatus": "All Status",
+      "allStatus": "All statuses",
       "issueDate": "Issue Date",
       "amount": "Amount",
       "customer": "Customer",
@@ -833,13 +1295,47 @@
         "postDraft": "Post",
         "recalculateTotals": "Recalculate totals",
         "createCreditNote": "Create credit note",
-        "createExchange": "Create exchange order"
+        "createExchange": "Create exchange order",
+        "archive": "Archive PDF to Documents",
+        "recalculate": "Recalculate totals",
+        "registerPayment": "Register payment",
+        "cancel": "Cancel document",
+        "reconcilePayment": "Reconcile payment"
       },
       "recordSheet": {
         "actionsTab": "Actions",
         "openActions": "Open document actions"
       },
-      "postMissingCogsAccounts": "Cannot post: chart of accounts is missing COGS and inventory GL accounts. Add expense (COGS) and asset (inventory) accounts first."
+      "postMissingCogsAccounts": "Cannot post: chart of accounts is missing COGS and inventory GL accounts. Add expense (COGS) and asset (inventory) accounts first.",
+      "attachments": "Attachments",
+      "backToInvoices": "Back to invoices",
+      "preview": "Preview",
+      "discussion": "Discussion",
+      "draftName": "Draft",
+      "moreActions": "More",
+      "notFound": "Document not found",
+      "notFoundHint": "It may have been deleted, or belong to another company.",
+      "purchaseOrder": "Purchase order",
+      "saleOrder": "Sales order",
+      "cancelConfirm": "This cancels the document and its lines. This cannot be undone.",
+      "noRegistrablePayments": "No posted payments available",
+      "payment": "Payment",
+      "registerPaymentHint": "Apply a posted payment to this document.",
+      "removeLinesDescription": "The lines are deleted from this draft and its totals are recomputed.",
+      "removeLinesTitle": "Delete the selected lines?",
+      "paymentStates": {
+        "notPaid": "Not paid",
+        "paid": "Paid",
+        "partial": "Partial",
+        "reversed": "Reversed",
+        "unpaid": "Unpaid"
+      },
+      "noReconcilablePayments": "No posted payments available",
+      "reconcilePaymentHint": "Match a posted payment entry to this document. The lesser of the two open balances is applied.",
+      "emptyState": {
+        "description": "Invoices bill your customers and feed receivables and revenue reporting. Create the first one to start getting paid.",
+        "title": "No invoices yet"
+      }
     },
     "bills": {
       "title": "Bills (Accounts Payable)",
@@ -855,7 +1351,41 @@
         "payBill": "Pay Bill",
         "download": "Download",
         "recalculateTotals": "Recalculate totals"
+      },
+      "emptyState": {
+        "description": "Vendor bills record what you owe suppliers so payables and expenses stay accurate. Add the first one to start tracking it.",
+        "title": "No vendor bills yet"
       }
+    },
+    "worklists": {
+      "scopeRequired": "Select an organization and company to view these records.",
+      "incompleteScope": "Record identity or company scope is unavailable. Refresh the complete records before using this worklist.",
+      "openStatus": "Open",
+      "unavailable": "Unavailable",
+      "currency": "Currency",
+      "statusHint": "Open is a balance state, not proof of delivery or approval. CSV exports always include currency context.",
+      "matchingRecords": "matching records · totals reflect the current filters, across all pages",
+      "selection": "Export selection",
+      "pagination": "Worklist pages",
+      "search": "Document or partner",
+      "allCurrencies": "All currencies",
+      "queue": "Balance queue",
+      "allBalances": "All balances",
+      "open": "Posted · balance due",
+      "linkedFilters": "Linked filters remain active when you apply a saved view. Clear a linked filter to change it.",
+      "savedViews": "Saved views",
+      "chooseView": "Choose a saved view",
+      "viewName": "View name",
+      "viewNamePlaceholder": "e.g. Overdue customers",
+      "saveView": "Save view",
+      "savedLocally": "Views are saved in this browser for your account and company.",
+      "sessionOnly": "Views are available for this session only; browser persistence is unavailable.",
+      "clearSelection": "Clear selection",
+      "exportSelected": "Export selected",
+      "columns": "Columns",
+      "exportCsv": "Export CSV",
+      "actions": "Actions",
+      "previous": "Previous"
     },
     "taxes": {
       "title": "Taxes",
@@ -863,7 +1393,13 @@
       "taxUse": "Type",
       "priceInclude": "Price Inc.",
       "refreshDeadlineStatuses": "Refresh tax deadline statuses",
-      "scheduleDeadlineUpdates": "Schedule daily deadline updates"
+      "scheduleDeadlineUpdates": "Schedule daily deadline updates",
+      "actions": {
+        "active": "Active",
+        "edit": "Edit tax",
+        "invalid": "Enter a name and a rate.",
+        "withholding": "Withholding"
+      }
     },
     "taxGroups": {
       "title": "Tax Groups",
@@ -876,14 +1412,25 @@
         "precedingSubtotal": "Preceding Subtotal",
         "taxPayableAccountId": "Payable Account",
         "taxReceivableAccountId": "Receivable Account",
-        "advanceTaxPaymentAccountId": "Advance Payment Account"
+        "advanceTaxPaymentAccountId": "Advance Payment Account",
+        "advanceAccount": "Advance tax payment account",
+        "company": "Company",
+        "payableAccount": "Tax payable account",
+        "receivableAccount": "Tax receivable account"
       },
       "filters": {
         "name": "Name"
       },
       "actions": {
         "newTaxGroup": "New Tax Group",
-        "editTaxGroup": "Edit Tax Group"
+        "editTaxGroup": "Edit Tax Group",
+        "edit": "Edit tax group",
+        "invalid": "Enter a name and a whole-number sequence.",
+        "new": "New tax group"
+      },
+      "empty": "No tax groups.",
+      "form": {
+        "none": "None"
       }
     },
     "taxJurisdictions": {
@@ -900,7 +1447,8 @@
         "city": "City",
         "zipFrom": "ZIP From",
         "zipTo": "ZIP To",
-        "isActive": "Active"
+        "isActive": "Active",
+        "status": "Status"
       },
       "filters": {
         "countryCode": "Country",
@@ -909,8 +1457,17 @@
       },
       "actions": {
         "newJurisdiction": "New Jurisdiction",
-        "editJurisdiction": "Edit Jurisdiction"
-      }
+        "editJurisdiction": "Edit Jurisdiction",
+        "edit": "Edit jurisdiction",
+        "invalid": "Enter a name, a code and a country code.",
+        "new": "New jurisdiction"
+      },
+      "active": "Active",
+      "empty": "No tax jurisdictions.",
+      "form": {
+        "countryHint": "ISO country code, for example US."
+      },
+      "inactive": "Inactive"
     },
     "taxSchedules": {
       "title": "Tax Schedules",
@@ -924,7 +1481,11 @@
         "taxIds": "Taxes",
         "isActive": "Active",
         "effectiveFrom": "Effective From",
-        "effectiveTo": "Effective To"
+        "effectiveTo": "Effective To",
+        "company": "Company",
+        "jurisdiction": "Jurisdiction",
+        "status": "Status",
+        "taxes": "Taxes"
       },
       "filters": {
         "jurisdictionId": "Jurisdiction",
@@ -932,8 +1493,19 @@
       },
       "actions": {
         "newSchedule": "New Schedule",
-        "editSchedule": "Edit Schedule"
-      }
+        "editSchedule": "Edit Schedule",
+        "edit": "Edit schedule",
+        "invalid": "Enter a name and valid effective dates.",
+        "new": "New schedule"
+      },
+      "active": "Active",
+      "empty": "No tax schedules.",
+      "form": {
+        "inactive": "(inactive)",
+        "noActiveTaxes": "There are no active taxes to choose from.",
+        "none": "None"
+      },
+      "inactive": "Inactive"
     },
     "taxDeadlines": {
       "title": "Tax Deadlines",
@@ -949,7 +1521,8 @@
         "fiscalPeriodStart": "Period Start",
         "fiscalPeriodEnd": "Period End",
         "reminderDaysBefore": "Reminders",
-        "autoGenerated": "Auto-generated"
+        "autoGenerated": "Auto-generated",
+        "description": "Description"
       },
       "filters": {
         "deadlineType": "Type",
@@ -976,7 +1549,39 @@
         "waiveSelected": "Waive Selected",
         "deleteSelected": "Delete Selected",
         "refreshStatuses": "Refresh Statuses",
-        "scheduleUpdates": "Schedule Updates"
+        "scheduleUpdates": "Schedule Updates",
+        "complete": "Mark complete",
+        "delete": "Delete deadline",
+        "deleteConfirm": "Delete this tax deadline? It disappears from the list.",
+        "done": "{{action}} completed",
+        "edit": "Edit deadline",
+        "failed": "{{action}} failed",
+        "invalid": "Enter a title and a due date.",
+        "new": "New deadline",
+        "waive": "Waive",
+        "waiveConfirm": "Mark this deadline as not applicable. It stops counting as open."
+      },
+      "empty": "No tax deadlines.",
+      "reminders": {
+        "acknowledgedAt": "Acknowledged",
+        "channel": "Channel",
+        "date": "Reminder date",
+        "daysBefore": "Days before",
+        "empty": "No reminders for this deadline.",
+        "sentAt": "Sent",
+        "status": "Status",
+        "tab": "Reminders"
+      },
+      "form": {
+        "company": "Company (optional)",
+        "type": "Type",
+        "types": {
+          "Filing": "Filing",
+          "Payment": "Payment",
+          "Registration": "Registration",
+          "Report": "Report",
+          "Renewal": "Renewal"
+        }
       }
     },
     "budgets": {
@@ -1303,6 +1908,19 @@
         "dividend": "Dividend",
         "profit": "Profit",
         "other": "Other"
+      },
+      "rates": {
+        "company": "Company",
+        "currency": "Currency",
+        "effectiveDate": "Effective",
+        "empty": "No consolidation rates recorded.",
+        "period": "Period",
+        "rate": "Rate",
+        "title": "Company exchange rates",
+        "type": "Type",
+        "invalid": "Choose a company, period and currency, and enter a rate above zero and an effective date.",
+        "set": "Add / update rate",
+        "setHint": "A company and period that already has a rate gets its rate, type and effective date updated."
       }
     },
     "states": {
@@ -1343,20 +1961,8 @@
       "paymentTerms": "Payment terms",
       "paymentTermLines": "Term lines",
       "journals": "Journals",
+      "journalEntries": "Journal entries",
       "moveLines": "Move lines"
-    },
-    "overview": {
-      "title": "Accounting",
-      "description": "Financial overview and reporting",
-      "glAccounts": "GL Accounts",
-      "totalAccounts": "Total accounts",
-      "openInvoices": "Open Invoices",
-      "unpaid": "Unpaid",
-      "outstanding": "${{amount}} outstanding",
-      "draftEntries": "Draft Entries",
-      "awaitingPosting": "Awaiting posting",
-      "cashFlow": "Cash Flow Position",
-      "budgetVsActual": "Budget vs Actual"
     },
     "messages": {
       "connecting": "Connecting…",
@@ -1475,10 +2081,48 @@
           "confirmSelected": "Confirm Selected",
           "closeSelected": "Close Selected",
           "computeDepreciation": "Compute Depreciation",
+          "disposeSelected": "Dispose Selected",
           "addDepreciationLine": "Add depreciation line",
           "deleteSelected": "Delete Selected",
           "activateSelected": "Set active",
-          "deactivateSelected": "Set inactive"
+          "deactivateSelected": "Set inactive",
+          "edit": "Edit asset",
+          "new": "New asset"
+        },
+        "form": {
+          "acquisitionDate": "Acquisition date",
+          "assetAccount": "Asset account",
+          "assetType": "Asset type",
+          "code": "Code",
+          "currency": "Currency",
+          "depreciationAccount": "Accumulated depreciation account",
+          "disposalAccount": "Disposal account (optional)",
+          "expenseAccount": "Depreciation expense account",
+          "firstDepreciationDate": "First depreciation date",
+          "gainAccount": "Disposal gain account (optional)",
+          "invalidAccounts": "Choose a general journal, asset and depreciation accounts from the Asset group and an expense account from the Expense group.",
+          "invalidAmounts": "The original value must be above zero and the salvage value from zero up to below the original value.",
+          "invalidDates": "Enter a valid acquisition date (and a valid first depreciation date, if any).",
+          "invalidDisposal": "Disposal accounts must be an income account for gains, an expense account for losses and an asset account for disposals.",
+          "invalidIdentity": "Enter a code, a name, an asset type and a currency.",
+          "invalidMethod": "Choose a method, at least one depreciation of at least one month, and a degressive factor above 0 up to 100 for degressive methods.",
+          "journal": "Depreciation journal (general)",
+          "lossAccount": "Disposal loss account (optional)",
+          "method": "Depreciation method",
+          "methodDegressive": "Degressive",
+          "methodDegressiveThenLinear": "Degressive then linear",
+          "methodLinear": "Linear",
+          "methodNumber": "Number of depreciations",
+          "methodPeriod": "Months between depreciations",
+          "name": "Name",
+          "none": "None",
+          "originalValue": "Original value",
+          "progressFactor": "Degressive factor (%)",
+          "prorata": "Prorata temporis",
+          "salvageValue": "Salvage value",
+          "typePurchase": "Purchase",
+          "typeSale": "Sale",
+          "unavailable": "(unavailable)"
         }
       },
       "depreciationSchedule": {
@@ -2508,7 +3152,9 @@
       "manualAmountResidual": "Amount residual",
       "reconcileManual": "Reconcile (manual)",
       "unreconcileLine": "Unreconcile",
-      "unreconcileConfirm": "Clear reconciliation for this line?"
+      "unreconcileConfirm": "Clear reconciliation for this line?",
+      "settlementLocked": "Settlement confirmed. Editing, unlinking and reversal are unavailable in this alpha.",
+      "settlementPending": "Payment awaiting approval or settlement completion. Use Focus line to continue."
     },
     "fiscalYears": {
       "title": "Fiscal Years",
@@ -2594,6 +3240,190 @@
         "dateTo": "End date",
         "openFirstPeriod": "Open first period"
       }
+    },
+    "bankStatementImportLines": {
+      "description": "Description",
+      "empty": "No imported lines for this statement.",
+      "reference": "Reference",
+      "row": "Row",
+      "tab": "Imported lines",
+      "validationError": "Validation"
+    },
+    "bankStatements": {
+      "actions": {
+        "currency": "Currency",
+        "edit": "Edit statement",
+        "editTab": "Edit",
+        "invalidEdit": "Enter valid balances and date.",
+        "invalidNew": "Choose a bank journal and a currency, and enter a valid opening balance.",
+        "new": "New statement",
+        "noBankJournal": "Create a bank journal first; statements are opened on bank journals.",
+        "postedLocked": "A posted statement can no longer be edited.",
+        "reference": "Reference"
+      }
+    },
+    "billCorrection": {
+      "action": "Correct bill quantity / price",
+      "quantity": "Bill quantity",
+      "price": "Unit price",
+      "unavailable": "This bill line has no supported exact PO source. Refresh and review its lineage.",
+      "description": "Review the supplier bill and correct its economic values. PO unit price: {{price}}; received quantity: {{received}}. Expense, payable, bill totals and PO billed quantities update together. Existing discounts are preserved. Linked percentage tax rows and currency amounts are recalculated using the bill-date exchange rate. Inconsistent tax or currency evidence must be reviewed; do not widen matching tolerances to clear a variance."
+    },
+    "importReview": {
+      "title": "Source control totals",
+      "scope": "These totals cover all {{rows}} source rows, before posting or payment allocation. Compare them with your source records.",
+      "references": "{{count}} distinct document or journal references",
+      "invalid": "Fix source exceptions before importing. Totals are incomplete while exceptions remain.",
+      "moreIssues": "{{count}} more exceptions in the source file.",
+      "currency": "Currency ID {{id}}",
+      "companyCurrency": "Currency unspecified; verify company default",
+      "confirm": "I checked these source totals and references.",
+      "scopeChanged": "The organization, company or import target changed. Select and review the source file again before importing.",
+      "fields": {
+        "source_total": "Source total",
+        "opening_residual": "Opening residual",
+        "opening_debit": "Opening debit",
+        "opening_credit": "Opening credit",
+        "opening_balance": "Opening balance",
+        "debit": "Debit",
+        "credit": "Credit",
+        "amount_untaxed": "Amount untaxed",
+        "amount_tax": "Amount tax",
+        "amount_total": "Amount total",
+        "planned_amount": "Planned amount"
+      }
+    },
+    "billIntake": {
+      "issues": {
+        "supplier": "Select supplier",
+        "reference": "Review supplier reference",
+        "invoiceDate": "Set invoice date",
+        "lines": "Add bill lines",
+        "lineValues": "Review line accounts and amounts",
+        "balance": "Balance journal lines",
+        "total": "Recalculate bill total"
+      },
+      "title": "Bill intake review",
+      "description": "Review draft bills, source references and journal lines before posting. Purchase order receipt and matching exceptions are available in Purchasing.",
+      "purchasing": "Review orders and receipts",
+      "scopeUnavailable": "Bill or journal line ownership is incomplete. Refresh the source records before reviewing intake.",
+      "count": "{{count}} draft bills to review",
+      "empty": "No draft bills in this company.",
+      "supplierUnavailable": "Supplier not available",
+      "lineCount": "{{count}} journal lines",
+      "reviewDetails": "Review source and posting details",
+      "openBill": "Review bill"
+    },
+    "paymentOperations": {
+      "returnToAllocationCompany": "Return to company #{{companyId}} to recover the original allocation."
+    },
+    "billDocuments": {
+      "title": "Supplier documents and receipts",
+      "scopeUnavailable": "Document links or ownership could not be verified. Refresh before attaching a file.",
+      "empty": "No supplier documents linked to this bill.",
+      "file": "Receipt or supplier document (PDF or image, up to 20 MB)",
+      "invalidFile": "Choose a non-empty PDF, PNG, JPEG or WebP file up to 20 MB.",
+      "uploading": "Attaching…",
+      "attach": "Attach to this bill",
+      "readOnly": "Document creation permission is required to attach files.",
+      "unknown": "Attachment submission is unverified. Refresh documents to check this attempt before uploading again.",
+      "refresh": "Refresh documents"
+    },
+    "bankRecovery": {
+      "actorChanged": "The signed-in user changed. Return to the original user and check this action.",
+      "unknownRecovery": "The recovery result is unconfirmed. Check the original action or retry its exact saved request.",
+      "pendingRecovery": "Confirming the reviewed settlement recovery…",
+      "paymentPosted": "Approved payment posted; settlement completion requires review",
+      "checkSaved": "Check the saved settlement before continuing",
+      "abandoned": "Unposted settlement draft abandoned",
+      "reversed": "Settlement reversal confirmed",
+      "reversalApproval": "Settlement reversal awaiting approval",
+      "reversalClosed": "The reversal approval is closed; the posted settlement remains unchanged",
+      "approvalClosed": "The payment approval is closed; the bank line remains unmatched",
+      "restored": "The compensating entry is posted, this settlement’s invoice balances are restored, and the statement is open with an unmatched bank line.",
+      "unallocatedReversed": "The unallocated payment has a posted compensating entry. The statement is open and the bank line is unmatched.",
+      "retired": "The unposted payment is retired and the original invoice balances are unchanged. Review a fresh settlement when ready.",
+      "originalPayment": "Original payment",
+      "selectedItems": "Selected journal items",
+      "originalUser": "Return to the original signed-in user to recover this action.",
+      "checkSettlement": "Check settlement status",
+      "retryOriginal": "Retry original recovery",
+      "reversalUnchanged": "The original posted payment and bank allocation stay unchanged while reversal approval is pending.",
+      "reviewReversalApproval": "Review reversal approval",
+      "reviewedReason": "Reviewed reason",
+      "reversalDate": "Reversal date",
+      "reviewOriginalReversal": "I reviewed the original reversal date and reason before completing its approved request.",
+      "completeReversal": "Complete approved reversal",
+      "missingReversal": "The original reversal payload is unavailable. Keep this review and check the saved request; do not create a replacement while approval is open.",
+      "abandon": "Abandon unposted draft",
+      "resubmit": "Resubmit for approval",
+      "reverse": "Reverse settlement",
+      "reviewRecovery": "Review settlement recovery",
+      "abandonEffect": "Retire this closed, unposted payment draft. The invoice balances stay unchanged and a fresh settlement can be reviewed afterwards.",
+      "resubmitEffect": "Retire the closed draft and submit one new payment approval for the freshly reviewed invoices. The bank line remains unmatched until the approved settlement completes.",
+      "reverseEffect": "Post a compensating journal entry and restore only the balances allocated by this bank settlement. Earlier payments remain applied.",
+      "selectResubmission": "Select obligations for resubmission",
+      "selectResubmissionItem": "Resubmit invoice item",
+      "resubmitTotal": "Selected open amount",
+      "resubmitDifference": "Difference",
+      "resubmitExact": "Select every current open item of each chosen invoice for one partner. The total must exactly match the original bank amount.",
+      "resubmitUnavailable": "Current eligible invoice records are unavailable. Refresh them before reviewing a resubmission.",
+      "reason": "Reason for recovery",
+      "reviewAuthorization": "I reviewed the original payment, selected invoices, reason and financial effect of this recovery.",
+      "confirmRecovery": "Confirm reviewed recovery",
+      "cancelReview": "Cancel recovery review"
+    },
+    "authoring": {
+      "account": "Account",
+      "amount": "Amount",
+      "bill": "Bill",
+      "calendarRule": "See date rule below",
+      "companyId": "Company {{id}}",
+      "credit": "Credit",
+      "currencyId": "Currency {{id}}",
+      "customer": "Customer",
+      "debit": "Debit",
+      "description": "Description",
+      "difference": "Remaining difference: {{amount}}",
+      "discount": "Discount: {{amount}}%",
+      "documentDate": "Document date",
+      "documentPreview": "Document preview",
+      "documentPreviewOnly": "Preview of the current draft. Saving creates a draft, not a posted entry. The server confirms amounts and rounding.",
+      "dueDate": "Due date",
+      "editDocument": "Edit document",
+      "exampleInvoiceAmount": "Example invoice amount",
+      "exampleInvoiceDate": "Example invoice date",
+      "fromMonthEnd": "Count from the end of the month.",
+      "headerOnly": "This action creates a draft header only. After saving, add debit and credit lines in Journal items, then review and post the entry.",
+      "instalment": "Instalment",
+      "invoice": "Invoice",
+      "invoiceExample": "Example invoice",
+      "journalPreviewTitle": "Journal preview",
+      "linePreviewOnly": "This line is not saved. Totals use the loaded current-company draft when available. The server checks the entry before posting.",
+      "noInstalments": "No instalments yet",
+      "noLines": "No lines yet",
+      "offsetRule": "Date rule: {{months}} month(s), {{days}} day(s).",
+      "paymentReference": "Payment reference",
+      "paymentTerms": "Payment terms",
+      "proposedTotals": "After adding this line: debit {{debit}}, credit {{credit}}.",
+      "quantity": "Quantity",
+      "remainingBalance": "Remaining balance",
+      "sampleAmount": "Example amount",
+      "tax": "Tax",
+      "taxExampleOnly": "Illustration for one tax only. This amount is not saved. The invoice calculation determines tax amounts and rounding.",
+      "taxExampleTitle": "Try this tax",
+      "taxName": "Your tax",
+      "taxPreviewLimited": "Enter an amount and a valid percentage rate to see an example. Fixed and division taxes need the invoice calculation.",
+      "termExampleOnly": "Illustration of this line only. Sample inputs are not saved. The full schedule determines the balance, calendar-month dates, and rounding.",
+      "termExampleTitle": "Payment schedule preview",
+      "termHeaderOnly": "Save the terms, then add payment term lines to define amounts and due dates. A name alone does not create an instalment schedule.",
+      "termName": "Your payment terms",
+      "total": "Total",
+      "unitPrice": "Unit price",
+      "unsavedDraft": "Unsaved draft",
+      "unsavedPreview": "Unsaved preview",
+      "untaxed": "Untaxed amount",
+      "vendor": "Vendor"
     }
   },
   "crm": {
@@ -2647,7 +3477,10 @@
         "email": "Email",
         "meeting": "Meeting",
         "todo": "To-do"
-      }
+      },
+      "attachFiles": "Attach files",
+      "attachmentsFailed": "Some files failed to upload. Remove them or retry.",
+      "removeAttachment": "Remove"
     },
     "csvImport": {
       "contactsTitle": "Import contacts (CSV)",
@@ -2699,6 +3532,9 @@
         "Won": "Won",
         "Lost": "Lost",
         "Converted": "Converted"
+      },
+      "emptyState": {
+        "hint": "Leads are unqualified enquiries; qualify the good ones into opportunities."
       }
     },
     "opportunities": {
@@ -2726,6 +3562,9 @@
         "Low": "Low",
         "Medium": "Medium",
         "High": "High"
+      },
+      "emptyState": {
+        "hint": "Opportunities move through your pipeline stages and feed the sales forecast."
       }
     },
     "opportunityLines": {
@@ -2756,6 +3595,9 @@
         "isCompany": "Type",
         "city": "City",
         "countryId": "Country"
+      },
+      "emptyState": {
+        "hint": "Contacts are the people and companies you sell to; leads, orders and invoices link back to them."
       }
     },
     "activities": {
@@ -2813,7 +3655,15 @@
       "editContactAddress": "Edit address",
       "editContactBusiness": "Edit business info",
       "editContactDetails": "Edit details",
-      "alreadyClosed": "This opportunity is already won or lost."
+      "alreadyClosed": "This opportunity is already won or lost.",
+      "archiveContactCategory": "Archive category",
+      "archiveContactCategoryConfirm": "Archive this category? Contacts already assigned to it keep it.",
+      "clearContactCategories": "Clear categories",
+      "clearContactCategoriesConfirm": "Remove every category from this contact?",
+      "editContactCategory": "Edit category",
+      "removeContactCategory": "Remove category",
+      "replaceContactCategories": "Replace categories",
+      "replaceContactCategoriesHint": "The contact keeps only the categories ticked here. Leave all unticked to clear them."
     },
     "duplicates": {
       "tabLabel": "Duplicates",
@@ -3470,6 +4320,22 @@
       "noRules": "No rules yet.",
       "applySample": "Apply AU customer rules",
       "evaluate": "Evaluate"
+    },
+    "inlineEdit": {
+      "emailInvalid": "Enter a valid email address",
+      "nameRequired": "A contact needs a name",
+      "phoneRequired": "Enter a phone number"
+    },
+    "myActivities": {
+      "empty": "You have no open activities.",
+      "noDeadline": "No deadline",
+      "overdue": "Overdue",
+      "tabLabel": "My activities"
+    },
+    "kpi": {
+      "expectedRevenue": "Expected revenue",
+      "open": "Open opportunities",
+      "overdue": "Past deadline"
     }
   },
   "iot": {
@@ -3596,7 +4462,8 @@
     "toolbar": {
       "selectOneHub": "Select exactly one hub.",
       "selectOneAction": "Select exactly one action.",
-      "actionNotPending": "Only Pending actions can be marked sent."
+      "actionNotPending": "Only Pending actions can be marked sent.",
+      "actionNotSent": "Select exactly one Sent action to acknowledge."
     },
     "table": {
       "token": "Token",
@@ -3674,7 +4541,8 @@
       "emptyState": {
         "title": "No employees yet",
         "description": "Add your first employee to start managing your workforce.",
-        "actionLabel": "New Employee"
+        "actionLabel": "New Employee",
+        "hint": "Employees anchor leave, contracts, payslips and expenses."
       },
       "columns": {
         "employeeNumber": "#",
@@ -3908,11 +4776,35 @@
       "description": "Department hierarchy and reporting lines",
       "emptyMessage": "No departments found. Add departments to build the org chart.",
       "employees": "employees",
-      "manager": "Manager"
+      "employeeCount_one": "{{count}} employee",
+      "employeeCount_other": "{{count}} employees",
+      "manager": "Manager",
+      "employeeCount": "{{count}} employees"
     },
     "recruitment": {
       "title": "Recruitment Pipeline",
-      "description": "Open positions actively recruiting"
+      "description": "Open positions actively recruiting",
+      "stages": {
+        "applied": "Applied",
+        "screening": "Screening",
+        "interview": "Interview",
+        "offer": "Offer",
+        "hired": "Hired",
+        "rejected": "Rejected"
+      },
+      "actionFailed": "Action failed",
+      "openPositions": "Open positions (recruit)",
+      "noOpenPositions": "No positions in recruit state.",
+      "addApplicant": "Add applicant",
+      "namePlaceholder": "Name",
+      "emailPlaceholder": "Email",
+      "jobPlaceholder": "Job position",
+      "add": "Add",
+      "applicantCount": "Applicants ({{count}})",
+      "applicantCount_one": "Applicant ({{count}})",
+      "applicantCount_other": "Applicants ({{count}})",
+      "noApplicants": "No applicants yet.",
+      "jobReference": "job #{{id}}"
     },
     "csvImport": {
       "description": "Choose a UTF-8 CSV file. Headers must match the template expected by SpacetimeDB.",
@@ -4188,6 +5080,157 @@
     },
     "workflow": {
       "approvalTimeline": "Approval timeline"
+    },
+    "operationsTab": "Operations",
+    "operationsTabDescription": "Approval and export queues, workforce planning",
+    "inlineEdit": {
+      "jobTitleRequired": "Enter a job title",
+      "nameRequired": "An employee needs a name"
+    },
+    "leaveAllocations": {
+      "columns": {
+        "allocated": "Allocated",
+        "employee": "Employee",
+        "leaveType": "Leave type",
+        "period": "Year",
+        "remaining": "Remaining",
+        "state": "State",
+        "used": "Used",
+        "validFrom": "Valid from",
+        "validTo": "Valid to"
+      },
+      "description": "Days allocated to each employee per leave type, with usage and remaining balance.",
+      "emptyMessage": "No leave allocations yet.",
+      "filters": {
+        "employee": "Employee",
+        "leaveType": "Leave type"
+      },
+      "loadError": "Could not load leave allocations.",
+      "searchPlaceholder": "Search by employee or leave type",
+      "tab": "Allocations",
+      "title": "Leave Allocations"
+    },
+    "offboarding": {
+      "complete": "Offboarding complete",
+      "done": "Done",
+      "empty": "No offboarding checklist for this employee.",
+      "loadError": "Could not load the offboarding checklist.",
+      "pending": "Pending",
+      "progress": "{{done}} of {{total}} steps done",
+      "tab": "Offboarding",
+      "items": {
+        "assetsReturned": "Assets returned",
+        "accessRevoked": "Access revoked",
+        "docsCollected": "Documents collected"
+      }
+    },
+    "statutoryIds": {
+      "country": "Country",
+      "empty": "No statutory IDs on record.",
+      "expires": "Expires",
+      "issued": "Issued",
+      "loadError": "Could not load statutory IDs.",
+      "tab": "Statutory IDs"
+    },
+    "performance": {
+      "status": {
+        "active": "Active",
+        "draft": "Draft",
+        "closed": "Closed"
+      },
+      "actionFailed": "Action failed",
+      "cycles": {
+        "title": "Performance cycles",
+        "namePlaceholder": "Cycle name",
+        "create": "Create cycle",
+        "fallbackName": "Cycle {{id}}",
+        "empty": "No active cycles yet.",
+        "selectPlaceholder": "Cycle"
+      },
+      "goals": {
+        "addTitle": "Add goal",
+        "titlePlaceholder": "Goal title",
+        "add": "Add goal",
+        "count": "{{count}} goals",
+        "count_one": "{{count}} goal",
+        "count_other": "{{count}} goals"
+      },
+      "employeePlaceholder": "Employee",
+      "reviews": {
+        "count": "{{count}} reviews",
+        "count_one": "{{count}} review",
+        "count_other": "{{count}} reviews",
+        "submitSelfTitle": "Submit review (self)",
+        "draftPlaceholder": "Draft review",
+        "option": "Employee {{employeeId}} / cycle {{cycleId}}",
+        "submit": "Submit",
+        "completeManagerTitle": "Complete review (manager)",
+        "submittedPlaceholder": "Submitted review",
+        "complete": "Complete"
+      }
+    },
+    "onboarding": {
+      "actionFailed": "Action failed",
+      "unassigned": "No onboarding checklist assigned. Choose a template to start hire onboarding.",
+      "selectTemplate": "Select template",
+      "templateFallback": "Template {{id}}",
+      "assignTemplate": "Assign template",
+      "statusLabel": "Status:",
+      "status": {
+        "complete": "Complete",
+        "inProgress": "In progress"
+      },
+      "markDone": "Mark onboarding done",
+      "itemFallback": "Item {{id}}",
+      "itemDone": "Done",
+      "completeItem": "Complete"
+    },
+    "benefits": {
+      "planTypes": {
+        "health": "Health",
+        "dental": "Dental",
+        "retirement": "Retirement",
+        "other": "Other"
+      },
+      "actionFailed": "Action failed",
+      "plans": {
+        "title": "Benefit plans",
+        "namePlaceholder": "Plan name",
+        "create": "Create plan",
+        "empty": "No benefit plans yet."
+      },
+      "enroll": {
+        "title": "Enroll employee",
+        "assign": "Assign",
+        "activeTitle": "Active enrollments",
+        "summary": "Employee {{employeeId}} → plan {{planId}}",
+        "unenroll": "Unenroll",
+        "empty": "No active enrollments."
+      },
+      "planPlaceholder": "Plan",
+      "employeePlaceholder": "Employee"
+    },
+    "documents": {
+      "purposes": {
+        "general": "General",
+        "taxId": "Tax ID",
+        "identity": "Identity",
+        "payroll": "Payroll"
+      },
+      "actionFailed": "Action failed",
+      "attachTitle": "Attach document reference",
+      "attachDescription": "Store attachment ID only — upload files via DMS separately.",
+      "typeLabel": "Document type",
+      "typePlaceholder": "passport, contract, …",
+      "attachmentIdLabel": "Attachment ID",
+      "attachmentIdPlaceholder": "DMS attachment ID",
+      "purposeLabel": "Purpose",
+      "titleOptionalLabel": "Title (optional)",
+      "attach": "Attach",
+      "empty": "No documents on file.",
+      "fallbackTitle": "Document",
+      "metadata": "{{type}} · purpose: {{purpose}} · attachment: {{attachmentId}}",
+      "remove": "Remove"
     }
   },
   "inventory": {
@@ -4239,7 +5282,8 @@
       "emptyState": {
         "title": "No products yet",
         "description": "Add your first product to start tracking stock and sales.",
-        "actionLabel": "New product"
+        "actionLabel": "New product",
+        "hint": "Products are what you buy, stock and sell: every order, transfer and invoice line points to one."
       },
       "detail": {
         "barcode": "Barcode",
@@ -4308,7 +5352,8 @@
       "emptyState": {
         "title": "No transfers yet",
         "description": "Create a transfer to move stock between locations.",
-        "actionLabel": "New transfer"
+        "actionLabel": "New transfer",
+        "hint": "Transfers (receipts, deliveries, internal moves) are how stock levels change."
       },
       "detail": {
         "locationFrom": "From location",
@@ -4341,6 +5386,25 @@
         "assigned": "Ready",
         "done": "Done",
         "cancel": "Cancelled"
+      },
+      "attachments": "Attachments",
+      "backorderOf": "Backorder of",
+      "backToTransfers": "Back to transfers",
+      "discussion": "Discussion",
+      "notFound": "Transfer not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "purchaseOrder": "Purchase order",
+      "saleOrder": "Sales order",
+      "backorders": "Backorders",
+      "detailedOperations": "Detailed operations",
+      "detailedOperationsEmpty": "No detailed operations yet. They appear once the transfer is reserved or processed.",
+      "ops": {
+        "done": "Done",
+        "from": "From",
+        "lot": "Lot / Serial",
+        "product": "Product",
+        "reserved": "Reserved",
+        "to": "To"
       }
     },
     "warehouses": {
@@ -4462,9 +5526,9 @@
     },
     "z3dActions": {
       "addZone": "Add 3D zone",
-      "editZone": "Edit zone (by ID)…",
+      "editZone": "Edit zone…",
       "zoneIdPrompt": "Zone ID",
-      "deleteZone": "Deactivate zone (by ID)…"
+      "deleteZone": "Deactivate zone…"
     },
     "productionLots": {
       "title": "Lots & Serials",
@@ -4791,9 +5855,9 @@
       "addVariant": "Add variant",
       "addSupplierLine": "Add supplier line",
       "addPackaging": "Add packaging",
-      "updateSupplierLineById": "Update supplier line (by ID)…",
+      "updateSupplierLineById": "Update supplier line…",
       "supplierLineIdPrompt": "Supplier info row ID",
-      "updatePackagingById": "Update packaging (by ID)…",
+      "updatePackagingById": "Update packaging…",
       "packagingIdPrompt": "Packaging row ID",
       "updatePricing": "Update pricing…",
       "standardPricePrompt": "Standard cost",
@@ -4801,7 +5865,7 @@
       "updateInventoryData": "Update inventory quantities…",
       "qtyAvailablePrompt": "Quantity on hand",
       "virtualAvailablePrompt": "Forecast quantity",
-      "updateVariantById": "Update variant (by ID)…",
+      "updateVariantById": "Update variant…",
       "variantIdPrompt": "Variant ID",
       "variantNamePrompt": "Variant name"
     },
@@ -4852,26 +5916,26 @@
       "linkDevice": "Link IoT device…",
       "deviceIdPrompt": "IoT device ID",
       "checkIdForDevicePrompt": "Quality check ID to link",
-      "openAlertById": "Open alert (by ID)…",
-      "solveAlertById": "Solve alert (by ID)…",
+      "openAlertById": "Open alert…",
+      "solveAlertById": "Solve alert…",
       "alertIdPrompt": "Quality alert ID",
       "solveDescriptionPrompt": "Resolution notes (optional)",
       "addAlertReason": "New alert reason…",
       "alertReasonNamePrompt": "Reason name",
       "alertReasonDescPrompt": "Description (optional)",
-      "updateAlertReason": "Update alert reason (by ID)…",
+      "updateAlertReason": "Update alert reason…",
       "reasonIdPrompt": "Reason ID",
       "newReasonNamePrompt": "New name (leave empty to skip)",
-      "deleteAlertReason": "Delete alert reason (by ID)…",
-      "addTeamMember": "Add member to team (by IDs)…",
-      "removeTeamMember": "Remove member from team (by IDs)…",
+      "deleteAlertReason": "Delete alert reason…",
+      "addTeamMember": "Add member to team…",
+      "removeTeamMember": "Remove member from team…",
       "teamIdPrompt": "Quality team ID",
       "memberIdentityPrompt": "Member identity (hex)",
-      "updatePoint": "Update quality point (by ID)…",
+      "updatePoint": "Update quality point…",
       "pointIdPrompt": "Quality point ID",
       "pointNamePrompt": "Point name",
       "testTypePrompt": "Test type",
-      "updateTeam": "Update quality team (by ID)…",
+      "updateTeam": "Update quality team…",
       "teamNamePrompt": "Team name",
       "teamEmailPrompt": "Team email"
     },
@@ -4879,19 +5943,20 @@
       "trigger": "Trigger now",
       "executeRule": "Stamp rule run",
       "executeRuleHint": "Updates last_run / next_run for this rule (not the same as “Trigger now”, which evaluates stock).",
-      "scheduleRun": "Schedule automatic run",
+      "scheduleRun": "Schedule automatic runs",
+      "cancelSchedule": "Cancel automatic runs",
       "cancelRun": "Cancel automatic run",
       "confirmDelete": "Delete this replenishment rule?"
     },
     "pickingWaveActions": {
-      "confirm": "Confirm wave",
+      "confirm": "Release wave",
       "process": "Process wave",
       "complete": "Complete wave",
       "confirmDelete": "Delete this picking wave?"
     },
     "categoryActions": {
       "confirmDelete": "Delete this product category?",
-      "restoreById": "Restore category (by ID)…",
+      "restoreById": "Restore category…",
       "categoryIdPrompt": "Category ID"
     },
     "routeActions": {
@@ -5446,6 +6511,105 @@
           "maxWeight": "Max weight"
         }
       }
+    },
+    "byRecord": {
+      "barcodeRule": "Barcode rule",
+      "category": "Archived category",
+      "color": "Color (hex)",
+      "deactivate": "Deactivate",
+      "destLocation": "Destination location",
+      "device": "IoT device",
+      "email": "Email",
+      "failReason": "Reason for failure",
+      "fromUom": "From unit",
+      "inventoryCount": "Inventory count",
+      "location": "Location",
+      "member": "Member identity",
+      "minQty": "Minimum quantity",
+      "name": "Name",
+      "packagingId": "Packaging ID",
+      "pointId": "Quality point ID",
+      "price": "Price",
+      "product": "Product",
+      "qualityRating": "Quality rating",
+      "quarantineLocation": "Quarantine location",
+      "reasonId": "Alert reason ID",
+      "sourceLocation": "Source location",
+      "standardPrice": "Standard price",
+      "status": "Status",
+      "supplierLineId": "Supplier line ID",
+      "taskCancelled": "Cancelled",
+      "taskDone": "Done",
+      "taskInProgress": "In progress",
+      "taskPending": "Pending",
+      "team": "Quality team",
+      "testType": "Test type",
+      "toUom": "To unit",
+      "uom": "Unit of measure",
+      "uomCategory": "Category",
+      "uomConversionHint": "Both units must be in the same category.",
+      "variantId": "Variant ID",
+      "whatsappAccountId": "WhatsApp account ID",
+      "zone": "Zone"
+    },
+    "inlineEdit": {
+      "nameRequired": "A product needs a name",
+      "priceInvalid": "Enter a price of 0 or more"
+    },
+    "productTabs": {
+      "packaging": {
+        "barcode": "Barcode",
+        "empty": "No packaging defined for this product.",
+        "name": "Packaging",
+        "purchase": "Purchase",
+        "qty": "Contained quantity",
+        "sales": "Sales",
+        "title": "Packaging",
+        "volume": "Volume",
+        "weight": "Weight"
+      },
+      "variants": {
+        "attribute": "Attribute",
+        "empty": "No attributes or variants configured for this product.",
+        "title": "Variants",
+        "valueCount": "Count",
+        "values": "Values"
+      },
+      "vendors": {
+        "currency": "Currency",
+        "delay": "Lead time (days)",
+        "empty": "No vendor prices for this product.",
+        "minQty": "Min qty",
+        "price": "Price",
+        "productCode": "Vendor code",
+        "productName": "Vendor product name",
+        "title": "Vendor prices",
+        "validFrom": "Valid from",
+        "validUntil": "Valid until",
+        "vendor": "Vendor"
+      }
+    },
+    "kpi": {
+      "late": "Late",
+      "ready": "Ready to ship",
+      "waiting": "Waiting"
+    },
+    "stockPackageActions": {
+      "confirm": "Confirm package",
+      "done": "Mark package done"
+    },
+    "stockPackages": {
+      "columns": {
+        "createDate": "Created",
+        "name": "Package",
+        "pickingId": "Transfer",
+        "state": "Status",
+        "volume": "Volume",
+        "weight": "Weight"
+      },
+      "description": "Packed shipments awaiting confirmation or dispatch",
+      "emptyMessage": "No packages found.",
+      "title": "Packages"
     }
   },
   "purchasing": {
@@ -5463,9 +6627,17 @@
       "pendingReceipt": "Pending Receipt",
       "awaitingApproval": "Awaiting Approval",
       "vendorLabel": "Vendor {{id}}",
-      "onTimePct": "On-time (MVP)",
+      "onTimePct": "On-time %",
       "overBilled": "Over-billed lines",
       "partialReceipt": "Partial receipt"
+    },
+    "handoffs": {
+      "title": "Receipts and vendor bills",
+      "loading": "Loading receipts and vendor bills...",
+      "error": "Receipts and vendor bills could not be loaded.",
+      "empty": "No receipts or vendor bills found.",
+      "receipt": "Receipt",
+      "bill": "Vendor bill"
     },
     "purchaseOrders": {
       "title": "Purchase Orders",
@@ -5475,7 +6647,8 @@
       "emptyState": {
         "title": "No purchase orders yet",
         "description": "Create your first purchase order to track vendor spending.",
-        "actionLabel": "New purchase order"
+        "actionLabel": "New purchase order",
+        "hint": "Confirmed purchase orders drive receipts and vendor bills, so spend stays traceable."
       },
       "columns": {
         "name": "Reference",
@@ -5513,7 +6686,8 @@
         "ToApprove": "To Approve",
         "Approved": "Purchase Order",
         "Done": "Done",
-        "Cancelled": "Cancelled"
+        "Cancelled": "Cancelled",
+        "Purchase": "Purchase order"
       },
       "fulfillment": {
         "dropship": "Dropship",
@@ -5550,14 +6724,29 @@
           "under_received": "Partial receipt — ordered quantity not fully received.",
           "over_received": "Received quantity exceeds ordered quantity.",
           "under_billed": "Billed less than received — variance {{variance}} units.",
-          "over_billed": "Billed exceeds received — reduce bill qty or receive goods (variance {{variance}})."
-        }
+          "over_billed": "Billed exceeds received — reduce bill qty or receive goods (variance {{variance}}).",
+          "unavailable": "Quantity data is incomplete or invalid. Review the purchase order before proceeding."
+        },
+        "unavailable": "Unavailable"
       },
       "states": {
         "Draft": "Draft",
         "Confirmed": "Confirmed",
         "Done": "Done",
         "Cancelled": "Cancelled"
+      },
+      "recovery": {
+        "title": "Quantity recovery",
+        "unavailable": "Refresh and review this line’s quantities before proceeding.",
+        "reviewBill": "Review the linked bill in the order’s Handoffs tab. Receiving more goods cannot resolve this billing exception safely.",
+        "receiveOrReviewBill": "If the missing goods have arrived, record their receipt. Otherwise review the bill with Accounting.",
+        "reviewReceipt": "Received quantity exceeds the order. Review the receipt and use the existing return process where appropriate.",
+        "reviewUnbilled": "Some received goods remain unbilled. Review existing bills before creating another.",
+        "quantityAligned": "Received and billed quantities align. Bill prices and source links are checked when posting.",
+        "awaitReceipt": "Record goods only after they arrive. Review the order’s receipts for partial deliveries.",
+        "reviewOrder": "Review order and linked bills",
+        "receiveMissing": "Receive missing goods",
+        "confirmReceipt": "Confirm that these goods have physically arrived. Review the quantity and enter a lot where required; do not record a receipt merely to clear a bill exception."
       }
     },
     "rfqs": {
@@ -5701,6 +6890,7 @@
       "addLineForm": "Add line…",
       "invoiceQtyForm": "Invoice qty…",
       "receiveFullOpenQty": "Receive all open qty",
+      "resolveReceipt": "Resolve pending receipt",
       "lockSelected": "Lock",
       "unlockSelected": "Unlock",
       "editLineForm": "Edit draft line…",
@@ -5734,15 +6924,20 @@
     "forms": {
       "purchaseReturn": {
         "title": "New purchase return",
-        "description": "Return received products to a vendor."
+        "description": "Return received products to a vendor.",
+        "refundableLine": "Create a refundable return line"
       },
       "rfq": {
-        "title": "New request for quotation",
+        "title": "Create request for quotation",
         "description": "Request pricing from vendors for a purchase requirement."
       },
       "rfqBid": {
-        "title": "New RFQ bid",
+        "title": "Add RFQ bid",
         "description": "Record a vendor bid for a request for quotation."
+      },
+      "rfqAward": {
+        "title": "Award RFQ bid",
+        "description": "Select an open RFQ and one of its submitted bids."
       },
       "vendorCredit": {
         "title": "New vendor credit",
@@ -6003,7 +7198,7 @@
       },
       "createBillFromOrder": {
         "title": "Create bill from purchase order",
-        "description": "Generate a vendor bill for the selected confirmed purchase order.",
+        "description": "Bill the received quantity in the purchase order currency. The bill date selects the exchange rate. Select the purchase tax matching the order; its tax group must have an input-tax account.",
         "submitLabel": "Create bill",
         "sections": {
           "accounting": "Accounting"
@@ -6013,6 +7208,9 @@
           "defaultExpenseAccountId": "Default expense account",
           "payableAccountId": "Payable account",
           "invoiceDate": "Bill date",
+          "taxId": "Purchase tax",
+          "taxHint": "Applies to all billable lines and must agree with their PO tax amounts.",
+          "discount": "Supplier discount (%)",
           "payableLineName": "Payable line label (optional)",
           "narration": "Bill notes",
           "narrationPlaceholder": "Defaults to the purchase order's notes if left blank…",
@@ -6021,6 +7219,7 @@
           "payableExcludeFromInvoiceTab": "Exclude payable line from bill tab",
           "payableBlocked": "Block payable line"
         },
+        "noTax": "No tax",
         "noPayableAccounts": "No payable accounts — create chart of accounts first",
         "noJournals": "No purchase journals — create one in Accounting",
         "noAccounts": "No GL accounts — create chart of accounts first"
@@ -6034,6 +7233,58 @@
           "header": "Header"
         },
         "title": "Edit purchase order"
+      },
+      "common": {
+        "cancel": "Cancel",
+        "noChoices": "No choices are available.",
+        "none": "None",
+        "saving": "Saving…"
+      },
+      "fields": {
+        "expenseAccount": "Expense account",
+        "journal": "Journal",
+        "lineDescription": "Line description",
+        "notes": "Notes",
+        "payableAccount": "Payable account",
+        "product": "Product",
+        "purchaseOrder": "Purchase order",
+        "purchaseReturn": "Purchase return",
+        "quantity": "Quantity",
+        "requisition": "Requisition",
+        "returnReason": "Return reason",
+        "rfq": "RFQ",
+        "rfqBid": "RFQ bid",
+        "selection": "Selection",
+        "submittedBid": "Submitted bid",
+        "unitPrice": "Unit price",
+        "uom": "Unit of measure",
+        "vendor": "Vendor"
+      },
+      "placeholders": {
+        "expenseAccount": "Select an expense account",
+        "journal": "Select a journal",
+        "payableAccount": "Select a payable account",
+        "product": "Select a product",
+        "purchaseOrder": "Select a purchase order",
+        "purchaseReturn": "Select a purchase return",
+        "requisition": "Select a requisition",
+        "rfq": "Select an RFQ",
+        "rfqFirst": "Select an RFQ first",
+        "submittedBid": "Select a submitted bid",
+        "uom": "Select a unit",
+        "vendor": "Select a vendor"
+      },
+      "validation": {
+        "greaterThanZero": "greater than zero",
+        "minimum": "{{label}} must be {{minimum}}",
+        "noCurrency": "No active currency is available",
+        "required": "{{label}} is required",
+        "zeroOrGreater": "zero or greater"
+      },
+      "intakeApproval": {
+        "title": "Approve supplier intake",
+        "description": "Select the vendor to link to this supplier request. Approval requires a different person from the submitter.",
+        "submit": "Approve supplier"
       }
     },
     "ops": {
@@ -6042,6 +7293,7 @@
       "advancedTitle": "Advanced procurement",
       "approve": "Approve",
       "awardRfqBid": "Award RFQ bid",
+      "actingAs": "Acting as",
       "cannotSelfApprove": "Requester cannot approve their own request (SoD)",
       "confirmPurchaseReturn": "Confirm purchase return",
       "createBlanket": "Create blanket order",
@@ -6051,8 +7303,14 @@
       "createPurchaseReturn": "Create purchase return",
       "createRfq": "Create RFQ",
       "createVendorCredit": "Create vendor credit",
+      "delegationEnds": "Ends",
+      "delegationReason": "Reason",
+      "delegationStarts": "Starts",
+      "myself": "Myself",
       "noPendingApproval": "No pending approval request for this order.",
       "openInWorkflow": "Open in Workflow",
+      "selectPrincipal": "Select an eligible principal",
+      "selectPrincipalHelp": "Select a currently eligible principal before approving or rejecting.",
       "prompt": {
         "bidId": "Bid ID",
         "bidPriceUnit": "Bid unit price",
@@ -6105,7 +7363,15 @@
       "toApproveHelp": "Approve or reject workflow requests for ToApprove POs (SoD).",
       "toApproveTitle": "Purchase orders awaiting approval",
       "upsertScorecard": "Upsert vendor scorecard",
-      "vendorCreditFromReturn": "Vendor credit from return"
+      "vendorCreditFromReturn": "Vendor credit from return",
+      "approvalDelegate": "Set approval delegate",
+      "commodityPriceIndex": "Commodity price index",
+      "createIntegrationIntent": "New integration intent",
+      "identityHexInvalid": "Enter the 64-character identity hex",
+      "noOrder": "No purchase order",
+      "recordIntegrationResult": "Record integration result",
+      "vendorRiskFlag": "Flag vendor risk",
+      "vendorScorecard": "Vendor scorecard"
     },
     "purchaseReturns": {
       "title": "Purchase returns",
@@ -6132,6 +7398,198 @@
         "creditMoveId": "Vendor credit",
         "createDate": "Created"
       }
+    },
+    "operationsTab": "Operations",
+    "operationsTabDescription": "RFQs, returns, blanket orders and supplier configuration",
+    "order": {
+      "attachments": "Attachments",
+      "backToOrders": "Back to purchase orders",
+      "bills": "Vendor bills",
+      "createBill": "Create bill",
+      "discussion": "Discussion",
+      "handoffs": "Receipts & vendor bills",
+      "notFound": "Purchase order not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "receipts": "Receipts",
+      "status": {
+        "cancelled": "Cancelled",
+        "done": "Done",
+        "purchase": "Purchase order",
+        "rfq": "RFQ",
+        "sent": "RFQ sent",
+        "toApprove": "To approve"
+      },
+      "moreActions": "More",
+      "removeLinesDescription": "The lines are deleted from this order and its totals are recomputed.",
+      "removeLinesTitle": "Remove the selected lines?"
+    },
+    "requisition": {
+      "addLine": {
+        "description": "Description (optional)",
+        "done": "Requisition line added",
+        "failed": "Add requisition line failed",
+        "invalid": "Choose a product, a unit and a quantity above zero.",
+        "quantity": "Quantity",
+        "title": "Add requisition line",
+        "uom": "Unit of measure"
+      }
+    },
+    "kpi": {
+      "late": "Late",
+      "rfqs": "RFQs",
+      "toReceive": "To receive"
+    },
+    "blanket": {
+      "actions": {
+        "addLine": "Add line",
+        "cancel": "Cancel",
+        "closeCreateForm": "Close create form",
+        "create": "Create blanket order",
+        "createShort": "Create blanket",
+        "creating": "Creating…",
+        "openPo": "Open PO #{{id}}",
+        "release": "Release to purchase order",
+        "releaseToPo": "Release to PO",
+        "releasing": "Releasing…",
+        "remove": "Remove"
+      },
+      "authoritativeLines": "Authoritative lines",
+      "committedLines": "Committed lines",
+      "description": "Commit vendor pricing and release remaining quantities to purchase orders.",
+      "states": {
+        "draft": "Draft"
+      },
+      "effectiveDates": "Effective {{start}} – {{end}}",
+      "empty": "No blanket orders yet.",
+      "errors": {
+        "dateOrder": "Start date must be on or before the end date.",
+        "invalidLine": "Every line needs an active purchasable product, a compatible active UoM, a positive quantity, and a non-negative price.",
+        "noEligibleOrder": "There is no blanket order currently eligible for release.",
+        "notEligible": "This blanket is not eligible for release.",
+        "positiveReleaseQuantity": "Enter a positive release quantity for an available line.",
+        "quantityExceedsRemaining": "A release quantity exceeds the remaining committed quantity.",
+        "requiredHeader": "Name, an active vendor, and currency are required.",
+        "secureUuidUnavailable": "Secure UUID generation is unavailable; release cannot be started safely."
+      },
+      "fallback": {
+        "blanket": "Blanket {{id}}",
+        "currency": "Currency {{id}}",
+        "draft": "Draft",
+        "order": "Blanket order",
+        "product": "Product {{id}}",
+        "uom": "UoM {{id}}",
+        "vendor": "Vendor {{id}}"
+      },
+      "fields": {
+        "currency": "Currency",
+        "end": "End",
+        "name": "Name",
+        "plannedDate": "Planned date",
+        "productForLine": "Product for line {{line}}",
+        "quantity": "Quantity",
+        "quantityForLine": "Committed quantity for line {{line}}",
+        "releaseNotes": "Release notes",
+        "start": "Start",
+        "unitPrice": "Unit price",
+        "unitPriceForLine": "Unit price for line {{line}}",
+        "uomForLine": "UoM for line {{line}}",
+        "vendor": "Vendor"
+      },
+      "newOrder": "New blanket order",
+      "noCommittedLines": "No committed lines.",
+      "orders": "Orders",
+      "placeholders": {
+        "activeVendor": "Select an active vendor",
+        "compatibleUom": "Select compatible UoM",
+        "currency": "Select a currency",
+        "eligibleBlanket": "Select eligible blanket",
+        "notesOptional": "Notes (optional)",
+        "purchasableProduct": "Select active purchasable product"
+      },
+      "productAndUom": "{{product}} · {{uom}}",
+      "release": {
+        "chooseOrder": "Choose an eligible blanket order to enter release quantities.",
+        "eligibleBlanket": "Eligible blanket",
+        "emptyHistory": "No purchase orders have been released from this blanket.",
+        "history": "Release history",
+        "historyEntry": "PO #{{id}} · {{date}}",
+        "lineLabel": "{{product}} ({{remaining}} remaining)",
+        "option": "{{name}} · {{vendor}} · ends {{endDate}} · {{remaining}} remaining",
+        "retryHelp": "Retries use the same secure idempotency key until this attempt succeeds or is cancelled.",
+        "selectedQuantities": "Release selected quantities",
+        "title": "Release blanket to purchase order",
+        "windowClosed": "This blanket is not currently within its release window."
+      },
+      "releaseCount": "{{count}} releases",
+      "remainingAtPrice": "{{remaining}} remaining @ {{price}}",
+      "remainingParenthetical": "({{remaining}} remaining)",
+      "selectOrder": "Select a blanket order to view its details.",
+      "title": "Blanket orders",
+      "unavailableLine": "Unavailable product or UoM — not releasable",
+      "unavailableProduct": "Unavailable product"
+    },
+    "configuration": {
+      "actions": {
+        "save": "Save {{kind}}",
+        "saving": "Saving…"
+      },
+      "description": "Maintain vendor controls, sourcing settings, and integration requests.",
+      "errors": {
+        "save": "Unable to save configuration",
+        "validDate": "Enter a valid date"
+      },
+      "fields": {
+        "agreementName": "Agreement name",
+        "asOfDate": "As-of date",
+        "commodityCode": "Commodity code",
+        "contractName": "Contract name",
+        "delegateIdentity": "Delegate identity",
+        "delegationActive": "Delegation is active",
+        "delegationEnds": "Ends",
+        "delegationReason": "Reason",
+        "delegationStarts": "Starts",
+        "endDate": "End date",
+        "idempotencyKey": "Idempotency key",
+        "intentType": "Intent type",
+        "otifScore": "OTIF score",
+        "principalIdentity": "Principal identity",
+        "product": "Product",
+        "provider": "Provider",
+        "purchaseOrder": "Purchase order",
+        "qualityScore": "Quality score",
+        "rate": "Rate",
+        "reason": "Reason",
+        "requestPayload": "Request payload",
+        "riskLevel": "Risk level",
+        "startDate": "Start date",
+        "type": "Configuration type",
+        "vendor": "Vendor",
+        "vendorFlagged": "Vendor is flagged",
+        "warehouse": "Warehouse"
+      },
+      "kinds": {
+        "approvalDelegate": "Approval delegate",
+        "commodityIndex": "Commodity price index",
+        "consignment": "Consignment agreement",
+        "contract": "Purchase contract",
+        "integrationIntent": "Integration intent",
+        "riskFlag": "Vendor risk flag",
+        "scorecard": "Vendor scorecard"
+      },
+      "none": "None",
+      "placeholders": {
+        "optionalRecordId": "Optional record id",
+        "recordId": "{{label}} id",
+        "select": "Select {{label}}"
+      },
+      "risk": {
+        "critical": "Critical",
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium"
+      },
+      "saved": "{{kind}} saved",
+      "title": "Purchasing configuration"
     }
   },
   "erpWorkflow": {
@@ -6165,6 +7623,42 @@
     }
   },
   "sales": {
+    "order": {
+      "handoffs": "Deliveries & invoices",
+      "attachments": "Attachments",
+      "backToOrders": "Back to orders",
+      "deliveries": "Deliveries",
+      "discussion": "Discussion",
+      "invoices": "Invoices",
+      "moreActions": "More",
+      "notFound": "Order not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "status": {
+        "cancelled": "Cancelled",
+        "locked": "Locked",
+        "quotation": "Quotation",
+        "sale": "Sales order",
+        "sent": "Quotation sent",
+        "toApprove": "To approve"
+      },
+      "optionalProducts": "Optional products",
+      "optionalProductsEmpty": "No optional products offered on this order.",
+      "options": {
+        "added": "Added to order",
+        "description": "Description",
+        "discount": "Discount %",
+        "priceUnit": "Unit price",
+        "product": "Product",
+        "quantity": "Quantity",
+        "subtotal": "Subtotal"
+      },
+      "createReturn": "Create return",
+      "createReturnFailed": "Create return failed",
+      "createReturnHint": "Enter the quantity to return per delivered line; leave a line blank to keep it.",
+      "createReturnInvalid": "Enter a quantity above 0 for at least one line, no more than what was delivered.",
+      "createReturnLine": "{{name}} (delivered {{qty}})",
+      "createReturnReason": "Reason (optional)"
+    },
     "dashboard": {
       "ordersByState": "Orders by State",
       "exceptionQueues": "Exception queues",
@@ -6243,7 +7737,10 @@
       "recordIntegrationResult": "Record integration result",
       "reject": "Reject",
       "rejectReasonPrompt": "Reason for rejection",
-      "scheduleSla": "Schedule SLA escalation"
+      "scheduleSla": "Schedule SLA escalation",
+      "invalidJson": "Not valid JSON",
+      "noOrder": "No sale order",
+      "scheduleSlaEscalation": "Schedule SLA escalation"
     },
     "csvImport": {
       "ordersTitle": "Import sale orders (CSV)",
@@ -6259,7 +7756,8 @@
       "emptyState": {
         "title": "No sales orders yet",
         "description": "Create your first sales order to start tracking revenue.",
-        "actionLabel": "New sales order"
+        "actionLabel": "New sales order",
+        "hint": "Start with a quotation: confirming it turns it into a sales order, deliveries and an invoice."
       },
       "columns": {
         "reference": "Order #",
@@ -6273,7 +7771,8 @@
         "deliverySummary": "Delivery",
         "invoiceSummary": "Invoicing",
         "paymentSummary": "Payment",
-        "outstandingAmount": "Balance due"
+        "outstandingAmount": "Balance due",
+        "partnerName": "Customer"
       },
       "cashSummary": {
         "delivery": {
@@ -6337,7 +7836,43 @@
         "qtyInvoiced": "Invoiced",
         "priceUnit": "Unit Price",
         "priceSubtotal": "Subtotal",
-        "discount": "Disc %"
+        "discount": "Disc %",
+        "description": "Description"
+      },
+      "add": "Add line",
+      "delete": "Remove line",
+      "update": "Update line",
+      "addLine": "Add line",
+      "addProductPlaceholder": "Add a product…",
+      "discountOf": "Discount of {{product}}",
+      "discountPercent": "Discount %",
+      "empty": "No lines yet",
+      "estimatedTotal": "Total (estimated until saved)",
+      "fromPricelist": "From pricelist",
+      "keep": "Keep",
+      "listPrice": "List {{price}}",
+      "noProductMatches": "No products match",
+      "priceHelp": "Leave the price empty to use the order's pricelist. Taxes are applied when the line is saved.",
+      "product": "Product",
+      "productFallback": "Product {{id}}",
+      "quantity": "Quantity",
+      "quantityOf": "Quantity of {{product}}",
+      "removeDescription": "The order's totals are recalculated without it.",
+      "removeProduct": "Remove {{product}}",
+      "removeTitle": "Remove this line?",
+      "searchProductsPlaceholder": "Search products…",
+      "subtotal": "Subtotal",
+      "taxes": "Taxes",
+      "total": "Total",
+      "unitPrice": "Unit price",
+      "unitPriceOf": "Unit price of {{product}}",
+      "untaxed": "Untaxed",
+      "validation": {
+        "discountRange": "Discount is a percentage from 0 to 100",
+        "missingUom": "This product has no unit of measure",
+        "nonNegativePrice": "Price cannot be negative",
+        "pickProduct": "Pick a product",
+        "quantityAboveZero": "Quantity must be above zero"
       }
     },
     "pricelistItems": {
@@ -6483,7 +8018,8 @@
       "createLoyaltyProgram": "New program",
       "loyaltyCards": "Loyalty cards",
       "createLoyaltyCard": "New card",
-      "ops": "Ops"
+      "ops": "Ops",
+      "commissionPlans": "Commission plans"
     },
     "deliveryPriceRules": {
       "title": "Delivery price rules",
@@ -6937,7 +8473,26 @@
       "deleteOrderLines": "Delete lines",
       "exportCommercialPacket": "Export commercial packet",
       "omnichannelChannelPrompt": "Channel (optional, e.g. web, store)",
-      "omnichannelRoutePrompt": "Preferred route id (optional)"
+      "omnichannelRoutePrompt": "Preferred route id (optional)",
+      "archivePdfToDocuments": "Archive PDF to Documents",
+      "downloadPdf": "Download PDF"
+    },
+    "commissionPlans": {
+      "active": "Active",
+      "defaultRate": "Default rate %",
+      "empty": "No commission plans yet.",
+      "name": "Plan",
+      "partner": "Partner",
+      "share": "Share %",
+      "splitCount": "Splits",
+      "splitsTitle": "Commission splits",
+      "splitTotal": "Total share %"
+    },
+    "kpi": {
+      "quotations": "Quotations",
+      "revenueOrders": "Orders: {{count}}",
+      "revenueThisMonth": "Revenue this month",
+      "toInvoice": "Orders to invoice"
     }
   },
   "manufacturing": {
@@ -6987,6 +8542,10 @@
         "ToClose": "To Close",
         "Done": "Done",
         "Cancelled": "Cancelled"
+      },
+      "emptyState": {
+        "description": "Manufacturing orders consume components and produce finished goods, keeping stock and costs in step with the shop floor.",
+        "hint": "Define a bill of materials first so orders know what to consume."
       }
     },
     "billsOfMaterials": {
@@ -7113,9 +8672,15 @@
         "moDescription": "Order #{{id}} — status: {{state}}",
         "moParamsHint": "Production quantity applies to “Record output”. Work center fields apply to “Create work order”.",
         "produceQty": "Quantity (record output)",
+        "scrapLocation": "Scrap location",
+        "scrapQuantity": "Scrap quantity",
         "bomDescription": "BOM #{{id}}",
         "bomParamsHint": "Quantity applies to “Update quantity”. Check the box before deleting a BOM.",
         "confirmDeleteBom": "I understand this BOM and its lines will be deleted",
+        "byproductProduct": "Byproduct",
+        "byproductUom": "Byproduct UOM ID",
+        "byproductQuantity": "Byproduct quantity",
+        "byproductCostShare": "Cost share (%)",
         "woDescription": "Work order #{{id}} — status: {{state}}",
         "noActionsAvailable": "No actions available for this status",
         "wcDescription": "Work center #{{id}}",
@@ -7134,6 +8699,8 @@
         "completeLogId": "Open productivity log ID",
         "logDescription": "Description",
         "logDescriptionPlaceholder": "What happened during this time entry?",
+        "qualityCheckName": "Quality check name",
+        "qualityNote": "Quality note",
         "csvFile": "CSV file"
       },
       "titleOrder": "Manufacturing order",
@@ -7148,6 +8715,7 @@
       "cancel": "Cancel",
       "recordOutput": "Record output",
       "consumeMaterials": "Consume materials",
+      "scrapOutput": "Scrap finished output",
       "createWorkorderSection": "Add work order",
       "selectWorkcenter": "Work center",
       "durationExpected": "Expected duration (min)",
@@ -7156,6 +8724,7 @@
       "saveBomQty": "Update quantity",
       "computeCost": "Compute cost",
       "explodeBom": "Explode BOM",
+      "addByproduct": "Add byproduct",
       "deleteBom": "Delete BOM",
       "deleteBomConfirm": "Delete this BOM and its lines? This cannot be undone.",
       "saveName": "Save name",
@@ -7163,6 +8732,9 @@
       "block": "Block",
       "unblock": "Unblock",
       "logProductivity": "Log productivity",
+      "requireQuality": "Require quality check",
+      "passQuality": "Pass quality check",
+      "failQuality": "Fail quality check",
       "createRoutingOperation": "Add routing operation",
       "completeProductivityLog": "Complete productivity log",
       "linkIotDevice": "Link IoT device",
@@ -7221,6 +8793,15 @@
       "newBom": {
         "title": "New Bill of Materials",
         "description": "Define a product structure",
+        "components": {
+          "title": "Components",
+          "product": "Component product",
+          "selectProduct": "Select a component…",
+          "quantity": "Quantity per BOM",
+          "add": "Add component",
+          "remove": "Remove component",
+          "invalid": "Select products with a valid unit of measure and enter positive component quantities."
+        },
         "sections": {
           "product": "Product"
         },
@@ -7258,6 +8839,33 @@
           "oeeTarget": "OEE Target %",
           "oeeTargetPlaceholder": "85"
         }
+      }
+    },
+    "page": {
+      "backToOrders": "Back to manufacturing orders",
+      "discussion": "Discussion",
+      "notFound": "Manufacturing order not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "produced": "produced",
+      "actionDone": "{{action}} completed",
+      "actionFailed": "{{action}} failed",
+      "actions": {
+        "cancel": "Cancel order",
+        "cancelConfirm": "Cancel this manufacturing order? A done order cannot be cancelled.",
+        "confirm": "Confirm",
+        "consume": "Consume materials",
+        "consumeConfirm": "Consume the bill-of-materials components for this order from stock.",
+        "finish": "Finish",
+        "produce": "Record output",
+        "produceHint": "Quantity produced now. {{remaining}} remaining.",
+        "produceInvalid": "Enter a quantity above 0 and no more than the {{remaining}} remaining.",
+        "produceQty": "Quantity produced",
+        "start": "Start"
+      },
+      "workorderActions": {
+        "finish": "Finish work order",
+        "finishConfirm": "Stop the clock and mark this work order done. Open quality checks must already pass.",
+        "start": "Start work order"
       }
     }
   },
@@ -7312,6 +8920,10 @@
         "Paused": "Paused",
         "Done": "Done",
         "Cancelled": "Cancelled"
+      },
+      "emptyState": {
+        "description": "Projects group tasks, timesheets and billing for a piece of work, so progress and profitability are visible.",
+        "hint": "Add tasks to a project, then log time against them."
       }
     },
     "tasks": {
@@ -7349,7 +8961,8 @@
         "Changes": "Changes Requested",
         "Approved": "Approved",
         "Done": "Done",
-        "Cancelled": "Cancelled"
+        "Cancelled": "Cancelled",
+        "ChangesRequested": "Changes requested"
       },
       "priority": {
         "0": "Normal",
@@ -7555,6 +9168,26 @@
           "descriptionPlaceholder": "What did you work on?"
         }
       }
+    },
+    "page": {
+      "backToProjects": "Back to projects",
+      "discussion": "Discussion",
+      "edit": "Edit",
+      "notFound": "Project not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "openTasksBoard": "Open tasks board",
+      "board": "Board",
+      "archive": "Archive",
+      "archiveConfirm": "Archive this project?",
+      "archived": "Project archived",
+      "duplicate": "Duplicate",
+      "duplicated": "Project duplicated",
+      "moreActions": "More",
+      "unarchive": "Unarchive",
+      "unarchived": "Project unarchived"
+    },
+    "inlineEdit": {
+      "nameRequired": "A project needs a name"
     }
   },
   "calendar": {
@@ -7634,7 +9267,19 @@
       "edit": "Edit",
       "delete": "Delete",
       "closeAria": "Close",
-      "relatedTo": "Related {{type}}"
+      "relatedTo": "Related {{type}}",
+      "open": "Open",
+      "attendees": "Attendees",
+      "cancel": "Cancel event",
+      "cancelConfirm": "Cancel this event?",
+      "confirm": "Confirm event",
+      "noAttendees": "No attendees",
+      "editRecurrence": "Edit recurrence",
+      "rrule": "Recurrence rule",
+      "rruleType": "Recurrence type",
+      "duplicate": "Duplicate",
+      "duplicated": "Event duplicated",
+      "moreActions": "More"
     },
     "view": {
       "today": "Today",
@@ -7651,6 +9296,15 @@
         "fri": "Fri",
         "sat": "Sat"
       }
+    },
+    "page": {
+      "backToCalendar": "Back to calendar",
+      "discussion": "Discussion",
+      "notFound": "Event not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization."
+    },
+    "inlineEdit": {
+      "nameRequired": "An event needs a title"
     }
   },
   "documents": {
@@ -7670,7 +9324,9 @@
         "createDate": "Created",
         "fiscalKind": "Fiscal kind",
         "residencyRegion": "Residency",
-        "retentionDays": "Retention"
+        "retentionDays": "Retention",
+        "description": "Description",
+        "resName": "Attached to"
       },
       "filters": {
         "isDeleted": {
@@ -7997,12 +9653,115 @@
           "classificationIdHint": "Optional data_classification row id"
         }
       }
+    },
+    "backToDocuments": "Back to documents",
+    "notFound": "Document not found",
+    "notFoundHint": "It may have been purged, or belong to another organization.",
+    "page": {
+      "delete": "Delete",
+      "deleted": "In recycle bin",
+      "deleteHint": "You can restore it from the recycle bin.",
+      "deleteTitle": "Move to recycle bin?",
+      "discussion": "Discussion",
+      "edit": "Edit",
+      "favorite": "Favorite",
+      "linkedRecord": "Attached record",
+      "lock": "Lock",
+      "locked": "Locked",
+      "noVersions": "No versions yet",
+      "openFile": "Open file",
+      "restore": "Restore",
+      "setRetention": "Set retention",
+      "shared": "Shared",
+      "unlock": "Unlock",
+      "uploadVersion": "Upload version",
+      "versions": "Versions",
+      "legalHold": "Legal hold",
+      "move": "Move to folder",
+      "externalRefs": "External references",
+      "heldHint": "Not allowed while a legal hold is active. Release the hold first.",
+      "holdDate": "Held since",
+      "holdReason": "Reason",
+      "legalHoldActive": "Legal hold",
+      "legalHoldBadge": "Legal hold",
+      "loadError": "Could not load this data.",
+      "noExternalRefs": "No external references",
+      "noSignatures": "No signature requests",
+      "refDirection": "Last sync direction",
+      "refExternalId": "External ID",
+      "refLastSync": "Last synced",
+      "refSystem": "System",
+      "releaseHold": "Release hold",
+      "releaseHoldHint": "The document can be changed, deleted or purged again once the hold is released.",
+      "releaseHoldTitle": "Release legal hold?",
+      "releaseNote": "Note (optional)",
+      "signatureCompleted": "Completed",
+      "signatureRequested": "Requested",
+      "signatures": "Signatures",
+      "signatureStatus": "Status",
+      "signerCount": "Signers",
+      "requestSignature": "Request signature",
+      "requestSignatureDone": "Signature requested",
+      "requestSignatureHint": "Record the e-signature envelope created with your provider for this document.",
+      "requestSignatureTitle": "Request signature",
+      "signatureEnvelope": "Envelope ID",
+      "signatureEnvelopeRequired": "An envelope ID is required",
+      "signatureProvider": "Provider",
+      "signatureProviderRequired": "A provider is required",
+      "signatureSigners": "Signers (optional)",
+      "signatureSignersHint": "One e-mail address per line.",
+      "signatureSignersInvalid": "Enter valid e-mail addresses, one per line"
+    },
+    "knowledgeActions": {
+      "categoryInvalid": "Enter a name, a colour from 0 to 11 and a whole-number sequence.",
+      "delayInvalid": "Enter a whole number of seconds, 1 or more.",
+      "delaySeconds": "Delay (seconds)",
+      "deleteCategory": "Delete category",
+      "deleteCategoryConfirm": "Delete this category? Only categories without articles can be deleted, so move or delete their articles first.",
+      "done": "{{action}} completed",
+      "editCategory": "Edit category",
+      "failed": "{{action}} failed",
+      "memberIdentity": "Member identity (hex)",
+      "memberRequired": "Member identity is required.",
+      "removeMember": "Remove member",
+      "retentionPurge": "Run retention purge",
+      "retentionPurgeConfirm": "Schedule the purge to run in {{seconds}} seconds? Purged documents cannot be restored.",
+      "retentionPurgeHint": "Permanently deletes recycle-bin documents whose retention period has ended, after the delay.",
+      "retentionPurgeScheduled": "Retention purge scheduled in {{seconds}} seconds"
+    },
+    "browser": {
+      "allFiles": "All files",
+      "folders": "Folders",
+      "noFolders": "No folders yet. Create one to organise your files.",
+      "search": "Search files…",
+      "newFolder": "New folder",
+      "upload": "Upload",
+      "uploading": "Uploading…",
+      "fileCount": "{{count}} files",
+      "fileCount_one": "{{count}} file",
+      "updated": "Updated {{date}}",
+      "layout": "File layout",
+      "grid": "Grid view",
+      "list": "List view",
+      "empty": "No files here yet",
+      "noMatches": "No files match your search",
+      "dropHint": "Drop files here or use Upload.",
+      "name": "Name",
+      "size": "Size",
+      "modifiedBy": "Modified by",
+      "modified": "Modified",
+      "viewFiles": "Files",
+      "viewTable": "Table",
+      "uploadFailed": "Upload failed"
     }
   },
   "helpdesk": {
     "actions": {
       "importTicketsCsv": "Import tickets (CSV)",
-      "editTicket": "Edit ticket"
+      "editTicket": "Edit ticket",
+      "importSlasCsv": "Import SLAs (CSV)",
+      "importStagesCsv": "Import stages (CSV)",
+      "importTeamsCsv": "Import teams (CSV)"
     },
     "tabs": {
       "teams": "Teams",
@@ -8107,6 +9866,10 @@
         "normal": "Normal",
         "high": "High",
         "urgent": "Urgent"
+      },
+      "emptyState": {
+        "description": "Tickets track every customer request from first contact to resolution, so nothing gets lost.",
+        "hint": "Assign tickets to a team and SLAs will time them for you."
       }
     },
     "forms": {
@@ -8220,6 +9983,14 @@
           "description": "Headers must match the server import template for SLAs."
         }
       }
+    },
+    "discussion": "Discussion",
+    "inlineEdit": {
+      "nameRequired": "A ticket needs a subject"
+    },
+    "kpi": {
+      "open": "Open tickets",
+      "slaBreached": "SLA breached"
     }
   },
   "subscriptions": {
@@ -8273,6 +10044,10 @@
       "health": {
         "good": "Good",
         "bad": "At risk"
+      },
+      "emptyState": {
+        "description": "Subscriptions bill customers on a schedule and drive recurring revenue reporting.",
+        "hint": "Create a plan first, then attach it to a customer's subscription."
       }
     },
     "plans": {
@@ -8291,6 +10066,32 @@
         "productId": "Product",
         "recurrenceId": "Billing Cycle",
         "active": "Active"
+      },
+      "actions": {
+        "activate": "Activate plan",
+        "deactivate": "Deactivate plan",
+        "deactivateConfirm": "Deactivating a plan also unpublishes it, so it can no longer be chosen for new subscriptions.",
+        "edit": "Edit plan",
+        "failed": "{{action}} failed",
+        "newBundle": "New bundle"
+      },
+      "bundle": {
+        "invalid": "Choose a plan and enter a name and a code.",
+        "plan": "Plan"
+      },
+      "edit": {
+        "description": "Description",
+        "invalidBillingPeriod": "Choose a billing period: day, week, month or year.",
+        "invalidBillingPeriodUnit": "The billing interval must be a whole number of at least 1.",
+        "invalidCode": "A plan code cannot be blank.",
+        "invalidInvoiceDay": "The invoice day must be a whole number from 1 to 28.",
+        "invalidName": "Enter a plan name.",
+        "invalidPaymentMode": "Choose a payment mode: draft invoice or automated payment.",
+        "invalidTrialDuration": "The trial duration must be a whole number of 0 or more.",
+        "isPublished": "Published",
+        "paymentMode": "Payment mode",
+        "recurringInvoiceDay": "Invoice day (1-28)",
+        "unchanged": "Nothing to change."
       }
     },
     "deferredSchedules": {
@@ -8436,8 +10237,11 @@
           "recurrenceId": "Billing Cycle",
           "recurrencePlaceholder": "Recurrence ID",
           "options": {
+            "day": "Day",
+            "week": "Week",
+            "month": "Month",
+            "year": "Year",
             "monthly": "Monthly",
-            "quarterly": "Quarterly",
             "yearly": "Yearly"
           }
         }
@@ -8734,6 +10538,38 @@
       "emptyMessage": "No usage events yet.",
       "tabLabel": "Usage events",
       "title": "Usage events"
+    },
+    "backToSubscriptions": "Back to subscriptions",
+    "notFound": "Subscription not found",
+    "notFoundHint": "It may have been deleted, or belong to another organization.",
+    "page": {
+      "attachments": "Attachments",
+      "billing": "Invoices & payments",
+      "discussion": "Discussion",
+      "moreInList": "More actions",
+      "moreInListHint": "Close, invoice, amend, renew and the other actions that ask for details are in the list.",
+      "moreActions": "More"
+    },
+    "paymentIntent": {
+      "amount": "Amount",
+      "create": "Create payment intent",
+      "currency": "Currency",
+      "failed": "Create payment intent failed",
+      "intentType": "Intent type",
+      "invalid": "Choose an intent type and a currency, and enter an amount above zero (and a valid invoice move ID, if any).",
+      "invoiceMoveId": "Invoice move ID (optional)"
+    },
+    "bundles": {
+      "columns": {
+        "active": "Active",
+        "code": "Code",
+        "name": "Name",
+        "plan": "Plan"
+      },
+      "description": "Bundles group extra items on top of a subscription plan",
+      "emptyMessage": "No bundles yet. Use New bundle on the Plans tab.",
+      "tabLabel": "Bundles",
+      "title": "Bundles"
     }
   },
   "expenses": {
@@ -8785,6 +10621,10 @@
         "Posted": "Posted",
         "Done": "Done",
         "Refused": "Refused"
+      },
+      "emptyState": {
+        "description": "Expenses record what employees spend so it can be approved, reimbursed and booked to the right accounts.",
+        "hint": "Group expenses into a report to submit them for approval."
       }
     },
     "expenseReports": {
@@ -8851,7 +10691,8 @@
       "noApprovalRequests": "No workflow approval requests for this report yet.",
       "setAllocations": "Split allocations",
       "projectRebill": "Project rebill invoice",
-      "accountingMoves": "Accounting moves"
+      "accountingMoves": "Accounting moves",
+      "financeFailed": "Expense report action failed"
     },
     "capture": {
       "title": "Mobile capture (delayed sync)",
@@ -8978,6 +10819,7 @@
           "paymentModeCorporateCard": "Corporate card",
           "merchantKey": "Merchant",
           "merchantKeyPlaceholder": "e.g. starbucks",
+          "receiptFile": "Receipt file",
           "storageKey": "Receipt storage key",
           "storageKeyPlaceholder": "Opaque key (auto-generated if empty when receipt checked)",
           "hasReceipt": "Receipt attached (required to submit report)",
@@ -9043,6 +10885,7 @@
           "taxIds": "Tax IDs",
           "paymentMode": "Payment mode",
           "merchantKey": "Merchant",
+          "receiptFile": "Receipt file",
           "hasReceipt": "Receipt attached",
           "description": "Notes"
         }
@@ -9164,6 +11007,21 @@
           "incomeAccountId": "Income account"
         }
       }
+    },
+    "operationsTab": "Operations",
+    "operationsTabDescription": "Receipt capture queue, card statements and expense settings",
+    "page": {
+      "backToReports": "Back to expense reports",
+      "discussion": "Discussion",
+      "moreInList": "Post or reimburse in the list",
+      "moreInListHint": "Posting, reimbursing and rebilling ask for details and are done from the list.",
+      "notFound": "Expense report not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "refuseReason": "Reason (optional)"
+    },
+    "inlineEdit": {
+      "nameRequired": "An expense needs a description",
+      "quantityInvalid": "Quantity must be above 0"
     }
   },
   "workflows": {
@@ -9513,7 +11371,8 @@
         "resId": "Record ID",
         "messageType": "Type",
         "subtype": "Subtype",
-        "date": "Date"
+        "date": "Date",
+        "author": "Author"
       },
       "states": {
         "email": "Email",
@@ -9608,6 +11467,18 @@
       "description": "Chatter notifications for records you follow",
       "searchPlaceholder": "Search notifications…",
       "emptyMessage": "No notifications for you yet. Follow a record and post a note to receive updates."
+    },
+    "page": {
+      "backToMessages": "Back to messages",
+      "filedOn": "Filed on",
+      "inReplyTo": "In reply to",
+      "noReplies": "No replies yet.",
+      "notFound": "Message not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "openReply": "Open",
+      "replies": "Replies",
+      "reply": "Reply",
+      "thread": "Replies"
     }
   },
   "pos": {
@@ -9753,6 +11624,42 @@
         }
       },
       "operations": "Operations"
+    },
+    "session": {
+      "backToSessions": "Back to sessions",
+      "cashDifference": "Difference",
+      "cashEnd": "Counted cash",
+      "cashStart": "Opening cash",
+      "discussion": "Discussion",
+      "notFound": "Session not found",
+      "notFoundHint": "It may have been deleted, or belong to another organization.",
+      "startAt": "Opened",
+      "states": {
+        "closed": "Closed",
+        "closingControl": "Closing control",
+        "new": "New",
+        "opened": "Open",
+        "openingControl": "Opening control"
+      },
+      "stopAt": "Closed",
+      "openNew": "Open a new session",
+      "orders": "Orders"
+    },
+    "orders": {
+      "columns": {
+        "date": "Date",
+        "partner": "Customer",
+        "reference": "Reference",
+        "state": "State",
+        "total": "Total"
+      },
+      "emptyMessage": "No orders in this session",
+      "error": "Orders could not be loaded",
+      "linesUnavailable": "Order lines and payments are not available here.",
+      "loadMore": "Load more",
+      "loadMoreHint": "No orders for this session in the pages loaded so far.",
+      "searchPlaceholder": "Search orders",
+      "title": "Orders"
     }
   },
   "aiChat": {
@@ -9795,10 +11702,114 @@
     }
   },
   "aiHarness": {
+    "title": "AI Workbench",
+    "description": "Compose AI reports, scan stock and review AI-proposed actions with their evidence",
+    "enums": {
+      "verificationMethods": {
+        "none": "Not verified",
+        "deterministic": "Deterministic",
+        "modelAssisted": "Model assisted",
+        "humanReviewed": "Human reviewed"
+      },
+      "verificationOutcomes": {
+        "unverified": "Unverified",
+        "supported": "Supported",
+        "qualified": "Qualified",
+        "unsupported": "Unsupported",
+        "unresolved": "Unresolved",
+        "traceable": "Traceable"
+      },
+      "evidenceStatuses": {
+        "proposed": "Proposed",
+        "accepted": "Accepted",
+        "rejected": "Rejected",
+        "superseded": "Superseded",
+        "needsReview": "Needs review",
+        "current": "Current",
+        "invalid": "Invalid"
+      },
+      "runStatuses": {
+        "pending": "Pending",
+        "ready": "Ready",
+        "running": "Running",
+        "waitingInput": "Waiting for input",
+        "waitingApproval": "Waiting for approval",
+        "interrupted": "Interrupted",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "failed": "Failed",
+        "agentSettled": "Agent settled"
+      },
+      "questionStatuses": {
+        "open": "Open",
+        "answered": "Answered",
+        "skipped": "Skipped"
+      },
+      "eventKinds": {
+        "initialized": "Initialized",
+        "checkpoint": "Checkpoint advanced",
+        "questionAsked": "Question asked",
+        "questionReplied": "Question answered",
+        "steered": "Steered",
+        "interrupted": "Interrupted",
+        "resumed": "Resumed",
+        "forked": "Forked",
+        "compared": "Compared"
+      },
+      "linkStates": {
+        "linked": "Linked",
+        "changed": "Changed",
+        "unresolved": "Unresolved"
+      },
+      "availability": {
+        "available": "Available",
+        "restricted": "Restricted",
+        "tombstoned": "Deleted",
+        "outOfScope": "Out of scope",
+        "missing": "Missing"
+      },
+      "reviewTargets": {
+        "claim": "claim",
+        "decision": "decision",
+        "workflowStep": "workflow step"
+      },
+      "reviewOutcomes": {
+        "confirmed": "Confirmed"
+      },
+      "claimKinds": {
+        "policy": "Policy",
+        "inference": "Inference",
+        "sourcedFact": "Sourced fact",
+        "calculation": "Calculation",
+        "quotation": "Quotation",
+        "paraphrase": "Paraphrase",
+        "recommendation": "Recommendation",
+        "concept": "Concept"
+      },
+      "proposerKinds": {
+        "agent": "Agent",
+        "contributor": "Contributor",
+        "human": "Human",
+        "user": "User",
+        "system": "System"
+      },
+      "policyOutcomes": {
+        "allow": "Allowed",
+        "draftOnly": "Draft only",
+        "deny": "Denied"
+      },
+      "riskClasses": {
+        "green": "Green risk",
+        "amber": "Amber risk",
+        "red": "Red risk"
+      }
+    },
     "tabs": {
       "reportComposer": "Report composer",
       "lowStock": "Low stock",
-      "redActionDrafts": "Red action drafts"
+      "redActionDrafts": "Red action drafts",
+      "evidenceReviewer": "Evidence reviewer",
+      "runLifecycle": "Run lifecycle"
     },
     "auditTrail": {
       "title": "Audit trail",
@@ -9871,6 +11882,229 @@
       "nameColumn": "Product",
       "qtyColumn": "On hand",
       "reorderColumn": "Reorder level"
+    },
+    "companyDataError": "Company data {{status}}: {{message}}",
+    "reviewQueue": {
+      "accept": "Accept",
+      "accessDenied": "Access denied",
+      "adoptedClaims": "Adopts claims {{claims}} · created by {{creator}}",
+      "adoptedClaims_one": "Adopts claim {{claims}} · created by {{creator}}",
+      "adoptedClaims_other": "Adopts claims {{claims}} · created by {{creator}}",
+      "affects": "Affects: {{steps}}",
+      "awaitingPerson": "Awaiting a person",
+      "claimNumber": "Claim #{{id}}",
+      "claimsAriaLabel": "Claims awaiting review",
+      "claimsCount": "Claims ({{count}}{{suffix}})",
+      "confirmContent": "Confirm this content",
+      "contentHash": "Content {{hash}}",
+      "contributor": "contributor",
+      "createdBy": "Created by {{creator}}{{proposal}}",
+      "decisionTitle": "Decision #{{id}}: {{title}}",
+      "decisionsAriaLabel": "Decisions awaiting review",
+      "decisionsCount": "Decisions ({{count}}{{suffix}})",
+      "description": "Claims and decisions awaiting a person, and workflow steps whose links need confirming. You cannot review what you created or proposed.",
+      "errors": {
+        "loadFailed": "The review queue could not be loaded.",
+        "qualifiedNoteRequired": "A qualified verdict must say how it is qualified. Add a note.",
+        "reviewFailed": "The review could not be recorded.",
+        "reviewerRequired": "Reviewer access is required.",
+        "unavailable": "The review queue is unavailable.",
+        "verdictFailed": "That verdict could not be recorded."
+      },
+      "inspect": "Inspect",
+      "leaveUnresolved": "Leave unresolved",
+      "needsReview": "Needs review",
+      "noClaims": "No claims are waiting for review.",
+      "noDecisions": "No decisions are waiting for review.",
+      "noWorkflowSteps": "No workflow step needs its links confirmed.",
+      "none": "none",
+      "noteLabel": "Note for the next verdict",
+      "otherReviewerRequired": "You created or proposed this, so another reviewer must decide.",
+      "proposedBy": " · proposed by {{kind}} {{proposer}}",
+      "qualified": "Qualified",
+      "queueUnavailable": "Queue unavailable",
+      "recorded": "Recorded",
+      "refresh": "Refresh",
+      "reject": "Reject",
+      "reviewRejected": "Review rejected",
+      "sources": "Sources: {{sources}}",
+      "supported": "Supported",
+      "thisCompany": "This company",
+      "title": "Review queue",
+      "unsupported": "Unsupported",
+      "untitledDecision": "Untitled decision",
+      "verdictRecorded": "{{kind}} #{{id}}: {{outcome}}.",
+      "workflowStep": "workflow step",
+      "workflowStepLabel": "workflow {{workflowId}} · step {{nodeKey}}",
+      "workflowStepsAriaLabel": "Workflow steps needing link review",
+      "workflowStepsCount": "Workflow steps ({{count}}{{suffix}})"
+    },
+    "evidenceReviewer": {
+      "accepted": "Accepted",
+      "accessDenied": "Access denied",
+      "adoptedClaimIds": "Adopted claim IDs",
+      "adoptedClaimIdsPlaceholder": "12, 18",
+      "authorUnknown": "Author unknown",
+      "captureDecisionDescription": "The active assistant discussion supplies the user-attributed contribution; the decision remains proposed until reviewed.",
+      "captureDecisionTitle": "Capture a discussion decision",
+      "captureProposedDecision": "Capture proposed decision",
+      "claim": "Claim",
+      "claimHeading": "Claim #{{id}}",
+      "company": "Company",
+      "companyPlaceholder": "Select a company…",
+      "decision": "Decision",
+      "decisionCaptured": "Decision #{{id}} was captured with its user contribution and is awaiting review.",
+      "decisionHeading": "Decision #{{id}}: {{title}}",
+      "decisionTitle": "Title",
+      "description": "Inspect a decision or claim and trace it back to reviewed passages and attributed sources.",
+      "errors": {
+        "chooseCompanyAndRecord": "Choose a company and enter a positive record ID.",
+        "decisionCaptureFailed": "The decision could not be captured.",
+        "decisionFieldsRequired": "Choose a company, start an assistant discussion, and provide a title, rationale, and adopted claim IDs.",
+        "decisionResponseIncomplete": "The captured decision response was incomplete.",
+        "exportFailed": "The authorized run export could not be created.",
+        "inspectionIncomplete": "The inspection response was incomplete.",
+        "inspectionLoadFailed": "The evidence inspection could not be loaded.",
+        "inspectionUnavailable": "The evidence inspection service is unavailable.",
+        "lineageNotFound": "No evidence lineage was found for that record.",
+        "noPersistedClaims": "This run has no persisted answer claims.",
+        "nodeKeyRequired": "Enter the workflow step's node key.",
+        "reviewFailed": "The review could not be recorded.",
+        "reviewerRequired": "Reviewer access is required.",
+        "runInspectionLoadFailed": "The run evidence inspection could not be loaded.",
+        "runInspectionUnavailable": "The run evidence inspection is unavailable."
+      },
+      "excerptUnavailable": "Excerpt unavailable for this reviewer.",
+      "exportRun": "Export run #{{id}}",
+      "findLineage": "Find evidence lineage",
+      "fromRevision": " · from #{{id}}",
+      "inspectLineage": "Inspect lineage",
+      "inspectionUnavailable": "Inspection unavailable",
+      "lineagePasses": "Lineage passes",
+      "mutationRejected": "Mutation rejected",
+      "noAuthor": "No author recorded",
+      "noEvidenceDescription": "Select a company and enter a decision or claim ID to inspect its lineage.",
+      "noEvidenceSelected": "No evidence selected",
+      "noLineageDescription": "The record exists, but no inspectable decision, claim, passage, or source links were returned.",
+      "noLineageRecords": "No lineage records",
+      "noRationale": "No rationale recorded.",
+      "observableRationale": "Observable rationale",
+      "originalRevision": " · original",
+      "outOfScope": "Out of scope",
+      "outcome": "Outcome",
+      "passageHeading": "Passage #{{id}}",
+      "qualified": "Qualified",
+      "recordId": "Record ID",
+      "recordReview": "Record review",
+      "recordType": "Record type",
+      "recordVerdict": "Record reviewer verdict",
+      "recordVerdictDescription": "The authenticated reviewer and timestamp are recorded by the evidence reducer.",
+      "rejected": "Rejected",
+      "reviewNote": "Review note",
+      "reviewRecorded": "{{kind}} review recorded.",
+      "reviewRequired": "Review required",
+      "reviewedBy": " · reviewed by {{reviewer}}",
+      "reviewerOnly": "Reviewer only",
+      "saved": "Saved",
+      "scopeUnknown": "Scope unknown",
+      "sessionIdentity": "Organization and reviewer identity come from your session.",
+      "sourceHeading": "Source #{{id}}",
+      "sourceMetadataHidden": "Source metadata is hidden for this reviewer.",
+      "stepNodeKey": "Step node key",
+      "stepRevisions": "Step revisions",
+      "stepRevisionsDescription": "Newest first, following each edit or fork back to the original.",
+      "supported": "Supported",
+      "title": "Evidence reviewer",
+      "unsupported": "Unsupported",
+      "untitledDecision": "Untitled decision",
+      "untitledSource": "Untitled source",
+      "workflowStep": "Workflow step",
+      "workflowVersionId": "Workflow version ID"
+    },
+    "runLifecycle": {
+      "accessDenied": "Access denied",
+      "answeredSuffix": " · answered",
+      "answersHidden": "Answer contents are intentionally not displayed.",
+      "authenticatedSession": "Authenticated session",
+      "command": "Command",
+      "commands": {
+        "ask": "Ask question",
+        "compare": "Compare",
+        "fork": "Fork",
+        "interrupt": "Interrupt",
+        "reply": "Reply",
+        "resume": "Resume",
+        "steer": "Steer"
+      },
+      "company": "Company",
+      "companyPlaceholder": "Select company…",
+      "comparison": "Comparison",
+      "comparisonDescription": "The current core response confirms the compared continuations but does not yet expose bounded component, evidence, or validation differences.",
+      "comparisonSummary": "Run #{{leftRunId}} at cursor {{leftCursor}} compared with run #{{rightRunId}} at cursor {{rightCursor}}.",
+      "completed": "Completed",
+      "controlDescription": "Every command uses the latest returned continuation token.",
+      "controlTitle": "Run control",
+      "controlsUnavailable": "Controls unavailable",
+      "cursor": "cursor {{cursor}}",
+      "description": "Inspect and steer durable AI runs without supplying organization, identity, or credentials.",
+      "durationMs": "{{duration}} ms",
+      "errors": {
+        "chooseCompany": "Choose a company first.",
+        "operationFailed": "The run operation could not be completed.",
+        "positiveRunId": "Enter a positive run ID.",
+        "responseIncomplete": "The lifecycle response was incomplete.",
+        "runDenied": "This run is unavailable to the current session.",
+        "runNotFound": "No authorized run was found.",
+        "serviceUnavailable": "The lifecycle service is unavailable.",
+        "transcriptIncomplete": "The governed tool transcript response was incomplete.",
+        "transcriptNotFound": "No governed tool transcript was found for this lifecycle run.",
+        "transcriptUnauthorized": "The current session is not authorized to inspect this run's transcript.",
+        "transcriptUnavailable": "The governed tool transcript is temporarily unavailable."
+      },
+      "events": "Events",
+      "executeCommand": "Execute {{command}}",
+      "failed": "Failed",
+      "fields": {
+        "answer": "Answer",
+        "childRunKey": "Child run key",
+        "forkKey": "Fork key",
+        "instruction": "Instruction",
+        "otherCheckpointHash": "Other checkpoint hash",
+        "otherConcurrencyVersion": "Other concurrency version",
+        "otherCursor": "Other cursor",
+        "otherRunId": "Other run ID",
+        "prompt": "Prompt",
+        "question": "Question",
+        "questionKey": "Question key",
+        "questionPlaceholder": "Select question…",
+        "reason": "Reason"
+      },
+      "idle": "Inspect an authorized run to view questions, events, and available controls.",
+      "inputHash": "input hash {{hash}}",
+      "inspect": "Inspect",
+      "inspectDescription": "Company access and run ownership are rechecked on the server.",
+      "inspectTitle": "Inspect a run",
+      "noContinuation": "No continuation",
+      "noEvents": "No observable events.",
+      "noQuestions": "No questions.",
+      "noToolSteps": "No observable tool steps were returned.",
+      "noValidContinuation": "This response has no valid continuation.",
+      "questionNumber": "Question {{id}}",
+      "questionStatus": "{{status}} · revision {{revision}}{{answered}}",
+      "questions": "Questions",
+      "required": "Required",
+      "runId": "Run ID",
+      "runNumber": "Run #{{id}}",
+      "stepCount": "{{count}} steps",
+      "stepCount_one": "{{count}} step",
+      "stepCount_other": "{{count}} steps",
+      "stepNumber": "Step {{number}}",
+      "title": "Run lifecycle",
+      "tokenCount": "{{count}} tokens",
+      "transcriptDescription": "Ordered persisted steps; raw arguments, results, answers, and error messages are not exposed.",
+      "transcriptTitle": "Governed tool transcript",
+      "transcriptUnavailable": "Transcript unavailable",
+      "unavailable": "Lifecycle unavailable"
     }
   },
   "map": {
@@ -9885,6 +12119,7 @@
     "emptyDataHint": "No live map pins yet — create fleet vehicles (with position), POS terminals, or warehouse geo to populate coordinates.",
     "fleet": {
       "title": "Fleet",
+      "description": "Vehicles, drivers, fuel and maintenance",
       "subtitle": "Vehicles",
       "empty": "No vehicles yet.",
       "create": "Add vehicle",
@@ -9998,6 +12233,12 @@
       "serviceType": "Service type",
       "provider": "Provider",
       "notes": "Notes",
+      "costAmount": "Service cost",
+      "currency": "Currency",
+      "accountMove": "Journal entry",
+      "journal": "Journal",
+      "expenseAccount": "Expense account",
+      "offsetAccount": "Offset account",
       "servicedAt": "Serviced at",
       "inspectedAt": "Inspected at",
       "outcome": "Outcome",
@@ -10024,6 +12265,13 @@
         "failed": "Failed",
         "attentionRequired": "Attention required"
       }
+    },
+    "description": "Vehicles, drivers, fuel and maintenance",
+    "page": {
+      "backToVehicles": "Back to vehicles",
+      "discussion": "Discussion",
+      "notFound": "Vehicle not found",
+      "notFoundHint": "It may have been deleted, or belong to another company."
     }
   },
   "tasks": {
@@ -10050,7 +12298,95 @@
         "Cancelled": "Cancelled"
       },
       "changeState": "Move to…",
-      "viewProjects": "Open in Projects"
+      "viewProjects": "Open in Projects",
+      "allMembers": "All Members",
+      "assigneeFilterPlaceholder": "Filter by assignee",
+      "boardView": "Board view",
+      "dropTasksHere": "Drop tasks here",
+      "listView": "List view",
+      "wipLimitReached": "WIP limit reached ({{limit}})",
+      "tableView": "Table",
+      "moveFailed": "Could not move the task"
+    },
+    "actions": {
+      "addComment": "Add comment",
+      "create": "Create Task",
+      "openMenu": "Open actions for {{key}}",
+      "viewDetails": "View Details"
+    },
+    "assignee": {
+      "select": "Select assignee",
+      "unassigned": "Unassigned"
+    },
+    "card": {
+      "storyPoints": "{{count}} SP",
+      "comments": "{{count}} comments",
+      "attachments": "{{count}} attachments",
+      "progress": "Progress"
+    },
+    "create": {
+      "descriptionPlaceholder": "Enter task description",
+      "labelsPlaceholder": "frontend, bug-fix, urgent",
+      "title": "Create New Task",
+      "titlePlaceholder": "Enter task title"
+    },
+    "detail": {
+      "commentPlaceholder": "Add a comment...",
+      "commentsCount": "Comments ({{count}})",
+      "createdOn": "Created: {{date}}",
+      "descriptionPlaceholder": "Add a description...",
+      "noDescription": "No description provided",
+      "noLabels": "No labels",
+      "notSet": "Not set",
+      "updatedOn": "Updated: {{date}}"
+    },
+    "fields": {
+      "assignee": "Assignee",
+      "description": "Description",
+      "dueDate": "Due Date",
+      "key": "Key",
+      "labels": "Labels",
+      "labelsCommaSeparated": "Labels (comma-separated)",
+      "priority": "Priority",
+      "requiredTitle": "Title *",
+      "status": "Status",
+      "storyPoints": "Story Points",
+      "title": "Title",
+      "type": "Type"
+    },
+    "identity": {
+      "currentUser": "Current User"
+    },
+    "priorities": {
+      "high": "High",
+      "low": "Low",
+      "medium": "Medium",
+      "urgent": "Urgent"
+    },
+    "sprint": {
+      "statuses": {
+        "active": "Active",
+        "completed": "Completed",
+        "planning": "Planning"
+      }
+    },
+    "stats": {
+      "completed": "Completed",
+      "totalTasks": "Total Tasks"
+    },
+    "statuses": {
+      "backlog": "Backlog",
+      "done": "Done",
+      "in-progress": "In Progress",
+      "review": "Review",
+      "todo": "To Do"
+    },
+    "types": {
+      "bug": "Bug",
+      "epic": "Epic",
+      "feature": "Feature",
+      "story": "Story",
+      "task": "Task"
     }
   },
   "trackers": {
@@ -10119,8 +12455,10 @@
     "import": {
       "title": "Guided data import",
       "entity": "Entity",
-      "file": "CSV file",
-      "stepUpload": "1. Upload CSV",
+      "file": "CSV or Excel file",
+      "fileHint": "Use CSV or .xlsx. For older .xls workbooks, save a copy as .xlsx first.",
+      "dataRows": "data rows",
+      "stepUpload": "1. Upload file",
       "stepAnalyze": "2. Analyze columns",
       "stepMap": "3. Map columns",
       "stepPreview": "4. Preview",
@@ -10128,9 +12466,22 @@
       "analyze": "Analyze with AI",
       "analyzing": "Analyzing…",
       "analyzed": "Column mapping suggested — review and continue.",
+      "sourceColumns": "Source columns",
+      "mappedColumns": "Mapped columns",
+      "unmappedRequired": "Unmapped target fields",
       "preview": "Preview import",
+      "reconciliation": "Pre-import reconciliation",
+      "sourceRows": "Source rows",
+      "previewRows": "Previewed",
+      "previewErrors": "Errors",
+      "previewWarnings": "Warnings",
+      "fullPreviewRequired": "Every source row must pass preview before import. Run preview again.",
+      "previewDisplayLimit": "All {{count}} rows were validated; the table shows the first 25.",
+      "rowsToImport": "Rows to import",
       "run": "Import",
       "done": "Imported {{count}} rows.",
+      "outcomeUnknown": "The import was accepted, but its job could not be identified. Review import history before you retry.",
+      "reconciliationMetadataFailed": "The import completed, but its reconciliation details could not be attached: {{message}}",
       "startOver": "Start over",
       "row": "Row",
       "action": "Action",
@@ -10150,11 +12501,23 @@
       "templateName": "Template name",
       "templateNamePlaceholder": "e.g. HubSpot contacts",
       "templateNameRequired": "Template name is required",
+      "templateApplied": "Applied {{count}} saved column mappings.",
       "templateSaved": "Mapping template saved.",
       "templateDeleted": "Mapping template deleted.",
       "deleteTemplate": "Delete template",
       "deleteTemplateConfirm": "Delete this mapping template?",
-      "deleteTemplateHint": "This cannot be undone."
+      "deleteTemplateHint": "This cannot be undone.",
+      "jobRefreshing": "Import job #{{id}} is complete. Refreshing its reconciliation record…",
+      "recentImports": "Recent imports for this entity",
+      "noRecentImports": "No tracked imports for this entity yet.",
+      "job": "Job",
+      "status": "Status",
+      "importedRows": "Imported",
+      "errorRows": "Errors",
+      "reviewJob": "Review",
+      "rollbackConfirm": "Rollback removes every record created by this import. Confirm rollback?",
+      "confirmRollback": "Confirm rollback",
+      "rollbackComplete": "Import rolled back."
     },
     "backToSettings": "Back to Settings",
     "adminAccess": "Admin Access",
@@ -10834,14 +13197,36 @@
       },
       "countryPacks": {
         "cardTitle": "Country / locale packs",
-        "cardDescription": "Enable jurisdiction-specific tax and compliance rules for the selected company.",
+        "cardDescription": "Review versioned jurisdiction settings and activate only accepted packs for the selected company.",
         "enabled": "Enabled",
         "disabled": "Disabled",
         "toggleSuccess": "Country pack updated",
         "toggleError": "Could not update country pack",
         "emptyCatalog": "No country packs are available yet.",
         "regionLabel": "Region: {{region}}",
-        "countryMismatch": "Company country ({{companyCountry}}) differs from pack ({{packCountry}})."
+        "countryMismatch": "Company country ({{companyCountry}}) differs from pack ({{packCountry}}).",
+        "versionLabel": "Version {{version}}",
+        "effectiveWindow": "Effective from {{from}} to {{to}}",
+        "pinnedVersion": "Company pin: version {{version}}",
+        "notPinned": "Company pin: not activated",
+        "toggleLabel": "Toggle {{pack}} country pack",
+        "evidenceSummary": "Official evidence reviewed {{date}} · {{count}} sources",
+        "decisionsRemaining": "{{count}} legal or operational decisions still require confirmation.",
+        "acceptance": {
+          "accepted": "Accepted",
+          "legacy_enabled": "Legacy enabled",
+          "review_required": "Review required",
+          "unknown": "Status unavailable"
+        },
+        "blocked": {
+          "reviewRequired": "Review required. This pack cannot be activated until its rules are reviewed and accepted.",
+          "inactive": "This pack is inactive and cannot be activated.",
+          "notYetEffective": "This pack is not effective yet and cannot be activated.",
+          "expired": "This pack is no longer effective and cannot be activated.",
+          "invalidEffectiveWindow": "The effective dates are invalid or unavailable. Activation is blocked.",
+          "notAccepted": "This pack has not been accepted. Activation is blocked.",
+          "versionMismatch": "The company pin does not match the catalog version. Review the version before activation."
+        }
       },
       "privacy": {
         "cardTitle": "Data privacy",
@@ -10984,7 +13369,8 @@
       "pivotExplorer": "Pivot explorer",
       "vatReport": "VAT report",
       "queryBuilder": "Query builder",
-      "ownerReports": "Owner reports"
+      "ownerReports": "Owner reports",
+      "statements": "Statements"
     },
     "queryBuilder": {
       "title": "Self-serve query builder",
@@ -10999,17 +13385,26 @@
       },
       "aggregation": "Aggregation",
       "aggregationField": "Aggregation field",
+      "timeField": "Time field",
+      "timeFieldNone": "No time filter",
+      "timeFieldDescription": "Select a timestamp field to make dashboard date ranges strict and complete.",
       "groupBy": "Group by",
       "chartType": "Chart type",
       "displayFields": "Display fields",
       "filters": "Filters",
       "addFilter": "Add filter",
+      "removeFilter": "Remove filter",
       "sortBy": "Sort by",
       "sortNone": "None",
       "limit": "Limit",
       "preview": "Live preview",
       "previewEmpty": "Configure a model and widget to see a live preview.",
       "previewNoRows": "No rows match the current filters.",
+      "previewUnavailable": "The preview is unavailable until the data source can be read.",
+      "sourceRefreshing": "Refreshing source data…",
+      "sourceDenied": "You do not have permission to read this data source.",
+      "sourceError": "The data source could not be loaded.",
+      "retrySource": "Retry data source",
       "widgetName": "Widget name",
       "widgetNamePlaceholder": "e.g. Open orders by state",
       "attachDashboard": "Add to dashboard (optional)",
@@ -11017,7 +13412,14 @@
       "save": "Save widget",
       "saved": "Widget \"{{name}}\" saved.",
       "savedAttached": "Widget \"{{name}}\" saved and added to the dashboard.",
-      "rowsLoaded": "{{count}} rows loaded"
+      "rowsLoaded": "{{count}} rows loaded",
+      "sourceStates": {
+        "denied": "You do not have access to this dashboard source.",
+        "unavailable": "This dashboard source is unavailable.",
+        "partial": "Only partial dashboard source data is available."
+      },
+      "rowsLoaded_one": "{{count}} row loaded",
+      "rowsLoaded_other": "{{count}} rows loaded"
     },
     "ownerReports": {
       "title": "Owner Reports",
@@ -11199,6 +13601,10 @@
       "description": "Custom analytics dashboards",
       "searchPlaceholder": "Search dashboards…",
       "emptyMessage": "No dashboards yet.",
+      "sourceRefreshing": "Refreshing dashboard data…",
+      "sourceDenied": "You do not have permission to read one or more dashboard data sources.",
+      "sourceError": "One or more dashboard data sources could not be loaded.",
+      "retrySource": "Retry dashboard data",
       "columns": {
         "name": "Name",
         "description": "Description",
@@ -11549,6 +13955,111 @@
         "archiveFailed": "Archive failed",
         "generateFailed": "Generate failed"
       }
+    },
+    "statements": {
+      "columns": {
+        "amount": "Amount",
+        "comparison": "Comparison",
+        "line": "Line"
+      },
+      "empty": "This report has no statement lines. Generate the report to populate it.",
+      "exportCsv": "Export CSV",
+      "loadError": "Could not load statement lines.",
+      "noReports": "No profit and loss, balance sheet or cash flow reports yet. Generate one in Financial Reports first.",
+      "report": "Report",
+      "subtotal": "Total {{name}}",
+      "viewJournalItems": "View journal items"
+    },
+    "periodContext": {
+      "title": "Period close report review",
+      "scope": "Company {{company}} · period {{period}} · {{from}} to {{to}}. Report results and new report dates use this exact period.",
+      "loading": "Checking period ownership and report sources…",
+      "denied": "You do not have access to the period or report sources needed for this review.",
+      "unavailable": "The period context or its source records could not be verified. Return to period close, select the active company and period, and retry.",
+      "returnToClose": "Return to period close",
+      "clear": "View all reports"
+    },
+    "authoring": {
+      "account": "Account",
+      "accountRows": "Account rows",
+      "active": "Active schedule",
+      "addRecipients": "Add recipients to preview the delivery list.",
+      "assets": "Assets",
+      "balance": "Balance",
+      "bar": "Bar",
+      "chartStyle": "Chart style",
+      "chooseSource": "Choose a company and data source",
+      "chooseTemplate": "Choose a report template.",
+      "companyRequired": "Select a company to preview its data.",
+      "credit": "Credit",
+      "currency": "Currency",
+      "dashboardNext": "Save the dashboard, then use Add widget to choose and arrange its content.",
+      "debit": "Debit",
+      "delivery": "Delivery",
+      "donut": "Donut",
+      "emptyDashboard": "Start with an empty dashboard",
+      "equity": "Equity",
+      "expenses": "Expenses",
+      "groupBy": "Group records by",
+      "income": "Income",
+      "invalidMargins": "The margins leave no printable area in this preview.",
+      "journalDocuments": "Invoices, bills and journal entries",
+      "liabilities": "Liabilities",
+      "liveWidget": "The widget preview uses records you can read for the selected company.",
+      "metric": {
+        "accountingDocuments": "Accounting documents",
+        "activeDefinition": "The definition will be marked active.",
+        "average": "Average",
+        "awaitingCalculation": "No calculated value yet",
+        "calculation": "Calculation",
+        "company": "Company",
+        "count": "Document count",
+        "definition": "Definition preview",
+        "definitionOnly": "Saves a definition only",
+        "definitionOnlyHint": "Saving does not calculate a value or start a refresh job. This preview does not sum documents or combine currencies. Values must be supplied through the existing metric update action.",
+        "description": "Choose a measure and inspect its definition. Calculated values are supplied separately.",
+        "documentTotal": "Document total",
+        "inactiveDefinition": "The definition will be marked inactive.",
+        "maximum": "Highest value",
+        "measure": "Measure",
+        "measureHint": "Document count counts records and does not use the selected amount.",
+        "minimum": "Lowest value",
+        "noCompany": "No company selected",
+        "noSeries": "Calculated values are needed to display this chart.",
+        "noTarget": "No target set",
+        "noValue": "No calculated value",
+        "notSelected": "Not selected",
+        "outstandingAmount": "Outstanding amount",
+        "preview": "Metric preview",
+        "refreshHint": "This interval is saved in the definition. It does not start a calculation job.",
+        "requestedRefresh": "Requested refresh interval (minutes)",
+        "saveDefinition": "Save metric definition",
+        "source": "Source documents",
+        "sourceHint": "Accounting documents include invoices, bills, and journal entries. No document-type filter is applied.",
+        "sum": "Total",
+        "target": "Target",
+        "taxAmount": "Tax amount",
+        "thisMonth": "This month",
+        "thisQuarter": "This quarter",
+        "thisWeek": "This week",
+        "thisYear": "This year",
+        "today": "Today",
+        "untaxedAmount": "Untaxed amount",
+        "untitled": "Your metric"
+      },
+      "nextRun": "Selected next run",
+      "notSaved": "Changes in this preview are not saved until you submit.",
+      "pageReference": "Page layout using an A4 reference. The template body is configured after creation.",
+      "paused": "Paused schedule",
+      "payments": "Payments",
+      "preview": "Preview",
+      "recordCount": "Number of records",
+      "reportContent": "Report content",
+      "scheduleLimit": "The selected datetime uses your browser time zone. Future run dates depend on the scheduler.",
+      "status": "Status",
+      "structureOnly": "Layout preview only. Financial amounts are calculated by the report service after generation.",
+      "unsaved": "Unsaved",
+      "widgetScope": "Read-only preview of the selected company. The saved widget is added to a dashboard separately."
     }
   },
   "proposalWorkspace": {
@@ -11584,7 +14095,11 @@
       "untitled": "Untitled",
       "sourceDocs": "Source Docs ({{count}})",
       "addDocument": "Add document",
-      "proposalValue": "Proposal value"
+      "proposalValue": "Proposal value",
+      "customSectionAdd": "Add section",
+      "customSectionDescription": "Name the new proposal section.",
+      "customSectionPlaceholder": "Section title",
+      "customSectionTitle": "Section title"
     },
     "sectionEditor": {
       "statusEmpty": "Empty",
@@ -11623,7 +14138,9 @@
       "discountPercent": "Discount %",
       "saved": "saved {{amount}}",
       "notes": "Notes",
-      "additionalNotes": "Additional notes..."
+      "additionalNotes": "Additional notes...",
+      "moveDown": "Move down",
+      "moveUp": "Move up"
     },
     "presenceBar": {
       "activeCollaborators": "Active collaborators",
@@ -11723,7 +14240,82 @@
       "empty": "No compliance requirements yet — run Analyze to materialize.",
       "title": "Compliance"
     },
-    "requestPdf": "Queue PDF render"
+    "requestPdf": "Queue PDF render",
+    "bidDecision": {
+      "bid": "Bid",
+      "button": "Bid / no bid",
+      "decision": "Decision",
+      "description": "A bid decision is required before this proposal can be submitted.",
+      "done": "Bid decision recorded",
+      "failed": "Record bid decision failed",
+      "invalid": "Choose bid or no bid and give a rationale.",
+      "noBid": "No bid",
+      "rationale": "Rationale",
+      "title": "Record bid decision"
+    },
+    "convertToProject": {
+      "billType": "Billing",
+      "button": "Convert to project",
+      "description": "Creates a project from this awarded proposal. A proposal can only be converted once.",
+      "done": "Project created from proposal",
+      "failed": "Convert to project failed",
+      "invalid": "Choose a billing type and a pricing type.",
+      "pricingType": "Pricing",
+      "title": "Convert to project",
+      "unavailable": "Only an awarded proposal without a project can be converted."
+    },
+    "procurementScores": {
+      "add": "Add score",
+      "addTitle": "Add procurement score",
+      "countryPackKey": "Country pack key",
+      "description": "A score is identified by its country pack and score kind; saving an existing pair updates it.",
+      "done": "Procurement score saved",
+      "edit": "Edit",
+      "editTitle": "Edit procurement score",
+      "empty": "No procurement scores yet.",
+      "failed": "Save procurement score failed",
+      "invalidKeys": "Country pack key and score kind are required.",
+      "invalidNumbers": "Score and maximum must be numbers.",
+      "maxValue": "Maximum",
+      "notes": "Notes",
+      "scoreKind": "Score kind",
+      "scoreValue": "Score",
+      "title": "Procurement scores"
+    },
+    "reorderLineItems": {
+      "failed": "Reorder line items failed"
+    },
+    "saveAsTemplate": {
+      "button": "Save as template",
+      "category": "Category",
+      "countryPackKey": "Country pack key (optional)",
+      "description": "Saves this proposal's sections (titles and content) to the template library.",
+      "done": "Template saved",
+      "failed": "Save as template failed",
+      "invalid": "Template name, category and locale are required.",
+      "locale": "Locale",
+      "name": "Template name",
+      "noSections": "Add at least one section first.",
+      "title": "Save as template"
+    },
+    "sectionConflict": {
+      "description": "Your save was not applied. Keep your version to overwrite theirs, or keep theirs to discard your edits.",
+      "discarded": "Your edits were discarded; showing the server version",
+      "fieldAiSuggestion": "AI suggestion",
+      "fieldContent": "Content",
+      "fieldSequence": "Order",
+      "fieldStatus": "Status",
+      "fieldTitle": "Title",
+      "identical": "The server version already matches your edits.",
+      "keepMine": "Keep mine",
+      "keepTheirs": "Keep theirs",
+      "mine": "Your version",
+      "resolved": "Your version was saved",
+      "resolveFailed": "Could not save your version",
+      "revision": "Revision",
+      "theirs": "Server version",
+      "title": "This section was changed by someone else"
+    }
   },
   "forensics": {
     "page": {
@@ -11746,7 +14338,7 @@
       "tabAnalytics": "Analytics",
       "searchPlaceholder": "Search reports...",
       "filterStatus": "Status",
-      "filterStatusAll": "All Status",
+      "filterStatusAll": "All statuses",
       "filterStatusOpen": "Open",
       "filterStatusInvestigating": "Investigating",
       "filterStatusResolved": "Resolved",
@@ -12043,7 +14635,8 @@
         "GBP": "GBP — British Pound",
         "CAD": "CAD — Canadian Dollar",
         "AUD": "AUD — Australian Dollar",
-        "JPY": "JPY — Japanese Yen"
+        "JPY": "JPY — Japanese Yen",
+        "RWF": "RWF — Rwandan Franc"
       },
       "errors": {
         "notConnected": "Not connected to server. Please wait a moment and try again.",
@@ -12054,6 +14647,539 @@
     "nav": {
       "backToSignIn": "Back to sign in",
       "requestNewLink": "Request a new link"
+    }
+  },
+  "modules": {
+    "workspaces": {
+      "label": "Module workspaces",
+      "advanced": "Advanced / Configuration",
+      "more": "More workspaces",
+      "overview": "Overview",
+      "orders": "Orders",
+      "fulfillment": "Fulfillment",
+      "pricing": "Pricing",
+      "configuration": "Configuration",
+      "pipeline": "Pipeline",
+      "contacts": "Contacts",
+      "activities": "Activities",
+      "sourcing": "Sourcing",
+      "suppliers": "Suppliers",
+      "financial": "Financial reports",
+      "analytics": "Analytics",
+      "schedules": "Schedules",
+      "expenses": "Expenses",
+      "expenseReports": "Expense reports",
+      "operations": "Operations"
+    },
+    "tabGroups": {
+      "banking": "Banking",
+      "billing": "Billing",
+      "close": "Close",
+      "fulfillment": "Fulfillment",
+      "invoicing": "Invoicing",
+      "ledger": "Ledger",
+      "movements": "Movements",
+      "orders": "Orders",
+      "pay": "Pay",
+      "people": "People",
+      "planning": "Planning",
+      "pricing": "Pricing",
+      "quality": "Quality",
+      "revenue": "Revenue",
+      "setup": "Setup",
+      "stock": "Stock",
+      "subscriptions": "Subscriptions",
+      "timeoff": "Time off",
+      "warehouse": "Warehouse"
+    }
+  },
+  "notifications": {
+    "bell": {
+      "empty": "No notifications.",
+      "label": "Notifications",
+      "markAllRead": "Mark all read",
+      "recent": "Latest notifications",
+      "unread": "Unread notifications",
+      "viewAll": "View all"
+    }
+  },
+  "commandPalette": {
+    "placeholder": "Search modules, actions and records...",
+    "records": {
+      "loading": "Searching records...",
+      "failed": "Some records could not be searched. Try again."
+    }
+  },
+  "recordHeader": {
+    "edit": {
+      "transfer": "Edit transfer",
+      "manufacturing": "Edit manufacturing order",
+      "vehicle": "Edit vehicle"
+    },
+    "origin": "Source reference",
+    "note": "Note",
+    "quantity": "Quantity to produce",
+    "positiveQuantity": "Enter a quantity greater than zero.",
+    "name": "Name",
+    "vehicleType": "Vehicle type",
+    "licensePlate": "License plate",
+    "driverName": "Driver name",
+    "odometerKm": "Odometer (km)",
+    "fuelLevel": "Fuel level (0–1)",
+    "unreserve": "Release reservation",
+    "unreserveDescription": "Release the stock reserved for this transfer? You can check availability again afterwards.",
+    "reset": "Reset to draft",
+    "resetDescription": "Return this cancelled document to draft for editing? Only documents that have never been posted can be reset."
+  },
+  "aiSkills": {
+    "actions": {
+      "assignSkill": "Assign skill",
+      "cancel": "Cancel",
+      "configure": "Configure",
+      "createSkill": "Create skill",
+      "saveConfig": "Save config",
+      "setActive": "Set active",
+      "syncBundledSkills": "Sync bundled skills → STDB",
+      "syncing": "Syncing…",
+      "unassign": "Unassign",
+      "update": "Update"
+    },
+    "agentRuns": {
+      "description": "Live skill orchestration runs for this organization.",
+      "empty": "No runs yet.",
+      "stepCount": " ({{count}} steps)",
+      "stepCount_one": " ({{count}} step)",
+      "stepCount_other": " ({{count}} steps)",
+      "status": {
+        "agentSettled": "Agent settled",
+        "awaitingApproval": "Awaiting approval",
+        "cancelled": "Cancelled",
+        "completed": "Completed",
+        "failed": "Failed",
+        "pending": "Pending",
+        "running": "Running"
+      },
+      "title": "Agent runs"
+    },
+    "assignments": {
+      "description": "Link AI personas to skills they may run by default.",
+      "empty": "No skill assignments yet.",
+      "title": "Team member skill assignments"
+    },
+    "confirm": {
+      "removeAssignment": "Remove this skill assignment?"
+    },
+    "description": "Manage org skill playbooks, registry releases, and AI team member assignments. Skills are invoked by the ERP Assistant, not from this page.",
+    "fields": {
+      "active": "Active",
+      "category": "Category",
+      "configJson": "Config JSON",
+      "customInstructions": "Custom instructions",
+      "defaultSkill": "Default skill",
+      "description": "Description",
+      "enabled": "Enabled",
+      "maxSteps": "Max steps",
+      "maxToolCalls": "Max tool calls",
+      "moduleHintOptional": "Module hint (optional)",
+      "name": "Name",
+      "optionalToolsCsv": "Optional tools (CSV)",
+      "promptTemplate": "Prompt template",
+      "requiredToolsCsv": "Required tools (CSV)",
+      "skillId": "Skill ID",
+      "skillKey": "Skill key",
+      "teamMemberId": "Team member ID"
+    },
+    "forms": {
+      "assign": {
+        "title": "Assign Skill to Team Member"
+      },
+      "configure": {
+        "title": "Configure {{skillName}}"
+      },
+      "create": {
+        "title": "Create AI Skill"
+      },
+      "setActive": {
+        "title": "Set active — {{skillName}}"
+      }
+    },
+    "labels": {
+      "assignmentNumber": "Assignment #{{id}}",
+      "categorySkill": "{{category}} skill",
+      "defaultSuffix": " · default",
+      "memberNumber": "Member #{{id}}",
+      "number": "#{{id}}",
+      "skillNumber": "Skill #{{id}}"
+    },
+    "messages": {
+      "syncSuccess": "Synced {{count}} bundled skill(s) to SpacetimeDB."
+    },
+    "registry": {
+      "actions": {
+        "accept": "Accept",
+        "createFixture": "Create fixture",
+        "createReviewedVersion": "Create reviewed version",
+        "promote": "Promote",
+        "proposeForReview": "Propose for review",
+        "proposing": "Proposing…",
+        "reject": "Reject",
+        "retry": "Retry",
+        "retryCertification": "Retry certification",
+        "rollBackToThis": "Roll back to this",
+        "runCertification": "Run certification"
+      },
+      "activeRelease": "Active release #{{releaseNumber}} · version id {{versionId}}",
+      "certification": {
+        "blockedFixtureRequired": " · certification blocked: fixture required",
+        "evidenceSummary": "evidence #{{evidenceId}} · {{status}} · {{hash}}",
+        "noExecutionHash": "no execution hash",
+        "passed": "Passed",
+        "passedSuffix": " · certification passed",
+        "pendingSuffix": " · certification pending",
+        "queued": "Queued",
+        "requestSummary": "v{{version}} · request #{{requestId}} · {{status}} · {{readinessCode}}",
+        "running": "Running"
+      },
+      "description": "Review immutable skill versions, run server-owned fixture certification, and manage release history.",
+      "empty": {
+        "noFixtures": "No fixtures yet.",
+        "noPromotions": "No persisted knowledge promotions.",
+        "noReleases": "No releases recorded.",
+        "noSkillsForCertification": "No persisted skills are available for certification.",
+        "noTerminalEvidence": "No terminal evidence has been persisted.",
+        "noVersions": "No versions for this skill yet."
+      },
+      "errors": {
+        "invalidKnowledgeVersion": "Enter a positive approved knowledge version id and select a skill",
+        "loadCertification": "Failed to load persisted certification state",
+        "loadPromotions": "Failed to load knowledge promotions."
+      },
+      "fields": {
+        "approvedKnowledgeVersionId": "Approved knowledge version id",
+        "skill": "Skill"
+      },
+      "knowledge": {
+        "description": "Independent acceptance creates an unreleased skill version. The server binds the reviewed knowledge lineage; certification and release remain gated above.",
+        "promotionSummary": "Knowledge version {{versionId}} → {{skillName}}",
+        "statusSummary": "{{status}} · certification {{certification}}",
+        "title": "Knowledge promotion"
+      },
+      "messages": {
+        "selectCompanyForCertification": "Select an operating company before requesting certification."
+      },
+      "noActiveRelease": "No active release",
+      "placeholders": {
+        "fixtureKey": "fixture key",
+        "name": "name",
+        "reviewNote": "Independent review note"
+      },
+      "release": {
+        "activeSuffix": " · active",
+        "version": "version {{versionId}}"
+      },
+      "sections": {
+        "addFixture": "Add fixture",
+        "createVersion": "Create version",
+        "fixturesAndRuns": "Fixtures & test runs",
+        "releaseHistory": "Release history",
+        "versions": "Versions"
+      },
+      "states": {
+        "loadingCertification": "Loading persisted certification state…",
+        "loadingPromotions": "Loading persisted promotions…"
+      },
+      "status": {
+        "certified": "Certified",
+        "accepted": "Accepted",
+        "completed": "Completed",
+        "draft": "Draft",
+        "errored": "Errored",
+        "notRequested": "Not requested",
+        "passed": "Passed",
+        "promoted": "Promoted",
+        "proposed": "Proposed",
+        "queued": "Queued",
+        "rejected": "Rejected",
+        "running": "Running",
+        "rolledBack": "Rolled back",
+        "unknown": "unknown"
+      },
+      "title": "Skill registry"
+    },
+    "sources": {
+      "localMd": "Local MD",
+      "organization": "Organization",
+      "systemStdb": "System (STDB)"
+    },
+    "states": {
+      "loadingSkills": "Loading skills…"
+    },
+    "title": "AI Skills"
+  },
+  "ui": {
+    "journal": {
+      "actions": {
+        "archive": "Archive",
+        "dragToMove": "Drag to move",
+        "markResolved": "Mark Resolved",
+        "maximize": "Maximize",
+        "minimize": "Minimize",
+        "noteMenu": "Note actions",
+        "reopen": "Reopen",
+        "restore": "Restore",
+        "saveNote": "Save Note",
+        "startRecording": "Start voice recording",
+        "stopRecording": "Stop voice recording"
+      },
+      "addTagPlaceholder": "add tag",
+      "allStatuses": "All Status",
+      "allTypes": "All Types",
+      "empty": {
+        "description": "Use the quick actions above to add your first note",
+        "title": "No notes yet"
+      },
+      "filter": "Filter",
+      "linkTaskPlaceholder": "Link to task ID (optional)",
+      "notePlaceholder": "Write your note...",
+      "noteTypes": {
+        "blocker": "Blocker",
+        "decision": "Decision",
+        "idea": "Idea",
+        "meetingNote": "Meeting Note",
+        "observation": "Observation",
+        "question": "Question",
+        "reminder": "Reminder",
+        "taskUpdate": "Task Update"
+      },
+      "other": "Other",
+      "priorities": {
+        "high": "High",
+        "low": "Low",
+        "normal": "Normal",
+        "urgent": "Urgent"
+      },
+      "priority": "Priority:",
+      "quickAdd": "Quick add:",
+      "quickTemplates": {
+        "adminBlocker": {
+          "label": "Critical Issue",
+          "placeholder": "Blocking issue identified..."
+        },
+        "adminDecision": {
+          "label": "Policy Decision",
+          "placeholder": "Decision made regarding..."
+        },
+        "adminObservation": {
+          "label": "System Observation",
+          "placeholder": "Noticed something about the system..."
+        },
+        "defaultIdea": {
+          "label": "Idea",
+          "placeholder": "What if we..."
+        },
+        "defaultObservation": {
+          "label": "Observation",
+          "placeholder": "I noticed..."
+        },
+        "defaultUpdate": {
+          "label": "Task Update",
+          "placeholder": "Progress on..."
+        },
+        "managerDecision": {
+          "label": "Project Decision",
+          "placeholder": "Decided to..."
+        },
+        "managerMeeting": {
+          "label": "Meeting Note",
+          "placeholder": "Key points from meeting..."
+        },
+        "managerUpdate": {
+          "label": "Team Update",
+          "placeholder": "Team progress update..."
+        },
+        "salesObservation": {
+          "label": "Customer Insight",
+          "placeholder": "Customer mentioned..."
+        },
+        "salesReminder": {
+          "label": "Follow-up Reminder",
+          "placeholder": "Remember to follow up on..."
+        },
+        "salesUpdate": {
+          "label": "Deal Update",
+          "placeholder": "Deal status changed..."
+        },
+        "viewerIdea": {
+          "label": "Suggestion",
+          "placeholder": "It would be helpful if..."
+        },
+        "viewerObservation": {
+          "label": "Data Observation",
+          "placeholder": "Noticed in the data..."
+        },
+        "viewerQuestion": {
+          "label": "Question",
+          "placeholder": "Need clarification on..."
+        },
+        "warehouseBlocker": {
+          "label": "Issue Report",
+          "placeholder": "Problem with..."
+        },
+        "warehouseObservation": {
+          "label": "Inventory Note",
+          "placeholder": "Noticed in warehouse..."
+        },
+        "warehouseUpdate": {
+          "label": "Task Complete",
+          "placeholder": "Completed..."
+        }
+      },
+      "searchPlaceholder": "Search notes...",
+      "stats": {
+        "activeNotes": "{{count}} active notes",
+        "activeNotes_one": "{{count}} active note",
+        "activeNotes_other": "{{count}} active notes",
+        "resolvedToday": "{{count}} resolved today",
+        "resolvedToday_one": "{{count}} resolved today",
+        "resolvedToday_other": "{{count}} resolved today"
+      },
+      "status": "Status",
+      "statuses": {
+        "active": "Active",
+        "archived": "Archived",
+        "resolved": "Resolved"
+      },
+      "subtitle": "Quick notes, observations & updates",
+      "time": {
+        "daysAgo": "{{count}}d ago",
+        "daysAgo_one": "{{count}}d ago",
+        "daysAgo_other": "{{count}}d ago",
+        "hoursAgo": "{{count}}h ago",
+        "hoursAgo_one": "{{count}}h ago",
+        "hoursAgo_other": "{{count}}h ago",
+        "justNow": "Just now",
+        "minutesAgo": "{{count}}m ago",
+        "minutesAgo_one": "{{count}}m ago",
+        "minutesAgo_other": "{{count}}m ago"
+      },
+      "title": "Work Notes",
+      "type": "Type"
+    },
+    "stock3d": {
+      "categories": {
+        "clothing": "Clothing",
+        "electronics": "Electronics",
+        "finishedGoods": "Finished Goods",
+        "food": "Food & Beverage",
+        "furniture": "Furniture",
+        "packaging": "Packaging",
+        "rawMaterials": "Raw Materials",
+        "tools": "Tools"
+      },
+      "details": {
+        "actions": "Actions",
+        "close": "Close item details",
+        "editQuantity": "Edit quantity",
+        "lastUpdated": "Last Updated",
+        "location": "Location",
+        "move": "Move",
+        "quantity": "Quantity",
+        "removeConfirmation": "Remove \"{{name}}\" from inventory?",
+        "saveQuantity": "Save quantity",
+        "stockRange": "Min: {{min}} / Max: {{max}}"
+      },
+      "emptySlot": {
+        "addItemHint": "Click to add item",
+        "title": "Empty Slot"
+      },
+      "locationCoordinates": "Row {{row}}, Col {{column}}, Level {{level}}",
+      "lowStock": "Low Stock",
+      "quantityAbbreviation": "Qty:",
+      "quantityWithValue": "Qty: {{quantity}}",
+      "search": {
+        "clear": "Clear search",
+        "lowBadge": "Low",
+        "noResults": "No items found matching \"{{query}}\"",
+        "placeholder": "Search items by name or SKU...",
+        "resultLocation": "{{zone}} - Row {{row}}, Col {{column}}, Level {{level}}",
+        "resultsFound": "{{count}} results found",
+        "resultsFound_one": "{{count}} result found",
+        "resultsFound_other": "{{count}} results found"
+      },
+      "sidebar": {
+        "belowMinimum": "{{count}} items below minimum stock level",
+        "belowMinimum_one": "{{count}} item below minimum stock level",
+        "belowMinimum_other": "{{count}} items below minimum stock level",
+        "categories": "Categories",
+        "colorLegend": "Color Legend",
+        "emptySlots": "{{count}} empty",
+        "emptySlots_one": "{{count}} empty",
+        "emptySlots_other": "{{count}} empty",
+        "lowStockAlert": "Low Stock Alert",
+        "subtitle": "3D Warehouse Visualization",
+        "title": "Stock Overview",
+        "totalItems": "Total Items",
+        "units": "{{count}} units",
+        "units_one": "{{count}} unit",
+        "units_other": "{{count}} units",
+        "utilization": "Utilization",
+        "viewLowStock": "View Low Stock",
+        "viewMode": "View Mode",
+        "viewModes": {
+          "all": "All Items",
+          "emptySlots": "Empty Slots",
+          "lowStock": "Low Stock Only"
+        },
+        "zones": "Zones"
+      },
+      "zoneTypes": {
+        "bin": "Bin",
+        "coldStorage": "Cold Storage",
+        "floor": "Floor",
+        "rack": "Rack",
+        "shelf": "Shelf"
+      }
+    }
+  },
+  "workspace": {
+    "myWork": "My work",
+    "viewAll": "View all",
+    "sections": {
+      "today": "Today",
+      "projects": "Projects in flight"
+    },
+    "widgets": {
+      "todayTasks": "My tasks",
+      "calendar": "Calendar",
+      "projects": "Project progress",
+      "notes": "Recent notes",
+      "quickActions": "Quick actions"
+    },
+    "todayTasks": {
+      "empty": "Nothing due. Enjoy the calm.",
+      "toggle": "Mark {{title}} done",
+      "today": "Today"
+    },
+    "projects": {
+      "empty": "No active projects",
+      "progress": "{{name}} progress",
+      "openTasks": "{{open}} open of {{total}}",
+      "due": "due {{date}}"
+    },
+    "calendar": {
+      "nothing": "Nothing scheduled",
+      "event": "Event",
+      "deadline": "Task deadline",
+      "open": "Open calendar"
+    },
+    "notes": {
+      "empty": "No notes yet"
+    },
+    "actions": {
+      "newTask": "New task",
+      "upload": "Upload file",
+      "logTime": "Log time",
+      "newEvent": "New event"
     }
   }
 }

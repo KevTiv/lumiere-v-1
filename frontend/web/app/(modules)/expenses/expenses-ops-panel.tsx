@@ -22,6 +22,13 @@ import {
 } from "@lumiere/ui"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { currencyOptionsFromRows } from "@/lib/form-lookup"
 
 /**
@@ -141,16 +148,16 @@ export function ExpensesOpsPanel({ organizationId }: { organizationId: number })
           value={fxFee}
           onChange={(e) => setFxFee(e.target.value)}
         />
-        <select
-          className="rounded-md border bg-background px-2 py-1.5 text-sm"
-          value={currencyId}
-          onChange={(e) => setCurrencyId(e.target.value)}
-          aria-label={t("expenses.ops.currencyId")}
-        >
-          {currencyOptions.map((currency) => (
-            <option key={currency.value} value={currency.value}>{currency.label}</option>
-          ))}
-        </select>
+        <Select value={currencyId} onValueChange={setCurrencyId}>
+          <SelectTrigger className="w-auto min-w-28" aria-label={t("expenses.ops.currencyId")}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {currencyOptions.map((currency) => (
+              <SelectItem key={currency.value} value={currency.value}>{currency.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           type="button"
           size="sm"

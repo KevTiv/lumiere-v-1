@@ -13,8 +13,9 @@ use crate::accounting::chart_of_accounts::{
 };
 use crate::accounting::fixed_assets::{
     account_asset, account_asset_depreciation_line, backfill_fixed_asset_organization_ownership,
-    confirm_account_asset, create_account_asset, create_depreciation_line, dispose_account_asset,
-    set_asset_active, AccountAsset, AccountAssetDepreciationLine, CreateAccountAssetParams,
+    compute_depreciation_board, confirm_account_asset, create_account_asset,
+    create_depreciation_line, dispose_account_asset, set_asset_active, AccountAsset,
+    AccountAssetDepreciationLine, CreateAccountAssetParams,
     CreateDepreciationLineParams, DisposeAccountAssetParams,
 };
 use crate::accounting::idempotency::accounting_operation_receipt;
@@ -464,6 +465,162 @@ pub fn test_asset_and_amortization_relation_negative_matrix(
         != asset_before + 1
     {
         return Err("rejected asset relations persisted rows".to_string());
+    }
+
+    Ok(())
+}
+
+pub fn test_depreciation_board_and_disposal_are_single_exact_effect(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let code = format!("COV08D2-ASSET-{}", fixture.company_id);
+
+    create_account_asset(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        asset_params(ctx, &fixture, code.clone(), None)?,
+    )?;
+    let asset = find_asset(ctx, &code)?;
+    confirm_account_asset(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        asset.id,
+    )?;
+
+    compute_depreciation_board(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        asset.id,
+    )?;
+
+    let computed_asset = find_asset(ctx, &code)?;
+    let mut computed_lines: Vec<_> = ctx
+        .db
+        .account_asset_depreciation_line()
+        .depreciation_line_by_asset()
+        .filter(&asset.id)
+        .collect();
+    computed_lines.sort_by_key(|line| line.sequence);
+    if computed_lines.len() != 12 {
+        return Err(format!(
+            "expected 12 depreciation lines, found {}",
+            computed_lines.len()
+        ));
+    }
+    let computed_ids: Vec<u64> = computed_lines.iter().map(|line| line.id).collect();
+    if computed_asset.depreciation_board_ids != computed_ids
+        || computed_asset.depreciation_sequence != 12
+    {
+        return Err("asset did not persist the exact depreciation board identity".to_string());
+    }
+    for (index, line) in computed_lines.iter().enumerate() {
+        if line.organization_id != fixture.organization_id
+            || line.company_id != Some(fixture.company_id)
+            || line.asset_id != asset.id
+            || line.sequence != (index as u32 + 1)
+        {
+            return Err("depreciation board contains a mis-scoped or non-canonical line".to_string());
+        }
+    }
+
+    let line_snapshot: Vec<_> = computed_lines
+        .iter()
+        .map(|line| {
+            (
+                line.id,
+                line.sequence,
+                line.amount,
+                line.remaining_value,
+                line.depreciated_value,
+                line.write_date,
+            )
+        })
+        .collect();
+    match compute_depreciation_board(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        asset.id,
+    ) {
+        Err(error) if error.contains("already computed") => {}
+        Err(error) => {
+            return Err(format!(
+                "unexpected depreciation-board replay error: {error}"
+            ))
+        }
+        Ok(()) => return Err("depreciation-board replay unexpectedly succeeded".to_string()),
+    }
+
+    let replayed_asset = find_asset(ctx, &code)?;
+    let mut replayed_lines: Vec<_> = ctx
+        .db
+        .account_asset_depreciation_line()
+        .depreciation_line_by_asset()
+        .filter(&asset.id)
+        .collect();
+    replayed_lines.sort_by_key(|line| line.sequence);
+    let replayed_snapshot: Vec<_> = replayed_lines
+        .iter()
+        .map(|line| {
+            (
+                line.id,
+                line.sequence,
+                line.amount,
+                line.remaining_value,
+                line.depreciated_value,
+                line.write_date,
+            )
+        })
+        .collect();
+    if replayed_snapshot != line_snapshot
+        || replayed_asset.depreciation_board_ids != computed_asset.depreciation_board_ids
+        || replayed_asset.depreciation_sequence != computed_asset.depreciation_sequence
+        || replayed_asset.write_date != computed_asset.write_date
+    {
+        return Err("depreciation-board replay changed the canonical effect".to_string());
+    }
+
+    let disposal = DisposeAccountAssetParams {
+        disposal_date: ctx.timestamp,
+        gain_account_id: None,
+        loss_account_id: None,
+    };
+    dispose_account_asset(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        asset.id,
+        disposal.clone(),
+    )?;
+    let disposed = find_asset(ctx, &code)?;
+    if disposed.state != crate::types::AssetState::Removed
+        || disposed.disposal_date != Some(disposal.disposal_date)
+    {
+        return Err("asset disposal did not persist the exact Removed state".to_string());
+    }
+
+    match dispose_account_asset(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        asset.id,
+        disposal,
+    ) {
+        Err(error) if error.contains("already disposed") => {}
+        Err(error) => return Err(format!("unexpected asset-disposal replay error: {error}")),
+        Ok(()) => return Err("asset-disposal replay unexpectedly succeeded".to_string()),
+    }
+    let replayed_disposal = find_asset(ctx, &code)?;
+    if replayed_disposal.state != disposed.state
+        || replayed_disposal.disposal_date != disposed.disposal_date
+        || replayed_disposal.write_date != disposed.write_date
+    {
+        return Err("asset-disposal replay changed the canonical asset".to_string());
     }
 
     Ok(())

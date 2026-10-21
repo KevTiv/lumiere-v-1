@@ -17,14 +17,18 @@ name: Release contracts
 on:
   push:
     # main only receives pins through merged branches.
-    branches-ignore: [main]
+    # Draft backend prerequisites must be reviewed before publishing immutable tags.
+    branches-ignore: [main, "codex/draft-backend-*"]
     # Everything codegen reads to produce the contract IR.
     paths:
       - spacetimedb/**
       - crates/presentation-core/**
+      - crates/policy-core/**
       - lumiere-codegen/**
       - crates/stdb-auth/assets/resource_registry.json
+      - .github/workflows/build-contracts-module.yml
       - .github/workflows/release-contracts.yml
+      - .github/actions/setup-contracts-ssh/action.yml
   workflow_dispatch:
     inputs:
       version:
@@ -56,7 +60,11 @@ env:
   CONTRACTS_REMOTE: git@github.com:KevTiv/lumiere-contracts.git
 
 jobs:
+  contracts-module:
+    uses: ./.github/workflows/build-contracts-module.yml
+
   release:
+    needs: contracts-module
     runs-on: ubuntu-latest
     steps:
       # The branch head, not the triggering commit: a queued run releases the
@@ -67,8 +75,6 @@ jobs:
           fetch-depth: 0
 
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
 
       # A dedicated write key is preferred; the shared deploy key is used when
       # no publish key is configured.
@@ -97,8 +103,9 @@ jobs:
           manifest = json.loads(Path("release-compatibility-manifest.json").read_text(encoding="utf-8"))
           previous = manifest["lumiere_contracts"]["version"]
           cargo = Path("Cargo.toml").read_text(encoding="utf-8")
-          if f'tag = "v{previous}"' not in cargo:
-              raise SystemExit(f"Cargo.toml does not pin v{previous}, the release manifest version")
+          expected_path = 'path = "vendor/lumiere-contracts/crates/lumiere-contracts"'
+          if expected_path not in cargo:
+              raise SystemExit("Cargo.toml does not consume the verified vendored contracts path")
           pinned = parse(previous)
           if pinned is None:
               raise SystemExit(f"current pin {previous!r} is not x.y.z")
@@ -138,25 +145,20 @@ jobs:
           print(f"pinned v{previous}, highest published v{highest}; next v{version}")
           PY
 
-      # Same key as the CI contracts job, so a module CI already compiled for
-      # these sources is reused instead of rebuilt.
-      - name: Restore compiled contracts module
-        id: contracts-module
-        uses: actions/cache@v4
-        with:
-          path: .ci/contracts-module.wasm
-          key: contracts-module-v1-${{ runner.os }}-${{ hashFiles('spacetimedb/src/**', 'spacetimedb/assets/**', 'spacetimedb/Cargo.toml', 'spacetimedb/Cargo.lock', 'crates/presentation-core/src/**', 'crates/presentation-core/Cargo.toml') }}
-
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            spacetimedb
-            .
+          workspaces: .
           cache-on-failure: true
 
       - uses: ./.github/actions/setup-spacetime-cli
         with:
           version: ${{ env.SPACETIME_CLI_VERSION }}
+
+      - name: Download compiled contracts module
+        uses: actions/download-artifact@v4
+        with:
+          name: contracts-module
+          path: .ci
 
       - name: Start standalone SpacetimeDB
         run: |
@@ -169,13 +171,6 @@ jobs:
           done
           cat /tmp/lumiere-release-stdb.log
           exit 1
-
-      - name: Build contracts module (ci-contracts profile)
-        if: steps.contracts-module.outputs.cache-hit != 'true'
-        run: |
-          cargo build --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts
-          mkdir -p .ci
-          cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm
 
       - name: Publish module
         run: |
@@ -192,8 +187,17 @@ jobs:
           CHECKOUT="$(bash scripts/resolve-pinned-contracts.sh)"
           if python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json \
               --expect-schema-hash-from "$CHECKOUT/ir/lumiere-contract-ir-v2.json" >/dev/null 2>&1; then
-            echo "Generated contracts match v$PREVIOUS_VERSION; nothing to release."
-            echo "release=false" >> "$GITHUB_OUTPUT"
+            # The IR hash does not cover the durable PostgreSQL migrations, which
+            # are generated from the same sources (and the migration ledger), so a
+            # change there is a release on its own.
+            if diff -rq "$CHECKOUT/manifests/pg_ddl/migrations" .contracts-staging/manifests/pg_ddl/migrations >/dev/null 2>&1 \
+                && cmp -s "$CHECKOUT/manifests/durable-pg-schema-manifest.json" .contracts-staging/manifests/durable-pg-schema-manifest.json; then
+              echo "Generated contracts match v$PREVIOUS_VERSION; nothing to release."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "IR matches v$PREVIOUS_VERSION but the durable PostgreSQL migrations differ; releasing."
+              echo "release=true" >> "$GITHUB_OUTPUT"
+            fi
           else
             echo "release=true" >> "$GITHUB_OUTPUT"
           fi
@@ -268,8 +272,6 @@ jobs:
       - name: Commit regenerated sources
         if: steps.changes.outputs.release == 'true'
         run: |
-          # The compiled module in .ci/ is a build output, never source.
-          echo '/.ci/' >> .git/info/exclude
           git add -A
           git status --short
           if ! git diff --cached --quiet; then
@@ -297,7 +299,7 @@ jobs:
         run: |
           make clean-contracts-live-staging
           make generate-presentation-schemas schema-snapshot generate-stdb-rust-sdk generate-stdb-ts-sdk codegen
-          dirty="$(git status --porcelain --untracked-files=normal -- spacetimedb crates/presentation-core lumiere-codegen crates/stdb-auth/assets/resource_registry.json)"
+          dirty="$(git status --porcelain --untracked-files=normal -- spacetimedb crates/presentation-core crates/policy-core lumiere-codegen crates/stdb-auth/assets/resource_registry.json)"
           if [ -n "$dirty" ]; then
             echo "Regeneration is not reproducible from the committed tree:"
             echo "$dirty"
@@ -306,6 +308,25 @@ jobs:
           fi
           python3 scripts/verify-operation-history.py
           python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
+
+      # api-server consumes durable follow-up migrations from the migration
+      # ledger. A pending one has no catalog entry, so publishing it would fail
+      # every database's startup verification; stop before anything is published.
+      - name: Require promoted durable migrations
+        if: steps.changes.outputs.release == 'true'
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+
+          manifest = json.load(open(".contracts-staging/manifests/durable-pg-schema-manifest.json", encoding="utf-8"))
+          pending = [entry["name"] for entry in manifest.get("migrations", []) if entry.get("state") != "released"]
+          if pending:
+              sys.exit(
+                  "Durable PostgreSQL migrations must be promoted into lumiere-codegen/pg-migration-ledger "
+                  "and added to the api-server catalog before release: " + ", ".join(pending)
+              )
+          PY
 
       # The presentation contract generator imports frontend dev dependencies
       # (json-schema-to-typescript).
@@ -317,12 +338,30 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      - name: Restore contract release npm cache
+        if: steps.changes.outputs.release == 'true'
+        uses: actions/cache@v4
+        with:
+          path: target/contracts-release/npm-cache
+          key: contracts-release-npm-v1-${{ runner.os }}-${{ hashFiles('release-compatibility-manifest.json') }}
+          restore-keys: |
+            contracts-release-npm-v1-${{ runner.os }}-
+
+      # The generation passes emit only the presentation schemas, but the
+      # publisher also requires the TypeScript contracts. They need only node and
+      # the frontend dependencies installed above.
+      - name: Generate presentation contracts
+        if: steps.changes.outputs.release == 'true'
+        run: make generate-presentation-contracts
+
       # Build and check the full candidate first; nothing remote changes if it fails.
       - name: Prepare contracts release
         if: steps.changes.outputs.release == 'true'
         env:
           LUMIERE_CONTRACTS_PREPARE_DIR: ${{ runner.temp }}/contracts-release
-        run: make publish-contracts VERSION="$VERSION"
+        # Pass 2 already rebuilt and verified the staging tree from the clean
+        # commit. Do not run the generation prerequisites for a third time.
+        run: make publish-contracts-prepared VERSION="$VERSION"
 
       - name: Publish contracts release
         if: steps.changes.outputs.release == 'true'
@@ -337,23 +376,57 @@ jobs:
         if: steps.changes.outputs.release == 'true'
         run: |
           REVISION="$(git -C "$RUNNER_TEMP/contracts-release/repo" rev-parse HEAD)"
-          sed -i "s/tag = \"v$PREVIOUS_VERSION\"/tag = \"v$VERSION\"/" Cargo.toml
-          sed -i "s/lumiere-contracts#v$PREVIOUS_VERSION&/lumiere-contracts#v$VERSION\&/" \
+          rm -f "vendor/lumiere-contracts-rust-$PREVIOUS_VERSION.tar.gz" \
+            "vendor/lumiere-contracts-rust-$PREVIOUS_VERSION.tar.gz.sha256" \
+            "vendor/lumiere-contracts-rust-$PREVIOUS_VERSION.sha256"
+          bash scripts/package-contracts-rust.sh \
+            "$RUNNER_TEMP/contracts-release/repo" "$VERSION" vendor
+          sed -i "s/lumiere-contracts-$PREVIOUS_VERSION\.tgz/lumiere-contracts-$VERSION.tgz/" \
             frontend/packages/presentation-core/package.json \
             frontend/packages/query-hooks/package.json \
             frontend/packages/stdb/package.json
-          # The old revision appears in specifiers, package keys and the git
-          # resolution; the resolved package entry also records the version.
-          sed -i "s/lumiere-contracts#v$PREVIOUS_VERSION&/lumiere-contracts#v$VERSION\&/; s/$PREVIOUS_REVISION/$REVISION/g" \
-            frontend/pnpm-lock.yaml
-          sed -i "/resolution: {commit: $REVISION, path: packages\/contracts/{n;s/^    version: $PREVIOUS_VERSION\$/    version: $VERSION/}" \
-            frontend/pnpm-lock.yaml
-          if grep -q "$PREVIOUS_REVISION" frontend/pnpm-lock.yaml; then echo "pnpm-lock.yaml still references $PREVIOUS_REVISION"; exit 1; fi
-          sed -i "s/v$PREVIOUS_VERSION/v$VERSION/g" api-server/src/presentation_dictionary.rs
-          cargo update -p lumiere-contracts
-          grep -q "tag=v$VERSION#$REVISION" Cargo.lock
-          CHECKOUT="$(bash scripts/resolve-pinned-contracts.sh)"
-          python3 - "$CHECKOUT" "$REVISION" <<'PY'
+          # Keep the application build self-contained. Railway must not need a
+          # private GitHub credential merely to install the released frontend
+          # contracts package.
+          PACK_DIR="$RUNNER_TEMP/contracts-release/package"
+          rm -rf "$PACK_DIR"
+          mkdir -p "$PACK_DIR" frontend/vendor
+          PACK_JSON="$(npm pack "$RUNNER_TEMP/contracts-release/repo/packages/contracts" \
+            --pack-destination "$PACK_DIR" --json)"
+          PACK_FILENAME="$(jq -r '.[0].filename // empty' <<<"$PACK_JSON")"
+          test "$PACK_FILENAME" = "lumiere-contracts-$VERSION.tgz"
+          test "$(tar -xOf "$PACK_DIR/$PACK_FILENAME" package/package.json | jq -r .name)" = "@lumiere/contracts"
+          test "$(tar -xOf "$PACK_DIR/$PACK_FILENAME" package/package.json | jq -r .version)" = "$VERSION"
+          rm -f frontend/vendor/lumiere-contracts-*.tgz
+          cp "$PACK_DIR/$PACK_FILENAME" "frontend/vendor/$PACK_FILENAME"
+          pnpm --dir frontend install --lockfile-only --no-frozen-lockfile
+          # pnpm 10 can retain the file: specifier and integrity while dropping
+          # the tarball locator, which makes the following frozen install fall
+          # back to the public registry for this private package.
+          python3 - "$VERSION" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          version = sys.argv[1]
+          tarball = f"file:vendor/lumiere-contracts-{version}.tgz"
+          path = Path("frontend/pnpm-lock.yaml")
+          contents = path.read_text(encoding="utf-8")
+          package = re.escape(f"'@lumiere/contracts@{tarball}':")
+          pattern = rf"({package}\n    resolution: \{{integrity: [^}}\n]+)(\}})"
+          contents, count = re.subn(pattern, rf"\1, tarball: {tarball}\2", contents, count=1)
+          if count != 1:
+              raise SystemExit("expected one vendored @lumiere/contracts lockfile package entry")
+          path.write_text(contents, encoding="utf-8")
+          PY
+          pnpm --dir frontend install --frozen-lockfile
+          if grep -q 'github.com/KevTiv/lumiere-contracts' frontend/pnpm-lock.yaml; then
+            echo "pnpm-lock.yaml still requires private GitHub access" >&2
+            exit 1
+          fi
+          sed -i "s/$PREVIOUS_VERSION/$VERSION/g; s/$PREVIOUS_REVISION/$REVISION/g" \
+            api-server/src/presentation_dictionary.rs
+          python3 - "$RUNNER_TEMP/contracts-release/repo" "$REVISION" <<'PY'
           import hashlib
           import json
           import os
@@ -379,6 +452,23 @@ jobs:
           manifest["minimum_client_contract"]["generated_contract_release"] = version
           path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
           PY
+          bash scripts/prepare-vendored-contracts-rust.sh
+          cargo update -p lumiere-contracts
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          # Migration SQL ships in lumiere-contracts, so the application catalog
+          # checksum moves with the pin; compute it with the runtime's own function.
+          export CATALOG_CHECKSUM="$(cargo run -q --locked -p api-server --example migration_catalog_checksum)"
+          case "$CATALOG_CHECKSUM" in sha256:*) ;; *) echo "bad catalog checksum: $CATALOG_CHECKSUM"; exit 1 ;; esac
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path("release-compatibility-manifest.json")
+          manifest = json.loads(path.read_text(encoding="utf-8"))
+          manifest["durable_postgres"]["application_catalog_checksum"] = os.environ["CATALOG_CHECKSUM"]
+          path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          PY
           python3 scripts/verify-release-manifest.py
           git diff --stat
 
@@ -389,10 +479,11 @@ jobs:
       - name: Commit the pin
         if: steps.changes.outputs.release == 'true'
         run: |
-          git add Cargo.toml Cargo.lock frontend/packages/presentation-core/package.json \
+          git add Cargo.lock frontend/packages/presentation-core/package.json \
             frontend/packages/query-hooks/package.json frontend/packages/stdb/package.json \
-            frontend/pnpm-lock.yaml api-server/src/presentation_dictionary.rs \
-            release-compatibility-manifest.json
+            frontend/pnpm-lock.yaml frontend/vendor \
+            api-server/src/presentation_dictionary.rs \
+            release-compatibility-manifest.json vendor
           git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
             commit -m "chore(contracts): publish and pin v$VERSION"
           # The tag is already published, so land the pin even if the branch
@@ -402,7 +493,9 @@ jobs:
             if git push origin "HEAD:${GITHUB_REF_NAME}"; then
               exit 0
             fi
-            git pull --rebase origin "${GITHUB_REF_NAME}"
+            # A rebase recommits the pin, so it needs the same identity as the commit.
+            git -c user.name="github-actions[bot]" -c user.email="41898+github-actions[bot]@users.noreply.github.com" \
+              pull --rebase origin "${GITHUB_REF_NAME}"
           done
           echo "::error::could not push the v$VERSION pin to ${GITHUB_REF_NAME}; pin it by hand."
           exit 1

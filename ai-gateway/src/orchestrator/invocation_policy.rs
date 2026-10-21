@@ -12,10 +12,29 @@ use crate::{
         },
     },
     providers::llm::ToolCallRequest,
-    tools::types::ToolOutput,
+    tools::{
+        generated::{embedded_catalog, EffectiveGeneratedCapabilityView, GeneratedReadGrant},
+        types::ToolOutput,
+    },
 };
 
 use super::agent_loop::LoopPolicy;
+
+/// Resolve the generated capability surface for one model invocation.
+///
+/// The released skill declaration is an allowlist, the embedded catalog is
+/// the reviewed authority, and actor grants are fetched authorization. The
+/// caller must invoke this after resolving current grants so a revocation is
+/// reflected before the next model request.
+pub(crate) fn resolve_effective_generated_capabilities(
+    released_skill_tools: &[String],
+    current_actor_grants: &[GeneratedReadGrant],
+) -> Result<EffectiveGeneratedCapabilityView> {
+    embedded_catalog()
+        .map_err(anyhow::Error::from)?
+        .effective_view(released_skill_tools, current_actor_grants)
+        .map_err(anyhow::Error::from)
+}
 
 /// Policy adapter for a reviewed set of tools in an agent invocation.
 ///
@@ -485,5 +504,33 @@ mod tests {
             execute.plan.tool_calls
         )
         .is_err());
+    }
+
+    #[test]
+    fn model_visible_generated_tools_require_all_three_authorities() {
+        let grant = GeneratedReadGrant {
+            capability_key: "inventory.products.read".into(),
+            max_rows: 7,
+            max_bytes: 1_024,
+        };
+
+        let missing_skill_declaration =
+            resolve_effective_generated_capabilities(&[], std::slice::from_ref(&grant)).unwrap();
+        assert!(missing_skill_declaration.specs.is_empty());
+
+        let missing_actor_grant =
+            resolve_effective_generated_capabilities(&["inventory_products_read".into()], &[])
+                .unwrap();
+        assert!(missing_actor_grant.specs.is_empty());
+
+        let effective = resolve_effective_generated_capabilities(
+            &["inventory_products_read".into(), "unreviewed_tool".into()],
+            &[grant],
+        )
+        .unwrap();
+        assert_eq!(effective.specs.len(), 1);
+        assert_eq!(effective.specs[0].name, "inventory_products_read");
+        assert_eq!(effective.grants.len(), 1);
+        assert_eq!(effective.grants[0].max_rows, 7);
     }
 }

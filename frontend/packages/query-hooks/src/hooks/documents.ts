@@ -26,7 +26,24 @@ import type {
   KnowledgeArticleCategory,
 } from "@lumiere/stdb/types"
 
+import { decodeOperationDispatch } from "@lumiere/api-client"
 import { responseErrorMessage as parseCallErrorDocuments } from "@lumiere/api-client/response-error"
+
+import { dispatchNamedOperation } from "../operation-dispatch"
+import { resolveDocumentVersionEffect } from "./document-version-effect"
+import { resolveDocumentCreateEffect } from "./document-create-effect"
+import { resolveDocumentLockEffect, type DocumentLockProjection } from "./document-lock-effect"
+import {
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+  type CanonicalRecordRef,
+} from "./operation-effect"
+import {
+  resolveArticleMemberRemovalEffect,
+  resolveKnowledgeCategoryDeleteEffect,
+  resolveKnowledgeCategoryUpdateEffect,
+  resolveRetentionPurgeScheduleEffect,
+} from "./knowledge-action-effect"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
@@ -115,6 +132,36 @@ export function useDocumentVersions(organizationId: bigint, initialData?: QueryR
   })
 }
 
+export function useDocumentLegalHolds(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-legal-holds', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/document-legal-holds', 'Failed to fetch document legal holds'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDocumentSignatureRequests(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-signature-requests', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/document-signature-requests', 'Failed to fetch document signature requests'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
+export function useDocumentExternalRefs(organizationId: bigint, initialData?: QueryRows) {
+  return useQuery<QueryRows>({
+    queryKey: ['document-external-refs', rqBigIntKey(organizationId)],
+    queryFn: () =>
+      fetchQueryList('/api/query/document-external-refs', 'Failed to fetch document external references'),
+    staleTime: 30_000,
+    initialData,
+  })
+}
+
 export function useDeletedDocuments(organizationId: bigint, initialData?: QueryRows) {
   return useQuery<QueryRows>({
     queryKey: ['documents-deleted', rqBigIntKey(organizationId)],
@@ -134,6 +181,34 @@ export function useCreateDocument(organizationId: bigint, companyId: bigint) {
       const { urlPath, init } = stdbBffCommandPost("create_document", { companyId: companyId, params: stdbParamsToJson(params as object, "CreateDocumentParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create document')
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+  })
+}
+
+/**
+ * `create_document` returns nothing, so this reads `documents` before and after and resolves the
+ * created row (new id, same blob url + checksum, same host record). Resolves its `{resource,id}`.
+ */
+export function useCreateDocumentWithRef(organizationId: bigint, companyId: bigint, options?: { mayDispatch?: () => boolean }) {
+  const qc = useQueryClient()
+  return useMutation<CanonicalRecordRef, Error, CreateDocumentParams>({
+    mutationFn: async (params) => {
+      const before = await fetchQueryList("/api/query/documents", "Failed to read documents")
+      if (options?.mayDispatch && !options.mayDispatch()) throw new Error("Document scope or permissions changed before submission")
+      const { urlPath, init } = stdbBffCommandPost("create_document", { companyId: companyId, params: stdbParamsToJson(params as object, "CreateDocumentParams") })
+      const r = await apiFetch(urlPath, init)
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+      const after = await fetchQueryList("/api/query/documents", "Failed to read documents")
+      const p = params as { url?: unknown; checksum?: unknown; resModel?: unknown; resId?: unknown }
+      const effect = resolveDocumentCreateEffect(before, after, organizationId, {
+        url: typeof p.url === "string" ? p.url : "",
+        checksum: typeof p.checksum === "string" ? p.checksum : "",
+        resModel: typeof p.resModel === "string" ? p.resModel : undefined,
+        resId: p.resId == null ? undefined : toScalarU64(p.resId as ScalarId),
+      })
+      if (!effect) throw new Error("Document did not read back")
+      return effect
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
@@ -193,13 +268,13 @@ export function useRestoreDocument(organizationId: bigint) {
 
 export function useLockDocument(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (
-      input:
-        | ScalarId
-        | { documentId: ScalarId; leaseSeconds?: number | null },
-    ) => {
-      const documentId =
+  return useMutation<
+    CanonicalRecordRef,
+    Error,
+    ScalarId | { documentId: ScalarId; leaseSeconds?: number | null }
+  >({
+    mutationFn: async (input) => {
+      const rawId =
         typeof input === "object" && input !== null && "documentId" in input
           ? input.documentId
           : input
@@ -207,9 +282,14 @@ export function useLockDocument(organizationId: bigint) {
         typeof input === "object" && input !== null && "documentId" in input
           ? (input.leaseSeconds ?? null)
           : null
-      const { urlPath, init } = stdbBffCommandPost("lock_document", { documentId: toScalarU64(documentId), leaseSeconds: leaseSeconds == null ? null : Number(leaseSeconds) })
+      const documentId = toScalarU64(rawId)
+      const { urlPath, init } = stdbBffCommandPost("lock_document", { documentId, leaseSeconds: leaseSeconds == null ? null : Number(leaseSeconds) })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to lock document')
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+      const rows = await fetchQueryList("/api/query/documents", "Failed to read document")
+      const effect = resolveDocumentLockEffect(rows, organizationId, documentId, "locked")
+      if (!effect) throw new Error("Document did not read back as locked")
+      return effect
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
@@ -217,11 +297,16 @@ export function useLockDocument(organizationId: bigint) {
 
 export function useUnlockDocument(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (documentId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("unlock_document", { documentId: toScalarU64(documentId) })
+  return useMutation<CanonicalRecordRef, Error, ScalarId>({
+    mutationFn: async (rawId) => {
+      const documentId = toScalarU64(rawId)
+      const { urlPath, init } = stdbBffCommandPost("unlock_document", { documentId })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to unlock document')
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+      const rows = await fetchQueryList("/api/query/documents", "Failed to read document")
+      const effect = resolveDocumentLockEffect(rows, organizationId, documentId, "unlocked")
+      if (!effect) throw new Error("Document did not read back as unlocked")
+      return effect
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
   })
@@ -229,17 +314,23 @@ export function useUnlockDocument(organizationId: bigint) {
 
 export function useAddDocumentVersion(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({
-      documentId,
-      params,
-    }: {
-      documentId: bigint | number | string
-      params: Record<string, unknown>
-    }) => {
-      const { urlPath, init } = stdbBffCommandPost("add_document_version", { documentId: toScalarU64(documentId), params: stdbParamsToJson(params as object, "AddDocumentVersionParams") })
+  return useMutation<
+    CanonicalRecordRef,
+    Error,
+    { documentId: bigint | number | string; params: Record<string, unknown> }
+  >({
+    mutationFn: async ({ documentId: rawId, params }) => {
+      const documentId = toScalarU64(rawId)
+      const url = typeof params.url === "string" ? params.url : ""
+      const checksum = typeof params.checksum === "string" ? params.checksum : ""
+      const before = await fetchQueryList("/api/query/document-versions", "Failed to read document versions")
+      const { urlPath, init } = stdbBffCommandPost("add_document_version", { documentId, params: stdbParamsToJson(params as object, "AddDocumentVersionParams") })
       const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to add document version')
+      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
+      const after = await fetchQueryList("/api/query/document-versions", "Failed to read document versions")
+      const effect = resolveDocumentVersionEffect(before, after, organizationId, documentId, { url, checksum })
+      if (!effect) throw new Error("Document version did not read back")
+      return effect
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] })
@@ -338,17 +429,52 @@ export function useScheduleDocumentRetentionPurge(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params?: { delaySeconds?: number }) => {
-      const { urlPath, init } = stdbBffCommandPost("schedule_document_retention_purge", { params: stdbParamsToJson(
-          { delaySeconds: params?.delaySeconds ?? 60 } as object,
-          "ScheduleDocumentRetentionPurgeParams",
-        ) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
-    },
-    onSuccess: () => {
       const k = rqBigIntKey(organizationId)
-      void qc.invalidateQueries({ queryKey: ['documents', k] })
-      void qc.invalidateQueries({ queryKey: ['documents-deleted', k] })
+      const before = await fetchQueryList(
+        "/api/query/document-retention-purge-jobs",
+        "Failed to read retention purge jobs",
+      )
+      const beforeIds = new Set(
+        before.flatMap((row) => {
+          try {
+            return [BigInt(String(row.scheduledId))]
+          } catch {
+            return []
+          }
+        }),
+      )
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveBeforeDispatch: false,
+        resolveEffect: async () =>
+          resolveRetentionPurgeScheduleEffect(
+            beforeIds,
+            await fetchQueryList(
+              "/api/query/document-retention-purge-jobs",
+              "Failed to read retention purge jobs",
+            ),
+            organizationId,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("schedule_document_retention_purge", {
+            params: stdbParamsToJson(
+              { delaySeconds: params?.delaySeconds ?? 60 } as object,
+              "ScheduleDocumentRetentionPurgeParams",
+            ),
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to schedule retention purge",
+          )
+        },
+        afterDispatch: () => {
+          void qc.invalidateQueries({ queryKey: ["documents", k] })
+          void qc.invalidateQueries({ queryKey: ["documents-deleted", k] })
+          void qc.invalidateQueries({ queryKey: ["document-retention-purge-jobs", k] })
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
@@ -367,7 +493,35 @@ export function useApplyDocumentLegalHold(organizationId: bigint) {
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['documents', rqBigIntKey(organizationId)] }),
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['document-legal-holds', k] })
+    },
+  })
+}
+
+export function useReleaseDocumentLegalHold(organizationId: bigint) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      holdId,
+      metadata,
+    }: {
+      holdId: bigint | number | string
+      metadata?: string
+    }) => {
+      await dispatchNamedOperation(
+        "release_document_legal_hold",
+        { holdId: toScalarU64(holdId), params: stdbParamsToJson({ metadata } as object, "ReleaseDocumentLegalHoldParams") },
+        "Failed to release legal hold",
+      )
+    },
+    onSuccess: () => {
+      const k = rqBigIntKey(organizationId)
+      void qc.invalidateQueries({ queryKey: ['documents', k] })
+      void qc.invalidateQueries({ queryKey: ['document-legal-holds', k] })
+    },
   })
 }
 
@@ -610,14 +764,31 @@ export function useRemoveArticleMember(organizationId: bigint, _companyId?: bigi
       articleId: bigint | number | string
       member: string
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("remove_article_member", { articleId: toScalarU64(articleId), member: member })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to remove article member')
-    },
-    onSuccess: () => {
+      const id = toScalarU64(articleId)
       const k = rqBigIntKey(organizationId)
-      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
-      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveArticleMemberRemovalEffect(
+            await fetchQueryList("/api/query/knowledge-articles", "Failed to read knowledge article"),
+            organizationId,
+            id,
+            member,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("remove_article_member", {
+            articleId: id,
+            member,
+          })
+          return decodeOperationDispatch(await apiFetch(urlPath, init), "Failed to remove article member")
+        },
+        afterDispatch: () => {
+          void qc.invalidateQueries({ queryKey: ["knowledge-categories", k] })
+          void qc.invalidateQueries({ queryKey: ["knowledge-articles", k] })
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
@@ -656,14 +827,31 @@ export function useUpdateKnowledgeCategory(organizationId: bigint, companyId?: b
         ...params,
         ...(params['companyId'] == null && companyId != null ? { companyId } : {}),
       }
-      const { urlPath, init } = stdbBffCommandPost("update_knowledge_category", { categoryId: toScalarU64(categoryId), params: stdbParamsToJson(payload as object) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update knowledge category')
-    },
-    onSuccess: () => {
+      const id = toScalarU64(categoryId)
       const k = rqBigIntKey(organizationId)
-      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
-      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveKnowledgeCategoryUpdateEffect(
+            await fetchQueryList("/api/query/knowledge-categories", "Failed to read knowledge category"),
+            organizationId,
+            id,
+            payload,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("update_knowledge_category", {
+            categoryId: id,
+            params: stdbParamsToJson(payload as object),
+          })
+          return decodeOperationDispatch(await apiFetch(urlPath, init), "Failed to update knowledge category")
+        },
+        afterDispatch: () => {
+          void qc.invalidateQueries({ queryKey: ["knowledge-categories", k] })
+          void qc.invalidateQueries({ queryKey: ["knowledge-articles", k] })
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
@@ -672,14 +860,27 @@ export function useDeleteKnowledgeCategory(organizationId: bigint, _companyId?: 
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (categoryId: bigint | number | string) => {
-      const { urlPath, init } = stdbBffCommandPost("delete_knowledge_category", { categoryId: toScalarU64(categoryId) })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to delete knowledge category')
-    },
-    onSuccess: () => {
+      const id = toScalarU64(categoryId)
       const k = rqBigIntKey(organizationId)
-      void qc.invalidateQueries({ queryKey: ['knowledge-categories', k] })
-      void qc.invalidateQueries({ queryKey: ['knowledge-articles', k] })
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveKnowledgeCategoryDeleteEffect(
+            await fetchQueryList("/api/query/knowledge-categories", "Failed to read knowledge categories"),
+            organizationId,
+            id,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("delete_knowledge_category", { categoryId: id })
+          return decodeOperationDispatch(await apiFetch(urlPath, init), "Failed to delete knowledge category")
+        },
+        afterDispatch: () => {
+          void qc.invalidateQueries({ queryKey: ["knowledge-categories", k] })
+          void qc.invalidateQueries({ queryKey: ["knowledge-articles", k] })
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }

@@ -135,17 +135,19 @@ pub struct AiIntelligenceEvent {
     /// "pending" | "accepted" | "rejected"
     pub acceptance_status: String,
     pub acceptance_reason: Option<String>,
-    /// Set only for `event_kind == "decision_shadow"`; identifies which
-    /// shadow model profile produced this event.
-    pub shadow_profile_ref: Option<String>,
-    /// Set only for `event_kind == "decision_shadow"` when the shadow
-    /// attempt itself failed (`outcome_kind`/`output_json` are absent in
-    /// that case). Never set for `"decision"`/`"reasoning"` events.
-    pub shadow_error: Option<String>,
     pub create_uid: Identity,
     pub create_date: Timestamp,
     pub write_uid: Identity,
     pub write_date: Timestamp,
+    /// Set only for `event_kind == "decision_shadow"`; identifies which
+    /// shadow model profile produced this event.
+    #[default(None::<String>)]
+    pub shadow_profile_ref: Option<String>,
+    /// Set only for `event_kind == "decision_shadow"` when the shadow
+    /// attempt itself failed (`outcome_kind`/`output_json` are absent in
+    /// that case). Never set for `"decision"`/`"reasoning"` events.
+    #[default(None::<String>)]
+    pub shadow_error: Option<String>,
 }
 
 // ── Input params ─────────────────────────────────────────────────────────────

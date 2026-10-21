@@ -68,3 +68,50 @@ pub async fn consume_password_reset_token(pool: &Pool, token_hash: &str) -> Resu
         .context("consume platform password reset token")?;
     Ok(changed == 1)
 }
+
+/// Consume the reset link, change the password, and invalidate sibling links in
+/// one transaction. A failure leaves both credential and token unchanged.
+pub async fn complete_password_reset(
+    pool: &Pool,
+    token_hash: &str,
+    password_hash: &str,
+) -> Result<bool> {
+    let mut client = pool
+        .get()
+        .await
+        .context("get PG client to complete password reset")?;
+    let transaction = client.transaction().await.context("begin password reset")?;
+    let token = transaction
+        .query_opt(
+            "UPDATE lumiere_platform.password_reset_token SET used_at = now() \
+         WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() \
+         RETURNING platform_user_id",
+            &[&token_hash],
+        )
+        .await
+        .context("claim password reset")?;
+    let Some(token) = token else {
+        return Ok(false);
+    };
+    let user_id: String = token.get("platform_user_id");
+    let changed = transaction
+        .execute(
+            "UPDATE lumiere_platform.user_credential SET password_hash = $2, updated_at = now() \
+         WHERE platform_user_id = $1 AND password_hash IS NOT NULL AND workos_user_id IS NULL",
+            &[&user_id, &password_hash],
+        )
+        .await
+        .context("replace native password")?;
+    if changed != 1 {
+        return Ok(false);
+    }
+    transaction.execute(
+        "UPDATE lumiere_platform.password_reset_token SET used_at = now() WHERE platform_user_id = $1 AND used_at IS NULL",
+        &[&user_id],
+    ).await.context("invalidate sibling password resets")?;
+    transaction
+        .commit()
+        .await
+        .context("commit password reset")?;
+    Ok(true)
+}

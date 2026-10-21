@@ -17,7 +17,8 @@ use crate::crm::leads::{crm_team, lead, lead_source, Lead};
 use crate::crm::opportunities::{opp_stage, opportunity, Opportunity};
 use crate::data_ops::helpers::*;
 use crate::data_ops::import_tracker::{
-    begin_import_job, finish_import_job, record_import_created_id, record_import_error,
+    begin_import_job, finish_import_job, import_content_sha256, record_import_created_id,
+    record_import_error, reject_committed_import_replay, stamp_import_sha256,
 };
 use crate::helpers::check_permission;
 
@@ -209,7 +210,10 @@ pub fn import_contact_csv(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "contact", "create")?;
     let (headers, rows) = parse_csv(&csv_data)?;
+    let sha256 = import_content_sha256(&csv_data);
+    reject_committed_import_replay(ctx, organization_id, "contact", &sha256)?;
     let job = begin_import_job(ctx, organization_id, "contact", None, rows.len() as u32);
+    let job = stamp_import_sha256(ctx, job, &sha256);
     let mut imported = 0u32;
     let mut errors = 0u32;
 

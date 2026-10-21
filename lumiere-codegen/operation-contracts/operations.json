@@ -6,8 +6,8 @@
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/iot/actions.rs:278 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
-      "idempotency": "idempotent",
+      "evidence": "spacetimedb/src/iot/actions.rs:274 reducer accepts only Sent actions and rejects replay after acknowledgement; session-exposed.",
+      "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
     "activate_consignment_agreement": {
@@ -226,7 +226,7 @@
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/replenishment.rs:912 is permission-checked and COV-06o exposes it through the Inventory replenishment schedule/cancel workflow; deleting an absent run remains a backend no-op.",
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:912 reducer deletes the rule's pending runs and succeeds as a no-op when none exist; exposed through the Inventory replenishment scheduler UI.",
       "idempotency": "idempotent",
       "semantic_kind": "command"
     },
@@ -366,7 +366,7 @@
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:534 reducer body shows current-state or membership guard; session-exposed.",
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs confirm_manufacturing_order accepts Draft only; a routed BOM creates exactly one owned mrp_workorder per operation, updates mrp_workcenter counters, and confirms the same mrp_production. Replay rejects before new rows; session-exposed.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
@@ -450,13 +450,27 @@
       "idempotency": "non_idempotent",
       "semantic_kind": "command"
     },
+    "configure_workcenter_cost_rate": {
+      "client_facing": true,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/src/manufacturing/costing.rs configure_workcenter_cost_rate validates a scoped active workcenter and overwrites its keyed rate; audit and organization commits remain append-only. Typed frontend BFF cost configuration caller; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "configure_manufacturing_valuation": {
+      "client_facing": true,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/src/manufacturing/costing.rs configure_manufacturing_valuation validates same-company posting accounts and overwrites keyed valuation configuration; audit and organization commits remain append-only. Typed frontend BFF valuation configuration caller; session-exposed.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
     "create_bom_byproduct": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:664 reducer rejects a duplicate byproduct for the same BOM and cost shares above 100; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs:664 reducer rejects a duplicate byproduct for the same BOM and cost shares above 100; exposed through the BOM row action.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
@@ -1161,12 +1175,12 @@
       "semantic_kind": "command"
     },
     "create_workorder_quality_check": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/quality.rs:405 reducer requires an in-progress work order without an existing quality check; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/inventory/quality.rs:405 reducer requires an in-progress work order without an existing quality check; exposed through the workorder quality action.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
@@ -1511,12 +1525,12 @@
       "semantic_kind": "operator"
     },
     "fail_workorder_quality_check": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/quality.rs:507 reducer rejects an already completed check; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/inventory/quality.rs:507 reducer rejects an already completed check; exposed through the workorder quality action.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
@@ -1529,6 +1543,13 @@
       "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:905 reducer body shows current-state or membership guard; session-exposed.",
       "idempotency": "state_guarded",
       "semantic_kind": "operator"
+    },
+    "finish_manufacturing_order_with_tracking": {
+      "client_facing": true,
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs: finish_manufacturing_order_with_tracking validates exact lot/serial attribution and shares the ToClose state guard with finish.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
     },
     "finish_workorder": {
       "client_facing": true,
@@ -2001,14 +2022,14 @@
       "semantic_kind": "command"
     },
     "release_document_legal_hold": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/documents/legal_hold.rs:156 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "evidence": "spacetimedb/src/documents/legal_hold.rs:156 reducer releases an active legal hold behind document admin permission with audit logging; session-exposed for the document page.",
       "idempotency": "idempotent",
-      "semantic_kind": "internal"
+      "semantic_kind": "command"
     },
     "release_picking_wave": {
       "client_facing": true,
@@ -2336,17 +2357,66 @@
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/inventory/replenishment.rs:853 is permission-checked and COV-06o exposes it through the Inventory replenishment schedule workflow; duplicate scheduling fails closed.",
+      "evidence": "spacetimedb/src/inventory/replenishment.rs:853 reducer rejects a rule that already has a pending scheduled run; exposed through the Inventory replenishment scheduler UI.",
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
-    "scrap_finished_manufacturing_output": {
+    "run_manufacturing_tracked_output_test": {
       "client_facing": false,
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/tests/manufacturing/tracked_output_test.rs: isolated persisted domain proof; test-only reducer denied to session callers.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "run_manufacturing_bom_to_close_domain_lifecycle_test": {
+      "client_facing": false,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted full manufacturing lifecycle proof with isolated fixture writes; test-only reducer denied to session callers.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "run_manufacturing_bom_routing_lifecycle_test": {
+      "client_facing": false,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted routing ownership and predecessor proof with isolated fixture writes; test-only reducer denied to session callers.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "run_manufacturing_actual_cost_valuation_test": {
+      "client_facing": false,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted manufacturing cost and posted accounting valuation proof with isolated fixture writes; test-only reducer denied to session callers.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "run_manufacturing_cost_configuration_scope_test": {
+      "client_facing": false,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/tests/manufacturing/mod.rs invokes the persisted cost configuration scope and closed-period rejection proof with isolated fixture writes; test-only reducer denied to session callers.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
+    "scrap_finished_manufacturing_output": {
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:1200 reducer takes a caller idempotency key and rejects a reused key; denied until a session call site exists.",
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:1200 reducer takes a caller idempotency key and rejects a reused key; exposed through the manufacturing-order scrap action.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
+    },
+    "scrap_manufacturing_material": {
+      "client_facing": true,
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs: scrap_manufacturing_material requires exact available BOM material stock in Progress before consumption and rejects reused request references.",
+      "idempotency": "request_guarded",
+      "semantic_kind": "command"
+    },
+    "scrap_tracked_manufacturing_output": {
+      "client_facing": true,
+      "codec": { "id": "spacetimedb-sats-json", "version": 1 },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs: scrap_tracked_manufacturing_output bounds scrap by the exact owned output move and rejects reused request references.",
       "idempotency": "request_guarded",
       "semantic_kind": "command"
     },
@@ -2370,6 +2440,13 @@
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
+    "set_bom_operations": {
+      "client_facing": false,
+      "codec": {"id": "spacetimedb-sats-json", "version": 1},
+      "evidence": "spacetimedb/src/manufacturing/bill_of_materials.rs set_bom_operations validates ordered scoped routing and rejects changes after any MO references the BOM; audit and organization commits remain append-only. No enumerated frontend BFF caller.",
+      "idempotency": "non_idempotent",
+      "semantic_kind": "operator"
+    },
     "set_document_retention": {
       "client_facing": true,
       "codec": {
@@ -2387,6 +2464,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/documents/drive_sync.rs:364 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "idempotency": "idempotent",
+      "semantic_kind": "internal"
+    },
+    "set_helpdesk_related_record": {
+      "client_facing": false,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/helpdesk/related_records.rs: exact ticket-keyed relation is inserted, replaced, or explicitly cleared after tenant and target authorization",
       "idempotency": "idempotent",
       "semantic_kind": "internal"
     },
@@ -2580,6 +2667,16 @@
       "idempotency": "idempotent",
       "semantic_kind": "command"
     },
+    "unreserve_stock_picking": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:3213 reducer accepts only assigned pickings and returns them to confirmed; session-exposed for the transfer record page with exact canonical readback.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
+    },
     "unreserve_stock_quant": {
       "client_facing": true,
       "codec": {
@@ -2680,6 +2777,16 @@
       "idempotency": "state_guarded",
       "semantic_kind": "command"
     },
+    "update_fleet_vehicle_details": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/fleet/fleet.rs:518 reducer body shows keyed overwrite with tenant/company guard; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
     "update_google_drive_connection": {
       "client_facing": true,
       "codec": {
@@ -2759,6 +2866,16 @@
       "evidence": "spacetimedb/src/documents/templates.rs:356 reducer body shows keyed overwrite/delete or recomputation; denied.",
       "idempotency": "idempotent",
       "semantic_kind": "internal"
+    },
+    "update_manufacturing_order": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/manufacturing/manufacturing_orders.rs:651 reducer body shows Draft-state guard and tenant/company-scoped overwrite; session-exposed.",
+      "idempotency": "state_guarded",
+      "semantic_kind": "command"
     },
     "update_pos_terminal": {
       "client_facing": true,
@@ -2947,6 +3064,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/inventory/warehouse.rs:722 reducer body shows keyed overwrite/delete or recomputation; session-exposed.",
+      "idempotency": "idempotent",
+      "semantic_kind": "command"
+    },
+    "update_stock_picking": {
+      "client_facing": true,
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/inventory/stock.rs:4012 reducer accepts only draft pickings and overwrites the supplied header fields; session-exposed for the transfer record page with exact canonical readback.",
       "idempotency": "idempotent",
       "semantic_kind": "command"
     },

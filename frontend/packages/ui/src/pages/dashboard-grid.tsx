@@ -4,15 +4,18 @@ import { forwardRef } from "react"
 import type { DashboardSection } from "../lib/dashboard-types"
 import { gridWidthClasses } from "../lib/dashboard-types"
 import { DashboardWidgetRenderer } from "./dashboard-widget-renderer"
+import type { ReportExportSourceProvenance } from "../lib/report-export-provenance"
 
 interface DashboardGridProps {
   sections: DashboardSection[]
   testId?: string
   widgetTestIdPrefix?: string
+  isLoading?: boolean
+  exportProvenanceByWidget?: Record<string, ReportExportSourceProvenance>
 }
 
 export const DashboardGrid = forwardRef<HTMLDivElement, DashboardGridProps>(
-  function DashboardGrid({ sections, testId, widgetTestIdPrefix }, ref) {
+  function DashboardGrid({ sections, testId, widgetTestIdPrefix, isLoading, exportProvenanceByWidget }, ref) {
     return (
       <div ref={ref} className="space-y-10" data-testid={testId}>
         {sections.map((section) => (
@@ -28,7 +31,9 @@ export const DashboardGrid = forwardRef<HTMLDivElement, DashboardGridProps>(
                   key={widget.id}
                   widget={widget}
                   widthClass={gridWidthClasses[widget.width]}
+                  isLoading={isLoading}
                   testId={widgetTestIdPrefix ? `${widgetTestIdPrefix}-${widget.id}` : undefined}
+                  exportProvenance={exportProvenanceByWidget?.[widget.id]}
                 />
               ))}
             </div>

@@ -55,6 +55,42 @@ Admin + non-admin personas (first-org fixture has them).
 - **No contract delta:** `user-role-assignment` already projects id, user_identity, role_id,
   organization_id and is_active.
 
+## WorkOS access editor update (2026-10-18)
+
+Settings → Users now saves primary role, additive roles, active status and job title
+through the atomic `erp.set_member_access` operation. The legacy assign/revoke hooks
+remain available, but the browser proof observes the member editor's operation.
+The generated `SetMemberAccessParams` encoder preserves optional job-title values
+on the wire. Each save also checks the last monotonic audit revision for the
+membership and all its role assignments, including inactive assignments. Returning
+to an earlier role/status combination cannot make an old command current again.
+Rows without a server revision must reload before saving. Exact retries acknowledge an already-committed state; replaying an
+older assignment after revocation returns 422 and cannot restore access. Reader
+replays remain denied with 403.
+
+Module SSR prefetches leave denied resources unseeded so the authoritative client
+query can display their permission state without crashing readable sibling tabs.
+A write-only operation is observed using an administrator readback in the browser
+proof; write permission does not imply read permission.
+
+## Wave 2 closure evidence (2026-10-13)
+
+- The browser proof now observes a unique settings-read permission appear in a fresh target session
+  after assignment and disappear after revoke. It also proves an administrator can create and persist
+  a company switch while a company-bound reader's forged selection is repaired to the membership
+  company after session recovery.
+- Settings navigation is governed by an exhaustive exposure manifest: user sections are admitted,
+  admin sections require admin authority, AI remains hidden, and unknown sections fail closed. Pure
+  checks pass: company-scope resolver 3/3 and settings exposure ratchet 2/2. Playwright discovery
+  succeeds as part of the 14-test Wave-2 selection.
+- Security correction: organization-wide company access now uses the canonical single active
+  membership base `role_id` plus active, unexpired assignments. Equal-now, expired, malformed expiry,
+  inactive role, and ambiguous membership cases fail closed; pure Rust tests were added but could not
+  run because Cargo is unavailable in this workspace.
+- Runtime acceptance still requires the seeded same-head browser run. COV-26 must add settings/auth
+  denied, keyboard/focus, viewport, and reconnect quality evidence; COV-27 must run the all-module
+  launch manifest and prove no unclassified enabled operation or visible stub with required suites green.
+
 ## D/A/O/E proof checklist
 
 | Gate | Required proof | State |

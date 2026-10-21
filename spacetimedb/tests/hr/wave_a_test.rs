@@ -1,19 +1,25 @@
 //! HR Wave A — isolation, leave balance, payslip artifact, offboarding gate.
 use std::time::Duration;
 
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{Identity, ReducerContext, Table};
 
+use crate::core::audit::audit_log;
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::core::persistence::{organization_commit, organization_row_change};
 use crate::hr::contracts::{create_contract, hr_contract, CreateContractParams};
 use crate::hr::employees::{
     archive_employee, create_employee, hr_employee, update_employee, CreateEmployeeParams,
-    UpdateEmployeeParams,
+    HrEmployee, UpdateEmployeeParams,
 };
 use crate::hr::leaves::{
     approve_leave, create_leave_request, create_leave_type, hr_leave, hr_leave_allocation,
     hr_leave_type, refuse_leave, submit_leave, CreateLeaveRequestParams, CreateLeaveTypeParams,
     HrLeave,
+};
+use crate::hr::integrations::{
+    apply_hr_integration_intent, create_hr_integration_intent, hr_integration_intent,
+    record_hr_integration_result, CreateHrIntegrationIntentParams,
+    RecordHrIntegrationResultParams,
 };
 use crate::hr::offboarding::{
     complete_offboarding_item, start_offboarding, ArchiveEmployeeParams,
@@ -175,6 +181,117 @@ fn latest_payslip_for_employee(
         .ok_or_else(|| "payslip missing".to_string())
 }
 
+pub fn test_statutory_integration_requires_canonical_provider_result(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let idempotency_key = format!("stp-unavailable-{}", fixture.company_id);
+    create_hr_integration_intent(
+        ctx,
+        fixture.organization_id,
+        CreateHrIntegrationIntentParams {
+            company_id: Some(fixture.company_id),
+            intent_kind: "stp".to_string(),
+            idempotency_key: idempotency_key.clone(),
+            payslip_id: None,
+            export_intent_id: None,
+            payload: r#"{"requested_action":"submit"}"#.to_string(),
+            metadata: None,
+        },
+    )?;
+    let intent = ctx
+        .db
+        .hr_integration_intent()
+        .hr_intent_by_key()
+        .filter(&idempotency_key)
+        .find(|row| row.organization_id == fixture.organization_id)
+        .ok_or("STP integration intent missing")?;
+
+    apply_hr_integration_intent(ctx, fixture.organization_id, intent.id)?;
+    let unavailable = ctx
+        .db
+        .hr_integration_intent()
+        .id()
+        .find(&intent.id)
+        .ok_or("STP integration intent missing after apply")?;
+    if unavailable.status != "failed"
+        || unavailable.result_ref.is_some()
+        || unavailable.external_ref.is_some()
+        || unavailable.applied_at.is_some()
+        || unavailable.attempt_count != 1
+        || !unavailable
+            .last_error
+            .as_deref()
+            .unwrap_or_default()
+            .contains("provider adapter is unavailable")
+    {
+        return Err("unconfigured STP must persist a canonical failed outcome".into());
+    }
+
+    let missing_reference = record_hr_integration_result(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        intent.id,
+        RecordHrIntegrationResultParams {
+            status: "applied".to_string(),
+            external_ref: None,
+            payload_hash: None,
+            result_ref: None,
+            last_error: None,
+            metadata: None,
+            gross_wage: None,
+            net_wage: None,
+            calculation_metadata: None,
+        },
+    );
+    if missing_reference.is_ok() {
+        return Err("STP applied status must require a real provider reference".into());
+    }
+    let after_rejection = ctx
+        .db
+        .hr_integration_intent()
+        .id()
+        .find(&intent.id)
+        .ok_or("STP integration intent missing after rejected result")?;
+    if after_rejection.status != "failed" || after_rejection.attempt_count != 1 {
+        return Err("rejected provider result must leave the failed row unchanged".into());
+    }
+
+    record_hr_integration_result(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        intent.id,
+        RecordHrIntegrationResultParams {
+            status: "applied".to_string(),
+            external_ref: None,
+            payload_hash: Some("sha256:provider-payload".to_string()),
+            result_ref: Some("provider-receipt-001".to_string()),
+            last_error: None,
+            metadata: None,
+            gross_wage: None,
+            net_wage: None,
+            calculation_metadata: None,
+        },
+    )?;
+    let applied = ctx
+        .db
+        .hr_integration_intent()
+        .id()
+        .find(&intent.id)
+        .ok_or("STP integration intent missing after canonical result")?;
+    if applied.status != "applied"
+        || applied.result_ref.as_deref() != Some("provider-receipt-001")
+        || applied.applied_at.is_none()
+        || applied.attempt_count != 2
+    {
+        return Err("canonical provider result was not persisted exactly".into());
+    }
+    Ok(())
+}
+
 pub fn test_company_isolation_on_leave_and_payslip(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture_a = OrgFixture::seed_minimal(ctx)?;
@@ -229,6 +346,65 @@ pub fn test_company_isolation_on_leave_and_payslip(ctx: &ReducerContext) -> Resu
     );
     if cross_payslip.is_ok() {
         return Err("company B must not confirm company A payslip".into());
+    }
+    Ok(())
+}
+
+pub fn test_payslip_approval_rejects_self_approval(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let employee_id = seed_employee(ctx, &fixture, "Payroll Self Approval Emp")?;
+    let employee = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(&employee_id)
+        .ok_or("employee missing")?;
+    ctx.db.hr_employee().id().update(HrEmployee {
+        user_id: Some(ctx.sender()),
+        ..employee
+    });
+    let structure_id = seed_payroll_structure(ctx, &fixture)?;
+    create_payslip(
+        ctx,
+        fixture.organization_id,
+        CreatePayslipParams {
+            company_id: Some(fixture.company_id),
+            employee_id,
+            struct_id: structure_id,
+            date_from: ctx.timestamp,
+            date_to: ctx.timestamp + Duration::from_secs(86400 * 30),
+            basic_wage: 5000.0,
+            contract_id: None,
+            notes: Some("self-approval-proof".to_string()),
+        },
+    )?;
+    let payslip_id = latest_payslip_for_employee(ctx, &fixture, employee_id)?;
+    let result = confirm_payslip(
+        ctx,
+        fixture.organization_id,
+        payslip_id,
+        ConfirmPayslipParams {
+            company_id: Some(fixture.company_id),
+            gross_wage: 5000.0,
+            net_wage: 4000.0,
+            calculation_source: "manual".to_string(),
+        },
+    );
+    let error = result.expect_err("employee must not approve own payslip");
+    if !error.contains("own payslip") {
+        return Err(format!("unexpected self-approval error: {error}"));
+    }
+    let unchanged = ctx
+        .db
+        .hr_payslip()
+        .id()
+        .find(&payslip_id)
+        .ok_or("payslip missing after denied approval")?;
+    if unchanged.state != PayslipState::Draft {
+        return Err("denied self-approval changed payslip state".to_string());
     }
     Ok(())
 }
@@ -889,6 +1065,40 @@ fn expect_rejected_unchanged(
     op: impl FnOnce() -> Result<(), String>,
 ) -> Result<(), String> {
     let before = leave_row(ctx, leave_id)?;
+    let effects = || {
+        let mut allocations: Vec<_> = ctx
+            .db
+            .hr_leave_allocation()
+            .iter()
+            .filter(|row| {
+                row.employee_id == before.employee_id && row.leave_type_id == before.leave_type_id
+            })
+            .map(|row| (row.id, row.allocated_days, row.used_days))
+            .collect();
+        allocations.sort_by_key(|row| row.0);
+        let mut audits: Vec<_> = ctx
+            .db
+            .audit_log()
+            .iter()
+            .filter(|row| {
+                row.organization_id == before.organization_id
+                    && row.table_name == "hr_leave"
+                    && row.record_id == leave_id
+            })
+            .map(|row| row.id)
+            .collect();
+        audits.sort_unstable();
+        let mut commits: Vec<_> = ctx
+            .db
+            .organization_commit()
+            .iter()
+            .filter(|row| row.organization_id == before.organization_id)
+            .map(|row| row.id)
+            .collect();
+        commits.sort();
+        (allocations, audits, commits)
+    };
+    let before_effects = effects();
     match op() {
         Ok(()) => return Err(format!("{label}: must be rejected")),
         Err(message) if message.contains(expected) => {}
@@ -896,6 +1106,11 @@ fn expect_rejected_unchanged(
     }
     if leave_row(ctx, leave_id)? != before {
         return Err(format!("{label}: rejected call mutated the leave"));
+    }
+    if effects() != before_effects {
+        return Err(format!(
+            "{label}: rejected call changed balance, audit or durable effects"
+        ));
     }
     Ok(())
 }
@@ -910,6 +1125,20 @@ pub fn test_leave_approval_rejects_replay_and_self_approval(
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let (org, company) = (fixture.organization_id, fixture.company_id);
     let employee_id = seed_employee(ctx, &fixture, "Cov09 Emp")?;
+    // A linked, distinct requester makes the successful SoD case explicit.
+    if ctx.sender() == Identity::__dummy() {
+        return Err("COV-09 requires a non-dummy test caller".into());
+    }
+    let employee = ctx
+        .db
+        .hr_employee()
+        .id()
+        .find(employee_id)
+        .ok_or("employee missing")?;
+    ctx.db.hr_employee().id().update(HrEmployee {
+        user_id: Some(Identity::__dummy()),
+        ..employee
+    });
     let leave_type_id = seed_leave_type(ctx, &fixture, "Cov09 Type", 30.0)?;
 
     // Submit → approve, with replays of both.
