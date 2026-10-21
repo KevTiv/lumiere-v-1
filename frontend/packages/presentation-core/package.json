@@ -12,7 +12,7 @@
     "./saved-draft-decoder": "./src/saved-draft-decoder.ts"
   },
   "dependencies": {
-    "@lumiere/contracts": "file:../../vendor/lumiere-contracts-0.3.137.tgz",
+    "@lumiere/contracts": "file:../../vendor/lumiere-contracts-0.3.138.tgz",
     "ajv": "8.18.0"
   },
   "scripts": {
