@@ -1,5 +1,6 @@
 //! Platform module smoke tests — helpdesk, HR, manufacturing, documents, workflow, subscriptions.
 mod country_pack_test;
+mod document_templates_test;
 mod platform_smoke;
 mod tenant_isolation_test;
 
@@ -61,6 +62,10 @@ pub fn run_documents_wave_a_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("documents ACL: {e}"))?;
     platform_smoke::test_documents_company_isolation(ctx)
         .map_err(|e| format!("documents isolation: {e}"))?;
+    document_templates_test::test_document_template_lifecycle(ctx)
+        .map_err(|e| format!("document template lifecycle: {e}"))?;
+    document_templates_test::test_document_template_rejections(ctx)
+        .map_err(|e| format!("document template rejections: {e}"))?;
     Ok(())
 }
 

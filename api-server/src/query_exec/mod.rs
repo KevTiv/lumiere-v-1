@@ -337,7 +337,14 @@ async fn read_resource_query_for_company(
             return Ok(Vec::new());
         }
         "document-templates" => {
-            return read_document_templates(client, organization_id).await;
+            let company_ids = company_scope::resolve_template_company_ids(
+                client,
+                organization_id,
+                identity_hex,
+                requested_company_id,
+            )
+            .await?;
+            return read_document_templates(client, organization_id, &company_ids, fa).await;
         }
         "mail-templates" => {
             return read_mail_templates(client, organization_id).await;
