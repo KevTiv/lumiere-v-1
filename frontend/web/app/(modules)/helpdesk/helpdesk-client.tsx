@@ -5,7 +5,8 @@ import type { KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
 import { ticketKpis } from "./ticket-kpis"
 import { requiredInlineText, ticketPriorityPatch } from "@/lib/inline-edit-params"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { canUseModuleData, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -129,10 +130,15 @@ function HelpdeskClientLoaded({
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvImportKind, setCsvImportKind] = useState<"ticket" | "team" | "stage" | "sla" | null>(null)
 
-  const { data: ticketsRaw = [], isLoading: ticketsLoading } = useHelpdeskTickets(orgId, initialTickets)
-  const { data: teams = [] } = useHelpdeskTeams(orgId, initialTeams)
-  const { data: stages = [] } = useHelpdeskStages(orgId, initialStages)
-  const { data: slas = [] } = useHelpdeskSlas(orgId, initialSlas)
+  const ticketsRead = moduleCollection(useHelpdeskTickets(orgId, initialTickets))
+  const ticketsRaw = ticketsRead.rows
+  const ticketsLoading = ticketsRead.state.status === "loading"
+  const teamsRead = moduleCollection(useHelpdeskTeams(orgId, initialTeams))
+  const teams = teamsRead.rows
+  const stagesRead = moduleCollection(useHelpdeskStages(orgId, initialStages))
+  const stages = stagesRead.rows
+  const slasRead = moduleCollection(useHelpdeskSlas(orgId, initialSlas))
+  const slas = slasRead.rows
   const { data: orgUsers = [] } = useOrgUsers()
 
   const tickets = useMemo(
@@ -463,7 +469,35 @@ function HelpdeskClientLoaded({
     [tickets, ticketsLoading, t],
   )
 
+  const dataState = {
+    dashboard: ticketsRead.state,
+    tickets: ticketsRead.state,
+    teams: teamsRead.state,
+    stages: stagesRead.state,
+    slas: slasRead.state,
+  }
+  const actionTabs: Record<string, keyof typeof dataState> = {
+    createTicket: "tickets", createHelpdeskTeam: "teams", createHelpdeskStage: "stages", createHelpdeskSla: "slas",
+  }
+  const csvTabs = { ticket: "tickets", team: "teams", stage: "stages", sla: "slas" } as const
+  const actionUsable = (action: string) => {
+    const tab = actionTabs[action]
+    return tab == null || canUseModuleData(dataState[tab])
+  }
+  const ticketsUsable = canUseModuleData(ticketsRead.state)
+  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  const csvSourceState = csvImportKind == null ? undefined : dataState[csvTabs[csvImportKind]]
+  useEffect(() => {
+    // Dialogs close when the collection they act on becomes denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!ticketsUsable) {
+      setTicketDialogOpen(false)
+      setSelectedTicket(null)
+    }
+  }, [quickActionUsable, ticketsUsable])
+
   const handleFormSubmit = async (tabId: string, action: string, formData: Record<string, unknown>) => {
+    if (!actionUsable(action)) throw new Error("Required data is unavailable. Refresh and try again.")
     if (action === "createTicket") {
       const params = toCreateTicketParams(formData)
       if (!params) return
@@ -514,6 +548,7 @@ function HelpdeskClientLoaded({
 
   const handleTicketSave = async (formData: Record<string, unknown>) => {
     if (!selectedTicket) return
+    if (!ticketsUsable) throw new Error("Required data is unavailable. Refresh and try again.")
     const ticketId = Number(selectedTicket.id)
     const origName = String(selectedTicket.name ?? "")
     const origDesc = selectedTicket.description != null ? String(selectedTicket.description) : ""
@@ -557,13 +592,14 @@ function HelpdeskClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         onRowClick={onRowClick}
         isPending={isFormMutationPending}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? ticketFormConfig}
         isPending={isFormMutationPending}
@@ -576,6 +612,7 @@ function HelpdeskClientLoaded({
       />
       {csvImportKind ? (
         <CsvImportModal
+          sourceState={csvSourceState}
           trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={`helpdesk_${csvImportKind}`}
@@ -597,7 +634,7 @@ function HelpdeskClientLoaded({
           }}
         />
       ) : null}
-      {ticketDetailFormConfig && selectedTicket ? (
+      {ticketDetailFormConfig && selectedTicket && ticketsUsable ? (
         <HelpdeskTicketDialog
           open={ticketDialogOpen}
           onOpenChange={(open) => {

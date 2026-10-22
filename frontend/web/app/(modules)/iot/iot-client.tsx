@@ -4,7 +4,8 @@ import {
   withDashboardSections,
 } from '@lumiere/ui/lib/dashboard-sections';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import { useTranslation } from '@lumiere/i18n';
 import { useConfirmDialog } from '@lumiere/ui/hooks/use-confirm-dialog';
 import {
@@ -345,16 +346,20 @@ function IotClientLoaded({
   const operatingCompanyId = useOperatingCompanyBigInt(organizationId);
   const moduleConfigBase = useMemo(() => iotModuleConfig(t), [t]);
 
-  const { data: devices = [] } = useIotDevices(orgId, initialDevices);
-  const { data: hubs = [] } = useIotHubs(orgId, initialHubs);
-  const { data: pairingTokens = [] } = useIotPairingTokens(
-    orgId,
-    initialPairingTokens,
-  );
-  const { data: actions = [] } = useIotActions(orgId, initialActions);
-  const { data: telemetry = [] } = useIotTelemetry(orgId, initialTelemetry);
-  const { data: alerts = [] } = useIotAlerts(orgId, initialAlerts);
-  const { data: thresholds = [] } = useIotThresholds(orgId, initialThresholds);
+  const devicesRead = moduleCollection(useIotDevices(orgId, initialDevices));
+  const devices = devicesRead.rows;
+  const hubsRead = moduleCollection(useIotHubs(orgId, initialHubs));
+  const hubs = hubsRead.rows;
+  const pairingTokensRead = moduleCollection(useIotPairingTokens(orgId, initialPairingTokens));
+  const pairingTokens = pairingTokensRead.rows;
+  const actionsRead = moduleCollection(useIotActions(orgId, initialActions));
+  const actions = actionsRead.rows;
+  const telemetryRead = moduleCollection(useIotTelemetry(orgId, initialTelemetry));
+  const telemetry = telemetryRead.rows;
+  const alertsRead = moduleCollection(useIotAlerts(orgId, initialAlerts));
+  const alerts = alertsRead.rows;
+  const thresholdsRead = moduleCollection(useIotThresholds(orgId, initialThresholds));
+  const thresholds = thresholdsRead.rows;
   const { data: locations = [] } = useStockLocations(orgId);
 
   const genPairing = useGenerateHubPairingToken(orgId, operatingCompanyId);
@@ -757,11 +762,38 @@ function IotClientLoaded({
     [pairingTokens, hubs, devices, actions, telemetry, alerts, thresholds],
   );
 
+  const dataState = {
+    dashboard: mergeModuleStates([devicesRead.state, hubsRead.state, actionsRead.state, pairingTokensRead.state]),
+    'iot-pairing-tokens': pairingTokensRead.state,
+    'iot-hubs': hubsRead.state,
+    'iot-devices': devicesRead.state,
+    'iot-actions': actionsRead.state,
+    'iot-telemetry': telemetryRead.state,
+    'iot-alerts': alertsRead.state,
+    'iot-thresholds': thresholdsRead.state,
+  };
+  const devicesUsable = canUseModuleData(devicesRead.state);
+  const hubsUsable = canUseModuleData(hubsRead.state);
+  const actionUsable = (action: string) =>
+    action === 'registerIotHub' ? hubsUsable : action === 'registerIotDevice' ? devicesUsable : true;
+  const dashFormUsable = dashForm == null || actionUsable(dashForm.action);
+  const iotModalUsable =
+    iotModal.type === null ||
+    canUseModuleData(iotModal.type === 'failAction' ? actionsRead.state : devicesRead.state);
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!dashFormUsable) setDashForm(null);
+    if (!hubsUsable) setSyncOpen(false);
+    if (!devicesUsable) setDeviceRow(null);
+    if (!iotModalUsable) setIotModal({ type: null });
+  }, [dashFormUsable, hubsUsable, devicesUsable, iotModalUsable]);
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!actionUsable(action)) throw new Error('Required data is unavailable. Refresh and try again.');
     if (action === 'registerIotHub') {
       await registerHub.mutateAsync({
         name: String(formData.name ?? ''),
@@ -792,6 +824,7 @@ function IotClientLoaded({
   };
 
   const handleDeviceRowSubmit = async (formData: Record<string, unknown>) => {
+    if (!devicesUsable) throw new Error('Required data is unavailable. Refresh and try again.');
     setRowSubmitError(null);
     const deviceId = Number(formData.device_id);
     const op = String(formData.operation ?? '');
@@ -840,6 +873,7 @@ function IotClientLoaded({
 
   const handleIotModalSubmit = async (formData: Record<string, unknown>) => {
     if (iotModal.type === null) return;
+    if (!iotModalUsable) throw new Error('Required data is unavailable. Refresh and try again.');
     setIotModalError(null);
     try {
       const ids = selectedIds(iotModal.rows);
@@ -959,6 +993,7 @@ function IotClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         onRowClick={(tabId, row) => {
           if (tabId === 'iot-devices') setDeviceRow(row);
@@ -966,7 +1001,7 @@ function IotClientLoaded({
         isPending={isIotMutationPending}
       />
       <FormModal
-        open={dashForm !== null}
+        open={dashForm !== null && dashFormUsable}
         onOpenChange={(o) => {
           if (!o) {
             setDashForm(null);
@@ -989,7 +1024,7 @@ function IotClientLoaded({
         }}
       />
       <FormModal
-        open={syncOpen}
+        open={syncOpen && hubsUsable}
         onOpenChange={setSyncOpen}
         config={syncIotHubDevicesForm(t)}
         isPending={isIotMutationPending}
@@ -1027,7 +1062,7 @@ function IotClientLoaded({
       {deviceRowFormConfig ? (
         <FormModal
           key={deviceIdStr}
-          open={deviceRow !== null}
+          open={deviceRow !== null && devicesUsable}
           onOpenChange={(o) => {
             if (!o) {
               setDeviceRow(null);
@@ -1041,7 +1076,7 @@ function IotClientLoaded({
           onSubmit={handleDeviceRowSubmit}
         />
       ) : null}
-      {iotModal.type !== null ? (
+      {iotModal.type !== null && iotModalUsable ? (
         <FormModal
           open
           onOpenChange={(open) => {
