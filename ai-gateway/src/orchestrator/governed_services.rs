@@ -76,7 +76,13 @@ use super::agent_loop::{LoopPolicy, LoopTools};
 use super::intelligence::{CapabilityProposal, EvidenceRef, FinalDraft};
 use super::skill_loader::sats_option;
 use crate::{
-    harness::audit::{DecisionOutcome, PolicyDecision},
+    harness::{
+        action_draft_bridge::{
+            ActionDraftControlOutcome, ActionDraftObservation, ActionDraftRequestIdentity,
+            ActionDraftResolution, ActionDraftWait,
+        },
+        audit::{DecisionOutcome, PolicyDecision},
+    },
     providers::llm::ToolCallRequest,
     tools::types::ToolOutput,
 };
@@ -223,15 +229,11 @@ fn capability_recovery_key(run_id: u64, proposal: &CapabilityProposal) -> Result
 /// `ai_spend::input_request_key`'s scheme (`h5:draft:run:<id>:input:<hex>`)
 /// so it round-trips through the same `SpendReader::draft_request` lookup
 /// `tools::action_draft`'s run-correlated path already uses.
-fn approval_request_key(run_id: u64, proposal: &CapabilityProposal) -> Result<String> {
-    crate::ai_spend::input_request_key(
-        crate::ai_spend::RequestKind::Draft,
-        run_id,
-        &serde_json::json!({
-            "capability": proposal.capability,
-            "arguments": proposal.arguments,
-        }),
-    )
+fn approval_request_payload(proposal: &CapabilityProposal) -> Value {
+    serde_json::json!({
+        "capability": proposal.capability,
+        "arguments": proposal.arguments,
+    })
 }
 
 /// Reference implementation used in tests and by any caller that does not
@@ -463,13 +465,6 @@ fn decode_capability_execution_row(row: &Value) -> Result<CapabilityExecutionRow
 /// `StdbApprovalCoordinator` binds it to the existing H5 action-draft
 /// reducer path so approval is a real, human-actionable durable record
 /// rather than only an in-memory value.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) enum ApprovalStatus {
-    Pending,
-    Approved { execution_record_id: Option<u64> },
-    Rejected(String),
-}
-
 #[async_trait]
 pub(super) trait ApprovalCoordinator: Send + Sync {
     async fn request_approval(
@@ -479,16 +474,26 @@ pub(super) trait ApprovalCoordinator: Send + Sync {
         decision: &PolicyDecision,
     ) -> Result<ApprovalRequest>;
 
-    async fn approval_status(&self, draft_id: u64) -> Result<ApprovalStatus>;
+    async fn approval_status(
+        &self,
+        wait: &ActionDraftWait,
+        current_identity: &ActionDraftRequestIdentity,
+    ) -> Result<ActionDraftControlOutcome>;
 }
 
 #[derive(Clone, Debug)]
 pub(super) struct ApprovalRequest {
     pub capability: String,
     pub reason: String,
-    /// The durable `AiActionDraft` id a human reviews/approves, when the
-    /// coordinator created one. `None` for `RecordingApprovalCoordinator`.
-    pub draft_id: Option<u64>,
+    /// Exact durable wait token, including tenant, run, request-map key, and
+    /// the `AiActionDraft` id. `None` for `RecordingApprovalCoordinator`.
+    pub wait: Option<ActionDraftWait>,
+}
+
+impl ApprovalRequest {
+    pub fn draft_id(&self) -> Option<u64> {
+        self.wait.as_ref().map(|wait| wait.draft_id)
+    }
 }
 
 /// Records the approval requirement without creating a durable draft.
@@ -506,12 +511,16 @@ impl ApprovalCoordinator for RecordingApprovalCoordinator {
         Ok(ApprovalRequest {
             capability: proposal.capability.clone(),
             reason: reason_summary(decision),
-            draft_id: None,
+            wait: None,
         })
     }
 
-    async fn approval_status(&self, _draft_id: u64) -> Result<ApprovalStatus> {
-        Ok(ApprovalStatus::Pending)
+    async fn approval_status(
+        &self,
+        _wait: &ActionDraftWait,
+        _current_identity: &ActionDraftRequestIdentity,
+    ) -> Result<ActionDraftControlOutcome> {
+        bail!("recording approval coordinator has no durable action draft")
     }
 }
 
@@ -546,6 +555,62 @@ pub(super) struct StdbApprovalCoordinator<'a> {
     pub company_id: u64,
 }
 
+fn action_draft_resolution(row: &Value) -> Result<ActionDraftResolution> {
+    let status = row
+        .get("status")
+        .and_then(Value::as_str)
+        .context("approval draft status missing")?;
+    Ok(match status {
+        "pending" => ActionDraftResolution::Pending,
+        "approved" => ActionDraftResolution::Approved {
+            execution_record_id: row
+                .get("executionRecordId")
+                .or_else(|| row.get("execution_record_id"))
+                .and_then(Value::as_u64),
+        },
+        "rejected" => ActionDraftResolution::Rejected {
+            reason: row
+                .get("rejectReason")
+                .or_else(|| row.get("reject_reason"))
+                .and_then(Value::as_str)
+                .unwrap_or("approval was rejected")
+                .to_string(),
+        },
+        "failed" => ActionDraftResolution::Rejected {
+            reason: row
+                .get("executionError")
+                .or_else(|| row.get("execution_error"))
+                .and_then(Value::as_str)
+                .unwrap_or("approved action execution failed")
+                .to_string(),
+        },
+        "expired" => ActionDraftResolution::Rejected {
+            reason: "approval draft expired".to_string(),
+        },
+        other => bail!("unknown approval draft status '{other}'"),
+    })
+}
+
+fn approval_request_identity(
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    decision: &PolicyDecision,
+) -> Result<ActionDraftRequestIdentity> {
+    if decision.correlation.organization_id != organization_id
+        || decision.correlation.company_id != company_id
+    {
+        bail!("approval decision scope does not match coordinator scope");
+    }
+    ActionDraftRequestIdentity::new(
+        organization_id,
+        company_id,
+        run_id,
+        &decision.correlation.correlation_id,
+    )
+    .context("build exact approval request identity")
+}
+
 #[async_trait]
 impl ApprovalCoordinator for StdbApprovalCoordinator<'_> {
     async fn request_approval(
@@ -557,6 +622,12 @@ impl ApprovalCoordinator for StdbApprovalCoordinator<'_> {
         if self.organization_id == 0 || self.company_id == 0 {
             bail!("durable approval requires organization and company context");
         }
+        let identity =
+            approval_request_identity(self.organization_id, self.company_id, run_id, decision)?;
+        let request_payload = approval_request_payload(proposal);
+        let request_key = identity
+            .request_key_for_payload(&request_payload)
+            .context("build exact approval request key")?;
         let reason = reason_summary(decision);
         let params_json =
             serde_json::to_string(&proposal.arguments).context("serialize capability arguments")?;
@@ -566,6 +637,8 @@ impl ApprovalCoordinator for StdbApprovalCoordinator<'_> {
             .unwrap_or_else(|| format!("{} requires approval", proposal.capability));
         let metadata = serde_json::to_string(&serde_json::json!({
             "run_id": run_id,
+            "request_id": identity.request_id,
+            "request_key": request_key,
             "reason": reason,
         }))
         .ok();
@@ -581,7 +654,6 @@ impl ApprovalCoordinator for StdbApprovalCoordinator<'_> {
             "expires_at": Value::Null,
             "metadata": metadata,
         });
-        let request_key = approval_request_key(run_id, proposal)?;
         crate::ai_spend::create_run_action_draft(
             self.writer,
             self.organization_id,
@@ -596,56 +668,65 @@ impl ApprovalCoordinator for StdbApprovalCoordinator<'_> {
             .draft_request(self.organization_id, self.company_id, run_id, &request_key)
             .await
             .context("resolve durable approval draft id")?
-            .map(|request| request.draft_id);
+            .map(|request| request.draft_id)
+            .context("run-correlated approval draft request is not visible")?;
+        let wait = ActionDraftWait::for_payload(identity, &request_payload, draft_id)
+            .context("build durable approval wait token")?;
         Ok(ApprovalRequest {
             capability: proposal.capability.clone(),
             reason,
-            draft_id,
+            wait: Some(wait),
         })
     }
 
-    async fn approval_status(&self, draft_id: u64) -> Result<ApprovalStatus> {
-        if draft_id == 0 {
-            bail!("approval draft id must be nonzero");
+    async fn approval_status(
+        &self,
+        wait: &ActionDraftWait,
+        current_identity: &ActionDraftRequestIdentity,
+    ) -> Result<ActionDraftControlOutcome> {
+        if self.organization_id != current_identity.organization_id
+            || self.company_id != current_identity.company_id
+        {
+            bail!("approval resume scope does not match coordinator scope");
+        }
+        if wait.identity != *current_identity {
+            bail!("approval wait identity does not match the current request context");
+        }
+        let request = crate::ai_spend::SpendReader::new(self.reader)
+            .draft_request(
+                current_identity.organization_id,
+                current_identity.company_id,
+                current_identity.run_id,
+                &wait.request_key,
+            )
+            .await
+            .context("resolve exact approval draft request on resume")?
+            .context("exact approval draft request is not visible on resume")?;
+        if request.draft_id != wait.draft_id {
+            bail!("exact approval request resolved a different draft id");
         }
         let rows = self
             .reader
             .query_sql(&format!(
                 "SELECT * FROM ai_action_draft WHERE organization_id = {}                  AND company_id = {} AND id = {} LIMIT 1",
-                self.organization_id, self.company_id, draft_id
+                current_identity.organization_id, current_identity.company_id, wait.draft_id
             ))
             .await
             .context("load durable approval draft status")?;
         let row = rows.first().context("approval draft not found")?;
-        let status = row
-            .get("status")
-            .and_then(Value::as_str)
-            .context("approval draft status missing")?;
-        Ok(match status {
-            "pending" => ApprovalStatus::Pending,
-            "approved" => ApprovalStatus::Approved {
-                execution_record_id: row
-                    .get("executionRecordId")
-                    .or_else(|| row.get("execution_record_id"))
-                    .and_then(Value::as_u64),
+        let resolution = action_draft_resolution(row)?;
+        wait.resume(
+            current_identity,
+            ActionDraftObservation {
+                organization_id: current_identity.organization_id,
+                company_id: current_identity.company_id,
+                run_id: current_identity.run_id,
+                request_key: wait.request_key.clone(),
+                draft_id: request.draft_id,
+                resolution,
             },
-            "rejected" => ApprovalStatus::Rejected(
-                row.get("rejectReason")
-                    .or_else(|| row.get("reject_reason"))
-                    .and_then(Value::as_str)
-                    .unwrap_or("approval was rejected")
-                    .to_string(),
-            ),
-            "failed" => ApprovalStatus::Rejected(
-                row.get("executionError")
-                    .or_else(|| row.get("execution_error"))
-                    .and_then(Value::as_str)
-                    .unwrap_or("approved action execution failed")
-                    .to_string(),
-            ),
-            "expired" => ApprovalStatus::Rejected("approval draft expired".to_string()),
-            other => bail!("unknown approval draft status '{other}'"),
-        })
+        )
+        .context("validate exact approval resume identity")
     }
 }
 
@@ -966,8 +1047,12 @@ impl<'a> GovernedCapabilityService<'a> {
         Ok(Ok(request))
     }
 
-    pub async fn approval_status(&self, draft_id: u64) -> Result<ApprovalStatus> {
-        self.approvals.approval_status(draft_id).await
+    pub async fn approval_status(
+        &self,
+        wait: &ActionDraftWait,
+        current_identity: &ActionDraftRequestIdentity,
+    ) -> Result<ActionDraftControlOutcome> {
+        self.approvals.approval_status(wait, current_identity).await
     }
 
     pub async fn run(
@@ -1406,13 +1491,20 @@ mod tests {
 
     #[test]
     fn approval_request_key_is_stable_and_argument_sensitive() {
-        let a = approval_request_key(1, &proposal()).unwrap();
-        let b = approval_request_key(1, &proposal()).unwrap();
+        let identity = ActionDraftRequestIdentity::new(7, 8, 1, "request-1").unwrap();
+        let a = identity
+            .request_key_for_payload(&approval_request_payload(&proposal()))
+            .unwrap();
+        let b = identity
+            .request_key_for_payload(&approval_request_payload(&proposal()))
+            .unwrap();
         assert_eq!(a, b);
 
         let mut other = proposal();
         other.arguments = json!({"q": "different"});
-        let c = approval_request_key(1, &other).unwrap();
+        let c = identity
+            .request_key_for_payload(&approval_request_payload(&other))
+            .unwrap();
         assert_ne!(a, c);
 
         // Distinct from the execution recovery key for the same proposal —
@@ -1420,7 +1512,47 @@ mod tests {
         // sharing a key namespace by coincidence.
         assert_ne!(a, capability_recovery_key(1, &proposal()).unwrap());
 
-        assert!(approval_request_key(0, &proposal()).is_err());
+        assert!(ActionDraftRequestIdentity::new(7, 8, 0, "request-1").is_err());
+    }
+
+    #[test]
+    fn action_draft_status_decoding_matches_reducer_states() {
+        assert_eq!(
+            action_draft_resolution(&json!({"status": "pending"})).unwrap(),
+            ActionDraftResolution::Pending
+        );
+        assert_eq!(
+            action_draft_resolution(&json!({
+                "status": "approved",
+                "executionRecordId": 91,
+            }))
+            .unwrap(),
+            ActionDraftResolution::Approved {
+                execution_record_id: Some(91),
+            }
+        );
+        assert_eq!(
+            action_draft_resolution(&json!({
+                "status": "rejected",
+                "rejectReason": "not authorized",
+            }))
+            .unwrap(),
+            ActionDraftResolution::Rejected {
+                reason: "not authorized".to_string(),
+            }
+        );
+        assert!(action_draft_resolution(&json!({"status": "unknown"})).is_err());
+    }
+
+    #[test]
+    fn approval_identity_rejects_wrong_run_and_cross_company_scope() {
+        let policy = decision(DecisionOutcome::DraftOnly);
+        let identity = approval_request_identity(1, 1, 41, &policy).expect("identity");
+        assert_eq!(identity.run_id, 41);
+        assert_eq!(identity.request_id, "test-correlation");
+
+        assert!(approval_request_identity(1, 2, 41, &policy).is_err());
+        assert!(approval_request_identity(1, 1, 0, &policy).is_err());
     }
 
     #[test]

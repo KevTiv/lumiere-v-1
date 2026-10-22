@@ -29,6 +29,12 @@ on:
     # Weekly Monday 08:00 UTC
     - cron: "0 8 * * 1"
 
+# Cancel superseded PR/push runs before their replacement finishes building.
+# Explicit diagnostic runs remain independent of branch updates and each other.
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'latest' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+
 env:
   STDB_MODULE: lumiere-v1-j1uo0
   STDB_HOST: http://127.0.0.1:3000
@@ -58,29 +64,34 @@ jobs:
         run: python3 -m unittest discover -s scripts/tests -p 'test_ci_change_scope.py'
       - name: Test domain aggregate certification execution
         run: python3 -m unittest discover -s scripts/tests -p 'test_e2e_domain_aggregates.py'
+      - name: Test complete Playwright shard coverage
+        run: python3 -m unittest discover -s scripts/tests -p 'test_playwright_shards.py'
 
   plan:
     name: Plan E2E matrix
     needs: scope
     runs-on: ubuntu-latest
     outputs:
-      configs: ${{ steps.plan.outputs.configs }}
+      configs: ${{ steps.balance.outputs.configs }}
     steps:
       - uses: actions/checkout@v4
-        if: github.event_name == 'pull_request'
         with:
           fetch-depth: 0
       - name: Test E2E target selector
         if: github.event_name == 'pull_request'
-        run: python3 -m unittest discover -s scripts/tests -p 'test_ci_e2e_targets.py'
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_ci_e2e_targets.py'
+          python3 -m unittest discover -s scripts/tests -p 'test_e2e_workflow_plan.py'
       # PRs run only the specs they add or edit, plus specs importing an
       # edited e2e helper/fixture. PRs labelled e2e:full and PRs that select no
-      # spec run the full P0 suite (sharded); pushes to the default branch run
-      # the full suite, which still guards cross-module regressions.
+      # spec run the full P0 suite (sharded). Release candidates labelled
+      # e2e:release and pushes to the default branch run the complete suite,
+      # including non-P0 cross-module and recovery regressions.
       - id: targets
         if: >-
           github.event_name == 'pull_request' &&
-          !contains(github.event.pull_request.labels.*.name, 'e2e:full')
+          !contains(github.event.pull_request.labels.*.name, 'e2e:full') &&
+          !contains(github.event.pull_request.labels.*.name, 'e2e:release')
         run: |
           python3 scripts/ci-e2e-targets.py \
             --base "${{ github.event.pull_request.base.sha }}" \
@@ -90,21 +101,31 @@ jobs:
         env:
           TARGET_SPECS: ${{ steps.targets.outputs.specs }}
           DISPATCH_SPECS: ${{ github.event.inputs.specs }}
+          DISPATCH_SUITE: ${{ github.event.inputs.suite || 'p0' }}
+          DISPATCH_CLEAR_DB: ${{ github.event.inputs.clear_db }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_REF: ${{ github.head_ref }}
+          RELEASE_CANDIDATE: ${{ contains(github.event.pull_request.labels.*.name, 'e2e:release') }}
         run: |
           # Split whole-suite runs across runners; each shard gets its own
           # SpacetimeDB/Postgres/seed, so shards cannot interfere.
-          SHARDS=3
           shard() {
-            jq -cn --arg suite "$1" --arg clear_db "$2" --argjson n "${SHARDS}" \
+            # The complete suite needs more partitions than the bounded P0
+            # lane so long serial lifecycles cannot starve later test files.
+            local shards=3
+            if [ "$1" = full ]; then shards=6; fi
+            jq -cn --arg suite "$1" --arg clear_db "$2" --argjson n "${shards}" \
               '[range(1; $n + 1) | {suite: $suite, clear_db: $clear_db, shard: "\(.)/\($n)", slot: "\(.)"}]'
           }
-          case "${{ github.event_name }}" in
+          case "$EVENT_NAME" in
             push)
-              # Main retains one complete run; PRs use the bounded P0 suite.
+              # Main retains one complete run; ordinary PRs use bounded suites.
               configs="$(shard full 1)"
               ;;
             pull_request)
-              if [ "${{ github.head_ref }}" = "codex/base05-pretenant-integrated-certification" ]; then
+              if [ "$RELEASE_CANDIDATE" = "true" ]; then
+                configs="$(shard full 1)"
+              elif [ "$HEAD_REF" = "codex/base05-pretenant-integrated-certification" ]; then
                 configs="$(jq -cn --argjson p0 "$(shard p0 0)" '$p0 + [{suite:"pretenant",clear_db:"1"}]')"
               elif [ -n "${TARGET_SPECS}" ]; then
                 configs="$(jq -cn --arg specs "${TARGET_SPECS}" '[{suite:"targeted",clear_db:"0",specs:$specs}]')"
@@ -116,8 +137,8 @@ jobs:
               configs="$(shard full 1)"
               ;;
             workflow_dispatch)
-              suite="${{ github.event.inputs.suite || 'p0' }}"
-              if [ "${{ github.event.inputs.clear_db }}" = "true" ]; then
+              suite="$DISPATCH_SUITE"
+              if [ "$DISPATCH_CLEAR_DB" = "true" ]; then
                 clear_db="1"
               else
                 clear_db="0"
@@ -134,59 +155,93 @@ jobs:
               fi
               ;;
             *)
-              echo "Unsupported event: ${{ github.event_name }}" >&2
+              echo "Unsupported event: $EVENT_NAME" >&2
               exit 1
               ;;
           esac
           echo "configs=${configs}" >> "$GITHUB_OUTPUT"
-
-  e2e-smoke:
-    name: Playwright smoke (${{ matrix.config.suite }}${{ matrix.config.shard && format(' {0}', matrix.config.shard) || '' }})
-    needs: [scope, plan]
-    if: needs.plan.result == 'success' && needs.scope.outputs.run_e2e == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    services:
-      postgres:
-        image: postgres:18
+      - id: balance
+        name: Balance complete suites by observed file duration
         env:
-          POSTGRES_DB: lumiere
-          POSTGRES_USER: lumiere
-          POSTGRES_PASSWORD: lumiere
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U lumiere -d lumiere"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-    concurrency:
-      group: e2e-smoke-${{ github.workflow }}-${{ github.ref }}-${{ matrix.config.suite }}-${{ matrix.config.slot || '1' }}
-      cancel-in-progress: true
-    strategy:
-      fail-fast: false
-      matrix:
-        config: ${{ fromJSON(needs.plan.outputs.configs) }}
+          MATRIX_CONFIGS: ${{ steps.plan.outputs.configs }}
+        run: |
+          python3 scripts/ci-playwright-shards.py --matrix "$MATRIX_CONFIGS" \
+            --github-output "$GITHUB_OUTPUT" --report .ci/playwright-shard-plan.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playwright-shard-plan-${{ github.run_id }}
+          path: .ci/playwright-shard-plan.json
+          retention-days: 7
+          if-no-files-found: error
+
+  build-e2e:
+    name: Build exact-commit E2E artifacts
+    needs: scope
+    if: needs.scope.outputs.run_e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Fingerprints and compilation must see the same build-time configuration.
+    env:
+      NEXT_PUBLIC_DEV_ADMIN: 'false'
+      LUMIERE_API_SERVER_URL: http://127.0.0.1:8082
+      STDB_SERVER_TOKEN: e2e-build-placeholder
+      STDB_CREDENTIAL_ENCRYPTION_KEY: '0000000000000000000000000000000000000000000000000000000000000000'
+      STDB_MODULE: lumiere-v1-local-e2e
+      NEXT_PUBLIC_STDB_MODULE: lumiere-v1-local-e2e
+      STDB_HOST: http://127.0.0.1:3000
+      NEXT_PUBLIC_STDB_HOST: http://127.0.0.1:3000
+      NEXT_PUBLIC_API_GATEWAY_URL: ''
     steps:
       - uses: actions/checkout@v4
 
+      - name: Restore exact-commit E2E archive
+        id: e2e-build-cache
+        uses: actions/cache@v4
+        with:
+          path: .ci/e2e-build.tar.gz
+          key: e2e-build-v1-${{ runner.os }}-${{ github.sha }}
+
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        with:
+          targets: wasm32-unknown-unknown
+
+      # cargo metadata must see the complete workspace when the cache is keyed.
+      - uses: ./.github/actions/prepare-contracts
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+
+      # CI and E2E compile the same Cargo dev dependencies. Share those
+      # artifacts across jobs; Cargo still rebuilds changed local crates and
+      # validates dependency/features/profile fingerprints. Keep native runner
+      # images separate, alongside rust-cache's compiler/flags/lockfile keys.
+      - name: Identify Rust dependency cache environment
+        id: rust-dependency-environment
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ImageOS:?runner image must be identified}"
+          : "${ImageVersion:?runner image version must be identified}"
+          printf 'image=%s-%s\n' "$ImageOS" "$ImageVersion" >> "$GITHUB_OUTPUT"
 
       - uses: Swatinem/rust-cache@v2
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
         with:
+          shared-key: workspace-dev-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-dependency-environment.outputs.image }}
           workspaces: |
             spacetimedb
             .
+          # Cache only third-party dependencies, keeping local source builds fresh.
+          cache-workspace-crates: false
           cache-on-failure: true
 
-      # The install unpacks a ~150MB binary bundle; cached by exact version,
-      # so this only actually downloads again when SPACETIME_CLI_VERSION
-      # changes. Mirrors ci.yml's contracts-drift job.
       - uses: ./.github/actions/setup-spacetime-cli
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
         with:
           version: ${{ env.SPACETIME_CLI_VERSION }}
 
       - name: Cache WASM validation and optimization tools
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
         id: cache-wasm-tools
         uses: actions/cache@v4
         with:
@@ -197,7 +252,7 @@ jobs:
           key: wasm-tools-${{ env.WASM_TOOLS_VERSION }}-binaryen-${{ env.BINARYEN_VERSION }}-${{ runner.os }}-${{ runner.arch }}
 
       - name: Install pinned WASM validation and optimization tools
-        if: steps.cache-wasm-tools.outputs.cache-hit != 'true'
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.cache-wasm-tools.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -226,49 +281,114 @@ jobs:
           ln -s "$HOME/.local/share/binaryen/bin/wasm-opt" "$HOME/.local/bin/wasm-opt"
 
       - name: Add WASM tools to PATH
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/wasm-tools" --version
           "$HOME/.local/bin/wasm-opt" --version
 
-      - uses: ./.github/actions/setup-contracts-ssh
+      - name: Fingerprint E2E module inputs
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        id: e2e-wasm-inputs
+        env:
+          LUMIERE_ENABLE_DEV_REDUCERS: '1'
+        run: |
+          set -euo pipefail
+          fingerprint="$(python3 scripts/build-fingerprint.py stdb-wasm)"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Restore compiled E2E module
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        id: e2e-wasm-cache
+        uses: actions/cache/restore@v4
         with:
-          deploy-key: ${{ secrets.LUMIERE_CONTRACTS_DEPLOY_KEY }}
+          path: spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm
+          key: e2e-wasm-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.e2e-wasm-inputs.outputs.fingerprint }}
+
+      - name: Compile E2E module
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-wasm-cache.outputs.cache-hit != 'true'
+        run: LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime build --module-path ./spacetimedb
+
+      - name: Validate compiled E2E module
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        run: wasm-tools validate spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm
+
+      # Save a validated module even if a subsequent API/frontend build fails.
+      # There are no fallback keys: reuse requires every module input to match.
+      - name: Save compiled E2E module
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-wasm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm
+          key: ${{ steps.e2e-wasm-cache.outputs.cache-primary-key }}
 
       - uses: ./.github/actions/setup-frontend
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
 
       - name: Install frontend dependencies
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      # api-server's build script consumes the generated Rust bindings from
-      # .contracts-staging. Resolve the pinned contracts checkout and stage it
-      # before the E2E target builds api-server.
       - name: Populate .contracts-staging from pinned lumiere-contracts
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
         run: |
           cargo fetch --locked
           make contracts-staging-from-pinned
 
-      # Caches the downloaded browser binary only (keyed on the pinned
-      # playwright version in the lockfile); system deps from --with-deps
-      # still install every run since apt state isn't persisted across
-      # runners, but that step is fast — the browser download is what's slow.
-      - name: Cache Playwright browsers
-        id: cache-playwright
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+      - name: Fingerprint E2E API inputs
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        id: e2e-api-inputs
+        run: |
+          set -euo pipefail
+          fingerprint="$(python3 scripts/build-fingerprint.py api-ci)"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
 
-      - name: Install Playwright Chromium
-        working-directory: frontend/web
-        run: pnpm exec playwright install --with-deps chromium
+      - name: Restore compiled E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        id: e2e-api-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci/e2e-api
+          key: e2e-api-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.e2e-api-inputs.outputs.fingerprint }}
+
+      - name: Compile and validate E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-api-cache.outputs.cache-hit != 'true'
+        env:
+          EXPECTED_API_FINGERPRINT: ${{ steps.e2e-api-inputs.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          # A changed Cargo output layout must not leave stale restored binaries
+          # available to package. The E2E archive uses this native output layout.
+          rm -f target/debug/api-server target/debug/storage-migrate
+          scripts/e2e-dx.sh api-build
+          fingerprint="$(python3 scripts/build-fingerprint.py api-ci)"
+          if [ "$fingerprint" != "$EXPECTED_API_FINGERPRINT" ]; then
+            echo 'API build inputs changed during compilation; refusing to cache outputs.' >&2
+            exit 1
+          fi
+          python3 scripts/e2e-api-cache.py stage "$EXPECTED_API_FINGERPRINT"
+
+      - name: Install verified E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-api-cache.outputs.cache-hit == 'true'
+        env:
+          EXPECTED_API_FINGERPRINT: ${{ steps.e2e-api-inputs.outputs.fingerprint }}
+        run: python3 scripts/e2e-api-cache.py install "$EXPECTED_API_FINGERPRINT"
+
+      # Preserve successful API builds even if a later frontend build fails.
+      # Exact input keys and an inert checksum manifest guard native-binary reuse.
+      - name: Save compiled E2E API binaries
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true' && steps.e2e-api-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci/e2e-api
+          key: ${{ steps.e2e-api-cache.outputs.cache-primary-key }}
 
       - name: Cache Next.js intermediate output
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
         uses: actions/cache@v4
         with:
-          # Cache compiler data only, never Next's runtime fetch cache.
           path: |
             frontend/web/.next/cache/webpack
             frontend/web/.next/cache/turbopack
@@ -276,6 +396,115 @@ jobs:
           key: next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-${{ github.sha }}
           restore-keys: |
             next-compiler-v1-${{ runner.os }}-node22-${{ hashFiles('frontend/pnpm-lock.yaml', 'frontend/web/next.config.*', 'frontend/web/tsconfig.json') }}-
+
+      - name: Build exact-commit E2E artifacts
+        if: steps.e2e-build-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          scripts/e2e-dx.sh frontend-build
+          scripts/e2e-ci-artifact.sh pack "$GITHUB_SHA"
+
+      - name: Verify exact-commit E2E archive
+        run: scripts/e2e-ci-artifact.sh verify-archive "$GITHUB_SHA"
+
+      - name: Upload exact-commit E2E artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-build-${{ github.sha }}
+          path: .ci/e2e-build.tar.gz
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
+          compression-level: 0
+
+  e2e-smoke:
+    name: Playwright smoke (${{ matrix.config.suite }}${{ matrix.config.shard && format(' {0}', matrix.config.shard) || '' }})
+    needs: [scope, plan, build-e2e]
+    if: needs.plan.result == 'success' && needs.build-e2e.result == 'success' && needs.scope.outputs.run_e2e == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: lumiere
+          POSTGRES_USER: lumiere
+          POSTGRES_PASSWORD: lumiere
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U lumiere -d lumiere"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    strategy:
+      fail-fast: false
+      matrix:
+        config: ${{ fromJSON(needs.plan.outputs.configs) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The install unpacks a ~150MB binary bundle; cached by exact version,
+      # so this only actually downloads again when SPACETIME_CLI_VERSION
+      # changes. Mirrors ci.yml's contracts-drift job.
+      - uses: ./.github/actions/setup-spacetime-cli
+        with:
+          version: ${{ env.SPACETIME_CLI_VERSION }}
+
+      - uses: ./.github/actions/setup-frontend
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Identify installed Playwright browser revisions
+        id: playwright-browsers
+        working-directory: frontend/web
+        run: node scripts/playwright-browser-cache-key.mjs
+
+      - name: Test Playwright performance helpers
+        if: matrix.config.slot == '1' || matrix.config.suite == 'targeted'
+        working-directory: frontend/web
+        run: |
+          node scripts/playwright-browser-cache-key.test.mjs
+          node --import tsx scripts/playwright-timing-reporter.test.ts
+
+      - name: Verify planned coverage against Playwright discovery
+        if: matrix.config.balanced == true && matrix.config.slot == '1'
+        env:
+          MATRIX_CONFIGS: ${{ needs.plan.outputs.configs }}
+        run: python3 scripts/verify-playwright-shards.py --matrix "$MATRIX_CONFIGS"
+
+      # The actual installed browser revisions define this cache. Unrelated
+      # frontend dependencies and contract pins do not invalidate Chromium.
+      - name: Cache Playwright browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.playwright-browsers.outputs.key }}
+
+      - name: Install Playwright Chromium
+        working-directory: frontend/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: matrix.config.suite == 'pretenant'
+
+      - uses: Swatinem/rust-cache@v2
+        if: matrix.config.suite == 'pretenant'
+        with:
+          workspaces: |
+            spacetimedb
+            .
+          cache-on-failure: true
+
+      - uses: ./.github/actions/prepare-contracts
+        if: matrix.config.suite == 'pretenant'
+
+      - name: Populate .contracts-staging for pretenant gates
+        if: matrix.config.suite == 'pretenant'
+        run: make contracts-staging-from-pinned
 
       - name: Run BASE-05 pretenant static/native gates
         if: matrix.config.suite == 'pretenant'
@@ -286,12 +515,41 @@ jobs:
           cd frontend/web
           pnpm typecheck
 
+      # Install after optional native gates. Cargo cache restoration and checks
+      # can write target directories, so the verified E2E WASM must win last.
+      - name: Download exact-commit E2E artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: e2e-build-${{ github.sha }}
+          path: .ci
+
+      - name: Install and verify exact-commit E2E artifacts
+        run: scripts/e2e-ci-artifact.sh install "$GITHUB_SHA"
+
+      - name: Verify API outage control prerequisites
+        run: |
+          set -euo pipefail
+          pnpm --dir frontend/web exec node --import tsx tests/e2e/api-outage.unit.ts
+          sudo -n iptables --version
+
       - name: Run make e2e-smoke
         env:
           E2E_SUITE: ${{ matrix.config.suite }}
           E2E_CLEAR_DB: ${{ matrix.config.clear_db }}
           E2E_SPEC_FILES: ${{ matrix.config.specs || '' }}
-          E2E_SHARD: ${{ matrix.config.shard || '' }}
+          E2E_SHARD: ${{ matrix.config.balanced != true && matrix.config.shard || '' }}
+          # One worker preserves shared-fixture ordering within each isolated DB.
+          E2E_WORKERS: '1'
+          E2E_PARTITION: ${{ matrix.config.shard || '1/1' }}
+          E2E_BROWSER_READY: '1'
+          PLAYWRIGHT_TIMINGS_OUTPUT: playwright-timings.json
+          # One bounded certification run for the COV-06 scheduler stack; only
+          # shard 1 pays for the heavyweight aggregate reducer.
+          E2E_RUN_INVENTORY_AGGREGATE: ${{ github.event_name == 'pull_request' && github.head_ref == 'claude/cov06n-scheduler-readback' && (matrix.config.suite == 'targeted' || matrix.config.slot == '1') && '1' || '0' }}
+          E2E_PREBUILT: '1'
+          # This lane owns a native loopback API, not the local Compose service.
+          E2E_API_OUTAGE_MODE: loopback-reject
+          E2E_ARTIFACT_EXPECTED_SHA: ${{ github.sha }}
           # Run the heavyweight Inventory + Analytics reducers once on the
           # fixture-repair PR; shard 1 owns the bounded certification cost.
           E2E_RUN_DOMAIN_AGGREGATES: ${{ github.event_name == 'pull_request' && github.head_ref == 'codex/fix-org-scoped-currency-fixtures' && (matrix.config.suite == 'targeted' || matrix.config.slot == '1') && '1' || '0' }}
@@ -321,6 +579,15 @@ jobs:
             done
           fi
 
+      - name: Upload Playwright timings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-timings-${{ matrix.config.suite }}-${{ matrix.config.slot || '1' }}
+          path: frontend/web/playwright-timings.json
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
@@ -340,7 +607,7 @@ jobs:
   gate:
     name: E2E gate
     if: always()
-    needs: [scope, plan, e2e-smoke]
+    needs: [scope, plan, build-e2e, e2e-smoke]
     runs-on: ubuntu-latest
     steps:
       - name: Require scope and E2E result
@@ -348,7 +615,7 @@ jobs:
           test "${{ needs.scope.result }}" = success
           test "${{ needs.scope.outputs.valid }}" = true
           test "${{ needs.plan.result }}" = success
-          case "${{ needs.scope.outputs.run_e2e }}:${{ needs.e2e-smoke.result }}" in
-            true:success|false:skipped) ;;
+          case "${{ needs.scope.outputs.run_e2e }}:${{ needs.build-e2e.result }}:${{ needs.e2e-smoke.result }}" in
+            true:success:success|false:skipped:skipped) ;;
             *) exit 1 ;;
           esac

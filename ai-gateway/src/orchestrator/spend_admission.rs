@@ -34,8 +34,11 @@ use stdb_client::StdbClient;
 
 use crate::ai_spend::{
     self, allowance, billing_period, request_key, AcceptAttemptRequest, Allowance, AttemptResult,
-    PriceSnapshot, ProviderAttempt, RequestKind, Reservation, ReserveRequest, SpendBudget,
-    SpendReader, ATTEMPT_ACCEPTED, STATUS_RESERVED,
+    PriceSnapshot, ProviderAttempt, ProviderRecoveryAction, ReconcileAttemptRequest,
+    RecoverAttemptRequest, RecoveryAttribution, RequestKind, Reservation, ReserveRequest,
+    SpendBudget, SpendReader, ATTEMPT_ABANDONED, ATTEMPT_ACCEPTED, ATTEMPT_DISPATCHED,
+    ATTEMPT_FAILED, ATTEMPT_NOTE_MAX_LEN, ATTEMPT_OUTCOME_UNKNOWN, ATTEMPT_SUCCEEDED,
+    STATUS_RELEASED, STATUS_RESERVED, STATUS_SETTLED,
 };
 use crate::providers::llm::{
     CompletionTermination, LlmCompletion, LlmMessage, LlmRequest, LlmResponse,
@@ -85,6 +88,26 @@ pub(crate) trait SpendLedger: Send + Sync {
         &self,
         organization_id: u64,
         result: &AttemptResult,
+    ) -> Result<()>;
+    async fn reconcile_attempt(
+        &self,
+        organization_id: u64,
+        attempt_id: u64,
+        outcome: ReconciledOutcome,
+        input_tokens: u32,
+        output_tokens: u32,
+        resolution: &str,
+        actor_identity: &str,
+        approval_id: &str,
+    ) -> Result<()>;
+    async fn recover_attempt(
+        &self,
+        organization_id: u64,
+        attempt_id: u64,
+        action: ProviderRecoveryAction,
+        resolution: &str,
+        actor_identity: &str,
+        approval_id: &str,
     ) -> Result<()>;
 }
 
@@ -163,6 +186,60 @@ impl SpendLedger for StdbSpendLedger<'_> {
         ai_spend::record_provider_attempt_result(self.writer, organization_id, result).await
     }
 
+    async fn reconcile_attempt(
+        &self,
+        organization_id: u64,
+        attempt_id: u64,
+        outcome: ReconciledOutcome,
+        input_tokens: u32,
+        output_tokens: u32,
+        resolution: &str,
+        actor_identity: &str,
+        approval_id: &str,
+    ) -> Result<()> {
+        ai_spend::reconcile_provider_attempt(
+            self.writer,
+            &ReconcileAttemptRequest {
+                organization_id,
+                attempt_id,
+                status: outcome.status(),
+                input_tokens,
+                output_tokens,
+                attribution: RecoveryAttribution {
+                    actor_identity: actor_identity.into(),
+                    approval_id: approval_id.into(),
+                    resolution: resolution.into(),
+                },
+            },
+        )
+        .await
+    }
+
+    async fn recover_attempt(
+        &self,
+        organization_id: u64,
+        attempt_id: u64,
+        action: ProviderRecoveryAction,
+        resolution: &str,
+        actor_identity: &str,
+        approval_id: &str,
+    ) -> Result<()> {
+        ai_spend::recover_provider_attempt(
+            self.writer,
+            &RecoverAttemptRequest {
+                organization_id,
+                attempt_id,
+                action,
+                attribution: RecoveryAttribution {
+                    actor_identity: actor_identity.into(),
+                    approval_id: approval_id.into(),
+                    resolution: resolution.into(),
+                },
+            },
+        )
+        .await
+    }
+
     async fn settle(
         &self,
         organization_id: u64,
@@ -192,6 +269,314 @@ pub(super) struct SpendBinding {
     pub model: String,
     pub agent_max_tokens: u32,
     pub context_window: u32,
+}
+
+/// Operator-supplied, exact identity and known usage for resolving one
+/// ambiguous provider effect. Reconciliation never authorizes provider I/O.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ProviderAttemptReconciliation {
+    pub request_key: String,
+    pub reservation_id: u64,
+    pub attempt_id: u64,
+    pub outcome: ReconciledOutcome,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub resolution: String,
+    pub actor_identity: String,
+    pub approval_id: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct AcceptedAttemptAbandonment {
+    pub request_key: String,
+    pub reservation_id: u64,
+    pub attempt_id: u64,
+    pub resolution: String,
+    pub actor_identity: String,
+    pub approval_id: String,
+}
+
+/// A provider outcome established outside the request transport, for example
+/// from a provider usage log or support response.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReconciledOutcome {
+    Succeeded,
+    Failed,
+}
+
+impl ReconciledOutcome {
+    fn status(self) -> &'static str {
+        match self {
+            Self::Succeeded => ATTEMPT_SUCCEEDED,
+            Self::Failed => ATTEMPT_FAILED,
+        }
+    }
+}
+
+/// Resolve an ambiguous provider attempt and settle its reservation.
+///
+/// The SpacetimeDB reducers remain the transition and spend authorities. This
+/// function adds gateway-side exact-binding checks, verifies the committed
+/// result before settlement, and deliberately contains no dispatch path.
+/// Retrying the same request is safe when reconciliation committed but
+/// settlement or its response was lost.
+pub(super) async fn reconcile_provider_spend(
+    ledger: &dyn SpendLedger,
+    binding: &SpendBinding,
+    request: &ProviderAttemptReconciliation,
+) -> Result<()> {
+    if binding.organization_id == 0
+        || binding.company_id == 0
+        || binding.agent_id == 0
+        || binding.run_id == 0
+    {
+        bail!("spend reconciliation requires organization, company, agent and durable run ids");
+    }
+    if request.reservation_id == 0 || request.attempt_id == 0 {
+        bail!("spend reconciliation requires exact reservation and attempt ids");
+    }
+    let resolution = request.resolution.trim();
+    for (label, value, max) in [
+        ("operator resolution", resolution, ATTEMPT_NOTE_MAX_LEN),
+        ("actor identity", request.actor_identity.trim(), 160),
+        ("approval id", request.approval_id.trim(), 160),
+    ] {
+        if value.is_empty() || value.len() > max || value.chars().any(char::is_control) {
+            bail!("spend reconciliation requires a valid {label}");
+        }
+    }
+
+    let reservation = ledger
+        .reservation(
+            binding.organization_id,
+            binding.run_id,
+            &request.request_key,
+        )
+        .await?
+        .context("spend reconciliation reservation was not found")?;
+    ensure_reconciliation_reservation(&reservation, binding, request)?;
+
+    let mut attempt = ledger
+        .provider_attempt(
+            binding.organization_id,
+            binding.run_id,
+            &request.request_key,
+        )
+        .await?
+        .context("spend reconciliation provider attempt was not found")?;
+    ensure_reconciliation_attempt_binding(&attempt, binding, request)?;
+    if attempt.status == ATTEMPT_DISPATCHED {
+        ledger
+            .recover_attempt(
+                binding.organization_id,
+                request.attempt_id,
+                ProviderRecoveryAction::MarkOutcomeUnknown,
+                resolution,
+                request.actor_identity.trim(),
+                request.approval_id.trim(),
+            )
+            .await?;
+        attempt = ledger
+            .provider_attempt(
+                binding.organization_id,
+                binding.run_id,
+                &request.request_key,
+            )
+            .await?
+            .context("recovered provider attempt is not visible")?;
+        ensure_reconciliation_attempt_binding(&attempt, binding, request)?;
+    }
+    ensure_reconciliation_attempt_state(&attempt, request)?;
+    if reservation.status == STATUS_SETTLED && attempt.status == ATTEMPT_OUTCOME_UNKNOWN {
+        bail!("an unknown provider attempt cannot be reconciled against already settled spend");
+    }
+
+    ledger
+        .reconcile_attempt(
+            binding.organization_id,
+            request.attempt_id,
+            request.outcome,
+            request.input_tokens,
+            request.output_tokens,
+            resolution,
+            request.actor_identity.trim(),
+            request.approval_id.trim(),
+        )
+        .await?;
+
+    // Never settle merely because the reconciliation call returned. Confirm
+    // the exact durable attempt transition and usage first.
+    let committed = ledger
+        .provider_attempt(
+            binding.organization_id,
+            binding.run_id,
+            &request.request_key,
+        )
+        .await?
+        .context("reconciled provider attempt is not visible")?;
+    if committed.id != request.attempt_id
+        || committed.reservation_id != request.reservation_id
+        || committed.status != request.outcome.status()
+        || committed.input_tokens != request.input_tokens
+        || committed.output_tokens != request.output_tokens
+        || committed.resolution.as_deref() != Some(resolution)
+        || committed.reconciliation_actor.as_deref() != Some(request.actor_identity.trim())
+        || committed.reconciliation_approval_id.as_deref() != Some(request.approval_id.trim())
+    {
+        bail!("reconciled provider attempt does not match the requested outcome");
+    }
+
+    ledger
+        .settle(
+            binding.organization_id,
+            request.reservation_id,
+            request.input_tokens,
+            request.output_tokens,
+        )
+        .await
+        .context("provider attempt reconciled but spend settlement remains incomplete")
+}
+
+/// Abandon a durable intent that never claimed dispatch. This is the only
+/// recovery for `accepted`: the request is not resumed because its provider
+/// payload was not durably hashed, and the reservation is released atomically
+/// by the authoritative recovery reducer.
+pub(super) async fn abandon_accepted_provider_spend(
+    ledger: &dyn SpendLedger,
+    binding: &SpendBinding,
+    request: &AcceptedAttemptAbandonment,
+) -> Result<()> {
+    let resolution = request.resolution.trim();
+    if binding.organization_id == 0
+        || binding.company_id == 0
+        || binding.agent_id == 0
+        || binding.run_id == 0
+        || request.reservation_id == 0
+        || request.attempt_id == 0
+        || resolution.is_empty()
+        || resolution.len() > ATTEMPT_NOTE_MAX_LEN
+        || resolution.chars().any(char::is_control)
+        || request.actor_identity.trim().is_empty()
+        || request.actor_identity.trim().len() > 160
+        || request.approval_id.trim().is_empty()
+        || request.approval_id.trim().len() > 160
+    {
+        bail!("accepted attempt abandonment requires exact binding and attribution");
+    }
+    let reservation = ledger
+        .reservation(
+            binding.organization_id,
+            binding.run_id,
+            &request.request_key,
+        )
+        .await?
+        .context("abandonment reservation was not found")?;
+    if reservation.id != request.reservation_id
+        || reservation.company_id != binding.company_id
+        || reservation.agent_id != binding.agent_id
+        || reservation.provider != binding.provider
+        || reservation.model != binding.model
+        || !matches!(
+            reservation.status.as_str(),
+            STATUS_RESERVED | STATUS_RELEASED
+        )
+    {
+        bail!("abandonment reservation does not match the trusted binding");
+    }
+    let attempt = ledger
+        .provider_attempt(
+            binding.organization_id,
+            binding.run_id,
+            &request.request_key,
+        )
+        .await?
+        .context("abandonment provider attempt was not found")?;
+    if attempt.id != request.attempt_id
+        || attempt.reservation_id != request.reservation_id
+        || attempt.company_id != binding.company_id
+        || attempt.agent_id != binding.agent_id
+        || attempt.provider != binding.provider
+        || attempt.model != binding.model
+        || !matches!(
+            attempt.status.as_str(),
+            ATTEMPT_ACCEPTED | ATTEMPT_ABANDONED
+        )
+    {
+        bail!("only the exact accepted pre-dispatch attempt can be abandoned");
+    }
+    ledger
+        .recover_attempt(
+            binding.organization_id,
+            request.attempt_id,
+            ProviderRecoveryAction::AbandonAccepted,
+            resolution,
+            request.actor_identity.trim(),
+            request.approval_id.trim(),
+        )
+        .await
+}
+
+fn ensure_reconciliation_reservation(
+    reservation: &Reservation,
+    binding: &SpendBinding,
+    request: &ProviderAttemptReconciliation,
+) -> Result<()> {
+    if reservation.id != request.reservation_id
+        || reservation.company_id != binding.company_id
+        || reservation.agent_id != binding.agent_id
+        || reservation.provider != binding.provider
+        || reservation.model != binding.model
+        || !matches!(
+            reservation.status.as_str(),
+            STATUS_RESERVED | STATUS_SETTLED
+        )
+    {
+        bail!("spend reconciliation reservation does not match the trusted binding");
+    }
+    if request.input_tokens > reservation.input_token_allowance
+        || request.output_tokens > reservation.output_token_allowance
+    {
+        bail!("reconciled usage exceeds the reservation allowance");
+    }
+    Ok(())
+}
+
+fn ensure_reconciliation_attempt_binding(
+    attempt: &ProviderAttempt,
+    binding: &SpendBinding,
+    request: &ProviderAttemptReconciliation,
+) -> Result<()> {
+    if attempt.id != request.attempt_id
+        || attempt.reservation_id != request.reservation_id
+        || attempt.company_id != binding.company_id
+        || attempt.agent_id != binding.agent_id
+        || attempt.provider != binding.provider
+        || attempt.model != binding.model
+    {
+        bail!("spend reconciliation attempt does not match the trusted binding");
+    }
+    Ok(())
+}
+
+fn ensure_reconciliation_attempt_state(
+    attempt: &ProviderAttempt,
+    request: &ProviderAttemptReconciliation,
+) -> Result<()> {
+    if attempt.status == ATTEMPT_OUTCOME_UNKNOWN {
+        return Ok(());
+    }
+    // This exact terminal state may be a replay after the reconciliation
+    // committed and settlement failed. The reducer checks the resolution too.
+    if attempt.status == request.outcome.status()
+        && attempt.input_tokens == request.input_tokens
+        && attempt.output_tokens == request.output_tokens
+    {
+        return Ok(());
+    }
+    bail!(
+        "provider attempt is {}; accepted attempts must be abandoned and only dispatched attempts may recover to outcome_unknown",
+        attempt.status
+    )
 }
 
 /// Build a [`SpendBinding`] from a resolved agent and durable run context.
@@ -364,7 +749,7 @@ impl<'a> SpendAdmittedLlm<'a> {
             .await?
             .context("no price snapshot for the admitted provider, model and currency")?;
         let allowance = allowance(
-            prompt_bytes(req),
+            prompt_bytes(req)?,
             req.max_tokens,
             b.agent_max_tokens,
             b.context_window,
@@ -434,7 +819,14 @@ impl<'a> SpendAdmittedLlm<'a> {
 
 #[async_trait]
 impl LlmCompletion for SpendAdmittedLlm<'_> {
+    fn validate_request(&self, req: &LlmRequest) -> Result<()> {
+        self.inner.validate_request(req)
+    }
+
     async fn complete(&self, req: LlmRequest) -> Result<LlmResponse> {
+        // Deterministic transport rejection (including foreign native replay)
+        // must not create a reservation or an apparently dispatched attempt.
+        self.validate_request(&req)?;
         let organization_id = self.binding.organization_id;
         let call = self.next_call.fetch_add(1, Ordering::SeqCst);
         let step = self
@@ -561,11 +953,9 @@ fn ensure_binding(reservation: &Reservation, request: &ReserveRequest) -> Result
 }
 
 /// UTF-8 bytes the provider will receive for this attempt.
-fn prompt_bytes(req: &LlmRequest) -> usize {
-    let messages: usize = req
-        .messages
-        .iter()
-        .map(|message| match message {
+fn prompt_bytes(req: &LlmRequest) -> Result<usize> {
+    let messages = req.messages.iter().try_fold(0_usize, |total, message| {
+        let bytes = match message {
             LlmMessage::Text { role, content } => role.len() + content.len(),
             LlmMessage::AssistantToolCalls {
                 content,
@@ -586,23 +976,31 @@ fn prompt_bytes(req: &LlmRequest) -> usize {
                 name,
                 content,
             } => tool_call_id.as_deref().map_or(0, str::len) + name.len() + content.len(),
-        })
-        .sum();
+            // This is the full native assistant message, including its visible
+            // content and tool calls. Count it once, not again as normalized text.
+            LlmMessage::MistralAssistant(_) => {
+                message.mistral_replay_bytes(&req.provider, &req.model)?
+            }
+        };
+        total
+            .checked_add(bytes)
+            .context("provider prompt size overflow")
+    })?;
     let tools: usize = req
         .tools
         .iter()
         .map(|tool| serde_json::to_string(tool).map_or(0, |json| json.len()))
         .sum();
-    req.system.len() + messages + tools
+    req.system
+        .len()
+        .checked_add(messages)
+        .and_then(|bytes| bytes.checked_add(tools))
+        .context("provider prompt size overflow")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_spend::{
-        ATTEMPT_DISPATCHED, ATTEMPT_FAILED, ATTEMPT_OUTCOME_UNKNOWN, ATTEMPT_SUCCEEDED,
-        STATUS_SETTLED,
-    };
     use anyhow::anyhow;
     use chrono::TimeZone;
     use std::sync::Mutex;
@@ -652,6 +1050,7 @@ mod tests {
             termination: CompletionTermination::Complete,
             provider_done_reason: Some("stop".into()),
             thinking_observed: false,
+            mistral_replay: None,
         }
     }
 
@@ -697,6 +1096,9 @@ mod tests {
         reservations: Mutex<Vec<Reservation>>,
         attempts: Mutex<Vec<ProviderAttempt>>,
         settled: Mutex<Vec<(u64, u32, u32)>>,
+        reconciliations: Mutex<Vec<(u64, String, String, String)>>,
+        settle_failures: AtomicU32,
+        settle_response_losses: AtomicU32,
         /// Ledger writes in call order, so tests can assert the sequence.
         writes: Mutex<Vec<String>>,
     }
@@ -781,22 +1183,53 @@ mod tests {
                 input_token_allowance: request.allowance.input_tokens,
                 output_token_allowance: request.allowance.output_tokens,
                 status: STATUS_RESERVED.into(),
+                settled_input_tokens: 0,
+                settled_output_tokens: 0,
             });
             Ok(())
         }
 
         async fn settle(&self, _: u64, id: u64, input: u32, output: u32) -> Result<()> {
             self.writes.lock().unwrap().push("settle".into());
+            if self
+                .settle_failures
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_ok()
+            {
+                bail!("scripted settlement failure");
+            }
             let mut rows = self.reservations.lock().unwrap();
             let row = rows
                 .iter_mut()
                 .find(|r| r.id == id)
                 .context("no reservation")?;
+            if row.status == STATUS_SETTLED {
+                if (row.settled_input_tokens, row.settled_output_tokens) == (input, output) {
+                    return Ok(());
+                }
+                bail!("settlement replay has different usage");
+            }
+            if row.status != STATUS_RESERVED {
+                bail!("only a reserved reservation can be settled");
+            }
             if input > row.input_token_allowance || output > row.output_token_allowance {
                 bail!("actual usage exceeds reservation allowance");
             }
             row.status = STATUS_SETTLED.into();
+            row.settled_input_tokens = input;
+            row.settled_output_tokens = output;
             self.settled.lock().unwrap().push((id, input, output));
+            if self
+                .settle_response_losses
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_ok()
+            {
+                bail!("scripted lost settlement response");
+            }
             Ok(())
         }
 
@@ -849,6 +1282,11 @@ mod tests {
                 input_tokens: 0,
                 output_tokens: 0,
                 failure_reason: None,
+                resolution: None,
+                recovery_actor: None,
+                recovery_approval_id: None,
+                reconciliation_actor: None,
+                reconciliation_approval_id: None,
             });
             Ok(())
         }
@@ -903,6 +1341,104 @@ mod tests {
             row.failure_reason = result.failure_reason.clone();
             Ok(())
         }
+
+        async fn reconcile_attempt(
+            &self,
+            _: u64,
+            attempt_id: u64,
+            outcome: ReconciledOutcome,
+            input_tokens: u32,
+            output_tokens: u32,
+            resolution: &str,
+            actor_identity: &str,
+            approval_id: &str,
+        ) -> Result<()> {
+            self.writes.lock().unwrap().push("reconcile".into());
+            let mut rows = self.attempts.lock().unwrap();
+            let row = rows
+                .iter_mut()
+                .find(|attempt| attempt.id == attempt_id)
+                .context("no attempt")?;
+            let status = outcome.status();
+            if row.status == ATTEMPT_OUTCOME_UNKNOWN {
+                row.status = status.into();
+                row.input_tokens = input_tokens;
+                row.output_tokens = output_tokens;
+                row.resolution = Some(resolution.into());
+                row.reconciliation_actor = Some(actor_identity.into());
+                row.reconciliation_approval_id = Some(approval_id.into());
+                self.reconciliations.lock().unwrap().push((
+                    attempt_id,
+                    resolution.into(),
+                    actor_identity.into(),
+                    approval_id.into(),
+                ));
+                return Ok(());
+            }
+            let replayed_resolution =
+                self.reconciliations
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|(id, prior, actor, approval)| {
+                        *id == attempt_id
+                            && prior == resolution
+                            && actor == actor_identity
+                            && approval == approval_id
+                    });
+            if row.status == status
+                && row.input_tokens == input_tokens
+                && row.output_tokens == output_tokens
+                && replayed_resolution
+            {
+                return Ok(());
+            }
+            bail!("only an unknown outcome can be reconciled");
+        }
+
+        async fn recover_attempt(
+            &self,
+            _: u64,
+            attempt_id: u64,
+            action: ProviderRecoveryAction,
+            resolution: &str,
+            actor_identity: &str,
+            approval_id: &str,
+        ) -> Result<()> {
+            self.writes.lock().unwrap().push("recover".into());
+            let mut attempts = self.attempts.lock().unwrap();
+            let attempt = attempts
+                .iter_mut()
+                .find(|row| row.id == attempt_id)
+                .context("no attempt")?;
+            match (attempt.status.as_str(), action) {
+                (ATTEMPT_DISPATCHED, ProviderRecoveryAction::MarkOutcomeUnknown) => {
+                    attempt.status = ATTEMPT_OUTCOME_UNKNOWN.into();
+                }
+                (ATTEMPT_ACCEPTED, ProviderRecoveryAction::AbandonAccepted) => {
+                    attempt.status = ATTEMPT_ABANDONED.into();
+                    let mut reservations = self.reservations.lock().unwrap();
+                    let reservation = reservations
+                        .iter_mut()
+                        .find(|row| row.id == attempt.reservation_id)
+                        .context("no reservation")?;
+                    reservation.status = STATUS_RELEASED.into();
+                }
+                (ATTEMPT_OUTCOME_UNKNOWN, ProviderRecoveryAction::MarkOutcomeUnknown)
+                | (ATTEMPT_ABANDONED, ProviderRecoveryAction::AbandonAccepted)
+                    if attempt.resolution.as_deref() == Some(resolution)
+                        && attempt.recovery_actor.as_deref() == Some(actor_identity)
+                        && attempt.recovery_approval_id.as_deref() == Some(approval_id) =>
+                {
+                    return Ok(())
+                }
+                _ => bail!("invalid recovery transition"),
+            }
+            attempt.resolution = Some(resolution.into());
+            attempt.recovery_actor = Some(actor_identity.into());
+            attempt.recovery_approval_id = Some(approval_id.into());
+            Ok(())
+        }
     }
 
     fn admitted<'a>(provider: &'a Provider, ledger: &'a FakeLedger) -> SpendAdmittedLlm<'a> {
@@ -910,6 +1446,81 @@ mod tests {
     }
 
     const KEY: &str = "h5:spend:run:42:step:1:attempt:0";
+
+    fn reconciliation(outcome: ReconciledOutcome) -> ProviderAttemptReconciliation {
+        ProviderAttemptReconciliation {
+            request_key: KEY.into(),
+            reservation_id: 100,
+            attempt_id: 200,
+            outcome,
+            input_tokens: 40,
+            output_tokens: 20,
+            resolution: "confirmed from provider request log".into(),
+            actor_identity: "actor:operator-1".into(),
+            approval_id: "approval:spend-1".into(),
+        }
+    }
+
+    #[tokio::test]
+    async fn invalid_transport_state_is_rejected_before_reservation_or_dispatch() {
+        struct InvalidTransport;
+        #[async_trait]
+        impl LlmCompletion for InvalidTransport {
+            fn validate_request(&self, _: &LlmRequest) -> Result<()> {
+                bail!("invalid native replay binding")
+            }
+
+            async fn complete(&self, _: LlmRequest) -> Result<LlmResponse> {
+                panic!("invalid transport request must never dispatch")
+            }
+        }
+        let ledger = FakeLedger::configured();
+        let provider = InvalidTransport;
+        let admitted =
+            SpendAdmittedLlm::with_clock(&provider, &ledger, binding(), fixed_clock).unwrap();
+
+        let error = admitted.complete(request()).await.unwrap_err();
+
+        assert!(error.to_string().contains("invalid native replay binding"));
+        assert!(ledger.writes().is_empty());
+        assert!(ledger.reservations.lock().unwrap().is_empty());
+        assert!(ledger.attempts.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn native_replay_is_counted_once_and_foreign_binding_cannot_be_estimated() {
+        let native = serde_json::json!({
+            "role": "assistant",
+            "content": [
+                {"type": "thinking", "signature": "opaque", "thinking": [
+                    {"type": "text", "text": "private provider state"}
+                ]},
+                {"type": "text", "text": "Visible answer"}
+            ]
+        });
+        let decoded = crate::providers::llm::decode_mistral_response(
+            serde_json::json!({
+                "model": "resolved-model",
+                "choices": [{"finish_reason": "stop", "message": native}]
+            }),
+            "mistral-small",
+        )
+        .unwrap();
+        let mut req = request();
+        let before = prompt_bytes(&req).unwrap();
+        req.messages.push(decoded.to_assistant_message());
+
+        assert_eq!(
+            prompt_bytes(&req).unwrap(),
+            before + native.to_string().len()
+        );
+        assert!(!format!("{req:?}").contains("private provider state"));
+        req.model = "different-model".into();
+        assert!(prompt_bytes(&req).is_err());
+        req.model = "mistral-small".into();
+        req.provider = "gemini".into();
+        assert!(prompt_bytes(&req).is_err());
+    }
 
     #[tokio::test]
     async fn reserves_accepts_and_claims_dispatch_before_settling_actual_usage() {
@@ -1058,6 +1669,187 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn unknown_outcome_is_reconciled_then_settled_without_redispatch() {
+        let provider = Provider::new(Err(anyhow!("timeout")));
+        let ledger = FakeLedger::configured();
+        admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+
+        reconcile_provider_spend(
+            &ledger,
+            &binding(),
+            &reconciliation(ReconciledOutcome::Succeeded),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(provider.calls(), 1, "reconciliation must not redispatch");
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_SUCCEEDED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_SETTLED
+        );
+        assert_eq!(*ledger.settled.lock().unwrap(), vec![(100, 40, 20)]);
+        assert_eq!(
+            &ledger.writes()[4..],
+            &["reconcile".to_string(), "settle".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn exact_reconciliation_replay_finishes_a_failed_settlement() {
+        let provider = Provider::new(Err(anyhow!("lost response")));
+        let ledger = FakeLedger::configured();
+        admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        ledger.settle_failures.store(1, Ordering::SeqCst);
+        let recovery = reconciliation(ReconciledOutcome::Failed);
+
+        let first = reconcile_provider_spend(&ledger, &binding(), &recovery)
+            .await
+            .unwrap_err();
+        assert!(first.to_string().contains("settlement remains incomplete"));
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_FAILED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
+
+        reconcile_provider_spend(&ledger, &binding(), &recovery)
+            .await
+            .unwrap();
+        assert_eq!(provider.calls(), 1, "recovery replay must not redispatch");
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_SETTLED
+        );
+        assert_eq!(ledger.reconciliations.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn exact_replay_accepts_a_committed_settlement_with_lost_response() {
+        let provider = Provider::new(Err(anyhow!("lost provider response")));
+        let ledger = FakeLedger::configured();
+        admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        ledger.settle_response_losses.store(1, Ordering::SeqCst);
+        let recovery = reconciliation(ReconciledOutcome::Succeeded);
+
+        assert!(reconcile_provider_spend(&ledger, &binding(), &recovery)
+            .await
+            .is_err());
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_SETTLED
+        );
+        reconcile_provider_spend(&ledger, &binding(), &recovery)
+            .await
+            .unwrap();
+
+        assert_eq!(provider.calls(), 1);
+        assert_eq!(ledger.settled.lock().unwrap().len(), 1);
+        assert_eq!(ledger.reconciliations.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn conflicting_reconciler_cannot_rewrite_committed_attribution() {
+        let provider = Provider::new(Err(anyhow!("timeout")));
+        let ledger = FakeLedger::configured();
+        admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        ledger.settle_failures.store(1, Ordering::SeqCst);
+        let first = reconciliation(ReconciledOutcome::Succeeded);
+        assert!(reconcile_provider_spend(&ledger, &binding(), &first)
+            .await
+            .is_err());
+
+        let mut conflicting = first;
+        conflicting.approval_id = "approval:conflicting".into();
+        let error = reconcile_provider_spend(&ledger, &binding(), &conflicting)
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("only an unknown outcome"));
+        assert_eq!(
+            ledger.attempt(KEY).reconciliation_approval_id.as_deref(),
+            Some("approval:spend-1")
+        );
+        assert_eq!(ledger.settled.lock().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn reconciliation_rejects_wrong_identity_then_recovers_dispatched_without_redispatch() {
+        let provider = Provider::new(Err(anyhow!("timeout")));
+        let ledger = FakeLedger::configured();
+        admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        let writes_before = ledger.writes();
+
+        let mut wrong_id = reconciliation(ReconciledOutcome::Succeeded);
+        wrong_id.attempt_id = 999;
+        let error = reconcile_provider_spend(&ledger, &binding(), &wrong_id)
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("trusted binding"));
+        assert_eq!(ledger.writes(), writes_before);
+
+        ledger.attempts.lock().unwrap()[0].status = ATTEMPT_DISPATCHED.into();
+        reconcile_provider_spend(
+            &ledger,
+            &binding(),
+            &reconciliation(ReconciledOutcome::Succeeded),
+        )
+        .await
+        .unwrap();
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_SUCCEEDED);
+        assert!(ledger.writes().iter().any(|write| write == "recover"));
+        assert_eq!(provider.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn accepted_attempt_is_abandoned_and_released_never_resumed() {
+        let provider = Provider::new(Err(anyhow!("timeout")));
+        let ledger = FakeLedger::configured();
+        admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        ledger.attempts.lock().unwrap()[0].status = ATTEMPT_ACCEPTED.into();
+
+        abandon_accepted_provider_spend(
+            &ledger,
+            &binding(),
+            &AcceptedAttemptAbandonment {
+                request_key: KEY.into(),
+                reservation_id: 100,
+                attempt_id: 200,
+                resolution: "dispatch claim was never committed".into(),
+                actor_identity: "actor:operator-1".into(),
+                approval_id: "approval:abandon-1".into(),
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(provider.calls(), 1);
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_ABANDONED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RELEASED
+        );
+        assert!(ledger.settled.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
     async fn an_attempt_recovered_as_dispatched_is_not_redispatched() {
         let provider = Provider::new(Ok(response(1, 1)));
         let ledger = FakeLedger {
@@ -1090,6 +1882,11 @@ mod tests {
             input_tokens: 1,
             output_tokens: 1,
             failure_reason: None,
+            resolution: None,
+            recovery_actor: None,
+            recovery_approval_id: None,
+            reconciliation_actor: None,
+            reconciliation_approval_id: None,
         });
         let err = admitted(&provider, &ledger)
             .complete(request())
@@ -1138,6 +1935,8 @@ mod tests {
             input_token_allowance: 1,
             output_token_allowance: 1,
             status: STATUS_RESERVED.into(),
+            settled_input_tokens: 0,
+            settled_output_tokens: 0,
         });
         let err = admitted(&provider, &ledger)
             .complete(request())
@@ -1183,7 +1982,7 @@ mod tests {
     fn prompt_bytes_counts_every_part_sent_to_the_provider() {
         let mut req = request();
         assert_eq!(
-            prompt_bytes(&req),
+            prompt_bytes(&req).unwrap(),
             "system".len() + "user".len() + "hello".len()
         );
         req.messages.push(LlmMessage::ToolResult {
@@ -1192,7 +1991,7 @@ mod tests {
             content: "rows".into(),
         });
         assert_eq!(
-            prompt_bytes(&req),
+            prompt_bytes(&req).unwrap(),
             "system".len() + "userhello".len() + "c1lookuprows".len()
         );
     }

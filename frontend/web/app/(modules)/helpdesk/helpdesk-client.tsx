@@ -1,19 +1,24 @@
 "use client"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import type { KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
+import { ticketKpis } from "./ticket-kpis"
 import { requiredInlineText, ticketPriorityPatch } from "@/lib/inline-edit-params"
 
-import { useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
+import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
   RecordChatter,
   FormModal,
+  CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
+  csvImportForm,
   newHelpdeskTicketForm,
   newHelpdeskTeamForm,
   newHelpdeskStageForm,
   newHelpdeskSlaForm,
-  helpdeskCsvImportForm,
   MissingOrganization,
   mergeSelectOptionsForFields,
   helpdeskTicketDetailForm,
@@ -36,6 +41,9 @@ import {
   useCloseTicket,
   useReopenTicket,
   useImportHelpdeskTicketCsv,
+  useImportHelpdeskTeamCsv,
+  useImportHelpdeskStageCsv,
+  useImportHelpdeskSlaCsv,
 } from "@lumiere/query-hooks/hooks/helpdesk"
 import type {
   UpdateTicketParams,
@@ -99,6 +107,13 @@ export function HelpdeskClient(props: HelpdeskClientProps) {
   return <HelpdeskClientLoaded {...props} organizationId={props.organizationId} />
 }
 
+const HELPDESK_CSV_CONTRACT = {
+  ticket: "helpdeskTicket",
+  team: "helpdeskTeam",
+  stage: "helpdeskStage",
+  sla: "helpdeskSla",
+} as const
+
 function HelpdeskClientLoaded({
   initialTickets,
   initialTeams,
@@ -110,10 +125,11 @@ function HelpdeskClientLoaded({
   const { t } = useTranslation()
   const moduleConfig = useMemo(() => helpdeskModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
+  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvImportKind, setCsvImportKind] = useState<"ticket" | "team" | "stage" | "sla" | null>(null)
 
-  const { data: ticketsRaw = [] } = useHelpdeskTickets(orgId, initialTickets)
+  const { data: ticketsRaw = [], isLoading: ticketsLoading } = useHelpdeskTickets(orgId, initialTickets)
   const { data: teams = [] } = useHelpdeskTeams(orgId, initialTeams)
   const { data: stages = [] } = useHelpdeskStages(orgId, initialStages)
   const { data: slas = [] } = useHelpdeskSlas(orgId, initialSlas)
@@ -133,6 +149,9 @@ function HelpdeskClientLoaded({
   const closeTicket = useCloseTicket(orgId)
   const reopenTicket = useReopenTicket(orgId)
   const importTicketsCsv = useImportHelpdeskTicketCsv(orgId)
+  const importTeamsCsv = useImportHelpdeskTeamCsv(orgId)
+  const importStagesCsv = useImportHelpdeskStageCsv(orgId)
+  const importSlasCsv = useImportHelpdeskSlaCsv(orgId)
 
   const [selectedTicket, setSelectedTicket] = useState<Record<string, unknown> | null>(null)
   const [ticketDialogOpen, setTicketDialogOpen] = useState(false)
@@ -369,6 +388,34 @@ function HelpdeskClientLoaded({
           })
   }, [tickets, moduleConfig, t, ticketFormConfig])
 
+  const addCsvToolbar = useCallback(
+    (
+      ec: EntityViewConfig | undefined,
+      id: string,
+      label: string,
+      contract: "helpdeskTeam" | "helpdeskStage" | "helpdeskSla",
+      kind: "team" | "stage" | "sla",
+    ): EntityViewConfig | undefined => {
+      if (!ec || ec.view.mode !== "table") return ec
+      return {
+        ...ec,
+        view: {
+          ...ec.view,
+          actions: [
+            {
+              id,
+              label,
+              permission: { resource: CSV_IMPORT_CONTRACTS[contract].resource, action: "create" },
+              onClick: () => setCsvImportKind(kind),
+            },
+            ...(ec.view.actions ?? []),
+          ],
+        },
+      }
+    },
+    [],
+  )
+
   const config = useMemo(
     () =>
       ({
@@ -381,13 +428,19 @@ function HelpdeskClientLoaded({
               entityConfig: helpdeskTicketsWithBoard(t, ticketsEntityConfig),
             }
           }
-          if (tab.id === "teams") return { ...tab, createForm: teamFormConfig }
-          if (tab.id === "stages") return { ...tab, createForm: stageFormConfig }
-          if (tab.id === "slas") return { ...tab, createForm: slaFormConfig }
+          if (tab.id === "teams") {
+            return { ...tab, createForm: teamFormConfig, entityConfig: addCsvToolbar(tab.entityConfig, "csv-teams", t("helpdesk.actions.importTeamsCsv", { defaultValue: "Import teams (CSV)" }), "helpdeskTeam", "team") }
+          }
+          if (tab.id === "stages") {
+            return { ...tab, createForm: stageFormConfig, entityConfig: addCsvToolbar(tab.entityConfig, "csv-stages", t("helpdesk.actions.importStagesCsv", { defaultValue: "Import stages (CSV)" }), "helpdeskStage", "stage") }
+          }
+          if (tab.id === "slas") {
+            return { ...tab, createForm: slaFormConfig, entityConfig: addCsvToolbar(tab.entityConfig, "csv-slas", t("helpdesk.actions.importSlasCsv", { defaultValue: "Import SLAs (CSV)" }), "helpdeskSla", "sla") }
+          }
           return tab
         }),
       }) as ModuleConfig,
-    [liveSections, moduleConfig, ticketFormConfig, teamFormConfig, stageFormConfig, slaFormConfig, ticketsEntityConfig],
+    [liveSections, moduleConfig, ticketFormConfig, teamFormConfig, stageFormConfig, slaFormConfig, ticketsEntityConfig, addCsvToolbar, t],
   )
 
   const data = useMemo(
@@ -398,6 +451,16 @@ function HelpdeskClientLoaded({
       slas,
     }),
     [tickets, teams, stages, slas],
+  )
+
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      tickets: {
+        tiles: ticketKpis(tickets as Record<string, unknown>[], { t, now: new Date(), currencyCodeById: new Map() }),
+        loading: ticketsLoading,
+      },
+    }),
+    [tickets, ticketsLoading, t],
   )
 
   const handleFormSubmit = async (tabId: string, action: string, formData: Record<string, unknown>) => {
@@ -438,7 +501,10 @@ function HelpdeskClientLoaded({
     assignTicket.isPending ||
     closeTicket.isPending ||
     reopenTicket.isPending ||
-    importTicketsCsv.isPending
+    importTicketsCsv.isPending ||
+    importTeamsCsv.isPending ||
+    importStagesCsv.isPending ||
+    importSlasCsv.isPending
 
   const onRowClick = (tabId: string, row: Record<string, unknown>) => {
     if (tabId !== "tickets") return
@@ -491,6 +557,7 @@ function HelpdeskClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         onRowClick={onRowClick}
         isPending={isFormMutationPending}
@@ -507,18 +574,29 @@ function HelpdeskClientLoaded({
           }
         }}
       />
-      <FormModal
-        open={csvImportKind !== null}
-        onOpenChange={(open) => !open && setCsvImportKind(null)}
-        config={csvImportKind ? helpdeskCsvImportForm(t, csvImportKind) : helpdeskCsvImportForm(t, "ticket")}
-        isPending={isFormMutationPending}
-        onSubmit={async (formData) => {
-          const csv = String(formData.csvData ?? "")
-          if (!csv.trim() || !csvImportKind) return
-          if (csvImportKind === "ticket") await importTicketsCsv.mutateAsync(csv)
-          setCsvImportKind(null)
-        }}
-      />
+      {csvImportKind ? (
+        <CsvImportModal
+          trackedImport={{ companyId: operatingCompanyId }}
+          organizationId={orgId}
+          tableName={`helpdesk_${csvImportKind}`}
+          key={csvImportKind}
+          onClose={() => setCsvImportKind(null)}
+          config={csvImportForm(
+            t,
+            t(`helpdesk.forms.csvImport.${csvImportKind}.title`),
+            t(`helpdesk.forms.csvImport.${csvImportKind}.description`),
+          )}
+          columns={CSV_IMPORT_CONTRACTS[HELPDESK_CSV_CONTRACT[csvImportKind]]}
+          templateFileName={`helpdesk-${csvImportKind}-import-template.csv`}
+          isPending={isFormMutationPending}
+          onImport={async (text) => {
+            if (csvImportKind === "ticket") await importTicketsCsv.mutateAsync(text)
+            else if (csvImportKind === "team") await importTeamsCsv.mutateAsync(text)
+            else if (csvImportKind === "stage") await importStagesCsv.mutateAsync(text)
+            else await importSlasCsv.mutateAsync(text)
+          }}
+        />
+      ) : null}
       {ticketDetailFormConfig && selectedTicket ? (
         <HelpdeskTicketDialog
           open={ticketDialogOpen}

@@ -2,6 +2,27 @@
   "schema_version": 1,
   "reducers": [
     {
+      "source": "spacetimedb/src/documents/templates.rs",
+      "function": "queue_mail_from_template",
+      "operation": "queue_mail_from_template",
+      "operation_id": "erp.queue_mail_from_template",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/core/messaging.rs",
+      "function": "mark_mail_message_delivered",
+      "operation": "mark_mail_message_delivered",
+      "operation_id": "erp.mark_mail_message_delivered",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/documents/templates.rs",
+      "function": "claim_reviewed_mail_delivery",
+      "operation": "claim_reviewed_mail_delivery",
+      "operation_id": "erp.claim_reviewed_mail_delivery",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
       "source": "spacetimedb/src/accounting/journal_entries.rs",
       "function": "create_invoice_from_sale_order",
       "operation": "create_invoice_from_sale_order",
@@ -27,6 +48,13 @@
       "function": "record_bootstrap_organization_commit",
       "operation": "bootstrap_new_tenant",
       "operation_id": "erp.bootstrap_new_tenant",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/core/migrations.rs",
+      "function": "apply_org_migration",
+      "operation": "apply_org_migrations",
+      "operation_id": "erp.apply_org_migrations",
       "change_constructors": ["upsert_stdb_row"]
     },
     {
@@ -93,6 +121,13 @@
       "change_constructors": ["upsert_stdb_row"]
     },
     {
+      "source": "spacetimedb/src/helpdesk/related_records.rs",
+      "function": "set_helpdesk_related_record",
+      "operation": "set_helpdesk_related_record",
+      "operation_id": "erp.set_helpdesk_related_record",
+      "change_constructors": ["upsert_stdb_row", "delete"]
+    },
+    {
       "source": "spacetimedb/src/hr/payroll.rs",
       "function": "create_payroll_export_intent",
       "operation": "create_payroll_export_intent",
@@ -139,6 +174,27 @@
       "function": "create_bom",
       "operation": "create_bom",
       "operation_id": "erp.create_bom",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/bill_of_materials.rs",
+      "function": "set_bom_operations",
+      "operation": "set_bom_operations",
+      "operation_id": "erp.set_bom_operations",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/costing.rs",
+      "function": "configure_workcenter_cost_rate",
+      "operation": "configure_workcenter_cost_rate",
+      "operation_id": "erp.configure_workcenter_cost_rate",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/costing.rs",
+      "function": "configure_manufacturing_valuation",
+      "operation": "configure_manufacturing_valuation",
+      "operation_id": "erp.configure_manufacturing_valuation",
       "change_constructors": ["upsert_stdb_row"]
     },
     {
@@ -206,6 +262,273 @@
       "operation_id": "erp.save_presentation_module",
       "change_constructors": [
         "upsert_stdb_row"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/bill_of_materials.rs",
+      "function": "create_bom_byproduct",
+      "operation": "create_bom_byproduct",
+      "operation_id": "erp.create_bom_byproduct",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ]
+    },
+    {
+      "source": "spacetimedb/src/manufacturing/effects.rs",
+      "function": "record_created_order",
+      "operation": "create_manufacturing_order",
+      "operation_id": "erp.create_manufacturing_order",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ]
+    }
+  ],
+  "dynamic_commit_helpers": [
+    {
+      "source": "spacetimedb/src/manufacturing/effects.rs",
+      "function": "record",
+      "operation_id_parameter": "operation_id",
+      "snapshot_type": "ManufacturingEffectSnapshot",
+      "method": "record",
+      "change_constructors": [
+        "upsert_stdb_row",
+        "delete"
+      ],
+      "change_helpers": [
+        "add_row",
+        "changed_rows"
+      ],
+      "callers": [
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "confirm_manufacturing_order",
+          "argument": "\"erp.confirm_manufacturing_order\"",
+          "operations": {
+            "confirm_manufacturing_order": "erp.confirm_manufacturing_order"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "start_manufacturing_order",
+          "argument": "\"erp.start_manufacturing_order\"",
+          "operations": {
+            "start_manufacturing_order": "erp.start_manufacturing_order"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "produce_manufacturing_order",
+          "argument": "\"erp.produce_manufacturing_order\"",
+          "operations": {
+            "produce_manufacturing_order": "erp.produce_manufacturing_order"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "consume_mo_materials",
+          "argument": "\"erp.consume_mo_materials\"",
+          "operations": {
+            "consume_mo_materials": "erp.consume_mo_materials"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "finish_manufacturing_order_internal",
+          "argument": "close_operation",
+          "operations": {
+            "finish_manufacturing_order": "erp.finish_manufacturing_order",
+            "finish_manufacturing_order_with_tracking": "erp.finish_manufacturing_order_with_tracking"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "scrap_finished_manufacturing_output",
+          "argument": "\"erp.scrap_finished_manufacturing_output\"",
+          "operations": {
+            "scrap_finished_manufacturing_output": "erp.scrap_finished_manufacturing_output"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "scrap_tracked_manufacturing_output",
+          "argument": "\"erp.scrap_tracked_manufacturing_output\"",
+          "operations": {
+            "scrap_tracked_manufacturing_output": "erp.scrap_tracked_manufacturing_output"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "scrap_manufacturing_material",
+          "argument": "\"erp.scrap_manufacturing_material\"",
+          "operations": {
+            "scrap_manufacturing_material": "erp.scrap_manufacturing_material"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "create_workorder_internal",
+          "argument": "\"erp.create_workorder\"",
+          "operations": {
+            "create_workorder": "erp.create_workorder"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "start_workorder",
+          "argument": "\"erp.start_workorder\"",
+          "operations": {
+            "start_workorder": "erp.start_workorder"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/manufacturing_orders.rs",
+          "function": "finish_workorder",
+          "argument": "\"erp.finish_workorder\"",
+          "operations": {
+            "finish_workorder": "erp.finish_workorder"
+          }
+        },
+        {
+          "source": "spacetimedb/src/manufacturing/work_centers.rs",
+          "function": "log_workcenter_productivity",
+          "argument": "\"erp.log_workcenter_productivity\"",
+          "operations": {
+            "log_workcenter_productivity": "erp.log_workcenter_productivity"
+          }
+        },
+        {
+          "source": "spacetimedb/src/inventory/quality.rs",
+          "function": "create_workorder_quality_check",
+          "argument": "\"erp.create_workorder_quality_check\"",
+          "operations": {
+            "create_workorder_quality_check": "erp.create_workorder_quality_check"
+          }
+        },
+        {
+          "source": "spacetimedb/src/inventory/quality.rs",
+          "function": "fail_workorder_quality_check",
+          "argument": "\"erp.fail_workorder_quality_check\"",
+          "operations": {
+            "fail_workorder_quality_check": "erp.fail_workorder_quality_check"
+          }
+        },
+        {
+          "source": "spacetimedb/src/inventory/quality.rs",
+          "function": "pass_quality_check",
+          "argument": "\"erp.pass_quality_check\"",
+          "operations": {
+            "pass_quality_check": "erp.pass_quality_check"
+          }
+        }
+      ]
+    },
+    {
+      "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+      "function": "record",
+      "operation_id_parameter": "operation",
+      "snapshot_type": "BankSettlementCommitSnapshot",
+      "method": "record",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ],
+      "change_helpers": [],
+      "callers": [
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "payment_posted",
+          "argument": "\"erp.post_payment\"",
+          "operations": {
+            "post_payment": "erp.post_payment"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "settlement_finished",
+          "argument": "\"erp.reconcile_account_bank_statement_line\"",
+          "operations": {
+            "reconcile_account_bank_statement_line": "erp.reconcile_account_bank_statement_line"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "pending_finished",
+          "argument": "\"erp.reconcile_account_bank_statement_line\"",
+          "operations": {
+            "reconcile_account_bank_statement_line": "erp.reconcile_account_bank_statement_line"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "abandon_bank_statement_settlement",
+          "argument": "\"erp.abandon_bank_statement_settlement\"",
+          "operations": {
+            "abandon_bank_statement_settlement": "erp.abandon_bank_statement_settlement"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "resubmit_bank_statement_settlement",
+          "argument": "\"erp.resubmit_bank_statement_settlement\"",
+          "operations": {
+            "resubmit_bank_statement_settlement": "erp.resubmit_bank_statement_settlement"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "reverse_bank_statement_settlement",
+          "argument": "\"erp.reverse_bank_statement_settlement\"",
+          "operations": {
+            "reverse_bank_statement_settlement": "erp.reverse_bank_statement_settlement"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "execute_bank_statement_settlement_reversal",
+          "argument": "\"erp.reverse_bank_statement_settlement\"",
+          "operations": {
+            "reverse_bank_statement_settlement": "erp.reverse_bank_statement_settlement"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "record_cancelled_bank_approval",
+          "argument": "\"erp.cancel_workflow\"",
+          "operations": {
+            "cancel_workflow": "erp.cancel_workflow"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "record_invalidated_bank_approval",
+          "argument": "\"erp.invalidate_workflow_human_task\"",
+          "operations": {
+            "invalidate_workflow_human_task": "erp.invalidate_workflow_human_task"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "record_decided_bank_approval",
+          "argument": "\"erp.decide_workflow_human_task\"",
+          "operations": {
+            "decide_workflow_human_task": "erp.decide_workflow_human_task"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "record_bank_task_claim",
+          "argument": "\"erp.claim_workflow_human_task\"",
+          "operations": {
+            "claim_workflow_human_task": "erp.claim_workflow_human_task"
+          }
+        },
+        {
+          "source": "spacetimedb/src/accounting/bank_settlement_lifecycle.rs",
+          "function": "record_bank_task_comment",
+          "argument": "\"erp.add_workflow_human_task_comment\"",
+          "operations": {
+            "add_workflow_human_task_comment": "erp.add_workflow_human_task_comment"
+          }
+        }
       ]
     }
   ]

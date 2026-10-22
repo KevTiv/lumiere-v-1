@@ -22,7 +22,9 @@ use crate::{
             admit_structured_output, persist_or_withhold_generated_output, GeneratedOutputDraft,
             PublicationIdentity,
         },
-        skill_loader::{complete_run, create_generation_surface_run, GovernedRunRef},
+        skill_loader::{
+            complete_run, create_generation_surface_run, set_run_wait_state, GovernedRunRef,
+        },
         spend_admission::StdbSpendLedger,
         text_answer_gate::{TextAnswerProvenance, TextAnswerVerification, TextEvidence},
     },
@@ -443,9 +445,20 @@ async fn draft_actions_llm(
     let total_tokens = program
         .generation_input_tokens
         .saturating_add(program.generation_output_tokens);
-    let generated = program.final_content.as_deref().ok_or_else(|| {
-        DraftActionsError::other("governed action-draft generation produced no final content")
-    })?;
+    let Some(generated) = program.released_content() else {
+        set_run_wait_state(
+            state.stdb.as_ref(),
+            org_id,
+            req.company_id,
+            run.run_id,
+            "agent_settled",
+        )
+        .await
+        .map_err(|error| DraftActionsError::other(error.to_string()))?;
+        return Err(DraftActionsError::other(
+            "generated action drafts require review before release",
+        ));
+    };
     let model_json: Value = match serde_json::from_str(clean_json_response(generated)) {
         Ok(value) => value,
         Err(error) => {

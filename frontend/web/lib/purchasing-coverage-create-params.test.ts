@@ -57,6 +57,46 @@ describe("purchasing coverage create params — fail-closed FKs", () => {
   })
 })
 
+describe("tax/FX vendor-bill form parameters", () => {
+  const valid = {
+    journalId: "1",
+    defaultExpenseAccountId: "2",
+    payableAccountId: "3",
+    invoiceDate: "2026-10-12",
+  }
+
+  it("passes the selected tax and discount through existing line fields", () => {
+    const result = toCreateBillFromPurchaseOrderParams({ ...valid, taxId: "19", discount: "12.5" })
+    assert.ok(result)
+    assert.deepEqual(result.expenseLine.taxIds, [19n])
+    assert.equal(result.expenseLine.discount, 12.5)
+    assert.equal(result.payableLine.discount, 0)
+    assert.deepEqual(result.payableLine.taxIds, [])
+  })
+
+  it("keeps untaxed callers and an explicit no-tax selection", () => {
+    for (const taxId of [undefined, ""]) {
+      const result = toCreateBillFromPurchaseOrderParams({ ...valid, taxId })
+      assert.ok(result)
+      assert.deepEqual(result.expenseLine.taxIds, [])
+      assert.equal(result.expenseLine.discount, 0)
+    }
+  })
+
+  it("rejects malformed tax identities rather than silently dropping them", () => {
+    for (const taxId of ["wrong", "1.5", "-1", "0", 0, true, Number.NaN, Number.POSITIVE_INFINITY, "18446744073709551616"]) {
+      assert.equal(toCreateBillFromPurchaseOrderParams({ ...valid, taxId }), null)
+    }
+  })
+
+  it("rejects discounts outside finite percentage bounds", () => {
+    for (const discount of [-1, 101, Number.NaN, Number.POSITIVE_INFINITY, true, " ", "invalid"]) {
+      assert.equal(toCreateBillFromPurchaseOrderParams({ ...valid, discount }), null)
+    }
+    assert.equal(toCreateBillFromPurchaseOrderParams({ ...valid, discount: 100 })?.expenseLine.discount, 100)
+  })
+})
+
 describe("toReceivePoLineArgs — lot_id plumbing", () => {
   it("omits lotId when absent (backend enforces lot-tracked products)", () => {
     assert.deepEqual(toReceivePoLineArgs({ lineId: 10, qty: 2 }), { lineId: 10, qty: 2 })

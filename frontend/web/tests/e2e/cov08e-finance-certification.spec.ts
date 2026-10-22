@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerOwner,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
@@ -141,7 +142,7 @@ test.describe(
         })
 
       await gotoModule(page, "/reports", "reports")
-      await page.getByTestId("module-tab-reports-reports").click()
+      await selectModuleTab(page, "reports", "reports")
       const reportRow = page.getByTestId(`entity-row-${reportId}`)
       await expect(reportRow).toBeVisible({ timeout: 30_000 })
       await reportRow.click()

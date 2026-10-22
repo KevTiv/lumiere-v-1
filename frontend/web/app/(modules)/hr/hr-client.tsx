@@ -1,6 +1,7 @@
 "use client"
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -31,6 +32,7 @@ import {
   employeeDetailConfig,
   leaveDetailConfig,
   contractDetailConfig,
+  leaveAllocationsTableConfig,
   employeeStatusBadges,
   leaveRequestStatusBadges,
   contractStatusBadges,
@@ -40,11 +42,16 @@ import {
   previousPeriodMs,
   timeRangeToMs,
 } from "@lumiere/ui"
+import { allocationOptionalColumns, mapAllocationRows } from "@lumiere/query-hooks/hooks/hr-allocations"
+import { HrOffboardingPanel } from "./hr-offboarding-panel"
+import { HrStatutoryIdsPanel } from "./hr-statutory-ids-panel"
+import type { QueryResourceState } from "@lumiere/api-client"
 import type { EntityAction, EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
 import type { QueryRows } from "@lumiere/query-hooks/http"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
 import { useHrModuleSubscription } from "@/lib/module-subscription-hooks"
 import { groupBy } from "@/lib/utils"
+import { hrStpProviderState } from "@/lib/hr-stp-availability"
 import {
   useEmployees,
   useDepartments,
@@ -56,6 +63,9 @@ import {
   useHrIntegrationIntentsPending,
   useJobPositions,
   useLeaveTypes,
+  useLeaveAllocations,
+  useOffboardingChecklists,
+  useStatutoryIds,
   usePayrollStructures,
   useSalaryRules,
   useAttendance,
@@ -92,7 +102,6 @@ import {
   useConfirmPayslip,
   useCancelPayslip,
   useCreatePayrollExportIntent,
-  useCreateHrIntegrationIntent,
   usePostPayslip,
   useHrCsvImportMutations,
   useOnboardingTemplates,
@@ -407,17 +416,32 @@ function HrClientLoaded({
   const [rowActionError, setRowActionError] = useState<string | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
 
-  const { data: employees = [], isLoading: employeesLoading } = useEmployees(orgId, initialEmployees)
+  const employeesQuery = useEmployees(orgId, initialEmployees)
   const { data: departments = [] } = useDepartments(orgId, initialDepartments)
-  const { data: leaves = [], isLoading: leavesLoading } = useLeaveRequests(orgId, initialLeaves)
+  const leavesQuery = useLeaveRequests(orgId, initialLeaves)
   const { data: leavesToApprove = [] } = useLeavesToApprove(orgId)
-  const { data: contracts = [], isLoading: contractsLoading } = useContracts(orgId, initialContracts)
-  const { data: payslips = [] } = usePayslips(orgId, initialPayslips)
+  const contractsQuery = useContracts(orgId, initialContracts)
+  const payslipsQuery = usePayslips(orgId, initialPayslips)
+  const employeesState = moduleQueryState(employeesQuery)
+  const leavesState = moduleQueryState(leavesQuery)
+  const contractsState = moduleQueryState(contractsQuery)
+  const payslipsState = moduleQueryState(payslipsQuery)
+  const employees = canUseModuleData(employeesState) ? employeesQuery.data ?? [] : []
+  const leaves = canUseModuleData(leavesState) ? leavesQuery.data ?? [] : []
+  const contracts = canUseModuleData(contractsState) ? contractsQuery.data ?? [] : []
+  const payslips = canUseModuleData(payslipsState) ? payslipsQuery.data ?? [] : []
   const { data: payslipsToExport = [] } = usePayslipsToExport(orgId)
   const { data: hrIntegrationIntentsPending = [] } = useHrIntegrationIntentsPending(orgId)
   const { data: jobPositions = [] } = useJobPositions(orgId)
   const { data: applicants = [] } = useApplicants(orgId)
   const { data: leaveTypes = [] } = useLeaveTypes(orgId)
+  const {
+    data: leaveAllocations = [],
+    isLoading: leaveAllocationsLoading,
+    isError: leaveAllocationsError,
+  } = useLeaveAllocations(orgId)
+  const offboardingQuery = useOffboardingChecklists(orgId)
+  const statutoryIdsQuery = useStatutoryIds(orgId)
   const { data: payrollStructures = [] } = usePayrollStructures(orgId)
   const { data: salaryRules = [] } = useSalaryRules(orgId)
   const { data: onboardingTemplates = [] } = useOnboardingTemplates(orgId)
@@ -457,7 +481,6 @@ function HrClientLoaded({
   const confirmPayslip = useConfirmPayslip(orgId, operatingCompanyId)
   const cancelPayslip = useCancelPayslip(orgId, operatingCompanyId)
   const createPayrollExportIntent = useCreatePayrollExportIntent(orgId, operatingCompanyId)
-  const createHrIntegrationIntent = useCreateHrIntegrationIntent(orgId, operatingCompanyId)
   const postPayslip = usePostPayslip(orgId, operatingCompanyId)
   const createOnboardingTemplate = useCreateOnboardingTemplate(orgId, operatingCompanyId)
   const csvImports = useHrCsvImportMutations(orgId)
@@ -679,6 +702,16 @@ function HrClientLoaded({
     [contractFormConfig],
   )
 
+  const allocationRows = useMemo(
+    () =>
+      mapAllocationRows(
+        leaveAllocations as Record<string, unknown>[],
+        employees as unknown as Record<string, unknown>[],
+        leaveTypes as unknown as Record<string, unknown>[],
+      ),
+    [leaveAllocations, employees, leaveTypes],
+  )
+
   const employeeRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = employeeStatusBadges(t)
     return {
@@ -712,9 +745,52 @@ function HrClientLoaded({
             />
           ),
         },
+        // Hidden entirely when the user cannot read the resource.
+        ...(offboardingQuery.data?.status === "denied"
+          ? []
+          : [
+              {
+                id: "offboarding",
+                label: t("hr.offboarding.tab", { defaultValue: "Offboarding" }),
+                content: (record: Record<string, unknown>) => (
+                  <HrOffboardingPanel
+                    state={offboardingQuery.data as QueryResourceState<Record<string, unknown>> | undefined}
+                    isLoading={offboardingQuery.isLoading}
+                    isError={offboardingQuery.isError}
+                    employeeId={employeeRowId(record)}
+                  />
+                ),
+              },
+            ]),
+        ...(statutoryIdsQuery.data?.status === "denied"
+          ? []
+          : [
+              {
+                id: "statutory-ids",
+                label: t("hr.statutoryIds.tab", { defaultValue: "Statutory IDs" }),
+                content: (record: Record<string, unknown>) => (
+                  <HrStatutoryIdsPanel
+                    state={statutoryIdsQuery.data as QueryResourceState<Record<string, unknown>> | undefined}
+                    isLoading={statutoryIdsQuery.isLoading}
+                    isError={statutoryIdsQuery.isError}
+                    employeeId={employeeRowId(record)}
+                  />
+                ),
+              },
+            ]),
       ],
     }
-  }, [t, orgId, operatingCompanyId])
+  }, [
+    t,
+    orgId,
+    operatingCompanyId,
+    offboardingQuery.data,
+    offboardingQuery.isLoading,
+    offboardingQuery.isError,
+    statutoryIdsQuery.data,
+    statutoryIdsQuery.isLoading,
+    statutoryIdsQuery.isError,
+  ])
 
   const leaveRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = leaveRequestStatusBadges(t)
@@ -1082,6 +1158,22 @@ function HrClientLoaded({
               ),
             }
           }
+          if (tab.id === "leave-allocations") {
+            const cols = allocationOptionalColumns(allocationRows)
+            return {
+              ...tab,
+              entityConfig: leaveAllocationsTableConfig(t, {
+                employeeOptions: employeeRowsToSelectOptions(employees as unknown as Record<string, unknown>[]),
+                leaveTypeOptions: leaveTypeRowsToSelectOptions(leaveTypes as unknown as Record<string, unknown>[]),
+                showPeriod: cols.period,
+                showValidity: cols.validity,
+                showState: cols.state,
+                emptyMessage: leaveAllocationsError
+                  ? t("hr.leaveAllocations.loadError", { defaultValue: "Could not load leave allocations." })
+                  : undefined,
+              }),
+            }
+          }
           if (tab.id === "attendance" && tab.entityConfig) {
             return {
               ...tab,
@@ -1180,36 +1272,18 @@ function HrClientLoaded({
                 },
                 {
                   id: "create-stp-intent",
-                  label: "Create STP intent",
+                  label: "STP unavailable",
                   requiresSelection: true,
                   selection: "multiple",
                   isApplicable: (rows) => rows.some((row) => hrRowState(row) === "Verify"),
-                  successMessage: t("common.actionCompleted", { action: "Create STP intent" }),
-                  onClick: async (rows) => {
+                  onClick: (rows) => {
                     setToolbarError(null)
                     const verifyRows = rows.filter((row) => payslipState(row) === "Verify")
                     if (verifyRows.length === 0) {
                       setToolbarError("Select Verify (approved) payslips for STP integration.")
                       return
                     }
-                    try {
-                      for (const row of verifyRows) {
-                        const payslipId = Number(row.id)
-                        await createHrIntegrationIntent.mutateAsync({
-                          intentKind: "stp",
-                          idempotencyKey: `stp-${payslipId}-${Date.now()}`,
-                          payslipId,
-                          payload: JSON.stringify({
-                            payslipId,
-                            exportStatus: "sent",
-                            submissionId: `stp-stub-${payslipId}`,
-                          }),
-                        })
-                      }
-                    } catch (e) {
-                      setToolbarError(e instanceof Error ? e.message : String(e))
-                      throw e
-                    }
+                    setToolbarError(hrStpProviderState().reason)
                   },
                 },
                 {
@@ -1408,6 +1482,10 @@ function HrClientLoaded({
       }) as ModuleConfig,
     [
       moduleConfig,
+      allocationRows,
+      leaveAllocationsError,
+      employees,
+      leaveTypes,
       orgChartTab,
       performanceTab,
       benefitsTab,
@@ -1463,13 +1541,14 @@ function HrClientLoaded({
       "job-positions": jobPositions as unknown as Record<string, unknown>[],
       recruitment: recruitmentPositions as unknown as Record<string, unknown>[],
       "leave-types": leaveTypes as unknown as Record<string, unknown>[],
+      "leave-allocations": allocationRows as unknown as Record<string, unknown>[],
       "payroll-structures": payrollStructures as unknown as Record<string, unknown>[],
       "salary-rules": salaryRules as unknown as Record<string, unknown>[],
       "onboarding-templates": onboardingTemplates as unknown as Record<string, unknown>[],
       attendance: attendance as unknown as Record<string, unknown>[],
       "compensation-events": compensationEvents as unknown as Record<string, unknown>[],
     }),
-    [employees, departments, leaves, contracts, payslips, jobPositions, recruitmentPositions, leaveTypes, payrollStructures, salaryRules, onboardingTemplates, attendance, compensationEvents]
+    [employees, departments, leaves, contracts, payslips, jobPositions, recruitmentPositions, leaveTypes, allocationRows, payrollStructures, salaryRules, onboardingTemplates, attendance, compensationEvents]
   )
 
   const handleFormSubmit = async (
@@ -1566,13 +1645,19 @@ function HrClientLoaded({
     cancelPayslip.isPending ||
     Object.values(csvImports).some((m) => m.isPending)
 
-  const dataLoading = useMemo(
+  const dataState = useMemo(
     () => ({
-      employees: employeesLoading,
-      leaves: leavesLoading,
-      contracts: contractsLoading,
+      employees: employeesState,
+      leaves: leavesState,
+      contracts: contractsState,
+      payslips: payslipsState,
     }),
-    [employeesLoading, leavesLoading, contractsLoading],
+    [employeesState, leavesState, contractsState, payslipsState],
+  )
+
+  const dataLoading = useMemo(
+    () => ({ "leave-allocations": leaveAllocationsLoading }),
+    [leaveAllocationsLoading],
   )
 
   return (
@@ -1585,6 +1670,7 @@ function HrClientLoaded({
       <ModuleView
         config={config}
         data={data}
+        dataState={dataState}
         dataLoading={dataLoading}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
@@ -1733,36 +1819,36 @@ function HrClientLoaded({
           isPending={isFormMutationPending}
           onImport={async (text) => {
             switch (csvKind) {
-                case "resource":
-                  await csvImports.importResource.mutateAsync(text)
-                  break
-                case "department":
-                  await csvImports.importDepartment.mutateAsync(text)
-                  break
-                case "job_position":
-                  await csvImports.importJobPosition.mutateAsync(text)
-                  break
-                case "employee":
-                  await csvImports.importEmployee.mutateAsync(text)
-                  break
-                case "contract":
-                  await csvImports.importContract.mutateAsync(text)
-                  break
-                case "leave_type":
-                  await csvImports.importLeaveType.mutateAsync(text)
-                  break
-                case "leave":
-                  await csvImports.importLeave.mutateAsync(text)
-                  break
-                case "payroll_structure":
-                  await csvImports.importPayrollStructure.mutateAsync(text)
-                  break
-                case "salary_rule":
-                  await csvImports.importSalaryRule.mutateAsync(text)
-                  break
-                case "payslip":
-                  await csvImports.importPayslip.mutateAsync(text)
-                  break
+              case "resource":
+                await csvImports.importResource.mutateAsync(text)
+                break
+              case "department":
+                await csvImports.importDepartment.mutateAsync(text)
+                break
+              case "job_position":
+                await csvImports.importJobPosition.mutateAsync(text)
+                break
+              case "employee":
+                await csvImports.importEmployee.mutateAsync(text)
+                break
+              case "contract":
+                await csvImports.importContract.mutateAsync(text)
+                break
+              case "leave_type":
+                await csvImports.importLeaveType.mutateAsync(text)
+                break
+              case "leave":
+                await csvImports.importLeave.mutateAsync(text)
+                break
+              case "payroll_structure":
+                await csvImports.importPayrollStructure.mutateAsync(text)
+                break
+              case "salary_rule":
+                await csvImports.importSalaryRule.mutateAsync(text)
+                break
+              case "payslip":
+                await csvImports.importPayslip.mutateAsync(text)
+                break
               default:
                 break
             }

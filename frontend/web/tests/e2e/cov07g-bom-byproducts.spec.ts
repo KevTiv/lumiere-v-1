@@ -3,6 +3,8 @@ import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { chooseSelectOptionByLabel, signIn, submitForm } from "./helpers"
 import { command, exact, finishViaUi, id, manufacturingFixture, openRow, password, prepareOutput, product, quantQuantity, rows, tag, value } from "./cov-scheduler-manufacturing-fixtures"
 import { canonicalRow } from "./sod-evidence"
+import { expectExactRecordFocus } from "./cov25-link-navigation"
+import { moduleTabHref } from "@lumiere/erp-shared/record-links"
 
 test.describe("COV-07g operator BOM byproduct definition and output", {
   tag: ["@p0", "@cov07", "@cov07g", "@unauthenticated"],
@@ -43,6 +45,13 @@ test.describe("COV-07g operator BOM byproduct definition and output", {
       expect(Array.isArray(owned)).toBe(true)
       expect((owned as unknown[]).map(String)).toEqual([String(id(definition))])
       await expect(warehousePage.getByTestId(`form-modal-${formId}`)).not.toBeVisible()
+      const definitionLink = warehousePage.getByTestId(`manufacturing-result-mrp-bom-byproducts-${id(definition)}`)
+      await expect(definitionLink).toHaveAttribute("href", moduleTabHref("manufacturing", "bom-byproducts", { id: String(id(definition)) }))
+      await definitionLink.click()
+      await expectExactRecordFocus(warehousePage, { module: "manufacturing", tab: "bom-byproducts", id: id(definition) })
+      await expect(warehousePage.getByTestId(`entity-row-${id(definition)}`)).toContainText(String(bomId))
+      await warehousePage.reload({ waitUntil: "domcontentloaded" })
+      await expectExactRecordFocus(warehousePage, { module: "manufacturing", tab: "bom-byproducts", id: id(definition) })
 
       const input = { bomId, params: stdbParamsToJson({
         productId: id(byproduct), productUomId: uomId, productQty: 0.5, costShare: 20, sequence: 10,
@@ -79,6 +88,17 @@ test.describe("COV-07g operator BOM byproduct definition and output", {
       const persistedOutput = await canonicalRow(page, "stock-moves", id(output[0]!))
       expect(Number(value(persistedOutput, "costShare", "cost_share"))).toBe(20)
       await expect.poll(async () => quantQuantity(page, companyId, id(byproduct), id(destination))).toBe(before + 1)
+      // The operator receives the full proven output set, including its byproduct.
+      const orderLink = warehousePage.getByTestId(`manufacturing-result-mrp-productions-${moId}`)
+      await expect(orderLink).toHaveAttribute("href", moduleTabHref("manufacturing", "orders", { id: String(moId) }))
+      for (const move of moves) {
+        await expect(warehousePage.getByTestId(`manufacturing-result-stock-moves-${id(move)}`)).toHaveAttribute("href", moduleTabHref("inventory", "stock-moves", { id: String(id(move)) }))
+      }
+      const outputLink = warehousePage.getByTestId(`manufacturing-result-stock-moves-${id(output[0]!)}`)
+      await outputLink.click()
+      await expectExactRecordFocus(warehousePage, { module: "inventory", tab: "stock-moves", id: id(output[0]!) })
+      await warehousePage.reload({ waitUntil: "domcontentloaded" })
+      await expectExactRecordFocus(warehousePage, { module: "inventory", tab: "stock-moves", id: id(output[0]!) })
       const replay = await command(warehousePage, "finish_manufacturing_order", { companyId, moId })
       expect(replay.status()).toBe(422)
       expect(value(await exact(page, "mrp-productions", moId), "moveFinishedIds", "move_finished_ids")).toEqual(ownedMoves)

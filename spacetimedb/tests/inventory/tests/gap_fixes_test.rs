@@ -54,15 +54,15 @@ use crate::inventory::quality::{
 use crate::inventory::replenishment::{
     cancel_replenishment_run, create_replenishment_rule, execute_replenishment_rule,
     replenishment_rule, replenishment_run_job, run_scheduled_replenishment,
-    schedule_replenishment_run, CreateReplenishmentRuleParams, ReplenishmentRunJob,
+    schedule_replenishment_run, CreateReplenishmentRuleParams,
 };
 use crate::inventory::stock::{
     apply_validated_move_to_quants, assign_stock_picking, confirm_stock_picking, create_stock_move,
     create_stock_picking, create_stock_quant, increase_quant_at_location, move_stock_quant,
     reserve_quantity_at_location, reserve_stock_quant, resolve_warehouse_stock_location,
     stock_move, stock_picking, stock_quant, to_product_stock_qty, validate_stock_picking,
-    CreateStockMoveParams, CreateStockPickingParams, CreateStockQuantParams,
-    MoveStockQuantParams, StockQuantReserveParams,
+    CreateStockMoveParams, CreateStockPickingParams, CreateStockQuantParams, MoveStockQuantParams,
+    StockQuantReserveParams,
 };
 use crate::inventory::tracking::{
     create_stock_production_lot, create_stock_production_serial, stock_production_lot,
@@ -86,7 +86,10 @@ use crate::inventory::warehouse_sync::{
 use crate::purchasing::procurement_advanced::{
     consignment_agreement, create_consignment_agreement, CreateConsignmentAgreementParams,
 };
-use crate::purchasing::purchase_orders::purchase_order;
+use crate::purchasing::purchase_orders::{
+    create_replenishment_purchase_demand, purchase_order, purchase_order_line,
+    ReplenishmentPurchaseDemandParams,
+};
 use crate::purchasing::PURCHASING_RI_PHASE0_UNSAFE_ACTIONS_FLAG;
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{AccountInternalGroup, JournalType};
@@ -1955,13 +1958,29 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
     }
     let job = jobs_before[0].clone();
     let job_id = job.scheduled_id;
+    let rule_scheduled = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("rule after schedule")?;
+    if rule_scheduled.scheduled_run_job_id != Some(job_id) {
+        return Err(format!(
+            "expected rule.scheduled_run_job_id {:?} after schedule, got {:?}",
+            Some(job_id),
+            rule_scheduled.scheduled_run_job_id
+        ));
+    }
 
     // Simulate the scheduler's own dispatch: the job row is gone by the time
     // the reducer body runs (SpacetimeDB deletes it after invoking the
     // reducer for a real fire, but the row must not exist to test that this
     // reducer's own reschedule is a fresh insert, not a mutation of the same row).
-    ctx.db.replenishment_run_job().scheduled_id().delete(&job_id);
-    run_scheduled_replenishment(ctx, job)?;
+    ctx.db
+        .replenishment_run_job()
+        .scheduled_id()
+        .delete(&job_id);
+    run_scheduled_replenishment(ctx, job.clone())?;
 
     let rule_after = ctx
         .db
@@ -1975,6 +1994,62 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
     let meta = rule_after.metadata.unwrap_or_default();
     if !meta.contains("buy") {
         return Err(format!("expected demand_type buy in metadata, got {meta}"));
+    }
+
+    let scheduled_origin = format!("REPLENISH-{rule_id}");
+    let matching_orders: Vec<_> = ctx
+        .db
+        .purchase_order()
+        .iter()
+        .filter(|order| {
+            order.organization_id == org_id
+                && order.company_id == company_id
+                && order.origin.as_deref() == Some(scheduled_origin.as_str())
+        })
+        .collect();
+    if matching_orders.len() != 1 {
+        return Err(format!(
+            "expected one exact scheduled replenishment PO, got {}",
+            matching_orders.len()
+        ));
+    }
+    let order = &matching_orders[0];
+    if order.state != crate::types::PoState::Draft
+        || order.partner_id != vendor_id
+        || order.currency_id != fixture.currency_id
+        || order.user_id != ctx.sender()
+    {
+        return Err("scheduled replenishment PO scope or audit identity mismatch".into());
+    }
+    let order_metadata = order.metadata.as_deref().unwrap_or_default();
+    if !order_metadata.contains("scheduled_replenishment")
+        || !order_metadata.contains(&format!("\"replenishment_rule_id\":{rule_id}"))
+    {
+        return Err(format!(
+            "scheduled replenishment PO metadata missing canonical service link: {order_metadata}"
+        ));
+    }
+    let matching_lines: Vec<_> = ctx
+        .db
+        .purchase_order_line()
+        .iter()
+        .filter(|line| line.order_id == order.id)
+        .collect();
+    if matching_lines.len() != 1 {
+        return Err(format!(
+            "expected one exact scheduled replenishment PO line, got {}",
+            matching_lines.len()
+        ));
+    }
+    let line = &matching_lines[0];
+    if line.organization_id != org_id
+        || line.company_id != company_id
+        || line.product_id != fixture.product_id
+        || line.product_uom != product.uom_id
+        || (line.product_qty - 20.0).abs() > 1e-9
+        || line.create_uid != ctx.sender()
+    {
+        return Err("scheduled replenishment PO line relation or audit identity mismatch".into());
     }
 
     let jobs_after: Vec<_> = ctx
@@ -1992,6 +2067,138 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
     if jobs_after[0].scheduled_id == job_id {
         return Err("reschedule reused the old job id instead of inserting a new one".into());
     }
+    if rule_after.scheduled_run_job_id != Some(jobs_after[0].scheduled_id) {
+        return Err(format!(
+            "expected rule.scheduled_run_job_id to follow the rescheduled job {}, got {:?}",
+            jobs_after[0].scheduled_id, rule_after.scheduled_run_job_id
+        ));
+    }
+
+    // Lost-response replay: the deterministic job id must resolve to the same
+    // PO and must not create either a second line or a second recurrence.
+    run_scheduled_replenishment(ctx, job)?;
+    let replay_orders = ctx
+        .db
+        .purchase_order()
+        .iter()
+        .filter(|candidate| candidate.id == order.id)
+        .count();
+    let replay_lines = ctx
+        .db
+        .purchase_order_line()
+        .iter()
+        .filter(|candidate| candidate.order_id == order.id)
+        .count();
+    let replay_jobs = ctx
+        .db
+        .replenishment_run_job()
+        .replenishment_run_job_by_rule()
+        .filter(&rule_id)
+        .count();
+    if replay_orders != 1 || replay_lines != 1 || replay_jobs != 1 {
+        return Err(format!(
+            "scheduled replay duplicated effects: orders={replay_orders}, lines={replay_lines}, jobs={replay_jobs}"
+        ));
+    }
+
+    let unauthorized_rule_id = rule_id + 9_000;
+    let unauthorized_origin = format!("REPLENISH-{unauthorized_rule_id}");
+    match create_replenishment_purchase_demand(
+        ctx,
+        org_id,
+        ReplenishmentPurchaseDemandParams {
+            company_id,
+            rule_id: unauthorized_rule_id,
+            partner_id: vendor_id,
+            product_id: fixture.product_id,
+            uom_id: product.uom_id,
+            quantity: 5.0,
+            price_unit: 12.0,
+            currency_id: fixture.currency_id + 9_000,
+            date_planned: Some(ctx.timestamp),
+        },
+    ) {
+        Err(message) if message.to_lowercase().contains("supplier relation") => {}
+        Err(message) => {
+            return Err(format!(
+                "expected service-authorization rejection, got: {message}"
+            ))
+        }
+        Ok(_) => return Err("scheduled buy accepted an unauthorized supplier relation".into()),
+    }
+    if ctx.db.purchase_order().iter().any(|candidate| {
+        candidate.organization_id == org_id
+            && candidate.origin.as_deref() == Some(unauthorized_origin.as_str())
+    }) {
+        return Err("unauthorized scheduled buy left a purchase order side effect".into());
+    }
+
+    // The service-only path must obey the inventory period fence even though
+    // it intentionally does not require an interactive Purchasing membership.
+    create_inventory_close(
+        ctx,
+        org_id,
+        company_id,
+        CreateInventoryCloseParams {
+            name: "IC-SCHED-RPL-BUY".to_string(),
+            as_of: Some(ctx.timestamp),
+            journal_id: None,
+            inventory_account_id: None,
+            valuation_account_id: None,
+            metadata: None,
+        },
+    )?;
+    let close_id = ctx
+        .db
+        .inventory_close()
+        .iter()
+        .find(|close| close.organization_id == org_id && close.name == "IC-SCHED-RPL-BUY")
+        .map(|close| close.id)
+        .ok_or("scheduled replenishment inventory close missing")?;
+    run_inventory_close(
+        ctx,
+        org_id,
+        company_id,
+        close_id,
+        RunInventoryCloseParams {
+            journal_id: None,
+            inventory_account_id: None,
+            valuation_account_id: None,
+            metadata: None,
+        },
+    )?;
+    let blocked_rule_id = rule_id + 10_000;
+    let blocked_origin = format!("REPLENISH-{blocked_rule_id}");
+    match create_replenishment_purchase_demand(
+        ctx,
+        org_id,
+        ReplenishmentPurchaseDemandParams {
+            company_id,
+            rule_id: blocked_rule_id,
+            partner_id: vendor_id,
+            product_id: fixture.product_id,
+            uom_id: product.uom_id,
+            quantity: 5.0,
+            price_unit: 12.0,
+            currency_id: fixture.currency_id,
+            date_planned: Some(ctx.timestamp),
+        },
+    ) {
+        Err(message) if message.to_lowercase().contains("locked") => {}
+        Err(message) => {
+            return Err(format!(
+                "expected inventory-close rejection, got: {message}"
+            ))
+        }
+        Ok(_) => return Err("scheduled buy bypassed the locked inventory close".into()),
+    }
+    if ctx.db.purchase_order().iter().any(|candidate| {
+        candidate.organization_id == org_id
+            && candidate.origin.as_deref() == Some(blocked_origin.as_str())
+    }) {
+        return Err("locked scheduled buy left a purchase order side effect".into());
+    }
+    reopen_inventory_close(ctx, org_id, company_id, close_id)?;
 
     cancel_replenishment_run(ctx, org_id, company_id, rule_id)?;
     let jobs_cancelled: Vec<_> = ctx
@@ -2005,6 +2212,15 @@ pub fn test_replenishment_scheduled_run_reschedules(ctx: &ReducerContext) -> Res
             "expected no scheduled jobs after cancel, got {}",
             jobs_cancelled.len()
         ));
+    }
+    let rule_cancelled = ctx
+        .db
+        .replenishment_rule()
+        .id()
+        .find(&rule_id)
+        .ok_or("rule after cancel")?;
+    if rule_cancelled.scheduled_run_job_id.is_some() {
+        return Err("expected scheduled_run_job_id cleared by cancel".into());
     }
 
     // Cancelling an unscheduled rule is a no-op success, not an error.
@@ -2234,8 +2450,24 @@ pub fn test_quality_fail_ambiguous_source_rejected(ctx: &ReducerContext) -> Resu
         .map(|location| location.id)
         .ok_or("No second active fixture location for ambiguity test")?;
 
-    create_quant(ctx, org_id, company_id, product_id, fixture.location_id, 5.0, None)?;
-    create_quant(ctx, org_id, company_id, product_id, second_location_id, 5.0, None)?;
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.location_id,
+        5.0,
+        None,
+    )?;
+    create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        second_location_id,
+        5.0,
+        None,
+    )?;
 
     create_quality_check(
         ctx,
@@ -2353,8 +2585,15 @@ pub fn test_quality_fail_ambiguous_destination_rejected(
         .map(|l| l.id)
         .ok_or("qc location missing")?;
 
-    let source_quant_id =
-        create_quant(ctx, org_id, company_id, product_id, fixture.location_id, 5.0, None)?;
+    let source_quant_id = create_quant(
+        ctx,
+        org_id,
+        company_id,
+        product_id,
+        fixture.location_id,
+        5.0,
+        None,
+    )?;
     // Two compatible destination identities already exist at the quarantine
     // location. Keep their quantity at zero so they cannot also become source
     // candidates before quarantine_quantity checks the duplicate destination.

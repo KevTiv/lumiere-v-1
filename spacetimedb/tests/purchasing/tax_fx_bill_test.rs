@@ -19,7 +19,7 @@ use crate::purchasing::purchase_orders::{
 };
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::types::{AccountInternalGroup, JournalType, TaxAmountType, TaxTypeUse};
-use spacetimedb::{ReducerContext, Table};
+use spacetimedb::{ReducerContext, Table, Timestamp};
 
 pub fn test_tax_fx_bill_creation(ctx: &ReducerContext) -> Result<(), String> {
     for (taxed, foreign, included) in [
@@ -71,8 +71,9 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
     };
     ctx.db.purchase_order_line().id().update(PurchaseOrderLine {
         currency_id: doc_currency,
+        price_subtotal: if included { 25.0 } else { 30.0 },
         price_tax: tax_on_order,
-        price_total: 30.0 + tax_on_order,
+        price_total: if included { 30.0 } else { 30.0 + tax_on_order },
         ..source
     });
     // A functional-currency journal must not replace the PO document currency.
@@ -191,7 +192,7 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
     if taxed {
         expense_line.tax_ids = vec![tax.id];
     }
-    let params = CreateBillFromPurchaseOrderParams {
+    let mut params = CreateBillFromPurchaseOrderParams {
         journal_id: journal.id,
         default_expense_account_id: expense,
         invoice_date: ctx.timestamp,
@@ -199,6 +200,12 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
         payable_line: empty_move_line(ap),
         metadata: None,
     };
+    let discount_error = create_bill_from_purchase_order(ctx, org, po_id, params.clone())
+        .expect_err("PO bill discount without PO evidence must fail");
+    if !discount_error.contains("zero discount") {
+        return Err("PO bill discount rejection was not explicit".into());
+    }
+    params.expense_line.discount = 0.0;
     // Missing rates and mappings fail before canonical bills, rows or quantities change.
     if foreign {
         rejected(ctx, org, po_id, params.clone())?;
@@ -226,7 +233,9 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
             to_currency_id: fixture.currency_id,
             rate: 1.25,
             inverse_rate: 0.8,
-            date: ctx.timestamp,
+            date: Timestamp::from_micros_since_unix_epoch(
+                ctx.timestamp.to_micros_since_unix_epoch() - 2,
+            ),
             created_at: ctx.timestamp,
             metadata: None,
         });
@@ -241,36 +250,6 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
         foreign,
         included,
     )?;
-    let product_line = ctx
-        .db
-        .account_move_line()
-        .move_line_by_move()
-        .filter(&first)
-        .find(|l| l.product_id.is_some())
-        .ok_or("product line")?;
-    let correct = |price| UpdateAccountMoveLineParams {
-        company_id: Some(fixture.company_id),
-        quantity: Some(1.0),
-        price_unit: Some(price),
-        expected_quantity: Some(1.0),
-        expected_price_unit: Some(10.0),
-        name: None,
-        debit: None,
-        credit: None,
-        partner_id: None,
-        analytic_account_id: None,
-        metadata: None,
-    };
-    update_account_move_line(ctx, org, product_line.id, correct(10.5))?;
-    update_account_move_line(
-        ctx,
-        org,
-        product_line.id,
-        UpdateAccountMoveLineParams {
-            expected_price_unit: Some(10.5),
-            ..correct(10.0)
-        },
-    )?;
     post_invoice(ctx, org, first, expense, expense)?;
     let first_after = ctx
         .db
@@ -283,6 +262,7 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
     if first == second {
         return Err("later receipt reused the earlier bill".into());
     }
+    correct_and_verify(ctx, &fixture, po_id, second, taxed, foreign, included)?;
     let unchanged = ctx
         .db
         .account_move()
@@ -302,6 +282,169 @@ fn cycle(ctx: &ReducerContext, taxed: bool, foreign: bool, included: bool) -> Re
         || unchanged.amount_total_signed != first_after.amount_total_signed
     {
         return Err("partial tax/FX billing altered the prior bill or source conservation".into());
+    }
+    Ok(())
+}
+
+fn correct_and_verify(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    po_id: u64,
+    bill_id: u64,
+    taxed: bool,
+    foreign: bool,
+    included: bool,
+) -> Result<(), String> {
+    let org = fixture.organization_id;
+    let bill = ctx.db.account_move().id().find(&bill_id).ok_or("bill")?;
+    if foreign {
+        let invoice_date = bill.invoice_date.ok_or("bill date")?;
+        ctx.db.currency_rate().insert(CurrencyRate {
+            id: 0,
+            organization_id: org,
+            company_id: Some(fixture.company_id),
+            from_currency_id: bill.currency_id,
+            to_currency_id: bill.company_currency_id,
+            rate: 2.0,
+            inverse_rate: 0.5,
+            date: Timestamp::from_micros_since_unix_epoch(
+                invoice_date.to_micros_since_unix_epoch() - 1,
+            ),
+            created_at: ctx.timestamp,
+            metadata: Some("backdated after bill creation".into()),
+        });
+    }
+    let product = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&bill_id)
+        .find(|line| line.product_id.is_some())
+        .ok_or("product")?;
+    let correction = |quantity, expected_quantity| UpdateAccountMoveLineParams {
+        company_id: Some(fixture.company_id),
+        name: None,
+        debit: None,
+        credit: None,
+        partner_id: None,
+        analytic_account_id: None,
+        metadata: None,
+        quantity: Some(quantity),
+        price_unit: Some(product.price_unit),
+        expected_quantity: Some(expected_quantity),
+        expected_price_unit: Some(product.price_unit),
+    };
+
+    let direct_amount_error = update_account_move_line(
+        ctx,
+        org,
+        product.id,
+        UpdateAccountMoveLineParams {
+            company_id: Some(fixture.company_id),
+            name: None,
+            debit: Some(product.debit / 2.0),
+            credit: None,
+            partner_id: None,
+            analytic_account_id: None,
+            metadata: None,
+            quantity: None,
+            price_unit: None,
+            expected_quantity: None,
+            expected_price_unit: None,
+        },
+    )
+    .expect_err("direct PO bill amount edits must fail");
+    if !direct_amount_error.contains("amounts are derived")
+        || ctx
+            .db
+            .account_move_line()
+            .id()
+            .find(&product.id)
+            .ok_or("product after rejected edit")?
+            .debit
+            != product.debit
+    {
+        return Err("rejected direct PO bill amount edit changed accounting evidence".into());
+    }
+
+    update_account_move_line(ctx, org, product.id, correction(1.0, 2.0))?;
+    verify_corrected_bill(
+        ctx, po_id, bill_id, product.id, taxed, foreign, included, 1.0,
+    )?;
+
+    update_account_move_line(ctx, org, product.id, correction(2.0, 1.0))?;
+    verify_corrected_bill(
+        ctx, po_id, bill_id, product.id, taxed, foreign, included, 2.0,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn verify_corrected_bill(
+    ctx: &ReducerContext,
+    po_id: u64,
+    bill_id: u64,
+    product_id: u64,
+    taxed: bool,
+    foreign: bool,
+    included: bool,
+    quantity: f64,
+) -> Result<(), String> {
+    let bill = ctx.db.account_move().id().find(&bill_id).ok_or("bill")?;
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&bill_id)
+        .collect();
+    let product = lines
+        .iter()
+        .find(|line| line.id == product_id)
+        .ok_or("corrected product")?;
+    let source = ctx
+        .db
+        .purchase_order_line()
+        .purchase_order_line_by_order()
+        .filter(&po_id)
+        .find(|line| line.invoice_lines.contains(&product_id))
+        .ok_or("exact source")?;
+    let net = quantity * 10.0 / if included { 1.2 } else { 1.0 };
+    let tax = if taxed { net * 0.2 } else { 0.0 };
+    let rate = if foreign { 1.25 } else { 1.0 };
+    let ledger = |amount: f64| {
+        if foreign {
+            (amount * rate * 100.0).round() / 100.0
+        } else {
+            amount
+        }
+    };
+    let debit: f64 = lines.iter().map(|line| line.debit).sum();
+    let credit: f64 = lines.iter().map(|line| line.credit).sum();
+    let tax_lines: Vec<_> = lines
+        .iter()
+        .filter(|line| line.tax_line_id.is_some())
+        .collect();
+    if product.quantity != quantity
+        || product.discount != 0.0
+        || (product.price_subtotal - net).abs() > 1e-8
+        || (product.price_total - net - tax).abs() > 1e-8
+        || (bill.amount_untaxed - net).abs() > 1e-8
+        || (bill.amount_tax - tax).abs() > 1e-8
+        || (bill.amount_total - net - tax).abs() > 1e-8
+        || (bill.amount_total_signed - ledger(net) - ledger(tax)).abs() > 1e-8
+        || (debit - credit).abs() > 1e-8
+        || tax_lines.len() != usize::from(taxed)
+        // The first posted bill retained one unit; this draft owns the corrected remainder.
+        || (source.qty_invoiced - (1.0 + quantity)).abs() > 1e-8
+    {
+        return Err(
+            "corrected tax/FX bill did not conserve document, ledger, or source amounts".into(),
+        );
+    }
+    if taxed
+        && ((tax_lines[0].price_total - tax).abs() > 1e-8
+            || (tax_lines[0].tax_base_amount - net).abs() > 1e-8)
+    {
+        return Err("corrected tax row amount or base is inconsistent".into());
     }
     Ok(())
 }
@@ -414,7 +557,7 @@ fn create_and_verify(
         .move_line_by_move()
         .filter(&bill.id)
         .collect();
-    let net = quantity * 10.0 * 0.9 / if included { 1.2 } else { 1.0 };
+    let net = quantity * 10.0 / if included { 1.2 } else { 1.0 };
     let tax_amount = if taxed { net * 0.2 } else { 0.0 };
     let rate = if foreign { 1.25 } else { 1.0 };
     let ledger = |a: f64| {
@@ -445,7 +588,7 @@ fn create_and_verify(
         || (debit - credit).abs() > 1e-8
         || (bill.amount_total_signed - ledger(net) - ledger(tax_amount)).abs() > 1e-8
         || product.quantity != quantity
-        || product.discount != 10.0
+        || product.discount != 0.0
         || taxes.len() != if taxed { 1 } else { 0 }
         || source
             .invoice_lines

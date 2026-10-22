@@ -4,7 +4,9 @@ use spacetimedb::rand::Rng;
 use spacetimedb::{Identity, ReducerContext, Table};
 
 use crate::core::organization::company;
-use crate::core::permissions::{role, sod_conflict_rule, Role, SodConflictRule};
+use crate::core::permissions::{
+    role, sod_conflict_rule, user_role_assignment, Role, SodConflictRule, UserRoleAssignment,
+};
 use crate::core::users::{user_organization, user_profile, UserOrganization, UserProfile};
 use crate::purchasing::purchase_orders::{purchase_order, PurchaseOrder};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -18,10 +20,11 @@ use crate::workflow::approval_gate::{
 use crate::workflow::approvals::{
     add_workflow_human_task_comment_for_actor, claim_workflow_human_task_for_actor,
     create_workflow_human_task_internal, decide_workflow_human_task_for_actor,
-    invalidate_workflow_human_task_internal, workflow_human_task, workflow_human_task_event,
-    AddWorkflowHumanTaskCommentParams, ClaimWorkflowHumanTaskParams, CreateWorkflowHumanTaskParams,
-    DecideWorkflowHumanTaskParams, InvalidateWorkflowHumanTaskParams, WorkflowHumanTaskDecision,
-    WorkflowHumanTaskStatus, WorkflowTaskGuardedAction,
+    invalidate_workflow_human_task_internal, workflow_human_task, workflow_human_task_candidate,
+    workflow_human_task_event, workflow_human_task_receipt, AddWorkflowHumanTaskCommentParams,
+    ClaimWorkflowHumanTaskParams, CreateWorkflowHumanTaskParams, DecideWorkflowHumanTaskParams,
+    InvalidateWorkflowHumanTaskParams, WorkflowHumanTaskDecision, WorkflowHumanTaskStatus,
+    WorkflowTaskGuardedAction,
 };
 use crate::workflow::definitions::{
     create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
@@ -41,6 +44,7 @@ const REVISION_B: &str = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 pub fn test_workflow_human_tasks(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     gate_creates_and_converges_real_guarded_action(ctx)?;
+    all_candidates_projects_base_and_supplemental_roles(ctx)?;
     claim_comment_decision_and_replay(ctx)?;
     reject_requires_comment_and_invalidation_wins(ctx)?;
     authorization_is_rechecked_at_decision_time(ctx)?;
@@ -48,9 +52,68 @@ pub fn test_workflow_human_tasks(ctx: &ReducerContext) -> Result<(), String> {
     Ok(())
 }
 
+fn all_candidates_projects_base_and_supplemental_roles(ctx: &ReducerContext) -> Result<(), String> {
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let candidate_role = seed_role(ctx, fixture.organization_id, vec!["workflow_task:approve"]);
+    let member_role = seed_role(ctx, fixture.organization_id, Vec::new());
+    let base_candidate = seed_member(ctx, &fixture, candidate_role, None);
+    let supplemental_candidate = seed_member(ctx, &fixture, member_role, None);
+    let expired_candidate = seed_member(ctx, &fixture, member_role, None);
+    ctx.db.user_role_assignment().insert(UserRoleAssignment {
+        id: 0,
+        user_identity: supplemental_candidate,
+        role_id: candidate_role,
+        organization_id: fixture.organization_id,
+        assigned_by: ctx.sender(),
+        assigned_at: ctx.timestamp,
+        expires_at: None,
+        is_active: true,
+        metadata: Some(r#"{"test":"human-task"}"#.to_string()),
+    });
+    ctx.db.user_role_assignment().insert(UserRoleAssignment {
+        id: 0,
+        user_identity: expired_candidate,
+        role_id: candidate_role,
+        organization_id: fixture.organization_id,
+        assigned_by: ctx.sender(),
+        assigned_at: ctx.timestamp,
+        expires_at: Some(ctx.timestamp),
+        is_active: true,
+        metadata: Some(r#"{"test":"expired-human-task"}"#.to_string()),
+    });
+
+    let seeded = seed_task_runtime(
+        ctx,
+        &fixture,
+        candidate_role,
+        new_identity(ctx),
+        WorkflowTaskAssignment::AllCandidates,
+        false,
+        None,
+    )?;
+    let projected: Vec<_> = ctx
+        .db
+        .workflow_human_task_candidate()
+        .human_task_candidate_by_task()
+        .filter(&seeded.task_id)
+        .map(|candidate| candidate.candidate_identity)
+        .collect();
+    if projected.len() != 2
+        || !projected.contains(&base_candidate)
+        || !projected.contains(&supplemental_candidate)
+    {
+        return Err("AllCandidates did not project base and supplemental roles".to_string());
+    }
+    Ok(())
+}
+
 fn gate_creates_and_converges_real_guarded_action(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
-    let role_id = seed_role(ctx, fixture.organization_id, vec!["workflow_task:approve"]);
+    let role_id = seed_role(
+        ctx,
+        fixture.organization_id,
+        vec!["workflow_task:approve", "workflow_task:reject"],
+    );
     let actor = seed_member(ctx, &fixture, role_id, None);
     let nonce = ctx.rng().gen::<u64>();
     let workflow_key = format!("po-send-approval-{nonce}");
@@ -91,7 +154,7 @@ fn gate_creates_and_converges_real_guarded_action(ctx: &ReducerContext) -> Resul
             2,
             Some(WorkflowTaskPolicy {
                 kind: WorkflowHumanTaskKind::ApproveReject,
-                assignment: WorkflowTaskAssignment::AnyCandidate,
+                assignment: WorkflowTaskAssignment::AllCandidates,
                 candidate_role_ids: vec![role_id],
                 candidate_group_ids: Vec::new(),
                 candidate_unit_ids: Vec::new(),
@@ -177,6 +240,71 @@ fn gate_creates_and_converges_real_guarded_action(ctx: &ReducerContext) -> Resul
         partner_ref: Some("new vendor quote requiring fresh approval".to_string()),
         ..current
     });
+    let events_before_rejection = ctx
+        .db
+        .workflow_human_task_event()
+        .human_task_event_by_task()
+        .filter(&task_id)
+        .count();
+    let receipts_before_rejection = ctx
+        .db
+        .workflow_human_task_receipt()
+        .human_task_receipt_by_task()
+        .filter(&task_id)
+        .count();
+    let stale_rejection = decide_workflow_human_task_for_actor(
+        ctx,
+        fixture.organization_id,
+        actor,
+        DecideWorkflowHumanTaskParams {
+            company_id: fixture.company_id,
+            task_id,
+            expected_task_revision: 1,
+            expected_instance_revision: 2,
+            decision: WorkflowHumanTaskDecision::Reject,
+            acting_for: None,
+            comment: Some("reject stale quote".to_string()),
+            idempotency_key: format!("stale-gate-rejection-{nonce}"),
+            correlation_id: format!("stale-gate-rejection-correlation-{nonce}"),
+            causation_id: None,
+        },
+    )
+    .err()
+    .ok_or("changed vendor quote was rejected through the stale task")?;
+    assert_contains(&stale_rejection, "subject changed")?;
+    let stale_candidate = ctx
+        .db
+        .workflow_human_task_candidate()
+        .human_task_candidate_by_task()
+        .filter(&task_id)
+        .find(|candidate| candidate.candidate_identity == actor)
+        .ok_or("guarded AllCandidates actor projection missing")?;
+    let stale_task = ctx
+        .db
+        .workflow_human_task()
+        .id()
+        .find(&task_id)
+        .ok_or("stale guarded task missing")?;
+    if stale_task.status != WorkflowHumanTaskStatus::Open
+        || stale_task.revision != 1
+        || stale_candidate.decision.is_some()
+        || ctx
+            .db
+            .workflow_human_task_event()
+            .human_task_event_by_task()
+            .filter(&task_id)
+            .count()
+            != events_before_rejection
+        || ctx
+            .db
+            .workflow_human_task_receipt()
+            .human_task_receipt_by_task()
+            .filter(&task_id)
+            .count()
+            != receipts_before_rejection
+    {
+        return Err("stale guarded rejection recorded evidence or closed its task".to_string());
+    }
     let old_error = decide_workflow_human_task_for_actor(
         ctx,
         fixture.organization_id,

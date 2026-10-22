@@ -44,9 +44,14 @@ pub(super) async fn query_human_task_inbox(
             continue;
         }
         let options = scope.delegated_options(&row, &caller);
+        let directly_eligible = scope.principal.matches(&row);
         let mut projected = project_human_task(row, &instance_revisions);
         if let Some(object) = projected.as_object_mut() {
             object.insert("actingForOptions".to_string(), Value::Array(options));
+            object.insert(
+                "directlyEligible".to_string(),
+                Value::Bool(directly_eligible),
+            );
         }
         out.push(projected);
     }

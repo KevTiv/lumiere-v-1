@@ -10,6 +10,7 @@ import {
   linesOfOrder,
   purchaseOrderHeaderDefaults,
   purchaseOrderLineEditDefaults,
+  selectedRfqCurrencyId,
   toReceiveLineInput,
   toUpdatePurchaseOrderHeaderArgs,
 } from './purchase-order-forms';
@@ -22,6 +23,34 @@ test('only an unlocked draft can have its header and lines edited', () => {
   assert.equal(canEditPurchaseOrder(order('Purchase')), false);
   assert.equal(canAddPurchaseOrderLine(order('Draft', { isLocked: true })), true);
   assert.equal(canAddPurchaseOrderLine(order('Sent')), false);
+});
+
+test('bill tax choices require canonical supported purchase-tax evidence', () => {
+  const tax = {
+    id: 7,
+    name: 'Input VAT',
+    active: true,
+    typeTaxUse: { tag: 'Purchase' },
+    amountType: { tag: 'Percent' },
+    includeBaseAmount: false,
+    hasNegativeFactor: false,
+    taxGroupId: 8,
+    invoiceRepartitionLineIds: [],
+  };
+  const hidden = [
+    { ...tax, active: false },
+    { ...tax, typeTaxUse: 'Sale' },
+    { ...tax, amountType: 'Fixed' },
+    { ...tax, includeBaseAmount: true },
+    { ...tax, hasNegativeFactor: true },
+    { ...tax, taxGroupId: null },
+    { ...tax, invoiceRepartitionLineIds: [3] },
+    { id: 9, name: 'Missing flags' },
+  ];
+  assert.deepEqual(billTaxOptions((key) => key, [tax, ...hidden]), [
+    { value: '', label: 'purchasing.forms.createBillFromOrder.noTax' },
+    { value: '7', label: 'Input VAT' },
+  ]);
 });
 
 test('finished or already locked orders cannot be locked', () => {
@@ -81,14 +110,12 @@ test('quantity can be invoiced only on lines received beyond what is invoiced', 
   assert.equal(canInvoicePurchaseOrderLine({ qtyReceived: 0 }), false);
 });
 
-test('bill tax choices require canonical supported purchase-tax evidence', () => {
-  const tax = { id: 7, name: 'Input VAT', active: true, typeTaxUse: { tag: 'Purchase' }, amountType: { tag: 'Percent' }, includeBaseAmount: false, hasNegativeFactor: false, taxGroupId: 8, invoiceRepartitionLineIds: [] };
-  const hidden = [
-    { ...tax, active: false }, { ...tax, typeTaxUse: 'Sale' }, { ...tax, amountType: 'Fixed' },
-    { ...tax, includeBaseAmount: true }, { ...tax, hasNegativeFactor: true },
-    { ...tax, taxGroupId: null }, { ...tax, invoiceRepartitionLineIds: [3] }, { id: 9, name: 'Missing flags' },
+test('RFQ bids derive currency from the selected RFQ', () => {
+  const rfqs = [
+    { value: '10', currencyId: '1' },
+    { value: '11', currencyId: '7' },
   ];
-  assert.deepEqual(billTaxOptions((key) => key, [tax, ...hidden]), [
-    { value: '', label: 'purchasing.forms.createBillFromOrder.noTax' }, { value: '7', label: 'Input VAT' },
-  ]);
+  assert.equal(selectedRfqCurrencyId(rfqs, '11'), 7n);
+  assert.equal(selectedRfqCurrencyId(rfqs, 'missing'), null);
+  assert.equal(selectedRfqCurrencyId([{ value: '12', currencyId: '' }], '12'), null);
 });

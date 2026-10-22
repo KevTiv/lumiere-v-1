@@ -106,7 +106,8 @@ Production checklist (set on the host / orchestrator before docker compose up):
 
   Optional but recommended:
     STDB_CREDENTIAL_ENCRYPTION_KEY  (64 hex chars — required for email/password auth)
-    WORKOS_*                        (enterprise SSO; omit for built-in auth)
+    WORKOS_*                        (hosted auth; see WorkOS alpha admission in docs/PRODUCTION_DEPLOY.md)
+    LUMIERE_WORKOS_ALPHA_ADMISSIONS  (required with WorkOS; explicit subject/email/org JSON)
     RESEND_API_KEY / RESEND_FROM_EMAIL
     NEXT_PUBLIC_POSTHOG_* / POSTHOG_*
 
@@ -162,6 +163,21 @@ validate() {
 
   if [[ -z "${STDB_CREDENTIAL_ENCRYPTION_KEY:-}" ]]; then
     warnings+=("STDB_CREDENTIAL_ENCRYPTION_KEY is unset — email/password credential storage will not work")
+  fi
+
+  if [[ -n "${WORKOS_CLIENT_ID:-}" ]]; then
+    require_nonempty WORKOS_API_KEY || true
+    require_nonempty WORKOS_ISSUER || true
+    require_nonempty WORKOS_COOKIE_PASSWORD || true
+    require_one_of WORKOS_REDIRECT_URI NEXT_PUBLIC_WORKOS_REDIRECT_URI || true
+    require_nonempty LUMIERE_WORKOS_ALPHA_ADMISSIONS || true
+    require_nonempty STDB_CREDENTIAL_ENCRYPTION_KEY || true
+    if [[ -n "${WORKOS_COOKIE_PASSWORD:-}" && ${#WORKOS_COOKIE_PASSWORD} -lt 32 ]]; then
+      missing+=("WORKOS_COOKIE_PASSWORD (must contain at least 32 characters)")
+    fi
+    if [[ -n "${NEXT_PUBLIC_API_GATEWAY_URL:-}" ]]; then
+      missing+=("NEXT_PUBLIC_API_GATEWAY_URL (must be unset for hosted same-origin auth)")
+    fi
   fi
 
   if [[ -z "${NEXT_PUBLIC_STDB_MODULE:-}" && -n "${STDB_MODULE:-}" ]]; then

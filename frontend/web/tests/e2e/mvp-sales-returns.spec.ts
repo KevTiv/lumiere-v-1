@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   expectFormModalVisible,
@@ -16,7 +17,6 @@ import {
   fillField,
   gotoModule,
   openEntityCreate,
-  postDraftCreditNoteMove,
   postDraftInvoiceViaUi,
   selectEntityRowById,
   selectEntityRowByText,
@@ -24,6 +24,7 @@ import {
   submitForm,
   waitForAuditLogEntry,
   waitForEntityActionEnabled,
+  waitForMovePosted,
   waitForOpportunityLineExists,
   waitForReturnOrderState,
   waitForSaleOrderBillableLines,
@@ -34,6 +35,55 @@ import {
   fetchDraftInvoiceMoveIdForSaleOrder,
   openCreateInvoiceFromOrder,
 } from "./helpers"
+
+async function fetchExactExchangeOrderId(page: import("@playwright/test").Page, returnOrderId: number) {
+  const deadline = Date.now() + 30_000
+  let lastMatches: Array<Record<string, unknown>> = []
+
+  while (Date.now() < deadline) {
+    const response = await page.request.get("/api/query/sale-orders")
+    expect(response.ok()).toBe(true)
+    const json = (await response.json()) as { data?: Array<Record<string, unknown>> }
+    lastMatches = (json.data ?? []).filter((row) => {
+      const origin = String(row.origin ?? "")
+      if (origin === `exchange:RMA/${returnOrderId}`) return true
+      if (typeof row.metadata !== "string") return false
+      try {
+        return String((JSON.parse(row.metadata) as { exchange_return_id?: unknown }).exchange_return_id) === String(returnOrderId)
+      } catch {
+        return false
+      }
+    })
+    if (lastMatches.length === 1) {
+      const id = Number(lastMatches[0]?.id)
+      expect(Number.isSafeInteger(id) && id > 0).toBe(true)
+      return id
+    }
+    expect(lastMatches.length, "at most one exact exchange order for the return").toBeLessThan(2)
+    await page.waitForTimeout(250)
+  }
+
+  expect(lastMatches, "one exact exchange order for the return").toHaveLength(1)
+  throw new Error("unreachable")
+}
+
+async function replayAcceptedOperation(page: import("@playwright/test").Page, response: import("@playwright/test").Response) {
+  return page.request.post(new URL(response.url()).pathname, {
+    headers: { "Content-Type": "application/json" },
+    data: response.request().postDataJSON(),
+  })
+}
+
+async function countMovesForSaleOrder(page: import("@playwright/test").Page, orderId: number) {
+  const res = await page.request.get("/api/query/account-moves")
+  expect(res.ok()).toBe(true)
+  const json = (await res.json()) as { data?: Array<Record<string, unknown>> }
+  return (json.data ?? []).filter(
+    (row) =>
+      Number(row.saleOrderId ?? row.sale_order_id) === orderId &&
+      /invoice/i.test(JSON.stringify(row.moveType ?? row.move_type ?? "")),
+  ).length
+}
 
 /**
  * Sales RMA workflow: return order from delivered SO → receive → credit note → post.
@@ -66,7 +116,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     ])
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-leads").click()
+    await selectModuleTab(page, "crm", "leads")
     await selectEntityRowByText(page, leadName)
     await waitForEntityActionEnabled(page, "entity-action-convert-lead")
     await page.getByTestId("entity-action-convert-lead").click()
@@ -82,7 +132,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
 
     const opportunityName = `${leadName} - Opportunity`
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     const opportunityId = await fetchOpportunityIdByName(page, opportunityName)
 
     await openEntityCreate(page, "/crm", "crm", "opportunity-lines", "add-opportunity-line")
@@ -102,7 +152,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForOpportunityLineExists(page, opportunityId)
 
     await gotoModule(page, "/crm", "crm")
-    await page.getByTestId("module-tab-crm-opportunities").click()
+    await selectModuleTab(page, "crm", "opportunities")
     await selectEntityRowByText(page, opportunityName)
     await waitForEntityActionEnabled(page, "entity-action-convert-opp-order")
     await page.getByTestId("entity-action-convert-opp-order").click()
@@ -121,7 +171,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForSaleOrderLineExists(page, orderId)
 
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await selectEntityRowById(page, orderId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-orders")
     await Promise.all([
@@ -135,7 +185,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForSaleOrderBillableLines(page, orderId)
 
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-fulfillment").click()
+    await selectModuleTab(page, "sales", "fulfillment")
     const pickingId = await fetchFulfillmentPickingIdBySaleOrderId(page, orderId)
     await selectEntityRowById(page, pickingId)
     await waitForEntityActionEnabled(page, "entity-action-confirm-picking")
@@ -170,12 +220,12 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     const incomeLabel = await fetchAccountSelectLabelByInternalType(page, "income")
     const receivableLabel = await fetchAccountSelectLabelByInternalType(page, "receivable")
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-orders").click()
+    await selectModuleTab(page, "sales", "orders")
     await openCreateInvoiceFromOrder(page, orderId)
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
-    await Promise.all([
+    const [invoiceResponse] = await Promise.all([
       page.waitForResponse(
         (res) =>
           matchesOperationResponse(res, "create_invoice_from_sale_order") && res.ok(),
@@ -184,12 +234,15 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
       submitForm(page, "create-invoice-from-sale-order"),
     ])
     const invoiceMoveId = await fetchDraftInvoiceMoveIdForSaleOrder(page, orderId)
+    // Replaying the exact accepted command must be refused and must not create a second invoice.
+    expect((await replayAcceptedOperation(page, invoiceResponse)).ok()).toBe(false)
+    expect(await countMovesForSaleOrder(page, orderId)).toBe(1)
     await postDraftInvoiceViaUi(page, invoiceMoveId)
 
     const saleOrderLabel = await fetchSaleOrderSelectLabel(page, orderId)
 
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-returns").click()
+    await selectModuleTab(page, "sales", "returns")
     await page.getByTestId("module-create-sales-returns").click()
     await expect(page.getByTestId("form-modal-new-return-order")).toBeVisible()
     await chooseSelectOptionByLabel(page, "partnerId", new RegExp(leadName, "i"))
@@ -231,8 +284,24 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     ])
     await waitForReturnOrderState(page, returnOrderId, "received")
 
+    await selectEntityRowById(page, returnOrderId)
+    await waitForEntityActionEnabled(page, "entity-action-create-exchange-order")
+    await Promise.all([
+      page.waitForResponse(
+        (res) => matchesOperationResponse(res, "create_exchange_order_from_return") && res.ok(),
+        { timeout: 30_000 },
+      ),
+      page.getByTestId("entity-action-create-exchange-order").click(),
+    ])
+    const exchangeOrderId = await fetchExactExchangeOrderId(page, returnOrderId)
+    await expect(page).toHaveURL((url) =>
+      url.pathname === "/sales" &&
+      url.searchParams.get("tab") === "orders" &&
+      url.searchParams.get("filter") === `id:${exchangeOrderId}`,
+    )
+
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-returns").click()
+    await selectModuleTab(page, "sales", "returns")
     await selectEntityRowById(page, returnOrderId)
     await waitForEntityActionEnabled(page, "entity-action-create-return-credit-note")
     await page.getByTestId("entity-action-create-return-credit-note").click()
@@ -240,7 +309,7 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await chooseSelectOptionByLabel(page, "journalId", journalLabel)
     await chooseSelectOptionByLabel(page, "defaultIncomeAccountId", incomeLabel)
     await chooseSelectOptionByLabel(page, "receivableAccountId", receivableLabel)
-    await Promise.all([
+    const [creditNoteResponse] = await Promise.all([
       page.waitForResponse(
         (res) =>
           matchesOperationResponse(res, "create_credit_note_from_return_order") && res.ok(),
@@ -251,7 +320,20 @@ test.describe("MVP sales returns (RMA)", { tag: "@p0" }, () => {
     await waitForReturnOrderState(page, returnOrderId, "refunded")
 
     const creditNoteId = await fetchDraftCreditNoteMoveIdForReturnOrder(page, returnOrderId)
-    await postDraftCreditNoteMove(page, creditNoteId)
+    // The exact accepted credit-note command is not accepted twice, and the credit note stays unique.
+    expect((await replayAcceptedOperation(page, creditNoteResponse)).ok()).toBe(false)
+    expect(await fetchDraftCreditNoteMoveIdForReturnOrder(page, returnOrderId)).toBe(creditNoteId)
+    // Credit notes have no list tab; the operator posts them from the document page.
+    await page.goto(`/accounting/invoices/${creditNoteId}`)
+    const postCreditNote = page.getByTestId("record-workflow-action-accounting.invoice.post").first()
+    await expect(postCreditNote).toBeEnabled({ timeout: 30_000 })
+    await Promise.all([
+      page.waitForResponse((res) => matchesOperationResponse(res, "post_invoice") && res.ok(), {
+        timeout: 30_000,
+      }),
+      postCreditNote.click(),
+    ])
+    await waitForMovePosted(page, creditNoteId)
 
     await expect
       .poll(async () => {

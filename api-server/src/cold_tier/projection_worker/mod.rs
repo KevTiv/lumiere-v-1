@@ -136,7 +136,7 @@ fn require_split_stdb_tokens(
 
 /// Start the standalone projection worker service.
 pub async fn serve() -> Result<()> {
-    let config = Config::from_env()?;
+    let config = Config::from_projection_worker_env()?;
     let finalization_token = require_split_stdb_tokens(
         config.stdb_server_token.as_deref(),
         config.stdb_finalization_token.as_deref(),

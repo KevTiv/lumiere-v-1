@@ -18,7 +18,9 @@ export default defineConfig({
     : process.env.CI
       ? 4
       : undefined,
-  reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
+  // Line reports the final failed attempt immediately; list/GitHub reporters
+  // defer failure details until suite end, which can be lost on job timeout.
+  reporter: process.env.CI ? [["line"], ["github"], ["html", { open: "never" }], ["./scripts/playwright-timing-reporter.ts"]] : "list",
   use: {
     baseURL,
     trace: "retain-on-failure",

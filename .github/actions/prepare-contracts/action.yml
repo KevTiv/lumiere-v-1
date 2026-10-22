@@ -1,0 +1,9 @@
+name: Prepare contracts
+description: Materialize the checksum-verified contracts release used by application builds
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare checksum-verified contracts release
+      shell: bash
+      run: bash scripts/prepare-vendored-contracts-rust.sh

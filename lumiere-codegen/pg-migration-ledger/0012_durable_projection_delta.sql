@@ -2,27 +2,22 @@
 -- Migration version: 12
 -- Migration name: 0012_durable_projection_delta
 -- Checksum algorithm: sha256
--- Body checksum: sha256:d9829e7cae6fc5f5e9ba9515acc56c5608f8025f1e8066a8b487153f3b8a9e78
+-- Body checksum: sha256:459c01c181971234fd61552935556d533560acf4efbe3251561af2e69e6dbd16
 
--- Durable projection: purchase_receipt_operation
-CREATE TABLE IF NOT EXISTS "purchase_receipt_operation" (
+-- Durable projection: workflow_subject_snapshot
+CREATE TABLE IF NOT EXISTS "workflow_subject_snapshot" (
     "id" TEXT NOT NULL,
     "organization_id" NUMERIC(20,0) NOT NULL,
     "company_id" NUMERIC(20,0) NOT NULL,
-    "operation_key" TEXT NOT NULL,
-    "line_id" NUMERIC(20,0) NOT NULL,
-    "order_id" NUMERIC(20,0) NOT NULL,
-    "quantity" DOUBLE PRECISION NOT NULL,
-    "lot_id" NUMERIC(20,0),
-    "received_before" DOUBLE PRECISION NOT NULL,
-    "received_after" DOUBLE PRECISION NOT NULL,
-    "move_id" NUMERIC(20,0),
-    "picking_id" NUMERIC(20,0),
-    "continuation_move_id" NUMERIC(20,0),
-    "continuation_picking_id" NUMERIC(20,0),
-    "created_by" BYTEA NOT NULL,
-    "created_at" BIGINT NOT NULL,
-    CONSTRAINT "purchase_receipt_operation_pkey" PRIMARY KEY ("id")
+    "subject_model" TEXT NOT NULL,
+    "subject_id" NUMERIC(20,0) NOT NULL,
+    "workflow_version_id" NUMERIC(20,0) NOT NULL,
+    "subject_revision_hash" TEXT NOT NULL,
+    "fields" JSONB NOT NULL,
+    "requested_by" BYTEA NOT NULL,
+    "requested_at" BIGINT NOT NULL,
+    CONSTRAINT "workflow_subject_snapshot_pkey" PRIMARY KEY ("id")
 );
-CREATE INDEX IF NOT EXISTS "purchase_receipt_operation_line_id" ON "purchase_receipt_operation" ("line_id");
-CREATE INDEX IF NOT EXISTS "purchase_receipt_operation_organization_id_company_id" ON "purchase_receipt_operation" ("organization_id", "company_id");
+CREATE INDEX IF NOT EXISTS "workflow_subject_snapshot_company_id" ON "workflow_subject_snapshot" ("company_id");
+CREATE INDEX IF NOT EXISTS "workflow_subject_snapshot_organization_id" ON "workflow_subject_snapshot" ("organization_id");
+CREATE INDEX IF NOT EXISTS "workflow_subject_snapshot_requested_by" ON "workflow_subject_snapshot" ("requested_by");

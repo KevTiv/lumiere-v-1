@@ -344,7 +344,7 @@ function PurchaseOrderPageLoaded({
   const lineActions: EntityAction[] = [
     {
       id: 'pol-resolve-receipt',
-      label: t('purchasing.actions.resolveReceipt', { defaultValue: 'Resolve pending receipt' }),
+      label: t('purchasing.actions.resolveReceipt'),
       requiresSelection: true,
       selection: 'single',
       isApplicable: (rows) => rows.length === 1 && workflow.canResolveReceipt(String(rows[0].id)),

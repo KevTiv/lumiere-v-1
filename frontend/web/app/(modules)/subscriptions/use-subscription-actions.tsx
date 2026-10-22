@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   FormModal,
@@ -82,7 +82,7 @@ export function isSubscriptionDialogAction(id: string): id is SubscriptionDialog
  * The subscription form dialogs and reducer calls shared by the list's row actions and the
  * subscription record page. `dialogs` must be rendered once by the caller.
  */
-export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint) {
+export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint, enabled = true) {
   const { t } = useTranslation()
   const dialogLabels: Record<SubscriptionDialogAction, string> = {
     close: t("subscriptions.actions.close"),
@@ -105,8 +105,11 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
       showWorkflowToast({ kind: "error", title: t("common.error.title"), description: error.message }),
   })
   const [target, setTarget] = useState<{ action: SubscriptionDialogAction; id: number } | null>(null)
-  const targetFor = (action: SubscriptionDialogAction) => (target?.action === action ? target.id : null)
+  const targetFor = (action: SubscriptionDialogAction) => (enabled && target?.action === action ? target.id : null)
   const close = () => setTarget(null)
+  useEffect(() => {
+    if (!enabled) setTarget(null)
+  }, [enabled])
 
   const { data: subscriptions = [] } = useSubscriptions(orgId)
   const { data: billingRuns = [] } = useSubscriptionBillingRuns(orgId)
@@ -151,6 +154,7 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
   /** Run an action that needs no extra input. Rejects with the reducer error. */
   const runDirect = useCallback(
     async (action: SubscriptionDirectAction, subscriptionId: bigint): Promise<void> => {
+      if (!enabled) return
       switch (action) {
         case "activate":
           await activate.mutateAsync({ subscriptionId })
@@ -175,13 +179,14 @@ export function useSubscriptionActions(orgId: bigint, operatingCompanyId: bigint
           return
       }
     },
-    [activate, pause, resume, rateUsage, recordFailure, advanceDunning, refreshFlags],
+    [enabled, activate, pause, resume, rateUsage, recordFailure, advanceDunning, refreshFlags],
   )
 
   const openDialog = useCallback(
-    (action: SubscriptionDialogAction, subscriptionId: number | bigint) =>
-      setTarget({ action, id: Number(subscriptionId) }),
-    [],
+    (action: SubscriptionDialogAction, subscriptionId: number | bigint) => {
+      if (enabled) setTarget({ action, id: Number(subscriptionId) })
+    },
+    [enabled],
   )
 
   const journalFieldOptions = useMemo(() => {

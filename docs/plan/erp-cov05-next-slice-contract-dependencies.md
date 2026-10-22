@@ -1,7 +1,5 @@
 # COV-05 next-slice contract dependencies
 
-> Integration update (2026-10-12): [Purchasing stack integration](erp-cov05-purchasing-stack-integration.md) supersedes the original build/release blockers below. This document retains evidence from its original base; it does not claim current integrated acceptance.
-
 **Investigated base:** `16f87f9ffc5be5fb18dcde6b184c344a56c52665`
 
 These are producer → release → consumer dependencies, not implemented contracts.

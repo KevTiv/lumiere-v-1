@@ -21,6 +21,7 @@ These Playwright tests exercise the current high-value ERP web flows:
 | `auth-shell.spec.ts` | Public landing, auth redirect, sign-in, shell navigation, sign-out |
 | `module-smoke.spec.ts` | Cross-module minimal creates (CRM, Helpdesk, Inventory, Sales, Proposals) |
 | `accounting-module.spec.ts` | All accounting tabs, creates, quick actions, CSV import guard |
+| `rwanda-accounting-alpha-rehearsal.spec.ts` | Opt-in isolated Rwanda tenant gate: country/setup readiness, invoice and bill drafts, opening-balance retry, historical journals, residual-only or original-total document migration, real historical-payment replay, and evidence attachments (`@rwanda-alpha`). See [`docs/RWANDA_ACCOUNTING_ALPHA_REHEARSAL.md`](../../../../docs/RWANDA_ACCOUNTING_ALPHA_REHEARSAL.md). |
 | `mvp-lead-to-cash.spec.ts` | Golden-path CRM → payment (steps 3–13, 17; full UI) |
 | `mvp-procure-to-pay.spec.ts` | PO create → line → confirm → receive → bill modal → post (@p0) |
 | `mvp-ai-action-draft.spec.ts` | AI action draft create → approve/reject (steps 15–16, @p0) |

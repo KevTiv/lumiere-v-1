@@ -36,6 +36,10 @@ E2E_SPEC_FILES     ?=
 # Playwright shard for e2e-smoke, e.g. 2/3 (CI splits the p0/full suites across runners).
 E2E_SHARD          ?=
 E2E_WORKERS        ?= 1
+# CI can install a checksum-verified, exact-commit build artifact before it
+# starts an isolated runtime for each Playwright shard.
+E2E_PREBUILT       ?= 0
+RWANDA_ALPHA_EVIDENCE ?=
 # Run reducer/domain validation before browser fixture seeding. Set to 0 when
 # reducer proof is run separately and the browser suite needs a pristine seed.
 E2E_RUN_DOMAIN_TESTS ?= 1
@@ -109,10 +113,13 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	generate-stdb-ts-sdk generate-stdb-rust-sdk schema-snapshot \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
-	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running e2e-docker \
+	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running e2e-single-remote e2e-docker \
 	e2e-pretenant pretenant-cert-stdb pretenant-cert-native \
+	validate-rwanda-alpha-evidence \
+	prepare-rwanda-alpha-evidence \
 	init-stack refresh-stack-tokens docker-dev docker-dev-iot \
 	register-stack-identities \
+	generate-stdb-http-option-metadata check-stdb-http-option-metadata \
 	codegen check-codegen check-codegen-pinned check-contract-ir check-operation-history check-release-compatibility check-tenant-ownership check-storage-policy check-c2-commit-coverage check-cov00c-correctness-census check-cov00d-evidence-matrix check-cov02-seed-inventory check-cov02-first-org-fixture check-reducer-contracts-drift check-contracts-source-drift check-contracts-drift check-c9-isolation-matrix lint-trusted-route-boundaries \
 	clean-contracts-live-staging generate-presentation-schemas generate-presentation-contracts lint-reducer-call-literals api-server-run \
 	lint-no-magic-fk-zero lint-accounting-as-unknown-as lint-accounting-currency-refs \
@@ -121,7 +128,8 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	local-start local-stop local-publish local-reset local-test local-logs \
 	stack-init stack-up stack-up-iot stack-down \
 	codegen-all codegen-check api-run \
-	cloud-wasm cloud-publish cloud-reset cloud-test cloud-logs
+	cloud-wasm cloud-publish cloud-reset cloud-test cloud-logs \
+	identity-bootstrap-plan identity-bootstrap-apply identity-rotate-apply
 
 help-legacy:
 	@echo "Usage: make <target>"
@@ -150,6 +158,7 @@ help-legacy:
 	@echo "  e2e-single-test      one spec; matching local Next builds are reused (--workers=1)"
 	@echo "  e2e-web-dev          prepare API/STDB and keep Next dev running in this terminal"
 	@echo "  e2e-single-running   one spec against an existing stack; no build/publish/seed"
+	@echo "  e2e-single-remote    one spec against PLAYWRIGHT_BASE_URL; preserves caller credentials and service variables"
 	@echo "  e2e-p2p              Wave 3 gate: procure-to-pay golden path (mvp-procure-to-pay.spec.ts)"
 	@echo "  e2e-mvp-golden       Both MVP golden paths (lead-to-cash + procure-to-pay, fresh DB)"
 	@echo "  generate-stdb-rust-sdk  Regenerate api-server Rust STDB client bindings (+ keyword fix)"
@@ -220,8 +229,20 @@ help:
 	$(call print-command,cloud-reset,DESTRUCTIVE: clear the Maincloud database and republish.)
 	$(call print-command,cloud-test,Run core reducer tests against Maincloud.)
 	$(call print-command,cloud-logs,Tail Maincloud module logs.)
+	$(call print-command,identity-bootstrap-plan,Validate and print the redacted production identity plan.)
+	$(call print-command,identity-bootstrap-apply,Mint and publish initial production service identities.)
+	$(call print-command,identity-rotate-apply,Rotate drained production service identities.)
 	@printf "\nCompatibility aliases: check, build, start, stop, publish, publish-clear, test, logs,\n"
 	@printf "generate-stdb-ts-sdk, generate-stdb-rust-sdk, init-stack, docker-dev, and publish-cloud.\n"
+
+identity-bootstrap-plan:
+	node scripts/bootstrap-production-identities.mjs --mode bootstrap
+
+identity-bootstrap-apply:
+	node scripts/bootstrap-production-identities.mjs --apply --mode bootstrap
+
+identity-rotate-apply:
+	node scripts/bootstrap-production-identities.mjs --apply --mode rotate
 
 help-e2e:
 	@printf "E2E commands (all use local SpacetimeDB and write logs under .tmp/e2e):\n"
@@ -231,6 +252,7 @@ help-e2e:
 	$(call print-command,e2e-playwright-only,Run Playwright against already-running services.)
 	$(call print-command,e2e-web-dev,Prepare API/STDB then keep Next dev running in this terminal.)
 	$(call print-command,e2e-single-running,One spec against a running stack without building or seeding.)
+	$(call print-command,e2e-single-remote,One spec against PLAYWRIGHT_BASE_URL without local health checks or environment overrides.)
 	$(call print-command,e2e-single,Setup plus one spec; E2E_SPEC=<file> and E2E_GREP=<pattern>.)
 	$(call print-command,e2e-single-test,One spec against an existing E2E setup.)
 	$(call print-command,e2e-p2p,Procure-to-pay golden-path spec.)
@@ -238,6 +260,7 @@ help-e2e:
 	$(call print-command,e2e-crm-isolation,Fresh live CRM organization/company read-isolation gate.)
 	$(call print-command,e2e-dx-test,Validate local E2E fingerprint and API binary helpers.)
 	$(call print-command,e2e-wipe-local-stdb,DESTRUCTIVE: delete all local SpacetimeDB data.)
+	$(call print-command,validate-rwanda-alpha-evidence,Validate a Rwanda rehearsal bundle; set RWANDA_ALPHA_EVIDENCE=<manifest.json>.)
 	@printf "\nUseful inputs: E2E_CLEAR_DB=1, E2E_SUITE=p0, E2E_SPEC=<file>, E2E_GREP=<pattern>.\n"
 
 # ── Module build and environment checks ──────────────────────────────────────
@@ -395,6 +418,9 @@ e2e-smoke-setup:
 					fi; \
 				done; \
 				echo "[e2e] Domain reducer tests passed."; \
+				if [ "$${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
+					spacetime call "$(E2E_DB)" run_all_inventory_tests --server local --no-config || exit 1; \
+				fi; \
 				if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 					for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
 						echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
@@ -752,6 +778,30 @@ e2e-single-test:
 e2e-single-running:
 	@$(MAKE) e2e-playwright-only E2E_ONLY_SPEC="$(E2E_SPEC)"
 
+# Run one spec against an already-deployed stack. Unlike e2e-single-running,
+# this target deliberately preserves the caller's URL, login and optional
+# trusted-fixture variables and performs no localhost health checks.
+e2e-single-remote:
+	@env E2E_SPEC="$(E2E_SPEC)" E2E_GREP="$(E2E_GREP)" E2E_WORKERS="$(E2E_WORKERS)" /bin/bash -c 'set -euo pipefail; \
+		: "$${E2E_SPEC:?Set E2E_SPEC to one Playwright spec filename}"; \
+		: "$${PLAYWRIGHT_BASE_URL:?Set PLAYWRIGHT_BASE_URL to the isolated tenant URL}"; \
+		: "$${E2E_TEST_EMAIL:?Set E2E_TEST_EMAIL for the rehearsal operator}"; \
+		if [ -z "$${E2E_TEST_PASSWORD:-}" ]; then echo "Set E2E_TEST_PASSWORD through a secret manager or hidden prompt" >&2; exit 2; fi; \
+		case "$$PLAYWRIGHT_BASE_URL" in http://*|https://*) ;; *) echo "PLAYWRIGHT_BASE_URL must be an http(s) URL" >&2; exit 2 ;; esac; \
+		PW_ARGS=("tests/e2e/$$E2E_SPEC" --workers "$$E2E_WORKERS"); \
+		if [ -n "$$E2E_GREP" ]; then PW_ARGS+=(--grep "$$E2E_GREP"); fi; \
+		cd frontend/web; \
+		pnpm exec playwright test "$${PW_ARGS[@]}"'
+
+validate-rwanda-alpha-evidence:
+	@test -n "$(RWANDA_ALPHA_EVIDENCE)" || { echo "Set RWANDA_ALPHA_EVIDENCE=/path/to/evidence-manifest.json" >&2; exit 2; }
+	@node scripts/validate-rwanda-accounting-alpha-evidence.mjs "$(RWANDA_ALPHA_EVIDENCE)"
+
+prepare-rwanda-alpha-evidence:
+	@test -n "$(RWANDA_ALPHA_CONTEXT)" || { echo "Set RWANDA_ALPHA_CONTEXT=/path/to/00-rwanda-rehearsal-context.json" >&2; exit 2; }
+	@test -n "$(RWANDA_ALPHA_BUNDLE)" || { echo "Set RWANDA_ALPHA_BUNDLE=/secure/path/to/bundle-directory" >&2; exit 2; }
+	@node scripts/prepare-rwanda-accounting-alpha-evidence.mjs "$(RWANDA_ALPHA_CONTEXT)" "$(RWANDA_ALPHA_BUNDLE)"
+
 # Foreground development server; Ctrl-C stops only this web process. The API
 # and local database prepared by setup remain available for the next session.
 e2e-web-dev: e2e-smoke-setup
@@ -840,7 +890,7 @@ e2e-docker:
 	'
 
 e2e-smoke:
-	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(value E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" E2E_PREBUILT="$(E2E_PREBUILT)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
@@ -886,8 +936,12 @@ e2e-smoke:
 		echo "[e2e] Logging in to local SpacetimeDB (database owner for private-table SQL)..."; \
 		E2E_STDB_HOST="$$E2E_STDB_HOST" node "$$ROOT/scripts/e2e-local-stdb-token.mjs" --login-only; \
 		echo "[e2e] Publishing local database $(E2E_DB) (--no-config)..."; \
-		LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime build --module-path "$(MODULE)"; \
-		wasm-tools validate "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"; \
+		if [ "$${E2E_PREBUILT:-0}" = "1" ]; then \
+			"$$ROOT/scripts/e2e-ci-artifact.sh" verify "$${E2E_ARTIFACT_EXPECTED_SHA:-}"; \
+		else \
+			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime build --module-path "$(MODULE)"; \
+			wasm-tools validate "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm"; \
+		fi; \
 		if [ "$${E2E_CLEAR_DB:-0}" = "1" ]; then \
 			echo "[e2e] E2E_CLEAR_DB=1: clearing module data (--clear-database)"; \
 			LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime publish "$(E2E_DB)" --bin-path "$(MODULE)/target/wasm32-unknown-unknown/release/lumiere_v1.wasm" --server local --clear-database -y --no-config; \
@@ -911,6 +965,9 @@ e2e-smoke:
 				fi; \
 			done; \
 			echo "[e2e] Domain reducer tests passed."; \
+			if [ "$${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
+				spacetime call "$(E2E_DB)" run_all_inventory_tests --server local --no-config || exit 1; \
+			fi; \
 			if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
 					echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
@@ -941,7 +998,7 @@ e2e-smoke:
 			lsof -ti:"$(E2E_API_PORT)" | xargs kill >/dev/null 2>&1 || true; \
 			sleep 1; \
 		fi; \
-		echo "[e2e] Building api-server (first run may take a few minutes)..."; \
+		if [ "$${E2E_PREBUILT:-0}" = "1" ]; then echo "[e2e] Loading prebuilt api-server."; else echo "[e2e] Building api-server (first run may take a few minutes)..."; fi; \
 		scripts/e2e-dx.sh api-build; \
 		set -a; [ ! -f "$$ROOT/frontend/web/.env.local" ] || . "$$ROOT/frontend/web/.env.local"; set +a; \
 		echo "[e2e] Applying checksum-verified PostgreSQL migrations..."; \
@@ -977,7 +1034,7 @@ e2e-smoke:
 			sleep 1; \
 		fi; \
 		cd "$$ROOT/frontend/web"; \
-		echo "[e2e] Building Next.js (once, before Playwright)..."; \
+		if [ "$${E2E_PREBUILT:-0}" = "1" ]; then echo "[e2e] Loading prebuilt Next.js application."; else echo "[e2e] Building Next.js (once, before Playwright)..."; fi; \
 		PORT="" \
 		PLAYWRIGHT_PORT="$(E2E_WEB_PORT)" \
 		NEXT_PUBLIC_DEV_ADMIN="false" \
@@ -1012,7 +1069,7 @@ e2e-smoke:
 			fi; \
 		done; \
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
-		pnpm exec playwright install chromium; \
+		if [ "$${E2E_BROWSER_READY:-0}" != "1" ]; then pnpm exec playwright install chromium; fi; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
 		if [ "$${E2E_SUITE:-full}" = "p0" ]; then \
 			PW_ARGS+=(--grep @p0); \
@@ -1027,6 +1084,10 @@ e2e-smoke:
 			PW_ARGS+=("$${SPEC_FILES[@]}"); \
 		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
 			PW_ARGS+=(--grep-invert @ai-live); \
+		fi; \
+		if [ "$${E2E_SUITE:-full}" != "targeted" ] && [ -n "$${E2E_SPEC_FILES:-}" ]; then \
+			read -r -a SPEC_FILES <<< "$$E2E_SPEC_FILES"; \
+			PW_ARGS+=("$${SPEC_FILES[@]}"); \
 		fi; \
 		if [ -n "$${E2E_SHARD:-}" ]; then echo "[e2e] Shard $$E2E_SHARD"; PW_ARGS+=(--shard "$$E2E_SHARD"); fi; \
 		PORT="" \
@@ -1067,8 +1128,16 @@ docker-dev:
 docker-dev-iot:
 	docker compose --env-file .env.docker -f docker-compose.dev.yml --profile iot up --build
 
+generate-stdb-http-option-metadata:
+	python3 scripts/generate-stdb-http-option-metadata.py
+
+check-stdb-http-option-metadata:
+	python3 scripts/generate-stdb-http-option-metadata.py --check
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p test_stdb_http_option_metadata.py
+
 codegen: schema-snapshot
 	cargo run -p lumiere-codegen
+	python3 scripts/generate-stdb-http-option-metadata.py
 
 check-agent-capabilities: codegen
 	python3 scripts/verify-agent-capability-artifact.py .contracts-staging/ir/agent-capability-registry-v1.json
@@ -1112,6 +1181,10 @@ check-cov00d-evidence-matrix:
 check-cov02-seed-inventory:
 	@python3 scripts/validate-cov02-seed-inventory.py
 
+check-cov27-launch-manifest:
+	@python3 scripts/validate-cov27-launch-manifest.py
+	@python3 -m unittest scripts/test_validate_cov27_launch_manifest.py
+
 check-cov02-first-org-fixture:
 	@node frontend/web/scripts/seed-test-user.mjs --check-manifest
 
@@ -1131,9 +1204,12 @@ check-c2-commit-coverage:
 	python3 lumiere-codegen/tests/test_c2_commit_coverage.py
 
 check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-policy check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
+	$(MAKE) check-stdb-http-option-metadata
 	@git add -N \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
+		frontend/packages/stdb/src/stdb-http-option-fields.json \
+		frontend/packages/stdb/src/stdb-http-option-types.json \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
@@ -1142,6 +1218,8 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
+		frontend/packages/stdb/src/stdb-http-option-fields.json \
+		frontend/packages/stdb/src/stdb-http-option-types.json \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
@@ -1152,12 +1230,15 @@ check-codegen: codegen check-contract-ir check-tenant-ownership check-storage-po
 # contract regeneration belongs to check-contracts-source-drift; this target
 # must not couple ordinary Rust checks to whichever module is currently deployed.
 check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pinned check-release-compatibility check-tenant-ownership check-c2-commit-coverage check-c8-contract-ratchet lint-reducer-call-literals lint-trusted-route-boundaries
+	$(MAKE) check-stdb-http-option-metadata
 	python3 scripts/verify-contract-ir.py .contracts-staging/ir/lumiere-contract-ir-v2.json --require-clean
 	python3 lumiere-codegen/tests/test_contract_ir_pin.py
 	node scripts/bootstrap-storage-policies.mjs --check
 	@git diff --exit-code -- \
 		frontend/packages/stdb/src/query-resource-row-type.json \
 		frontend/packages/stdb/src/query-row-map.ts \
+		frontend/packages/stdb/src/stdb-http-option-fields.json \
+		frontend/packages/stdb/src/stdb-http-option-types.json \
 		frontend/packages/stdb/src/generated/org-subscription-descriptors.ts \
 		crates/stdb-client/src/generated_reducer_contract.rs \
 		crates/stdb-auth/assets/resource_registry.json \
@@ -1165,14 +1246,14 @@ check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pi
 		(echo "Checked-in generated artifacts are out of date" && exit 1)
 
 # Populates .contracts-staging/{bindings,manifests} from the currently
-# pinned lumiere-contracts git dependency instead of a live `spacetime
-# generate` run. Use this when the schema hasn't changed and you just need
-# .contracts-staging present to build/check/test (e.g. in CI, which has no
-# `spacetime` CLI). Requires `cargo fetch` (or any prior cargo invocation)
-# to have already resolved the dependency.
+# pinned, checksum-verified lumiere-contracts release instead of a live
+# `spacetime generate` run. Use this when the schema hasn't changed and you
+# just need .contracts-staging present to build/check/test.
 contracts-staging-from-pinned:
+	@bash scripts/prepare-vendored-contracts-rust.sh
 	@cargo fetch --quiet
-	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
+	@set -euo pipefail; \
+	CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "contracts-staging-from-pinned: could not resolve the pinned lumiere-contracts checkout" >&2; \
 		exit 1; \
@@ -1187,11 +1268,12 @@ contracts-staging-from-pinned:
 			exit 1; \
 		fi; \
 	done; \
-	rm -rf .contracts-staging; \
-	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated .contracts-staging/ir; \
-	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
-	cp -R "$$CHECKOUT/manifests/." .contracts-staging/manifests/; \
-	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." .contracts-staging/ir/; fi; \
+	STAGING="$$(mktemp -d)"; \
+	trap 'rm -rf "$$STAGING"' EXIT; \
+	mkdir -p "$$STAGING/bindings" "$$STAGING/manifests" "$$STAGING/ts/generated" "$$STAGING/ir"; \
+	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." "$$STAGING/bindings/"; \
+	cp -R "$$CHECKOUT/manifests/." "$$STAGING/manifests/"; \
+	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." "$$STAGING/ir/"; fi; \
 	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
 	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
 	python3 scripts/verify-contract-ir.py \
@@ -1205,9 +1287,10 @@ contracts-staging-from-pinned:
 		python3 scripts/verify-agent-capability-artifact.py \
 			"$$CHECKOUT/ir/agent-capability-registry-v1.json"; \
 	fi; \
-	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
-	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
-	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
+	cp -R "$$CHECKOUT/packages/contracts/src/generated/." "$$STAGING/ts/generated/"; \
+	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" "$$STAGING/ts/"; \
+	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" "$$STAGING/ts/"; \
+	python3 scripts/sync-directory.py "$$STAGING" .contracts-staging; \
 	echo "contracts-staging-from-pinned: populated .contracts-staging/ from $$CHECKOUT"
 
 # CI-safe reducer drift check. Unlike full bindings drift, schema retrieval is
@@ -1223,6 +1306,8 @@ check-reducer-contracts-drift: schema-snapshot codegen
 # CI source check that does not depend on a separately deployed module. The
 # live deployment compatibility check remains available as check-contracts-drift.
 check-contracts-source-drift: clean-contracts-live-staging generate-stdb-rust-sdk generate-stdb-ts-sdk
+	@git diff --exit-code -- frontend/packages/stdb/src/stdb-http-option-fields.json || \
+		(echo "Generated HTTP option-field registry is out of date. Run: make generate-stdb-ts-sdk" && exit 1)
 	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "check-contracts-source-drift: could not resolve pinned contracts" >&2; \
@@ -1286,6 +1371,13 @@ check-contracts-drift: clean-contracts-live-staging generate-presentation-schema
 contracts-module-ci:
 	mkdir -p .ci
 	@cargo build --quiet --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts \
+		2>.ci/contracts-module-build.log || \
+		(cat .ci/contracts-module-build.log >&2; exit 1)
+	cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm
+
+contracts-module-production-ci:
+	mkdir -p .ci
+	@cargo build --quiet --manifest-path spacetimedb/Cargo.toml --target wasm32-unknown-unknown --profile ci-contracts --no-default-features \
 		2>.ci/contracts-module-build.log || \
 		(cat .ci/contracts-module-build.log >&2; exit 1)
 	cp spacetimedb/target/wasm32-unknown-unknown/ci-contracts/lumiere_v1.wasm .ci/contracts-module.wasm

@@ -184,6 +184,7 @@ mod readiness_tests {
         Config {
             port: 8080,
             internal_secret: None,
+            ai_execution_envelope_key: None,
             qdrant_url: "http://qdrant".into(),
             qdrant_api_key: None,
             qdrant_collection: "collection".into(),
@@ -209,6 +210,8 @@ mod readiness_tests {
             ollama_llm_model: "llm".into(),
             ollama_supports_tool_calling: false,
             mistral_api_key: None,
+            mistral_reasoning_effort: None,
+            mistral_reasoning_models: Vec::new(),
             google_api_key: None,
             gemini_embed_model: "gemini".into(),
             kong_llm_url: None,

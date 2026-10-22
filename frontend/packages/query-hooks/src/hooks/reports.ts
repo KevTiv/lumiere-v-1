@@ -12,6 +12,7 @@ import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useRef } from "react"
 
 import { apiFetch, fetchQueryList, type QueryRows, rqBigIntKey } from "../http"
 import { responseErrorMessage } from "@lumiere/api-client/response-error"
@@ -27,9 +28,11 @@ import type {
 import { encodeTimestampMicros, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { i18n } from "@lumiere/i18n"
-import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
+import { stbTimestampFromDate, stbTimestampFromValue } from "@lumiere/erp-shared/stb-timestamp"
+import { financialReportInputKey, financialReportReady, resolveFinancialReportCreation } from "./financial-report-create-effect"
 import { downloadDocumentExport } from "./templates"
 import { resolveReportRunEffect, scheduledReportRunCount } from "./report-run-effect"
+import { currentReportTemplate, reportTemplateEditValues, reportTemplateValuesEqual, resolveReportTemplateUpdate, type ReportTemplateEditValues, type ReportTemplateUpdateRef } from "./report-template-effect"
 import { toCreateFinancialReportParams, toCreateTrialBalanceEntryParams } from "@lumiere/erp-shared/reports-create-params"
 import { toCreateReportTemplateParams } from "@lumiere/erp-shared/reports-template-params"
 import { toCreateScheduledReportParams } from "@lumiere/erp-shared/reports-scheduled-params"
@@ -49,15 +52,23 @@ import {
   type CanonicalRecordRef,
   type ResolvedOperationEffectOutcome,
 } from "./operation-effect"
+import {
+  resolveDashboardWidgetAttachmentEffect,
+  resolveDashboardWidgetCreationEffect,
+  type DashboardEffectRef,
+  type DashboardWidgetEffectRef,
+} from "./dashboard-widget-effect"
 
 // ── Reads ────────────────────────────────────────────────────────────────────
 
 export function useFinancialReports(
   organizationId: bigint,
   initialData?: FinancialReport[],
+  options?: { enabled?: boolean },
 ) {
   return useQuery<FinancialReport[]>({
     queryKey: ['financial-reports', rqBigIntKey(organizationId)],
+    enabled: options?.enabled,
     queryFn: () => fetchQueryList('/api/query/financial-reports', 'Failed to fetch financial reports'),
     staleTime: 30_000,
     initialData,
@@ -172,52 +183,66 @@ function requireOperatingCompany(companyId: bigint | undefined): bigint {
  * Creates a draft `FinancialReport`, resolves its id from SQL, then calls
  * `generate_financial_report` to build trial balance lines.
  */
-export function useCreateFinancialReportFlow(organizationId: bigint, companyId?: bigint) {
+export function useCreateFinancialReportFlow(organizationId: bigint, companyId?: bigint, options?: { mayDispatch?: () => boolean; scopeKey?: string }) {
   const qc = useQueryClient()
+  const attempts = useRef(new Map<string, { requestId: string; before: { id?: unknown }[]; generatedDispatched: boolean }>())
+  const inFlight = useRef(new Set<string>())
   return useMutation<void, Error, Record<string, unknown>>({
+    retry: false,
     mutationFn: async (formData) => {
       const params = toCreateFinancialReportParams(formData)
       if (!params) throw new Error('Invalid report parameters')
 
-      const name = params.name.trim()
-      const listBefore = await fetchQueryList(
-        '/api/query/financial-reports',
-        'Failed to load financial reports',
-      )
-      const maxIdBefore = listBefore.reduce(
-        (m, row) => Math.max(m, Number(row.id) || 0),
-        0,
-      )
-
-      const createCall = stdbBffCommandPost("create_financial_report", {
-        companyId: requireOperatingCompany(companyId),
-        params: stdbParamsToJson(params),
-      })
-      const createRes = await apiFetch(createCall.urlPath, createCall.init)
-      if (!createRes.ok) throw new Error('Failed to create financial report')
+      const company = requireOperatingCompany(companyId)
+      const attemptKey = `${options?.scopeKey ?? `${organizationId}:${company}`}:${financialReportInputKey(params)}`
+      if (inFlight.current.has(attemptKey)) throw new Error("This report submission is already pending")
+      inFlight.current.add(attemptKey)
+      try {
+      let attempt = attempts.current.get(attemptKey)
+      if (!attempt) {
+        const listBefore = await fetchQueryList('/api/query/financial-reports', 'Failed to load financial reports')
+        if (options?.mayDispatch && !options.mayDispatch()) throw new Error("Report scope or permissions changed before submission")
+        attempt = { requestId: globalThis.crypto.randomUUID(), before: listBefore.map((row) => ({ id: row.id })), generatedDispatched: false }
+        attempts.current.set(attemptKey, attempt)
+        const createCall = stdbBffCommandPost("create_financial_report", {
+          companyId: company,
+          params: stdbParamsToJson({ ...params, metadata: JSON.stringify({ lumiere_report_request: attempt.requestId, input_fingerprint: financialReportInputKey(params) }) }),
+        })
+        const createRes = await apiFetch(createCall.urlPath, createCall.init)
+        if (!createRes.ok) {
+          if (createRes.status >= 400 && createRes.status < 500 && createRes.status !== 408 && createRes.status !== 429) attempts.current.delete(attemptKey)
+          throw new Error('Failed to create financial report; refresh Reports before retrying an unverified submission')
+        }
+      }
 
       const listAfter = await fetchQueryList(
         '/api/query/financial-reports',
         'Failed to load financial reports',
       )
-      const created = listAfter.find(
-        (row) =>
-          Number(row.id) > maxIdBefore && String(row.name ?? '').trim() === name,
-      )
+      const created = resolveFinancialReportCreation(attempt.before, listAfter, { organizationId, companyId: company }, params, attempt.requestId)
       if (created?.id == null) {
         throw new Error(
           'Report was created but could not be resolved; refresh and generate manually if needed.',
         )
       }
+      if (financialReportReady(created)) { attempts.current.delete(attemptKey); return }
+      if (attempt.generatedDispatched) throw new Error(`Report #${String(created.id)} generation remains unverified. Refresh and review this report; generation was not sent again.`)
+      if (options?.mayDispatch && !options.mayDispatch()) throw new Error("Report scope or permissions changed before generation")
+      attempt.generatedDispatched = true
 
       const genCall = stdbBffCommandPost("generate_financial_report", {
         companyId: requireOperatingCompany(companyId),
-        reportId: Number(created.id),
+        reportId: parseStrictU64(created.id)!,
       })
       const genRes = await apiFetch(genCall.urlPath, genCall.init)
       if (!genRes.ok) throw new Error('Failed to generate financial report')
+      const generated = await fetchQueryList('/api/query/financial-reports', 'Failed to verify generated report')
+      const exact = resolveFinancialReportCreation(attempt.before, generated, { organizationId, companyId: company }, params, attempt.requestId)
+      if (!exact || parseStrictU64(exact.id) !== parseStrictU64(created.id) || !financialReportReady(exact)) throw new Error(`Report #${String(created.id)} generation is unverified. Refresh Reports before continuing.`)
+      attempts.current.delete(attemptKey)
+      } finally { inFlight.current.delete(attemptKey) }
     },
-    onSuccess: async () => {
+    onSettled: async () => {
       await invalidateReportsModule(qc, organizationId)
     },
   })
@@ -399,8 +424,9 @@ export function useGenerateEuVatReport(organizationId: bigint, companyId?: bigin
       if (!name || dateFromRaw == null || dateToRaw == null || !Number.isSafeInteger(currencyId) || currencyId <= 0) {
         throw new Error("Name, date range, and currency are required")
       }
-      const dateFrom = stbTimestampFromDate(new Date(String(dateFromRaw)))
-      const dateTo = stbTimestampFromDate(new Date(String(dateToRaw)))
+      const dateFrom = stbTimestampFromValue(dateFromRaw)
+      const dateTo = stbTimestampFromValue(dateToRaw)
+      if (!dateFrom || !dateTo || dateFrom.microsSinceUnixEpoch >= dateTo.microsSinceUnixEpoch) throw new Error("A valid report date range is required")
       const { urlPath, init } = stdbBffCommandPost("generate_eu_vat_report", {
         companyId: requireOperatingCompany(companyId),
         params: stdbParamsToJson({
@@ -520,8 +546,8 @@ export function useCreateReportTemplate(organizationId: bigint) {
     mutationFn: async (formData) => {
       const params = toCreateReportTemplateParams(formData)
       if (!params) throw new Error('Invalid template parameters')
-      const companyId = companyIdStringOrNull(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_report_template", { companyId: companyId, params: stdbParamsToJson(params) })
+      const companyId = companyIdNumberOrNull(formData)
+      const { urlPath, init } = stdbBffCommandPost("create_report_template", { companyId: companyId, params: stdbParamsToJson(params, "CreateReportTemplateParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create report template')
@@ -532,25 +558,32 @@ export function useCreateReportTemplate(organizationId: bigint) {
   })
 }
 
-export function useUpdateReportTemplate(
-  organizationId: bigint,
-  companyId?: bigint,
-) {
+export function useUpdateReportTemplate(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    { templateId: string | number | bigint; params: Record<string, unknown> }
-  >({
-    mutationFn: async ({ templateId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_report_template", { companyId: requireOperatingCompany(companyId), templateId: templateId, params: stdbParamsToJson(params as object) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update report template')
+  return useMutation<ResolvedOperationEffectOutcome<ReportTemplateUpdateRef>, Error,
+    { templateId: string | number | bigint; params: ReportTemplateEditValues; expected?: ReportTemplateEditValues }>({
+    mutationFn: async ({ templateId: input, params, expected }) => {
+      const activeCompanyId = requireOperatingCompany(companyId)
+      const templateId = parseStrictU64(input)
+      if (templateId == null) throw new Error("Invalid report template id")
+      const before = await fetchQueryList("/api/query/report-templates", "Failed to read report template")
+      const current = currentReportTemplate(before, organizationId, activeCompanyId, templateId)
+      if (!current) throw new Error("Report template is no longer available")
+      const actual = reportTemplateEditValues(current)
+      if (expected && !reportTemplateValuesEqual(actual, expected) && !reportTemplateValuesEqual(actual, params)) {
+        throw new Error("The template changed while you were editing. Reopen it before saving.")
+      }
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () => resolveReportTemplateUpdate(await fetchQueryList("/api/query/report-templates", "Failed to confirm report template"), organizationId, activeCompanyId, templateId, params),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("update_report_template", { companyId: activeCompanyId, templateId, params: stdbParamsToJson(params, "UpdateReportTemplateParams") })
+          return decodeOperationDispatch(await apiFetch(urlPath, init), "Failed to update report template")
+        },
+        afterDispatch: async () => { await invalidateReportsModule(qc, organizationId) },
+      })
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: async () => {
-      await invalidateReportsModule(qc, organizationId)
-    },
+    onSuccess: () => invalidateReportsModule(qc, organizationId),
   })
 }
 
@@ -561,7 +594,7 @@ export function useCreateScheduledReport(organizationId: bigint) {
       const params = toCreateScheduledReportParams(formData)
       if (!params) throw new Error('Invalid scheduled report parameters')
       const companyId = companyIdNumberOrNull(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_scheduled_report", { companyId: companyId, params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("create_scheduled_report", { companyId: companyId, params: stdbParamsToJson(params, "CreateScheduledReportParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create scheduled report')
@@ -706,7 +739,7 @@ export function useCreateDashboard(organizationId: bigint) {
       const params = toCreateDashboardParams(formData)
       if (!params.name.trim()) throw new Error('Dashboard name is required')
       const companyId = companyIdFromDashboardForm(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_dashboard", { companyId: companyId, params: stdbParamsToJson(params) })
+      const { urlPath, init } = stdbBffCommandPost("create_dashboard", { companyId: companyId, params: stdbParamsToJson(params, "CreateDashboardParams") })
 
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to create dashboard')
@@ -719,19 +752,49 @@ export function useCreateDashboard(organizationId: bigint) {
 
 export function useCreateDashboardWidget(organizationId: bigint) {
   const qc = useQueryClient()
-  return useMutation<void, Error, Record<string, unknown>>({
+  return useMutation<
+    ResolvedOperationEffectOutcome<DashboardWidgetEffectRef>,
+    Error,
+    Record<string, unknown>
+  >({
     mutationFn: async (formData) => {
+      const creationRequestId = String(formData.creationRequestId ?? "").trim()
+      if (!creationRequestId) {
+        throw new Error("Dashboard widget creation request id is required")
+      }
       const params = toCreateDashboardWidgetParams(formData)
       if (!params.name.trim()) throw new Error('Widget name is required')
       if (!params.model.trim()) throw new Error('Data source / model is required')
       const companyId = companyIdFromDashboardWidgetForm(formData)
-      const { urlPath, init } = stdbBffCommandPost("create_dashboard_widget", { companyId: companyId, params: stdbParamsToJson(params) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to create dashboard widget')
-    },
-    onSuccess: async () => {
-      await invalidateReportsModule(qc, organizationId)
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveDashboardWidgetCreationEffect(
+            await fetchQueryList(
+              "/api/query/dashboard-widgets",
+              "Failed to read dashboard widgets",
+            ),
+            organizationId,
+            creationRequestId,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("create_dashboard_widget", {
+            companyId,
+            params: stdbParamsToJson(params, "CreateDashboardWidgetParams"),
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to create dashboard widget",
+          )
+        },
+        afterDispatch: async () => {
+          await qc.invalidateQueries({
+            queryKey: ["dashboard-widgets", rqBigIntKey(organizationId)],
+          })
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }
@@ -739,18 +802,43 @@ export function useCreateDashboardWidget(organizationId: bigint) {
 export function useAddWidgetToDashboard(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<
-    void,
+    ResolvedOperationEffectOutcome<DashboardEffectRef>,
     Error,
     { dashboardId: string | number | bigint; widgetId: string | number | bigint; layout?: Record<string, unknown> }
   >({
     mutationFn: async ({ dashboardId, widgetId }) => {
-      const { urlPath, init } = stdbBffCommandPost("add_widget_to_dashboard", { dashboardId: dashboardId, widgetId: widgetId })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to add widget to dashboard')
-    },
-    onSuccess: async () => {
-      await invalidateReportsModule(qc, organizationId)
+      const resolvedDashboardId = parseStrictU64(dashboardId)
+      const resolvedWidgetId = parseStrictU64(widgetId)
+      if (resolvedDashboardId == null || resolvedWidgetId == null) {
+        throw new Error("Invalid dashboard or widget id")
+      }
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () =>
+          resolveDashboardWidgetAttachmentEffect(
+            await fetchQueryList("/api/query/dashboards", "Failed to read dashboards"),
+            organizationId,
+            resolvedDashboardId,
+            resolvedWidgetId,
+          ),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("add_widget_to_dashboard", {
+            dashboardId: resolvedDashboardId,
+            widgetId: resolvedWidgetId,
+          })
+          return decodeOperationDispatch(
+            await apiFetch(urlPath, init),
+            "Failed to add widget to dashboard",
+          )
+        },
+        afterDispatch: async () => {
+          await qc.invalidateQueries({
+            queryKey: ["dashboards", rqBigIntKey(organizationId)],
+          })
+        },
+        readbackAttempts: 6,
+        readbackDelayMs: 150,
+      })
+      return requireResolvedOperationEffect(outcome)
     },
   })
 }

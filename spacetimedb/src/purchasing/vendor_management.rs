@@ -642,7 +642,10 @@ pub fn approve_supplier_intake(
     }
     if let Some(company_id) = vendor.company_id {
         crate::workflow::authorization::require_workflow_company_access(
-            ctx, organization_id, company_id, ctx.sender(),
+            ctx,
+            organization_id,
+            company_id,
+            ctx.sender(),
         )?;
     }
 

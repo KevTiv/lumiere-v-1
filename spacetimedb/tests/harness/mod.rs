@@ -87,7 +87,8 @@ use crate::core::reference::{
     uom, uom_cat, CreateCurrencyParams, CreateUomCategoryParams, CreateUomParams,
 };
 use crate::core::users::{
-    find_user_profile_for_identity, find_user_profile_for_organization, user_profile, UserProfile,
+    add_user_to_organization, find_user_profile_for_identity, find_user_profile_for_organization,
+    user_organization, user_profile, AddUserToOrganizationParams, UserProfile,
 };
 use crate::crm::contacts::{contact, create_contact, CreateContactParams};
 use crate::crm::CRM_MULTI_COMPANY_FLAG;
@@ -139,6 +140,32 @@ pub struct OrgFixture {
 }
 
 impl OrgFixture {
+    /// Retain an administrator when a scenario removes the fixture's owner.
+    pub fn seed_additional_admin(&self, ctx: &ReducerContext) -> Result<(), String> {
+        let owner = ctx
+            .db
+            .user_organization()
+            .user_org_by_user()
+            .filter(&ctx.sender())
+            .find(|member| member.organization_id == self.organization_id && member.is_active)
+            .ok_or("Harness: active owner membership missing")?;
+        add_user_to_organization(
+            ctx,
+            spacetimedb::Identity::__dummy(),
+            self.organization_id,
+            AddUserToOrganizationParams {
+                role_id: owner.role_id,
+                company_id: Some(self.company_id),
+                job_title: None,
+                department_id: None,
+                employee_id: None,
+                is_active: true,
+                is_default: false,
+                metadata: None,
+            },
+        )
+    }
+
     /// Seed org-scoped baseline data via domain reducers (plus one warehouse row aligned with `seed.rs`).
     pub fn seed_minimal(ctx: &ReducerContext) -> Result<Self, String> {
         let suffix = unique_suffix(ctx);

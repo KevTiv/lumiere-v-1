@@ -51,13 +51,16 @@ export function observeConfirmedOrder(
   orderId: string,
   orders: readonly RowValueMap[],
   pickings: readonly RowValueMap[],
+  approvalTask?: ReturnType<typeof recordRef>,
 ): ObservedTransition {
   const order = orders.find((row) => rowId(row) === orderId)
   if (!order) return {}
   const orderRef = recordRef(saleOrderWorkflow.resource, orderId, saleOrderWorkflow.module)
 
   if (!isSaleOrderConfirmed(order)) {
-    return { outcome: "approval_pending", next: orderRef }
+    return approvalTask
+      ? { outcome: "approval_pending", createdRecords: [approvalTask], next: orderRef }
+      : {}
   }
 
   const deliveries = pickings

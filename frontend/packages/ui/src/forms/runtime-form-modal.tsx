@@ -36,6 +36,9 @@ export interface RuntimeFormModalProps {
    */
   runtimeConfigFailureMode?: "block" | "use-static"
   aiAssist?: React.ComponentProps<typeof FormModal>["aiAssist"]
+  renderPreview?: React.ComponentProps<typeof FormModal>["renderPreview"]
+  onValuesChange?: React.ComponentProps<typeof FormModal>["onValuesChange"]
+  submissionDisabled?: boolean
 }
 
 export function RuntimeFormModal({
@@ -53,6 +56,7 @@ export function RuntimeFormModal({
   foldCustomFieldsIntoMetadata = true,
   runtimeConfigFailureMode = "block",
   submitError,
+  submissionDisabled = false,
   ...rest
 }: RuntimeFormModalProps) {
   const { config, isLoading, error, customFieldIds } = useRuntimeFormModalConfig({
@@ -109,7 +113,7 @@ export function RuntimeFormModal({
       onOpenChange={onOpenChange}
       config={runtimeConfigFailed ? staticConfig : resolvedConfig}
       onSubmit={submissionBlocked ? undefined : runtimeConfigFailed ? onSubmit : handleSubmit}
-      submissionDisabled={submissionBlocked}
+      submissionDisabled={submissionBlocked || submissionDisabled}
       submitError={runtimeConfigError}
       {...rest}
     />

@@ -8,12 +8,14 @@ import {
   moduleTabHref,
   projectTimesheetsHref,
   purchaseOrderHref,
+  returnOrderHref,
   saleOrderHref,
   stockPickingHref,
 } from "./record-links"
 
 test("a record link is the owning tab focused on one id", () => {
   assert.equal(saleOrderHref(12n), "/sales?tab=orders&filter=id%3A12")
+  assert.equal(returnOrderHref(13n), "/sales?tab=returns&filter=id%3A13")
   assert.equal(purchaseOrderHref(7), "/purchasing?tab=orders&filter=id%3A7")
   assert.equal(stockPickingHref("5"), "/inventory?tab=transfers&filter=id%3A5")
   assert.equal(accountMoveHref(40n), "/accounting?tab=journal-entries&filter=id%3A40")

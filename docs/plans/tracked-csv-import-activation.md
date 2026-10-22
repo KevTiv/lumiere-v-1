@@ -8,7 +8,7 @@ available for older callers.
 
 ## Release and deployment prerequisites
 
-The source adds `import_csv_tracked`; the pinned `lumiere-contracts` v0.3.104 package
+The source adds `import_csv_tracked`; the pinned `lumiere-contracts` v0.3.91 package
 does not expose it. Before enabling this path in production, regenerate and validate
 the canonical reducer IR, generated operation metadata, SDK and contract package from
 the changed module. Release an immutable contract version through the approved release
@@ -39,19 +39,12 @@ The modal does not automatically choose an unrelated recent job. Once a terminal
 receipt is visible, importing another file creates a new submission; it does not retry
 the original terminal job.
 
-The seven previously blocked entities now have reviewed governed read projections:
-`country`, `currency`, `currency_rate`, `uom_category`,
-`knowledge_article_category`, `product_variant`, and `hr_expense_sheet`. Country,
-currency, currency-rate, UOM-category and product-variant projections are registered
-directly. Knowledge categories and expense sheets reuse their existing canonical
-projections through explicit permission aliases. Tracked activation is fail-closed for
-`knowledge_article_category`, `product_variant`, and `hr_expense_sheet` until
-their reducers validate every parent relation inside the current organization and
-company. Automatic exact-result handling is enabled in source for `country`,
-`currency`, `currency_rate`, and `uom_category`, but remains unavailable at
-runtime until the contract and module release prerequisite above is complete.
+Seven entities still use explicitly uncorrelated manual history because their current
+governed read projection is missing: `country`, `currency`, `currency_rate`,
+`uom_category`, `knowledge_article_category`, `product_variant`, and `hr_expense_sheet`.
+These require read-policy/registry work before automatic results can be enabled.
 
-All existing tracked file modals pass selected company context. Product imports retain
+All eleven existing file modals pass selected company context. Product imports retain
 their required currency from the selected pricelist. Other CSV bytes are unchanged;
 the HR payslip hash-based readback is replaced by the exact request receipt only on
 the tracked path. Cache refresh is limited to the affected resources in the frozen
@@ -59,10 +52,16 @@ organization/company scope, including `stdb` and `typed-stdb` query namespaces.
 
 ## Validation and acceptance
 
-The integration worktree includes native, API, dependency-free request, and mounted
-React tests for the tracked protocol. Focused results must be recorded against the
-combined v0.3.104 lineage before release. Full frontend typechecking and browser
-acceptance remain required.
+The integrated native module and API test builds passed. Thirteen CSV protocol,
+eleven API route and four Helpdesk helper tests passed through Cargo.
+
+Thirteen dependency-free request tests passed under Node 24, covering response loss
+and byte-identical retry, mismatched receipt rejection, u64 precision, terminal states,
+700 job-scoped errors, missing deployment capability and scoped cache invalidation.
+Mounted React tests are included for submission handoff, initial POST/read ordering,
+safe retry, redaction and organization/company changes. They have not been run in this workspace:
+the dependency installation tool call did not complete. Full frontend typechecking,
+mounted tests and browser acceptance remain required.
 
 Before release, exercise two concurrent imports of the same entity, duplicate POST
 after response loss, same-token changed bytes/scope rejection, partial/failed outcomes,

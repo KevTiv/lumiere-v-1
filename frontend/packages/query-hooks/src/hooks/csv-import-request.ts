@@ -5,6 +5,7 @@ export type TrackedCsvImportScope = {
   /** Cache scope for an org-only import that changes company-scoped product reads. */
   cacheCompanyId?: bigint | number | string
 }
+
 export type CsvImportRequest = {
   organizationId: string
   entity: string
@@ -29,85 +30,9 @@ export type CsvImportReceipt = {
   errorsRedacted: boolean
 }
 
-/** Server-reviewed path aliases with governed entity and import-receipt reads. */
-const TRACKED_CSV_IMPORT_ENTITIES = new Set([
-  "account",
-  "account_account",
-  "account_analytic_account",
-  "account_move",
-  "account_move_line",
-  "account_tax",
-  "ai_agent",
-  "analytic_account",
-  "analytics_metric",
-  "bom",
-  "bom_line",
-  "budget",
-  "budget_line",
-  "company",
-  "contact",
-  "country",
-  "crossovered_budget",
-  "crossovered_budget_lines",
-  "currency",
-  "currency_rate",
-  "expense",
-  "helpdesk_sla",
-  "helpdesk_stage",
-  "helpdesk_team",
-  "helpdesk_ticket",
-  "hr_contract",
-  "hr_department",
-  "hr_employee",
-  "hr_expense",
-  "hr_job_position",
-  "hr_leave",
-  "hr_leave_type",
-  "hr_payroll_structure",
-  "hr_payslip",
-  "hr_resource",
-  "hr_salary_rule",
-  "knowledge_article",
-  "lead",
-  "lot",
-  "manufacturing_order",
-  "mrp_bom",
-  "mrp_bom_line",
-  "mrp_production",
-  "mrp_workcenter",
-  "opportunity",
-  "product",
-  "product_category",
-  "product_supplier_info",
-  "project",
-  "project_project",
-  "project_task",
-  "project_timesheet",
-  "purchase_order",
-  "purchase_order_line",
-  "report_template",
-  "role",
-  "sale_order",
-  "sale_order_line",
-  "stock_location",
-  "stock_production_lot",
-  "stock_quant",
-  "subscription",
-  "subscription_plan",
-  "supplier_info",
-  "task",
-  "tax_rate",
-  "timesheet",
-  "uom",
-  "uom_category",
-  "warehouse",
-  "workcenter",
-  "workflow",
-])
-
-/** Fail closed when a future entity has not completed server read-policy review. */
+/** These tables lack a governed read projection; never claim an exact result for them. */
 export function supportsTrackedCsvImport(entity: string): boolean {
-  return TRACKED_CSV_IMPORT_ENTITIES.has(entity)
+  return !["country", "currency", "currency_rate", "uom_category", "knowledge_article_category", "product_variant", "hr_expense_sheet"].includes(entity)
 }
 
 export function createCsvImportRequestId(): string {

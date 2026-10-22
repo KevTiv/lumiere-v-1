@@ -69,6 +69,35 @@ export function clearReceiptInvocation(scope: InvocationScope, pending: PendingR
   if (raw != null && stored(raw, scope, pending.lineId).operationKey === pending.operationKey) storage.removeItem(key)
 }
 
+export type ReceiptResolution =
+  | { kind: "applied"; pending: PendingReceipt; evidence: RowValueMap[] }
+  | { kind: "rebased"; pending: PendingReceipt }
+
+/**
+ * Resolve a saved receipt against the canonical owner read. A successful empty
+ * read proves this key has no server operation and is the only condition under
+ * which a stale local intent may be discarded. Read errors and malformed local
+ * records remain fail-closed.
+ */
+export async function resolveReceiptInvocation(
+  scope: InvocationScope,
+  lineId: string,
+  storage: ReceiptStorage,
+  read: (key: string) => Promise<RowValueMap[]>,
+): Promise<ReceiptResolution> {
+  const pending = readPendingReceipt(scope, lineId, storage)
+  if (!pending) throw new WorkflowError("validation", "No pending receipt exists for this actor and line")
+  const evidence = await read(pending.operationKey)
+  if (evidence.length === 0) {
+    clearReceiptInvocation(scope, pending, storage)
+    return { kind: "rebased", pending }
+  }
+  if (observeReceiptInvocation(pending, evidence).outcome !== "applied") {
+    throw new WorkflowError("conflict", "Saved receipt does not agree with canonical evidence")
+  }
+  return { kind: "applied", pending, evidence }
+}
+
 /** Caller holds the browser's per-line lock until this dispatch finishes. */
 export async function executeReceiptInvocation(scope: InvocationScope, lineId: string, quantity: number, lotId: unknown,
     storage: ReceiptStorage, ports: {

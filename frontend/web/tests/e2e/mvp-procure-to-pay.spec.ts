@@ -6,13 +6,14 @@ import {
   fetchPurchaseOrderInvoiceIds,
   fetchVendorBillById,
 } from "./purchasing-order-fixtures"
+import { postGeneratedOperationOk } from "./generated-operation"
+import { loseNextResponse } from "./pretenant-support"
 import {
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   chooseSelectOptionByValue,
   assertMoveLinesBalanced,
   clickEntityActionAndWaitForReducer,
-  callReducerBff,
   expectNoAppError,
   expectPostDraftBillRejected,
   fetchAccountSelectLabelByInternalType,
@@ -23,11 +24,11 @@ import {
   fetchOnlyPurchaseOrderLineId,
   fetchPurchaseOrderLineReceiveLabel,
   fetchPurchaseOrderSelectLabel,
-  fetchSessionOrganizationId,
   fetchVendorBillJournalLabel,
   fetchVendorPartnerIdByName,
   fillField,
   gotoModule,
+  openAccountingTab,
   postDraftBillViaUi,
   scalarQueryString,
   selectEntityRowById,
@@ -38,6 +39,7 @@ import {
   waitForPurchaseOrderState,
   waitForPoLineMatchStatus,
   waitForPaymentPosted,
+  reloadSettled,
 } from "./helpers"
 
 const VENDOR_NAME = "Globex Corp"
@@ -80,7 +82,7 @@ async function createConfirmedPoWithLine(
   await fillField(page, "origin", origin)
   const [createPoRes] = await Promise.all([
     page.waitForResponse(
-      (res) => matchesOperationResponse(res, "create_purchase_order") && res.ok(),
+      (res) => matchesOperationResponse(res, "erp.create_purchase_order_once") && res.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "new-purchase-order"),
@@ -130,7 +132,7 @@ async function receivePoLineQty(
   await fillField(page, "qty", qty)
   const [receiveRes] = await Promise.all([
     page.waitForResponse(
-      (res) => matchesOperationResponse(res, "receive_po_line") && res.ok(),
+      (res) => matchesOperationResponse(res, "erp.receive_po_line_once") && res.ok(),
       { timeout: 30_000 },
     ),
     submitForm(page, "receive-purchase-order-line"),
@@ -138,7 +140,11 @@ async function receivePoLineQty(
   expect(receiveRes.ok()).toBe(true)
 }
 
-async function createBillFromPo(page: import("@playwright/test").Page, orderId: number) {
+async function createBillFromPo(
+  page: import("@playwright/test").Page,
+  orderId: number,
+  options: { loseResponse?: boolean } = {},
+) {
   // Receiving a stocked line may navigate to the new receipt (navigateToNext), and that
   // client-side push can land after the receive form closes. Reload purchasing so the bill
   // step never races it.
@@ -157,6 +163,12 @@ async function createBillFromPo(page: import("@playwright/test").Page, orderId: 
   await chooseSelectOptionByLabel(page, "defaultExpenseAccountId", expenseLabel)
   await chooseSelectOptionByLabel(page, "payableAccountId", payableLabel)
   await fillField(page, "invoiceDate", new Date().toISOString().slice(0, 10))
+  if (options.loseResponse) {
+    const injected = await loseNextResponse(page, "create_bill_from_purchase_order")
+    await submitForm(page, "create-bill-from-purchase-order")
+    await expect.poll(() => injected.lost()).toBe(true)
+    return null
+  }
   const [billRes] = await Promise.all([
     page.waitForResponse(
       (res) =>
@@ -187,6 +199,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await receivePoLineQty(page, orderId, lineId, "2")
 
     const billResponse = await createBillFromPo(page, orderId)
+    if (billResponse == null) throw new Error("expected the accepted bill response")
 
     const moveId = await fetchDraftVendorBillMoveIdForPurchaseOrder(page, orderId)
     await assertMoveLinesBalanced(page, moveId)
@@ -200,7 +213,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
 
     const { amountTotal, currencyId } = await fetchInvoiceMoveDetails(page, moveId)
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await openAccountingTab(page, "payments")
     await page.getByTestId("module-create-accounting-payments").click()
     await expect(page.getByTestId("form-modal-new-account-payment")).toBeVisible()
     await chooseSelectOptionByValue(page, "paymentType", "OutBound")
@@ -251,9 +264,9 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     ])
     expect(registerPaymentResponse.ok()).toBe(true)
 
-    await page.reload({ waitUntil: "domcontentloaded" })
+    await reloadSettled(page)
     await gotoModule(page, "/accounting", "accounting")
-    await page.getByTestId("module-tab-accounting-payments").click()
+    await openAccountingTab(page, "payments")
     await expect(page.getByTestId(`entity-row-${paymentId}`)).toContainText(VENDOR_NAME)
     await waitForSettledBill(page, moveId)
     expect(
@@ -262,6 +275,33 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
       }),
     ).toBe(paymentId)
 
+    await expectNoAppError(page)
+  })
+
+  test("a lost create-bill response converges by canonical readback to exactly one bill", async ({
+    page,
+  }) => {
+    test.setTimeout(240_000)
+
+    const origin = smokeName("mvp-po-lost-bill")
+    const vendorPartnerId = await fetchVendorPartnerIdByName(page, VENDOR_NAME)
+    const { orderId } = await createConfirmedPoWithLine(page, origin, vendorPartnerId, "2")
+    const lineId = await fetchOnlyPurchaseOrderLineId(page, orderId)
+    await receivePoLineQty(page, orderId, lineId, "2")
+
+    const before = await fetchPurchaseOrderInvoiceIds(page, orderId)
+    await createBillFromPo(page, orderId, { loseResponse: true })
+
+    // The write committed once; the workflow converges by readback and offers no blind retry.
+    await expect(page.getByText(/Result unknown/i)).toHaveCount(0)
+    await expect
+      .poll(async () => (await fetchPurchaseOrderInvoiceIds(page, orderId)).filter((id) => !before.includes(id)))
+      .toHaveLength(1)
+    await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0)
+    const moveId = await fetchDraftVendorBillMoveIdForPurchaseOrder(page, orderId)
+    await assertMoveLinesBalanced(page, moveId)
+    await postDraftBillViaUi(page, moveId)
+    expect(await fetchPurchaseOrderInvoiceIds(page, orderId)).toHaveLength(before.length + 1)
     await expectNoAppError(page)
   })
 
@@ -318,8 +358,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     const billId = invoiceIdsAfter.find((id) => !invoiceIdsBefore.includes(id))
     if (billId == null) throw new Error("Expected one PO-owned vendor bill")
 
-    const orgId = await fetchSessionOrganizationId(page)
-    await callReducerBff(page, "invoice_po_line", [orgId, lineId, 5])
+    await postGeneratedOperationOk(page, "invoice_po_line", { lineId: BigInt(lineId), qty: 5 })
 
     await waitForPoLineMatchStatus(page, lineId, "over_billed")
 
@@ -348,7 +387,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     await expect(recoveryForm.getByTestId("form-field-lineId")).toContainText(await fetchPurchaseOrderLineReceiveLabel(page, orderId, lineId))
     await expect(recoveryForm).toContainText("physically arrived")
     const [recoveryResponse] = await Promise.all([
-      page.waitForResponse((res) => matchesOperationResponse(res, "receive_po_line") && res.ok()),
+      page.waitForResponse((res) => matchesOperationResponse(res, "erp.receive_po_line_once") && res.ok()),
       submitForm(page, "receive-purchase-order-line"),
     ])
     expect(recoveryResponse.ok()).toBe(true)
@@ -384,7 +423,7 @@ test.describe("MVP procure-to-pay workflow", { tag: "@p0" }, () => {
     expect(expenseIds).toHaveLength(1)
     const expenseId = Number(expenseIds![0])
     const correctPrice = async (price: string, expectedPrice: string) => {
-      await page.goto(`/accounting/invoices/${billId}`)
+      await page.goto(`/accounting/invoices/${billId}?tab=lines`)
       await selectEntityRowById(page, expenseId)
       await page.getByTestId("entity-action-bill-line-correct-economics").click()
       await expect(page.getByTestId("form-field-quantity")).toHaveValue("3")

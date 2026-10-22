@@ -1,15 +1,20 @@
 "use client"
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights } from "../../../components/module-insights"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import type { QueryResourceState } from "@lumiere/api-client"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useTranslation } from "@lumiere/i18n"
+import { useErpSession } from "@lumiere/erp-session"
 import { Badge } from "@lumiere/ui/components/badge"
 import {
   ModuleView,
   FormModal,
   CsvImportModal,
+  CSV_IMPORT_CONTRACTS,
   RuntimeFormModal,
   useRBAC,
   workflowActionsToEntityActions,
@@ -59,7 +64,13 @@ import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
 import { purchaseMatchRecovery, type PoLineMatchStatus } from "./purchase-match-recovery"
 import { PurchasingOpsSod } from "./purchasing-ops-sod"
-import { purchaseOrderLineCanBeRemoved, requisitionCanCreateRfq } from "./purchasing-action-gates"
+import {
+  purchaseOrderLineCanBeRemoved,
+  requisitionCanApprove,
+  requisitionCanCreateRfq,
+} from "./purchasing-action-gates"
+import { requisitionCanAddLine, toRequisitionLineInput } from "./purchase-requisition-line"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { PurchasingBlanketWorkspace } from "./purchasing-blanket-workspace"
 import {
   PurchasingOperationDialogs,
@@ -105,6 +116,7 @@ import {
   type ResPartnerBank,
   useCreatePurchaseOrder,
   useCreatePurchaseRequisition,
+  useAddPurchaseRequisitionLine,
   useAddPurchaseOrderLine,
   useRemovePurchaseOrderLine,
   useInvoicePurchaseOrderLine,
@@ -167,6 +179,8 @@ import {
 import { fetchQueryList } from "@lumiere/query-hooks/http"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import type { KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
+import { purchaseOrderKpis } from "./purchase-order-kpis"
 import {
   contactRowsToVendorSelectOptions,
   pricelistRowsToSelectOptions,
@@ -200,6 +214,7 @@ import {
   toCreatePartnerBankParams,
   toUpdatePartnerBankParams,
 } from "@/lib/purchasing-partner-bank-params"
+import { runtimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 /** Forms that render their own failure inline instead of a toast. */
 const INLINE_ERROR_TRANSITIONS: ReadonlySet<string> = new Set(["purchasing.order.create-bill"])
@@ -381,8 +396,9 @@ function PurchasingClientLoaded({
 }: PurchasingClientLoadedProps) {
   usePurchasingModuleSubscription()
   const { t } = useTranslation()
+  const { identity } = useErpSession()
   const { currentUser } = useRBAC()
-  const runtimeRoleId = currentUser?.roles[0]
+  const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const { orgId } = orgBigInts(organizationId)
   const { askForm, formDialog } = useFormDialog()
 
@@ -436,7 +452,8 @@ function PurchasingClientLoaded({
     }
   }, [quickActionForm])
 
-  const { data: orders = [], isLoading: ordersLoading } = usePurchaseOrders(orgId, initialOrders)
+  const ordersQuery = usePurchaseOrders(orgId, initialOrders)
+  const { data: orders = [], isLoading: ordersLoading } = ordersQuery
   const billOrder = useMemo(
     () =>
       billOrderId == null
@@ -481,7 +498,8 @@ function PurchasingClientLoaded({
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId)
-  const { data: currencies = [] } = useCurrencies()
+  const currenciesQuery = useCurrencies()
+  const { data: currencies = [] } = currenciesQuery
   const { data: blanketOrders = [] } = usePurchaseBlanketOrders(orgId)
   const { data: blanketOrderLines = [] } = usePurchaseBlanketOrderLines(orgId)
   const { data: blanketReleases = [] } = usePurchaseBlanketReleases(orgId)
@@ -489,6 +507,7 @@ function PurchasingClientLoaded({
 
   const createPurchaseOrder = useCreatePurchaseOrder(orgId, { companyId: operatingCompanyId ?? undefined })
   const createPurchaseRequisition = useCreatePurchaseRequisition(orgId, { companyId: operatingCompanyId ?? undefined })
+  const addRequisitionLine = useAddPurchaseRequisitionLine(orgId, operatingCompanyId)
   const workflowSurface = useWorkflowSurface({ organizationId })
   const purchasingWorkflow = usePurchasingWorkflow(
     orgId,
@@ -600,6 +619,39 @@ function PurchasingClientLoaded({
     orgId,
     operatingCompanyId,
   )
+
+  const promptAddRequisitionLine = async (requisitionId: string) => {
+    const title = t("purchasing.requisition.addLine.title", { defaultValue: "Add requisition line" })
+    const values = await askForm({
+      title,
+      fields: [
+        { id: "productId", name: "productId", label: t("purchasing.ops.prompt.productId", { defaultValue: "Product" }), type: "select", required: true, searchable: true, options: productFieldOptions },
+        { id: "uomId", name: "uomId", label: t("purchasing.requisition.addLine.uom", { defaultValue: "Unit of measure" }), type: "select", required: true, searchable: true, options: uomFieldOptions },
+        { id: "quantity", name: "quantity", label: t("purchasing.requisition.addLine.quantity", { defaultValue: "Quantity" }), type: "number", required: true, min: 0, defaultValue: 1, width: "1/2" },
+        { id: "name", name: "name", label: t("purchasing.requisition.addLine.description", { defaultValue: "Description (optional)" }), type: "text" },
+      ],
+    })
+    if (values == null) return
+    const input = toRequisitionLineInput(values)
+    if (input == null) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("purchasing.requisition.addLine.failed", { defaultValue: "Add requisition line failed" }),
+        description: t("purchasing.requisition.addLine.invalid", { defaultValue: "Choose a product, a unit and a quantity above zero." }),
+      })
+      return
+    }
+    try {
+      await addRequisitionLine.mutateAsync({ requisitionId, ...input })
+      showWorkflowToast({ kind: "success", title: t("purchasing.requisition.addLine.done", { defaultValue: "Requisition line added" }) })
+    } catch (error) {
+      showWorkflowToast({
+        kind: "error",
+        title: t("purchasing.requisition.addLine.failed", { defaultValue: "Add requisition line failed" }),
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
 
   const openCreateRfqFromRequisition = async (requisitionId?: string) => {
     setOperationDialogRequest({ kind: "create-rfq", requisitionId })
@@ -1145,6 +1197,7 @@ function PurchasingClientLoaded({
         .map((row) => ({
           value: String(row.id ?? ""),
           label: String(row.name ?? `RFQ ${String(row.id ?? "")}`),
+          currencyId: String(row.currencyId ?? row.currency_id ?? ""),
         })),
       rfqBids: submittedBids.map((row) => ({
         value: String(row.id ?? ""),
@@ -1307,6 +1360,7 @@ function PurchasingClientLoaded({
           {
             id: "csv-purchase-orders",
             label: t("purchasing.csvImport.toolbarOrders"),
+            permission: { resource: CSV_IMPORT_CONTRACTS.purchaseOrder.resource, action: "create" },
             onClick: () => setCsvKind("order"),
           },
           {
@@ -1504,7 +1558,7 @@ function PurchasingClientLoaded({
             key: "matchRecovery",
             label: t("purchasing.orderLines.recovery.title"),
             render: (_value, row) => {
-              const order = (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(row.orderId ?? row.order_id))
+              const order = (orders as EntityRow[]).find((o) => String(o.id) === String(row.orderId ?? row.order_id))
               const recovery = purchaseMatchRecovery(row, order)
               return (
                 <div className="max-w-xs space-y-1" data-testid={`po-match-recovery-${String(row.id)}`}>
@@ -1556,6 +1610,7 @@ function PurchasingClientLoaded({
           {
             id: "csv-purchase-order-lines",
             label: t("purchasing.csvImport.toolbarOrderLines"),
+            permission: { resource: CSV_IMPORT_CONTRACTS.purchaseOrderLine.resource, action: "create" },
             onClick: () => setCsvKind("orderLine"),
           },
           {
@@ -1601,13 +1656,13 @@ function PurchasingClientLoaded({
             label: t("purchasing.orderLines.recovery.receiveMissing"),
             requiresSelection: true,
             selection: "single",
-            isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.receiveLine.canPresent(rows[0] as EntityRow) && purchaseMatchRecovery(rows[0], (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(rows[0].orderId ?? rows[0].order_id))).receiptQty != null,
+            isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.receiveLine.canPresent(rows[0] as EntityRow) && purchaseMatchRecovery(rows[0], (orders as EntityRow[]).find((o) => String(o.id) === String(rows[0].orderId ?? rows[0].order_id))).receiptQty != null,
             onClick: (rows) => {
               const selected = rows[0]
               // Re-read the current query row rather than the selection's older snapshot.
-              const line = selected && (lines as Record<string, unknown>[]).find((l) => String(l.id) === String(selected.id))
+              const line = selected && (lines as EntityRow[]).find((l) => String(l.id) === String(selected.id))
               if (!line || !purchasingWorkflow.receiveLine.canPresent(line as EntityRow)) return
-              const order = (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(line.orderId ?? line.order_id))
+              const order = (orders as EntityRow[]).find((o) => String(o.id) === String(line.orderId ?? line.order_id))
               const recovery = purchaseMatchRecovery(line, order)
               if (recovery.receiptQty == null) return
               setQuickActionForm({
@@ -1630,12 +1685,18 @@ function PurchasingClientLoaded({
           },
           {
             id: "pol-resolve-receipt",
-            label: t("purchasing.actions.resolveReceipt", { defaultValue: "Resolve pending receipt" }),
+            label: t("purchasing.actions.resolveReceipt"),
             requiresSelection: true,
             selection: "single",
-            isApplicable: (rows) => rows.length === 1 && purchasingWorkflow.canResolveReceipt(String(rows[0].id)),
+            isApplicable: (rows) =>
+              rows.length === 1 &&
+              purchasingWorkflow.canResolveReceipt(String(rows[0].id)),
             onClick: async (rows) => {
-              if (rows[0]) await purchasingWorkflow.resolveReceipt(String(rows[0].id)).catch(() => undefined)
+              if (rows[0]) {
+                await purchasingWorkflow
+                  .resolveReceipt(String(rows[0].id))
+                  .catch(() => undefined)
+              }
             },
           },
         ],
@@ -1651,27 +1712,49 @@ function PurchasingClientLoaded({
     orders,
     lines,
     purchasingWorkflow.receiveLine,
+    purchasingWorkflow.canResolveReceipt,
+    purchasingWorkflow.resolveReceipt,
   ])
 
   const requisitionsEntityConfig = useMemo((): EntityViewConfig => {
     const base = purchaseRequisitionsTableConfig(t)
     const view = base.view as EntityTableConfig
+    const workflowActions = workflowActionsToEntityActions(purchasingWorkflow.requisitionActions, {
+      ids: {
+        "purchasing.requisition.submit": "req-submit",
+        "purchasing.requisition.approve": "req-approve",
+        "purchasing.requisition.convert": "req-convert-po",
+        "purchasing.requisition.close": "req-close",
+        "purchasing.requisition.cancel": "req-cancel",
+      },
+      confirmation: WORKFLOW_CONFIRMATION(t),
+    }).map((action) =>
+      action.id === "req-approve"
+        ? {
+            ...action,
+            isApplicable: (rows: EntityRow[]) =>
+              rows.length > 0 && rows.every((row) => requisitionCanApprove(row, identity)),
+          }
+        : action,
+    )
     return {
       ...base,
       view: {
         ...view,
         actions: [
           // Legacy ids keep the existing e2e selectors while the actions run through the workflow seam.
-          ...workflowActionsToEntityActions(purchasingWorkflow.requisitionActions, {
-            ids: {
-              "purchasing.requisition.submit": "req-submit",
-              "purchasing.requisition.approve": "req-approve",
-              "purchasing.requisition.convert": "req-convert-po",
-              "purchasing.requisition.close": "req-close",
-              "purchasing.requisition.cancel": "req-cancel",
+          ...workflowActions,
+          {
+            id: "req-add-line",
+            label: t("purchasing.requisition.addLine.title", { defaultValue: "Add requisition line" }),
+            requiresSelection: true,
+            isApplicable: (rows) => rows.length === 1 && rows.every((r) => requisitionCanAddLine(r)),
+            onClick: async (rows) => {
+              const first = rows[0]
+              if (!first) return
+              await promptAddRequisitionLine(String(first.id))
             },
-            confirmation: WORKFLOW_CONFIRMATION(t),
-          }),
+          },
           {
             id: "req-create-rfq",
             label: t("purchasing.actions.createRfq", {
@@ -1692,7 +1775,7 @@ function PurchasingClientLoaded({
         ],
       },
     }
-  }, [t, purchasingWorkflow.requisitionActions, openCreateRfqFromRequisition])
+  }, [t, identity, purchasingWorkflow.requisitionActions, openCreateRfqFromRequisition, promptAddRequisitionLine])
 
   const landedCostsEntityConfig = useMemo((): EntityViewConfig => {
     const view: EntityTableConfig = {
@@ -2159,6 +2242,7 @@ function PurchasingClientLoaded({
                       {
                         id: "csv-supplier-info",
                         label: t("purchasing.csvImport.toolbarSupplierInfo"),
+                        permission: { resource: CSV_IMPORT_CONTRACTS.supplierInfo.resource, action: "create" },
                         onClick: () => setCsvKind("supplierInfo"),
                       },
                       ...(view.actions ?? []),
@@ -2302,7 +2386,7 @@ function PurchasingClientLoaded({
   const enrichedLines = useMemo(
     () =>
       (lines as Record<string, unknown>[]).map((line) => {
-        const order = (orders as Record<string, unknown>[]).find((o) => String(o.id) === String(line.orderId ?? line.order_id))
+        const order = (orders as EntityRow[]).find((o) => String(o.id) === String(line.orderId ?? line.order_id))
         const match = purchaseMatchRecovery(line, order)
         return {
           ...line,
@@ -2358,6 +2442,16 @@ function PurchasingClientLoaded({
       "partner-banks": partnerBanks as unknown as Record<string, unknown>[],
     }),
     [enrichedOrders, enrichedLines, requisitions, vendors, rfqs, rfqBids, purchaseReturns, landedCosts, supplierIntakes, partnerBanks],
+  )
+
+  const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
+    () => ({
+      orders: {
+        tiles: purchaseOrderKpis(enrichedOrders as Record<string, unknown>[], { t, now: new Date(), currencyCodeById: new Map() }),
+        loading: ordersLoading,
+      },
+    }),
+    [enrichedOrders, ordersLoading, t],
   )
 
   const handleFormSubmit = async (
@@ -2656,8 +2750,10 @@ function PurchasingClientLoaded({
       )}
       <ModuleView
         config={configWithOperations}
+        dashboardContent={<ModuleInsights input={{ module: "purchasing", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: moduleQueryState(ordersQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataLoading={{ orders: ordersLoading }}
+        kpiStrips={kpiStrips}
         onFormSubmit={handleFormSubmit}
         activeTab={activeTab}
         onActiveTabChange={setActiveTab}
@@ -2778,6 +2874,8 @@ function PurchasingClientLoaded({
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}
+          columns={CSV_IMPORT_CONTRACTS[csvKind === "order" ? "purchaseOrder" : csvKind === "orderLine" ? "purchaseOrderLine" : "supplierInfo"]}
+          templateFileName={`purchasing-${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
             if (csvKind === "order") await csvImports.importPurchaseOrder.mutateAsync(text)

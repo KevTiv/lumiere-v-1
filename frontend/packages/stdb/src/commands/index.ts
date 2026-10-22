@@ -41,7 +41,7 @@ export { FLEET_BFF_REDUCERS, FLEET_COMMAND_SUBSCRIPTION_HINTS, fleetCommandContr
 export { CALENDAR_BFF_REDUCERS, CALENDAR_COMMAND_SUBSCRIPTION_HINTS, calendarCommandContract, type CalendarBffReducerKey } from "./calendar-http";
 export { MESSAGES_BFF_REDUCERS, MESSAGES_COMMAND_SUBSCRIPTION_HINTS, messagesCommandContract, type MessagesBffReducerKey } from "./messages-http";
 export { AUTH_BFF_REDUCERS, AUTH_COMMAND_SUBSCRIPTION_HINTS, authCommandContract, type AuthBffReducerKey } from "./auth-http";
-export { purchasingReceiptReplayAvailable, PURCHASING_BFF_REDUCERS, PURCHASING_COMMAND_SUBSCRIPTION_HINTS, purchasingCommandContract, type PurchasingBffReducerKey } from "./purchasing-http";
+export { PURCHASING_BFF_REDUCERS, PURCHASING_COMMAND_SUBSCRIPTION_HINTS, purchasingCommandContract, type PurchasingBffReducerKey } from "./purchasing-http";
 export {
   REPORTS_BFF_REDUCERS,
   REPORTS_COMMAND_SUBSCRIPTION_HINTS,
@@ -76,6 +76,7 @@ export {
   stdbCommandContract,
   type StdbBffCommandInput,
   type StdbBffNamedReducerKey,
+  type StdbNamedOperationInput,
   type StdbBffReducerKey,
 } from "./stdb-http";
 export { APPROVALS_BFF_REDUCERS, APPROVALS_COMMAND_SUBSCRIPTION_HINTS, approvalsCommandContract, type ApprovalsBffReducerKey } from "./approvals-http";

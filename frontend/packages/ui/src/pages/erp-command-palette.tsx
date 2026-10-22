@@ -13,6 +13,8 @@ import { useRBAC } from "@/lib/rbac-context"
 import { buildNavGroups, type NavGroup } from "../lib/navigation-catalog"
 import { isRecordSearchQuery } from "../lib/record-search"
 import { RecordSearchResults, type RecordSearchSummary } from "./erp-command-palette-records"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
 import { isFirstOrgSurfaceAdmitted } from "../lib/product-surface-catalog"
 import {
   Command,
@@ -26,6 +28,8 @@ import {
 } from "../components/command"
 
 export interface ErpCommandPaletteProps {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   onOpenAIChat?: () => void
   onOpenNotebook?: () => void
   onOpenJournal?: () => void
@@ -36,35 +40,42 @@ export interface ErpCommandPaletteProps {
 }
 
 export function ErpCommandPalette({
+  open: controlledOpen,
+  onOpenChange,
   onOpenAIChat,
   onOpenNotebook,
   onOpenJournal,
   firstOrgProfile = false,
   recordHref,
 }: ErpCommandPaletteProps) {
-  const [open, setOpenState] = useState(false)
+  const [internalOpen, setOpenState] = useState(false)
+  const open = controlledOpen ?? internalOpen
   const [search, setSearch] = useState("")
   const [recordSummary, setRecordSummary] = useState<RecordSearchSummary | null>(null)
   const { organizationId } = useErpSession()
   const setOpen = useCallback((next: boolean | ((prev: boolean) => boolean)) => {
-    setOpenState(next)
+    const value = typeof next === "function" ? next(open) : next
+    setOpenState(value)
+    onOpenChange?.(value)
     // The next opening starts from an empty query.
     setSearch("")
     setRecordSummary(null)
-  }, [])
+  }, [onOpenChange, open])
   const router = useRouter()
   const { checkPermission, isAdmin } = useRBAC()
   const { t } = useTranslation()
 
+  const workspaceProfile = useWorkspaceProfile()
   const userIsAdmin = isAdmin()
   const navGroups = useMemo(
-    (): NavGroup[] => buildNavGroups(t, { firstOrgProfile, isAdmin: userIsAdmin }),
-    [firstOrgProfile, t, userIsAdmin],
+    (): NavGroup[] => buildNavGroups(t, { workspaceProfile, firstOrgProfile, isAdmin: userIsAdmin }),
+    [workspaceProfile, firstOrgProfile, t, userIsAdmin],
   )
   const quickActionIsVisible = useCallback(
     (surfaceId: string) =>
-      !firstOrgProfile || isFirstOrgSurfaceAdmitted(surfaceId, userIsAdmin),
-    [firstOrgProfile, userIsAdmin],
+      isWorkspaceSurfaceVisible(workspaceProfile, surfaceId) &&
+      (!firstOrgProfile || isFirstOrgSurfaceAdmitted(surfaceId, userIsAdmin)),
+    [workspaceProfile, firstOrgProfile, userIsAdmin],
   )
 
   const accessibleNavGroups = useMemo(
@@ -99,14 +110,14 @@ export function ErpCommandPalette({
   const runAction = useCallback((action: () => void) => {
     setOpen(false)
     action()
-  }, [])
+  }, [setOpen])
 
   const navigate = useCallback(
     (href: string) => {
       setOpen(false)
       router.push(href)
     },
-    [router],
+    [router, setOpen],
   )
 
   useEffect(() => {
@@ -119,7 +130,7 @@ export function ErpCommandPalette({
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
+  }, [setOpen])
 
   const visibleAiChat = quickActionIsVisible("ai-assistant") ? onOpenAIChat : undefined
   const visibleNotebook = quickActionIsVisible("notebook") ? onOpenNotebook : undefined

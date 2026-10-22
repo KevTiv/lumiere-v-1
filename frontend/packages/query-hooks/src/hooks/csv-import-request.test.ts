@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { createCsvImportRequest, csvImportInvalidatesQuery, csvImportRequestBody, csvImportRequestPath, fetchCsvImportReceipt, parseCsvImportReceipt, supportsTrackedCsvImport } from "./csv-import-request"
+import { createCsvImportRequest, csvImportInvalidatesQuery, csvImportRequestBody, csvImportRequestPath, fetchCsvImportReceipt, parseCsvImportReceipt } from "./csv-import-request"
 
 const request = createCsvImportRequest(1n, "account_move", "name\nAda\n", "moves.csv", { companyId: 9007199254740993n }, "a".repeat(32))
 const receipt = {
@@ -54,15 +54,6 @@ test("missing capability rejects and never calls a legacy reducer", async () => 
   let calls = 0
   await assert.rejects(fetchCsvImportReceipt(request, async () => { calls++; return new Response(null, { status: 503 }) }), /contracts must be updated/)
   assert.equal(calls, 1)
-})
-test("enables only tracked imports with reviewed read and mutation integrity", () => {
-  for (const entity of ["country", "currency", "currency_rate", "uom_category"]) {
-    assert.equal(supportsTrackedCsvImport(entity), true, entity)
-  }
-  for (const entity of ["knowledge_article_category", "knowledge_category", "product_variant", "expense_sheet", "hr_expense_sheet"]) {
-    assert.equal(supportsTrackedCsvImport(entity), false, entity)
-  }
-  assert.equal(supportsTrackedCsvImport("future_unreviewed_entity"), false)
 })
 test("missing exact lookup remains recoverable without selecting any recent job", async () => {
   await assert.rejects(fetchCsvImportReceipt(request, async () => new Response(null, { status: 404 }), true), /not visible yet/)

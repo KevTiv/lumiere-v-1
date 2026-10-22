@@ -4,6 +4,9 @@ use serde_json::{Map, Value};
 use spacetimedb::{ReducerContext, Table};
 
 use crate::core::country_pack::{country_pack_definition, country_pack_tax_rule};
+use crate::core::migrations::{
+    apply_org_migrations, org_schema_migration, MIGRATION_ORG_COUNTRY_CATALOG,
+};
 use crate::core::organization::{
     bootstrap_new_tenant, company, organization, organization_settings, BootstrapNewTenantParams,
     CreateOrganizationParams, UpsertOrganizationSettingsParams,
@@ -12,7 +15,7 @@ use crate::core::permissions::{role, user_role_assignment};
 use crate::core::persistence::{
     organization_commit, organization_row_change, CHANGE_SCHEMA_VERSION, CONTRACT_VERSION,
 };
-use crate::core::reference::currency;
+use crate::core::reference::{country, create_country, currency, Country, CreateCountryParams};
 use crate::core::users::{user_organization, user_profile};
 use crate::crm::activities::activity_type;
 use crate::forms::migrations::seed_organization_form_configs;
@@ -232,6 +235,7 @@ pub fn test_bootstrap_new_tenant_records_complete_commit(
     }
 
     let mut expected_tables = vec!["organization", "currency", "currency"];
+    expected_tables.extend(["country"; 7]);
     for _ in 0..11 {
         expected_tables.push("country_pack_definition");
     }
@@ -285,6 +289,21 @@ pub fn test_bootstrap_new_tenant_records_complete_commit(
         expected_changes.push(expected_change(
             "currency",
             serde_json::json!({"id": row.id}),
+            &row,
+        )?);
+    }
+
+    let mut countries: Vec<_> = ctx
+        .db
+        .country()
+        .country_by_organization()
+        .filter(&org.id)
+        .collect();
+    countries.sort_by(|left, right| left.organization_code_key.cmp(&right.organization_code_key));
+    for row in countries {
+        expected_changes.push(expected_change(
+            "country",
+            serde_json::json!({"organization_code_key": row.organization_code_key}),
             &row,
         )?);
     }
@@ -632,6 +651,113 @@ pub fn test_bootstrap_new_tenant_records_complete_commit(
     ctx.db.form_config().id().delete(&duplicate_bill.id);
     if rejected_bill.is_ok() {
         return Err("duplicate governed bill identity must fail provisioning".to_string());
+    }
+    // Model an existing tenant missing one canonical country. Preserve an
+    // operator-customized inactive country and never grant platform privileges.
+    let nl_key = format!("{}:NL", org.id);
+    let nl = ctx
+        .db
+        .country()
+        .organization_code_key()
+        .find(&nl_key)
+        .ok_or("NL missing")?;
+    let eur = ctx
+        .db
+        .currency()
+        .id()
+        .find(nl.currency_id.ok_or("NL currency missing")?)
+        .ok_or("EUR missing")?;
+    if eur.organization_id != org.id || eur.code != "EUR" {
+        return Err("country currency was not resolved within the tenant".to_string());
+    }
+    ctx.db.country().organization_code_key().update(Country {
+        name: "Governed Netherlands".to_string(),
+        is_active: false,
+        ..nl
+    });
+    ctx.db
+        .country()
+        .organization_code_key()
+        .delete(format!("{}:US", org.id));
+    apply_org_migrations(ctx, org.id)?;
+    let count = ctx
+        .db
+        .organization_commit()
+        .iter()
+        .filter(|row| row.organization_id == org.id)
+        .count();
+    apply_org_migrations(ctx, org.id)?;
+    let preserved = ctx
+        .db
+        .country()
+        .organization_code_key()
+        .find(&nl_key)
+        .ok_or("NL replaced")?;
+    if preserved.name != "Governed Netherlands"
+        || preserved.is_active
+        || ctx
+            .db
+            .country()
+            .country_by_organization()
+            .filter(&org.id)
+            .count()
+            != 7
+        || ctx
+            .db
+            .currency()
+            .currency_by_organization()
+            .filter(&org.id)
+            .count()
+            != 2
+        || ctx
+            .db
+            .organization_commit()
+            .iter()
+            .filter(|row| row.organization_id == org.id)
+            .count()
+            != count
+        || ctx
+            .db
+            .org_schema_migration()
+            .org_migration_by_org()
+            .filter(&org.id)
+            .filter(|row| row.version == MIGRATION_ORG_COUNTRY_CATALOG)
+            .count()
+            != 1
+    {
+        return Err("country catalog migration was not additive and idempotent".to_string());
+    }
+    let owner = ctx
+        .db
+        .user_profile()
+        .iter()
+        .find(|row| row.organization_id == org.id && row.identity == ctx.sender())
+        .ok_or("owner profile missing")?;
+    if owner.is_superuser
+        || apply_org_migrations(ctx, 0).is_ok()
+        || apply_org_migrations(ctx, u64::MAX).is_ok()
+    {
+        return Err("country provisioning changed authorization boundaries".to_string());
+    }
+    if create_country(
+        ctx,
+        org.id,
+        "FR".to_string(),
+        CreateCountryParams {
+            name: "France".to_string(),
+            iso3: "FRA".to_string(),
+            numcode: 250,
+            phone_code: "33".to_string(),
+            official_name: None,
+            currency_id: Some(eur.id),
+            language_codes: vec!["fr".to_string()],
+            is_active: true,
+            metadata: None,
+        },
+    )
+    .is_ok()
+    {
+        return Err("custom country creation must remain superuser-only".to_string());
     }
     Ok(())
 }

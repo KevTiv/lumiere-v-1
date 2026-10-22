@@ -21,10 +21,6 @@ use spacetimedb::ReducerContext;
 pub fn run_purchasing_bill_balanced_test(ctx: &ReducerContext) -> Result<(), String> {
     purchase_bill_test::test_po_confirm_to_balanced_bill(ctx)
         .map_err(|e| format!("po_confirm_to_balanced_bill: {e}"))?;
-    order_creation_identity_test::test_exact_purchase_order_creation_identity(ctx)
-        .map_err(|e| format!("exact_purchase_order_creation_identity: {e}"))?;
-    receipt_replay_test::test_durable_partial_receipt(ctx)
-        .map_err(|e| format!("durable_partial_receipt: {e}"))?;
     invoice_provenance_test::test_purchase_bill_exact_invoice_provenance(ctx)
         .map_err(|e| format!("purchase_bill_exact_invoice_provenance: {e}"))
 }
@@ -117,6 +113,14 @@ pub fn run_purchasing_phase2_blanket_release_test(ctx: &ReducerContext) -> Resul
 }
 
 #[spacetimedb::reducer]
+pub fn run_purchasing_keyed_operations_test(ctx: &ReducerContext) -> Result<(), String> {
+    order_creation_identity_test::test_exact_purchase_order_creation_identity(ctx)
+        .map_err(|e| format!("purchase_order_creation_identity: {e}"))?;
+    receipt_replay_test::test_durable_partial_receipt(ctx)
+        .map_err(|e| format!("receipt_replay_identity: {e}"))
+}
+
+#[spacetimedb::reducer]
 pub fn run_all_purchasing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_purchasing_bill_balanced_test(ctx)?;
     run_purchasing_incoming_picking_test(ctx)?;
@@ -131,5 +135,6 @@ pub fn run_all_purchasing_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_purchasing_phase1_purchase_orders_test(ctx)?;
     run_purchasing_phase1_returns_advanced_test(ctx)?;
     run_purchasing_phase2_blanket_release_test(ctx)?;
+    run_purchasing_keyed_operations_test(ctx)?;
     Ok(())
 }

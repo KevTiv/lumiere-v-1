@@ -64,6 +64,7 @@ export type HumanTaskRow = {
   requestedBy?: unknown
   requested_by?: unknown
   actingForOptions?: Array<{ identityHex: string; label: string }>
+  directlyEligible?: boolean
   claimedBy?: unknown
   claimed_by?: unknown
   decision?: string | { tag?: string } | null

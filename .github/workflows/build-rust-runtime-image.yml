@@ -1,0 +1,165 @@
+name: Build Rust runtime image
+
+on:
+  push:
+    branches:
+      - main
+      - codex/railway-shared-rust-runtime
+      - codex/railway-production-completion
+    paths:
+      - Cargo.lock
+      - Cargo.toml
+      - api-server/**
+      - ai-gateway/**
+      - crates/**
+      - scripts/prepare-vendored-contracts-rust.sh
+      - scripts/sync-directory.py
+      - scripts/lumiere-runtime-entrypoint.sh
+      - scripts/tests/lumiere-runtime-entrypoint.test.sh
+      - scripts/tests/rust-runtime-image-contract.test.sh
+      - scripts/measure-ci-builds.py
+      - Makefile
+      - release-compatibility-manifest.json
+      - lumiere-codegen/**
+      - iot-gateway/**
+      - vendor/**
+      - .dockerignore
+      - Dockerfile.rust-runtime
+      - .github/workflows/build-rust-runtime-image.yml
+  pull_request:
+    paths:
+      - Cargo.lock
+      - Cargo.toml
+      - api-server/**
+      - ai-gateway/**
+      - crates/**
+      - scripts/prepare-vendored-contracts-rust.sh
+      - scripts/sync-directory.py
+      - scripts/lumiere-runtime-entrypoint.sh
+      - scripts/tests/lumiere-runtime-entrypoint.test.sh
+      - scripts/tests/rust-runtime-image-contract.test.sh
+      - scripts/measure-ci-builds.py
+      - Makefile
+      - release-compatibility-manifest.json
+      - lumiere-codegen/**
+      - iot-gateway/**
+      - vendor/**
+      - .dockerignore
+      - Dockerfile.rust-runtime
+      - .github/workflows/build-rust-runtime-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: rust-runtime-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cache-inventory:
+    name: Inspect cache retention
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Read cache inventory without modifying entries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/measure-ci-builds.py --inventory-only --repository "$REPOSITORY" --output .ci/cache-inventory
+      - name: Summarize retained cache entries
+        run: cat .ci/cache-inventory/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rust-runtime-cache-inventory-${{ github.run_id }}
+          path: .ci/cache-inventory
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Validate runtime dispatcher
+        run: |
+          bash scripts/tests/lumiere-runtime-entrypoint.test.sh
+          bash scripts/tests/rust-runtime-image-contract.test.sh
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute immutable image name
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_sha='${{ github.event.pull_request.head.sha || github.sha }}'
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}-rust-runtime"
+          echo "repository=$repository" >> "$GITHUB_OUTPUT"
+          echo "tag=$repository:$image_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse to rewrite an existing commit image
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker buildx imagetools inspect '${{ steps.image.outputs.tag }}' >/dev/null 2>&1; then
+            echo "${{ steps.image.outputs.tag }} already exists; commit image tags are immutable" >&2
+            exit 1
+          fi
+
+      - name: Build and push once
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.rust-runtime
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.image.outputs.tag }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=lumiere-rust-runtime
+          cache-to: type=gha,mode=max,scope=lumiere-rust-runtime
+          provenance: mode=max
+          sbom: true
+
+      - name: Attest image provenance
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ steps.image.outputs.repository }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Publish deployment coordinates
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          {
+            echo '### Rust runtime image'
+            echo
+            echo '```text'
+            echo '${{ steps.image.outputs.repository }}@${{ steps.build.outputs.digest }}'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

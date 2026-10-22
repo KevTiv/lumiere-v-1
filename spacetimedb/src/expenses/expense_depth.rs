@@ -807,6 +807,11 @@ pub fn create_expense_project_rebill(
         sheet.currency_id
     };
 
+    let invoice_metadata = crate::documents::invoice_profile::capture_invoice_document_metadata(
+        ctx, organization_id, company_id, Some(partner_id),
+        Some(&serde_json::json!({ "expense_sheet_id": sheet_id, "kind": "expense_project_rebill", "client_request_id": params.client_request_id, "tax_ids": tax_ids, "amount_tax": amount_tax }).to_string()),
+    )?;
+
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
@@ -860,16 +865,7 @@ pub fn create_expense_project_rebill(
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: Some(
-            serde_json::json!({
-                "expense_sheet_id": sheet_id,
-                "kind": "expense_project_rebill",
-                "client_request_id": params.client_request_id,
-                "tax_ids": tax_ids,
-                "amount_tax": amount_tax,
-            })
-            .to_string(),
-        ),
+        metadata: Some(invoice_metadata),
     });
 
     let rebill_project_ids: Vec<u64> = income_lines

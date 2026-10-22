@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { beginReceiptInvocation, clearReceiptInvocation, executeReceiptInvocation, observeReceiptInvocation, receiptStorageKey, type PendingReceipt, type ReceiptStorage } from "./purchasing-receipt-invocation"
+import { beginReceiptInvocation, clearReceiptInvocation, executeReceiptInvocation, observeReceiptInvocation, receiptStorageKey, resolveReceiptInvocation, type PendingReceipt, type ReceiptStorage } from "./purchasing-receipt-invocation"
 import type { ReceiptSnapshot } from "./purchasing-receipt-effect"
 const scope = { organizationId: 1n, companyId: 2n, actorHex: "ab".repeat(32) }
 const snapshot: ReceiptSnapshot = { ...scope, lineId: "3", orderId: 4n, productId: 5n, qtyReceived: 0, qty: 1, service: false, target: { moveId: "6", pickingId: "7" } }
@@ -59,4 +59,28 @@ test("unavailable producer probe cannot persist or dispatch a new invocation", a
   await assert.rejects(executeReceiptInvocation(scope, "3", 1, null, store, { capture: async () => snapshot, makeKey: () => "key",
     read: async () => { throw Error("old backend") }, dispatch: async () => { assert.fail("must not dispatch") } }), /old backend/)
   assert.equal(store.getItem(receiptStorageKey(scope, "3")), null)
+})
+test("stale receipt intent rebases only after a definitive empty canonical read", async () => {
+  const store = storage(); const pending = await begin(store)
+  const rebased = await resolveReceiptInvocation(scope, "3", store, async (key) => {
+    assert.equal(key, pending.operationKey)
+    return []
+  })
+  assert.equal(rebased.kind, "rebased")
+  assert.equal(store.getItem(receiptStorageKey(scope, "3")), null)
+
+  const guarded = storage(); await begin(guarded)
+  await assert.rejects(resolveReceiptInvocation(scope, "3", guarded, async () => { throw Error("read unavailable") }), /read unavailable/)
+  assert.ok(guarded.getItem(receiptStorageKey(scope, "3")))
+})
+test("receipt resolution fails closed for corrupt local data and mismatched evidence", async () => {
+  const corrupt = storage(); corrupt.setItem(receiptStorageKey(scope, "3"), "{broken")
+  let reads = 0
+  await assert.rejects(resolveReceiptInvocation(scope, "3", corrupt, async () => { reads++; return [] }), /data is invalid/)
+  assert.equal(reads, 0)
+  assert.ok(corrupt.getItem(receiptStorageKey(scope, "3")))
+
+  const store = storage(); const pending = await begin(store)
+  await assert.rejects(resolveReceiptInvocation(scope, "3", store, async () => [{ ...receipt(pending), lineId: 99 }]), /does not agree/)
+  assert.ok(store.getItem(receiptStorageKey(scope, "3")))
 })

@@ -27,6 +27,7 @@
       "code",
       "name",
       "deprecated",
+      "reconcile",
       "used",
       "company_id",
       "internal_type",
@@ -57,7 +58,9 @@
       "state",
       "acquisition_date",
       "original_value",
-      "company_id"
+      "company_id",
+      "organization_id",
+      "depreciation_board_ids"
     ],
     "mandatory": [
       "id",
@@ -115,9 +118,22 @@
       "debit",
       "credit",
       "balance",
+      "parent_state",
+      "company_currency_id",
+      "currency_id",
+      "amount_residual",
+      "amount_residual_currency",
+      "blocked",
       "account_id",
       "partner_id",
-      "company_id"
+      "product_id",
+      "quantity",
+      "price_unit",
+      "company_id",
+      "payment_id",
+      "account_internal_type",
+      "matching_number",
+      "journal_id"
     ],
     "mandatory": [
       "id",
@@ -139,6 +155,7 @@
       "journal_id",
       "partner_id",
       "currency_id",
+      "company_currency_id",
       "invoice_date",
       "invoice_date_due",
       "invoice_origin",
@@ -149,6 +166,7 @@
       "amount_total",
       "amount_residual",
       "payment_state",
+      "posted_before",
       "metadata"
     ],
     "mandatory": [
@@ -203,11 +221,16 @@
       "company_id",
       "state",
       "ref",
+      "move_id",
+      "reversal_move_id",
       "journal_id",
       "currency_id",
       "partner_id",
       "reconciled_invoice_ids",
-      "reconciled_bill_ids"
+      "reconciled_bill_ids",
+      "payment_type",
+      "partner_type",
+      "date"
     ],
     "mandatory": [
       "id",
@@ -228,7 +251,8 @@
       "state",
       "fiscal_year_id",
       "is_adjustment",
-      "company_id"
+      "company_id",
+      "organization_id"
     ],
     "mandatory": [
       "id",
@@ -267,10 +291,12 @@
       "active",
       "type_tax_use",
       "amount_type",
+      "tax_group_id",
+      "has_negative_factor",
       "price_include",
       "include_base_amount",
-      "has_negative_factor",
-      "tax_group_id",
+      "is_base_affected",
+      "sequence",
       "invoice_repartition_line_ids"
     ],
     "mandatory": [
@@ -684,12 +710,18 @@
       "amount",
       "comparison_amount",
       "variance",
-      "variance_percentage"
+      "variance_percentage",
+      "sequence",
+      "parent_id",
+      "level",
+      "is_leaf",
+      "currency_id"
     ],
     "mandatory": [
       "id",
       "organization_id",
-      "company_id"
+      "company_id",
+      "report_id"
     ],
     "table": "balance_sheet_line"
   },
@@ -722,11 +754,14 @@
       "amount",
       "reference",
       "description",
-      "validation_error"
+      "validation_error",
+      "row_number",
+      "created_statement_line_id"
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "import_id"
     ],
     "table": "bank_statement_import_line"
   },
@@ -738,6 +773,10 @@
     "default_restricted": [
       "amount",
       "amount_currency",
+      "date",
+      "currency_id",
+      "journal_currency_id",
+      "foreign_currency_id",
       "partner_id",
       "statement_id",
       "journal_id",
@@ -745,7 +784,10 @@
       "move_ids",
       "amount_residual",
       "transaction_type",
-      "account_number"
+      "account_number",
+      "payment_ids",
+      "move_id",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -764,6 +806,7 @@
       "date",
       "balance_start",
       "balance_end",
+      "currency_id",
       "state",
       "journal_id",
       "company_id"
@@ -971,12 +1014,18 @@
       "amount",
       "comparison_amount",
       "variance",
-      "variance_percentage"
+      "variance_percentage",
+      "sequence",
+      "parent_id",
+      "level",
+      "is_leaf",
+      "currency_id"
     ],
     "mandatory": [
       "id",
       "organization_id",
-      "company_id"
+      "company_id",
+      "report_id"
     ],
     "table": "cash_flow_line"
   },
@@ -1006,66 +1055,6 @@
       "organization_id"
     ],
     "table": "company"
-  },
-  "countries": {
-    "aliases": [
-      "countries",
-      "country"
-    ],
-    "default_restricted": [
-      "code",
-      "name",
-      "official_name",
-      "iso_3",
-      "numcode",
-      "phone_code",
-      "currency_id",
-      "is_active"
-    ],
-    "mandatory": [
-      "organization_code_key",
-      "organization_id"
-    ],
-    "table": "country"
-  },
-  "currencies": {
-    "aliases": [
-      "currencies",
-      "currency"
-    ],
-    "default_restricted": [
-      "code",
-      "name",
-      "symbol",
-      "decimal_places",
-      "rounding_factor",
-      "active",
-      "position"
-    ],
-    "mandatory": [
-      "id",
-      "organization_id"
-    ],
-    "table": "currency"
-  },
-  "currency-rates": {
-    "aliases": [
-      "currency-rates",
-      "currency_rate"
-    ],
-    "default_restricted": [
-      "from_currency_id",
-      "to_currency_id",
-      "rate",
-      "inverse_rate",
-      "date",
-      "company_id"
-    ],
-    "mandatory": [
-      "id",
-      "organization_id"
-    ],
-    "table": "currency_rate"
   },
   "compensation-events": {
     "aliases": [
@@ -1114,11 +1103,12 @@
       "rate_type",
       "effective_date",
       "currency_id",
-      "company_id"
+      "period_id"
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id"
     ],
     "table": "consolidation_company_rate"
   },
@@ -1505,8 +1495,20 @@
       "name",
       "model",
       "widget_type",
+      "domain",
+      "fields",
+      "group_by",
+      "aggregation",
+      "chart_type",
+      "sort_order",
+      "limit",
+      "configuration",
+      "position_x",
+      "position_y",
+      "width",
       "is_active",
-      "company_id"
+      "company_id",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -1725,7 +1727,6 @@
       "document_external_ref"
     ],
     "default_restricted": [
-      "document_id",
       "provider",
       "connection_id",
       "external_id",
@@ -1734,7 +1735,8 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "document_id"
     ],
     "table": "document_external_ref"
   },
@@ -1761,7 +1763,6 @@
       "document_legal_hold"
     ],
     "default_restricted": [
-      "document_id",
       "reason",
       "is_active",
       "held_at",
@@ -1769,9 +1770,24 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "document_id"
     ],
     "table": "document_legal_hold"
+  },
+  "document-retention-purge-jobs": {
+    "aliases": [
+      "document-retention-purge-jobs",
+      "document_retention_purge_job"
+    ],
+    "default_restricted": [
+      "scheduled_at"
+    ],
+    "mandatory": [
+      "scheduled_id",
+      "organization_id"
+    ],
+    "table": "document_retention_purge_job"
   },
   "document-signature-requests": {
     "aliases": [
@@ -1779,8 +1795,6 @@
       "document_signature_request"
     ],
     "default_restricted": [
-      "document_id",
-      "company_id",
       "provider",
       "external_envelope_id",
       "status",
@@ -1790,7 +1804,9 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "document_id"
     ],
     "table": "document_signature_request"
   },
@@ -1820,7 +1836,6 @@
       "document_version"
     ],
     "default_restricted": [
-      "document_id",
       "version_number",
       "file_name",
       "file_size",
@@ -1831,7 +1846,8 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "document_id"
     ],
     "table": "document_version"
   },
@@ -1848,7 +1864,14 @@
       "is_locked",
       "locked_by",
       "locked_at",
-      "locked_until"
+      "locked_until",
+      "url",
+      "checksum",
+      "file_size",
+      "mimetype",
+      "file_name",
+      "owner_id",
+      "metadata"
     ],
     "mandatory": [
       "id",
@@ -2034,8 +2057,7 @@
   "expense-sheets": {
     "aliases": [
       "expense-sheets",
-      "expense_sheet",
-      "hr_expense_sheet"
+      "expense_sheet"
     ],
     "default_restricted": [
       "name",
@@ -2089,8 +2111,29 @@
     "default_restricted": [
       "name",
       "employee_id",
+      "date",
+      "total_amount",
+      "currency_id",
       "state",
-      "company_id"
+      "company_id",
+      "client_request_id",
+      "attachment_ids",
+      "has_receipt",
+      "unit_amount",
+      "quantity",
+      "description",
+      "tax_ids",
+      "product_id",
+      "account_id",
+      "analytic_account_id",
+      "project_id",
+      "line_kind",
+      "mileage_distance",
+      "mileage_rate_id",
+      "per_diem_days",
+      "per_diem_rate_id",
+      "payment_mode",
+      "merchant_key"
     ],
     "mandatory": [
       "id",
@@ -2146,7 +2189,23 @@
     "default_restricted": [
       "name",
       "state",
-      "report_type"
+      "report_type",
+      "date_from",
+      "date_to",
+      "target_move",
+      "metadata",
+      "currency_id",
+      "result_currency_id",
+      "comparison_mode",
+      "hierarchy_level",
+      "show_zero_lines",
+      "show_hierarchy",
+      "show_percentage",
+      "show_debit_credit",
+      "filter_analytic_account_ids",
+      "filter_account_ids",
+      "filter_partner_ids",
+      "filter_journal_ids"
     ],
     "mandatory": [
       "id",
@@ -2555,8 +2614,6 @@
       "hr_leave_allocation"
     ],
     "default_restricted": [
-      "employee_id",
-      "company_id",
       "leave_type_id",
       "period_year",
       "allocated_days",
@@ -2564,7 +2621,9 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "employee_id"
     ],
     "table": "hr_leave_allocation"
   },
@@ -2574,8 +2633,6 @@
       "hr_offboarding_checklist"
     ],
     "default_restricted": [
-      "employee_id",
-      "company_id",
       "status",
       "assets_returned",
       "access_revoked",
@@ -2586,7 +2643,9 @@
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "employee_id"
     ],
     "table": "hr_offboarding_checklist"
   },
@@ -2629,13 +2688,13 @@
       "hr_statutory_id"
     ],
     "default_restricted": [
-      "employee_id",
-      "id_kind",
-      "company_id"
+      "id_kind"
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id",
+      "employee_id"
     ],
     "table": "hr_statutory_id"
   },
@@ -2991,7 +3050,9 @@
     ],
     "default_restricted": [
       "name",
-      "is_published"
+      "is_published",
+      "member_ids",
+      "article_member_count"
     ],
     "mandatory": [
       "id",
@@ -3002,11 +3063,12 @@
   "knowledge-categories": {
     "aliases": [
       "knowledge-categories",
-      "kb_category",
-      "knowledge_article_category"
+      "kb_category"
     ],
     "default_restricted": [
       "name",
+      "description",
+      "color",
       "article_count",
       "parent_id",
       "sequence"
@@ -3040,9 +3102,21 @@
     "table": "hr_labor_cost_snapshot"
   },
   "landed-cost-applications": {
-    "aliases": ["landed-cost-applications", "stock_landed_cost_application"],
-    "default_restricted": ["company_id", "landed_cost_id", "allocation_count", "applied_at"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "landed-cost-applications",
+      "stock_landed_cost_application"
+    ],
+    "default_restricted": [
+      "company_id",
+      "landed_cost_id",
+      "allocation_count",
+      "applied_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "stock_landed_cost_application"
   },
   "landed-cost-lines": {
@@ -3428,6 +3502,94 @@
       "organization_id"
     ],
     "table": "mrp_production"
+  },
+  "mrp-production-costs": {
+    "aliases": [
+      "mrp-production-costs",
+      "mrp_production_cost"
+    ],
+    "default_restricted": [
+      "company_id",
+      "currency_id",
+      "material_value",
+      "workcenter_value",
+      "total_value",
+      "inventory_value",
+      "variance_value",
+      "raw_move_ids",
+      "output_move_ids",
+      "productivity_cost_ids",
+      "account_move_id",
+      "account_move_line_ids",
+      "created_at"
+    ],
+    "mandatory": [
+      "production_id",
+      "organization_id"
+    ],
+    "table": "mrp_production_cost"
+  },
+  "mrp-productivity-costs": {
+    "aliases": [
+      "mrp-productivity-costs",
+      "mrp_productivity_cost"
+    ],
+    "default_restricted": [
+      "company_id",
+      "production_id",
+      "workorder_id",
+      "workcenter_id",
+      "currency_id",
+      "duration_minutes",
+      "hourly_rate",
+      "configured",
+      "value",
+      "created_at"
+    ],
+    "mandatory": [
+      "productivity_id",
+      "organization_id"
+    ],
+    "table": "mrp_productivity_cost"
+  },
+  "mrp-valuation-configs": {
+    "aliases": [
+      "mrp-valuation-configs",
+      "mrp_valuation_config"
+    ],
+    "default_restricted": [
+      "currency_id",
+      "journal_id",
+      "material_account_id",
+      "output_account_id",
+      "workcenter_account_id",
+      "variance_account_id",
+      "updated_at",
+      "updated_by"
+    ],
+    "mandatory": [
+      "company_id",
+      "organization_id"
+    ],
+    "table": "mrp_valuation_config"
+  },
+  "mrp-workcenter-cost-rates": {
+    "aliases": [
+      "mrp-workcenter-cost-rates",
+      "mrp_workcenter_cost_rate"
+    ],
+    "default_restricted": [
+      "company_id",
+      "currency_id",
+      "hourly_rate",
+      "updated_by",
+      "updated_at"
+    ],
+    "mandatory": [
+      "workcenter_id",
+      "organization_id"
+    ],
+    "table": "mrp_workcenter_cost_rate"
   },
   "mrp-routing-workcenters": {
     "aliases": [
@@ -3829,7 +3991,9 @@
       "write_off_amount",
       "write_off_account_id",
       "write_off_move_id",
-      "metadata"
+      "metadata",
+      "currency_id",
+      "reversed_reconciliation_id"
     ],
     "mandatory": [
       "id",
@@ -3847,7 +4011,9 @@
     "default_restricted": [
       "company_id",
       "reason",
-      "metadata"
+      "metadata",
+      "original_account_payment_id",
+      "correcting_account_payment_id"
     ],
     "mandatory": [
       "id",
@@ -3873,7 +4039,13 @@
       "evidence_document_ids",
       "created_by",
       "updated_by",
-      "metadata"
+      "metadata",
+      "currency_id",
+      "partner_id",
+      "source_entity",
+      "source_entity_id",
+      "partner_type",
+      "payment_account_id"
     ],
     "mandatory": [
       "id",
@@ -3899,7 +4071,8 @@
   "payslips": {
     "aliases": [
       "payslips",
-      "hr_payslip"
+      "hr_payslip",
+      "hr_payroll"
     ],
     "default_restricted": [
       "name",
@@ -3929,7 +4102,8 @@
   "payslips-to-export": {
     "aliases": [
       "payslips-to-export",
-      "hr_payslip"
+      "hr_payslip",
+      "hr_payroll"
     ],
     "default_restricted": [
       "name",
@@ -4216,7 +4390,8 @@
     "default_restricted": [
       "product_tmpl_id",
       "attribute_id",
-      "active"
+      "active",
+      "value_ids"
     ],
     "mandatory": [
       "id",
@@ -4364,26 +4539,6 @@
     ],
     "table": "product"
   },
-  "product-variants": {
-    "aliases": [
-      "product-variants",
-      "product_variant"
-    ],
-    "default_restricted": [
-      "product_tmpl_id",
-      "name",
-      "default_code",
-      "barcode",
-      "lst_price",
-      "price_extra",
-      "is_active"
-    ],
-    "mandatory": [
-      "id",
-      "organization_id"
-    ],
-    "table": "product_variant"
-  },
   "profit-loss-lines": {
     "aliases": [
       "profit-loss-lines",
@@ -4397,12 +4552,18 @@
       "amount",
       "comparison_amount",
       "variance",
-      "variance_percentage"
+      "variance_percentage",
+      "sequence",
+      "parent_id",
+      "level",
+      "is_leaf",
+      "currency_id"
     ],
     "mandatory": [
       "id",
       "organization_id",
-      "company_id"
+      "company_id",
+      "report_id"
     ],
     "table": "profit_loss_line"
   },
@@ -5013,51 +5174,164 @@
     "table": "public_holiday"
   },
   "commodity-price-indexes": {
-    "aliases": ["commodity-price-indexes", "commodity_price_index"],
-    "default_restricted": ["company_id", "code", "rate", "as_of"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "commodity-price-indexes",
+      "commodity_price_index"
+    ],
+    "default_restricted": [
+      "company_id",
+      "code",
+      "rate",
+      "as_of"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "commodity_price_index"
   },
   "consignment-agreements": {
-    "aliases": ["consignment-agreements", "consignment_agreement"],
-    "default_restricted": ["company_id", "name", "partner_id", "product_id", "warehouse_id", "state"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "consignment-agreements",
+      "consignment_agreement"
+    ],
+    "default_restricted": [
+      "company_id",
+      "name",
+      "partner_id",
+      "product_id",
+      "warehouse_id",
+      "state"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "consignment_agreement"
   },
   "purchase-approval-delegates": {
-    "aliases": ["purchase-approval-delegates", "purchase_approval_delegate"],
-    "default_restricted": ["company_id", "principal_identity", "delegate_identity", "is_active"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchase-approval-delegates",
+      "purchase_approval_delegate"
+    ],
+    "default_restricted": [
+      "company_id",
+      "principal_identity",
+      "delegate_identity",
+      "is_active"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchase_approval_delegate"
   },
   "purchase-blanket-order-lines": {
-    "aliases": ["purchase-blanket-order-lines", "purchase_blanket_order_line"],
-    "default_restricted": ["company_id", "blanket_order_id", "product_id", "product_uom", "committed_quantity", "released_quantity", "price_unit"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchase-blanket-order-lines",
+      "purchase_blanket_order_line"
+    ],
+    "default_restricted": [
+      "company_id",
+      "blanket_order_id",
+      "product_id",
+      "product_uom",
+      "committed_quantity",
+      "released_quantity",
+      "price_unit"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchase_blanket_order_line"
   },
   "purchase-blanket-orders": {
-    "aliases": ["purchase-blanket-orders", "purchase_blanket_order"],
-    "default_restricted": ["company_id", "name", "partner_id", "currency_id", "state", "date_start", "date_end", "release_count", "last_release_po_id"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchase-blanket-orders",
+      "purchase_blanket_order"
+    ],
+    "default_restricted": [
+      "company_id",
+      "name",
+      "partner_id",
+      "currency_id",
+      "state",
+      "date_start",
+      "date_end",
+      "release_count",
+      "last_release_po_id"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchase_blanket_order"
   },
   "purchase-blanket-releases": {
-    "aliases": ["purchase-blanket-releases", "purchase_blanket_release"],
-    "default_restricted": ["company_id", "blanket_order_id", "purchase_order_id", "idempotency_key", "request_fingerprint"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchase-blanket-releases",
+      "purchase_blanket_release"
+    ],
+    "default_restricted": [
+      "company_id",
+      "blanket_order_id",
+      "purchase_order_id",
+      "idempotency_key",
+      "request_fingerprint"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchase_blanket_release"
   },
   "purchase-contracts": {
-    "aliases": ["purchase-contracts", "purchase_contract"],
-    "default_restricted": ["company_id", "name", "partner_id", "state", "date_start", "date_end"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchase-contracts",
+      "purchase_contract"
+    ],
+    "default_restricted": [
+      "company_id",
+      "name",
+      "partner_id",
+      "state",
+      "date_start",
+      "date_end"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchase_contract"
   },
   "purchasing-integration-intents": {
-    "aliases": ["purchasing-integration-intents", "purchasing_integration_intent"],
-    "default_restricted": ["company_id", "provider", "intent_type", "purchase_order_id", "idempotency_key", "status", "external_reference", "attempt_count"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "purchasing-integration-intents",
+      "purchasing_integration_intent"
+    ],
+    "default_restricted": [
+      "company_id",
+      "provider",
+      "intent_type",
+      "purchase_order_id",
+      "idempotency_key",
+      "status",
+      "external_reference",
+      "attempt_count"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "purchasing_integration_intent"
   },
   "purchase-order-lines": {
@@ -5067,8 +5341,11 @@
     ],
     "default_restricted": [
       "product_id",
+      "product_uom",
       "product_qty",
       "price_unit",
+      "state",
+      "invoice_lines",
       "qty_received",
       "qty_invoiced",
       "qty_to_invoice"
@@ -5091,6 +5368,8 @@
       "product_id",
       "product_qty",
       "price_unit",
+      "state",
+      "invoice_lines",
       "qty_received",
       "qty_invoiced",
       "qty_to_invoice"
@@ -5121,33 +5400,6 @@
       "company_id"
     ],
     "table": "purchase_order_creation_operation"
-  },
-  "purchase-receipt-operations": {
-    "aliases": [
-      "purchase-receipt-operations",
-      "purchase_receipt_operation"
-    ],
-    "default_restricted": [
-      "operation_key",
-      "line_id",
-      "order_id",
-      "quantity",
-      "lot_id",
-      "received_before",
-      "received_after",
-      "move_id",
-      "picking_id",
-      "continuation_move_id",
-      "continuation_picking_id",
-      "created_by",
-      "created_at"
-    ],
-    "mandatory": [
-      "id",
-      "organization_id",
-      "company_id"
-    ],
-    "table": "purchase_receipt_operation"
   },
   "purchase-orders": {
     "aliases": [
@@ -5215,6 +5467,33 @@
     ],
     "table": "purchase_order"
   },
+  "purchase-receipt-operations": {
+    "aliases": [
+      "purchase-receipt-operations",
+      "purchase_receipt_operation"
+    ],
+    "default_restricted": [
+      "operation_key",
+      "line_id",
+      "order_id",
+      "quantity",
+      "lot_id",
+      "received_before",
+      "received_after",
+      "move_id",
+      "picking_id",
+      "continuation_move_id",
+      "continuation_picking_id",
+      "created_by",
+      "created_at"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
+    "table": "purchase_receipt_operation"
+  },
   "purchase-requisition-lines": {
     "aliases": [
       "purchase-requisition-lines",
@@ -5243,7 +5522,14 @@
     "default_restricted": [
       "state",
       "company_id",
-      "description"
+      "description",
+      "origin",
+      "user_id",
+      "vendor_id",
+      "line_ids",
+      "purchase_ids",
+      "order_count",
+      "write_uid"
     ],
     "mandatory": [
       "id",
@@ -5299,7 +5585,8 @@
       "partner_id",
       "price_unit",
       "amount_total",
-      "state"
+      "state",
+      "notes"
     ],
     "mandatory": [
       "id",
@@ -5335,7 +5622,9 @@
       "company_id",
       "requisition_id",
       "awarded_bid_id",
-      "purchase_order_id"
+      "purchase_order_id",
+      "notes",
+      "currency_id"
     ],
     "mandatory": [
       "id",
@@ -5431,7 +5720,21 @@
       "product_id",
       "location_id",
       "company_id",
-      "active"
+      "active",
+      "warehouse_id",
+      "uom_id",
+      "product_min_qty",
+      "product_max_qty",
+      "qty_multiple",
+      "qty_to_order",
+      "lead_days",
+      "route_id",
+      "trigger",
+      "group_id",
+      "last_run",
+      "next_run",
+      "metadata",
+      "scheduled_run_job_id"
     ],
     "mandatory": [
       "id",
@@ -5464,7 +5767,12 @@
       "name",
       "model",
       "report_type",
-      "is_active"
+      "is_active",
+      "company_id",
+      "orientation",
+      "paper_format",
+      "template_content",
+      "write_date"
     ],
     "mandatory": [
       "id",
@@ -5535,9 +5843,21 @@
     "table": "resource_utilisation_snapshot"
   },
   "return-order-creations": {
-    "aliases": ["return-order-creations", "return_order_creation"],
-    "default_restricted": ["company_id", "return_order_id", "idempotency_key", "request_fingerprint"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "return-order-creations",
+      "return_order_creation"
+    ],
+    "default_restricted": [
+      "company_id",
+      "return_order_id",
+      "idempotency_key",
+      "request_fingerprint"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "return_order_creation"
   },
   "return-order-lines": {
@@ -5762,6 +6082,7 @@
     ],
     "default_restricted": [
       "reference",
+      "origin",
       "client_order_ref",
       "state",
       "partner_id",
@@ -5772,7 +6093,8 @@
       "picking_ids",
       "invoice_ids",
       "invoice_count",
-      "invoice_status"
+      "invoice_status",
+      "origin_so_id"
     ],
     "mandatory": [
       "id",
@@ -5811,13 +6133,17 @@
       "name",
       "model",
       "row_dimension",
+      "column_dimension",
       "measure_field",
       "measure_op",
-      "is_active"
+      "filter_json",
+      "is_active",
+      "company_id"
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "company_id"
     ],
     "table": "saved_report"
   },
@@ -6381,6 +6707,15 @@
     "default_restricted": [
       "name",
       "company_id",
+      "subscription_id",
+      "product_id",
+      "product_uom_qty",
+      "price_unit",
+      "discount",
+      "price_subtotal",
+      "recurring_rule_type",
+      "recurring_interval",
+      "line_is_recurring",
       "active"
     ],
     "mandatory": [
@@ -6580,7 +6915,10 @@
       "company_name",
       "contact_name",
       "email",
-      "phone"
+      "phone",
+      "submitted_by",
+      "approved_by",
+      "partner_id"
     ],
     "mandatory": [
       "id",
@@ -6596,7 +6934,16 @@
     "default_restricted": [
       "name",
       "project_id",
-      "company_id"
+      "company_id",
+      "state",
+      "priority",
+      "is_closed",
+      "date_deadline",
+      "progress",
+      "planned_hours",
+      "effective_hours",
+      "user_ids",
+      "message_ids"
     ],
     "mandatory": [
       "id",
@@ -6614,11 +6961,14 @@
       "reminder_date",
       "days_before_deadline",
       "notification_type",
-      "status"
+      "status",
+      "sent_at",
+      "acknowledged_at"
     ],
     "mandatory": [
       "id",
-      "organization_id"
+      "organization_id",
+      "tax_deadline_id"
     ],
     "table": "tax_deadline_reminder"
   },
@@ -6649,7 +6999,10 @@
     "default_restricted": [
       "name",
       "sequence",
-      "company_id"
+      "company_id",
+      "tax_payable_account_id",
+      "tax_receivable_account_id",
+      "advance_tax_payment_account_id"
     ],
     "mandatory": [
       "id",
@@ -6782,23 +7135,6 @@
       "organization_id"
     ],
     "table": "uom"
-  },
-  "uom-categories": {
-    "aliases": [
-      "uom-categories",
-      "uom_category",
-      "uom_cat"
-    ],
-    "default_restricted": [
-      "name",
-      "description",
-      "sequence"
-    ],
-    "mandatory": [
-      "id",
-      "organization_id"
-    ],
-    "table": "uom_cat"
   },
   "user-custom-fields": {
     "aliases": [
@@ -6945,15 +7281,40 @@
     "table": "warehouse_3_d_zone"
   },
   "vendor-risk-flags": {
-    "aliases": ["vendor-risk-flags", "vendor_risk_flag"],
-    "default_restricted": ["company_id", "partner_id", "is_flagged", "risk_level", "reason"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "vendor-risk-flags",
+      "vendor_risk_flag"
+    ],
+    "default_restricted": [
+      "company_id",
+      "partner_id",
+      "is_flagged",
+      "risk_level",
+      "reason"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "vendor_risk_flag"
   },
   "vendor-scorecards": {
-    "aliases": ["vendor-scorecards", "vendor_scorecard"],
-    "default_restricted": ["company_id", "partner_id", "otif_score", "quality_score"],
-    "mandatory": ["id", "organization_id", "company_id"],
+    "aliases": [
+      "vendor-scorecards",
+      "vendor_scorecard"
+    ],
+    "default_restricted": [
+      "company_id",
+      "partner_id",
+      "otif_score",
+      "quality_score"
+    ],
+    "mandatory": [
+      "id",
+      "organization_id",
+      "company_id"
+    ],
     "table": "vendor_scorecard"
   },
   "warehouse-geo": {

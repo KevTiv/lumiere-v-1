@@ -156,21 +156,21 @@ static IMPORT_ENTITIES: &[ImportEntity] = &[
         table_name: "country",
         reducer: "import_country_csv",
         job_table: "country",
-        read_resource: Some("countries"),
+        read_resource: None,
         shape: ImportArgShape::OrgOnly,
     },
     ImportEntity {
         table_name: "currency",
         reducer: "import_currency_csv",
         job_table: "currency",
-        read_resource: Some("currencies"),
+        read_resource: None,
         shape: ImportArgShape::OrgOnly,
     },
     ImportEntity {
         table_name: "currency_rate",
         reducer: "import_currency_rate_csv",
         job_table: "currency_rate",
-        read_resource: Some("currency-rates"),
+        read_resource: None,
         shape: ImportArgShape::OrgOnly,
     },
     ImportEntity {
@@ -184,7 +184,7 @@ static IMPORT_ENTITIES: &[ImportEntity] = &[
         table_name: "expense_sheet",
         reducer: "import_expense_sheet_csv",
         job_table: "hr_expense_sheet",
-        read_resource: Some("expense-sheets"),
+        read_resource: None,
         shape: ImportArgShape::OrgOnly,
     },
     ImportEntity {
@@ -296,7 +296,7 @@ static IMPORT_ENTITIES: &[ImportEntity] = &[
         table_name: "knowledge_category",
         reducer: "import_knowledge_category_csv",
         job_table: "knowledge_article_category",
-        read_resource: Some("knowledge-categories"),
+        read_resource: None,
         shape: ImportArgShape::OrgOnly,
     },
     ImportEntity {
@@ -345,7 +345,7 @@ static IMPORT_ENTITIES: &[ImportEntity] = &[
         table_name: "product_variant",
         reducer: "import_product_variant_csv",
         job_table: "product_variant",
-        read_resource: Some("product-variants"),
+        read_resource: None,
         shape: ImportArgShape::OrgOnly,
     },
     ImportEntity {
@@ -464,7 +464,7 @@ static IMPORT_ENTITIES: &[ImportEntity] = &[
         table_name: "uom_category",
         reducer: "import_uom_category_csv",
         job_table: "uom_category",
-        read_resource: Some("uom-categories"),
+        read_resource: None,
         shape: ImportArgShape::OrgOnly,
     },
     ImportEntity {
@@ -867,7 +867,6 @@ fn match_receipt<'a>(
 }
 
 fn project_errors(
-    spec: &ImportEntity,
     rows: Vec<Value>,
     organization_id: u64,
     job_id: u64,
@@ -888,7 +887,7 @@ fn project_errors(
         let row_number = row_number(&row, "row_number", "rowNumber")
             .ok_or_else(|| ApiError::Internal("Invalid import error row number".into()))?;
         let field = row_value(&row, "field_name", "fieldName").and_then(option_string);
-        let field = field.filter(|field| import_error_field_is_readable(spec, field, columns));
+        let field = field.filter(|field| columns.iter().any(|column| column == field));
         errors.push(json!({"id":id.to_string(), "jobId":job_id.to_string(), "rowNumber":row_number,
             "fieldName":field, "errorMessage":if detailed {
                 row_value(&row,"error_message","errorMessage").and_then(Value::as_str).unwrap_or("Import validation failed")
@@ -900,20 +899,6 @@ fn project_errors(
             .unwrap_or_default()
     });
     Ok(errors)
-}
-
-fn import_error_field_is_readable(spec: &ImportEntity, field: &str, columns: &[String]) -> bool {
-    let projected_field = match (spec.job_table, field) {
-        // SpacetimeDB exposes the Rust/CSV `iso3` field as SQL `iso_3`.
-        ("country", "iso3") => "iso_3",
-        // Import headers use business references; governed reads expose their IDs.
-        ("country", "currency_code") => "currency_id",
-        ("currency_rate", "from_currency") => "from_currency_id",
-        ("currency_rate", "to_currency") => "to_currency_id",
-        ("product_variant", "product_id") => "product_tmpl_id",
-        _ => field,
-    };
-    columns.iter().any(|column| column == projected_field)
 }
 
 async fn read_exact_outcome(
@@ -972,7 +957,6 @@ async fn read_exact_outcome(
             .iter()
             .any(|permission| permission == "*:*");
     let errors = project_errors(
-        spec,
         error_rows,
         context.organization_id(),
         job_id,
@@ -998,9 +982,9 @@ async fn read_exact_outcome(
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/import/{entity}", post(import_entity_post))
+        .route("/import/:entity", post(import_entity_post))
         .route(
-            "/import/{entity}/requests/{request_id}",
+            "/import/:entity/requests/:request_id",
             get(import_request_get),
         )
 }
@@ -1147,15 +1131,7 @@ mod tests {
             "row_number":id,"field_name":"wage","raw_value":"90000","error_message":"90000 is invalid for secret employee"})).collect();
         rows.push(json!({"id":900,"organization_id":8,"job_id":123,"row_number":1}));
         rows.push(json!({"id":901,"organization_id":7,"job_id":124,"row_number":1}));
-        let errors = project_errors(
-            resolve_import_entity("product").unwrap(),
-            rows,
-            7,
-            123,
-            &["name".into()],
-            false,
-        )
-        .unwrap();
+        let errors = project_errors(rows, 7, 123, &["name".into()], false).unwrap();
         assert_eq!(errors.len(), 650);
         assert_eq!(errors[0]["fieldName"], Value::Null);
         assert_eq!(errors[0]["errorMessage"], json!("Import validation failed"));
@@ -1174,33 +1150,6 @@ mod tests {
     }
 
     #[test]
-    fn import_headers_map_to_governed_projection_columns() {
-        for (entity, header, projected) in [
-            ("country", "iso3", "iso_3"),
-            ("country", "currency_code", "currency_id"),
-            ("currency_rate", "from_currency", "from_currency_id"),
-            ("currency_rate", "to_currency", "to_currency_id"),
-            ("product_variant", "product_id", "product_tmpl_id"),
-        ] {
-            let spec = resolve_import_entity(entity).unwrap();
-            assert!(
-                import_error_field_is_readable(spec, header, &[projected.into()]),
-                "{entity}.{header}"
-            );
-            assert!(!import_error_field_is_readable(
-                spec,
-                header,
-                &["name".into()]
-            ));
-        }
-        assert!(!import_error_field_is_readable(
-            resolve_import_entity("country").unwrap(),
-            "future_private_field",
-            &["iso_3".into(), "currency_id".into()]
-        ));
-    }
-
-    #[test]
     fn receipt_read_authorization_requires_domain_role_and_outcome_field_grants() {
         let mut access = FieldAccessContext {
             organization_id: 7,
@@ -1210,6 +1159,8 @@ mod tests {
             role_permissions: vec!["hr_employee:read".into()],
             identity_hex: ACTOR.into(),
             field_permissions: vec![],
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         };
         assert!(
             import_read_columns(resolve_import_entity("hr_employee").unwrap(), &access).is_ok()
@@ -1237,46 +1188,5 @@ mod tests {
         assert!(
             import_read_columns(resolve_import_entity("hr_employee").unwrap(), &access).is_err()
         );
-    }
-
-    #[test]
-    fn every_tracked_import_entity_has_a_reviewed_read_policy() {
-        for (entity, permission, expected_resource) in [
-            ("country", "country:read", "countries"),
-            ("currency", "currency:read", "currencies"),
-            ("currency_rate", "currency_rate:read", "currency-rates"),
-            ("uom_category", "uom_category:read", "uom-categories"),
-            (
-                "knowledge_article_category",
-                "knowledge_article_category:read",
-                "knowledge-categories",
-            ),
-            (
-                "product_variant",
-                "product_variant:read",
-                "product-variants",
-            ),
-            (
-                "hr_expense_sheet",
-                "hr_expense_sheet:read",
-                "expense-sheets",
-            ),
-        ] {
-            let spec = resolve_import_entity(entity).expect("tracked import entity");
-            assert_eq!(spec.read_resource, Some(expected_resource), "{entity}");
-            let access = FieldAccessContext {
-                organization_id: 7,
-                role_id: 2,
-                role_name: "Import reader".into(),
-                is_superuser: false,
-                role_permissions: vec![permission.into()],
-                identity_hex: ACTOR.into(),
-                field_permissions: vec![],
-            };
-            assert!(
-                import_read_columns(spec, &access).is_ok(),
-                "{entity} must resolve its governed projection"
-            );
-        }
     }
 }

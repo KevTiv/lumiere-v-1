@@ -8,12 +8,15 @@ use crate::state::AppState;
 use crate::trusted_context::{opaque_correlation_id, TrustedOperationContext};
 use axum::Json;
 use serde_json::{json, Value};
-use stdb_client::{Exposure, ReducerCall, ReducerContract, ScalarKind, StdbClientError};
+use stdb_client::{
+    Exposure, ReducerCall, ReducerContract, ScalarKind, StdbClient, StdbClientError,
+};
 
 /// Narrow server-owned authorities for routes that cannot run as an ordinary
 /// organization session. Each variant has an explicit reducer allowlist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum InternalRouteAuthority {
+    InvitationCreation,
     InvitationAcceptance,
     PasswordRecovery,
     PlatformProfileProjection,
@@ -23,12 +26,14 @@ pub(crate) enum InternalRouteAuthority {
 impl InternalRouteAuthority {
     fn permits(self, reducer: &str) -> bool {
         match self {
+            Self::InvitationCreation => reducer == "create_user_invite",
             Self::InvitationAcceptance => matches!(
                 reducer,
                 "add_org_member"
                     | "bind_user_credential"
                     | "bind_user_profile"
                     | "mark_invite_accepted"
+                    | "accept_user_invite"
             ),
             Self::PasswordRecovery => matches!(
                 reducer,
@@ -197,6 +202,161 @@ pub(crate) async fn dispatch_session_reducer(
     Ok(context)
 }
 
+/// Only the fixed reviewed-email route may claim provider work. The reducer
+/// remains denied to generic operations and runs as the session actor.
+pub(crate) async fn dispatch_reviewed_mail_mutation(
+    state: &AppState,
+    session: &ApiSession,
+    company_id: u64,
+    reducer: &'static str,
+    args: Value,
+) -> Result<TrustedOperationContext, ApiError> {
+    let expected: &[(&str, ScalarKind)] = match reducer {
+        "claim_reviewed_mail_delivery" => &[
+            ("organization_id", ScalarKind::UnsignedInteger),
+            ("company_id", ScalarKind::UnsignedInteger),
+            ("message_id", ScalarKind::UnsignedInteger),
+            ("review_id", ScalarKind::String),
+            ("request_digest", ScalarKind::String),
+        ],
+        _ => {
+            return Err(ApiError::Forbidden(
+                "reviewed mail mutation is not admitted".into(),
+            ))
+        }
+    };
+    let contract = stdb_client::reducer_contract(reducer).ok_or_else(|| {
+        ApiError::Forbidden("reviewed mail reducer is absent from the contract".into())
+    })?;
+    if contract.exposure != Exposure::Denied
+        || contract.contract_operation_id != format!("erp.{reducer}")
+        || contract.organization_position != Some(0)
+        || contract.company_position != Some(1)
+        || contract.params.len() != expected.len()
+        || !contract
+            .params
+            .iter()
+            .zip(expected)
+            .all(|(actual, (name, kind))| {
+                actual.name == *name && actual.kind == *kind && actual.ref_target.is_none()
+            })
+    {
+        return Err(ApiError::Forbidden(
+            "reviewed mail reducers must retain the fixed denied contract".into(),
+        ));
+    }
+    let args = args
+        .as_array()
+        .cloned()
+        .ok_or_else(|| ApiError::Internal("reviewed mail arguments must be an array".into()))?;
+    let context = TrustedOperationContext::from_session_with_placement(
+        session,
+        state.client_with_token(&session.stdb_token),
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
+    let _ = validate_reducer_scope(contract, &args, context.organization_id())?;
+    let company_scope = authorize_reducer_company_scope(&context, vec![company_id]).await?;
+    let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
+    let _ = execute_reducer_call(&context, contract, args).await?;
+    Ok(context)
+}
+
+/// Narrow, preverified service authority for provider acceptance receipts.
+/// It exposes no arbitrary reducer, scope or metadata arguments to callers.
+pub(crate) struct ReviewedMailDeliveryAuthority {
+    client: StdbClient,
+    organization_id: u64,
+}
+
+impl ReviewedMailDeliveryAuthority {
+    /// Verify dedicated credentials and the organization's active service binding
+    /// before the route can claim a message or contact the email provider.
+    pub(crate) async fn prepare(state: &AppState, organization_id: u64) -> Result<Self, ApiError> {
+        let token = std::env::var("LUMIERE_REVIEWED_MAIL_STDB_TOKEN").unwrap_or_default();
+        let token = token.trim();
+        if token.is_empty()
+            || state.config.stdb_server_token.as_deref().map(str::trim) == Some(token)
+        {
+            return Err(ApiError::Unavailable(
+                "a dedicated reviewed email dispatcher credential is required".into(),
+            ));
+        }
+        let client = state.client_with_token(token);
+        crate::service_identity::verify_registered_service_identity(
+            &client,
+            organization_id,
+            crate::service_identity::REVIEWED_MAIL_DISPATCHER_SERVICE,
+        )
+        .await
+        .map_err(|_| {
+            ApiError::Unavailable(
+                "reviewed email dispatcher identity is unavailable for this organization".into(),
+            )
+        })?;
+        reviewed_mail_receipt_contract()?;
+        require_active_placement(state, organization_id)?;
+        Ok(Self {
+            client,
+            organization_id,
+        })
+    }
+
+    pub(crate) async fn record_acceptance(
+        &self,
+        state: &AppState,
+        message_id: u64,
+        review_id: &str,
+        request_digest: &str,
+        provider_id: Option<String>,
+    ) -> Result<(), ApiError> {
+        let contract = reviewed_mail_receipt_contract()?;
+        require_active_placement(state, self.organization_id)?;
+        let receipt = json!({"dispatch_review_id":review_id, "dispatch_request_digest":request_digest, "provider_message_id":provider_id}).to_string();
+        self.client
+            .call_reducer(
+                ReducerCall::from_name(
+                    contract.name,
+                    json!([self.organization_id, message_id, receipt]),
+                )
+                .map_err(|error| ApiError::Internal(error.to_string()))?,
+            )
+            .await
+            .map_err(map_reducer_error)
+    }
+}
+
+fn reviewed_mail_receipt_contract() -> Result<&'static ReducerContract, ApiError> {
+    let contract =
+        stdb_client::reducer_contract("mark_mail_message_delivered").ok_or_else(|| {
+            ApiError::Forbidden("reviewed mail receipt reducer is absent from the contract".into())
+        })?;
+    let expected = [
+        ("organization_id", ScalarKind::UnsignedInteger),
+        ("message_id", ScalarKind::UnsignedInteger),
+        ("delivery_metadata", ScalarKind::OptionalString),
+    ];
+    if contract.exposure != Exposure::Denied
+        || contract.contract_operation_id != "erp.mark_mail_message_delivered"
+        || contract.organization_position != Some(0)
+        || contract.company_position.is_some()
+        || contract.params.len() != expected.len()
+        || !contract
+            .params
+            .iter()
+            .zip(expected)
+            .all(|(actual, (name, kind))| {
+                actual.name == name && actual.kind == kind && actual.ref_target.is_none()
+            })
+    {
+        return Err(ApiError::Forbidden(
+            "reviewed mail receipt reducer must retain its fixed denied contract".into(),
+        ));
+    }
+    Ok(contract)
+}
+
 /// Dispatch the presentation draft save through an explicit API-only path.
 ///
 /// The reducer intentionally remains `Exposure::Denied`: it must not become a
@@ -283,6 +443,70 @@ pub(crate) async fn dispatch_user_evidence_contribution(
     }
     let args = args.as_array().cloned().ok_or_else(|| {
         ApiError::Internal("evidence contribution arguments must be an array".into())
+    })?;
+    let client = state.client_with_token(&session.stdb_token);
+    let context = TrustedOperationContext::from_session_with_placement(
+        session,
+        client,
+        contract.contract_operation_id,
+        &state.organization_placements,
+    )?;
+    let company_scope = validate_reducer_scope(contract, &args, context.organization_id())?;
+    let company_scope = authorize_reducer_company_scope(&context, company_scope).await?;
+    let context = context.with_company_scope(company_scope)?;
+    context.require_current_placement(&state.organization_placements)?;
+    let _ = execute_reducer_call(&context, contract, args).await?;
+    Ok(context)
+}
+
+pub(crate) fn historical_payment_allocations_contract() -> Result<&'static ReducerContract, ApiError>
+{
+    const REDUCER: &str = "apply_historical_payment_allocations";
+    let contract = stdb_client::reducer_contract(REDUCER).ok_or_else(|| {
+        ApiError::Forbidden(
+            "historical payment allocation reducer is absent from the contract".into(),
+        )
+    })?;
+    let company_scope_paths = stdb_client::company_scope_paths(REDUCER);
+    let company_scope_ok = matches!(
+        company_scope_paths,
+        [scope]
+            if scope.parameter_position == 1
+                && scope.path == ["company_id"]
+                && scope.required
+                && !scope.nullable
+    );
+    let signature_ok = contract.name == REDUCER
+        && contract.contract_operation_id == "erp.apply_historical_payment_allocations"
+        && contract.exposure == Exposure::Denied
+        && contract.organization_position == Some(0)
+        && contract.company_position.is_none()
+        && contract.params.len() == 2
+        && contract.params[0].name == "organization_id"
+        && contract.params[0].kind == ScalarKind::UnsignedInteger
+        && contract.params[0].ref_target.is_none()
+        && contract.params[1].name == "params"
+        && contract.params[1].kind == ScalarKind::Composite
+        && contract.params[1].ref_target == Some("ApplyHistoricalPaymentAllocationsParams")
+        && company_scope_ok;
+    if !signature_ok {
+        return Err(ApiError::Forbidden(
+            "historical payment allocation contract no longer matches the admitted boundary".into(),
+        ));
+    }
+    Ok(contract)
+}
+
+/// Dispatch original-total historical payment replay through one fixed BFF
+/// boundary while the reducer remains denied to generic session operations.
+pub(crate) async fn dispatch_historical_payment_allocations(
+    state: &AppState,
+    session: &ApiSession,
+    args: Value,
+) -> Result<TrustedOperationContext, ApiError> {
+    let contract = historical_payment_allocations_contract()?;
+    let args = args.as_array().cloned().ok_or_else(|| {
+        ApiError::Internal("historical payment allocation arguments must be an array".into())
     })?;
     let client = state.client_with_token(&session.stdb_token);
     let context = TrustedOperationContext::from_session_with_placement(
@@ -501,7 +725,14 @@ pub(crate) async fn dispatch_internal_reducer(
     let invitation_membership = authority == InternalRouteAuthority::InvitationAcceptance
         && reducer == "add_org_member"
         && contract.exposure == Exposure::Session;
-    if contract.exposure != Exposure::Denied && !invitation_membership {
+    // Invitation creation has a generated session contract, but the module
+    // requires a trusted issuer. Only the validated invitation route may use
+    // this exception; ordinary session dispatch retains its original actor.
+    let invitation_creation = authority == InternalRouteAuthority::InvitationCreation
+        && reducer == "create_user_invite"
+        && organization_id.is_some()
+        && contract.exposure == Exposure::Session;
+    if contract.exposure != Exposure::Denied && !invitation_membership && !invitation_creation {
         return Err(ApiError::Forbidden(format!(
             "internal reducer '{reducer}' must be denied to sessions"
         )));
@@ -760,7 +991,15 @@ pub(crate) fn validate_reducer_scope(
         for company_path in company_scope_paths {
             let mut value = args.get(company_path.parameter_position);
             for segment in company_path.path {
-                value = value.and_then(|value| value.get(*segment));
+                value = match value {
+                    Some(value) => nested_contract_field(
+                        contract.name,
+                        value,
+                        segment,
+                        company_path.parameter_position,
+                    )?,
+                    None => None,
+                };
             }
             let Some(value) = value else {
                 if company_path.required {
@@ -792,6 +1031,34 @@ pub(crate) fn validate_reducer_scope(
         )));
     }
     Ok(company_ids)
+}
+
+/// Generated TypeScript commands serialize nested fields as lower camel case,
+/// while contract scope metadata deliberately retains the canonical Rust/SQL
+/// snake-case field name. Accept either representation, but fail closed when
+/// a caller supplies both spellings because scope authority would otherwise be
+/// ambiguous.
+fn nested_contract_field<'a>(
+    reducer_name: &str,
+    value: &'a Value,
+    snake_name: &str,
+    parameter_position: usize,
+) -> Result<Option<&'a Value>, ApiError> {
+    let Some(fields) = value.as_object() else {
+        return Ok(None);
+    };
+    let camel_name = snake_to_lower_camel(snake_name);
+    let snake_value = fields.get(snake_name);
+    let camel_value = (camel_name != snake_name)
+        .then(|| fields.get(&camel_name))
+        .flatten();
+    if snake_value.is_some() && camel_value.is_some() {
+        return Err(ApiError::Unprocessable(format!(
+            "Reducer '{}' received both '{}' and '{}' for company scope at argument {}",
+            reducer_name, snake_name, camel_name, parameter_position
+        )));
+    }
+    Ok(snake_value.or(camel_value))
 }
 
 fn decode_company_id(
@@ -896,6 +1163,42 @@ mod tests {
     }
 
     #[test]
+    fn historical_payment_replay_has_one_signature_pinned_bff_boundary() {
+        let contract = historical_payment_allocations_contract().expect("historical payment");
+        assert_eq!(contract.exposure, Exposure::Denied);
+        assert!(session_reducer_contract(contract.name).is_err());
+        assert!(session_operation_contract(contract.contract_operation_id).is_err());
+
+        let [company_scope] = stdb_client::company_scope_paths(contract.name) else {
+            panic!("historical payment requires exactly one company scope path");
+        };
+        assert_eq!(company_scope.parameter_position, 1);
+        assert_eq!(company_scope.path, ["company_id"]);
+        assert!(company_scope.required);
+        assert!(!company_scope.nullable);
+
+        let args = [
+            json!(7),
+            json!({
+                "company_id": 42,
+                "payment_transaction_id": 11,
+                "currency_id": 3,
+                "allocations": [],
+                "idempotency_key": "history-1",
+                "metadata": { "none": [] }
+            }),
+        ];
+        assert_eq!(
+            validate_reducer_scope(contract, &args, 7).expect("valid nested company scope"),
+            vec![42]
+        );
+        assert!(matches!(
+            validate_reducer_scope(contract, &args, 8),
+            Err(ApiError::Forbidden(_))
+        ));
+    }
+
+    #[test]
     fn account_create_requires_and_validates_the_selected_company() {
         let contract = session_operation_contract("erp.create_account_account")
             .expect("account create operation");
@@ -914,6 +1217,24 @@ mod tests {
             validate_reducer_scope(
                 contract,
                 &[json!(7), json!({ "company_id": { "none": [] } })],
+                7,
+            ),
+            Err(ApiError::Unprocessable(_))
+        ));
+    }
+
+    #[test]
+    fn manual_invoice_scope_accepts_generated_camel_case_and_rejects_ambiguity() {
+        let contract = session_operation_contract("erp.create_manual_account_invoice")
+            .expect("manual invoice operation");
+        assert_eq!(
+            validate_reducer_scope(contract, &[json!(7), json!({ "companyId": 42 })], 7).unwrap(),
+            vec![42]
+        );
+        assert!(matches!(
+            validate_reducer_scope(
+                contract,
+                &[json!(7), json!({ "company_id": 42, "companyId": 42 })],
                 7,
             ),
             Err(ApiError::Unprocessable(_))
@@ -1008,6 +1329,9 @@ mod tests {
 
     #[test]
     fn internal_route_authorities_are_narrow_and_non_interchangeable() {
+        assert!(InternalRouteAuthority::InvitationCreation.permits("create_user_invite"));
+        assert!(!InternalRouteAuthority::InvitationCreation.permits("add_org_member"));
+        assert!(!InternalRouteAuthority::InvitationAcceptance.permits("create_user_invite"));
         assert!(InternalRouteAuthority::PasswordRecovery.permits("bind_password_reset_token"));
         assert!(!InternalRouteAuthority::PasswordRecovery.permits("project_user_profile"));
         assert!(InternalRouteAuthority::ProviderWebhook.permits("receive_crm_provider_message"));

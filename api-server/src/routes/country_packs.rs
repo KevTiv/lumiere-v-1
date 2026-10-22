@@ -26,8 +26,9 @@ async fn catalog_get(
     let data = context
         .client()
         .query_sql(&format!(
-            "SELECT pack_key, country_code, name, region, version, is_active, metadata \
-             FROM country_pack_definition WHERE organization_id = {organization_id} AND is_active = true ORDER BY name"
+            "SELECT pack_key, country_code, name, region, version, acceptance_status, \
+             effective_from, effective_to, is_active, metadata \
+             FROM country_pack_definition WHERE organization_id = {organization_id} ORDER BY name"
         ))
         .await
         .map_err(ApiError::internal)?;
@@ -55,7 +56,7 @@ async fn company_packs_get(
     let data = context
         .client()
         .query_sql(&format!(
-            "SELECT id, company_id, pack_key, enabled, configuration, activated_at, updated_at \
+            "SELECT id, company_id, pack_key, pinned_pack_version, enabled, configuration, activated_at, updated_at \
              FROM company_country_pack WHERE organization_id = {organization_id} AND company_id = {company_id}"
         ))
         .await

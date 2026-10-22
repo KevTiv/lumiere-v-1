@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { ContextTabsList as TabsList, ContextTabsTrigger as TabsTrigger } from "../components/context-tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
@@ -28,7 +29,6 @@ import {
   Shield,
   TrendingUp,
   ExternalLink,
-  Download,
   Printer,
   ChevronRight,
   Circle,
@@ -145,11 +145,14 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
               <p className="text-sm text-muted-foreground mt-1">{report.summary}</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" title={t("forensics.detailModal.printReport")}>
+              <Button
+                variant="outline"
+                size="icon"
+                title={t("forensics.detailModal.printReport")}
+                aria-label={t("forensics.detailModal.printReport")}
+                onClick={() => window.print()}
+              >
                 <Printer className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" title={t("forensics.detailModal.downloadPdf")}>
-                <Download className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -189,21 +192,21 @@ export function ReportDetailModal({ report, open, onClose, onUpdateStatus }: Rep
 
         {/* Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
-          <div className="border-b border-border px-6">
-            <TabsList className="h-12 bg-transparent p-0 w-full justify-start gap-6">
-              <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3">
+          <div className="px-6">
+            <TabsList scrollable>
+              <TabsTrigger value="overview">
                 {t("forensics.detailModal.tabOverview")}
               </TabsTrigger>
-              <TabsTrigger value="timeline" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3">
+              <TabsTrigger value="timeline">
                 {t("forensics.detailModal.tabTimeline")}
               </TabsTrigger>
-              <TabsTrigger value="analysis" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3">
+              <TabsTrigger value="analysis">
                 {t("forensics.detailModal.tabRootCause")}
               </TabsTrigger>
-              <TabsTrigger value="actions" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3">
+              <TabsTrigger value="actions">
                 {t("forensics.detailModal.tabActions")}
               </TabsTrigger>
-              <TabsTrigger value="impact" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-0 pb-3">
+              <TabsTrigger value="impact">
                 {t("forensics.detailModal.tabImpact")}
               </TabsTrigger>
             </TabsList>

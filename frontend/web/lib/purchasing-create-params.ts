@@ -92,20 +92,20 @@ export function toCreateBillFromPurchaseOrderParams(
   const invoiceDate = requiredTimestampFromForm(formData.invoiceDate)
   if (invoiceDate == null) return null
 
-  const taxRaw = formData.taxId;
-  const taxId = taxRaw == null || String(taxRaw).trim() === "" ? undefined : nullableBigIntU64(taxRaw);
-  if (taxId === null || taxId === 0n) return null;
-  const discountRaw = formData.discount;
-  const discount = discountRaw == null || discountRaw === "" ? 0 : typeof discountRaw === "number" || typeof discountRaw === "string" && discountRaw.trim() !== "" ? Number(discountRaw) : NaN;
-  if (!Number.isFinite(discount) || discount < 0 || discount > 100) return null;
+  const taxRaw = formData.taxId
+  const taxId = taxRaw == null || String(taxRaw).trim() === "" ? undefined : nullableBigIntU64(taxRaw)
+  if (taxId === null || taxId === 0n) return null
+  const discountRaw = formData.discount
+  const discount = discountRaw == null || discountRaw === ""
+    ? 0
+    : (typeof discountRaw === "number" || (typeof discountRaw === "string" && discountRaw.trim() !== ""))
+      ? Number(discountRaw)
+      : Number.NaN
+  if (!Number.isFinite(discount) || discount < 0 || discount > 100) return null
 
   const expenseLine = emptyMoveLineParams(defaultExpenseAccountId)
-  expenseLine.excludeFromInvoiceTab = checkboxFromForm(
-    formData.expenseExcludeFromInvoiceTab,
-    false,
-  )
-  expenseLine.taxIds = taxId == null ? [] : [taxId];
-  expenseLine.discount = discount;
+  expenseLine.taxIds = taxId == null ? [] : [taxId]
+  expenseLine.discount = discount
   expenseLine.blocked = checkboxFromForm(formData.expenseBlocked, false)
 
   const payableLine = emptyMoveLineParams(payableAccountId)

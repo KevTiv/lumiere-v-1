@@ -139,11 +139,15 @@ pub async fn attach_workos_subject(
     workos_user_id: &str,
     email_verified: bool,
 ) -> Result<bool> {
-    let client = pool
+    let mut client = pool
         .get()
         .await
         .context("get PG client to link WorkOS credential")?;
-    let changed = client
+    let transaction = client
+        .transaction()
+        .await
+        .context("begin approved identity link")?;
+    let changed = transaction
         .execute(
             "UPDATE lumiere_platform.user_credential \
              SET workos_user_id = $2, email_verified = $3, updated_at = now() \
@@ -153,5 +157,14 @@ pub async fn attach_workos_subject(
         )
         .await
         .context("link canonical WorkOS credential")?;
+    if changed == 1 {
+        let profile_updated = transaction.execute("UPDATE lumiere_platform.user_profile AS p SET email=c.email,email_verified=true,updated_at=now() FROM lumiere_platform.user_credential AS c WHERE p.platform_user_id=$1 AND c.platform_user_id=p.platform_user_id AND c.workos_user_id=$2 AND p.is_active=true", &[&platform_user_id.as_str(), &workos_user_id]).await?;
+        if profile_updated != 1 {
+            transaction.rollback().await?;
+            return Ok(false);
+        }
+        transaction.execute("INSERT INTO lumiere_platform.identity_link_audit (platform_user_id,provider_subject) VALUES ($1,$2) ON CONFLICT DO NOTHING", &[&platform_user_id.as_str(), &workos_user_id]).await?;
+    }
+    transaction.commit().await?;
     Ok(changed == 1)
 }

@@ -12,6 +12,15 @@ export function enumTag(value: unknown): string {
 }
 
 export const purchaseOrderState = (row: Row): string => enumTag(row.state);
+
+/** Currency is owned by the RFQ; a bid must never inherit an unrelated UI default. */
+export function selectedRfqCurrencyId(
+  rfqs: ReadonlyArray<{ value: string; currencyId: string }>,
+  rfqId: string,
+): bigint | null {
+  const raw = rfqs.find((option) => option.value === rfqId)?.currencyId.trim() ?? '';
+  return /^\d+$/.test(raw) && BigInt(raw) > 0n ? BigInt(raw) : null;
+}
 export const isPurchaseOrderLocked = (row: Row): boolean => (row.isLocked ?? row.is_locked) === true;
 
 /** The reducers accept header and line edits only on an unlocked draft; lines can be added to any draft. */
@@ -110,16 +119,23 @@ export function linesOfOrder(lines: readonly Row[], orderId: string): Row[] {
 }
 
 /** Only explicit, active non-compounding percentage purchase rules are selectable. */
-export function billTaxOptions(t: (key: string) => string, taxes: readonly Row[]): Array<{ value: string; label: string }> {
+export function billTaxOptions(
+  t: (key: string) => string,
+  taxes: readonly Row[],
+): Array<{ value: string; label: string }> {
   return [
     { value: '', label: t('purchasing.forms.createBillFromOrder.noTax') },
-    ...taxes.filter((tax) => tax.active === true && ['Purchase', 'None'].includes(enumTag(tax.typeTaxUse ?? tax.type_tax_use))
-      && enumTag(tax.amountType ?? tax.amount_type) === 'Percent'
-      && (tax.includeBaseAmount ?? tax.include_base_amount) === false
-      && (tax.hasNegativeFactor ?? tax.has_negative_factor) === false
-      && (tax.taxGroupId ?? tax.tax_group_id) != null
-      && Array.isArray(tax.invoiceRepartitionLineIds ?? tax.invoice_repartition_line_ids)
-      && ((tax.invoiceRepartitionLineIds ?? tax.invoice_repartition_line_ids) as unknown[]).length === 0)
+    ...taxes
+      .filter((tax) =>
+        tax.active === true
+        && ['Purchase', 'None'].includes(enumTag(tax.typeTaxUse ?? tax.type_tax_use))
+        && enumTag(tax.amountType ?? tax.amount_type) === 'Percent'
+        && (tax.includeBaseAmount ?? tax.include_base_amount) === false
+        && (tax.hasNegativeFactor ?? tax.has_negative_factor) === false
+        && (tax.taxGroupId ?? tax.tax_group_id) != null
+        && Array.isArray(tax.invoiceRepartitionLineIds ?? tax.invoice_repartition_line_ids)
+        && ((tax.invoiceRepartitionLineIds ?? tax.invoice_repartition_line_ids) as unknown[]).length === 0,
+      )
       .map((tax) => ({ value: String(tax.id), label: String(tax.name ?? '') })),
   ];
 }

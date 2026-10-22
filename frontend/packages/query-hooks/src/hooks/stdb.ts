@@ -13,6 +13,7 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useErpSession } from '@lumiere/erp-session'
+import { httpResponseError } from '@lumiere/api-client/response-error'
 
 import {
   stdbBffCommandPost,
@@ -69,13 +70,18 @@ export function realtimeQueryKeysForResource(
   organizationId: bigint | number,
 ): QueryKey[] {
   const orgString = organizationId.toString()
-  const keys: QueryKey[] = [
-    stdbQueryKey(resource, organizationId),
-    [resource, orgString],
-  ]
+  const keys: QueryKey[] = []
+  const appendResourceKeys = (resourceKey: string) => {
+    keys.push(stdbQueryKey(resourceKey, organizationId), [resourceKey, orgString])
+    if (typeof organizationId === 'number') {
+      keys.push(['stdb', resourceKey, organizationId])
+    }
+  }
 
-  if (typeof organizationId === 'number') {
-    keys.push(['stdb', resource, organizationId])
+  appendResourceKeys(resource)
+
+  for (const resourceAlias of BUNDLE_RESOURCE_ALIASES[resource] ?? []) {
+    appendResourceKeys(resourceAlias)
   }
 
   // HR hooks (`hooks/hr.ts`) deviate from the `[resource, org]` convention and
@@ -88,9 +94,39 @@ export function realtimeQueryKeysForResource(
     keys.push([hrAlias, orgString])
   }
 
-  // TODO(BFF Form Cleanup): add explicit aliases for bundle resources like
-  // "auth" and "form-configuration" once their concrete query keys are settled.
+  if (resource === 'auth') {
+    keys.push(
+      ['settings-roles', orgString],
+      ['settings-users', orgString],
+      ['user-role-assignments', orgString],
+      ['user-organizations', orgString],
+      ['current-user-profile'],
+    )
+  }
+
   return keys
+}
+
+/** Concrete BFF resource caches covered by invalidation-only subscription bundles. */
+const BUNDLE_RESOURCE_ALIASES: Record<string, readonly string[]> = {
+  auth: [
+    'user-profile',
+    'user-role-assignment',
+    'user-organization',
+    'roles',
+    'field-permissions',
+  ],
+  'form-configuration': [
+    'form-configs',
+    'form-config-fields',
+    'form-role-configs',
+    'user-custom-fields',
+    'form-field-labels',
+  ],
+}
+
+export function isInvalidationOnlyResource(resource: string): boolean {
+  return Object.prototype.hasOwnProperty.call(BUNDLE_RESOURCE_ALIASES, resource)
 }
 
 /** Maps `HR_WORKSPACE_RESOURCE_KEYS` resource names to the custom query key prefix used in `hooks/hr.ts`. */
@@ -128,13 +164,15 @@ export function invalidateStdbQueryResources(
   organizationId: bigint | number,
   resources: readonly string[],
 ) {
+  const invalidateHttpCaches =
+    !isSubscriptionReady() || resources.some(isInvalidationOnlyResource)
   for (const resource of resources) {
     // Typed HTTP rows use a separate namespace so the opt-in legacy direct-row
     // cache can never populate them with unprojected SDK entities.
     void qc.invalidateQueries({
       queryKey: typedStdbQueryKey(resource, organizationId),
     })
-    if (isSubscriptionReady()) continue
+    if (!invalidateHttpCaches) continue
     for (const queryKey of realtimeQueryKeysForResource(resource, organizationId)) {
       void qc.invalidateQueries({ queryKey })
     }
@@ -146,6 +184,16 @@ export function invalidateStdbQueryResources(
  * When `invalidateResources` is omitted or empty, uses `STDB_REDUCER_INVALIDATION` from codegen manifest.
  */
 type NamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>
+
+
+/** Execute one generated named operation through the authenticated BFF transport. */
+export async function callStdbOperation<K extends NamedReducerKey>(
+  reducerName: K,
+  input: StdbBffCommandInput<K>,
+): Promise<Response> {
+  const { urlPath, init } = stdbBffCommandPost(reducerName, input)
+  return apiFetch(urlPath, init)
+}
 
 export function useStdbCallMutation<K extends NamedReducerKey>(
   reducerName: K,
@@ -159,8 +207,7 @@ export function useStdbCallMutation<K extends NamedReducerKey>(
       : stdbInvalidationFor(reducerName)
   return useMutation<void, Error, StdbBffCommandInput<K>>({
     mutationFn: async (input) => {
-      const { urlPath, init } = stdbBffCommandPost(reducerName, input)
-      const r = await apiFetch(urlPath, init)
+      const r = await callStdbOperation(reducerName, input)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? `Reducer ${reducerName} failed`)
@@ -184,8 +231,7 @@ export function useStdbCallMutation<K extends NamedReducerKey>(
 export function useStdbReducer<K extends NamedReducerKey>(reducerName: K) {
   return useMutation<void, Error, StdbBffCommandInput<K>>({
     mutationFn: async (input) => {
-      const { urlPath, init } = stdbBffCommandPost(reducerName, input)
-      const r = await apiFetch(urlPath, init)
+      const r = await callStdbOperation(reducerName, input)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? `Reducer ${reducerName} failed`)
@@ -283,6 +329,20 @@ export function useCompanyScopedTypedQuery<Row>(
   })
 }
 
+/** Fetch and decode one company-scoped resource while retaining HTTP failure status. */
+export async function fetchTypedStdbQueryRows<Resource extends TypedResourceReadKey>(
+  resource: Resource,
+  companyId: bigint | number,
+  fetcher: typeof apiFetch = apiFetch,
+): Promise<ResourceQueryRowMap[Resource][]> {
+  const companyQuery = `?companyId=${encodeURIComponent(String(companyId))}`
+  const response = await fetcher(`/api/query/${resource}${companyQuery}`)
+  if (!response.ok) {
+    throw await httpResponseError(response, `Query ${resource} failed`)
+  }
+  return decodeTypedResourceQueryResponse(resource, await response.json())
+}
+
 /** Fetch and decode any resource in the reviewed generated typed-read set. */
 export function useTypedStdbQuery<Resource extends TypedResourceReadKey>(
   resource: Resource,
@@ -301,13 +361,7 @@ export function useTypedStdbQuery<Resource extends TypedResourceReadKey>(
       if (companyId == null || companyId <= 0) {
         throw new Error(`An active company is required to query ${resource}`)
       }
-      const companyQuery = `?companyId=${encodeURIComponent(String(companyId))}`
-      const response = await apiFetch(`/api/query/${resource}${companyQuery}`)
-      if (!response.ok) {
-        const json = await response.json().catch(() => ({})) as Record<string, unknown>
-        throw new Error((json.error as string | undefined) ?? `Query ${resource} failed`)
-      }
-      return decodeTypedResourceQueryResponse(resource, await response.json())
+      return fetchTypedStdbQueryRows(resource, companyId)
     },
     enabled:
       (options?.enabled ?? true) &&

@@ -13,6 +13,10 @@ use crate::purchasing::purchase_orders::{
 #[spacetimedb::table(
     accessor = purchase_order_creation_operation,
     index(
+        accessor = purchase_order_creation_operation_by_organization,
+        btree(columns = [organization_id])
+    ),
+    index(
         accessor = purchase_order_creation_operation_by_scope,
         btree(columns = [organization_id, company_id])
     ),

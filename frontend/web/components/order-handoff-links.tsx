@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 
-import { accountMoveHref, saleOrderHref, stockPickingHref } from "@lumiere/erp-shared/record-links"
+import { accountMoveHref, accountPaymentHref, returnOrderHref, saleOrderHref, stockPickingHref } from "@lumiere/erp-shared/record-links"
 import type { OrderHandoffs } from "@lumiere/query-hooks/hooks/order-to-cash"
 import type { CrossRecordLinks as Result } from "@lumiere/query-hooks/hooks/cross-record-links"
 
@@ -46,7 +46,7 @@ export function OrderHandoffLinks({
   pickingLabel?: string
   invoiceLabel?: string
 }) {
-  if (handoffs.pickings.length === 0 && handoffs.invoices.length === 0) {
+  if (handoffs.pickings.length === 0 && handoffs.invoices.length === 0 && (handoffs.returns?.length ?? 0) === 0 && (handoffs.payments?.length ?? 0) === 0) {
     return <span className="text-muted-foreground" data-testid={`${testIdPrefix}-none`}>{emptyLabel}</span>
   }
   return (
@@ -69,6 +69,29 @@ export function OrderHandoffLinks({
           </span>
         </li>
       ))}
+      {(handoffs.returns ?? []).map((returned) => (
+        <li key={`r${returned.id}`}>
+          <Link className="underline underline-offset-2" href={returnOrderHref(returned.id)} data-testid={`${testIdPrefix}-return-${returned.id}`}>
+            {returned.name || `Return #${returned.id}`}
+          </Link>
+          <span className="ml-2 text-muted-foreground">{returned.state}</span>
+        </li>
+      ))}
+      {(handoffs.payments ?? []).map((payment) => (
+        <li key={`pay${payment.id}`}>
+          <Link className="underline underline-offset-2" href={accountPaymentHref(payment.id)} data-testid={`${testIdPrefix}-payment-${payment.id}`}>
+            {payment.name || `Payment #${payment.id}`}
+          </Link>
+          <span className="ml-2 text-muted-foreground">{payment.state}</span>
+        </li>
+      ))}
+      {handoffs.paymentNotice ? (
+        <li role="alert" data-testid={`${testIdPrefix}-payment-${handoffs.paymentNotice}`} className="text-muted-foreground">
+          {handoffs.paymentNotice === "relation_unavailable"
+            ? "Payment relation is unavailable"
+            : "Payment relation failed its identity check"}
+        </li>
+      ) : null}
     </ul>
   )
 }

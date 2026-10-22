@@ -27,6 +27,7 @@ pub mod packs;
 pub(crate) mod receipts;
 pub mod runtime;
 pub mod simulation;
+pub mod subject_snapshot;
 
 pub use action_registry::*;
 pub use approval_gate::*;
@@ -41,3 +42,4 @@ pub use migration::*;
 pub use packs::*;
 pub use runtime::*;
 pub use simulation::*;
+pub use subject_snapshot::*;

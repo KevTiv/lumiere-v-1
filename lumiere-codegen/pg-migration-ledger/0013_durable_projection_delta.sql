@@ -2,19 +2,17 @@
 -- Migration version: 13
 -- Migration name: 0013_durable_projection_delta
 -- Checksum algorithm: sha256
--- Body checksum: sha256:581cf77ee221e058030fe0e2974b75cd3b90572aba3defc4ed637507eb13e447
+-- Body checksum: sha256:1b4e2442cc4c5a68ecc37fee7fdbaf4629eb84f1e7df15502cb3dddd47f83d44
 
--- Durable projection: purchase_order_creation_operation
-CREATE TABLE IF NOT EXISTS "purchase_order_creation_operation" (
-    "id" TEXT NOT NULL,
+-- Durable projection: helpdesk_ticket_related_record
+CREATE TABLE IF NOT EXISTS "helpdesk_ticket_related_record" (
+    "ticket_id" NUMERIC(20,0) NOT NULL,
     "organization_id" NUMERIC(20,0) NOT NULL,
     "company_id" NUMERIC(20,0) NOT NULL,
-    "operation_key" TEXT NOT NULL,
-    "purchase_order_id" NUMERIC(20,0) NOT NULL,
-    "payload_hash" TEXT NOT NULL,
-    "created_by" BYTEA NOT NULL,
-    "created_at" BIGINT NOT NULL,
-    CONSTRAINT "purchase_order_creation_operation_pkey" PRIMARY KEY ("id")
+    "target" TEXT NOT NULL,
+    "write_uid" BYTEA NOT NULL,
+    "write_date" BIGINT NOT NULL,
+    CONSTRAINT "helpdesk_ticket_related_record_pkey" PRIMARY KEY ("ticket_id")
 );
-CREATE INDEX IF NOT EXISTS "purchase_order_creation_operation_purchase_order_id" ON "purchase_order_creation_operation" ("purchase_order_id");
-CREATE INDEX IF NOT EXISTS "purchase_order_creation_operation_organization_id_company_id" ON "purchase_order_creation_operation" ("organization_id", "company_id");
+CREATE INDEX IF NOT EXISTS "helpdesk_ticket_related_record_company_id" ON "helpdesk_ticket_related_record" ("company_id");
+CREATE INDEX IF NOT EXISTS "helpdesk_ticket_related_record_organization_id" ON "helpdesk_ticket_related_record" ("organization_id");

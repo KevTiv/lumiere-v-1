@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page, type Response } from "@playwright/test"
+import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import {
   activeTabEntityTable,
@@ -59,6 +60,16 @@ async function operation(page: Page, reducer: string, click: () => Promise<unkno
     click(),
   ])
   return response
+}
+
+async function requisitionApprovalRequest(page: Page, requisitionId: number) {
+  const { urlPath, init } = stdbBffCommandPost("approve_purchase_requisition", {
+    requisitionId,
+  })
+  return page.request.post(urlPath, {
+    headers: { "Content-Type": "application/json" },
+    data: JSON.parse(String(init.body)),
+  })
 }
 
 async function selectRow(page: Page, tab: string, recordId: number) {
@@ -167,8 +178,10 @@ test.describe("COV-05e upstream procurement", { tag: ["@p0", "@cov05", "@unauthe
         await selectRow(page, "requisitions", reqId)
         await expect(page.getByTestId("entity-action-req-convert-po")).toBeDisabled()
         await expect(page.getByTestId("entity-action-req-create-rfq")).toBeDisabled()
-        const selfApproval = await rowAction(page, "requisitions", reqId, "req-approve", "approve_purchase_requisition")
+        await expect(page.getByTestId("entity-action-req-approve")).toBeDisabled()
+        const selfApproval = await requisitionApprovalRequest(page, reqId)
         expect(selfApproval.status()).toBe(422)
+        expect(await selfApproval.text()).toMatch(/independent approver/i)
         expect(await state(approver, "purchase-requisitions", reqId)).toBe("InProgress")
         const approved = await rowAction(approver, "requisitions", reqId, "req-approve", "approve_purchase_requisition")
         expect(approved.ok(), await approved.text()).toBe(true)
@@ -194,9 +207,10 @@ test.describe("COV-05e upstream procurement", { tag: ["@p0", "@cov05", "@unauthe
           const rfqDialog = page.getByRole("dialog", { name: "Create request for quotation" })
           await expect(rfqDialog.getByLabel("Requisition", { exact: true })).toContainText(key)
           await choose(page, rfqDialog, "Product", productName)
-          await choose(page, rfqDialog, "Unit of measure", uomName)
+          // UoM options are labelled "name (symbol)".
+          await choose(page, rfqDialog, "Unit of measure", new RegExp(`^${uomName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( \\(|$)`))
           await rfqDialog.getByLabel("Quantity", { exact: true }).fill("7")
-          await rfqDialog.getByLabel("Notes", { exact: true }).fill(key)
+          await rfqDialog.getByRole("textbox", { name: "Notes rich text editor", exact: true }).fill(key)
           const rfqCreate = await operation(page, "create_purchase_rfq", () => rfqDialog.getByRole("button", { name: "Create RFQ", exact: true }).click())
           expect(rfqCreate.ok(), await rfqCreate.text()).toBe(true)
           const rfq = await createdRow(approver, "purchase-rfqs", (row) => row.notes === key && scalarQueryId(row.requisitionId ?? row.requisition_id) === reqId)
@@ -207,7 +221,7 @@ test.describe("COV-05e upstream procurement", { tag: ["@p0", "@cov05", "@unauthe
           await choose(page, bidDialog, "RFQ", scalarQueryString(rfq.name))
           await choose(page, bidDialog, "Vendor", vendorName)
           await bidDialog.getByLabel("Unit price", { exact: true }).fill("925")
-          await bidDialog.getByLabel("Notes", { exact: true }).fill(key)
+          await bidDialog.getByRole("textbox", { name: "Notes rich text editor", exact: true }).fill(key)
           const bidCreate = await operation(page, "add_purchase_rfq_bid", () => bidDialog.getByRole("button", { name: "Add RFQ bid", exact: true }).click())
           expect(bidCreate.ok(), await bidCreate.text()).toBe(true)
           const bid = await createdRow(approver, "purchase-rfq-bids", (row) => row.notes === key && scalarQueryId(row.rfqId ?? row.rfq_id) === rfqId)

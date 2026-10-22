@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@lumiere/ui/components/tabs"
+import { Tabs, TabsContent } from "@lumiere/ui/components/tabs"
+import { WorkspaceTabsList as TabsList, WorkspaceTabsTrigger as TabsTrigger } from "@lumiere/ui/components/workspace-tabs"
 import { DashboardHeader } from "@lumiere/ui"
 
 import { ReportComposerPanel } from "./report-composer-panel"
@@ -27,7 +28,7 @@ export function AiHarnessClient({
     <div className="flex flex-col gap-2">
     <DashboardHeader title={t("aiHarness.title")} description={t("aiHarness.description")} />
     <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-6">
-      <TabsList>
+      <TabsList scrollable>
         <TabsTrigger value="report-composer">
           {t("aiHarness.tabs.reportComposer")}
         </TabsTrigger>
@@ -38,10 +39,10 @@ export function AiHarnessClient({
           {t("aiHarness.tabs.redActionDrafts")}
         </TabsTrigger>
         <TabsTrigger value="evidence-reviewer">
-          Evidence reviewer
+          {t("aiHarness.tabs.evidenceReviewer")}
         </TabsTrigger>
         <TabsTrigger value="run-lifecycle">
-          Run lifecycle
+          {t("aiHarness.tabs.runLifecycle")}
         </TabsTrigger>
       </TabsList>
 
@@ -72,5 +73,14 @@ export function AiHarnessClient({
       </TabsContent>
     </Tabs>
     </div>
+  )
+}
+
+export function CompanyDataError({ status, message }: { status: string; message: string }) {
+  const { t } = useTranslation()
+  return (
+    <main className="p-6" role="alert">
+      {t("aiHarness.companyDataError", { status, message })}
+    </main>
   )
 }

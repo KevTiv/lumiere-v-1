@@ -520,6 +520,11 @@ pub fn create_subscription_ar_invoice(
         subscription.recurring_interval,
     )?;
 
+    let invoice_metadata = crate::documents::invoice_profile::capture_invoice_document_metadata(
+        ctx, organization_id, company_id, Some(subscription.partner_invoice_id),
+        Some(&serde_json::json!({ "subscription_id": subscription.id, "billing_run_key": billing_run_key, "fx_rate": fx_rate }).to_string()),
+    )?;
+
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
         organization_id,
@@ -573,14 +578,7 @@ pub fn create_subscription_ar_invoice(
         create_date: Some(ctx.timestamp),
         write_uid: Some(created_by),
         write_date: Some(ctx.timestamp),
-        metadata: Some(
-            serde_json::json!({
-                "subscription_id": subscription.id,
-                "billing_run_key": billing_run_key,
-                "fx_rate": fx_rate,
-            })
-            .to_string(),
-        ),
+        metadata: Some(invoice_metadata),
     });
 
     let mut amount_untaxed = 0.0f64;
@@ -1032,6 +1030,20 @@ pub fn apply_subscription_invoice_payment(
         .id()
         .find(&payment_id)
         .ok_or("Payment not found after create")?;
+    // The move was built before the payment existed. Complete its reverse
+    // links before posting the payment so balance readers can verify the
+    // clearing lines belong to this exact ledger payment.
+    for line in ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+    {
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            payment_id: Some(payment_id),
+            ..line
+        });
+    }
     let pay_name = payment
         .name
         .clone()

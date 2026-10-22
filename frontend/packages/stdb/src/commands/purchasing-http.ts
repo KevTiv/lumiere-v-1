@@ -1,4 +1,3 @@
-import { ReceivePoLineOnceParams } from "@lumiere/contracts/generated/types";
 
 import type { ReducerCommandContractMeta } from "./types";
 
@@ -49,7 +48,6 @@ export const PURCHASING_BFF_REDUCERS = [
   "lock_purchase_order",
   "post_landed_costs",
   "receive_po_line",
-  "receive_po_line_once",
   "record_purchasing_integration_result",
   "reject_supplier_intake",
   "release_blanket_to_po",
@@ -161,8 +159,6 @@ const PURCHASING_HINT_OVERRIDES: Partial<
     "purchase-order-lines",
     "purchase-order-lines-over-billed",
   ],
-  // Private invocation evidence is read through its protected exact-key API.
-  receive_po_line_once: ["purchase-orders", "purchase-order-lines", "stock-moves", "stock-pickings", "stock-quants"],
   record_purchasing_integration_result: ["purchasing-integration-intents"],
   reject_supplier_intake: ["supplier-intakes", "contacts"],
   release_blanket_to_po: ["purchase-blanket-orders", "purchase-blanket-order-lines", "purchase-blanket-releases", "purchase-orders", "purchase-order-lines", "purchase-orders-to-approve"],
@@ -216,9 +212,4 @@ export function purchasingCommandContract(
     expectations:
       "Authenticated api-server session with organization scope; args must match SpacetimeDB u64 JSON rules (see stringifyReducerCallBody).",
   };
-}
-
-/** No legacy fallback when durable receipt identity is unavailable. */
-export function purchasingReceiptReplayAvailable(): boolean {
-  return ["operationKey", "quantity", "expectedReceived", "expectedMoveId", "expectedPickingId"].every(field => Object.hasOwn(ReceivePoLineOnceParams.elements, field));
 }

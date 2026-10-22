@@ -12,7 +12,6 @@ fn nullable_company_id_resource(resource: &str) -> bool {
     matches!(
         resource,
         "account-account-types"
-            | "currency-rates"
             | "depreciation-lines"
             | "partner-banks"
             | "product-categories"

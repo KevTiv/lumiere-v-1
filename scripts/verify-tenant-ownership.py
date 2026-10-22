@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate the C0 direct organization-ownership schema invariant.
 
-All 504 relations in the ERP manifest are organization-routed: 499
+All 515 relations in the ERP manifest are organization-routed: 510
 application relations and five persistence/reconstruction protocol relations.
 Platform-control truth that cannot be tenant-owned lives outside this
 manifest, rather than through a global-table exception.
@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Any
 
 
-EXPECTED_TABLE_COUNT = 504
-APPLICATION_RELATION_COUNT = 499
+EXPECTED_TABLE_COUNT = 515
+APPLICATION_RELATION_COUNT = 510
 PROTOCOL_RELATIONS = frozenset(
     {
         "organization_commit",
@@ -139,7 +139,8 @@ def validate_manifest(manifest: dict[str, Any], expected_table_count: int) -> No
         application = table_names - PROTOCOL_RELATIONS
         if len(application) != APPLICATION_RELATION_COUNT:
             fail(
-                "C0 requires 498 application relations + 5 protocol relations, "
+                f"C0 requires {APPLICATION_RELATION_COUNT} application relations + "
+                f"{len(PROTOCOL_RELATIONS)} protocol relations, "
                 f"found {len(application)} + {len(PROTOCOL_RELATIONS & table_names)}"
             )
 
@@ -195,7 +196,7 @@ def validate_no_global_scope(source_path: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("manifest", type=Path)
-    parser.add_argument("--expected-table-count", type=int, default=504)
+    parser.add_argument("--expected-table-count", type=int, default=EXPECTED_TABLE_COUNT)
     parser.add_argument(
         "--schema-ir-source",
         type=Path,

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { encodeIdentity } from "../stdb-params-json"
+import { encodeIdentity, stdbParamsToJson } from "../stdb-params-json"
 import { SESSION_OPERATION_DESCRIPTORS } from "@lumiere/contracts/generated/operation-descriptors"
 import {
   stdbBffCallUrl,
@@ -54,5 +54,57 @@ test("AI run cancellation uses its released immutable ID and named company input
     companyId: 3,
     runId: 7,
     reason: "Cancelled from UI",
+  })
+})
+
+test("documents and workflow snapshot reducers use released named contracts", () => {
+  const release = stdbBffCommandPost("release_document_legal_hold", {
+    holdId: 17n,
+    params: { metadata: { some: "case-17" } },
+  })
+  assert.equal(
+    release.urlPath,
+    `/api/operations/${encodeURIComponent(SESSION_OPERATION_DESCRIPTORS.release_document_legal_hold.contractOperationId)}`,
+  )
+  assert.deepEqual(JSON.parse(String(release.init.body)), {
+    holdId: 17,
+    params: { metadata: { some: "case-17" } },
+  })
+
+  const snapshot = stdbBffCommandPost("request_workflow_subject_snapshot", {
+    companyId: 4n,
+    params: {
+      subjectModel: "sale_order",
+      subjectId: 23n,
+      workflowVersionId: 29n,
+    },
+  })
+  assert.equal(
+    snapshot.urlPath,
+    `/api/operations/${encodeURIComponent(SESSION_OPERATION_DESCRIPTORS.request_workflow_subject_snapshot.contractOperationId)}`,
+  )
+  assert.deepEqual(JSON.parse(String(snapshot.init.body)), {
+    companyId: 4,
+    params: {
+      subjectModel: "sale_order",
+      subjectId: 23,
+      workflowVersionId: 29,
+    },
+  })
+})
+
+test("statement import named command sends decimal row amounts inside SATS Some", () => {
+  const { init } = stdbBffCommandPost("stage_bank_statement_import", {
+    companyId: 2n, journalId: 3n, currencyId: 4n,
+    params: stdbParamsToJson({
+      idempotencyKey: "actual-reviewed-import", fileName: "bank.csv", openingBalance: 10,
+      rows: [{ rowNumber: 2, amount: 125.5 }],
+    }, "StageBankStatementImportParams"),
+  })
+  assert.deepEqual(JSON.parse(String(init.body)), {
+    companyId: 2, journalId: 3, currencyId: 4,
+    params: { idempotency_key: "actual-reviewed-import", file_name: { some: "bank.csv" }, opening_balance: 10,
+      rows: [{ row_number: 2, amount: { some: 125.5 }, date: { none: [] }, reference: { none: [] }, description: { none: [] } }],
+    },
   })
 })

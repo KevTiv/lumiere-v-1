@@ -24,6 +24,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon, FileIcon, X, Sparkles } from "lucide-react"
 import { format } from "date-fns"
 import type { ParsedFormField, FieldOption } from "../config/types"
+import { isPlainTextareaField } from "../../lib/form-types"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -73,6 +74,7 @@ export function FormFieldRenderer({
       case "Textarea":
         return (
           <Textarea
+            variant={isPlainTextareaField({ name: field.name }) ? "plain" : "rich"}
             placeholder={field.placeholder}
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
@@ -258,6 +260,7 @@ export function FormFieldRenderer({
       case "UserSelect":
         return (
           <UserSelectField
+            options={field.options || []}
             value={(value as string) || ""}
             onChange={onChange}
             disabled={disabled}
@@ -600,30 +603,46 @@ function FileUploadField({
 }
 
 function UserSelectField({
+  options,
   value,
   onChange,
   disabled,
 }: {
+  options: FieldOption[]
   value: string
   onChange: (value: string) => void
   disabled?: boolean
 }) {
-  // TODO: Connect to actual users list from SpacetimeDB
-  const mockUsers = [
-    { id: "user-1", name: "John Doe" },
-    { id: "user-2", name: "Jane Smith" },
-    { id: "user-3", name: "Bob Johnson" },
-  ]
+  const selectedIsAvailable = options.some(option => option.value === value)
+  const displayOptions = value && !selectedIsAvailable
+    ? [
+        ...options,
+        {
+          value,
+          label: `Unavailable user (${value.length > 10 ? `${value.slice(0, 8)}…` : value})`,
+          disabled: true,
+        },
+      ]
+    : options
+  const hasSelectableUser = displayOptions.some(option => !option.disabled)
 
   return (
-    <Select value={value} onValueChange={onChange} disabled={disabled}>
+    <Select
+      value={radixSelectControlledValue(value, displayOptions)}
+      onValueChange={(next) => onChange(storedValueFromRadixSelect(next))}
+      disabled={disabled || !hasSelectableUser}
+    >
       <SelectTrigger>
-        <SelectValue placeholder="Select user..." />
+        <SelectValue placeholder={options.length > 0 ? "Select user..." : "No users available"} />
       </SelectTrigger>
       <SelectContent>
-        {mockUsers.map((user) => (
-          <SelectItem key={user.id} value={user.id}>
-            {user.name}
+        {displayOptions.map((option, index) => (
+          <SelectItem
+            key={`${radixSelectItemValue(option, index)}-${index}`}
+            value={radixSelectItemValue(option, index)}
+            disabled={option.disabled}
+          >
+            {option.label}
           </SelectItem>
         ))}
       </SelectContent>

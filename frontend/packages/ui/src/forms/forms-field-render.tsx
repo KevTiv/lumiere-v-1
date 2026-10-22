@@ -1,8 +1,9 @@
 "use client"
 
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
-import type { FormField } from "../lib/form-types"
-import { fieldWidthClasses } from "../lib/form-types"
+import type { FormField, FormValues } from "../lib/form-types"
+import { fieldWidthClasses, isPlainTextareaField } from "../lib/form-types"
 import { Input } from "../components/input"
 import { Textarea } from "../components/textarea"
 import { Checkbox } from "../components/checkbox"
@@ -23,7 +24,7 @@ import {
 } from "./utils/radix-select-empty-value"
 
 const inputBase =
-  "bg-background border-input focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:border-ring transition-[border-color,box-shadow,background-color] duration-150"
+  "bg-background border-input focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-ring transition-[border-color,box-shadow,background-color] duration-150"
 
 function autoCompleteForField(field: FormField): string | undefined {
   if (field.autoComplete) return field.autoComplete
@@ -44,6 +45,7 @@ function inputModeForField(field: FormField): FormField["inputMode"] {
 
 interface FormFieldRendererProps {
   field: FormField
+  values?: FormValues
   value: unknown
   onChange: (value: unknown) => void
   error?: string
@@ -55,11 +57,13 @@ interface FormFieldRendererProps {
 
 export function FormFieldRenderer({
   field,
+  values,
   value,
   onChange,
   error,
   aiSuggestion,
 }: FormFieldRendererProps) {
+  const { t } = useTranslation()
   const width = field.width || "full"
   const descriptionId = field.description ? `${field.id}-description` : undefined
   const errorId = error ? `${field.id}-error` : undefined
@@ -119,6 +123,7 @@ export function FormFieldRenderer({
       case "textarea":
         return (
           <Textarea
+            variant={isPlainTextareaField(field) ? "plain" : "rich"}
             id={field.id}
             name={field.name}
             data-testid={`form-field-${field.name}`}
@@ -160,6 +165,7 @@ export function FormFieldRenderer({
             disabled={field.disabled}
           >
             <SelectTrigger
+              id={field.id}
               data-testid={`form-field-${field.name}`}
               className={cn(
                 "w-full",
@@ -185,12 +191,51 @@ export function FormFieldRenderer({
           </Select>
         )
 
+      case "multiselect":
+        return (
+          <select
+            id={field.id}
+            name={field.name}
+            data-testid={`form-field-${field.name}`}
+            multiple
+            value={Array.isArray(value) ? value : []}
+            onChange={(event) => {
+              const selected = Array.from(event.target.selectedOptions, (option) => option.value)
+              // Disabled and no-longer-listed values cannot be edited here; keep them intact.
+              const retained = Array.isArray(value) ? value.filter((item) => {
+                const option = field.options.find((option) => option.value === item)
+                return !option || option.disabled
+              }) : []
+              onChange([...new Set([...retained, ...selected])])
+            }}
+            disabled={field.disabled}
+            required={field.required}
+            aria-invalid={!!error}
+            aria-describedby={describedBy}
+            className={cn("w-full rounded-md border p-2", inputBase, error && "border-destructive")}
+          >
+            {Array.isArray(value) ? value
+              .filter((selected) => !field.options.some((option) => option.value === selected))
+              .map((selected) => (
+                <option key={selected} value={selected} disabled>
+                  {t("common.form.unavailableSelection", { value: selected, defaultValue: "Unavailable selection: {{value}}" })}
+                </option>
+              )) : null}
+            {field.options.map((option) => (
+              <option key={option.value} value={option.value} disabled={option.disabled}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        )
+
       case "checkbox":
         return (
           <div className="flex items-center gap-3 pt-2">
             <Checkbox
               id={field.id}
               data-testid={`form-field-${field.name}`}
+              aria-label={field.label}
               checked={(value as boolean) || false}
               onCheckedChange={onChange}
               disabled={field.disabled}
@@ -227,6 +272,7 @@ export function FormFieldRenderer({
             <Switch
               id={field.id}
               data-testid={`form-field-${field.name}`}
+              aria-label={field.label}
               checked={(value as boolean) || false}
               onCheckedChange={onChange}
               disabled={field.disabled}
@@ -322,6 +368,7 @@ export function FormFieldRenderer({
         return (
           <CustomComponent
             field={field}
+            values={values}
             value={value}
             onChange={onChange}
             error={error}

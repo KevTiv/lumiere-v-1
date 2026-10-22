@@ -32,6 +32,8 @@ describe("EntityRecordSheet discussion", () => {
   it("has no Discussion tab unless the config asks for one", () => {
     open(base)
     expect(screen.queryByTestId("entity-record-sheet-tab-discussion")).toBeNull()
+    expect(screen.getByRole("tablist").getAttribute("data-variant")).toBe("line")
+    expect(screen.getByRole("tablist").getAttribute("data-ui")).toBe("context-tabs")
   })
 
   it("adds a Discussion tab filed under the audit table by default", () => {

@@ -4,6 +4,8 @@ import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { CheckCheck, MessageSquare, Reply } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { MarkdownView } from "@/components/ui/markdown-view"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import type { ProposalComment } from "@lumiere/stdb/proposal-row-types"
 import { rowBigint, rowBool, rowString } from "./row-field-utils"
@@ -66,9 +68,10 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
               </span>
             )}
           </div>
-          <p className={cn("text-xs mt-0.5 text-foreground", isResolved ? "line-through decoration-muted-foreground" : undefined)}>
-            {rowString(comment.content)}
-          </p>
+          <MarkdownView
+            value={rowString(comment.content)}
+            className={cn("mt-0.5 text-foreground [&_.ProseMirror]:text-xs", isResolved ? "line-through decoration-muted-foreground" : undefined)}
+          />
           {!isResolved && (
             <div className="flex items-center gap-2 mt-1">
               <button
@@ -108,7 +111,7 @@ function CommentCard({ comment, replies, currentUserId, onReply, onResolve }: Co
                   <span className="text-xs font-medium">{rowString(reply.authorName)}</span>
                   <span className="text-[10px] text-muted-foreground">{formatDate(reply.createDate)}</span>
                 </div>
-                <p className="text-xs mt-0.5">{rowString(reply.content)}</p>
+                <MarkdownView value={rowString(reply.content)} className="mt-0.5 [&_.ProseMirror]:text-xs" />
               </div>
             </div>
           ))}
@@ -183,12 +186,12 @@ export function CommentThread({ comments, currentUserId, onAdd, onResolve }: Com
           {replyingTo && (
             <div className="ml-8 space-y-1">
               <p className="text-[10px] text-muted-foreground">{t("proposalWorkspace.commentThread.replyingToComment")}</p>
-              <textarea
+              <Textarea
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
                 placeholder={t("proposalWorkspace.commentThread.writeReply")}
                 rows={2}
-                className="w-full text-xs border border-border rounded px-2 py-1.5 bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                className="text-xs"
               />
               <div className="flex gap-1.5">
                 <Button size="sm" className="h-6 text-xs px-2" onClick={handleAddReply}>
@@ -203,13 +206,18 @@ export function CommentThread({ comments, currentUserId, onAdd, onResolve }: Com
 
           {/* New comment input */}
           <div className="space-y-1">
-            <textarea
+            <Textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleAddRoot() }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault()
+                  handleAddRoot()
+                }
+              }}
               placeholder={t("proposalWorkspace.commentThread.addComment")}
               rows={2}
-              className="w-full text-xs border border-border rounded px-2 py-1.5 bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              className="text-xs"
             />
             <Button
               size="sm"

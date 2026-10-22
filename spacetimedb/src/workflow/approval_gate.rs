@@ -198,6 +198,16 @@ pub fn request_guarded_action(
     })
 }
 
+/// Validate workflow discovery and selected routing without creating an instance/task.
+pub(crate) fn preflight_guarded_action_gate(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    snapshot: &GuardedActionSnapshot,
+) -> Result<(), String> {
+    discover_gate_plan(ctx, organization_id, company_id, snapshot).map(|_| ())
+}
+
 struct GatePlan {
     version: WorkflowVersion,
     task_node: Option<WorkflowNode>,
@@ -237,29 +247,32 @@ fn discover_gate_plan(
                         && action.input_schema_version == snapshot.action_version
                 })
             }) {
-                candidates.push((version, nodes));
+                let edges: Vec<_> = ctx
+                    .db
+                    .workflow_edge()
+                    .workflow_edge_by_version()
+                    .filter(&version.id)
+                    .collect();
+                let (task_node, path) = selected_task_path(&version, &nodes, &edges, snapshot)?;
+                // A published definition can mention the guarded action while its
+                // conditions route this subject directly to an end node. Such a
+                // definition does not gate this request and must not conflict with
+                // the one definition whose selected path reaches an approval task.
+                if task_node.is_some() {
+                    candidates.push(GatePlan {
+                        version,
+                        task_node,
+                        path,
+                    });
+                }
             }
         }
     }
-    candidates.sort_by_key(|(version, _)| version.id);
+    candidates.sort_by_key(|plan| plan.version.id);
     if candidates.len() > 1 {
         return Err("multiple published workflows match this guarded action".to_string());
     }
-    let Some((version, nodes)) = candidates.pop() else {
-        return Ok(None);
-    };
-    let edges: Vec<_> = ctx
-        .db
-        .workflow_edge()
-        .workflow_edge_by_version()
-        .filter(&version.id)
-        .collect();
-    let (task_node, path) = selected_task_path(&version, &nodes, &edges, snapshot)?;
-    Ok(Some(GatePlan {
-        version,
-        task_node,
-        path,
-    }))
+    Ok(candidates.pop())
 }
 
 fn selected_task_path(
