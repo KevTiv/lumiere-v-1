@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 import { WorkspaceProfileProvider } from "../lib/workspace-profile-context"
@@ -133,6 +133,11 @@ describe("ErpCommandPalette records", () => {
     }
     render(<WorkspaceSearch />)
     fireEvent.click(screen.getByRole("button", { name: "Search workspace" }))
+    const dialog = screen.getByRole("dialog", {
+      name: "Command Palette",
+      description: "Search modules, quick actions and records",
+    })
+    expect(within(dialog).getByRole("heading", { name: "Command Palette" })).toBeTruthy()
     expect(screen.getByRole("combobox")).toBeTruthy()
     type("so00")
     fireEvent.click(screen.getByTestId("erp-command-palette-record-sale_order-1"))

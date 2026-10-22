@@ -24,7 +24,10 @@ use crate::types::{
     PaymentTransactionStatus,
 };
 
-use super::helpers::{create_balanced_customer_invoice, seed_bank_journal};
+use super::helpers::{
+    create_balanced_customer_invoice, create_balanced_customer_invoice_on_account,
+    seed_bank_journal,
+};
 
 fn company_currency_id(ctx: &ReducerContext, company_id: u64) -> Result<u64, String> {
     ctx.db
@@ -997,5 +1000,391 @@ pub fn test_update_payment_account_rejects_cross_tenant_accounts(
         return Err("same-tenant fee_account_id update did not persist".to_string());
     }
 
+    Ok(())
+}
+
+/// Seeded Paid rows must satisfy the same ledger and allocation invariants as
+/// real payments. In particular an operational receipt may be unallocated, but
+/// it may never be posted without a linked ledger payment and balanced move.
+pub fn test_seed_payment_ledger_and_partial_report_balance(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    use crate::accounting::journal_entries::reconcile_payment_with_invoice;
+    use crate::accounting::payment_management::{PaymentFee, PaymentTransaction};
+    use crate::accounting::payments::AccountPayment;
+    use crate::types::{AccountMoveState, PaymentState, PaymentType};
+
+    ensure_test_superuser(ctx)?;
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let (journal_id, _) = seed_bank_journal(ctx, &fixture)?;
+    let currency_id = company_currency_id(ctx, fixture.company_id)?;
+    let ar_account_id = *fixture
+        .chart_account_ids
+        .get(crate::test_harness::chart_keys::AR)
+        .ok_or("fixture receivable account missing")?;
+    // The helper uses this reference as its creation idempotency key. Separate
+    // invoices in one organization must not replay the first invoice's receipt.
+    let invoice_id = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        13_750.0,
+        ar_account_id,
+        "Seed owner partially allocated invoice",
+        true,
+    )?;
+    let settled_invoice_id = create_balanced_customer_invoice_on_account(
+        ctx,
+        &fixture,
+        3_600.0,
+        ar_account_id,
+        "Seed settled sale-order invoice",
+        true,
+    )?;
+    use crate::inventory::product::product;
+    use crate::sales::pricelists::{product_pricelist, ProductPricelist};
+    use crate::sales::sales_core::{
+        create_sale_order, sale_order, CreateSaleOrderLineParams, CreateSaleOrderParams,
+    };
+    let product_uom_id = ctx
+        .db
+        .product()
+        .id()
+        .find(&fixture.product_id)
+        .ok_or("fixture product missing")?
+        .uom_id;
+    let pricelist_id = ctx
+        .db
+        .product_pricelist()
+        .insert(ProductPricelist {
+            id: 0,
+            organization_id: fixture.organization_id,
+            company_id: Some(fixture.company_id),
+            name: "Seed payment settlement regression".to_string(),
+            currency_id,
+            discount_policy: crate::types::DiscountPolicy::WithDiscount,
+            is_active: true,
+            created_at: ctx.timestamp,
+        })
+        .id;
+    let qty = 1.0;
+    let price_unit = Some(3_600.0);
+    let client_order_ref = "Seed payment sales order";
+    let metadata = "seed payment regression";
+    create_sale_order(
+        ctx,
+        fixture.organization_id,
+        CreateSaleOrderParams {
+            company_id: Some(fixture.company_id),
+            partner_id: fixture.partner_id,
+            partner_invoice_id: fixture.partner_id,
+            partner_shipping_id: fixture.partner_id,
+            pricelist_id,
+            currency_id: fixture.currency_id,
+            warehouse_id: fixture.warehouse_id,
+            order_lines: vec![CreateSaleOrderLineParams {
+                product_id: fixture.product_id,
+                quantity: qty,
+                uom_id: product_uom_id,
+                price_unit,
+                discount: 0.0,
+                tax_ids: vec![],
+                name: None,
+                sequence: 1,
+                is_downpayment: false,
+                display_type: None,
+                product_variant_id: None,
+                packaging_id: None,
+                route_id: None,
+                analytic_tag_ids: vec![],
+                customer_lead: None,
+                metadata: None,
+            }],
+            origin: Some(metadata.to_string()),
+            client_order_ref: Some(client_order_ref.to_string()),
+            payment_term_id: None,
+            fiscal_position_id: None,
+            team_id: None,
+            opportunity_id: None,
+            proposal_id: None,
+            note: None,
+            terms_and_conditions: None,
+            validity_days: None,
+            shipping_policy: None,
+            picking_policy: None,
+            campaign_id: None,
+            medium_id: None,
+            source_id: None,
+            commitment_date: None,
+            expected_date: None,
+            incoterm_id: None,
+            incoterm: None,
+            incoterm_location: None,
+            carrier_id: None,
+            customer_lead: None,
+            analytic_account_id: None,
+            user_id: None,
+            is_printed: None,
+            is_locked: None,
+            is_dropship: None,
+            invoice_policy: None,
+            message_follower_ids: None,
+            message_partner_ids: None,
+            message_channel_ids: None,
+            activity_ids: None,
+            metadata: Some(format!(r#"{{"test":"{metadata}"}}"#)),
+        },
+    )?;
+    let linked_order = ctx
+        .db
+        .sale_order()
+        .iter()
+        .find(|row| {
+            row.organization_id == fixture.organization_id
+                && row.client_order_ref.as_deref() == Some(client_order_ref)
+        })
+        .ok_or("seed regression sales order missing")?;
+    let settled_invoice = ctx
+        .db
+        .account_move()
+        .id()
+        .find(&settled_invoice_id)
+        .ok_or("seed invoice missing")?;
+    ctx.db
+        .account_move()
+        .id()
+        .update(crate::accounting::journal_entries::AccountMove {
+            sale_order_id: Some(linked_order.id),
+            ..settled_invoice
+        });
+
+    let account =
+        ctx.db
+            .payment_account()
+            .insert(crate::accounting::payment_management::PaymentAccount {
+                id: 0,
+                organization_id: fixture.organization_id,
+                company_id: fixture.company_id,
+                provider_code: PaymentProviderCode::Mtn,
+                name: "Seed ledger fixture wallet".to_string(),
+                provider_label: None,
+                reference_normalized: None,
+                reference_masked: None,
+                currency_id,
+                account_journal_id: journal_id,
+                fee_account_id: None,
+                clearing_account_id: None,
+                active: true,
+                is_primary: false,
+                created_at: ctx.timestamp,
+                updated_at: ctx.timestamp,
+                created_by: ctx.sender(),
+                updated_by: ctx.sender(),
+                archived_at: None,
+                metadata: None,
+            });
+    let mut payments = Vec::new();
+    for (name, amount) in [
+        ("PAY-0001", 3_600.0),
+        ("PAY-OWNER-0001", 15_000.0),
+        ("PAY-OWNER-0002", 5_000.0),
+        ("PAY-OWNER-UNREC", 2_500.0),
+    ] {
+        let draft = ctx.db.account_payment().insert(AccountPayment {
+            id: 0,
+            organization_id: fixture.organization_id,
+            company_id: fixture.company_id,
+            name: Some(name.to_string()),
+            move_id: None,
+            reversal_move_id: None,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            amount,
+            currency_id,
+            date: ctx.timestamp,
+            journal_id,
+            ref_: None,
+            memo: None,
+            reconciled_invoice_ids: vec![],
+            reconciled_bill_ids: vec![],
+            state: PaymentState::NotPaid,
+            created_at: ctx.timestamp,
+            create_uid: ctx.sender(),
+        });
+        let paid = crate::seed::seed_posted_payment(ctx, draft)?;
+        let move_id = paid.move_id.ok_or("seed payment missing ledger move")?;
+        let header = ctx
+            .db
+            .account_move()
+            .id()
+            .find(&move_id)
+            .ok_or("seed payment move missing")?;
+        assert_eq!(header.state, AccountMoveState::Posted);
+        assert_eq!(header.organization_id, fixture.organization_id);
+        assert_eq!(header.company_id, fixture.company_id);
+        assert_eq!(header.currency_id, currency_id);
+        assert_eq!(header.partner_id, Some(fixture.partner_id));
+        let lines: Vec<_> = ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(&move_id)
+            .collect();
+        assert_eq!(lines.len(), 2);
+        assert!((lines.iter().map(|l| l.debit - l.credit).sum::<f64>()).abs() < 0.000_001);
+        for line in &lines {
+            assert_eq!(line.parent_state, AccountMoveState::Posted);
+            assert_eq!(line.payment_id, Some(paid.id));
+            assert_eq!(line.organization_id, fixture.organization_id);
+            assert_eq!(line.company_id, fixture.company_id);
+            assert_eq!(line.currency_id, currency_id);
+            assert_eq!(line.company_currency_id, currency_id);
+            assert_eq!(line.partner_id, Some(fixture.partner_id));
+        }
+        payments.push(paid);
+    }
+    reconcile_payment_with_invoice(
+        ctx,
+        fixture.organization_id,
+        payments[0]
+            .move_id
+            .ok_or("settled seed payment missing move")?,
+        settled_invoice_id,
+    )?;
+    let settled_order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&linked_order.id)
+        .ok_or("settled seed sales order missing")?;
+    assert_eq!(settled_order.amount_total, 3_600.0);
+    assert_eq!(settled_order.amount_paid, 3_600.0);
+    assert_eq!(settled_order.amount_residual, 0.0);
+    let mut transactions = Vec::new();
+    for (payment, reference, gross, net) in [
+        (&payments[1], "SEED-MTN-0001", 15_300.0, 14_700.0),
+        (&payments[2], "SEED-WAYNE-PARTIAL", 5_000.0, 5_000.0),
+        (&payments[3], "SEED-UNREC-0001", 2_500.0, 2_500.0),
+    ] {
+        transactions.push(ctx.db.payment_transaction().insert(PaymentTransaction {
+            id: 0,
+            organization_id: fixture.organization_id,
+            company_id: fixture.company_id,
+            payment_account_id: account.id,
+            direction: PaymentDirection::Inbound,
+            partner_type: PartnerType::Customer,
+            partner_id: fixture.partner_id,
+            external_reference: Some(reference.to_string()),
+            reference_fingerprint: reference.to_lowercase(),
+            gross_external_amount: gross,
+            settlement_amount: payment.amount,
+            net_account_amount: net,
+            currency_id,
+            occurred_at: ctx.timestamp,
+            status: PaymentTransactionStatus::Posted,
+            account_payment_id: Some(payment.id),
+            source_entity: None,
+            source_entity_id: None,
+            evidence_document_ids: vec![],
+            created_at: ctx.timestamp,
+            updated_at: ctx.timestamp,
+            created_by: ctx.sender(),
+            updated_by: ctx.sender(),
+            voided_at: None,
+            metadata: None,
+        }));
+    }
+    let fee = ctx.db.payment_fee().insert(PaymentFee {
+        id: 0,
+        organization_id: fixture.organization_id,
+        company_id: fixture.company_id,
+        payment_transaction_id: transactions[0].id,
+        bearer: PaymentFeeBearer::Company,
+        amount: 300.0,
+        currency_id,
+        fee_account_id: None,
+        tax_account_id: None,
+        tax_amount: 0.0,
+        provider_reference: None,
+        created_at: ctx.timestamp,
+        created_by: ctx.sender(),
+        metadata: None,
+    });
+    let invoice_line = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&invoice_id)
+        .find(|line| line.account_id == ar_account_id)
+        .ok_or("partial owner invoice has no AR line")?;
+    assert!(invoice_line
+        .account_internal_type
+        .as_deref()
+        .is_some_and(|kind| kind.eq_ignore_ascii_case("receivable")));
+    allocate_payment_transaction(
+        ctx,
+        fixture.organization_id,
+        AllocatePaymentParams {
+            idempotency_key: format!("seed-ledger-regression-{}", transactions[1].id),
+            company_id: fixture.company_id,
+            payment_transaction_id: transactions[1].id,
+            allocated_move_line_id: invoice_line.id,
+            allocated_amount: 5_000.0,
+            currency_id,
+            write_off_amount: 0.0,
+            write_off_account_id: None,
+            metadata: None,
+        },
+    )?;
+    let allocation = ctx
+        .db
+        .payment_reconciliation()
+        .iter()
+        .find(|row| row.payment_transaction_id == transactions[1].id)
+        .ok_or("seed allocation absent")?;
+    assert_eq!(allocation.allocated_amount, 5_000.0);
+    assert_eq!(allocation.residual_before, 13_750.0);
+    assert_eq!(allocation.residual_after, 8_750.0);
+    assert_eq!(
+        ctx.db
+            .account_move()
+            .id()
+            .find(&invoice_id)
+            .ok_or("owner invoice missing")?
+            .amount_residual,
+        8_750.0
+    );
+    assert_eq!(
+        ctx.db
+            .account_move_line()
+            .id()
+            .find(&invoice_line.id)
+            .ok_or("owner invoice AR missing")?
+            .amount_residual,
+        8_750.0
+    );
+    for (payment, expected) in payments.iter().zip([0.0, 15_000.0, 0.0, 2_500.0]) {
+        let clearing_lines: Vec<_> = ctx
+            .db
+            .account_move_line()
+            .move_line_by_move()
+            .filter(&payment.move_id.ok_or("seed payment move absent")?)
+            .filter(|line| line.account_id == ar_account_id)
+            .collect();
+        assert_eq!(clearing_lines.len(), 1);
+        let remaining: f64 = clearing_lines
+            .iter()
+            .map(|line| line.amount_residual.abs())
+            .sum();
+        assert_eq!(remaining, expected);
+    }
+    assert_eq!(fee.amount, 300.0);
+    assert_eq!(
+        transactions
+            .iter()
+            .map(|row| row.settlement_amount)
+            .sum::<f64>(),
+        22_500.0
+    );
     Ok(())
 }

@@ -73,8 +73,11 @@ export function RecordAttachmentsPanel({
   }, [documents, resModel, resId])
 
   return (
-    <div className="space-y-3 rounded-md border border-border p-3" data-testid="record-attachments-panel">
-      <div className="flex items-center justify-between gap-2">
+    <div
+      className="@container/attachments space-y-3 rounded-md border border-border p-3 [overflow-wrap:anywhere]"
+      data-testid="record-attachments-panel"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium">{title}</h3>
         <span className="text-xs text-muted-foreground">
           {resModel} #{String(resId)}
@@ -89,13 +92,21 @@ export function RecordAttachmentsPanel({
             const label = d.name || d.fileName || d.file_name || `Document ${String(d.id)}`
             const href = d.url || undefined
             return (
-              <li key={String(d.id)} className="flex items-center justify-between gap-2">
+              <li
+                key={String(d.id)}
+                className="flex min-w-0 flex-wrap items-start justify-between gap-2 [overflow-wrap:anywhere]"
+              >
                 {href ? (
-                  <a className="text-primary underline-offset-2 hover:underline" href={href} target="_blank" rel="noreferrer">
+                  <a
+                    className="min-w-0 max-w-full text-primary underline-offset-2 hover:underline"
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
                     {label}
                   </a>
                 ) : (
-                  <span>{label}</span>
+                  <span className="min-w-0 max-w-full">{label}</span>
                 )}
                 <span className="text-xs text-muted-foreground">{d.mimetype || ""}</span>
               </li>
@@ -104,8 +115,8 @@ export function RecordAttachmentsPanel({
         </ul>
       )}
 
-      <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-        <div className="space-y-1">
+      <div className="grid gap-2 @lg/attachments:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] @lg/attachments:items-end">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor="attach-name">Name</Label>
           <Input
             id="attach-name"
@@ -115,7 +126,7 @@ export function RecordAttachmentsPanel({
             disabled={disabled || pending}
           />
         </div>
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor="attach-file">File</Label>
           <Input
             id="attach-file"
@@ -127,6 +138,7 @@ export function RecordAttachmentsPanel({
         </div>
         <Button
           type="button"
+          className="h-auto min-h-8 max-w-full whitespace-normal"
           disabled={disabled || pending || !file}
           onClick={async () => {
             if (!file) return

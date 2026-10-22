@@ -1030,6 +1030,20 @@ pub fn apply_subscription_invoice_payment(
         .id()
         .find(&payment_id)
         .ok_or("Payment not found after create")?;
+    // The move was built before the payment existed. Complete its reverse
+    // links before posting the payment so balance readers can verify the
+    // clearing lines belong to this exact ledger payment.
+    for line in ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+    {
+        ctx.db.account_move_line().id().update(AccountMoveLine {
+            payment_id: Some(payment_id),
+            ..line
+        });
+    }
     let pay_name = payment
         .name
         .clone()

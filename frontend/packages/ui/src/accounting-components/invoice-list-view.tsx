@@ -12,6 +12,8 @@ export interface InvoiceListViewProps extends AccountingWorklistProps {
   invoices: AccountMove[]
   onSelectInvoice?: (invoice: AccountMove) => void
   onCreateInvoice?: () => void
+  onSendInvoice?: (invoice: AccountMove) => void
+  onDownloadPdf?: (invoice: AccountMove) => void
   onRecalculateTotals?: (invoice: AccountMove) => void
 }
 
@@ -19,6 +21,8 @@ export function InvoiceListView({
   invoices,
   onSelectInvoice,
   onCreateInvoice,
+  onSendInvoice,
+  onDownloadPdf,
   ...props
 }: InvoiceListViewProps) {
   const [density, setDensity] = useTableDensity("accounting-invoices-list")
@@ -31,6 +35,8 @@ export function InvoiceListView({
       rows={invoices}
       onSelect={onSelectInvoice}
       onCreate={onCreateInvoice}
+      onSend={onSendInvoice}
+      onDownload={onDownloadPdf}
     />
     </div>
   )

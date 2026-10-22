@@ -1685,6 +1685,23 @@ function AccountingClientReady({
     [accountPaymentFormConfig],
   )
 
+  // Bills have no direct "pay" mutation: open the payment form pre-filled for the
+  // supplier; the payment is then linked to the bill via the existing register flow.
+  const openBillPayment = useCallback(
+    (bill: { partnerId?: unknown; amountResidual?: number | null; name?: string | null }) =>
+      setQuickActionForm({
+        form: mergeFieldDefaultValues(accountPaymentFormConfig, {
+          paymentType: "OutBound",
+          partnerType: "Supplier",
+          ...(bill.partnerId != null ? { partnerId: String(bill.partnerId) } : {}),
+          ...(bill.amountResidual ? { amount: String(bill.amountResidual) } : {}),
+          ...(bill.name ? { ref: String(bill.name) } : {}),
+        }),
+        action: "createAccountPayment",
+      }),
+    [accountPaymentFormConfig],
+  )
+
   const paymentRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = paymentStateBadges(t)
     return {
@@ -4491,11 +4508,12 @@ function AccountingClientReady({
     [postMove, invoiceToPayment.postInvoice, runMutation],
   )
 
-  const handleInvoiceDownloadPdf = useCallback(async () => {
-    if (!selectedInvoice?.id) return
+  const handleInvoiceDownloadPdf = useCallback(async (move?: { id?: unknown }) => {
+    const target = move ?? selectedInvoice
+    if (!target?.id) return
     try {
       setInvoiceDocBusy("download")
-      await downloadDocumentPdf("account-move", Number(selectedInvoice.id))
+      await downloadDocumentPdf("account-move", Number(target.id))
     } catch (e) {
       toast({
         variant: "destructive",
@@ -4533,8 +4551,8 @@ function AccountingClientReady({
     }
   }, [selectedInvoice, operatingCompanyId, createDocument, toast])
 
-  const handleInvoiceSendEmail = useCallback(() => {
-    const id = optionalBigIntU64(selectedInvoice?.id)
+  const handleInvoiceSendEmail = useCallback((move?: { id?: unknown }) => {
+    const id = optionalBigIntU64(move?.id ?? selectedInvoice?.id)
     if (id == null || id <= 0n) return
     // Review a single document; never drain the organization-wide mail queue here.
     router.push(`/accounting/invoices/${id}?review=email`)
@@ -5456,6 +5474,8 @@ function AccountingClientReady({
                     onInitialFilterClear={clearInvoiceFilter}
                     onSelectInvoice={(invoice) => setInvoiceSheetRecord(copyAsRecord(invoice))}
                     onCreateInvoice={openInvoiceCreate}
+                    onSendInvoice={(inv) => void handleInvoiceSendEmail(inv)}
+                    onDownloadPdf={(inv) => void handleInvoiceDownloadPdf(inv)}
                     onRecalculateTotals={(inv) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint))
                     }
@@ -5497,6 +5517,8 @@ function AccountingClientReady({
                     onInitialFilterClear={clearInvoiceFilter}
                     onCreateBill={openBillCreate}
                     onSelectBill={(bill) => setInvoiceSheetRecord(copyAsRecord(bill))}
+                    onPayBill={openBillPayment}
+                    onDownloadBill={(bill) => void handleInvoiceDownloadPdf(bill)}
                     onRecalculateTotals={(bill) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint))
                     }

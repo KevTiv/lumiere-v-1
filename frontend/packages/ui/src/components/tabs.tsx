@@ -5,19 +5,12 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@lumiere/ui/lib/utils"
 
-function Tabs({
-  className,
-  orientation = "horizontal",
-  ...props
-}: TabsPrimitive.Root.Props) {
+function Tabs({ className, orientation = "horizontal", ...props }: TabsPrimitive.Root.Props) {
   return (
     <TabsPrimitive.Root
       data-slot="tabs"
       data-orientation={orientation}
-      className={cn(
-        "group/tabs flex gap-2 data-horizontal:flex-col",
-        className
-      )}
+      className={cn("group/tabs flex gap-2 data-horizontal:flex-col", className)}
       {...props}
     />
   )
@@ -41,15 +34,35 @@ const tabsListVariants = cva(
 function TabsList({
   className,
   variant = "default",
+  scrollable = false,
   ...props
-}: TabsPrimitive.List.Props & VariantProps<typeof tabsListVariants>) {
-  return (
+}: TabsPrimitive.List.Props &
+  VariantProps<typeof tabsListVariants> & {
+    /** Contain long horizontal tab rows without changing compact lists. */
+    scrollable?: boolean
+  }) {
+  const list = (
     <TabsPrimitive.List
       data-slot="tabs-list"
       data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
+      className={cn(
+        tabsListVariants({ variant }),
+        scrollable && "h-auto w-max min-w-full group-data-horizontal/tabs:h-auto",
+        className
+      )}
       {...props}
     />
+  )
+
+  return scrollable ? (
+    <div
+      data-slot="tabs-scroll-container"
+      className="min-w-0 overflow-x-auto pb-1 [scrollbar-width:thin]"
+    >
+      {list}
+    </div>
+  ) : (
+    list
   )
 }
 

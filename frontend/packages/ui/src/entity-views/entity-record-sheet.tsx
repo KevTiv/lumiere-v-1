@@ -91,12 +91,13 @@ export function EntityRecordSheet({
                 </div>
               )}
 
-              <Tabs defaultValue="overview" className="flex flex-col">
+              <Tabs defaultValue="overview" className="min-w-0 flex flex-col">
                 <ContextTabsList aria-label="Record views">
                   <ContextTabsTrigger value="overview">Overview</ContextTabsTrigger>
                   {config.customTabs?.map((tab) => (
                     <ContextTabsTrigger
                       key={tab.id}
+                      className="flex-none"
                       value={tab.id}
                       data-testid={`entity-record-sheet-tab-${tab.id}`}
                     >
