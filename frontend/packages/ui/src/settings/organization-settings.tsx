@@ -1,4 +1,5 @@
 "use client"
+import { organizationCsvImportTable, trackedImportCompanyId } from "./organization-csv-import"
 
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -91,7 +92,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const { organizationId } = useErpSession()
+  const { organizationId, activeCompanyId, activeCompanyReady } = useErpSession()
   const [csvKind, setCsvKind] = useState<OrgMasterCsvKind | null>(null)
   const [referenceModal, setReferenceModal] = useState<"country" | "currency" | null>(null)
   const [referenceError, setReferenceError] = useState<string | null>(null)
@@ -1302,6 +1303,11 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
 
       {csvKind && csvFormConfig && hasValidOrganizationId(organizationId) ? (
         <CsvImportModal
+          organizationId={orgBigInt}
+          tableName={organizationCsvImportTable(csvKind)}
+          trackedImport={{
+            companyId: trackedImportCompanyId(activeCompanyId, activeCompanyReady),
+          }}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

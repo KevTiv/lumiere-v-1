@@ -2,7 +2,7 @@
 import { accountMoveHref, projectTimesheetsHref } from "@lumiere/erp-shared/record-links"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
-import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useMemo, useState, useCallback, useEffect } from "react"
@@ -350,32 +350,41 @@ function ProjectsClientLoaded({
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<ProjectsCsvImportKind | null>(null)
 
-  const projectsQuery = useProjects(orgId, initialProjects)
-  const tasksQuery = useTasks(orgId, initialTasks)
-  const timesheetsQuery = useTimesheets(orgId, initialTimesheets)
-  const projectsState = moduleQueryState(projectsQuery)
-  const tasksState = moduleQueryState(tasksQuery)
-  const timesheetsState = moduleQueryState(timesheetsQuery)
-  const projects = canUseModuleData(projectsState) ? projectsQuery.data ?? [] : []
-  const tasks = canUseModuleData(tasksState) ? tasksQuery.data ?? [] : []
-  const timesheets = canUseModuleData(timesheetsState) ? timesheetsQuery.data ?? [] : []
-  const { data: timesheetsToValidate = [] } = useTimesheetsToValidate(orgId)
-  const { data: timesheetsUnbilled = [] } = useTimesheetsUnbilled(orgId)
-  const { data: rateCards = [] } = useProjectRateCards(orgId)
-  const { data: allocations = [] } = useResourceAllocations(orgId)
-  const { data: capacity = [] } = useResourceCapacityByEmployee(orgId)
-  const { data: projectMargins = [] } = useProjectMarginByProject(orgId)
-  const { data: utilisation = [] } = useResourceUtilisationByEmployee(orgId)
+  const projectsRead = moduleCollection(useProjects(orgId, initialProjects))
+  const projects = projectsRead.rows
+  const tasksRead = moduleCollection(useTasks(orgId, initialTasks))
+  const tasks = tasksRead.rows
+  const timesheetsRead = moduleCollection(useTimesheets(orgId, initialTimesheets))
+  const timesheets = timesheetsRead.rows
+  const timesheetsToValidateRead = moduleCollection(useTimesheetsToValidate(orgId))
+  const timesheetsToValidate = timesheetsToValidateRead.rows
+  const timesheetsUnbilledRead = moduleCollection(useTimesheetsUnbilled(orgId))
+  const timesheetsUnbilled = timesheetsUnbilledRead.rows
+  const rateCardsRead = moduleCollection(useProjectRateCards(orgId))
+  const rateCards = rateCardsRead.rows
+  const allocationsRead = moduleCollection(useResourceAllocations(orgId))
+  const allocations = allocationsRead.rows
+  const capacityRead = moduleCollection(useResourceCapacityByEmployee(orgId))
+  const capacity = capacityRead.rows
+  const projectMarginsRead = moduleCollection(useProjectMarginByProject(orgId))
+  const projectMargins = projectMarginsRead.rows
+  const utilisationRead = moduleCollection(useResourceUtilisationByEmployee(orgId))
+  const utilisation = utilisationRead.rows
   const { data: milestones = [] } = useProjectMilestones(orgId)
-  const { data: capacityForecast = [] } = useCapacityForecastByEmployee(orgId)
-  const { data: changeOrders = [] } = useProjectChangeOrders(orgId)
-  const { data: earnedValue = [] } = useProjectEarnedValueByProject(orgId)
-  const { data: projectIntents = [] } = useProjectIntegrationIntents(orgId)
+  const capacityForecastRead = moduleCollection(useCapacityForecastByEmployee(orgId))
+  const capacityForecast = capacityForecastRead.rows
+  const changeOrdersRead = moduleCollection(useProjectChangeOrders(orgId))
+  const changeOrders = changeOrdersRead.rows
+  const earnedValueRead = moduleCollection(useProjectEarnedValueByProject(orgId))
+  const earnedValue = earnedValueRead.rows
+  const projectIntentsRead = moduleCollection(useProjectIntegrationIntents(orgId))
+  const projectIntents = projectIntentsRead.rows
   const { data: hrResources = [] } = useHrResources(orgId)
   const { data: hrSkills = [] } = useHrSkills(orgId)
   const { data: hrEmployeeSkills = [] } = useHrEmployeeSkills(orgId)
   const { data: expenseSheets = [] } = useExpenseSheets(orgId)
-  const { data: employees = [] } = useEmployees(orgId)
+  const employeesRead = moduleCollection(useEmployees(orgId))
+  const employees = employeesRead.rows
   const { data: uoms = [] } = useUoms(orgId)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const contactsQuery = useContacts(
@@ -421,7 +430,8 @@ function ProjectsClientLoaded({
   const validateTimesheets = useValidateTimesheets(orgId)
   const rejectTimesheets = useRejectTimesheets(orgId)
   const billTimesheets = useBillTimesheets(orgId)
-  const { data: timesheetApprovals = [] } = useTimesheetApprovals(orgId)
+  const timesheetApprovalsRead = moduleCollection(useTimesheetApprovals(orgId))
+  const timesheetApprovals = timesheetApprovalsRead.rows
   const projectRebill = useCreateExpenseProjectRebill(orgId)
   const csvImports = useProjectsCsvImportMutations(orgId, operatingCompanyId)
 
@@ -1308,11 +1318,53 @@ function ProjectsClientLoaded({
     [projects, tasks, timesheets, rateCards, employees, timesheetApprovals],
   )
 
+  const dataState = {
+    dashboard: mergeModuleStates([
+      projectsRead.state, tasksRead.state, timesheetsRead.state,
+      timesheetsToValidateRead.state, timesheetsUnbilledRead.state, projectMarginsRead.state,
+    ]),
+    projects: projectsRead.state,
+    tasks: tasksRead.state,
+    timesheets: timesheetsRead.state,
+    "rate-cards": rateCardsRead.state,
+    resources: employeesRead.state,
+    "timesheet-approvals": timesheetApprovalsRead.state,
+    gantt: mergeModuleStates([projectsRead.state, tasksRead.state]),
+    "resource-allocation": mergeModuleStates([employeesRead.state, allocationsRead.state, capacityRead.state]),
+    utilisation: mergeModuleStates([employeesRead.state, utilisationRead.state]),
+    "advanced-psa": mergeModuleStates([
+      capacityForecastRead.state, changeOrdersRead.state, earnedValueRead.state, projectIntentsRead.state,
+    ]),
+  }
+  type ProjectsTab = keyof typeof dataState
+  const tabUsable = (tab: ProjectsTab | undefined) => tab == null || canUseModuleData(dataState[tab])
+  const actionTabs: Record<string, ProjectsTab> = {
+    createProject: "projects", updateProject: "projects", createTask: "tasks", updateTask: "tasks",
+    logTimesheet: "timesheets", startTimer: "timesheets",
+  }
+  const lifecycleTabs: Record<NonNullable<LifecycleModalState["type"]>, ProjectsTab> = {
+    taskState: "tasks", taskParent: "tasks", assignUsers: "tasks", billTimesheets: "timesheets",
+    expenseRebill: "projects", projectMilestone: "projects", rateCardLine: "rate-cards",
+    resourceAllocation: "resource-allocation", changeOrder: "advanced-psa",
+    subcontractorCost: "advanced-psa", integrationIntent: "advanced-psa",
+  }
+  const csvTabs: Record<ProjectsCsvImportKind, ProjectsTab> = { project: "projects", task: "tasks", timesheet: "timesheets" }
+  const modalUsable = modal.type === null || tabUsable(actionTabs[modal.action])
+  const lifecycleUsable = lifecycleModal.type === null || tabUsable(lifecycleTabs[lifecycleModal.type])
+  const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!modalUsable) setModal({ type: null })
+    if (!lifecycleUsable) setLifecycleModal({ type: null })
+    // Keep CSV request identity and recovery mounted when the source becomes unavailable.
+  }, [modalUsable, lifecycleUsable])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!tabUsable(actionTabs[action])) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
     if (action === "createProject") {
       const p = toCreateProjectParams(formData, pricelists, operatingCompanyId)
       if (p) await createProject.mutateAsync(projectsParamsToJson(p))
@@ -1430,13 +1482,13 @@ function ProjectsClientLoaded({
       <ModuleView
         config={config}
         data={data}
-        dataState={{ projects: projectsState, tasks: tasksState, timesheets: timesheetsState }}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
         isPending={isFormMutationPending}
       />
       <FormModal
-        open={modal.type !== null}
+        open={modal.type !== null && modalUsable}
         onOpenChange={(open) => !open && setModal({ type: null })}
         config={modal.type ? modal.form : projectFormConfig}
         isPending={isFormMutationPending}
@@ -1454,7 +1506,7 @@ function ProjectsClientLoaded({
           setModal({ type: null })
         }}
       />
-      {lifecycleModal.type !== null ? (
+      {lifecycleModal.type !== null && lifecycleUsable ? (
         <FormModal
           open
           onOpenChange={(open) => {
@@ -1470,6 +1522,7 @@ function ProjectsClientLoaded({
           closeOnSubmit={false}
           submitError={lifecycleError}
           onSubmit={async (formData) => {
+            if (!lifecycleUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
             setLifecycleError(null)
             try {
               const ids = selectedIds(lifecycleModal.rows)
@@ -1705,6 +1758,7 @@ function ProjectsClientLoaded({
       ) : null}
       {csvKind === "task" ? (
         <ImportAssistantWizard
+          sourceState={dataState.tasks}
           key="task-assistant"
           open
           organizationId={organizationId}
@@ -1713,12 +1767,14 @@ function ProjectsClientLoaded({
           title={t("projects.csvImport.taskTitle")}
           isImportPending={csvImports.importTask.isPending}
           onImport={async (csvData) => {
+            if (!csvUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
             await csvImports.importTask.mutateAsync(csvData)
           }}
         />
       ) : null}
       {csvKind && csvKind !== "task" && csvFormConfig ? (
         <CsvImportModal
+          sourceState={dataState[csvTabs[csvKind]]}
           trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={csvKind === "project" ? "project_project" : "project_timesheet"}
@@ -1729,6 +1785,7 @@ function ProjectsClientLoaded({
           templateFileName={`${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
+            if (!csvUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
             if (csvKind === "project") await csvImports.importProject.mutateAsync(text)
             else await csvImports.importTimesheet.mutateAsync(text)
           }}
