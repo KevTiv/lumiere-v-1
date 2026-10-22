@@ -12,6 +12,7 @@ vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, opti
 vi.mock("@lumiere/query-hooks/hooks/import-jobs", () => ({
   useImportJobs: () => queries.jobs,
   useImportJobErrors: () => queries.errors,
+  useRollbackImportJob: () => ({ mutateAsync: vi.fn(), isPending: false }),
   canRollbackImportJob: () => false,
   canCleanupAbandonedAccountMoveImport: (job: Record<string, unknown>) =>
     job.table_name === "account_move",

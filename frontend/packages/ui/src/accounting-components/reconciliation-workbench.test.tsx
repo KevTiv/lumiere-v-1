@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { ReconciliationWorkbench, type ReconciliationOutcome } from "./reconciliation-workbench"
 import type { ReconciliationRequest, ReconciliationSource } from "./reconciliation-workbench-model"
@@ -110,7 +110,7 @@ describe("bank matching desk", () => {
     await screen.findByText("Bank settlement confirmed")
     expect(onCheckStatus.mock.calls.every(([request]) => request === captured)).toBe(true)
     expect(onConfirm).toHaveBeenCalledOnce()
-    expect(onOperationLockChange).toHaveBeenLastCalledWith(false)
+    await waitFor(() => expect(onOperationLockChange).toHaveBeenLastCalledWith(false))
   })
   it("treats thrown confirmation errors as unknown, not as permission to submit again", async () => {
     const onConfirm = vi.fn().mockRejectedValue(new Error("Network interrupted"))

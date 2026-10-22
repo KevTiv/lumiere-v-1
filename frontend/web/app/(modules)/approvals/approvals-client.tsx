@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { DashboardHeader, MissingOrganization, Button } from "@lumiere/ui"
+import { Textarea } from "@lumiere/ui/components/textarea"
 import {
   approvalRecordHref,
   humanTaskCompanyId,
@@ -320,8 +321,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
 
                 {commentingId === taskId ? (
                   <div className="space-y-3 border-t pt-4">
-                    <textarea
-                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    <Textarea
                       placeholder="Add an evidence comment"
                       value={commentText}
                       onChange={(e) => setCommentText(e.target.value)}
@@ -341,8 +341,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
 
                 {rejectingId === taskId ? (
                   <div className="space-y-3 border-t pt-4">
-                    <textarea
-                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    <Textarea
                       placeholder={
                         requireComment
                           ? "Reason for rejection (required)"

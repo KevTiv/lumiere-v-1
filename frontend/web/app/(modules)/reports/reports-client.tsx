@@ -6,6 +6,10 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 
 import { useEffect, useMemo, useState, useRef, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { templateEditorForm } from "./template-editor-config"
+import { TemplateLayoutPreview } from "./template-layout-editor"
+import { currentReportTemplate, reportTemplateEditValues, type ReportTemplateEditValues } from "@lumiere/query-hooks/hooks/report-template-effect"
+import { toast } from "sonner"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -16,7 +20,6 @@ import {
   newScheduledReportForm,
   newAnalyticsMetricForm,
   newTrialBalanceEntryForm,
-  updateReportTemplateForm,
   updateMetricValuesForm,
   recordScheduledRunForm,
   newDashboardForm,
@@ -215,6 +218,7 @@ function ReportsClientLoaded({
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [editTemplateOpen, setEditTemplateOpen] = useState(false)
   const [editTemplateId, setEditTemplateId] = useState<string | null>(null)
+  const [editTemplateInitial, setEditTemplateInitial] = useState<ReportTemplateEditValues | null>(null)
   const [metricValuesOpen, setMetricValuesOpen] = useState(false)
   const [metricValuesId, setMetricValuesId] = useState<string | null>(null)
   const [recordRunOpen, setRecordRunOpen] = useState(false)
@@ -703,14 +707,22 @@ function ReportsClientLoaded({
             onClick: (rows) => {
               const first = rows[0]
               if (!first?.id) return
-              setEditTemplateId(String(first.id))
-              setEditTemplateOpen(true)
+              try {
+                if (operatingCompanyId == null || operatingCompanyId <= 0n) throw new Error("Select a company before editing a template")
+                const row = currentReportTemplate(reportTemplates, orgId, operatingCompanyId, BigInt(String(first.id)))
+                if (!row) throw new Error("Report template is no longer available")
+                setEditTemplateInitial(reportTemplateEditValues(row))
+                setEditTemplateId(String(first.id))
+                setEditTemplateOpen(true)
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Unable to open report template")
+              }
             },
           },
         ],
       },
     }
-  }, [moduleConfig.tabs, t])
+  }, [moduleConfig.tabs, t, reportTemplates, orgId, operatingCompanyId])
 
   const analyticsMetricsEntityConfig = useMemo((): EntityViewConfig => {
     const tab = moduleConfig.tabs.find((x) => x.id === "analytics-metrics")
@@ -1184,6 +1196,11 @@ function ReportsClientLoaded({
     importReportTemplateCsv.isPending ||
     importAnalyticsMetricCsv.isPending
 
+  // The actor is part of ModuleView's scope key. Mounting its interactive state
+  // before initial authorization resolves would discard selections and drafts
+  // as soon as that key acquires the actor, even though the session did not change.
+  if (permissionsReady === false || !currentUser?.id) return <p role="status" className="m-4 text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p>
+
   if (periodRequested && periodState.status !== "ready") return <ReportPeriodNotice state={periodState} context={periodContext} />
 
   return (
@@ -1224,26 +1241,32 @@ function ReportsClientLoaded({
           if (!open) {
             setEditTemplateOpen(false)
             setEditTemplateId(null)
+            setEditTemplateInitial(null)
           }
         }}
-        config={updateReportTemplateForm(t)}
+        key={`template-editor-${editTemplateId ?? "closed"}`}
+        config={templateEditorForm(t, editTemplateInitial ?? { orientation: "Portrait" }, updateReportTemplate.isPending)}
+        renderPreview={(values) => <TemplateLayoutPreview values={values} />}
+        showSubmitSuccessToast={false}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
-          if (editTemplateId == null) return
+          if (editTemplateId == null || !editTemplateInitial) throw new Error("No template selected")
           await updateReportTemplate.mutateAsync({
+            expected: editTemplateInitial,
             templateId: editTemplateId,
             params: {
-              orientation: String(formData.orientation ?? "Portrait"),
+              orientation: String(formData.orientation ?? editTemplateInitial.orientation),
               paperFormat:
                 formData.paperFormat != null && String(formData.paperFormat).trim() !== ""
                   ? String(formData.paperFormat).trim()
                   : undefined,
               templateContent:
-                formData.templateContent != null && String(formData.templateContent).trim() !== ""
-                  ? String(formData.templateContent).trim()
+                formData.templateContent != null && String(formData.templateContent) !== ""
+                  ? String(formData.templateContent)
                   : undefined,
             },
           })
+          toast.success(t("reports.layout.saved", { defaultValue: "Template layout saved" }))
         }}
       />
       <FormModal

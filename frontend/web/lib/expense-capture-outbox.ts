@@ -1,7 +1,7 @@
 /**
  * Online-first expense capture outbox.
- * Queues captures with `client_request_id` when the create call fails (brief offline / flaky net);
- * flush retries `create_expense` idempotently.
+ * Stores metadata and verified upload checkpoints, with stable request identities.
+ * File bytes stay in the capture tab. Interrupted expense dispatches require exact readback.
  */
 
 import {
@@ -29,12 +29,41 @@ export type ExpenseCapturePayload = {
   merchantKey?: string
 }
 
-export type ExpenseCaptureSyncState = "queued" | "synced" | "error" | "conflict"
+export type ExpenseCaptureSyncState =
+  | "queued"
+  | "submitting"
+  | "unknown"
+  | "rejected"
+  | "synced"
+  | "error"
+  | "conflict"
+
+export interface ExpenseCaptureReceipt {
+  state: "queued" | "uploading" | "attached" | "failed"
+  clientRequestId: string
+  fileName: string
+  mimeType: string
+  fileSize: number
+  lastModified: number
+  uploaded?: {
+    objectKey: string
+    checksum: string
+    fileName: string
+    mimetype: string
+    fileSize: string
+  }
+  receiptId?: string
+  lastError?: string
+}
 
 export interface ExpenseCaptureOutboxItem {
   clientRequestId: string
   deviceId: string
   payload: ExpenseCapturePayload
+  /** Captured scope is immutable; a company switch must not retarget an offline item. */
+  companyId?: string
+  receipt?: ExpenseCaptureReceipt
+  expenseId?: string
   createdAt: string
   syncState: ExpenseCaptureSyncState
   lastError?: string
@@ -59,7 +88,9 @@ export function readExpenseCaptureOutbox(
   organizationId: string | number,
   deviceId: string,
 ): ExpenseCaptureOutboxItem[] {
-  return readLocalStorageArray<ExpenseCaptureOutboxItem>(storageKey(organizationId, deviceId))
+  return readLocalStorageArray<ExpenseCaptureOutboxItem>(
+    storageKey(organizationId, deviceId),
+  )
 }
 
 function writeExpenseCaptureOutbox(
@@ -106,13 +137,14 @@ export function markExpenseCaptureError(
   clientRequestId: string,
   lastError: string,
 ): void {
-  const conflict =
-    /already exists|idempotenc|conflict|duplicate client_request/i.test(lastError)
   const items = readExpenseCaptureOutbox(organizationId, deviceId).map((i) =>
     i.clientRequestId === clientRequestId
       ? {
           ...i,
-          syncState: (conflict ? "conflict" : "error") as ExpenseCaptureSyncState,
+          syncState:
+            i.syncState === "submitting" || i.syncState === "unknown"
+              ? ("unknown" as const)
+              : ("error" as const),
           lastError,
         }
       : i,
@@ -126,7 +158,9 @@ export function requeueExpenseCapture(
   clientRequestId: string,
 ): void {
   const items = readExpenseCaptureOutbox(organizationId, deviceId).map((i) =>
-    i.clientRequestId === clientRequestId
+    i.clientRequestId === clientRequestId &&
+    i.syncState !== "submitting" &&
+    i.syncState !== "unknown"
       ? { ...i, syncState: "queued" as const, lastError: undefined }
       : i,
   )
@@ -152,6 +186,30 @@ export function listQueuedExpenseCaptures(
     (i) =>
       i.syncState === "queued" ||
       i.syncState === "error" ||
-      i.syncState === "conflict",
+      i.syncState === "rejected" ||
+      i.syncState === "conflict" ||
+      i.syncState === "submitting" ||
+      i.syncState === "unknown",
+  )
+}
+
+/** Save a checkpoint before the next network side effect. Storage failure aborts that side effect. */
+export function saveExpenseCaptureCheckpoint(
+  organizationId: string | number,
+  deviceId: string,
+  next: ExpenseCaptureOutboxItem,
+): void {
+  const items = readExpenseCaptureOutbox(organizationId, deviceId)
+  const matches = items.filter(
+    (item) => item.clientRequestId === next.clientRequestId,
+  )
+  if (matches.length !== 1 || next.deviceId !== deviceId)
+    throw new Error("The queued capture identity is unavailable or ambiguous")
+  writeExpenseCaptureOutbox(
+    organizationId,
+    deviceId,
+    items.map((item) =>
+      item.clientRequestId === next.clientRequestId ? next : item,
+    ),
   )
 }

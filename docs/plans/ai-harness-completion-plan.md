@@ -7,6 +7,12 @@ provider transport, and pilot-versus-full admission gates.
 
 **Execution tracking:** [AIH issues](./ai-harness-completion-issues.md).
 
+**Current Mistral integration assessment (2026-10-16):**
+[Harness readiness and credential handoff](./mistral-harness-readiness.md).
+The governed runtime now implements substantial transport, routing, spend and
+execution work described below as historical gaps. Use that assessment for the
+current integration blockers; it does not close the admission milestones here.
+
 **Active Luna coordination:** [AI harness Luna execution plan](./ai-harness-luna-execution-plan.md).
 
 **Sequencing authority:** [Core deployability](./core-vertical-deployability-pruning-plan.md#6-explicitly-deferred-from-deployability).

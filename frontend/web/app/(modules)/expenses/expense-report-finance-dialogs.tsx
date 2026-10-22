@@ -10,15 +10,15 @@ import {
   reimburseExpenseReportForm,
 } from '@lumiere/ui';
 import type { FormConfig } from '@lumiere/ui';
+import type { FormValues } from '@lumiere/ui/lib/form-types';
 import { useTranslation } from '@lumiere/i18n';
-import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import {
   useCreateExpenseProjectRebill,
   useCreateExpenseReimbursementPayment,
   usePostExpenseSheet,
 } from '@lumiere/query-hooks/hooks/expenses';
 import { useAccountAccounts, useAccountJournals } from '@lumiere/query-hooks/hooks/accounting';
-import { accountAccountRowsToSelectOptions, accountJournalRowsToSelectOptions } from '@/lib/form-lookup';
+import { accountAccountRowsToSelectOptions, accountJournalRowsToSelectOptions } from '../../../lib/form-lookup';
 import {
   buildPostParams,
   buildReimburseParams,
@@ -36,6 +36,7 @@ type Row = Record<string, unknown>;
 export function useExpenseReportFinance(orgId: bigint, operatingCompanyId: bigint) {
   const { t } = useTranslation();
   const [active, setActive] = useState<{ kind: FinanceKind; row: Row } | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
@@ -91,34 +92,36 @@ export function useExpenseReportFinance(orgId: bigint, operatingCompanyId: bigin
 
   const isPending = post.isPending || reimburse.isPending || rebill.isPending;
 
-  const submit = async (formData: Record<string, unknown>) => {
+  const submit = async (formData: FormValues) => {
     if (!active) return;
+    setSubmitError(null);
     const sheetId = sheetIdOf(active.row);
     try {
       if (active.kind === 'postReport') {
         const args = buildPostParams(sheetId, formData);
-        if (!args) return;
+        if (!args) throw new Error(t('expenses.forms.capture.financeRequired', { defaultValue: 'Complete the required date, journal, and account fields.' }));
         await post.mutateAsync(args);
       } else if (active.kind === 'reimburseReport') {
         const args = buildReimburseParams(sheetId, formData);
-        if (!args) return;
+        if (!args) throw new Error(t('expenses.forms.capture.financeRequired', { defaultValue: 'Complete the required date, journal, and account fields.' }));
         await reimburse.mutateAsync(args);
       } else {
         const args = buildRebillParams(sheetId, formData);
-        if (!args) return;
+        if (!args) throw new Error(t('expenses.forms.capture.financeRequired', { defaultValue: 'Complete the required date, journal, and account fields.' }));
         await rebill.mutateAsync(args);
       }
       setActive(null);
     } catch (error) {
-      showWorkflowToast({
-        kind: 'error',
-        title: t('expenses.workflow.financeFailed', { defaultValue: 'Expense report action failed' }),
-        description: error instanceof Error ? error.message : String(error),
-      });
+      const message = error instanceof Error ? error.message : t('expenses.workflow.financeFailed', { defaultValue: 'Expense report action failed' });
+      setSubmitError(message);
+      throw error instanceof Error ? error : new Error(message);
     }
   };
 
-  const open = useCallback((kind: FinanceKind, row: Row) => setActive({ kind, row }), []);
+  const open = useCallback((kind: FinanceKind, row: Row) => {
+    setSubmitError(null);
+    setActive({ kind, row });
+  }, []);
 
   const modal =
     active && config ? (
@@ -128,6 +131,9 @@ export function useExpenseReportFinance(orgId: bigint, operatingCompanyId: bigin
         onOpenChange={(next) => !next && setActive(null)}
         config={config}
         isPending={isPending}
+        closeOnSubmit={false}
+        showSubmitSuccessToast={false}
+        submitError={submitError}
         onSubmit={submit}
       />
     ) : null;

@@ -248,7 +248,7 @@ Legend — Class: **C** covered, **P** partial, **N** not covered, **B** blocked
 | Concurrent budget reservations | `competing_budget_reservations_never_overspend_in_any_serialization_order` plus settlement-replay coverage; two independent live clients produced one winner and one budget rejection without overspend | — | STDB (`spend.rs`) | yes | — | AG-06 | C |
 | Permission / capability changes mid-run | `governed_services::tests::revocation_is_rechecked_before_replaying_recovered_output` | broader live admin-revocation E2E | ai-gateway | yes | — | AG-07 | C |
 | Tool protocol fuzzing | strict capability envelope + 16 KiB bound; malformed/unknown/duplicate calls, invalid fields/types and oversize matrix; nested scope variants; terminal continuation remains unread; correlation/recovery replay tests; two live clients proved exclusive claim acquisition and terminal reconnect rejection | consequential red-action dispatch through the live gateway/browser path | ai-gateway + STDB | candidate additions | local Rust/runtime | AG-08 | P |
-| Recovery of run/budget/tool steps/pending drafts | exclusive durable claims; restored-output scope/key/hash validation and zero-dispatch unit fixtures; read-only nine-table reconstruction verifier with eight offline tests; real 23-module source snapshot reached watermark sequence 2 with 1,744 rows | PostgreSQL-to-fresh-STDB restore is blocked until the live 504-table schema (including `return_order_creation`) is released and pinned; current contracts expose 503 tables, so the immutable drill correctly refuses staging/pin drift | STDB + ai-gateway + reconstruction drill | candidate additions | contract release/repin, then complete C7 runtime evidence | AG-09; full drill blocked | P |
+| Recovery of run/budget/tool steps/pending drafts | exclusive durable claims; restored-output scope/key/hash validation and zero-dispatch unit fixtures; read-only nine-table reconstruction verifier with eight offline tests; real 23-module source snapshot reached watermark sequence 2 with 1,744 rows | Fresh PostgreSQL-to-STDB reconstruction against the final integrated source and immutable contract pin is still required; the historical 503/504 schema mismatch is superseded by main integration | STDB + ai-gateway + reconstruction drill | candidate additions | final-pin drift validation and fresh C7 runtime evidence | AG-09; full drill blocked | P |
 
 Implementation note (2026-09-30): AG-05 and AG-06 have blocking owner-layer tests on
 `codex/aih-phase4-spend-safety` and fresh local runtime acceptance on
@@ -359,7 +359,7 @@ controlled recovery probes; never manufacture zero counts. The verifier does no 
 I/O, compares every complete scoped row across nine tables and checks bindings, exact budget
 reconciliation, pending/unresolved preservation and succeeded-output integrity. It validates supplied
 observation evidence; it is not itself a provider telemetry collector or a live restart driver.
-After the contracts release/repin, rerun the already-prepared frozen source/fresh target drill,
+After final-pin drift validation, rebuild and rerun the frozen source/fresh target drill,
 capture the real provider counter across reconstruction, and execute the nine-table verifier. Full
 AG-09 promotion to **C** remains blocked until that evidence exists.
 

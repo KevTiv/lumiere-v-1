@@ -1,10 +1,10 @@
 # Phase 4 reconstruction contract alignment
 
-Status: prerequisite source implemented; matching release/pin pending; live AG-09 acceptance pending.
+Status: integrated with current main and contracts v0.3.136; live AG-09 acceptance pending (2026-10-22).
 
 ## Scope
 
-Stacked on `codex/aih-phase4-draft-protocol-recovery` (#135). Carries the existing ERP keyed-return prerequisite from `3a1c42dfa8ede6d6803281d0c4b6e9f776988251`, including its owner-layer replay test, resource and storage policies, tenancy census and generated restore application. It does not import the wider ERP workflow stack.
+Stacked on `codex/aih-phase4-draft-protocol-recovery` (#135), now integrated with current main. The keyed-return source prerequisite is already present on main, so this follow-up retains its Option serialization regression and the live reconstruction gate. It preserves the current immutable contracts v0.3.136 rather than repinning an older candidate.
 
 The existing `release-contracts.yml` workflow regenerates from this coherent source, publishes a fresh immutable tag only after candidate preparation, updates every Rust/TypeScript consumer and lockfile, and checks drift. The migration catalog checksum is recomputed with the runtime checksum function after updating the pin. No manifest comparison is bypassed.
 
@@ -14,7 +14,7 @@ The September 30 release job for #135 (`36783133274`) generated 503 schema table
 
 The old counts described schema tables, not restore tables: v0.3.60 has 503 schema tables, 498 restored and 5 recreated; the keyed-return schema has 504 tables, 499 restored and 5 recreated.
 
-## Validation executed here
+## Historical validation before integration
 
 - Ownership, C2 coverage and AI reconstruction Python suites: 21 passed.
 - HTTP parameter serialization suite: 38 passed, including keyed and legacy return Option encoding. Executed through Node 24 native TypeScript stripping with only the test import resolved to its absolute source path.
@@ -24,8 +24,8 @@ The old counts described schema tables, not restore tables: v0.3.60 has 503 sche
 
 ## Local completion gate
 
-1. Confirm the release job has published and committed the matching pin, then check out that final commit. Do not reuse staging, WASM or binaries from a different ERP branch.
-2. Regenerate live staging and run `make check-contracts-drift`; verify 504 schema tables and 499 restored tables in the pinned manifest. Rebuild both C7 binaries and the disposable source/target modules from this commit.
+1. Check out the final integrated commit and verify its immutable contract pin. The historical v0.3.75 publication request is superseded by the existing v0.3.136 pin; publish a new version only if authoritative drift validation requires it. Do not reuse staging, WASM or binaries from another branch.
+2. Regenerate live staging and run `make check-contracts-drift`; derive schema and restored-table counts from the final pinned manifest, not the historical 504/499 fixture. Rebuild both C7 binaries and disposable source/target modules from this commit.
 3. Populate all nine AI tables plus foreign-organization rows in `lumiere-c7-ai-source`, then freeze the source. Capture a new real coverage watermark; do not reuse the previous 1,744-row report after changing source/schema.
 4. Run `scripts/c7-all-module-reconstruction-drill.sh <organization-id>` with the documented dedicated source/reconstructor identities, loopback placement, PostgreSQL and `C7_EVIDENCE_DIR`. Preserve real verified `coverage.json`, `resume.json` and `repeat.json`.
 5. Capture external provider-dispatch counters across restoration and controlled recovery probes in `ai-provider-dispatch.json`; run `scripts/verify-ai-harness-reconstruction.py`. Compare every scoped row, budget and request binding, unknown outcomes, pending approvals and succeeded-output integrity. Require no provider redispatch.
