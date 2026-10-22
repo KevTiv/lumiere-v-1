@@ -1,7 +1,7 @@
 "use client"
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
-import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -416,37 +416,44 @@ function HrClientLoaded({
   const [rowActionError, setRowActionError] = useState<string | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
 
-  const employeesQuery = useEmployees(orgId, initialEmployees)
-  const { data: departments = [] } = useDepartments(orgId, initialDepartments)
-  const leavesQuery = useLeaveRequests(orgId, initialLeaves)
-  const { data: leavesToApprove = [] } = useLeavesToApprove(orgId)
-  const contractsQuery = useContracts(orgId, initialContracts)
-  const payslipsQuery = usePayslips(orgId, initialPayslips)
-  const employeesState = moduleQueryState(employeesQuery)
-  const leavesState = moduleQueryState(leavesQuery)
-  const contractsState = moduleQueryState(contractsQuery)
-  const payslipsState = moduleQueryState(payslipsQuery)
-  const employees = canUseModuleData(employeesState) ? employeesQuery.data ?? [] : []
-  const leaves = canUseModuleData(leavesState) ? leavesQuery.data ?? [] : []
-  const contracts = canUseModuleData(contractsState) ? contractsQuery.data ?? [] : []
-  const payslips = canUseModuleData(payslipsState) ? payslipsQuery.data ?? [] : []
-  const { data: payslipsToExport = [] } = usePayslipsToExport(orgId)
+  const employeesRead = moduleCollection(useEmployees(orgId, initialEmployees))
+  const employees = employeesRead.rows
+  const departmentsRead = moduleCollection(useDepartments(orgId, initialDepartments))
+  const departments = departmentsRead.rows
+  const leavesRead = moduleCollection(useLeaveRequests(orgId, initialLeaves))
+  const leaves = leavesRead.rows
+  const leavesToApproveRead = moduleCollection(useLeavesToApprove(orgId))
+  const leavesToApprove = leavesToApproveRead.rows
+  const contractsRead = moduleCollection(useContracts(orgId, initialContracts))
+  const contracts = contractsRead.rows
+  const payslipsRead = moduleCollection(usePayslips(orgId, initialPayslips))
+  const payslips = payslipsRead.rows
+  const payslipsToExportRead = moduleCollection(usePayslipsToExport(orgId))
+  const payslipsToExport = payslipsToExportRead.rows
   const { data: hrIntegrationIntentsPending = [] } = useHrIntegrationIntentsPending(orgId)
-  const { data: jobPositions = [] } = useJobPositions(orgId)
-  const { data: applicants = [] } = useApplicants(orgId)
-  const { data: leaveTypes = [] } = useLeaveTypes(orgId)
-  const {
-    data: leaveAllocations = [],
-    isLoading: leaveAllocationsLoading,
-    isError: leaveAllocationsError,
-  } = useLeaveAllocations(orgId)
+  const jobPositionsRead = moduleCollection(useJobPositions(orgId))
+  const jobPositions = jobPositionsRead.rows
+  const applicantsRead = moduleCollection(useApplicants(orgId))
+  const applicants = applicantsRead.rows
+  const leaveTypesRead = moduleCollection(useLeaveTypes(orgId))
+  const leaveTypes = leaveTypesRead.rows
+  const leaveAllocationsQuery = useLeaveAllocations(orgId)
+  const leaveAllocationsRead = moduleCollection(leaveAllocationsQuery)
+  const leaveAllocations = leaveAllocationsRead.rows
+  const leaveAllocationsLoading = leaveAllocationsQuery.isLoading
+  const leaveAllocationsError = leaveAllocationsQuery.isError
   const offboardingQuery = useOffboardingChecklists(orgId)
   const statutoryIdsQuery = useStatutoryIds(orgId)
-  const { data: payrollStructures = [] } = usePayrollStructures(orgId)
-  const { data: salaryRules = [] } = useSalaryRules(orgId)
-  const { data: onboardingTemplates = [] } = useOnboardingTemplates(orgId)
-  const { data: attendance = [] } = useAttendance(orgId)
-  const { data: compensationEvents = [] } = useCompensationEvents(orgId)
+  const payrollStructuresRead = moduleCollection(usePayrollStructures(orgId))
+  const payrollStructures = payrollStructuresRead.rows
+  const salaryRulesRead = moduleCollection(useSalaryRules(orgId))
+  const salaryRules = salaryRulesRead.rows
+  const onboardingTemplatesRead = moduleCollection(useOnboardingTemplates(orgId))
+  const onboardingTemplates = onboardingTemplatesRead.rows
+  const attendanceRead = moduleCollection(useAttendance(orgId))
+  const attendance = attendanceRead.rows
+  const compensationEventsRead = moduleCollection(useCompensationEvents(orgId))
+  const compensationEvents = compensationEventsRead.rows
   const { data: laborCostSnapshots = [] } = useLaborCostSnapshots(orgId)
   const { data: shiftOptJobs = [] } = useShiftOptJobs(orgId)
   const { data: globalAssignments = [] } = useGlobalAssignments(orgId)
@@ -1551,11 +1558,62 @@ function HrClientLoaded({
     [employees, departments, leaves, contracts, payslips, jobPositions, recruitmentPositions, leaveTypes, allocationRows, payrollStructures, salaryRules, onboardingTemplates, attendance, compensationEvents]
   )
 
+  const dataState = {
+    dashboard: mergeModuleStates([
+      employeesRead.state, leaveTypesRead.state, departmentsRead.state, leavesRead.state, leavesToApproveRead.state,
+      payslipsToExportRead.state, contractsRead.state, jobPositionsRead.state, applicantsRead.state,
+    ]),
+    employees: employeesRead.state,
+    departments: departmentsRead.state,
+    leaves: leavesRead.state,
+    "leave-allocations": leaveAllocationsRead.state,
+    attendance: attendanceRead.state,
+    contracts: contractsRead.state,
+    payslips: payslipsRead.state,
+    "job-positions": jobPositionsRead.state,
+    recruitment: jobPositionsRead.state,
+    "leave-types": leaveTypesRead.state,
+    "payroll-structures": payrollStructuresRead.state,
+    "salary-rules": salaryRulesRead.state,
+    "onboarding-templates": onboardingTemplatesRead.state,
+    "compensation-events": compensationEventsRead.state,
+    "org-chart": mergeModuleStates([departmentsRead.state, employeesRead.state]),
+  }
+  type HrTab = keyof typeof dataState
+  const tabUsable = (tab: HrTab | undefined) => tab == null || canUseModuleData(dataState[tab])
+  const actionTabs: Record<string, HrTab> = {
+    createEmployee: "employees", createLeaveRequest: "leaves", createContract: "contracts",
+    createPayslip: "payslips", createJobPosition: "job-positions", createDepartment: "departments",
+    createLeaveType: "leave-types", createPayrollStructure: "payroll-structures",
+    createSalaryRule: "salary-rules", createAttendancePunch: "attendance",
+    createOnboardingTemplate: "onboarding-templates",
+  }
+  const rowActionTabs: Record<NonNullable<HrRowAction>["action"], HrTab> = {
+    archiveEmployee: "employees", updateEmployee: "employees", confirmPayslip: "payslips",
+    postPayslip: "payslips", updateDepartment: "departments", updateJobPosition: "job-positions",
+    updateContract: "contracts", updateLeaveType: "leave-types",
+  }
+  const csvTabs: Record<HrCsvImportKind, HrTab> = {
+    resource: "employees", employee: "employees", department: "departments", job_position: "job-positions",
+    contract: "contracts", leave_type: "leave-types", leave: "leaves",
+    payroll_structure: "payroll-structures", salary_rule: "salary-rules", payslip: "payslips",
+  }
+  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action])
+  const rowActionUsable = rowAction == null || tabUsable(rowActionTabs[rowAction.action])
+  const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!rowActionUsable) setRowAction(null)
+    // Keep CSV request identity and recovery mounted when the source becomes unavailable.
+  }, [quickActionUsable, rowActionUsable])
+
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>
   ) => {
+    if (!tabUsable(actionTabs[action])) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
     if (action === "createEmployee") {
       await createEmployee.mutateAsync(toCreateEmployeeParams(formData))
     } else if (action === "createLeaveRequest") {
@@ -1645,16 +1703,6 @@ function HrClientLoaded({
     cancelPayslip.isPending ||
     Object.values(csvImports).some((m) => m.isPending)
 
-  const dataState = useMemo(
-    () => ({
-      employees: employeesState,
-      leaves: leavesState,
-      contracts: contractsState,
-      payslips: payslipsState,
-    }),
-    [employeesState, leavesState, contractsState, payslipsState],
-  )
-
   const dataLoading = useMemo(
     () => ({ "leave-allocations": leaveAllocationsLoading }),
     [leaveAllocationsLoading],
@@ -1678,7 +1726,7 @@ function HrClientLoaded({
         onDashboardTimeRangeChange={setDashboardTimeRange}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? employeeFormConfig}
         isPending={isFormMutationPending}
@@ -1689,7 +1737,7 @@ function HrClientLoaded({
           }
         }}
       />
-      {rowAction ? (
+      {rowAction && rowActionUsable ? (
         <FormModal
           open
           onOpenChange={(open) => {
@@ -1703,6 +1751,7 @@ function HrClientLoaded({
           closeOnSubmit={false}
           submitError={rowActionError}
           onSubmit={async (formData) => {
+            if (!rowActionUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
             setRowActionError(null)
             try {
               if (rowAction.action === "archiveEmployee") {
@@ -1810,6 +1859,7 @@ function HrClientLoaded({
       ) : null}
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          sourceState={dataState[csvTabs[csvKind]]}
           trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={{ resource: "hr_resource", department: "hr_department", job_position: "hr_job_position", employee: "hr_employee", contract: "hr_contract", leave_type: "hr_leave_type", leave: "hr_leave", payroll_structure: "hr_payroll_structure", salary_rule: "hr_salary_rule", payslip: "hr_payslip" }[csvKind]}
@@ -1818,6 +1868,7 @@ function HrClientLoaded({
           config={csvFormConfig}
           isPending={isFormMutationPending}
           onImport={async (text) => {
+            if (!csvUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
             switch (csvKind) {
               case "resource":
                 await csvImports.importResource.mutateAsync(text)
