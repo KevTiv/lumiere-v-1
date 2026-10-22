@@ -53,6 +53,7 @@ import {
 import { newExpenseReceiptClientRequestId } from "../../../lib/expenses-create-params"
 import { expenseCompanyLookupRows } from "./expense-capture-input"
 import { captureFileMatches, syncExpenseCapture } from "./expense-capture-sync"
+import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { CaptureAttachmentPreview } from "./capture-attachment-preview"
 
 export function ExpensesCapturePanel({
@@ -394,7 +395,10 @@ export function ExpensesCapturePanel({
             {status}
           </p>
         ) : null}
-        <FieldGroup className="grid min-w-0 grid-cols-1 sm:grid-cols-2">
+        <FinanceReviewWorkspace
+          editorLabel={t("financeReview.expenseDetails", { defaultValue: "Expense details" })}
+          previewLabel={t("financeReview.receipt", { defaultValue: "Receipt" })}
+          editor={<FieldGroup className="grid min-w-0 grid-cols-1 sm:grid-cols-2">
           <Field className="min-w-0">
             <FieldLabel htmlFor="capture-employee">
               {t("expenses.forms.newExpense.fields.employeeId")}
@@ -688,10 +692,21 @@ export function ExpensesCapturePanel({
               </FieldDescription>
             </Field>
           ) : null}
-        </FieldGroup>
-        {hasReceipt && receiptFile ? (
-          <CaptureAttachmentPreview file={receiptFile} />
-        ) : null}
+        </FieldGroup>}
+          preview={<div className="flex flex-col gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>{name || t("financeReview.expenseDraft", { defaultValue: "Expense draft" })}</CardTitle>
+                <CardDescription>{t("financeReview.unsaved", { defaultValue: "Unsaved input. The server confirms the saved result." })}</CardDescription>
+              </CardHeader>
+              <CardContent><dl className="grid grid-cols-2 gap-3 text-sm">
+                <dt>{t("financeReview.employee", { defaultValue: "Employee" })}</dt><dd>{String(scopedEmployees.find((row) => String(row.id) === employeeId)?.name ?? "—")}</dd>
+                <dt>{lineKind === "Mileage" ? t("financeReview.distance", { defaultValue: "Distance" }) : lineKind === "PerDiem" ? t("financeReview.days", { defaultValue: "Days" }) : t("financeReview.amountInput", { defaultValue: "Entered amount" })}</dt><dd className="text-right tabular-nums">{(lineKind === "Mileage" ? mileageDistance : lineKind === "PerDiem" ? perDiemDays : amount) || "—"}</dd>
+              </dl></CardContent>
+            </Card>
+            {hasReceipt && receiptFile ? <CaptureAttachmentPreview file={receiptFile} /> : <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">{t("financeReview.chooseReceipt", { defaultValue: "Choose a receipt to review it beside the expense details." })}</p>}
+          </div>}
+        />
         <div>
           <Button
             type="button"

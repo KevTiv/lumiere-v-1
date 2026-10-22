@@ -1,5 +1,7 @@
 "use client"
 
+import { useTableDensity } from "../hooks/use-table-density"
+import { TableDensityControl } from "../composed/table-density-control"
 import type { AccountMove } from "../lib/accounting-types"
 import {
   AccountingWorklistView,
@@ -23,7 +25,10 @@ export function InvoiceListView({
   onDownloadPdf,
   ...props
 }: InvoiceListViewProps) {
+  const [density, setDensity] = useTableDensity("accounting-invoices-list")
   return (
+    <div className="space-y-4 data-[density=compact]:[&_tbody_td]:py-1 data-[density=comfortable]:[&_tbody_td]:py-3 [&_td]:tabular-nums" data-density={density} data-testid="finance-money-list">
+      <TableDensityControl value={density} onChange={setDensity} />
     <AccountingWorklistView
       {...props}
       kind="invoice"
@@ -33,5 +38,6 @@ export function InvoiceListView({
       onSend={onSendInvoice}
       onDownload={onDownloadPdf}
     />
+    </div>
   )
 }

@@ -2,6 +2,8 @@
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { AssetDepreciationSchedule } from "@lumiere/ui/accounting-components/asset-depreciation-schedule"
 import { useModuleTab } from "@/hooks/use-module-tab"
+import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
+import { BillSourcePreview } from "../../../components/finance-source-preview"
 import { mapDashboardWidgets } from "@lumiere/ui/lib/dashboard-sections"
 import { agingShareRows, agingTotals, collectionRate, singleCurrencyId, revenueVsExpensesByMonth, topCustomers, weeklyCashMovements } from "./accounting-dashboard-charts"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
@@ -39,6 +41,7 @@ import {
   CSV_IMPORT_CONTRACTS,
   RuntimeFormModal,
   EntityView,
+  EntityDetail,
   ListPivotSwitch,
   useRBAC,
   newJournalEntryForm,
@@ -1916,6 +1919,12 @@ function AccountingClientReady({
   const invoiceBillRecordSheet = useMemo(
     (): EntityRecordSheetConfig => ({
       ...accountMoveRecordSheet,
+      wide: true,
+      overviewContent: (record) => <FinanceReviewWorkspace
+        editorLabel={t("financeReview.savedDetails", { defaultValue: "Saved details" })}
+        editor={<EntityDetail config={accountMoveRecordSheet.detailConfig} data={record} />}
+        preview={<BillSourcePreview organizationId={BigInt(organizationId)} companyId={BigInt(operatingCompanyId ?? 0)} recordId={String(record.id)} />}
+      />,
       customTabs: [
         ...(accountMoveRecordSheet.customTabs ?? []),
         {
@@ -1938,7 +1947,7 @@ function AccountingClientReady({
         },
       ],
     }),
-    [accountMoveRecordSheet, t],
+    [accountMoveRecordSheet, t, organizationId, operatingCompanyId],
   )
 
   const paymentTermLineFormConfig = useMemo(
