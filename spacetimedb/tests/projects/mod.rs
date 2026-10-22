@@ -1,10 +1,10 @@
 //! Projects / PSA domain test suite — invoke via `run_projects_*_test` reducers.
+mod task_assignment_test;
 pub mod wave_a_test;
 pub mod wave_c_test;
 pub mod wave_d_test;
 pub mod wave_e_test;
 pub mod wave_f_test;
-mod task_assignment_test;
 
 use spacetimedb::ReducerContext;
 

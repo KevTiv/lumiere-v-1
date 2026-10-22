@@ -8,15 +8,15 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::account_move;
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::crm::contacts::contact;
 use crate::crm::leads::lead;
 use crate::crm::opportunities::opportunity;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::inventory::stock::stock_picking;
 use crate::purchasing::purchase_orders::purchase_order;
 use crate::sales::sales_core::sale_order;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
-use crate::core::users::{find_user_profile_for_organization, user_organization};
 
 /// Finance follow-ups inherit scope and read authorization from their canonical record.
 /// The activity remains independent of the record's business lifecycle.
@@ -94,8 +94,7 @@ fn require_activity_recipient(
         .any(|member| {
             member.organization_id == organization_id
                 && member.is_active
-                && company_id
-                    .is_none_or(|company| member.company_id.is_none_or(|id| id == company))
+                && company_id.is_none_or(|company| member.company_id.is_none_or(|id| id == company))
         });
     if !active_profile || !active_member {
         return Err("activity assignee must be an active member of the record's company".into());
@@ -229,7 +228,8 @@ fn resolve_activity_target(
                 .ok_or("activity target purchase order not found")?;
             if record.organization_id != organization_id {
                 return Err(
-                    "activity target purchase order does not belong to this organization".to_string(),
+                    "activity target purchase order does not belong to this organization"
+                        .to_string(),
                 );
             }
             Ok((Some("purchase_order".to_string()), Some(purchase_order_id)))
@@ -271,7 +271,8 @@ fn resolve_activity_target(
                 .ok_or("activity target stock picking not found")?;
             if record.organization_id != organization_id {
                 return Err(
-                    "activity target stock picking does not belong to this organization".to_string(),
+                    "activity target stock picking does not belong to this organization"
+                        .to_string(),
                 );
             }
             Ok((Some("stock_picking".to_string()), Some(stock_picking_id)))
@@ -506,7 +507,10 @@ pub fn create_activity(
     if finance_scope.is_some()
         && (params.auto
             || params.is_system
-            || !matches!(params.state.as_str(), "planned" | "today" | "overdue" | "open"))
+            || !matches!(
+                params.state.as_str(),
+                "planned" | "today" | "overdue" | "open"
+            ))
     {
         return Err("record follow-ups must use a supported manual activity state".into());
     }

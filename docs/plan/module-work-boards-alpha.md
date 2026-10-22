@@ -18,7 +18,7 @@ CRM, Reports and Subscriptions remain visible Finance modules, but this slice do
 
 ## User entry points
 
-- `/tasks` opens My work, initially filtered to assignments claimed by the current actor. The workspace selector can broaden this to eligible or available work and to a supported module.
+- `/tasks` opens My work with the mine filter: workflow tasks claimed by the current actor, or record follow-ups assigned to them. The workspace selector can broaden this to eligible or available work and to a supported module.
 - `/purchasing?tab=work`, `/sales?tab=work`, `/accounting?tab=work` and `/expenses?tab=work` open the module's Work workspace.
 - `workSource=activities` selects Record follow-ups where supported. Follow-ups are created from the source record's existing activity form.
 - `workView=mine|eligible|available`, `workTeam=department:<id>|workflow-group:<id>` and `workLayout=board|list` preserve the selected view in the URL. Activities support department teams; switching work type clears the previous team filter.
@@ -62,4 +62,4 @@ The change includes shared Kanban interaction tests, typed board/assignment mode
 
 The browser fixture is not a live SpacetimeDB authorization proof. The added project assignment scenarios extend the existing native project test suite. Before alpha acceptance, run those native scenarios and the production browser workflows against the deployed candidate with representative Finance roles, active companies and workflow policies. Include two simultaneous reviewers, membership/delegation revocation, a response lost after commit, and a source record whose status changes while a review panel is open.
 
-The PR records the checks actually executed for its head. It does not change deployment, CI acceptance criteria or the existing release gates.
+The PR records the checks actually executed for its head. The existing Rust CI job also runs the work-board, Activity, assignee-directory and authoritative-source suites. Deployment and live alpha acceptance continue through the existing release gates.

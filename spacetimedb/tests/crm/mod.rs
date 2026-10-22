@@ -1,10 +1,10 @@
 //! CRM domain test suite — invoke via `run_all_crm_tests` reducer.
+mod activity_work_test;
 pub mod contact_identity_test;
 pub mod contact_lifecycle_test;
 pub mod deferred_test;
 pub mod opportunity_lifecycle_test;
 pub mod relational_fk_test;
-mod activity_work_test;
 pub mod relationship_and_admin_test;
 pub mod wave2_test;
 

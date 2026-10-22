@@ -137,6 +137,13 @@ jobs:
       - name: Query authorization and field projection tests
         run: cargo test --locked -p stdb-auth --lib
 
+      - name: Work board authorization and pagination tests
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib workflow_reads
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::activity_work
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::task_assignees
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::authoritative::tests
+
       - name: Presentation contracts and draft validator
         run: cargo test --locked -p lumiere-presentation-core
 
