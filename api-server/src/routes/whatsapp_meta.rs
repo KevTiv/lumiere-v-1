@@ -63,7 +63,8 @@ struct MetaChange {
 
 #[derive(Deserialize)]
 struct MetaValue {
-    metadata: MetaMetadata,
+    #[serde(default)]
+    metadata: Option<MetaMetadata>,
     #[serde(default)]
     messages: Vec<MetaMessage>,
     #[serde(default)]
@@ -421,15 +422,13 @@ async fn receive_meta_webhook(
             if change.field != "messages" {
                 continue;
             }
-            let account = bound_account(
-                &state,
-                &entry.id,
-                &change.value.metadata.phone_number_id,
-            )
-            .await?;
+            let metadata = change.value.metadata.as_ref().ok_or_else(|| {
+                ApiError::BadRequest("meta messages event lacks phone metadata".into())
+            })?;
+            let account = bound_account(&state, &entry.id, &metadata.phone_number_id).await?;
             // Redundant defense against ambiguous/mutated account mappings.
             if account.business_account_id != entry.id
-                || account.phone_number_id != change.value.metadata.phone_number_id
+                || account.phone_number_id != metadata.phone_number_id
             {
                 return Err(ApiError::Forbidden("meta business asset binding changed".into()));
             }
