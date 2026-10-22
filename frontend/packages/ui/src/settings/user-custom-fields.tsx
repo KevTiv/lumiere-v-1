@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
+import { isWorkspaceFormModuleVisible } from "../lib/workspace-profile"
 import { cn } from "@/lib/utils"
 import { useErpSession } from "@lumiere/erp-session"
 import { stdbBrowserQuery } from "@lumiere/stdb/browser-http"
@@ -90,6 +92,7 @@ interface UserCustomFieldsProps {
 
 export function UserCustomFields({ className }: UserCustomFieldsProps) {
   const { t } = useTranslation()
+  const workspaceProfile = useWorkspaceProfile()
   const { organizationId } = useErpSession()
   const [formOptions, setFormOptions] = useState<FormConfigOption[]>([])
   const [selectedConfigId, setSelectedConfigId] = useState<number>(0)
@@ -130,7 +133,7 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
             formId: String(row.formId ?? row.form_id ?? ""),
             name: String(row.name ?? ""),
           }))
-          .filter((o) => o.id > 0)
+          .filter((o) => o.id > 0 && isWorkspaceFormModuleVisible(workspaceProfile, o.moduleId))
           .sort((a, b) => a.name.localeCompare(b.name))
 
         setFormOptions(options)
@@ -151,7 +154,7 @@ export function UserCustomFields({ className }: UserCustomFieldsProps) {
     return () => {
       cancelled = true
     }
-  }, [organizationId, t])
+  }, [organizationId, t, workspaceProfile])
 
   const selectedForm = useMemo(
     () => formOptions.find((o) => o.id === selectedConfigId) ?? null,

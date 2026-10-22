@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect } from "react"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
+import { isWorkspaceFormModuleVisible } from "../lib/workspace-profile"
 import { useTranslation } from "@lumiere/i18n"
 import { toast } from "sonner"
 import { useErpSession } from "@lumiere/erp-session"
@@ -129,7 +131,11 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
   const [selectedModule, setSelectedModule] = useState<string | null>(null)
   const [selectedForm, setSelectedForm] = useState<FormRegistryEntry | null>(null)
 
-  const modules = useMemo(() => formRegistry.getModules(), [])
+  const workspaceProfile = useWorkspaceProfile()
+  const modules = useMemo(
+    () => formRegistry.getModules().filter((module) => isWorkspaceFormModuleVisible(workspaceProfile, module.id)),
+    [workspaceProfile],
+  )
 
   const moduleForms = useMemo(() => {
     if (!selectedModule) return []
