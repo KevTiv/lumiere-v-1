@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { BillSourcePreview } from '../../../../../components/finance-source-preview';
+import { FinanceReviewWorkspace } from '@lumiere/ui/composed/finance-review-workspace';
 import { useResetAccountMoveToDraft } from '@lumiere/query-hooks/hooks/pass9-record-actions';
 import { useRBAC } from '@/lib/rbac-context';
 import { useUnsavedChangesGuard } from '@lumiere/ui';
@@ -831,7 +832,10 @@ function InvoicePageLoaded({
                 <ModuleDataNotice state={currenciesRead.state} />
                 <ModuleDataNotice state={companiesRead.state} />
                 {outgoingDraft ? <><ModuleDataNotice state={draftReviewState} /><p className="text-xs text-muted-foreground">Customer billing details were captured when this draft was created; posting refreshes them from the linked customer. Posting also captures the latest company invoice settings shown in this review.</p></> : null}
-                <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.45fr)]">
+                <FinanceReviewWorkspace
+                  editorLabel={t('financeReview.savedDetails', { defaultValue: 'Saved details' })}
+                  previewLabel={t('financeReview.sourceTitle', { defaultValue: 'Source document' })}
+                  editor={<div className="min-w-0 space-y-6">
                   <div className="min-w-0 space-y-4 rounded-xl bg-muted/40 p-3 sm:p-5">
                     <div className="flex flex-wrap items-center justify-between gap-2 px-1">
                       <h2 className="text-sm font-medium">{t('accounting.invoices.documentPreview', { defaultValue: 'Document preview' })}</h2>
@@ -844,9 +848,10 @@ function InvoicePageLoaded({
                   <aside className="min-w-0 rounded-xl border bg-card p-4" aria-label={t('accounting.invoices.recordDetails', { defaultValue: 'Record details' })}>
                     <h2 className="mb-4 text-sm font-semibold">{t('accounting.invoices.recordDetails', { defaultValue: 'Record details' })}</h2>
                     <EntityDetail config={detailConfig} data={move} />
-                    <BillSourcePreview organizationId={orgId} companyId={operatingCompanyId} recordId={moveId} />
                   </aside>
-                </div>
+                  </div>}
+                  preview={<BillSourcePreview organizationId={orgId} companyId={operatingCompanyId} recordId={moveId} />}
+                />
               </div>
             ),
           },
