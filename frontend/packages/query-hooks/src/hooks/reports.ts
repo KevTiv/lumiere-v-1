@@ -32,6 +32,7 @@ import { stbTimestampFromDate, stbTimestampFromValue } from "@lumiere/erp-shared
 import { financialReportInputKey, financialReportReady, resolveFinancialReportCreation } from "./financial-report-create-effect"
 import { downloadDocumentExport } from "./templates"
 import { resolveReportRunEffect, scheduledReportRunCount } from "./report-run-effect"
+import { currentReportTemplate, reportTemplateEditValues, reportTemplateValuesEqual, resolveReportTemplateUpdate, type ReportTemplateEditValues, type ReportTemplateUpdateRef } from "./report-template-effect"
 import { toCreateFinancialReportParams, toCreateTrialBalanceEntryParams } from "@lumiere/erp-shared/reports-create-params"
 import { toCreateReportTemplateParams } from "@lumiere/erp-shared/reports-template-params"
 import { toCreateScheduledReportParams } from "@lumiere/erp-shared/reports-scheduled-params"
@@ -557,25 +558,32 @@ export function useCreateReportTemplate(organizationId: bigint) {
   })
 }
 
-export function useUpdateReportTemplate(
-  organizationId: bigint,
-  companyId?: bigint,
-) {
+export function useUpdateReportTemplate(organizationId: bigint, companyId?: bigint) {
   const qc = useQueryClient()
-  return useMutation<
-    void,
-    Error,
-    { templateId: string | number | bigint; params: Record<string, unknown> }
-  >({
-    mutationFn: async ({ templateId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_report_template", { companyId: requireOperatingCompany(companyId), templateId: templateId, params: stdbParamsToJson(params as object) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to update report template')
+  return useMutation<ResolvedOperationEffectOutcome<ReportTemplateUpdateRef>, Error,
+    { templateId: string | number | bigint; params: ReportTemplateEditValues; expected?: ReportTemplateEditValues }>({
+    mutationFn: async ({ templateId: input, params, expected }) => {
+      const activeCompanyId = requireOperatingCompany(companyId)
+      const templateId = parseStrictU64(input)
+      if (templateId == null) throw new Error("Invalid report template id")
+      const before = await fetchQueryList("/api/query/report-templates", "Failed to read report template")
+      const current = currentReportTemplate(before, organizationId, activeCompanyId, templateId)
+      if (!current) throw new Error("Report template is no longer available")
+      const actual = reportTemplateEditValues(current)
+      if (expected && !reportTemplateValuesEqual(actual, expected) && !reportTemplateValuesEqual(actual, params)) {
+        throw new Error("The template changed while you were editing. Reopen it before saving.")
+      }
+      const outcome = await executeOperationWithCanonicalReadback({
+        resolveEffect: async () => resolveReportTemplateUpdate(await fetchQueryList("/api/query/report-templates", "Failed to confirm report template"), organizationId, activeCompanyId, templateId, params),
+        dispatch: async () => {
+          const { urlPath, init } = stdbBffCommandPost("update_report_template", { companyId: activeCompanyId, templateId, params: stdbParamsToJson(params, "UpdateReportTemplateParams") })
+          return decodeOperationDispatch(await apiFetch(urlPath, init), "Failed to update report template")
+        },
+        afterDispatch: async () => { await invalidateReportsModule(qc, organizationId) },
+      })
+      return requireResolvedOperationEffect(outcome)
     },
-    onSuccess: async () => {
-      await invalidateReportsModule(qc, organizationId)
-    },
+    onSuccess: () => invalidateReportsModule(qc, organizationId),
   })
 }
 

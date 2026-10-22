@@ -126,6 +126,7 @@ export const workflowImportCsvForm = (t: TFunction): FormConfig => ({
         {
           id: "csvData",
           name: "csvData",
+          format: "plain",
           type: "textarea",
           label: t("workflows.forms.importCsv.fields.csvData"),
           required: true,

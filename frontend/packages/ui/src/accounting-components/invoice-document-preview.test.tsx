@@ -49,7 +49,7 @@ describe("manual invoice document preview", () => {
     expect(preview.getByText(/Draft preview. Review and confirm totals before posting/)).toBeTruthy()
     expect(onSave).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit details" }))
+    fireEvent.click(screen.getByRole("tab", { name: "Edit document" }))
     expect((await screen.findByTestId("create-invoice-line-description") as HTMLInputElement).value).toBe("Consulting work")
     expect((screen.getByTestId("create-invoice-line-unit-price") as HTMLInputElement).value).toBe("100")
   })

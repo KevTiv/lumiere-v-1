@@ -411,6 +411,7 @@ export function EntityView({
           {surfaceMode === "table" ? (
             <EntityTable
               config={tableConfig}
+              densityKey={config.id}
               data={data}
               aiFocusRowKey={aiFocusRowKey}
               onRowClick={onRowClick}
@@ -483,6 +484,7 @@ export function EntityView({
       return (
         <EntityTable
           config={tableConfig}
+          densityKey={config.id}
           data={data}
           aiFocusRowKey={aiFocusRowKey}
           onRowClick={onRowClick}

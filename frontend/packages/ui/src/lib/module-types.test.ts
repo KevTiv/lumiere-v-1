@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { buildModuleTabRow, type ModuleTab } from "./module-types"
+import { buildModuleNavigationAreas, buildModuleTabRow, type ModuleTab } from "./module-types"
 
 const tab = (id: string): ModuleTab => ({ id, label: id, type: "custom" })
 
@@ -28,5 +28,22 @@ describe("buildModuleTabRow", () => {
       { kind: "tab", tab: tab("a") },
       { kind: "tab", tab: tab("b") },
     ])
+  })
+})
+
+
+describe("task areas", () => {
+  it("keeps all existing destinations exactly once and omits empty groups", () => {
+    const areas = buildModuleNavigationAreas(["dashboard", "invoices", "bills", "other"].map(tab), [
+      { label: "Receivables", tabIds: ["invoices"] },
+      { label: "Payables", tabIds: ["bills", "invoices"] },
+      { label: "Empty", tabIds: ["missing"] },
+    ], "Overview")
+    expect(areas).toEqual([
+      { id: "dashboard", label: "Overview", tabIds: ["dashboard", "other"] },
+      { id: "invoices", label: "Receivables", tabIds: ["invoices"] },
+      { id: "bills", label: "Payables", tabIds: ["bills"] },
+    ])
+    expect(areas.find((area) => area.tabIds.includes("bills"))?.id).toBe("bills")
   })
 })

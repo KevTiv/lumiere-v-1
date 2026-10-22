@@ -9,6 +9,28 @@ import {
 } from "./expenses-create-params"
 
 describe("expense operator create params", () => {
+  it("defaults an untouched or cleared optional quantity to one", () => {
+    for (const quantity of [undefined, null, "", "   "]) {
+      const params = toCreateExpenseParams({
+        employeeId: "7", name: "Hotel", date: "2026-10-13",
+        totalAmount: "73.17", quantity,
+      }, "2")
+      assert.ok(params)
+      assert.equal(params.quantity, 1)
+      assert.equal(params.unitAmount, 73.17)
+    }
+  })
+
+  it("preserves an explicit quantity, including zero for backend rejection", () => {
+    for (const quantity of [0, "0", "2.5"]) {
+      const params = toCreateExpenseParams({
+        employeeId: "7", name: "Hotel", date: "2026-10-13",
+        totalAmount: "73.17", quantity,
+      }, "2")
+      assert.equal(params?.quantity, Number(quantity))
+    }
+  })
+
   it("preserves the receipt identity and retry identity on create", () => {
     const params = toCreateExpenseParams(
       {

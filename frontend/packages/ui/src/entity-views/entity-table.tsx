@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useMemo, useEffect, type MouseEvent } from "react"
+import { useTableDensity } from "../hooks/use-table-density"
+import { TableDensityControl } from "../composed/table-density-control"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
 import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
 import type {
@@ -94,6 +97,8 @@ const LOADING_ROW_COUNT = 5
 
 interface EntityTableProps {
   config: EntityTableConfig
+  /** Stable list identity for density when saved filters are not enabled. */
+  densityKey?: string
   data: EntityRow[]
   /** Row key value highlighted as the ERP AI focus target */
   aiFocusRowKey?: string
@@ -136,6 +141,7 @@ function readPersistedFilters(
 
 export function EntityTable({
   config,
+  densityKey,
   data,
   aiFocusRowKey,
   onRowClick,
@@ -433,6 +439,7 @@ export function EntityTable({
         title={needsSingleRow ? "Select a single record to use this action" : undefined}
         aria-busy={isPending || undefined}
         onClick={() => runAction(action)}
+        className="h-auto min-h-7 max-w-full whitespace-normal text-left"
         data-testid={`entity-action-${action.id}`}
       >
         {isPending ? (
@@ -440,7 +447,7 @@ export function EntityTable({
         ) : (
           Icon && <Icon className="mr-2 h-4 w-4" />
         )}
-        {action.label}
+        <span className="min-w-0 [overflow-wrap:anywhere]">{action.label}</span>
       </Button>
     )
   }
@@ -532,13 +539,16 @@ export function EntityTable({
     filteredRows: sorted,
     listViewKey: config.listViewKey,
   })
+  const financeProfile = useWorkspaceProfile() === "finance-alpha"
+  const [density, setDensity] = useTableDensity(financeProfile ? (config.listViewKey ?? densityKey) : undefined)
   const exportLabel = t("common.entityView.export", { defaultValue: "Export" })
   const canExport = (allowExport ?? config.allowExport ?? false) && columns.some((col) => !col.sensitive)
 
   return (
     <TooltipProvider>
       <div
-        className={cn("space-y-4", className)}
+        className={cn("min-w-0 space-y-4", financeProfile && "data-[density=compact]:[&_tbody_td]:py-1 data-[density=comfortable]:[&_tbody_td]:py-3", className)}
+        data-density={financeProfile ? density : undefined}
         data-testid="entity-table"
         onClickCapture={publishRecordList}
       >
@@ -550,6 +560,7 @@ export function EntityTable({
                 variant="secondary"
                 size="sm"
                 aria-label={`Clear filter ${key}`}
+                className="h-auto min-h-7 max-w-full whitespace-normal text-left"
                 data-testid={`entity-active-filter-${key}`}
                 disabled={Object.hasOwn(initialFilters ?? {}, key) && !onInitialFilterClear}
                 onClick={() => {
@@ -563,16 +574,19 @@ export function EntityTable({
                   })
                 }}
               >
-                {key}: {value}
+                <span className="min-w-0 [overflow-wrap:anywhere]">{key}: {value}</span>
                 <X className="ml-2 h-3 w-3" />
               </Button>
             ))}
           </div>
         )}
         {(config.searchable || (config.filters?.length ?? 0) > 0 || hasActions) && (
-          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xs">
+          <div
+            className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-xs"
+            data-testid="entity-table-toolbar"
+          >
             {config.searchable && (
-              <div className="relative min-w-48 flex-1">
+              <div className="relative min-w-0 flex-1 basis-48">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   aria-label="Search records"
@@ -617,7 +631,7 @@ export function EntityTable({
                     }))
                   }}
                 >
-                  <SelectTrigger className="w-40" aria-label={f.label}>
+                  <SelectTrigger className="w-40 min-w-0 max-w-full" aria-label={f.label}>
                     <SelectValue placeholder={f.placeholder ?? f.label} />
                   </SelectTrigger>
                   <SelectContent>
@@ -634,12 +648,19 @@ export function EntityTable({
                 </Select>
               )
             })}
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center gap-2">
+              {financeProfile ? <TableDensityControl value={density} onChange={setDensity} /> : null}
               {config.listViewKey && ((config.filters?.length ?? 0) > 0 || config.searchable) && (
                 <Popover>
                   <PopoverTrigger
                     render={
-                      <Button variant="outline" size="sm" aria-label="Saved filters" data-testid="entity-saved-filters" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-auto min-h-7 max-w-full whitespace-normal"
+                        aria-label="Saved filters"
+                        data-testid="entity-saved-filters"
+                      />
                     }
                   >
                     <Bookmark className="mr-2 h-4 w-4" />
@@ -657,7 +678,7 @@ export function EntityTable({
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="min-w-0 flex-1 justify-start truncate"
+                              className="min-w-0 flex-1 justify-start"
                               data-testid={`entity-saved-filter-apply-${saved.name}`}
                               onClick={() => {
                                 setSearch(saved.search)
@@ -667,7 +688,7 @@ export function EntityTable({
                                 }))
                               }}
                             >
-                              {saved.name}
+                              <span className="truncate">{saved.name}</span>
                             </Button>
                             <Button
                               variant="ghost"
@@ -718,7 +739,7 @@ export function EntityTable({
                     setView((prev) => ({ ...prev, groupBy: val === "__none__" ? null : String(val) }))
                   }
                 >
-                  <SelectTrigger className="w-40" aria-label="Group by" data-testid="entity-group-by">
+                  <SelectTrigger className="w-40 min-w-0 max-w-full" aria-label="Group by" data-testid="entity-group-by">
                     <SelectValue placeholder="Group by" />
                   </SelectTrigger>
                   <SelectContent>
@@ -734,7 +755,13 @@ export function EntityTable({
               {permittedColumns.length > 1 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" aria-label="Choose columns" data-testid="entity-columns">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-auto min-h-7 max-w-full whitespace-normal"
+                      aria-label="Choose columns"
+                      data-testid="entity-columns"
+                    >
                       <Columns3 className="mr-2 h-4 w-4" />
                       Columns
                     </Button>
@@ -766,6 +793,7 @@ export function EntityTable({
                   size="sm"
                   onClick={exportCsv}
                   aria-label={exportLabel}
+                  className="h-auto min-h-7 max-w-full whitespace-normal"
                   data-testid="entity-table-export"
                 >
                   <FileDown className="mr-2 h-4 w-4" />
@@ -985,6 +1013,7 @@ export function EntityTable({
                           <TableCell
                             key={col.key}
                             className={cn(
+                              (col.type === "currency" || col.type === "number") && "tabular-nums",
                               col.align === "right" && "text-right",
                               col.align === "center" && "text-center",
                             )}

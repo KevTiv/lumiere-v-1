@@ -12,7 +12,6 @@ import {
   Calendar as CalendarIcon,
   Grid3x3,
   List,
-  Settings,
   Clock,
   MapPin,
   Users,
@@ -267,9 +266,6 @@ export function CalendarView({
           </Button>
         </div>
         <div className="text-sm font-semibold">{monthYear}</div>
-        <Button size="sm" variant="ghost">
-          <Settings className="w-4 h-4" />
-        </Button>
       </div>
 
       <div className="grid grid-cols-3 gap-6">

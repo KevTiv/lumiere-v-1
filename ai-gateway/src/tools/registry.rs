@@ -496,6 +496,8 @@ mod generated_registry_tests {
             ollama_llm_model: "test".into(),
             ollama_supports_tool_calling: false,
             mistral_api_key: None,
+            mistral_reasoning_effort: None,
+            mistral_reasoning_models: Vec::new(),
             google_api_key: None,
             gemini_embed_model: "test".into(),
             kong_llm_url: None,

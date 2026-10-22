@@ -1,4 +1,5 @@
 "use client"
+import { organizationCsvImportTable, trackedImportCompanyId } from "./organization-csv-import"
 
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -50,6 +51,8 @@ import {
 } from "../lib/organization-company-form-configs"
 import { createCountryForm, createCurrencyForm } from "../lib/settings-platform-form-configs"
 import { useRBAC } from "@/lib/rbac-context"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
 import { cn } from "@/lib/utils"
 import { CountryPackReadinessPanel } from "./country-pack-readiness-panel"
 import { InvoicePersonalizationSettings, type UploadInvoiceLogo } from "./invoice-personalization-settings"
@@ -85,10 +88,11 @@ function companyIdFromForm(data: Record<string, unknown>): string {
  */
 export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?: UploadInvoiceLogo } = {}) {
   const { t } = useTranslation()
+  const workspaceProfile = useWorkspaceProfile()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const { organizationId } = useErpSession()
+  const { organizationId, activeCompanyId, activeCompanyReady } = useErpSession()
   const [csvKind, setCsvKind] = useState<OrgMasterCsvKind | null>(null)
   const [referenceModal, setReferenceModal] = useState<"country" | "currency" | null>(null)
   const [referenceError, setReferenceError] = useState<string | null>(null)
@@ -1133,7 +1137,7 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
                 {t("settings.organization.csvImport.toolbarRoles")}
               </Button>
             ) : null}
-            {canImportCsv("aiAgent") ? (
+            {isWorkspaceSurfaceVisible(workspaceProfile, "ai-skills") && canImportCsv("aiAgent") ? (
               <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("aiAgent")}>
                 {t("settings.organization.csvImport.toolbarAiAgents")}
               </Button>
@@ -1299,6 +1303,11 @@ export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?
 
       {csvKind && csvFormConfig && hasValidOrganizationId(organizationId) ? (
         <CsvImportModal
+          organizationId={orgBigInt}
+          tableName={organizationCsvImportTable(csvKind)}
+          trackedImport={{
+            companyId: trackedImportCompanyId(activeCompanyId, activeCompanyReady),
+          }}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

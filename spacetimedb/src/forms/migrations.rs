@@ -83,6 +83,12 @@ fn seed_operator_workflow_forms(ctx: &ReducerContext, organization_id: u64) -> R
             "create-bill-from-purchase-order",
             "Create bill from purchase order",
         ),
+        (
+            "purchasing",
+            "new-purchase-requisition",
+            "New purchase requisition",
+        ),
+        ("purchasing", "new-supplier-intake", "New supplier intake"),
     ] {
         let existing: Vec<_> = ctx
             .db
@@ -234,6 +240,47 @@ fn workflow_form_fields(module_id: &str, form_id: &str) -> Vec<CreateFormFieldPa
                 false,
                 Some("false"),
             ),
+        ]
+    } else if form_id == "new-purchase-requisition" {
+        vec![
+            ("vendorId", "Vendor", FieldType::Select, false, None),
+            ("departmentId", "Department", FieldType::Select, false, None),
+            ("origin", "Source document", FieldType::Text, false, None),
+            (
+                "description",
+                "Description",
+                FieldType::Textarea,
+                false,
+                None,
+            ),
+            (
+                "orderingDate",
+                "Ordering date",
+                FieldType::Date,
+                false,
+                None,
+            ),
+            (
+                "scheduleDate",
+                "Scheduled date",
+                FieldType::Date,
+                false,
+                None,
+            ),
+            ("dateEnd", "End date", FieldType::Date, false, None),
+            ("productId", "Product", FieldType::Select, true, None),
+            ("uomId", "UoM", FieldType::Select, true, None),
+            ("quantity", "Quantity", FieldType::Number, true, None),
+        ]
+    } else if form_id == "new-supplier-intake" {
+        vec![
+            ("companyName", "Company name", FieldType::Text, true, None),
+            ("contactName", "Contact name", FieldType::Text, true, None),
+            ("email", "Email", FieldType::Email, true, None),
+            ("phone", "Phone", FieldType::Tel, false, None),
+            ("industry", "Industry", FieldType::Text, false, None),
+            ("website", "Website", FieldType::Url, false, None),
+            ("notes", "Notes", FieldType::Textarea, false, None),
         ]
     } else {
         vec![

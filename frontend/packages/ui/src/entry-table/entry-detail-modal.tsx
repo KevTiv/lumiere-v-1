@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { MarkdownView } from "@/components/ui/markdown-view"
 import { Pencil, Save, X, ImageIcon } from "lucide-react"
 
 interface EntryDetailModalProps {
@@ -157,7 +158,7 @@ export function EntryDetailModal({
           break
         case "textarea":
           displayValue = (
-            <p className="text-foreground whitespace-pre-wrap">{String(value)}</p>
+            <MarkdownView value={String(value)} className="text-foreground" />
           )
           break
         default:
