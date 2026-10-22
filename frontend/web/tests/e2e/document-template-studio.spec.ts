@@ -290,9 +290,12 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
       await page.keyboard.press("End")
       await page.keyboard.insertText(` ${followupNote}`)
       const updatedContact = page.waitForResponse((response) => matchesOperationResponse(response, "update_contact_details"), { timeout: 30_000 })
-      await submitForm(page, "edit-contact-details")
-      const updatedResponse = await updatedContact
-      expect(updatedResponse.ok(), await updatedResponse.text()).toBe(true)
+      await Promise.all([
+        submitForm(page, "edit-contact-details"),
+        updatedContact.then(async (response) => {
+          expect(response.ok(), await response.text()).toBe(true)
+        }),
+      ])
       await expect.poll(async () => (await queryRows<ContactRow>(page, "/api/query/contacts")).find((row) => String(row.id) === String(contact.id))?.description).toContain(followupNote)
       reopened = await reloadContactDescription(page, contact)
       await expect(reopened.locator("h2")).toHaveText(editedHeading)
