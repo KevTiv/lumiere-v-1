@@ -175,7 +175,9 @@ async fn bound_account(
     phone_number_id: &str,
 ) -> Result<BoundAccount, ApiError> {
     if !valid_meta_asset_id(business_account_id) || !valid_meta_asset_id(phone_number_id) {
-        return Err(ApiError::BadRequest("invalid meta business asset id".into()));
+        return Err(ApiError::BadRequest(
+            "invalid meta business asset id".into(),
+        ));
     }
     // Meta subscriptions normally share an app-level callback URL. Never
     // derive organization scope from the request path or sender's phone.
@@ -183,7 +185,11 @@ async fn bound_account(
     let sql = format!(
         "SELECT * FROM whatsapp_business_account WHERE business_account_id = '{business_account_id}' AND phone_number_id = '{phone_number_id}' LIMIT 3"
     );
-    let rows = state.stdb.query_sql(&sql).await.map_err(ApiError::unavailable)?;
+    let rows = state
+        .stdb
+        .query_sql(&sql)
+        .await
+        .map_err(ApiError::unavailable)?;
     if rows.len() != 1 {
         return Err(ApiError::Unavailable(
             "whatsapp business assets lack a unique active organization binding".into(),
@@ -194,7 +200,9 @@ async fn bound_account(
         || row.get("messaging_enabled").and_then(Value::as_bool) != Some(true)
         || row.get("webhook_enabled").and_then(Value::as_bool) != Some(true)
     {
-        return Err(ApiError::Forbidden("whatsapp provider account is disabled".into()));
+        return Err(ApiError::Forbidden(
+            "whatsapp provider account is disabled".into(),
+        ));
     }
     Ok(BoundAccount {
         organization_id: row_u64(row, "organization_id")
@@ -229,7 +237,16 @@ async fn resolve_contact(
         "SELECT * FROM contact_phone_identity WHERE organization_id = {} AND normalized_e164 = '{}' LIMIT 32",
         account.organization_id, phone
     );
-    let rows = state.stdb.query_sql(&sql).await.map_err(ApiError::unavailable)?;
+    let rows = state
+        .stdb
+        .query_sql(&sql)
+        .await
+        .map_err(ApiError::unavailable)?;
+    if rows.len() == 32 {
+        return Err(ApiError::Unavailable(
+            "whatsapp sender identity lookup exceeded the safe match limit".into(),
+        ));
+    }
     let mut contacts = BTreeSet::new();
     let mut identities = Vec::new();
     for row in rows {
@@ -243,7 +260,10 @@ async fn resolve_contact(
             continue;
         }
         // A revoked or archived identity cannot receive a provider event.
-        if row.get("archived_at").is_some_and(|value| !value.is_null() && value.get("none").is_none()) {
+        if row
+            .get("archived_at")
+            .is_some_and(|value| !value.is_null() && value.get("none").is_none())
+        {
             continue;
         }
         let (Some(contact_id), Some(phone_identity_id)) =
@@ -275,7 +295,9 @@ fn event_fingerprint<T: Serialize>(event: &T) -> Result<String, ApiError> {
 
 fn ensure_identifier(id: &str) -> Result<(), ApiError> {
     if id.trim().is_empty() || id.len() > 255 {
-        return Err(ApiError::BadRequest("invalid meta provider identifier".into()));
+        return Err(ApiError::BadRequest(
+            "invalid meta provider identifier".into(),
+        ));
     }
     Ok(())
 }
@@ -344,7 +366,11 @@ async fn ingest_status(
         "SELECT * FROM crm_conversation_message WHERE organization_id = {} AND direction = 'outbound' AND provider_message_id = '{}' LIMIT 2",
         account.organization_id, escaped_message_id
     );
-    let rows = state.stdb.query_sql(&sql).await.map_err(ApiError::unavailable)?;
+    let rows = state
+        .stdb
+        .query_sql(&sql)
+        .await
+        .map_err(ApiError::unavailable)?;
     if rows.len() != 1 {
         return Err(ApiError::Unavailable(
             "provider delivery lacks a linked outbound message".into(),
@@ -399,7 +425,9 @@ async fn receive_meta_webhook(
     body: Bytes,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     if body.is_empty() || body.len() > MAX_PAYLOAD_BYTES {
-        return Err(ApiError::BadRequest("invalid meta webhook body size".into()));
+        return Err(ApiError::BadRequest(
+            "invalid meta webhook body size".into(),
+        ));
     }
     let app_secret = std::env::var(APP_SECRET_ENV)
         .ok()
@@ -415,7 +443,9 @@ async fn receive_meta_webhook(
     let envelope: MetaEnvelope = serde_json::from_slice(&body)
         .map_err(|_| ApiError::BadRequest("invalid meta webhook JSON".into()))?;
     if envelope.object != "whatsapp_business_account" {
-        return Err(ApiError::BadRequest("not a whatsapp business webhook".into()));
+        return Err(ApiError::BadRequest(
+            "not a whatsapp business webhook".into(),
+        ));
     }
     for entry in envelope.entry {
         for change in entry.changes {
@@ -430,7 +460,9 @@ async fn receive_meta_webhook(
             if account.business_account_id != entry.id
                 || account.phone_number_id != metadata.phone_number_id
             {
-                return Err(ApiError::Forbidden("meta business asset binding changed".into()));
+                return Err(ApiError::Forbidden(
+                    "meta business asset binding changed".into(),
+                ));
             }
             for message in change.value.messages {
                 ingest_message(&state, &account, message).await?;
@@ -493,8 +525,14 @@ mod tests {
         let value = &envelope.entry[0].changes[0].value;
         assert_eq!(value.messages.len(), 1);
         assert_eq!(value.statuses.len(), 2);
-        assert_eq!(value.messages[0].text.as_ref().unwrap().body, "Have you received the payment?");
-        assert_eq!(sender_e164(&value.messages[0].from).unwrap(), "+250788123456");
+        assert_eq!(
+            value.messages[0].text.as_ref().unwrap().body,
+            "Have you received the payment?"
+        );
+        assert_eq!(
+            sender_e164(&value.messages[0].from).unwrap(),
+            "+250788123456"
+        );
         assert_ne!(
             event_fingerprint(&value.statuses[0]).unwrap(),
             event_fingerprint(&value.statuses[1]).unwrap()
@@ -525,8 +563,14 @@ mod tests {
 
     #[test]
     fn optional_company_and_ids_decode_from_stdb_rows() {
-        assert_eq!(row_u64(&json!({"company_id":{"some":4}}), "company_id"), Some(4));
+        assert_eq!(
+            row_u64(&json!({"company_id":{"some":4}}), "company_id"),
+            Some(4)
+        );
         assert_eq!(row_u64(&json!({"id":"42"}), "id"), Some(42));
-        assert_eq!(row_u64(&json!({"company_id":{"none":[]}}), "company_id"), None);
+        assert_eq!(
+            row_u64(&json!({"company_id":{"none":[]}}), "company_id"),
+            None
+        );
     }
 }
