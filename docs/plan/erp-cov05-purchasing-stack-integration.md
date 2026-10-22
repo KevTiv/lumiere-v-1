@@ -72,3 +72,7 @@ Full operator acceptance remains explicitly deferred.
   [COV-05j](erp-cov05j-tax-fx-bill-creation-status.md) adds explicit tax selection and
   canonical tax/FX bill production to the same integration lane.
 - Remote CI and review. This integration does not mark Purchasing accepted.
+
+## Main integration — 2026-10-22
+
+Integrated main through `136100d2` (#244). Procurement, exact order/receipt recovery, approval freshness, tax/FX billing and correction now retain the newer implementations already released on main. Preserve main’s contracts v0.3.136 and immutable migration catalog 1–21; older migration 12/13 variants and duplicate operation declarations were superseded during conflict resolution. Remaining branch additions include organization import scope wiring, seeded requisition/intake forms, supporting regression tests, and these historical implementation notes. Fresh CI validates the integrated head.
