@@ -45,12 +45,11 @@ for field in ("repository", "revision", "version"):
         raise SystemExit(f"vendored contracts {field} does not match release manifest")
 PY
 
-rm -rf "$TARGET"
-mv "$TEMP" "$TARGET"
-trap - EXIT
+# Always verify the archive above, then repair only changed files. Replacing an
+# identical checkout or bindings tree invalidates Cargo's watched build inputs.
+python3 "$ROOT/scripts/sync-directory.py" "$TEMP" "$TARGET"
 
 # Build scripts consume generated bindings from this conventional location.
 # Populate it from the same verified release.
-mkdir -p "$ROOT/.contracts-staging/bindings"
-rm -rf "$ROOT/.contracts-staging/bindings"/*
-cp -R "$TARGET/crates/lumiere-contracts/src/bindings/." "$ROOT/.contracts-staging/bindings/"
+python3 "$ROOT/scripts/sync-directory.py" \
+  "$TARGET/crates/lumiere-contracts/src/bindings" "$ROOT/.contracts-staging/bindings"

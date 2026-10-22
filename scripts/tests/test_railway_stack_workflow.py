@@ -1,4 +1,5 @@
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -148,12 +149,53 @@ class RailwayStackWorkflowTests(unittest.TestCase):
                 "positive-id-list",
             )
 
+    def test_document_blobs_use_persistent_single_replica_api_storage(self):
+        manifest = json.loads(
+            (ROOT / "infra/railway/production-eu-services.json").read_text()
+        )
+        api = next(service for service in manifest["services"] if service["name"] == "api-server")
+        storage = api["localStorage"]
+        self.assertEqual(storage["mountPath"], "/data")
+        self.assertEqual(storage["maxReplicas"], 1)
+        self.assertTrue(storage["directory"].startswith(storage["mountPath"] + "/"))
+        self.assertEqual(api["requiredVariables"]["LUMIERE_DOCUMENT_BLOB_DIR"], {
+            "kind": "exact", "value": storage["directory"],
+        })
+        compose = (ROOT / "docker-compose.yml").read_text()
+        api_config = compose.split("  api-server:\n", 1)[1].split("  chromium-worker:\n", 1)[0]
+        self.assertIn("LUMIERE_DOCUMENT_BLOB_DIR: /var/lib/lumiere/document-blobs", api_config)
+        self.assertIn("document-blobs:/var/lib/lumiere/document-blobs", api_config)
+        self.assertIn("  document-blobs:\n", compose.split("\nvolumes:\n", 1)[1])
+
     def test_web_release_resolves_production_service_by_name(self):
         workflow = (ROOT / ".github/workflows/release-railway-web.yml").read_text()
         self.assertIn("RAILWAY_ENVIRONMENT: production", workflow)
         self.assertIn("RAILWAY_SERVICE_NAME: web", workflow)
         self.assertIn("railway service list", workflow)
         self.assertNotIn("23ee8acf-1b14-4b1c-b6f5-ce8fd2ed683c", workflow)
+
+    def test_web_dockerfile_uses_only_railway_supported_mounts(self):
+        dockerfile = (ROOT / "frontend/web/Dockerfile").read_text()
+        instructions = "\n".join(
+            line for line in dockerfile.splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        for mount in re.findall(r"--mount=([^\s\\]+)", instructions):
+            options = dict(option.split("=", 1) for option in mount.split(",") if "=" in option)
+            self.assertEqual(options.get("type"), "cache", f"unsupported Railway mount: {mount}")
+
+    def test_web_dockerfile_retains_certificate_and_install_safeguards(self):
+        dockerfile = (ROOT / "frontend/web/Dockerfile").read_text()
+        self.assertIn("ca-certificates", dockerfile)
+        self.assertIn("--strict-ssl=true", dockerfile)
+        self.assertIn("pnpm install --frozen-lockfile", dockerfile)
+        self.assertIn("node ./scripts/verify-vendored-contracts.mjs", dockerfile)
+        for insecure_option in (
+            "--strict-ssl=false",
+            "NODE_TLS_REJECT_UNAUTHORIZED=0",
+            "GIT_SSL_NO_VERIFY",
+        ):
+            self.assertNotIn(insecure_option, dockerfile)
 
 
 if __name__ == "__main__":

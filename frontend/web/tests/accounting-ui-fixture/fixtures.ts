@@ -23,7 +23,12 @@ export const overviewFixture: AccountantOverviewData = {
   ]),
   deadlines: ready([{ ...scope, id: 401, name: "Quarterly VAT return", status: "Pending", dueDate: "2026-10-31" }]),
   periods: ready([{ ...scope, id: 501, name: "October 2026", state: "Open" }]),
-  currencies: ready([{ id: 1, name: "EUR" }, { id: 2, name: "USD" }]),
+  currencies: ready([{ id: 1, name: "EUR", decimalPlaces: 2 }, { id: 2, name: "USD", decimalPlaces: 2 }]),
+  companies: ready([{ id: 1, organizationId: 1, currencyId: 1 }]),
+  budgets: ready([
+    { ...scope, id: 601, name: "Synthetic operating budget", state: "Validate", dateFrom: "2026-01-01", dateTo: "2026-12-31", totalPlanned: 12000, totalPractical: 9000 },
+    { ...scope, id: 602, name: "Synthetic onboarding budget", state: "Confirm", dateFrom: "2026-10-01", dateTo: "2026-12-31", totalPlanned: 4000, totalPractical: 1500 },
+  ]),
 }
 
 export const fixtureNow = new Date("2026-10-16T12:00:00Z")

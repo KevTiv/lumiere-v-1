@@ -1,26 +1,50 @@
 "use client"
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
+import { AssetDepreciationSchedule } from "@lumiere/ui/accounting-components/asset-depreciation-schedule"
 import { useModuleTab } from "@/hooks/use-module-tab"
+import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
+import { BillSourcePreview } from "../../../components/finance-source-preview"
+import { mapDashboardWidgets } from "@lumiere/ui/lib/dashboard-sections"
+import { agingShareRows, agingTotals, collectionRate, singleCurrencyId, revenueVsExpensesByMonth, topCustomers, weeklyCashMovements } from "./accounting-dashboard-charts"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
+import { formatChartValue, type ChartValueFormat } from "@lumiere/ui/lib/chart-format"
 import { AccountantOverview } from "./accountant-overview"
+import { BillDocumentIntake } from "./bill-document-intake"
 import { currencyCatalogContainsId } from "@/lib/accounting-setup-reference"
+import { useInvoicePersonalization } from "@lumiere/query-hooks/hooks/invoice-personalization"
+import { invoiceSellerFromCompany, invoiceSellerCompanyFromQueryRow, isInvoiceSellerIdentityReady } from "@lumiere/erp-shared/invoice-personalization"
+import { formatInvoiceMoney, resolveDraftInvoiceDocument } from "../../../../packages/ui/src/accounting-components/invoice-document"
+import { ReconciliationWorkbench, type ReconciliationOutcome, type ReconciliationStatusResult } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench"
+import type { ReconciliationRequest, ReconciliationSource } from "../../../../packages/ui/src/accounting-components/reconciliation-workbench-model"
+import { bankLineFromQueryRow, bankSettlementRecoveryPermissions, canDispatchReviewedBankLink } from "./bank-link-review"
+import { resolveBankStatementSettlementEffect, useRecoverBankStatementSettlement } from "@lumiere/query-hooks/hooks/accounting/bank-statements"
+import { resolveBankSettlementLifecycleEffect } from "@lumiere/query-hooks/hooks/accounting/bank-settlement-effect"
+import { bankSettlementAttempt, bankSettlementRecoveryAllowed, bankSettlementRecoveryCorrelates, hasBankSettlementAttempt, type BankSettlementRecoveryAction, type BankSettlementRecoveryRequest } from "@lumiere/erp-shared/bank-settlement-lifecycle"
+import { CollectionsWorkspace } from "../../../../packages/ui/src/accounting-components/collections-workspace"
+import { AccountingAuthoringPreview, hasAccountingAuthoringPreview } from "./accounting-authoring-preview"
+import type { FormValues } from "@lumiere/ui/lib/form-types"
+import { ReconciliationMoveLineProvider } from "@lumiere/ui/forms/reconciliation-move-line-picker"
+import { reconciliationAccountChoices, reconciliationPartnerChoices, reconciliationSelectionIssue, type ReconciliationSelectionIssue } from "@lumiere/ui/lib/reconciliation-widget-choices"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "@lumiere/ui/lib/module-url-filters"
+import { useErpSession } from "@lumiere/erp-session"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
   ModuleView,
+  DashboardWidgetRenderer,
   FormModal,
   CsvImportModal,
   CSV_IMPORT_CONTRACTS,
   RuntimeFormModal,
   EntityView,
+  EntityDetail,
   ListPivotSwitch,
   useRBAC,
   newJournalEntryForm,
-  newTaxForm,
-  newFiscalYearForm,
   editFiscalYearForm,
   fiscalYearsTableConfig,
   newAccountPeriodForm,
@@ -32,7 +56,6 @@ import {
   editBankStatementLineForm,
   newReconciliationWidgetForm,
   editReconciliationWidgetForm,
-  reconciliationWidgetsTableConfig,
   analyticLinesTableConfig,
   editAnalyticAccountForm,
   editAnalyticLineForm,
@@ -87,8 +110,6 @@ import {
   type AccountingReadinessItem,
   type AccountingSetupReadinessInput,
 } from "@lumiere/ui"
-import { Input } from "@lumiere/ui/components/input"
-import { Label } from "@lumiere/ui/components/label"
 import type { BadgeVariant, EntityAction, EntityRecordSheetConfig, FormField, EntityRow, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   accountingParamsToJson,
@@ -210,7 +231,8 @@ import {
 } from "./historical-payment-import"
 import { accountMovePivotSetup } from "@lumiere/ui/lib/accounting-pivot-configs"
 import { PaymentOperationsPanel } from "./payment-operations-panel"
-import { useAccountingModuleSubscription } from "@/lib/module-subscription-hooks"
+import { useModuleSubscription } from "@lumiere/stdb/live"
+import { accountingReadPlan, accountingPlannedCollection, ACCOUNTING_ACTION_WORKSPACES, ACCOUNTING_IMPORT_WORKSPACES } from "./accounting-read-plan"
 import { chatterTargetFromRow, type ChatterTarget } from "@/lib/record-chatter"
 import { readImportFile } from "@/lib/import-spreadsheet-file"
 import {
@@ -268,8 +290,6 @@ import {
   useUpdateAccountBankStatementLine,
   useDeleteAccountBankStatementLine,
   useBankMatchCandidates,
-  useMatchBankLine,
-  useApplyReconciliationRules,
   useReconcileAccountBankStatementLine,
   useUnreconciledAccountBankStatementLine,
   useAccountReconciliationWidgets,
@@ -354,6 +374,8 @@ import {
   useAccountingCsvImportMutations,
   useApplyHistoricalPaymentAllocations,
   useAccountPayments,
+  usePaymentTransactions,
+  usePaymentReversals,
   useAccountPaymentTerms,
   useAccountPaymentTermLines,
   useCreateAccountPayment,
@@ -439,6 +461,7 @@ import {
   toAssetUpdateParams,
   type AssetFailure,
 } from "./asset-actions"
+import { withAssetAuthoringVisibility } from "./asset-authoring-fields"
 import { accountIsDeprecated, deprecateAccountParams } from "./account-deprecation"
 import { ACCOUNT_INTERNAL_TYPES, accountEditDefaults, toAccountUpdateParams } from "./account-edit"
 import {
@@ -448,7 +471,7 @@ import {
   toBankStatementCreateInput,
   toBankStatementUpdateParams,
 } from "./bank-statement-actions"
-import { formText, useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
+import { useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
 import type {
   AccountAnalyticAccount,
   AccountFiscalYear,
@@ -491,12 +514,7 @@ import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useSaleOrders } from "@lumiere/query-hooks/hooks/sales"
 import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
-import {
-  downloadDocumentPdf,
-  useDispatchQueuedMail,
-  useMailTemplates,
-  useQueueMailFromTemplate,
-} from "@lumiere/query-hooks/hooks/templates"
+import { downloadDocumentPdf } from "@lumiere/query-hooks/hooks/templates"
 import { useCreateDocument } from "@lumiere/query-hooks/hooks/documents"
 import { archiveRenderedPdfAsDocument } from "@/lib/archive-document-pdf"
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
@@ -508,6 +526,7 @@ import {
 import { Button } from "@lumiere/ui/components/button"
 import { cn } from "@lumiere/ui/lib/utils"
 import { TablePager, usePagedRows } from "@lumiere/ui/components/table-pager"
+import { runtimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 function copyAsRecord<T extends object>(row: T): Record<string, unknown> {
   return Object.fromEntries(Object.entries(row))
@@ -665,12 +684,6 @@ function budgetStateStr(row: Record<string, unknown>): string {
   return String(v ?? "")
 }
 
-function bankStatementStateStr(row: Record<string, unknown>): string {
-  const v = row.state
-  if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
-  return String(v ?? "")
-}
-
 function assetStateTag(row: Record<string, unknown>): string {
   const v = row.state
   if (v != null && typeof v === "object" && "tag" in v) return String((v as { tag: string }).tag)
@@ -702,13 +715,6 @@ function parseCommaSeparatedBigInts(raw: unknown): bigint[] {
     }
   }
   return out
-}
-
-function parseOptionalRuleId(s: string): number | null {
-  const x = s.trim()
-  if (x === "") return null
-  const n = Number(x)
-  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null
 }
 
 function moveLineIdsFromRow(line: Record<string, unknown>): bigint[] {
@@ -755,6 +761,7 @@ type AccountingClientLoadedProps = Omit<AccountingClientProps, "organizationId">
 
 type AccountingClientReadyProps = AccountingClientLoadedProps & {
   operatingCompanyId: bigint
+  companyAvailable: boolean
 }
 
 export function AccountingClient(props: AccountingClientProps) {
@@ -765,15 +772,36 @@ export function AccountingClient(props: AccountingClientProps) {
 }
 
 function AccountingClientLoaded(props: AccountingClientLoadedProps) {
+  const { companyIds, setActiveCompanyId } = useErpSession()
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(props.organizationId)
-  if (operatingCompanyId == null) {
+  const retainedCompany = useRef(operatingCompanyId)
+  if (operatingCompanyId != null) retainedCompany.current = operatingCompanyId
+  useEffect(() => {
+    const rawCompanyId = new URLSearchParams(window.location.search).get("companyId")
+    if (!rawCompanyId) return
+    const companyId = Number(rawCompanyId)
+    if (
+      !Number.isSafeInteger(companyId) ||
+      companyId <= 0 ||
+      !companyIds?.includes(companyId)
+    ) return
+    setActiveCompanyId?.(companyId)
+    window.history.replaceState(window.history.state, "", "/accounting")
+  }, [companyIds, setActiveCompanyId])
+  if (retainedCompany.current == null) {
     return (
-      <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">
-        Select an active company to open the accounting workspace.
+      <div className="space-y-4 rounded-lg border border-dashed p-6 text-sm text-muted-foreground" role="status">
+        <p>Select an active company to open the accounting workspace.</p>
+        <a
+          href="/settings?section=finance-setup"
+          className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+        >
+          Complete Finance setup
+        </a>
       </div>
     )
   }
-  return <AccountingClientReady {...props} operatingCompanyId={operatingCompanyId} />
+  return <AccountingClientReady {...props} operatingCompanyId={retainedCompany.current} companyAvailable={operatingCompanyId != null} />
 }
 
 function AccountingClientReady({
@@ -783,6 +811,7 @@ function AccountingClientReady({
   initialAccountPeriods,
   organizationId,
   operatingCompanyId,
+  companyAvailable,
 }: AccountingClientReadyProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -796,13 +825,14 @@ function AccountingClientReady({
     const query = params.toString()
     router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false })
   }, [clearModuleFilter, pathname, router, searchParams])
-  useAccountingModuleSubscription()
   const { t } = useTranslation()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
-  const { askForm, cancelForm, formDialog } = useFormDialog()
+  const { askForm: showForm, cancelForm, formDialog } = useFormDialog()
+  const [promptWorkspace, setPromptWorkspace] = useState<string | null>(null)
+  const [moduleFormWorkspace, setModuleFormWorkspace] = useState<string | null>(null)
   const { currentUser, checkPermission } = useRBAC()
-  const runtimeRoleId = currentUser?.roles[0]
+  const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   const accountingTabIds = useMemo(
     () => [
@@ -818,12 +848,17 @@ function AccountingClientReady({
     accountingTabIds,
     { history: "push" },
   )
+  const askForm = useCallback(async (request: Parameters<typeof showForm>[0]) => {
+    setPromptWorkspace(accountingActiveTab)
+    try { return await showForm(request) }
+    finally { setPromptWorkspace(null) }
+  }, [showForm, accountingActiveTab])
   /** BigInt organization id for `useStdbQuery` cache keys (not SpacetimeDB `company_id` reducers). */
   const { orgId } = orgBigInts(organizationId)
-  async function persistAccountMoveCustomFieldsExact(metadata: unknown, recordId: string) {
+  async function persistAccountMoveCustomFieldsExact(metadata: unknown, recordId: string, companyId: bigint) {
     await persistCustomFieldsToEav({
       organizationId,
-      companyId: operatingCompanyId,
+      companyId,
       model: "account_move",
       recordId: BigInt(recordId),
       metadata,
@@ -840,6 +875,11 @@ function AccountingClientReady({
   const [showCreateInvoice, setShowCreateInvoice] = useState(false)
   const [showCreateBill, setShowCreateBill] = useState(false)
   const [readinessAction, setReadinessAction] = useState<AccountingReadinessAction | undefined>()
+  const [pendingAccountingAction, setPendingAccountingAction] = useState<{
+    action: AccountingReadinessAction
+    onReady: () => void
+  } | null>(null)
+  useEffect(() => { setReadinessAction(undefined) }, [accountingActiveTab])
   const [creditNoteSource, setCreditNoteSource] = useState<AccountMove | null>(null)
   // Analytic row editors (click row on Analytic tabs)
   const [analyticAccountEdit, setAnalyticAccountEdit] = useState<Record<string, unknown> | null>(null)
@@ -849,9 +889,13 @@ function AccountingClientReady({
   const [bankLineCreateOpen, setBankLineCreateOpen] = useState(false)
   const [bankLineEdit, setBankLineEdit] = useState<Record<string, unknown> | null>(null)
   const [bankLineMatchFocus, setBankLineMatchFocus] = useState<Record<string, unknown> | null>(null)
-  const [reconciliationRuleIdInput, setReconciliationRuleIdInput] = useState("")
-  const [manualReconcileMoveIds, setManualReconcileMoveIds] = useState("")
-  const [manualReconcileResidual, setManualReconcileResidual] = useState("0")
+  const [bankLinkLocked, setBankLinkLocked] = useState(false)
+  const [paymentOperationsLocked, setPaymentOperationsLocked] = useState(false)
+  const bankLinkLockRef = useRef(false)
+  const handleBankLinkLock = useCallback((locked: boolean) => {
+    bankLinkLockRef.current = locked
+    setBankLinkLocked(locked)
+  }, [])
   const [reconciliationWidgetEdit, setReconciliationWidgetEdit] = useState<Record<string, unknown> | null>(null)
   const [fiscalYearEdit, setFiscalYearEdit] = useState<Record<string, unknown> | null>(null)
   const [fiscalSetupOpen, setFiscalSetupOpen] = useState(false)
@@ -873,75 +917,115 @@ function AccountingClientReady({
   const [moveLineEdit, setMoveLineEdit] = useState<Record<string, unknown> | null>(null)
   const [chatterTarget, setChatterTarget] = useState<ChatterTarget | null>(null)
   const [glDrilldownAccount, setGlDrilldownAccount] = useState<AccountAccount | null>(null)
+  // Keep the controller and open write/recovery sessions mounted across navigation.
+  // Their workspace dependencies remain live until the original dialog is dismissed.
+  const readPlan = accountingReadPlan(accountingActiveTab, [
+    promptWorkspace,
+    moduleFormWorkspace,
+    paymentOperationsLocked && "payment-operations",
+    quickActionForm && ACCOUNTING_ACTION_WORKSPACES[quickActionForm.action],
+    csvKind && ACCOUNTING_IMPORT_WORKSPACES[csvKind],
+    (selectedInvoice || invoiceSheetRecord || creditNoteSource) && "invoices",
+    (analyticAccountEdit && "analytic"), (analyticLineEdit && "analytic-lines"),
+    (analyticDistEdit && "analytic-distribution"),
+    (bankStatementDetail || bankLineMatchFocus || bankLinkLocked || bankLineEdit || bankLineCreateOpen) && "bank-statements",
+    reconciliationWidgetEdit && "reconciliation-widgets",
+    (registerPaymentForId || reconcilePaymentOpen) && "payments",
+    paymentTermLineEdit && "payment-term-lines",
+    (selectedFixedAsset || depreciationLineCreateOpen) && "fixed-assets",
+    intercompanyRuleEdit && "intercompany-rules",
+    (intercompanyTxCreateOpen || intercompanyTxError) && "intercompany-transactions",
+    (moveLineEdit || glDrilldownAccount) && "move-lines",
+  ].filter((workspace): workspace is string => typeof workspace === "string"))
+  useModuleSubscription([...readPlan])
+  const readEnabled = (resource: string) => companyAvailable && organizationId > 0 && readPlan.has(resource)
+  const plannedCollection = <Row,>(resource: string, query: Parameters<typeof moduleCollection<Row>>[0]) =>
+    accountingPlannedCollection(readEnabled(resource), moduleCollection(query))
   // ── Data hooks ──────────────────────────────────────────────────────────────
-  const accountsRead = moduleCollection(useAccountAccounts(orgId, {
-    enabled: organizationId > 0,
-  }))
+  const accountsQuery = useAccountAccounts(orgId, { enabled: organizationId > 0 })
+  const accountsRead = moduleCollection(accountsQuery)
   const accounts = accountsRead.rows
   const allMovesRead = moduleCollection(useAccountMoves(orgId, {
     enabled: organizationId > 0,
   }))
   const allMoves = allMovesRead.rows
   const movesLoading = allMovesRead.state.status === "loading"
-  const accountMoveLinesRead = moduleCollection(useAccountMoveLines(orgId, { enabled: organizationId > 0 }))
+  const accountMoveLinesRead = plannedCollection("account-move-lines", useAccountMoveLines(orgId, { enabled: readEnabled("account-move-lines") }))
   const accountMoveLines = accountMoveLinesRead.rows
   const taxesRead = moduleCollection(useAccountTaxes(orgId, { enabled: organizationId > 0 }))
   const taxes = taxesRead.rows
-  const budgetsRead = moduleCollection(useCrossoveredBudgets(orgId, {
-    enabled: organizationId > 0,
+  const budgetsRead = plannedCollection("budgets", useCrossoveredBudgets(orgId, {
+    enabled: readEnabled("budgets"),
     initialData: initialBudgets,
   }))
   const budgets = budgetsRead.rows
-  const budgetLinesRead = moduleCollection(useBudgetLines(orgId, { enabled: organizationId > 0 }))
+  const budgetLinesRead = plannedCollection("budget-lines", useBudgetLines(orgId, { enabled: readEnabled("budget-lines") }))
   const budgetLines = budgetLinesRead.rows
-  const budgetPostsRead = moduleCollection(useBudgetPosts(orgId, { enabled: organizationId > 0 }))
+  const budgetPostsRead = plannedCollection("budget-posts", useBudgetPosts(orgId, { enabled: readEnabled("budget-posts") }))
   const budgetPosts = budgetPostsRead.rows
-  const taxDeadlinesRead = moduleCollection(useTaxDeadlines(orgId, { enabled: organizationId > 0 }))
+  const taxDeadlinesRead = plannedCollection("tax-deadlines", useTaxDeadlines(orgId, { enabled: readEnabled("tax-deadlines") }))
   const taxDeadlines = taxDeadlinesRead.rows
   const taxGroupsRead = moduleCollection(useAccountTaxGroups(orgId, { enabled: organizationId > 0 }))
   const taxGroups = taxGroupsRead.rows
-  const taxJurisdictionsRead = moduleCollection(useTaxJurisdictions(orgId, { enabled: organizationId > 0 }))
+  const taxJurisdictionsRead = plannedCollection("tax-jurisdictions", useTaxJurisdictions(orgId, { enabled: readEnabled("tax-jurisdictions") }))
   const taxJurisdictions = taxJurisdictionsRead.rows
-  const taxSchedulesRead = moduleCollection(useTaxSchedules(orgId, { enabled: organizationId > 0 }))
+  const taxSchedulesRead = plannedCollection("tax-schedules", useTaxSchedules(orgId, { enabled: readEnabled("tax-schedules") }))
   const taxSchedules = taxSchedulesRead.rows
-  const analyticRead = moduleCollection(useAccountAnalyticAccounts(orgId, { enabled: organizationId > 0 }))
+  const analyticRead = plannedCollection("analytic-accounts", useAccountAnalyticAccounts(orgId, { enabled: readEnabled("analytic-accounts") }))
   const analytic = analyticRead.rows
-  const analyticLinesRead = moduleCollection(useAccountAnalyticLines(orgId, { enabled: organizationId > 0 }))
+  const analyticLinesRead = plannedCollection("analytic-lines", useAccountAnalyticLines(orgId, { enabled: readEnabled("analytic-lines") }))
   const analyticLines = analyticLinesRead.rows
-  const analyticDistributionRead = moduleCollection(useAccountAnalyticDistributionModels(orgId, {
-    enabled: organizationId > 0,
+  const analyticDistributionRead = plannedCollection("analytic-distribution-models", useAccountAnalyticDistributionModels(orgId, {
+    enabled: readEnabled("analytic-distribution-models"),
   }))
   const analyticDistribution = analyticDistributionRead.rows
-  const bankStatementsRead = moduleCollection(useAccountBankStatements(orgId, { enabled: organizationId > 0 }))
+  const bankStatementsRead = plannedCollection("bank-statements", useAccountBankStatements(orgId, { enabled: readEnabled("bank-statements") }))
   const bankStatements = bankStatementsRead.rows
   const bankStatementsLoading = bankStatementsRead.state.status === "loading"
-  const bankStatementLinesRead = moduleCollection(useAccountBankStatementLines(orgId, { enabled: organizationId > 0 }))
+  const bankStatementLinesRead = plannedCollection("bank-statement-lines", useAccountBankStatementLines(orgId, { enabled: readEnabled("bank-statement-lines") }))
   const bankStatementLines = bankStatementLinesRead.rows
-  const bankMatchCandidatesRead = moduleCollection(useBankMatchCandidates(orgId, { enabled: organizationId > 0 }))
+  const bankMatchCandidatesRead = plannedCollection("bank-match-candidates", useBankMatchCandidates(orgId, { enabled: readEnabled("bank-match-candidates") }))
   const bankMatchCandidates = bankMatchCandidatesRead.rows
-  const reconciliationWidgetsRead = moduleCollection(useAccountReconciliationWidgets(orgId, {
-    enabled: organizationId > 0,
+  const reconciliationWidgetsRead = plannedCollection("account-reconciliation-widgets", useAccountReconciliationWidgets(orgId, {
+    enabled: readEnabled("account-reconciliation-widgets"),
   }))
   const reconciliationWidgets = reconciliationWidgetsRead.rows
-  const fixedAssetsRead = moduleCollection(useAccountFixedAssets(orgId, { enabled: organizationId > 0 }))
+  const fixedAssetsRead = plannedCollection("fixed-assets", useAccountFixedAssets(orgId, { enabled: readEnabled("fixed-assets") }))
   const fixedAssets = fixedAssetsRead.rows
-  const accountPaymentsRead = moduleCollection(useAccountPayments(orgId, { enabled: organizationId > 0 }))
+  const accountPaymentsRead = plannedCollection("account-payments", useAccountPayments(orgId, { enabled: readEnabled("account-payments") }))
   const accountPayments = accountPaymentsRead.rows
   const paymentsLoading = accountPaymentsRead.state.status === "loading"
+  const paymentTransactionsRead = plannedCollection("payment-transactions", usePaymentTransactions(orgId, { enabled: readEnabled("payment-transactions") }))
+  const paymentReversalsRead = plannedCollection("payment-reversals", usePaymentReversals(orgId, { enabled: readEnabled("payment-reversals") }))
   const paymentTermsRead = moduleCollection(useAccountPaymentTerms(orgId, { enabled: organizationId > 0 }))
   const paymentTerms = paymentTermsRead.rows
-  const paymentTermLinesRead = moduleCollection(useAccountPaymentTermLines(orgId, { enabled: organizationId > 0 }))
+  const paymentTermLinesRead = plannedCollection("account-payment-term-lines", useAccountPaymentTermLines(orgId, { enabled: readEnabled("account-payment-term-lines") }))
   const paymentTermLines = paymentTermLinesRead.rows
-  const depreciationLinesRead = moduleCollection(useDepreciationLines(orgId, { enabled: organizationId > 0 }))
+  const depreciationLinesQuery = useDepreciationLines(orgId, { enabled: readEnabled("depreciation-lines") })
+  const depreciationLinesRead = plannedCollection("depreciation-lines", depreciationLinesQuery)
   const depreciationLines = depreciationLinesRead.rows
   const companiesRead = moduleCollection(useCompanies(organizationId, organizationId > 0))
   const companies = companiesRead.rows
-  const currenciesRead = moduleCollection(useCurrencies())
+  const invoicePersonalization = useInvoicePersonalization({ organizationId, companyId: operatingCompanyId, enabled: organizationId > 0 && operatingCompanyId > 0n })
+  const invoiceCompany = companies.find((company) => String(company.id) === String(operatingCompanyId))
+  const invoiceSellerCompany = invoiceSellerCompanyFromQueryRow(invoiceCompany)
+  const invoiceIdentityReady = isInvoiceSellerIdentityReady(invoiceSellerCompany, operatingCompanyId, organizationId)
+  const invoiceIdentityState = companiesRead.state.status === "ready" && !invoiceIdentityReady
+    ? { status: "error" as const, message: "The selected company identity is unavailable. Refresh before creating or posting an invoice." }
+    : companiesRead.state
+  const invoiceSeller = invoicePersonalization.profile && invoiceIdentityReady
+    ? invoiceSellerFromCompany(invoiceSellerCompany, invoicePersonalization.profile)
+    : undefined
+  const currenciesQuery = useCurrencies()
+  const currenciesRead = moduleCollection(currenciesQuery)
   const currencies = currenciesRead.rows
-  const intercompanyRulesRead = moduleCollection(useIntercompanyRules(orgId, { enabled: organizationId > 0 }))
+  const currentBankStatements = bankStatements.filter((row) => String(row.id) === String(bankStatementDetail?.id)
+    && row.organizationId === orgId && row.companyId === operatingCompanyId)
+  const currentBankStatement = currentBankStatements.length === 1 ? currentBankStatements[0]! : null
+  const intercompanyRulesRead = plannedCollection("intercompany-rules", useIntercompanyRules(orgId, { enabled: readEnabled("intercompany-rules") }))
   const intercompanyRules = intercompanyRulesRead.rows
-  const intercompanyTransactionsRead = moduleCollection(useIntercompanyTransactions(orgId, {
-    enabled: organizationId > 0,
+  const intercompanyTransactionsRead = plannedCollection("intercompany-transactions", useIntercompanyTransactions(orgId, {
+    enabled: readEnabled("intercompany-transactions"),
   }))
   const intercompanyTransactions = intercompanyTransactionsRead.rows
   const saleOrdersRead = moduleCollection(useSaleOrders(orgId))
@@ -950,38 +1034,39 @@ function AccountingClientReady({
   const contacts = contactsRead.rows
   const productsRead = moduleCollection(useProducts(orgId))
   const products = productsRead.rows
-  const journalsRead = moduleCollection(useAccountJournals(orgId, { enabled: organizationId > 0 }))
+  const journalsQuery = useAccountJournals(orgId, { enabled: organizationId > 0 })
+  const journalsRead = moduleCollection(journalsQuery)
   const journals = journalsRead.rows
   const accountTypesRead = moduleCollection(useAccountAccountTypes(orgId, { enabled: organizationId > 0 }))
   const accountTypes = accountTypesRead.rows
-  const accountGroupsRead = moduleCollection(useAccountGroups(orgId, { enabled: organizationId > 0 }))
+  const accountGroupsRead = plannedCollection("account-groups", useAccountGroups(orgId, { enabled: readEnabled("account-groups") }))
   const accountGroups = accountGroupsRead.rows
-  const consolidationAccountsRead = moduleCollection(useConsolidationAccounts(orgId, {
-    enabled: organizationId > 0,
+  const consolidationAccountsRead = plannedCollection("consolidation-accounts", useConsolidationAccounts(orgId, {
+    enabled: readEnabled("consolidation-accounts"),
   }))
   const consolidationAccounts = consolidationAccountsRead.rows
-  const consolidationJournalsRead = moduleCollection(useConsolidationJournals(orgId, {
-    enabled: organizationId > 0,
+  const consolidationJournalsRead = plannedCollection("consolidation-journals", useConsolidationJournals(orgId, {
+    enabled: readEnabled("consolidation-journals"),
   }))
   const consolidationJournals = consolidationJournalsRead.rows
-  const eliminationEntriesRead = moduleCollection(useConsolidationEliminationEntries(orgId, {
-    enabled: organizationId > 0,
+  const eliminationEntriesRead = plannedCollection("consolidation-elimination-entries", useConsolidationEliminationEntries(orgId, {
+    enabled: readEnabled("consolidation-elimination-entries"),
   }))
   const eliminationEntries = eliminationEntriesRead.rows
-  const fxRevaluationRunsRead = moduleCollection(useFxRevaluationRuns(orgId, {
-    enabled: organizationId > 0,
+  const fxRevaluationRunsRead = plannedCollection("fx-revaluation-runs", useFxRevaluationRuns(orgId, {
+    enabled: readEnabled("fx-revaluation-runs"),
   }))
   const fxRevaluationRuns = fxRevaluationRunsRead.rows
-  const partnerCreditControlsRead = moduleCollection(usePartnerCreditControls(orgId, {
-    enabled: organizationId > 0,
+  const partnerCreditControlsRead = plannedCollection("partner-credit-controls", usePartnerCreditControls(orgId, {
+    enabled: readEnabled("partner-credit-controls"),
   }))
   const partnerCreditControls = partnerCreditControlsRead.rows
-  const amortizationSchedulesRead = moduleCollection(useAmortizationSchedules(orgId, {
-    enabled: organizationId > 0,
+  const amortizationSchedulesRead = plannedCollection("amortization-schedules", useAmortizationSchedules(orgId, {
+    enabled: readEnabled("amortization-schedules"),
   }))
   const amortizationSchedules = amortizationSchedulesRead.rows
-  const amortizationLinesRead = moduleCollection(useAmortizationLines(orgId, {
-    enabled: organizationId > 0,
+  const amortizationLinesRead = plannedCollection("amortization-lines", useAmortizationLines(orgId, {
+    enabled: readEnabled("amortization-lines"),
   }))
   const amortizationLines = amortizationLinesRead.rows
   const fiscalYearsRawRead = moduleCollection(useAccountFiscalYears(orgId, {
@@ -990,12 +1075,13 @@ function AccountingClientReady({
     staleTime: 0,
   }))
   const fiscalYearsRaw = fiscalYearsRawRead.rows
-  const accountPeriodsRawRead = moduleCollection(useAccountPeriods(orgId, {
+  const accountPeriodsQuery = useAccountPeriods(orgId, {
     enabled: organizationId > 0,
     initialData: initialAccountPeriods,
-  }))
+  })
+  const accountPeriodsRawRead = moduleCollection(accountPeriodsQuery)
   const accountPeriodsRaw = accountPeriodsRawRead.rows
-  const financialReportsRead = moduleCollection(useFinancialReports(orgId))
+  const financialReportsRead = plannedCollection("financial-reports", useFinancialReports(orgId, undefined, { enabled: readEnabled("financial-reports") }))
   const financialReportsRaw = financialReportsRead.rows
 
   const createFiscalYear = useCreateFiscalYear(organizationId, operatingCompanyId)
@@ -1416,10 +1502,22 @@ function AccountingClientReady({
     [accountingSetup],
   )
 
-  const requestAccountingAction = useCallback(
+  const accountingSetupDataState = mergeModuleStates([
+    accountsRead.state,
+    taxesRead.state,
+    taxGroupsRead.state,
+    companiesRead.state,
+    currenciesRead.state,
+    journalsRead.state,
+    accountTypesRead.state,
+    fiscalYearsRawRead.state,
+    accountPeriodsRawRead.state,
+  ])
+
+  const runAccountingAction = useCallback(
     (action: AccountingReadinessAction, onReady: () => void) => {
       const readiness = readinessByAction[action]
-      setReadinessAction(action)
+      setReadinessAction(readiness.isReady ? undefined : action)
       if (readiness.isReady) {
         onReady()
         return
@@ -1434,6 +1532,25 @@ function AccountingClientReady({
     },
     [readinessByAction, toast],
   )
+
+  const requestAccountingAction = useCallback(
+    (action: AccountingReadinessAction, onReady: () => void) => {
+      setReadinessAction(action)
+      if (accountingSetupDataState.status === "loading") {
+        setPendingAccountingAction({ action, onReady })
+        return
+      }
+      setPendingAccountingAction(null)
+      runAccountingAction(action, onReady)
+    },
+    [accountingSetupDataState.status, runAccountingAction],
+  )
+
+  useEffect(() => {
+    if (accountingSetupDataState.status === "loading" || pendingAccountingAction == null) return
+    setPendingAccountingAction(null)
+    runAccountingAction(pendingAccountingAction.action, pendingAccountingAction.onReady)
+  }, [accountingSetupDataState.status, pendingAccountingAction, runAccountingAction])
 
   const openInvoiceCreate = useCallback(
     () => requestAccountingAction("invoice", () => setShowCreateInvoice(true)),
@@ -1462,8 +1579,17 @@ function AccountingClientReady({
 
   const handleReadinessResolve = useCallback(
     (item: AccountingReadinessItem) => {
-      if (item.id === "company" || item.id === "base-currency") {
-        window.location.assign("/settings")
+      if (item.id === "company") {
+        window.location.assign("/settings?section=finance-setup")
+        return
+      }
+      if (item.id === "base-currency") {
+        toast({
+          title: "Base currency needs administrator repair",
+          description:
+            "This operating company has no valid base currency. Keep this company selected and repair its company record before posting or importing accounting history.",
+          variant: "destructive",
+        })
         return
       }
       if (item.id === "fiscal-year") setAccountingActiveTab("fiscal-years")
@@ -1473,7 +1599,7 @@ function AccountingClientReady({
       } else if (item.id.endsWith("-account")) setAccountingActiveTab("accounts")
       else setAccountingActiveTab("taxes")
     },
-    [setAccountingActiveTab],
+    [setAccountingActiveTab, toast],
   )
 
   const partnerSelectOptions = useMemo(() => {
@@ -1554,6 +1680,23 @@ function AccountingClientReady({
     () =>
       setQuickActionForm({
         form: accountPaymentFormConfig,
+        action: "createAccountPayment",
+      }),
+    [accountPaymentFormConfig],
+  )
+
+  // Bills have no direct "pay" mutation: open the payment form pre-filled for the
+  // supplier; the payment is then linked to the bill via the existing register flow.
+  const openBillPayment = useCallback(
+    (bill: { partnerId?: unknown; amountResidual?: number | null; name?: string | null }) =>
+      setQuickActionForm({
+        form: mergeFieldDefaultValues(accountPaymentFormConfig, {
+          paymentType: "OutBound",
+          partnerType: "Supplier",
+          ...(bill.partnerId != null ? { partnerId: String(bill.partnerId) } : {}),
+          ...(bill.amountResidual ? { amount: String(bill.amountResidual) } : {}),
+          ...(bill.name ? { ref: String(bill.name) } : {}),
+        }),
         action: "createAccountPayment",
       }),
     [accountPaymentFormConfig],
@@ -1776,6 +1919,12 @@ function AccountingClientReady({
   const invoiceBillRecordSheet = useMemo(
     (): EntityRecordSheetConfig => ({
       ...accountMoveRecordSheet,
+      wide: true,
+      overviewContent: (record) => <FinanceReviewWorkspace
+        editorLabel={t("financeReview.savedDetails", { defaultValue: "Saved details" })}
+        editor={<EntityDetail config={accountMoveRecordSheet.detailConfig} data={record} />}
+        preview={<BillSourcePreview organizationId={BigInt(organizationId)} companyId={BigInt(operatingCompanyId ?? 0)} recordId={String(record.id)} />}
+      />,
       customTabs: [
         ...(accountMoveRecordSheet.customTabs ?? []),
         {
@@ -1785,6 +1934,7 @@ function AccountingClientReady({
             <Button
               type="button"
               variant="outline"
+              data-testid="accounting-invoice-record-actions"
               onClick={() => {
                 setInvoiceSheetRecord(null)
                 // ACC-RI-018 rationale: safe because this generic sheet is installed only on AccountMove tabs.
@@ -1797,7 +1947,7 @@ function AccountingClientReady({
         },
       ],
     }),
-    [accountMoveRecordSheet, t],
+    [accountMoveRecordSheet, t, organizationId, operatingCompanyId],
   )
 
   const paymentTermLineFormConfig = useMemo(
@@ -2047,6 +2197,13 @@ function AccountingClientReady({
     })
   }, [moveLineEdit, t])
 
+  const currentSelectedFixedAsset = useMemo(() => {
+    if (!selectedFixedAsset?.id) return null
+    const matches = fixedAssets.filter((asset) => String(asset.id) === String(selectedFixedAsset.id)
+      && asset.organizationId === orgId && asset.companyId === operatingCompanyId)
+    return matches.length === 1 ? matches[0]! : null
+  }, [selectedFixedAsset?.id, fixedAssets, orgId, operatingCompanyId])
+
   const depreciationLinesForSelectedAsset = useMemo(() => {
     if (!selectedFixedAsset?.id) return []
     const aid = String(selectedFixedAsset.id)
@@ -2160,12 +2317,6 @@ function AccountingClientReady({
   const updateBudgetPost = useUpdateBudgetPost(organizationId)
   const postMove = usePostAccountMove(organizationId, operatingCompanyId)
   const createCreditNote = useCreateCreditNoteFromInvoice(organizationId)
-  const mailTemplatesQuery = useMailTemplates(organizationId, organizationId > 0)
-  const queueMailFromTemplate = useQueueMailFromTemplate(
-    organizationId,
-    Number(operatingCompanyId),
-  )
-  const dispatchQueuedMail = useDispatchQueuedMail()
   const createDocument = useCreateDocument(orgId, operatingCompanyId)
   const [invoiceDocBusy, setInvoiceDocBusy] = useState<"download" | "send" | "archive" | null>(null)
   const cancelMove = useCancelAccountMove(organizationId)
@@ -2189,9 +2340,8 @@ function AccountingClientReady({
   const createBankStatementLine = useCreateAccountBankStatementLine(organizationId, operatingCompanyId)
   const updateBankStatementLine = useUpdateAccountBankStatementLine(organizationId, operatingCompanyId)
   const deleteBankStatementLine = useDeleteAccountBankStatementLine(organizationId, operatingCompanyId)
-  const matchBankLine = useMatchBankLine(organizationId)
-  const applyReconciliationRules = useApplyReconciliationRules(organizationId)
   const reconcileBankLine = useReconcileAccountBankStatementLine(organizationId, operatingCompanyId)
+  const recoverBankSettlement = useRecoverBankStatementSettlement(organizationId, operatingCompanyId)
   const unreconcileBankLine = useUnreconciledAccountBankStatementLine(organizationId, operatingCompanyId)
   const createReconciliationWidget = useCreateAccountReconciliationWidget(organizationId, operatingCompanyId)
   const updateReconciliationWidget = useUpdateAccountReconciliationWidget(organizationId, operatingCompanyId)
@@ -2349,11 +2499,11 @@ function AccountingClientReady({
   const statementLinesPager = usePagedRows(detailStatementLines)
 
   const statementBalancesMatch = useMemo(() => {
-    if (!bankStatementDetail) return false
-    const end = Number(bankStatementDetail.balanceEnd ?? 0)
-    const real = Number(bankStatementDetail.balanceEndReal ?? 0)
-    return Math.abs(end - real) <= 0.01
-  }, [bankStatementDetail])
+    if (!currentBankStatement) return false
+    const end = currentBankStatement.balanceEnd
+    const real = currentBankStatement.balanceEndReal
+    return typeof end === "number" && typeof real === "number" && Number.isFinite(end) && Number.isFinite(real) && Math.abs(end - real) <= 0.01
+  }, [currentBankStatement])
 
   const newBankStatementLineFormConfig = useMemo(() => {
     const base = !bankStatementDetail?.id
@@ -2370,13 +2520,42 @@ function AccountingClientReady({
     })
   }, [bankStatementDetail, defaultCurrencyId, t, optionalPartnerSelectOptions])
 
+  const reconciliationSelectionContext = useMemo(() => ({
+    organizationId: String(orgId),
+    companyId: String(operatingCompanyId),
+    accounts,
+    partners: contacts,
+    lines: accountMoveLines,
+    ready: canUseModuleData(accountsRead.state) && canUseModuleData(contactsRead.state) && canUseModuleData(accountMoveLinesRead.state),
+  }), [orgId, operatingCompanyId, accounts, contacts, accountMoveLines, accountsRead.state, contactsRead.state, accountMoveLinesRead.state])
+
+  const reconciliationAccountOptions = useMemo(() => {
+    const choices = reconciliationAccountChoices(accounts, reconciliationSelectionContext)
+    return choices.length > 0 ? choices : [{ value: "", label: t("common.noData"), disabled: true }]
+  }, [accounts, reconciliationSelectionContext, t])
+  const reconciliationPartnerOptions = useMemo(() => [
+    { value: "", label: t("accounting.forms.reconciliationWidget.picker.anyPartner", { defaultValue: "Any partner" }) },
+    ...reconciliationPartnerChoices(contacts, reconciliationSelectionContext),
+  ], [contacts, reconciliationSelectionContext, t])
+
+  const reconciliationSelectionMessage = useCallback((issue: ReconciliationSelectionIssue) => {
+    switch (issue) {
+      case "loading": return t("accounting.forms.reconciliationWidget.picker.loading", { defaultValue: "Journal item choices are unavailable until the company data is loaded." })
+      case "account": return t("accounting.forms.reconciliationWidget.picker.invalidAccount", { defaultValue: "Choose an available account from the current company." })
+      case "partner": return t("accounting.forms.reconciliationWidget.picker.invalidPartner", { defaultValue: "Choose an available partner from the current company, or choose Any partner." })
+      case "lines": return t("accounting.forms.reconciliationWidget.picker.invalidLines", { defaultValue: "Choose at least one available journal item." })
+      case "staleLines": return t("accounting.forms.reconciliationWidget.picker.staleLines", { defaultValue: "Some selected journal items no longer match the account, partner, or current company. Remove them or restore the matching selection before saving." })
+      case "mode": return t("accounting.forms.reconciliationWidget.picker.invalidMode", { defaultValue: "Choose a listed reconciliation mode." })
+    }
+  }, [t])
+
   const reconciliationWidgetCreateFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newReconciliationWidgetForm(t), {
-        accountId: glAccountFieldOptions,
-        partnerId: optionalPartnerSelectOptions,
+        accountId: reconciliationAccountOptions,
+        partnerId: reconciliationPartnerOptions,
       }),
-    [t, glAccountFieldOptions, optionalPartnerSelectOptions],
+    [t, reconciliationAccountOptions, reconciliationPartnerOptions],
   )
 
   const reconciliationWidgetEditFormConfig = useMemo(() => {
@@ -2385,46 +2564,38 @@ function AccountingClientReady({
       accountId: "",
       partnerId: "",
       mode: "bank",
-      moveLineIds: "",
+      moveLineIds: [],
       toCheck: false,
     }
     if (!reconciliationWidgetEdit) {
       return mergeSelectOptionsForFields(editReconciliationWidgetForm(t, empty), {
-        accountId: glAccountFieldOptions,
-        partnerId: optionalPartnerSelectOptions,
+        accountId: reconciliationAccountOptions,
+        partnerId: reconciliationPartnerOptions,
       })
     }
     const ml = reconciliationWidgetEdit.moveLineIds
-    const moveLineIds = Array.isArray(ml) ? ml.map((x) => String(x)).join(", ") : ""
+    const moveLineIds = Array.isArray(ml) ? ml.map((x) => String(x)) : []
+    const accountId = String(reconciliationWidgetEdit.accountId ?? "")
+    const partnerId = String(reconciliationWidgetEdit.partnerId ?? "")
+    const retainUnavailable = (options: Array<{ value: string; label: string; disabled?: boolean }>, selected: string) =>
+      selected && !options.some((option) => option.value === selected)
+        ? [...options, { value: selected, label: t("accounting.forms.reconciliationWidget.picker.unavailableRecord", { defaultValue: "Unavailable record #{{id}}", id: selected }), disabled: true }]
+        : options
     return mergeSelectOptionsForFields(
       editReconciliationWidgetForm(t, {
         widgetId: String(reconciliationWidgetEdit.id ?? ""),
-        accountId: String(reconciliationWidgetEdit.accountId ?? ""),
-        partnerId:
-          reconciliationWidgetEdit.partnerId != null ? String(reconciliationWidgetEdit.partnerId) : "",
+        accountId,
+        partnerId,
         mode: String(reconciliationWidgetEdit.mode ?? "bank"),
         moveLineIds,
         toCheck: Boolean(reconciliationWidgetEdit.toCheck),
       }),
       {
-        accountId: glAccountFieldOptions,
-        partnerId: optionalPartnerSelectOptions,
+        accountId: retainUnavailable(reconciliationAccountOptions, accountId),
+        partnerId: retainUnavailable(reconciliationPartnerOptions, partnerId),
       },
     )
-  }, [reconciliationWidgetEdit, t, glAccountFieldOptions, optionalPartnerSelectOptions])
-
-  const matchCandidatesForFocusedLine = useMemo(() => {
-    if (!bankLineMatchFocus?.id) return []
-    const lid = String(bankLineMatchFocus.id)
-    return bankMatchCandidates.filter((c) => String(c.statementLineId) === lid)
-  }, [bankLineMatchFocus, bankMatchCandidates])
-
-  useEffect(() => {
-    if (bankLineMatchFocus?.id != null) {
-      setManualReconcileResidual(String(bankLineMatchFocus.amount ?? 0))
-      setManualReconcileMoveIds("")
-    }
-  }, [bankLineMatchFocus?.id, bankLineMatchFocus?.amount])
+  }, [reconciliationWidgetEdit, t, reconciliationAccountOptions, reconciliationPartnerOptions])
 
   const editBankStatementLineFormConfig = useMemo(() => {
     const empty = {
@@ -2543,9 +2714,16 @@ function AccountingClientReady({
   )
 
   const onSubmitReconciliationWidgetEdit = useCallback(
-    async (formData: Record<string, unknown>) => {
+    async (formData: FormValues) => {
       const wid = formData.widgetId
       if (wid === "" || wid == null) return
+      const matches = reconciliationWidgets.filter((widget) => String(widget.id) === String(wid)
+        && String(widget.organizationId) === String(orgId) && String(widget.companyId) === String(operatingCompanyId))
+      if (!canUseModuleData(reconciliationWidgetsRead.state) || matches.length !== 1) {
+        throw new Error(t("accounting.forms.reconciliationWidget.picker.staleWidget", { defaultValue: "This reconciliation widget is no longer available in the current company. Close the form and refresh the list." }))
+      }
+      const issue = reconciliationSelectionIssue(formData, { ...reconciliationSelectionContext, existingMode: String(matches[0].mode ?? "bank"), allowEmpty: true })
+      if (issue) throw new Error(reconciliationSelectionMessage(issue))
       const params = toUpdateAccountReconciliationWidgetParams(formData)
       if (!params) return
       await updateReconciliationWidget.mutateAsync({
@@ -2554,7 +2732,7 @@ function AccountingClientReady({
       })
       setReconciliationWidgetEdit(null)
     },
-    [updateReconciliationWidget],
+    [updateReconciliationWidget, reconciliationWidgets, reconciliationWidgetsRead.state, orgId, operatingCompanyId, reconciliationSelectionContext, reconciliationSelectionMessage, t],
   )
 
   const onSubmitFiscalYearEdit = useCallback(
@@ -3499,6 +3677,26 @@ function AccountingClientReady({
     const noneLabel = t("accounting.entities.fixedAssets.form.none", { defaultValue: "None" })
     const accountRows = copyAsRecords(accounts)
     const journalRows = copyAsRecords(journals)
+    const lookupState = mergeModuleStates([accountsRead.state, journalsRead.state, currenciesRead.state])
+    const lookupsPending = lookupState.status === "loading" || accountsQuery.isFetching || journalsQuery.isFetching || currenciesQuery.isFetching
+    const hasRequiredChoices = ["asset", "depreciation", "expense"].every((role) =>
+      assetAccountOptions(accountRows, operatingCompanyId, role as Parameters<typeof assetAccountOptions>[2]).length > 0,
+    ) && assetJournalOptions(journalRows, operatingCompanyId).length > 0 && currencySelectOptions.length > 0
+    const lookupsReady = !lookupsPending && lookupState.status === "ready" && hasRequiredChoices
+    const unavailableLabel = lookupsPending
+      ? t("accounting.entities.fixedAssets.form.loadingSetup", { defaultValue: "Loading asset setup…" })
+      : t("accounting.entities.fixedAssets.form.unavailableSetup", { defaultValue: "Asset setup unavailable" })
+    const ensureLookupsReady = (): boolean => {
+      if (lookupsReady) return true
+      showWorkflowToast({
+        kind: "info",
+        title: unavailableLabel,
+        description: lookupsPending
+          ? t("accounting.entities.fixedAssets.form.waitForLookups", { defaultValue: "Wait for accounts, journals, and currencies to finish loading, then open the form." })
+          : t("accounting.entities.fixedAssets.form.refreshLookups", { defaultValue: "Refresh the unavailable accounts, journals, or currencies before opening the asset form." }),
+      })
+      return false
+    }
     const assetFailureMessage = (reason: AssetFailure): string => {
       switch (reason) {
         case "code":
@@ -3560,7 +3758,7 @@ function AccountingClientReady({
         Degressive: f("methodDegressive", "Degressive"),
         DegressiveThenLinear: f("methodDegressiveThenLinear", "Degressive then linear"),
       }
-      return [
+      return withAssetAuthoringVisibility([
         ...(current == null
           ? ([
               { id: "code", name: "code", label: f("code", "Code"), type: "text", required: true, width: "1/2" },
@@ -3622,10 +3820,13 @@ function AccountingClientReady({
         accountSelect("gainAccountId", f("gainAccount", "Disposal gain account (optional)"), "gain", current?.gainAccountId ?? "", true),
         accountSelect("lossAccountId", f("lossAccount", "Disposal loss account (optional)"), "loss", current?.lossAccountId ?? "", true),
         accountSelect("accountDisposalId", f("disposalAccount", "Disposal account (optional)"), "disposal", current?.accountDisposalId ?? "", true),
-      ]
+      ], {
+        disposalAccounts: f("showDisposalAccounts", "Show disposal account settings (optional)"),
+        disposalAccountsHint: f("showDisposalAccountsHint", "Use these accounts when the asset is disposed. Hiding these fields keeps your selections."),
+      })
     }
     const promptNewAsset = async () => {
-      if (operatingCompanyId <= 0n) return
+      if (operatingCompanyId <= 0n || !ensureLookupsReady()) return
       // One idempotency key per dialog: resubmitting this dialog replays instead of duplicating.
       const idempotencyKey = `create-account-asset:${globalThis.crypto.randomUUID()}`
       const values = await askForm({ title: newAssetLabel, fields: assetFields(operatingCompanyId, null) })
@@ -3645,7 +3846,7 @@ function AccountingClientReady({
     }
     const promptEditAsset = async (row: Record<string, unknown>) => {
       const companyId = assetCompanyId(row, operatingCompanyId)
-      if (companyId == null || !canEditAsset(row)) return
+      if (companyId == null || !canEditAsset(row) || !ensureLookupsReady()) return
       const values = await askForm({ title: editAssetLabel, fields: assetFields(companyId, assetEditDefaults(row)) })
       if (values == null) return
       const result = toAssetUpdateParams(values, row, { companyId, accounts: accountRows, journals: journalRows })
@@ -3672,17 +3873,17 @@ function AccountingClientReady({
         actions: [
           {
             id: "asset-new",
-            label: newAssetLabel,
+            label: lookupsReady ? newAssetLabel : unavailableLabel,
             permission: { resource: "account_asset", action: "create" },
             onClick: () => promptNewAsset(),
           },
           {
             id: "asset-edit",
-            label: editAssetLabel,
+            label: lookupsReady ? editAssetLabel : unavailableLabel,
             requiresSelection: true,
             selection: "single",
             permission: { resource: "account_asset", action: "write" },
-            isApplicable: (rows) => rows.length === 1 && canEditAsset(rows[0] as Record<string, unknown>),
+            isApplicable: (rows) => lookupsReady && rows.length === 1 && canEditAsset(rows[0] as Record<string, unknown>),
             onClick: (rows) => promptEditAsset(rows[0] as Record<string, unknown>),
           },
           {
@@ -3822,6 +4023,12 @@ function AccountingClientReady({
     askForm,
     accounts,
     journals,
+    accountsRead.state,
+    journalsRead.state,
+    currenciesRead.state,
+    accountsQuery.isFetching,
+    journalsQuery.isFetching,
+    currenciesQuery.isFetching,
     operatingCompanyId,
     defaultCurrencyId,
     currencySelectOptions,
@@ -4301,11 +4508,12 @@ function AccountingClientReady({
     [postMove, invoiceToPayment.postInvoice, runMutation],
   )
 
-  const handleInvoiceDownloadPdf = useCallback(async () => {
-    if (!selectedInvoice?.id) return
+  const handleInvoiceDownloadPdf = useCallback(async (move?: { id?: unknown }) => {
+    const target = move ?? selectedInvoice
+    if (!target?.id) return
     try {
       setInvoiceDocBusy("download")
-      await downloadDocumentPdf("account-move", Number(selectedInvoice.id))
+      await downloadDocumentPdf("account-move", Number(target.id))
     } catch (e) {
       toast({
         variant: "destructive",
@@ -4343,76 +4551,122 @@ function AccountingClientReady({
     }
   }, [selectedInvoice, operatingCompanyId, createDocument, toast])
 
-  const handleInvoiceSendEmail = useCallback(async () => {
-    if (!selectedInvoice?.id) return
-    const values = await askForm({
-      title: t("accounting.invoices.invoiceActions.send"),
-      fields: [
-        {
-          id: "recipient",
-          name: "recipient",
-          label: "Recipient email address",
-          type: "email",
-          required: true,
-        },
-      ],
-    })
-    const recipient = formText(values?.recipient)
-    if (recipient == null) return
-    const template = (mailTemplatesQuery.data ?? []).find(
-      (row) =>
-        (row.model ?? "") === "account_move" &&
-        (row.isActive ?? row.is_active) !== false,
-    )
-    if (!template?.id) {
-      toast({
-        variant: "destructive",
-        title: t("accounting.invoices.invoiceActions.send"),
-        description: "No active mail template for account_move. Create one in settings first.",
-      })
-      return
-    }
-    try {
-      setInvoiceDocBusy("send")
-      await queueMailFromTemplate.mutateAsync({
-        templateId: Number(template.id),
-        model: "account_move",
-        resId: Number(selectedInvoice.id),
-        recipientEmail: recipient,
-      })
-      const dispatchResult = await dispatchQueuedMail.mutateAsync()
-      toast({
-        title: t("accounting.invoices.invoiceActions.send"),
-        description: `Queued and dispatched ${dispatchResult.sent ?? 0} email(s).`,
-      })
-    } catch (e) {
-      toast({
-        variant: "destructive",
-        title: t("accounting.invoices.invoiceActions.send"),
-        description: e instanceof Error ? e.message : String(e),
-      })
-    } finally {
-      setInvoiceDocBusy(null)
-    }
-  }, [
-    selectedInvoice,
-    mailTemplatesQuery.data,
-    queueMailFromTemplate,
-    dispatchQueuedMail,
-    askForm,
-    toast,
-    t,
-  ])
+  const handleInvoiceSendEmail = useCallback((move?: { id?: unknown }) => {
+    const id = optionalBigIntU64(move?.id ?? selectedInvoice?.id)
+    if (id == null || id <= 0n) return
+    // Review a single document; never drain the organization-wide mail queue here.
+    router.push(`/accounting/invoices/${id}?review=email`)
+  }, [selectedInvoice?.id, router])
 
   // ── Derived data ────────────────────────────────────────────────────────────
   const invoices = useMemo(
-    () => allMoves.filter((m) => moveTypeTag(m as Record<string, unknown>) === "OutInvoice"),
-    [allMoves],
+    () => allMoves.filter((m) => m.organizationId === orgId && m.companyId === operatingCompanyId && moveTypeTag(m as Record<string, unknown>) === "OutInvoice"),
+    [allMoves, orgId, operatingCompanyId],
   )
   const bills = useMemo(
-    () => allMoves.filter((m) => moveTypeTag(m as Record<string, unknown>) === "InInvoice"),
-    [allMoves],
+    () => allMoves.filter((m) => m.organizationId === orgId && m.companyId === operatingCompanyId && moveTypeTag(m as Record<string, unknown>) === "InInvoice"),
+    [allMoves, orgId, operatingCompanyId],
   )
+
+  const bankStatementMoney = (value: unknown) => formatInvoiceMoney(typeof value === "number" ? value : null, {
+    id: currentBankStatement ? String(currentBankStatement.currencyId) : undefined,
+    code: invoiceCurrencyOptions.find((currency) => currency.value === String(currentBankStatement?.currencyId))?.code,
+  })
+  const bankLinkLines = bankStatementLines.map(bankLineFromQueryRow)
+  const bankLinkSource: ReconciliationSource = {
+    organizationId, companyId: operatingCompanyId, companyCurrencyId: invoiceCompany?.currencyId,
+    state: companyAvailable ? mergeModuleStates([bankStatementsRead.state, bankStatementLinesRead.state, allMovesRead.state,
+      accountMoveLinesRead.state, accountsRead.state, currenciesRead.state, companiesRead.state]) : { status: "loading" },
+    statement: currentBankStatement,
+    line: bankLinkLines.find((row) => String(row.id) === String(bankLineMatchFocus?.id)) ?? null,
+    bankLines: bankLinkLines, moves: allMoves, moveLines: accountMoveLines,
+    accounts, currencies, suggestions: bankMatchCandidates, partners: contacts,
+  }
+  const bankLinkAccess = useRef({ source: bankLinkSource, allowed: false, recovery: { abandon: false, resubmit: false, reverse: false }, actorKey: currentUser?.id ?? null })
+  // Posting/reconciliation are exact backend payment actions beyond the UI CRUD vocabulary.
+  const canCreateBankSettlement = companyAvailable && checkPermission("account_bank_statement_line", "write").allowed
+    && checkPermission("payment", "create").allowed
+    && checkPermission("payment", "post").allowed
+    && checkPermission("payment", "reconcile").allowed
+    && checkPermission("account_move", "write").allowed
+  const bankMutationAvailable = !postBankStatement.isPending && !deleteBankStatement.isPending && !deleteBankStatementLine.isPending
+    && !createBankStatementLine.isPending && !updateBankStatementLine.isPending && !unreconcileBankLine.isPending
+  const canLinkBankRecords = canCreateBankSettlement && bankMutationAvailable
+    && !recoverBankSettlement.isPending
+  const bankRecoveryPermissions = bankSettlementRecoveryPermissions(companyAvailable && bankMutationAvailable, canCreateBankSettlement, checkPermission)
+  bankLinkAccess.current = { source: bankLinkSource, allowed: canLinkBankRecords, recovery: bankRecoveryPermissions, actorKey: currentUser?.id ?? null }
+  const confirmBankLink = async (request: ReconciliationRequest): Promise<ReconciliationOutcome> => {
+    const current = bankLinkAccess.current
+    if (!current.actorKey || !canDispatchReviewedBankLink(current.source, request, current.allowed)) {
+      return { status: "rejected", message: "The company, access or bank records changed. Review the current records before linking." }
+    }
+    if ([request.organizationId, request.companyId, request.lineId, ...request.moveLineIds].some((id) => BigInt(id) > BigInt(Number.MAX_SAFE_INTEGER))) {
+      return { status: "rejected", message: "This record identifier is not supported by the current command transport. No link was submitted." }
+    }
+    try {
+      const effect = await reconcileBankLine.mutateAsync({ lineId: BigInt(request.lineId), params: bankReconcileParamsToJson(request.moveLineIds.map((id) => BigInt(id)), 0) })
+      if (!current.actorKey || bankLinkAccess.current.actorKey !== current.actorKey) return { status: "unknown", message: "The signed-in user changed. Return to the original user and check this action." }
+      if ("attempt" in effect) return { status: "lifecycle", attempt: effect.attempt }
+      return effect.status === "awaiting_approval" ? { status: "awaiting_approval", paymentId: effect.paymentId } : { status: "confirmed" }
+    } catch {
+      // The existing command hook does not retain HTTP status; no error is safe to replay automatically.
+      return { status: "unknown", message: "The original bank-line link could not be confirmed. Check its saved result; do not submit it again." }
+    }
+  }
+  const checkBankLink = async (request: ReconciliationRequest, recovery?: BankSettlementRecoveryRequest): Promise<ReconciliationStatusResult> => {
+    const actorKey = bankLinkAccess.current.actorKey
+    const sameScope = () => String(bankLinkAccess.current.source.organizationId) === request.organizationId
+      && String(bankLinkAccess.current.source.companyId) === request.companyId
+      && actorKey != null && bankLinkAccess.current.actorKey === actorKey
+      && bankLinkAccess.current.source.state.status === "ready"
+    if (!sameScope()) return "unconfirmed"
+    const [lines, statements, payments, moves, moveLines] = await Promise.all([
+      fetchQueryList("/api/query/bank-statement-lines", "Could not check the original bank line"),
+      fetchQueryList("/api/query/bank-statements", "Could not check the original statement"),
+      fetchQueryList("/api/query/account-payments", "Could not check the original settlement payment"),
+      fetchQueryList("/api/query/account-moves", "Could not check the original settlement entries"),
+      fetchQueryList("/api/query/account-move-lines", "Could not check the original settlement balances"),
+    ])
+    if (!sameScope()) return "unconfirmed"
+    const lifecycle = resolveBankSettlementLifecycleEffect({ lines, statements, payments, moves, moveLines }, {
+      organizationId: request.organizationId, companyId: request.companyId, lineId: request.lineId, request: recovery,
+    })
+    const expectedMoveIds = recovery?.moveLineIds ?? request.moveLineIds
+    if (lifecycle && lifecycle.statementId === request.statementId && lifecycle.attempt.selectedMoveLineIds.length === expectedMoveIds.length
+      && lifecycle.attempt.selectedMoveLineIds.every((id) => expectedMoveIds.includes(id))) return { status: "lifecycle", attempt: lifecycle.attempt }
+    if (recovery || lines.some((line) => String(line.id) === request.lineId && hasBankSettlementAttempt(line.metadata))) return "unconfirmed"
+    const effect = resolveBankStatementSettlementEffect(lines, statements, { payments, moves, moveLines }, {
+      organizationId: BigInt(request.organizationId), companyId: BigInt(request.companyId),
+      lineId: BigInt(request.lineId), moveIds: request.moveLineIds.map(BigInt), amountResidual: request.amountResidual,
+    })
+    return effect?.status === "awaiting_approval" ? { status: "awaiting_approval", paymentId: effect.paymentId }
+      : effect?.status === "confirmed" ? "confirmed" : "unconfirmed"
+  }
+  const recoverReviewedBankSettlement = async (request: BankSettlementRecoveryRequest): Promise<ReconciliationOutcome> => {
+    const actorKey = bankLinkAccess.current.actorKey
+    const mayDispatch = () => {
+      const current = bankLinkAccess.current
+      if (!actorKey || current.actorKey !== actorKey || !current.recovery[request.action] || current.source.state.status !== "ready"
+        || String(current.source.organizationId) !== request.organizationId || String(current.source.companyId) !== request.companyId
+        || String(current.source.statement?.id) !== request.statementId || String(current.source.line?.id) !== request.lineId) return false
+      const attempt = bankSettlementAttempt(current.source.line?.metadata)
+      if (!attempt) return false
+      if (bankSettlementRecoveryCorrelates(attempt, request)) return true
+      return attempt.attemptId === request.attemptId && attempt.paymentId === request.paymentId && bankSettlementRecoveryAllowed(attempt, request.action)
+        && (request.action !== "resubmit" || canDispatchReviewedBankLink(current.source, { organizationId: request.organizationId, companyId: request.companyId,
+          statementId: request.statementId, lineId: request.lineId, moveLineIds: request.moveLineIds, amountResidual: 0 }, true))
+    }
+    if (!mayDispatch()) return { status: "rejected", message: "The original settlement, user, company or access changed. Check its current status before recovering it." }
+    try {
+      const effect = await recoverBankSettlement.mutateAsync({ request, mayDispatch })
+      return { status: "lifecycle", attempt: effect.attempt }
+    } catch (error) {
+      const status = error != null && typeof error === "object" && "status" in error ? error.status : undefined
+      return typeof status === "number" && status >= 400 && status < 500 && ![408, 429].includes(status)
+        ? { status: "rejected", message: error instanceof Error ? error.message : "The recovery request was rejected." }
+        : { status: "unknown", message: "The settlement recovery is unconfirmed. Keep the original request and check its saved result." }
+    }
+  }
 
   // Each overview card owns its source state; an unavailable auxiliary read must
   // never become a zero balance or hide the other independently available queues.
@@ -4421,6 +4675,44 @@ function AccountingClientReady({
     productsRead.state, paymentTermsRead.state, currenciesRead.state, companiesRead.state, taxGroupsRead.state,
     fiscalYearsRawRead.state, accountPeriodsRawRead.state,
   ])
+  const draftReviewState = mergeModuleStates([invoiceIdentityState, invoicePersonalization.state])
+  const selectedInvoiceCompanyMatches = selectedInvoice != null && String(selectedInvoice.companyId) === String(operatingCompanyId)
+  const selectedDraftReviewState = !selectedInvoiceCompanyMatches
+    ? { status: "error" as const, message: "Select this invoice’s company before reviewing or posting it." }
+    : draftReviewState
+  const selectedInvoiceMoveType = enumTag(selectedInvoice?.moveType)
+  const draftInvoicePersonalization = selectedInvoice && selectedInvoiceCompanyMatches && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType) && invoicePersonalization.profile && invoiceSeller
+    ? resolveDraftInvoiceDocument(selectedInvoice.metadata, invoicePersonalization.profile, invoicePersonalization.profileVersionIds, invoiceSeller)
+    : null
+  const financeChartSections = useMemo(() => {
+    const now = new Date()
+    const currentRange = { startMs: new Date(now.getFullYear(), now.getMonth(), 1).getTime(), endMs: now.getTime() }
+    const previousRange = { startMs: new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(), endMs: currentRange.startMs - 1 }
+    const chartInvoices = invoices.filter((move) => move.companyId === operatingCompanyId)
+    const chartBills = bills.filter((move) => move.companyId === operatingCompanyId)
+    const chartPayments = accountPayments.filter((payment) => payment.companyId === operatingCompanyId)
+    const currencyId = singleCurrencyId([...chartInvoices, ...chartBills, ...chartPayments])
+    const currencyCode = currencyId ? currencyCodeMap(currencies).get(currencyId) : undefined
+    const money: ChartValueFormat = currencyCode ? { kind: "currency", currency: currencyCode } : { kind: "number" }
+    const sourceState = mergeModuleStates([allMovesRead.state, accountPaymentsRead.state, currenciesRead.state])
+    const ids = ["acc-revenue-expenses", "acc-collection-rate", "acc-aging-share", "acc-top-customers", "acc-cash-movements"]
+    return mapDashboardWidgets(moduleConfigBase, (w) => {
+      if (!ids.includes(w.id)) return w
+      if (sourceState.status !== "ready" || !currencyCode) return { ...w, type: "diagnostic", data: { code: "missing-measure", message: sourceState.status !== "ready" ? "Financial source data is not ready. Refresh this overview before interpreting totals." : "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
+      if (w.type === "combo-chart" && w.id === "acc-revenue-expenses") return { ...w, data: { ...w.data, values: revenueVsExpensesByMonth(chartInvoices, chartBills, now), valueFormat: money } }
+      if (w.type === "radial-gauge" && w.id === "acc-collection-rate") {
+        const rate = collectionRate(chartInvoices, currentRange)
+        return { ...w, data: { ...w.data, value: rate.collected, max: rate.invoiced, stats: [{ label: "Invoiced", value: formatChartValue(rate.invoiced, money) }, { label: "Collected", value: formatChartValue(rate.collected, money) }, { label: "Outstanding", value: formatChartValue(rate.outstanding, money) }] } }
+      }
+      if (w.type === "share-bar" && w.id === "acc-aging-share") return { ...w, data: { ...w.data, rows: agingShareRows(agingTotals(chartInvoices, chartBills, now.getTime()), { ar: "Invoices", ap: "Bills" }), valueFormat: money } }
+      if (w.type === "ranked-bars" && w.id === "acc-top-customers") return { ...w, data: { ...w.data, items: topCustomers(chartInvoices, partnerLabelMap, currentRange, previousRange), valueFormat: money } }
+      if (w.type === "step-chart" && w.id === "acc-cash-movements") {
+        const cash = weeklyCashMovements(chartPayments, now)
+        return { ...w, data: { ...w.data, values: cash.values, anomalies: cash.anomalies, valueFormat: money } }
+      }
+      return w
+    }).map((section) => ({ ...section, widgets: section.widgets.filter((widget) => ids.includes(widget.id)) })).filter((section) => section.widgets.length > 0)
+  }, [invoices, bills, accountPayments, operatingCompanyId, currencies, allMovesRead.state, accountPaymentsRead.state, currenciesRead.state, moduleConfigBase, partnerLabelMap])
   const accountantOverview = (
     <AccountantOverview
       companyName={companyLabelMap.get(String(operatingCompanyId))}
@@ -4429,11 +4721,14 @@ function AccountingClientReady({
         companyId: operatingCompanyId,
         moves: allMovesRead,
         payments: accountPaymentsRead,
+        paymentAllocationSources: { moveLines: accountMoveLinesRead, transactions: paymentTransactionsRead, reversals: paymentReversalsRead },
         bankStatements: bankStatementsRead,
         bankLines: bankStatementLinesRead,
         deadlines: taxDeadlinesRead,
         periods: accountPeriodsRawRead,
         currencies: currenciesRead,
+        companies: companiesRead,
+        budgets: budgetsRead,
       }}
       onNavigate={setAccountingActiveTab}
       onCreateInvoice={checkPermission("account_move", "create").allowed && manualInvoiceReadState.status === "ready" ? openInvoiceCreate : undefined}
@@ -4537,7 +4832,7 @@ function AccountingClientReady({
     ]),
     "tax-groups": taxGroupsRead.state,
     "tax-jurisdictions": taxJurisdictionsRead.state,
-    "tax-schedules": taxSchedulesRead.state,
+    "tax-schedules": mergeModuleStates([taxSchedulesRead.state, taxJurisdictionsRead.state, taxesRead.state]),
     "tax-deadlines": taxDeadlinesRead.state,
     "payment-terms": paymentTermsRead.state,
     "payment-term-lines": mergeModuleStates([paymentTermLinesRead.state, paymentTermsRead.state]),
@@ -4625,14 +4920,8 @@ function AccountingClientReady({
       saleOrdersRead.state,
       allMovesRead.state,
     ]),
-    "period-close": mergeModuleStates([
-      fiscalYearsRawRead.state,
-      accountPeriodsRawRead.state,
-      allMovesRead.state,
-      bankStatementsRead.state,
-      bankStatementLinesRead.state,
-      financialReportsRead.state,
-    ]),
+    // The checklist owns source truth and retries per check, like the overview.
+    "period-close": { status: "ready" } as const,
   }
   type AccountingTab = keyof typeof dataState
   const isAccountingTab = (tab: string): tab is AccountingTab =>
@@ -4689,10 +4978,10 @@ function AccountingClientReady({
   const csvUsable = csvKind == null || tabUsable(csvTabs[csvKind])
   // Overview can open these dialogs while a different source's tab is active.
   // Close them when their own primary reads stop being usable.
-  const bankDetailUsable = canUseModuleData(bankStatementsRead.state) && canUseModuleData(bankStatementLinesRead.state)
-  const manualInvoiceDataReady = manualInvoiceReadState.status === "ready"
+  const bankDetailUsable = companyAvailable && canUseModuleData(bankStatementsRead.state) && canUseModuleData(bankStatementLinesRead.state)
+  const manualInvoiceDataReady = companyAvailable && manualInvoiceReadState.status === "ready"
   useEffect(() => {
-    if (!bankDetailUsable) {
+    if (!bankDetailUsable && !bankLinkLockRef.current) {
       setBankStatementDetail(null)
       setBankLineMatchFocus(null)
       setBankLineEdit(null)
@@ -4702,9 +4991,9 @@ function AccountingClientReady({
       setShowCreateInvoice(false)
       setShowCreateBill(false)
     }
-  }, [bankDetailUsable, manualInvoiceDataReady])
+  }, [bankDetailUsable, manualInvoiceDataReady, bankLinkLocked])
   // Record sheets, row editors and prompts are opened from the active tab's rows.
-  const activeTabUsable = tabUsable(accountingActiveTab)
+  const activeTabUsable = companyAvailable && tabUsable(accountingActiveTab)
   useEffect(() => {
     // Dialogs close when the collection their rows came from is denied or fails.
     if (!quickActionUsable) setQuickActionForm(null)
@@ -4718,10 +5007,10 @@ function AccountingClientReady({
       setAnalyticAccountEdit(null)
       setAnalyticLineEdit(null)
       setAnalyticDistEdit(null)
-      setBankStatementDetail(null)
+      if (!bankLinkLockRef.current) setBankStatementDetail(null)
       setBankLineCreateOpen(false)
       setBankLineEdit(null)
-      setBankLineMatchFocus(null)
+      if (!bankLinkLockRef.current) setBankLineMatchFocus(null)
       setReconciliationWidgetEdit(null)
       setFiscalYearEdit(null)
       setFiscalSetupOpen(false)
@@ -4739,14 +5028,17 @@ function AccountingClientReady({
       setGlDrilldownAccount(null)
       cancelForm()
     }
-  }, [quickActionUsable, csvUsable, activeTabUsable, cancelForm])
+  }, [quickActionUsable, csvUsable, activeTabUsable, cancelForm, bankLinkLocked])
 
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (!actionUsable(action)) return
+    if (!companyAvailable) throw new Error("Select an active company before saving this accounting form.")
+    if (isAccountingDataAction(action) && dataState[actionTabs[action]].status !== "ready") {
+      throw new Error("The accounting records needed by this form are not ready. Refresh their source before saving.")
+    }
     if (action === "createAccount") {
       const p = toCreateAccountAccountParams(formData, {
         companyId: operatingCompanyId,
@@ -4777,6 +5069,8 @@ function AccountingClientReady({
       const p = toCreateAnalyticDistributionModelParams(formData, operatingCompanyId)
       if (p) await createAnalyticDistributionModel.mutateAsync(analyticParamsToJson(p, "CreateAnalyticDistributionModelParams"))
     } else if (action === "createReconciliationWidget") {
+      const issue = reconciliationSelectionIssue(formData, reconciliationSelectionContext)
+      if (issue) throw new Error(reconciliationSelectionMessage(issue))
       const p = toCreateAccountReconciliationWidgetParams(formData)
       if (p) await createReconciliationWidget.mutateAsync(reconciliationWidgetParamsToJson(p))
     } else if (action === "createFiscalYear") {
@@ -5131,6 +5425,9 @@ function AccountingClientReady({
   }, [csvKind, t])
 
   // ── Config: inject rich custom content for invoices/bills/accounts/ledger ───
+  const authoringCompanyLabel = companies.find((company) => company.id === operatingCompanyId)?.name
+    ?? t("accounting.authoring.companyId", { defaultValue: "Company {{id}}", id: String(operatingCompanyId) })
+
   const config = useMemo(
     () => {
       // Omit `tabs` from spread so static analysis (and runtime) only see the mapped tabs below.
@@ -5140,7 +5437,7 @@ function AccountingClientReady({
         tabs: (() => {
           const mapped = moduleConfigBase.tabs.map((tab) => {
             if (tab.id === "dashboard") {
-              return { ...tab, type: "custom" as const, customContent: accountantOverview }
+              return { ...tab, type: "custom" as const, customContent: <div className="space-y-8">{accountantOverview}<section aria-label="Financial charts" data-testid="accounting-finance-charts" className="grid grid-cols-1 gap-4 lg:grid-cols-3">{financeChartSections.flatMap((section) => section.widgets.map((widget) => <DashboardWidgetRenderer key={widget.id} widget={widget} widthClass={widget.width === "full" ? "lg:col-span-3" : widget.width === "2/3" ? "lg:col-span-2" : "lg:col-span-1"} />))}</section></div> }
             }
             if (tab.id === "analytic-lines") {
               return {
@@ -5161,24 +5458,39 @@ function AccountingClientReady({
                 ...tabRest,
                 type: "custom" as const,
                 customContent: (
+                  <div className="space-y-8">
                   <ListPivotSwitch
-                    storageId="accounting-invoices-list"
+                    storageId={`accounting-invoices-list:${organizationId}:${operatingCompanyId}:${currentUser?.id ?? "session"}`}
                     t={t}
                     rows={copyAsRecords(invoices)}
                     {...accountMovePivotSetup(t)}
                   >
                   <InvoiceListView
                     invoices={invoices}
+                    worklistScope={{ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }}
+                    sourceState={mergeModuleStates([allMovesRead.state, currenciesRead.state])}
                     currencyOptions={invoiceCurrencyOptions}
                     initialFilters={invoiceFilters}
                     onInitialFilterClear={clearInvoiceFilter}
                     onSelectInvoice={(invoice) => setInvoiceSheetRecord(copyAsRecord(invoice))}
                     onCreateInvoice={openInvoiceCreate}
+                    onSendInvoice={(inv) => void handleInvoiceSendEmail(inv)}
+                    onDownloadPdf={(inv) => void handleInvoiceDownloadPdf(inv)}
                     onRecalculateTotals={(inv) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(inv.id as string | number | bigint))
                     }
                   />
                   </ListPivotSwitch>
+                  <CollectionsWorkspace
+                    invoices={invoices}
+                    scope={{ organizationId, companyId: operatingCompanyId }}
+                    dataState={mergeModuleStates([allMovesRead.state, currenciesRead.state])}
+                    currencyOptions={invoiceCurrencyOptions}
+                    canReview={checkPermission("account_move", "read").allowed && checkPermission("mail_template", "read").allowed
+                      && checkPermission("mail_template", "write").allowed && checkPermission("mail_message", "read").allowed}
+                    onReviewReminder={(invoice) => router.push(`/accounting/invoices/${invoice.id}?reminder=1`)}
+                  />
+                  </div>
                 ),
               }
             }
@@ -5189,18 +5501,24 @@ function AccountingClientReady({
                 type: "custom" as const,
                 customContent: (
                   <ListPivotSwitch
-                    storageId="accounting-bills-list"
+                    storageId={`accounting-bills-list:${organizationId}:${operatingCompanyId}:${currentUser?.id ?? "session"}`}
                     t={t}
                     rows={copyAsRecords(bills)}
                     {...accountMovePivotSetup(t)}
                   >
                   <BillsListView
                     bills={bills}
+                    intake={{ lines: accountMoveLines, sourceState: mergeModuleStates([allMovesRead.state, accountMoveLinesRead.state]),
+                      renderDocuments: (bill) => <BillDocumentIntake organizationId={orgId} companyId={operatingCompanyId} billId={bill.id} partnerId={bill.partnerId} /> }}
+                    worklistScope={{ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }}
+                    sourceState={mergeModuleStates([allMovesRead.state, currenciesRead.state])}
                     currencyOptions={invoiceCurrencyOptions}
                     initialFilters={invoiceFilters}
                     onInitialFilterClear={clearInvoiceFilter}
                     onCreateBill={openBillCreate}
                     onSelectBill={(bill) => setInvoiceSheetRecord(copyAsRecord(bill))}
+                    onPayBill={openBillPayment}
+                    onDownloadBill={(bill) => void handleInvoiceDownloadPdf(bill)}
                     onRecalculateTotals={(bill) =>
                       void runMutation(() => computeInvoiceTotals.mutateAsync(bill.id as string | number | bigint))
                     }
@@ -5419,14 +5737,26 @@ function AccountingClientReady({
                       data={fixedAssets}
                       onRowClick={(row) => setSelectedFixedAsset(row)}
                     />
-                    {selectedFixedAsset ? (
+                    {currentSelectedFixedAsset ? (
+                      <div className="flex flex-col gap-4">
+                        <AssetDepreciationSchedule
+                          key={String(currentSelectedFixedAsset.id)}
+                          asset={currentSelectedFixedAsset}
+                          lines={depreciationLines}
+                          companyId={operatingCompanyId}
+                          dataState={mergeModuleStates([fixedAssetsRead.state, depreciationLinesRead.state])}
+                          currencyLabel={currencySelectOptions.find((option) => option.value === String(currentSelectedFixedAsset.currencyId))?.label}
+                          onGenerate={checkPermission("account_asset", "write").allowed ? async () => { await computeDepreciationBoard.mutateAsync(BigInt(String(currentSelectedFixedAsset.id))) } : undefined}
+                          generationPending={computeDepreciationBoard.isPending}
+                          onRefresh={async () => { const result = await depreciationLinesQuery.refetch(); if (result.isError) throw result.error }}
+                        />
                       <div className="rounded-lg border p-4 space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-sm text-muted-foreground">
                             {t("accounting.entities.depreciationSchedule.title")}
                             {" — "}
                             <span className="font-medium text-foreground">
-                              {String(selectedFixedAsset.name ?? selectedFixedAsset.id ?? "")}
+                              {String(currentSelectedFixedAsset.name ?? currentSelectedFixedAsset.id ?? "")}
                             </span>
                           </p>
                           <Button
@@ -5448,6 +5778,7 @@ function AccountingClientReady({
                           data={depreciationLinesForSelectedAsset}
                         />
                       </div>
+                      </div>
                     ) : null}
                   </div>
                 ),
@@ -5464,18 +5795,9 @@ function AccountingClientReady({
             if (tab.id === "payment-operations") {
               return {
                 ...tab,
-                customContent: (
-                  <PaymentOperationsPanel
-                    organizationId={organizationId}
-                    companyId={operatingCompanyId}
-                    defaultCurrencyId={defaultCurrencyId}
-                    currencyOptions={currencySelectOptions}
-                    journalOptions={journalFieldOptionsForModularForm}
-                    glAccountOptions={glAccountFieldOptions}
-                    partnerOptions={partnerSelectOptions}
-                    moveLines={accountMoveLines}
-                  />
-                ),
+                // The controller lives below ModuleView so tab changes cannot unmount
+                // an in-flight or uncertain payment allocation.
+                customContent: null,
               }
             }
             if (tab.id === "payment-terms") {
@@ -5730,6 +6052,7 @@ function AccountingClientReady({
             type: "custom" as const,
             customContent: (
               <PeriodCloseChecklist
+                organizationId={orgId}
                 companyId={operatingCompanyId}
                 fiscalYears={fiscalYearsRaw as Record<string, unknown>[]}
                 accountPeriods={accountPeriodsRaw as Record<string, unknown>[]}
@@ -5737,7 +6060,25 @@ function AccountingClientReady({
                 bankStatements={bankStatements as Record<string, unknown>[]}
                 bankStatementLines={bankStatementLines as Record<string, unknown>[]}
                 financialReports={financialReportsRaw as Record<string, unknown>[]}
+                sourceStates={{ fiscalYears: fiscalYearsRawRead.state, accountPeriods: accountPeriodsRawRead.state,
+                  moves: allMovesRead.state, bankStatements: bankStatementsRead.state,
+                  bankStatementLines: bankStatementLinesRead.state, financialReports: financialReportsRead.state }}
                 onNavigateToTab={setAccountingActiveTab}
+                companyLabel={authoringCompanyLabel}
+                dataState={mergeModuleStates([fiscalYearsRawRead.state, accountPeriodsRawRead.state, allMovesRead.state, bankStatementsRead.state, bankStatementLinesRead.state, financialReportsRead.state])}
+                onClosePeriod={checkPermission("account_period", "write").allowed ? async (periodId) => {
+                  await closeAccountPeriod.mutateAsync(periodId)
+                  const result = await accountPeriodsQuery.refetch()
+                  if (result.isError) throw result.error
+                } : undefined}
+                closePending={closeAccountPeriod.isPending}
+                onInspectBankLine={(statementId, lineId) => {
+                  const statements = bankStatements.filter((statement) => String(statement.id) === statementId && String(statement.companyId) === String(operatingCompanyId))
+                  const lines = bankStatementLines.filter((line) => String(line.id) === lineId && String(line.statementId) === statementId)
+                  if (statements.length !== 1 || lines.length !== 1) return
+                  setBankLineMatchFocus(lines[0]!)
+                  setBankStatementDetail(statements[0]!)
+                }}
               />
             ),
           }
@@ -5753,9 +6094,20 @@ function AccountingClientReady({
     },
     [
       accountantOverview,
+      financeChartSections,
       invoiceCurrencyOptions,
       invoiceFilters,
       clearInvoiceFilter,
+      currentUser?.id,
+      allMovesRead.state,
+      currenciesRead.state,
+      accountMoveLinesRead.state,
+      fiscalYearsRawRead.state,
+      accountPeriodsRawRead.state,
+      bankStatementsRead.state,
+      bankStatementLinesRead.state,
+      financialReportsRead.state,
+      router,
       chartStructurePanel,
       invoices,
       bills,
@@ -5802,6 +6154,22 @@ function AccountingClientReady({
       fixedAssetsEntityConfig,
       fixedAssets,
       depreciationLinesForSelectedAsset,
+      currentSelectedFixedAsset,
+      depreciationLinesQuery.refetch,
+      fixedAssetsRead.state,
+      depreciationLinesRead.state,
+      allMovesRead.state,
+      accountsRead.state,
+      accountMoveLinesRead.state,
+      fiscalYearsRawRead.state,
+      accountPeriodsRawRead.state,
+      bankStatementsRead.state,
+      bankStatementLinesRead.state,
+      financialReportsRead.state,
+      closeAccountPeriod,
+      computeDepreciationBoard,
+      checkPermission,
+      authoringCompanyLabel,
       selectedFixedAsset,
       depreciationLinesEntityConfig,
       intercompanyRuleCreateFormConfig,
@@ -5980,29 +6348,70 @@ function AccountingClientReady({
     [paymentsLoading, bankStatementsLoading, movesLoading],
   )
 
+  const renderAccountingAuthoringPreview = (values: FormValues, form: FormConfig) => {
+    if (!hasAccountingAuthoringPreview(form.id)) return null
+    const selectedJournal = journals.find((journal) => String(journal.id) === String(values.journalId ?? ""))
+    const currencyId = String(selectedJournal?.currencyId ?? defaultCurrencyId)
+    return <AccountingAuthoringPreview
+      key={form.id}
+      config={form}
+      values={values}
+      companyId={String(operatingCompanyId)}
+      companyLabel={authoringCompanyLabel}
+      currencyLabel={currencySelectOptions.find((option) => option.value === currencyId)?.label ?? "—"}
+      moves={allMoves}
+      moveLines={accountMoveLines}
+      ledgerLoaded={canUseModuleData(allMovesRead.state) && canUseModuleData(accountMoveLinesRead.state)}
+    />
+  }
+
   return (
-    <>
+    <ReconciliationMoveLineProvider value={reconciliationSelectionContext}>
       {activeTabUsable && formDialog}
-      <AccountingSetupReadinessPanel
+      {companyAvailable ? <AccountingSetupReadinessPanel
         setup={accountingSetup}
+        compact={readinessAction === undefined && !config.tabGroups?.find((group) => group.tabIds.includes("taxes"))?.tabIds.includes(accountingActiveTab)}
         action={readinessAction}
         onResolve={handleReadinessResolve}
         className="mb-4"
-      />
-      <ModuleView
+      /> : <p role="status" className="rounded-lg border p-4 text-sm">Select an active company to continue. Original pending operations have been retained.</p>}
+      {companyAvailable ? <ModuleView
         config={config}
         data={data}
         dataLoading={dataLoading}
         dataState={dataState}
         onFormSubmit={handleFormSubmit}
+        renderCreatePreview={(_tabId, values, form) => renderAccountingAuthoringPreview(values, form)}
         onRowClick={handleEntityRowClick}
         activeTab={accountingActiveTab}
         onActiveTabChange={setAccountingActiveTab}
+        onOpenFormChange={setModuleFormWorkspace}
         runtimeForms={{
           organizationId,
           roleId: runtimeRoleId,
         }}
-      />
+      /> : null}
+
+      {(accountingActiveTab === "payment-operations" && dataState["payment-operations"].status === "ready") || paymentOperationsLocked ? (
+        <section className="mt-6 space-y-3" aria-label="Payment operations">
+          {accountingActiveTab !== "payment-operations" ? <p role="status" className="rounded-lg border p-3 text-sm">The original payment operation is retained here until its result is confirmed.</p> : null}
+          <PaymentOperationsPanel
+            organizationId={organizationId}
+            companyId={operatingCompanyId}
+            defaultCurrencyId={defaultCurrencyId}
+            currencyOptions={currencySelectOptions}
+            journalOptions={journalFieldOptionsForModularForm}
+            glAccountOptions={glAccountFieldOptions}
+            partnerOptions={partnerSelectOptions}
+            moveLines={accountMoveLines}
+            moves={allMoves}
+            glAccounts={accounts}
+            lookupDataReady={allMovesRead.state.status === "ready" && accountsRead.state.status === "ready" && accountMoveLinesRead.state.status === "ready"}
+            onRecoveryLockChange={setPaymentOperationsLocked}
+            scopeAvailable={companyAvailable}
+          />
+        </section>
+      ) : null}
 
       {/* Invoice / bill record sheet (row click on invoices/bills tabs) */}
       <EntityRecordSheet
@@ -6150,6 +6559,7 @@ function AccountingClientReady({
               : { companyId: operatingCompanyId }
           }
           organizationId={orgId}
+          companyId={operatingCompanyId}
           abandonedAccountingCleanup={
             (csvKind === "accountMove" ||
               csvKind === "outstandingDocuments" ||
@@ -6224,11 +6634,19 @@ function AccountingClientReady({
       {/* Invoice detail */}
       <InvoiceDetailModal
         invoice={selectedInvoice}
+        organizationId={organizationId}
+        draftPersonalization={draftInvoicePersonalization?.personalization}
+        draftPersonalizationState={selectedInvoice && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType)
+          ? draftInvoicePersonalization?.personalizationError ? { status: "error", message: draftInvoicePersonalization.personalizationError } : selectedDraftReviewState
+          : undefined}
         currencyId={selectedInvoice ? String(selectedInvoice.currencyId ?? "") : undefined}
         currencyCode={selectedInvoice ? invoiceCurrencyOptions.find((currency) => currency.value === String(selectedInvoice.currencyId))?.code : undefined}
         open={!!selectedInvoice}
         onClose={() => setSelectedInvoice(null)}
-        onPostDraft={selectedInvoice ? () => postDraft(selectedInvoice) : undefined}
+        onPostDraft={selectedInvoice ? () => {
+          if (["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType) && (selectedDraftReviewState.status !== "ready" || !draftInvoicePersonalization?.personalization)) return
+          postDraft(selectedInvoice)
+        } : undefined}
         onCreateCreditNote={
           selectedInvoice &&
             moveTypeTag(selectedInvoice as Record<string, unknown>) === "OutInvoice" &&
@@ -6241,7 +6659,10 @@ function AccountingClientReady({
         }
         onDownloadPdf={selectedInvoice ? () => void handleInvoiceDownloadPdf() : undefined}
         onArchivePdf={selectedInvoice ? () => void handleInvoiceArchivePdf() : undefined}
-        onSendEmail={selectedInvoice ? () => void handleInvoiceSendEmail() : undefined}
+        onSendEmail={selectedInvoice && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType)
+          && enumTag(selectedInvoice.state) === "Posted"
+          && checkPermission("mail_template", "read").allowed && checkPermission("mail_template", "write").allowed
+          ? handleInvoiceSendEmail : undefined}
         onRecalculateTotals={
           selectedInvoice
             ? () =>
@@ -6289,6 +6710,10 @@ function AccountingClientReady({
         companyId={operatingCompanyId}
         onClose={() => setShowCreateInvoice(false)}
         organizationId={organizationId}
+        profile={invoicePersonalization.profile}
+        profileVersionIds={invoicePersonalization.profileVersionIds}
+        seller={invoiceSeller}
+        personalizationState={draftReviewState}
         journalOptions={manualInvoiceOptions.invoice.journals}
         currencyOptions={invoiceCurrencyOptions}
         partnerOptions={manualInvoiceOptions.invoice.partners}
@@ -6300,13 +6725,13 @@ function AccountingClientReady({
         onSave={async (params: CreateManualAccountInvoiceParams) => {
           const outcome = await createManualInvoice.mutateAsync(params)
           if (outcome.kind === "converged" || outcome.kind === "already-applied") {
-            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id)
+            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id, params.companyId)
           }
           return outcome
         }}
         onCheckStatus={async (params) => {
           const ref = await readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)
-          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id)
+          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id, params.companyId)
           return ref
         }}
         onResolved={(ref) => ref.href && router.push(ref.href)}
@@ -6330,13 +6755,13 @@ function AccountingClientReady({
         onSave={async (params: CreateManualAccountInvoiceParams) => {
           const outcome = await createManualInvoice.mutateAsync(params)
           if (outcome.kind === "converged" || outcome.kind === "already-applied") {
-            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id)
+            await persistAccountMoveCustomFieldsExact(params.metadata, outcome.ref.id, params.companyId)
           }
           return outcome
         }}
         onCheckStatus={async (params) => {
           const ref = await readManualAccountInvoiceEffect(params.companyId, params.idempotencyKey)
-          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id)
+          if (ref) await persistAccountMoveCustomFieldsExact(params.metadata, ref.id, params.companyId)
           return ref
         }}
         onResolved={(ref) => ref.href && router.push(ref.href)}
@@ -6347,6 +6772,9 @@ function AccountingClientReady({
         open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         staticConfig={quickActionForm?.form ?? journalEntryFormConfig}
+        renderPreview={(values) => renderAccountingAuthoringPreview(values, quickActionForm?.form ?? journalEntryFormConfig)}
+        closeOnSubmit={false}
+        showSubmitSuccessToast={false}
         moduleId="accounting"
         organizationId={organizationId}
         roleId={runtimeRoleId}
@@ -6417,6 +6845,7 @@ function AccountingClientReady({
           if (!open) setPaymentTermLineEdit(null)
         }}
         config={paymentTermLineEditFormConfig}
+        renderPreview={(values) => renderAccountingAuthoringPreview(values, paymentTermLineEditFormConfig)}
         onSubmit={async (formData) => {
           if (!paymentTermLineEdit?.id) return
           await updatePaymentTermLine.mutateAsync({
@@ -6601,53 +7030,48 @@ function AccountingClientReady({
       <Dialog
         open={!!bankStatementDetail}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !bankLinkLockRef.current) {
             setBankStatementDetail(null)
             setBankLineCreateOpen(false)
             setBankLineMatchFocus(null)
-            setReconciliationRuleIdInput("")
-            setManualReconcileMoveIds("")
-            setManualReconcileResidual("0")
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[94dvh] max-w-[calc(100%-1rem)] overflow-y-auto sm:max-w-6xl [&_button]:min-h-11 [&_button]:min-w-11">
           <DialogHeader>
             <DialogTitle>
               {t("accounting.bankStatementDetail.title")}
-              {bankStatementDetail?.name != null && String(bankStatementDetail.name).trim() !== ""
-                ? ` — ${String(bankStatementDetail.name)}`
-                : bankStatementDetail?.id != null
-                  ? ` #${String(bankStatementDetail.id)}`
+              {bankLinkSource.state.status === "ready" && currentBankStatement
+                ? ` — ${currentBankStatement.name || `Statement #${currentBankStatement.id}`}`
                   : ""}
             </DialogTitle>
           </DialogHeader>
-          {bankStatementDetail ? (
-            <div className="space-y-4 text-sm">
+          {currentBankStatement && bankLinkSource.state.status === "ready" ? (
+            <fieldset disabled={bankLinkLocked} className="min-w-0 space-y-4 text-sm">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <div>
                   <span className="text-muted-foreground">{t("accounting.entities.bankStatements.columns.state")}</span>
-                  <div className="font-medium">{bankStatementStateStr(bankStatementDetail)}</div>
+                  <div className="font-medium">{enumTag(currentBankStatement.state)}</div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("accounting.entities.bankStatements.columns.balanceStart")}</span>
-                  <div className="font-medium">{Number(bankStatementDetail.balanceStart ?? 0).toLocaleString()}</div>
+                  <div className="font-medium">{bankStatementMoney(currentBankStatement.balanceStart)}</div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("accounting.entities.bankStatements.columns.balanceEndReal")}</span>
-                  <div className="font-medium">{Number(bankStatementDetail.balanceEndReal ?? 0).toLocaleString()}</div>
+                  <div className="font-medium">{bankStatementMoney(currentBankStatement.balanceEndReal)}</div>
                 </div>
                 <div>
                   <span className="text-muted-foreground">{t("accounting.entities.bankStatements.columns.balanceEnd")}</span>
-                  <div className="font-medium">{Number(bankStatementDetail.balanceEnd ?? 0).toLocaleString()}</div>
+                  <div className="font-medium">{bankStatementMoney(currentBankStatement.balanceEnd)}</div>
                 </div>
               </div>
-              {bankStatementStateStr(bankStatementDetail) === "Open" && !statementBalancesMatch ? (
+              {enumTag(currentBankStatement.state) === "Open" && !statementBalancesMatch ? (
                 <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-amber-900 dark:text-amber-100">
                   {t("accounting.bankStatementDetail.balanceMismatch")}
                 </p>
               ) : null}
-              {bankStatementStateStr(bankStatementDetail) === "Posted" ? (
+              {enumTag(currentBankStatement.state) === "Posted" ? (
                 <p className="text-muted-foreground">{t("accounting.bankStatementDetail.postedHint")}</p>
               ) : null}
 
@@ -6656,13 +7080,14 @@ function AccountingClientReady({
                   type="button"
                   size="sm"
                   disabled={
-                    bankStatementStateStr(bankStatementDetail) !== "Open" ||
+                    enumTag(currentBankStatement.state) !== "Open" ||
                     !statementBalancesMatch ||
+                    detailStatementLines.some((line) => Array.isArray(line.paymentIds) && line.paymentIds.length > 0 && !line.isReconciled) ||
                     postBankStatement.isPending
                   }
                   onClick={async () => {
-                    if (!bankStatementDetail.id) return
-                    await postBankStatement.mutateAsync(BigInt(String(bankStatementDetail.id)))
+                    if (!currentBankStatement.id) return
+                    await postBankStatement.mutateAsync(BigInt(String(currentBankStatement.id)))
                     setBankStatementDetail(null)
                   }}
                 >
@@ -6672,11 +7097,12 @@ function AccountingClientReady({
                   type="button"
                   size="sm"
                   variant="secondary"
-                  disabled={bankStatementStateStr(bankStatementDetail) === "Posted" || deleteBankStatement.isPending}
+                  disabled={enumTag(currentBankStatement.state) === "Posted" || deleteBankStatement.isPending
+                    || detailStatementLines.some((line) => Array.isArray(line.paymentIds) && line.paymentIds.length > 0)}
                   onClick={async () => {
-                    if (!bankStatementDetail.id) return
+                    if (!currentBankStatement.id) return
                     if (!(await confirmDialog({ description: t("accounting.bankStatementDetail.deleteStatementConfirm") }))) return
-                    void runMutation(() => deleteBankStatement.mutateAsync(BigInt(String(bankStatementDetail.id)))).then(
+                    void runMutation(() => deleteBankStatement.mutateAsync(BigInt(String(currentBankStatement.id)))).then(
                       (ok) => {
                         if (ok) setBankStatementDetail(null)
                       },
@@ -6689,7 +7115,7 @@ function AccountingClientReady({
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={bankStatementStateStr(bankStatementDetail) === "Posted"}
+                  disabled={enumTag(currentBankStatement.state) === "Posted"}
                   onClick={() => setBankLineCreateOpen(true)}
                 >
                   {t("accounting.bankStatementDetail.addLineButton")}
@@ -6715,6 +7141,8 @@ function AccountingClientReady({
                       <tbody>
                         {statementLinesPager.pageRows.map((line) => {
                           const lineRow = line as Record<string, unknown>
+                          const linkedPaymentIds = lineRow.paymentIds ?? lineRow.payment_ids
+                          const settlementLinked = Array.isArray(linkedPaymentIds) && linkedPaymentIds.length > 0
                           const focused =
                             bankLineMatchFocus?.id != null &&
                             String(bankLineMatchFocus.id) === String(line.id)
@@ -6750,7 +7178,7 @@ function AccountingClientReady({
                                   >
                                     {t("accounting.bankStatementDetail.focusLineButton")}
                                   </Button>
-                                  {line.isReconciled ? (
+                                  {line.isReconciled && !settlementLinked ? (
                                     <Button
                                       type="button"
                                       size="sm"
@@ -6775,6 +7203,11 @@ function AccountingClientReady({
                                     </Button>
                                   ) : null}
                                 </div>
+                                {settlementLinked ? <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                                  {line.isReconciled
+                                    ? t("accounting.bankStatementDetail.settlementLocked", { defaultValue: "Settlement confirmed. Editing, unlinking and reversal are unavailable in this alpha." })
+                                    : t("accounting.bankStatementDetail.settlementPending", { defaultValue: "Payment awaiting approval or settlement completion. Use Focus line to continue." })}
+                                </p> : null}
                               </td>
                               <td className="p-2">
                                 <div className="flex flex-wrap gap-1">
@@ -6783,7 +7216,7 @@ function AccountingClientReady({
                                     size="sm"
                                     variant="ghost"
                                     className="h-7 px-2"
-                                    disabled={bankStatementStateStr(bankStatementDetail) === "Posted"}
+                                    disabled={enumTag(currentBankStatement.state) === "Posted" || settlementLinked}
                                     onClick={() => setBankLineEdit(lineRow)}
                                   >
                                     {t("common.edit")}
@@ -6794,7 +7227,8 @@ function AccountingClientReady({
                                     variant="ghost"
                                     className="h-7 px-2 text-destructive"
                                     disabled={
-                                      bankStatementStateStr(bankStatementDetail) === "Posted" ||
+                                      enumTag(currentBankStatement.state) === "Posted" ||
+                                      settlementLinked ||
                                       deleteBankStatementLine.isPending
                                     }
                                     onClick={async () => {
@@ -6818,182 +7252,20 @@ function AccountingClientReady({
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-border pt-4">
-                <h3 className="font-semibold">{t("accounting.reconciliation.title")}</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="recon-rule-id">{t("accounting.bankStatementDetail.reconciliationRuleId")}</Label>
-                  <Input
-                    id="recon-rule-id"
-                    value={reconciliationRuleIdInput}
-                    onChange={(e) => setReconciliationRuleIdInput(e.target.value)}
-                    className="max-w-xs"
-                    placeholder="—"
-                  />
-                  <p className="text-muted-foreground text-xs">
-                    {t("accounting.bankStatementDetail.reconciliationRuleIdHint")}
-                  </p>
-                </div>
-                {bankLineMatchFocus?.id ? (
-                  <>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        disabled={matchBankLine.isPending}
-                        onClick={() => {
-                          void runMutation(() =>
-                            matchBankLine.mutateAsync({
-                              lineId: BigInt(String(bankLineMatchFocus.id)),
-                              ruleId: parseOptionalRuleId(reconciliationRuleIdInput),
-                            }),
-                          )
-                        }}
-                      >
-                        {t("accounting.bankStatementDetail.matchBankLine")}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        disabled={applyReconciliationRules.isPending}
-                        onClick={() => {
-                          void runMutation(() =>
-                            applyReconciliationRules.mutateAsync({
-                              lineId: BigInt(String(bankLineMatchFocus.id)),
-                              ruleId: parseOptionalRuleId(reconciliationRuleIdInput),
-                            }),
-                          )
-                        }}
-                      >
-                        {t("accounting.bankStatementDetail.applyRules")}
-                      </Button>
-                    </div>
-                    <div>
-                      <h4 className="mb-2 text-sm font-medium">
-                        {t("accounting.bankStatementDetail.matchCandidatesHeading")}
-                      </h4>
-                      {matchCandidatesForFocusedLine.length === 0 ? (
-                        <p className="text-muted-foreground text-sm">
-                          {t("accounting.bankStatementDetail.noCandidates")}
-                        </p>
-                      ) : (
-                        <div className="overflow-x-auto rounded-md border">
-                          <table className="w-full text-left text-xs sm:text-sm">
-                            <thead className="border-b bg-muted/50">
-                              <tr>
-                                <th className="p-2">{t("accounting.bankStatementDetail.candidateType")}</th>
-                                <th className="p-2">{t("accounting.bankStatementDetail.candidateMoveLine")}</th>
-                                <th className="p-2 text-right">{t("accounting.bankStatementDetail.candidateAmount")}</th>
-                                <th className="p-2 text-right">{t("accounting.bankStatementDetail.candidateScore")}</th>
-                                <th className="p-2 w-24" />
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {matchCandidatesForFocusedLine.map((c) => (
-                                <tr key={String(c.id)} className="border-b last:border-0">
-                                  <td className="p-2">{String(c.matchType ?? "")}</td>
-                                  <td className="p-2 font-mono">{String(c.entityId ?? "")}</td>
-                                  <td className="p-2 text-right">{Number(c.amount ?? 0).toLocaleString()}</td>
-                                  <td className="p-2 text-right">{String(c.score ?? "")}</td>
-                                  <td className="p-2">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      className="h-7 px-2"
-                                      disabled={reconcileBankLine.isPending || Boolean(bankLineMatchFocus.isReconciled)}
-                                      onClick={() => {
-                                        if (!bankLineMatchFocus.id || c.entityId == null) return
-                                        void runMutation(() =>
-                                          reconcileBankLine.mutateAsync({
-                                            lineId: BigInt(String(bankLineMatchFocus.id)),
-                                            params: bankReconcileParamsToJson(
-                                              [BigInt(String(c.entityId))],
-                                              0,
-                                            ),
-                                          }),
-                                        )
-                                      }}
-                                    >
-                                      {t("accounting.bankStatementDetail.reconcileWithCandidate")}
-                                    </Button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2 rounded-md border border-dashed p-3">
-                      <h4 className="text-sm font-medium">
-                        {t("accounting.bankStatementDetail.manualReconcileHeading")}
-                      </h4>
-                      <div className="space-y-1">
-                        <Label htmlFor="manual-move-ids">
-                          {t("accounting.bankStatementDetail.manualMoveLineIds")}
-                        </Label>
-                        <Input
-                          id="manual-move-ids"
-                          value={manualReconcileMoveIds}
-                          onChange={(e) => setManualReconcileMoveIds(e.target.value)}
-                          placeholder="e.g. 101, 102"
-                        />
-                        <p className="text-muted-foreground text-xs">
-                          {t("accounting.bankStatementDetail.manualMoveLineIdsHint")}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="manual-residual">
-                          {t("accounting.bankStatementDetail.manualAmountResidual")}
-                        </Label>
-                        <Input
-                          id="manual-residual"
-                          value={manualReconcileResidual}
-                          onChange={(e) => setManualReconcileResidual(e.target.value)}
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        disabled={
-                          reconcileBankLine.isPending ||
-                          Boolean(bankLineMatchFocus.isReconciled) ||
-                          manualReconcileMoveIds.trim() === ""
-                        }
-                        onClick={() => {
-                          if (!bankLineMatchFocus.id) return
-                          const parts = manualReconcileMoveIds
-                            .split(/[\s,]+/)
-                            .map((s) => s.trim())
-                            .filter(Boolean)
-                          const ids = parts.map((p) => BigInt(p))
-                          const res = Number(manualReconcileResidual)
-                          void runMutation(() =>
-                            reconcileBankLine.mutateAsync({
-                              lineId: BigInt(String(bankLineMatchFocus.id)),
-                              params: bankReconcileParamsToJson(
-                                ids,
-                                Number.isFinite(res) ? res : 0,
-                              ),
-                            }),
-                          )
-                        }}
-                      >
-                        {t("accounting.bankStatementDetail.reconcileManual")}
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-muted-foreground text-sm">
-                    {t("accounting.bankStatementDetail.focusLineForMatches")}
-                  </p>
-                )}
-              </div>
-            </div>
+            </fieldset>
           ) : null}
+          <ReconciliationWorkbench
+            actorKey={currentUser?.id ?? null}
+            source={bankLinkSource}
+            canReconcile={canLinkBankRecords}
+            canRecover={(action: BankSettlementRecoveryAction) => bankRecoveryPermissions[action]}
+            onConfirm={confirmBankLink}
+            onRecover={recoverReviewedBankSettlement}
+            onCheckStatus={checkBankLink}
+            onOperationLockChange={handleBankLinkLock}
+          />
           <DialogFooter className="sm:justify-end">
-            <Button type="button" variant="outline" onClick={() => setBankStatementDetail(null)}>
+            <Button type="button" variant="outline" disabled={bankLinkLocked} onClick={() => { if (!bankLinkLockRef.current) setBankStatementDetail(null) }}>
               {t("common.close")}
             </Button>
           </DialogFooter>
@@ -7019,6 +7291,6 @@ function AccountingClientReady({
         onSubmit={onSubmitEditBankStatementLine}
       />
       {confirmDialogNode}
-    </>
+    </ReconciliationMoveLineProvider>
   )
 }

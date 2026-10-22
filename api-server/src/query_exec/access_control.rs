@@ -25,8 +25,29 @@ fn roles_sql(
     // Keep their existing permission descriptors, but never fetch SELECT * or
     // roles from another tenant. Descriptors do not grant the actor those roles.
     columns.push("permissions".into());
+    let mut filter = String::new();
+    if let Some(access) = field_access {
+        if access.organization_id != organization_id {
+            return Err(ApiError::Forbidden(
+                "Role organization scope changed".into(),
+            ));
+        }
+        if !stdb_auth::permission_allowed(access, "role", "read") {
+            let mut ids = access.role_ids.clone();
+            ids.push(access.role_id);
+            ids.sort_unstable();
+            ids.dedup();
+            filter.push_str(&format!(
+                " AND ({})",
+                ids.iter()
+                    .map(|id| format!("id = {id}"))
+                    .collect::<Vec<_>>()
+                    .join(" OR ")
+            ));
+        }
+    }
     Ok(format!(
-        "SELECT {} FROM role WHERE organization_id = {organization_id} AND is_active = true",
+        "SELECT {} FROM role WHERE organization_id = {organization_id} AND is_active = true{filter}",
         columns.join(", ")
     ))
 }
@@ -47,6 +68,21 @@ mod role_scope_tests {
             assert!(!sql.contains("metadata"));
             assert!(sql.contains("id, organization_id"));
         }
+    }
+
+    #[test]
+    fn role_hydration_limits_non_administrators_to_their_effective_role_set() {
+        let access = FieldAccessContext {
+            organization_id: 42,
+            role_id: 7,
+            role_ids: vec![9, 7],
+            role_permissions: vec!["contact:read".into()],
+            ..Default::default()
+        };
+        let sql = roles_sql(42, Some(&access)).unwrap();
+        assert!(sql.ends_with("AND (id = 7 OR id = 9)"));
+        assert!(!sql.contains("SELECT *"));
+        assert!(roles_sql(43, Some(&access)).is_err());
     }
 }
 

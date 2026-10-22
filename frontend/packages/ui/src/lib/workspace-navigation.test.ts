@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { ModuleTab, ModuleWorkspaceNav } from "./module-types"
-import { moduleTabHref, resolveWorkspaceNavigation } from "./workspace-navigation"
+import { moduleTabHref, moduleWorkspaceNavigation, resolveWorkspaceNavigation } from "./workspace-navigation"
 
 const tab = (id: string): ModuleTab => ({ id, label: id, type: "custom" })
 const config: ModuleWorkspaceNav = {
@@ -12,6 +12,26 @@ const config: ModuleWorkspaceNav = {
 }
 
 describe("workspace navigation", () => {
+  it("uses the same workspace model when a module only supplies legacy tab groups", () => {
+    const tabs = ["dashboard", "orders", "lines", "vendors"].map(tab)
+    const nav = moduleWorkspaceNavigation({ id: "purchasing", title: "Purchasing", tabs,
+      tabGroups: [{ label: "Orders", tabIds: ["orders", "lines", "not-installed"] }],
+    })
+    const result = resolveWorkspaceNavigation(tabs, nav)
+    expect(result.workspaces.map((group) => group.tabs.map((item) => item.id))).toEqual([["dashboard"], ["orders", "lines"], ["vendors"]])
+  })
+
+  it("bounds uncurated navigation without dropping any destinations", () => {
+    const tabs = Array.from({ length: 20 }, (_, index) => tab(`tab-${index}`))
+    const result = resolveWorkspaceNavigation(tabs, moduleWorkspaceNavigation({ id: "future", title: "Future", tabs }))
+    expect(result.workspaces).toHaveLength(6)
+    expect([...result.workspaces, ...result.overflow].flatMap((group) => group.tabs)).toEqual(tabs)
+  })
+
+  it("keeps curated configuration authoritative", () => {
+    expect(moduleWorkspaceNavigation({ id: "accounting", title: "Accounting", tabs: [], workspaceNav: config })).toBe(config)
+  })
+
   it("includes runtime additions and keeps every canonical tab reachable exactly once", () => {
     const tabs = ["dashboard", "journal-entries", "move-lines", "taxes", "future-runtime-tab"].map(tab)
     const result = resolveWorkspaceNavigation(tabs, config)

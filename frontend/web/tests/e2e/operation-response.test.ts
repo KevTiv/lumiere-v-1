@@ -36,6 +36,23 @@ test("matches explicitly named compatibility traffic", () => {
   )
 })
 
+test("matches an immutable contract operation", () => {
+  assert.equal(
+    matchesOperationResponse(
+      response("/api/operations/erp.create_purchase_order_once"),
+      "erp.create_purchase_order_once",
+    ),
+    true,
+  )
+  assert.equal(
+    matchesOperationResponse(
+      response("/api/operations/erp.create_purchase_order"),
+      "erp.create_purchase_order_once",
+    ),
+    false,
+  )
+})
+
 test("does not match a different operation", () => {
   assert.equal(
     matchesOperationResponse(
@@ -55,4 +72,13 @@ test("fault injection resolves names and legacy URLs to immutable operations", (
   assert.equal(matchesOperationFaultTarget(url, "confirm"), false)
   assert.equal(matchesOperationFaultTarget(new URL(`${url}/extra`), url.pathname), false)
   assert.equal(matchesOperationFaultTarget(new URL("http://localhost/api/compat/reducer/confirm_sales_order"), "confirm_sales_order"), true)
+})
+
+
+test("matches an exact immutable member access operation", () => {
+  for (const prefix of ["/api", "/v1"]) {
+    assert.equal(matchesOperationResponse(response(`${prefix}/operations/erp.set_member_access`), "erp.set_member_access"), true)
+    assert.equal(matchesOperationResponse(response(`${prefix}/operations/erp.set_member_access/extra`), "erp.set_member_access"), false)
+    assert.equal(matchesOperationResponse(response(`${prefix}/operations/erp.assign_role`), "erp.set_member_access"), false)
+  }
 })

@@ -1,18 +1,20 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
 import {
   DashboardHeader,
+  EntityView,
   FormModal,
   MissingOrganization,
+  TaskBoardView,
   mergeSelectOptionsForFields,
   newTaskForm,
   editTaskForm,
+  tasksTableConfig,
 } from "@lumiere/ui"
-import type { FormConfig } from "@lumiere/ui"
-import { enumTag } from "@/lib/accounting-post-draft"
+import type { EntityRow, EntityViewConfig, FormConfig } from "@lumiere/ui"
 import { useProjectsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import {
@@ -33,29 +35,16 @@ import {
   type ProjectTask,
   type ProjectProject,
 } from "@lumiere/query-hooks/hooks/projects"
+import { useDocuments } from "@lumiere/query-hooks/hooks/documents"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { Button, buttonVariants } from "@lumiere/ui/components/button"
-import { Input } from "@lumiere/ui/components/input"
-import { Badge } from "@lumiere/ui/components/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@lumiere/ui/components/select"
-import { cn } from "@lumiere/ui/lib/utils"
-import { Plus, Search, ExternalLink } from "lucide-react"
+import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
+import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import { Ban, CheckCheck, CircleCheck, ExternalLink, Pencil, Plus, RotateCcw } from "lucide-react"
+import { TASK_BOARD_STATES, taskBoardState, type TaskBoardState } from "../projects/project-record"
+import { taskAttachmentCounts, toTaskBoardItem } from "./task-board-items"
 
-const TASK_COLUMNS = [
-  "InProgress",
-  "ChangesRequested",
-  "Approved",
-  "Done",
-  "Cancelled",
-] as const
-
-type TaskColumnId = (typeof TASK_COLUMNS)[number]
+const TASK_COLUMN_COLORS = ["bg-info", "bg-warning", "bg-category-3", "bg-success", "bg-destructive"] as const
 
 interface TasksClientProps {
   organizationId?: number
@@ -67,25 +56,6 @@ type ModalState =
   | { type: null }
   | { type: "create"; form: FormConfig; action: string }
   | { type: "edit"; form: FormConfig; action: string; entityId: string | number }
-
-function taskStateTag(task: Record<string, unknown>): TaskColumnId {
-  const tag = enumTag(task.state) as TaskColumnId
-  if (TASK_COLUMNS.includes(tag)) return tag
-  if (task.isClosed) return "Done"
-  return "InProgress"
-}
-
-function priorityLabel(priority: unknown, t: (key: string) => string): string {
-  const key = String(priority ?? "0")
-  return t(`projects.tasks.priority.${key}`)
-}
-
-function formatDeadline(raw: unknown): string | null {
-  if (raw == null) return null
-  const ms = Number(raw) / 1000
-  if (!Number.isFinite(ms) || ms <= 0) return null
-  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" })
-}
 
 function getTaskFieldValue(task: Record<string, unknown>, fieldName: string): unknown {
   switch (fieldName) {
@@ -129,8 +99,6 @@ function TasksClientLoaded({
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [modal, setModal] = useState<ModalState>({ type: null })
-  const [searchQuery, setSearchQuery] = useState("")
-  const [projectFilter, setProjectFilter] = useState<string>("all")
 
   const { data: tasks = [] } = useTasks(orgId, initialTasks)
   const { data: projects = [] } = useProjects(orgId, initialProjects)
@@ -183,51 +151,121 @@ function TasksClientLoaded({
     [t, projectFieldOptions, taskStageFieldOptions],
   )
 
-  const filteredTasks = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    return (tasks as Record<string, unknown>[]).filter((task) => {
-      const matchesProject =
-        projectFilter === "all" || String(task.projectId ?? "") === projectFilter
-      if (!matchesProject) return false
-      if (!q) return true
-      const project = projects.find((p) => p.id === task.projectId)
-      return (
-        String(task.name ?? "").toLowerCase().includes(q) ||
-        String(project?.name ?? "").toLowerCase().includes(q)
-      )
-    })
-  }, [tasks, projects, searchQuery, projectFilter])
+  const identityLabels = useIdentityLabelMap(orgId)
+  const { data: documents = [] } = useDocuments(orgId)
+  const attachmentCounts = useMemo(() => taskAttachmentCounts(documents), [documents])
+  const projectNames = useMemo(
+    () => new Map(projects.map((project) => [String(project.id), project.name])),
+    [projects],
+  )
 
-  const tasksByColumn = useMemo(() => {
-    const grouped = Object.fromEntries(
-      TASK_COLUMNS.map((col) => [col, [] as Record<string, unknown>[]]),
-    ) as Record<TaskColumnId, Record<string, unknown>[]>
-    for (const task of filteredTasks) {
-      grouped[taskStateTag(task)].push(task)
-    }
-    return grouped
-  }, [filteredTasks])
+  // A dropped card stays in its new column until the live rows agree or the move fails.
+  const [pendingMoves, setPendingMoves] = useState<ReadonlyMap<string, TaskBoardState>>(new Map())
+
+  const boardItems = useMemo(
+    () =>
+      tasks.map((task) => {
+        const item = toTaskBoardItem(task, { projectNames, identityLabels, attachmentCounts })
+        const pending = pendingMoves.get(item.id)
+        return pending ? { ...item, columnId: pending } : item
+      }),
+    [tasks, projectNames, identityLabels, attachmentCounts, pendingMoves],
+  )
+
+  useEffect(() => {
+    if (pendingMoves.size === 0) return
+    const settled = tasks.filter((task) => pendingMoves.get(String(task.id)) === taskBoardState(task))
+    if (settled.length === 0) return
+    setPendingMoves((prev) => {
+      const next = new Map(prev)
+      for (const task of settled) next.delete(String(task.id))
+      return next
+    })
+  }, [tasks, pendingMoves])
+
+  const boardColumns = useMemo(
+    () =>
+      TASK_BOARD_STATES.map((state, index) => ({
+        id: state,
+        title: t(`tasks.board.columns.${state}`),
+        colorClass: TASK_COLUMN_COLORS[index],
+      })),
+    [t],
+  )
 
   const stats = useMemo(() => {
-    const all = tasks as Record<string, unknown>[]
     const nowMs = Date.now()
     return {
-      total: all.length,
-      inProgress: all.filter((task) => taskStateTag(task) === "InProgress").length,
-      done: all.filter((task) => taskStateTag(task) === "Done").length,
-      overdue: all.filter((task) => {
-        if (task.isClosed || task.dateDeadline == null) return false
-        return Number(task.dateDeadline) / 1000 < nowMs
-      }).length,
+      total: boardItems.length,
+      inProgress: boardItems.filter((item) => item.columnId === "InProgress").length,
+      done: boardItems.filter((item) => item.columnId === "Done").length,
+      overdue: boardItems.filter((item) => !item.isClosed && item.dueAt != null && item.dueAt < nowMs).length,
     }
-  }, [tasks])
+  }, [boardItems])
 
-  const handleMoveTask = async (taskId: string | number | bigint, column: TaskColumnId) => {
-    await updateTaskState.mutateAsync({
-      taskId,
-      state: { tag: column },
+  const handleMoveTask = async (taskId: string, toColumnId: string) => {
+    const state = TASK_BOARD_STATES.find((candidate) => candidate === toColumnId)
+    if (!state) return
+    setPendingMoves((prev) => new Map(prev).set(taskId, state))
+    try {
+      await updateTaskState.mutateAsync({ taskId, state })
+    } catch (error) {
+      setPendingMoves((prev) => {
+        const next = new Map(prev)
+        next.delete(taskId)
+        return next
+      })
+      showWorkflowToast({
+        kind: "error",
+        title: t("tasks.board.moveFailed"),
+        description: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  const openEditTask = (taskId: string) => {
+    const task = tasks.find((row) => String(row.id) === taskId)
+    if (!task) return
+    setModal({
+      type: "edit",
+      form: buildEditTaskForm(task),
+      action: "updateTask",
+      entityId: taskId,
     })
   }
+
+  const tableConfig = useMemo((): EntityViewConfig => {
+    const base = tasksTableConfig(t)
+    if (base.view.mode !== "table") return base
+    const moveTo = (state: TaskBoardState) => (row: EntityRow) => handleMoveTask(String(row.id), state)
+    const notIn = (state: TaskBoardState) => (row: EntityRow) => taskBoardState(row) !== state
+    return {
+      ...base,
+      title: "",
+      description: undefined,
+      view: {
+        ...base.view,
+        listViewKey: "lumiere:tasks-table",
+        columns: base.view.columns.map((column) =>
+          column.key === "projectId"
+            ? { ...column, render: (value: unknown) => projectNames.get(String(value ?? "")) ?? "—" }
+            : column,
+        ),
+        rowActions: [
+          { id: "edit", label: t("common.edit"), icon: Pencil, onClick: (row) => openEditTask(String(row.id)) },
+          { id: "approve", label: t("tasks.board.columns.Approved"), icon: CheckCheck, isApplicable: notIn("Approved"), onClick: moveTo("Approved") },
+          { id: "done", label: t("tasks.board.columns.Done"), icon: CircleCheck, isApplicable: notIn("Done"), onClick: moveTo("Done") },
+          { id: "reopen", label: t("tasks.board.columns.InProgress"), icon: RotateCcw, isApplicable: notIn("InProgress"), onClick: moveTo("InProgress") },
+          { id: "cancel", label: t("tasks.board.columns.Cancelled"), icon: Ban, destructive: true, isApplicable: notIn("Cancelled"), onClick: moveTo("Cancelled") },
+        ],
+      },
+    }
+    // handleMoveTask/openEditTask read the latest rows through state setters and lookups.
+  }, [t, projectNames, tasks]) // eslint-disable-line react-hooks/exhaustive-deps
+  const projectOptions = useMemo(
+    () => projectFieldOptions.filter((option) => option.value !== "" && !("disabled" in option && option.disabled)),
+    [projectFieldOptions],
+  )
 
   const handleFormSubmit = async (action: string, formData: Record<string, unknown>) => {
     if (action === "createTask") {
@@ -248,7 +286,7 @@ function TasksClientLoaded({
     createTask.isPending || updateTask.isPending || updateTaskState.isPending
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] flex-col gap-4">
+    <div className="flex min-h-[calc(100vh-12rem)] flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <DashboardHeader title={t("tasks.page.title")} description={t("tasks.page.description")} />
         <div className="flex items-center gap-2">
@@ -283,129 +321,25 @@ function TasksClientLoaded({
         ))}
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <div className="relative w-full max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t("tasks.board.searchPlaceholder")}
-            className="pl-9"
+      <TaskBoardView
+        className="min-h-0 flex-1"
+        items={boardItems}
+        columns={boardColumns}
+        onMove={handleMoveTask}
+        onTaskClick={openEditTask}
+        onCreateInColumn={() => setModal({ type: "create", form: taskFormConfig, action: "createTask" })}
+        priorityLabel={(priority) => t(`projects.tasks.priority.${priority}`, { defaultValue: priority })}
+        projects={projectOptions}
+        storageKey="lumiere:tasks-board-view"
+        renderTable={(visibleIds) => (
+          <EntityView
+            config={tableConfig}
+            useCard={false}
+            data={tasks.filter((task) => visibleIds.has(String(task.id)))}
+            onRowClick={(row) => openEditTask(String(row.id))}
           />
-        </div>
-        <Select value={projectFilter} onValueChange={setProjectFilter}>
-          <SelectTrigger className="w-56">
-            <SelectValue placeholder={t("tasks.board.allProjects")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("tasks.board.allProjects")}</SelectItem>
-            {projectFieldOptions
-              .filter((option) => option.value !== "")
-              .map((option) => (
-                <SelectItem
-                  key={option.value}
-                  value={option.value}
-                  disabled={"disabled" in option && option.disabled === true}
-                >
-                  {option.label}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-x-auto">
-        <div className="flex h-full gap-4 pb-4">
-          {TASK_COLUMNS.map((columnId) => {
-            const columnTasks = tasksByColumn[columnId]
-            return (
-              <div
-                key={columnId}
-                className="flex w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/20"
-              >
-                <div className="flex items-center justify-between border-b border-border px-3 py-2">
-                  <h3 className="text-sm font-medium">
-                    {t(`tasks.board.columns.${columnId}`)}
-                  </h3>
-                  <Badge variant="secondary">{columnTasks.length}</Badge>
-                </div>
-                <div className="flex-1 space-y-2 overflow-y-auto p-2">
-                  {columnTasks.length === 0 ? (
-                    <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-                      {t("tasks.board.emptyColumn")}
-                    </p>
-                  ) : (
-                    columnTasks.map((task) => {
-                      const project = projects.find((p) => p.id === task.projectId)
-                      const deadline = formatDeadline(task.dateDeadline)
-                      const overdue =
-                        task.dateDeadline != null &&
-                        !task.isClosed &&
-                        Number(task.dateDeadline) / 1000 < Date.now()
-                      return (
-                        <div
-                          key={String(task.id)}
-                          className="rounded-md border border-border bg-background p-3 shadow-sm"
-                        >
-                          <button
-                            type="button"
-                            className="w-full text-left"
-                            onClick={() =>
-                              setModal({
-                                type: "edit",
-                                form: buildEditTaskForm(task),
-                                action: "updateTask",
-                                entityId: task.id as string | number,
-                              })
-                            }
-                          >
-                            <p className="text-sm font-medium leading-snug">{String(task.name ?? "")}</p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {String(project?.name ?? "—")}
-                            </p>
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <Badge variant="outline" className="text-[10px]">
-                                {priorityLabel(task.priority, t)}
-                              </Badge>
-                              {deadline ? (
-                                <span
-                                  className={cn(
-                                    "text-[10px]",
-                                    overdue ? "text-destructive" : "text-muted-foreground",
-                                  )}
-                                >
-                                  {deadline}
-                                </span>
-                              ) : null}
-                            </div>
-                          </button>
-                          <Select
-                            value={columnId}
-                            onValueChange={(value) =>
-                              void handleMoveTask(task.id as string | number, value as TaskColumnId)
-                            }
-                          >
-                            <SelectTrigger className="mt-2 h-8 text-xs">
-                              <SelectValue placeholder={t("tasks.board.changeState")} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {TASK_COLUMNS.map((state) => (
-                                <SelectItem key={state} value={state}>
-                                  {t(`tasks.board.columns.${state}`)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
+        )}
+      />
 
       <FormModal
         open={modal.type !== null}

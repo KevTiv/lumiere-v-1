@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { chooseSelectValue } from "../components/select-test-utils"
 import { CsvImportHistory } from "./csv-import-history"
 
 const queries = vi.hoisted(() => ({
@@ -11,6 +12,7 @@ vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, opti
 vi.mock("@lumiere/query-hooks/hooks/import-jobs", () => ({
   useImportJobs: () => queries.jobs,
   useImportJobErrors: () => queries.errors,
+  useRollbackImportJob: () => ({ mutateAsync: vi.fn(), isPending: false }),
   canRollbackImportJob: () => false,
   canCleanupAbandonedAccountMoveImport: (job: Record<string, unknown>) =>
     job.table_name === "account_move",
@@ -34,14 +36,14 @@ beforeEach(() => {
 describe("CSV import outcome history", () => {
   it("leaves selection empty and filters history by the actual entity", () => {
     render(<CsvImportHistory organizationId={1n} tableName="hr_employee" />)
-    expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("")
+    expect(screen.getByRole("combobox").hasAttribute("data-placeholder")).toBe(true)
     expect(screen.queryByText(/#3/)).toBeNull()
     expect(screen.queryByText("Unknown employee")).toBeNull()
     expect(screen.getByText(/not automatically linked/)).toBeTruthy()
   })
   it("shows selected counts and only that job's inline row errors", () => {
     render(<CsvImportHistory organizationId={1n} tableName="hr_employee" />)
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "2" } })
+    chooseSelectValue(screen.getByRole("combobox"), "2")
     expect(screen.getByText("partial")).toBeTruthy()
     expect(screen.getByText(/Row 3: Unknown employee/)).toBeTruthy()
     expect(screen.queryByText(/Other job error/)).toBeNull()
@@ -58,7 +60,7 @@ describe("CSV import outcome history", () => {
   })
   it("hides cached jobs, selected counts and row errors after a 403 refetch failure", () => {
     const view = render(<CsvImportHistory organizationId={1n} tableName="hr_employee" />)
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "2" } })
+    chooseSelectValue(screen.getByRole("combobox"), "2")
     expect(screen.getByText(/Row 3: Unknown employee/)).toBeTruthy()
     Object.assign(queries.jobs, { isError: true, error: Object.assign(new Error("Forbidden"), { status: 403 }) })
     view.rerender(<CsvImportHistory organizationId={1n} tableName="hr_employee" />)

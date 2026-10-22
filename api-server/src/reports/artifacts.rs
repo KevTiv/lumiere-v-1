@@ -44,10 +44,14 @@ pub(crate) async fn record_generated_report(
         Some(suffix) => format!("owner-report:{report_key}:{suffix}"),
         None => format!("owner-report:{report_key}:{}", &output_hash[..16]),
     };
+    let mut report_parameters = json!({ "scope": value["scope"] });
+    if let Some(scenario) = value["report"].get("scenario") {
+        report_parameters["scenario"] = scenario.clone();
+    }
     let params = json!({
         "report_key": report_key,
         "schema_version": value["schemaVersion"].as_u64().unwrap_or(1),
-        "parameters_json": json!({ "scope": value["scope"] }).to_string(),
+        "parameters_json": report_parameters.to_string(),
         "source_watermark_json": value["sourceWatermark"].to_string(),
         "output_hash": format!("sha256:{output_hash}"),
         "renderer_version": "chromium-worker-v1",

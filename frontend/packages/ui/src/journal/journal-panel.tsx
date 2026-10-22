@@ -75,6 +75,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { runtimeFormRoleId } from "@/lib/runtime-form-role"
 
 interface Position {
   x: number
@@ -158,7 +159,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
   const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number; posX: number; posY: number }>({ x: 0, y: 0, width: 0, height: 0, posX: 0, posY: 0 })
 
   // Get role-based config
-  const userRoleId = currentUser?.roles[0] || "default"
+  const userRoleId = runtimeFormRoleId(currentUser) || "default"
   const config: WorkNotesConfig = workNotesConfigs[userRoleId] || defaultWorkNotesConfig
   const noteTypeLabels: Record<NoteType, string> = {
     observation: t("ui.journal.noteTypes.observation"),

@@ -21,6 +21,9 @@ use crate::accounting::relations::{
 };
 use crate::accounting::tax_management::account_tax_group;
 use crate::core::organization::{company, require_company_in_organization};
+use crate::documents::invoice_profile::{
+    capture_invoice_document_metadata, without_invoice_document_metadata,
+};
 use crate::helpers::{calculate_tax, check_permission, write_audit_log_v2, AuditLogParams};
 use crate::inventory::product::product;
 use crate::types::{
@@ -498,6 +501,17 @@ pub fn create_manual_account_invoice(
         &params.lines,
     )?;
     let amount_total = amount_untaxed + amount_tax;
+    let metadata = if params.move_type == MoveType::OutInvoice {
+        Some(capture_invoice_document_metadata(
+            ctx,
+            organization_id,
+            params.company_id,
+            Some(params.partner_id),
+            params.metadata.as_deref(),
+        )?)
+    } else {
+        without_invoice_document_metadata(params.metadata.as_deref())
+    };
 
     let move_record = ctx.db.account_move().insert(AccountMove {
         id: 0,
@@ -552,7 +566,7 @@ pub fn create_manual_account_invoice(
         create_date: Some(ctx.timestamp),
         write_uid: Some(ctx.sender()),
         write_date: Some(ctx.timestamp),
-        metadata: params.metadata.clone(),
+        metadata,
     });
 
     let is_customer_invoice = params.move_type == MoveType::OutInvoice;

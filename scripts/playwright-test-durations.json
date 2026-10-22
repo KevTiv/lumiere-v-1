@@ -1,0 +1,642 @@
+{
+  "version": 1,
+  "source": {
+    "run_id": 39624487039,
+    "commit": "72c3c44965e3fa003162c62d3d6794e0593c26a4",
+    "kind": "single-worker test-start log estimates; scheduling weights only",
+    "jobs": [
+      119316150454,
+      119316150532,
+      119316150534,
+      119316150569,
+      119316150582,
+      119316150594
+    ]
+  },
+  "files": {
+    "tests/e2e/account-deprecation-readback.spec.ts": {
+      "full_ms": 5974,
+      "p0_ms": 5974
+    },
+    "tests/e2e/accounting-module.spec.ts": {
+      "full_ms": 166412,
+      "p0_ms": 25559
+    },
+    "tests/e2e/accounting-mutations.spec.ts": {
+      "full_ms": 12314,
+      "p0_ms": 12314
+    },
+    "tests/e2e/accounting-post-reconcile.spec.ts": {
+      "full_ms": 45091,
+      "p0_ms": 45091
+    },
+    "tests/e2e/ai-harness-policy.spec.ts": {
+      "full_ms": 13781,
+      "p0_ms": 13781
+    },
+    "tests/e2e/ai-human-review-provenance.spec.ts": {
+      "full_ms": 2510,
+      "p0_ms": 2510
+    },
+    "tests/e2e/analytics-lifecycle.spec.ts": {
+      "full_ms": 13811,
+      "p0_ms": 13811
+    },
+    "tests/e2e/api-surface-hardening.spec.ts": {
+      "full_ms": 294,
+      "p0_ms": 294
+    },
+    "tests/e2e/auth-lifecycle.spec.ts": {
+      "full_ms": 8047,
+      "p0_ms": 0
+    },
+    "tests/e2e/auth-permission-enforcement.spec.ts": {
+      "full_ms": 66818,
+      "p0_ms": 66818
+    },
+    "tests/e2e/auth-shell.spec.ts": {
+      "full_ms": 27935,
+      "p0_ms": 19265
+    },
+    "tests/e2e/bank-statement-import.spec.ts": {
+      "full_ms": 738,
+      "p0_ms": 0
+    },
+    "tests/e2e/cov01d-opportunity-order-effect.spec.ts": {
+      "full_ms": 47847,
+      "p0_ms": 47847
+    },
+    "tests/e2e/cov03-lost-response-conversion.spec.ts": {
+      "full_ms": 63300,
+      "p0_ms": 63300
+    },
+    "tests/e2e/cov04-sales-order-confirmation.spec.ts": {
+      "full_ms": 81067,
+      "p0_ms": 81067
+    },
+    "tests/e2e/cov05-p2p-operator-lifecycle.spec.ts": {
+      "full_ms": 128379,
+      "p0_ms": 128379
+    },
+    "tests/e2e/cov05-purchase-order-confirmation.spec.ts": {
+      "full_ms": 30769,
+      "p0_ms": 30769
+    },
+    "tests/e2e/cov05b-purchase-receipt.spec.ts": {
+      "full_ms": 35770,
+      "p0_ms": 35770
+    },
+    "tests/e2e/cov05c-vendor-bill.spec.ts": {
+      "full_ms": 42972,
+      "p0_ms": 42972
+    },
+    "tests/e2e/cov05d-purchase-receipt-recovery.spec.ts": {
+      "full_ms": 35274,
+      "p0_ms": 35274
+    },
+    "tests/e2e/cov05d-rfq-award.spec.ts": {
+      "full_ms": 17612,
+      "p0_ms": 17612
+    },
+    "tests/e2e/cov05e-partial-receipt-billing.spec.ts": {
+      "full_ms": 74005,
+      "p0_ms": 74005
+    },
+    "tests/e2e/cov05e-requisition-procure-handoff.spec.ts": {
+      "full_ms": 47676,
+      "p0_ms": 47676
+    },
+    "tests/e2e/cov05e-upstream-procurement.spec.ts": {
+      "full_ms": 140222,
+      "p0_ms": 140222
+    },
+    "tests/e2e/cov05f-strict-provenance.spec.ts": {
+      "full_ms": 64423,
+      "p0_ms": 64423
+    },
+    "tests/e2e/cov06-picking-lifecycle.spec.ts": {
+      "full_ms": 66177,
+      "p0_ms": 66177
+    },
+    "tests/e2e/cov06b-picking-backorder.spec.ts": {
+      "full_ms": 50638,
+      "p0_ms": 50638
+    },
+    "tests/e2e/cov06c-internal-quant-transfer.spec.ts": {
+      "full_ms": 25323,
+      "p0_ms": 25323
+    },
+    "tests/e2e/cov06d-cycle-count-adjustment.spec.ts": {
+      "full_ms": 20274,
+      "p0_ms": 20274
+    },
+    "tests/e2e/cov06e-lot-tracked-quant-move.spec.ts": {
+      "full_ms": 25766,
+      "p0_ms": 25766
+    },
+    "tests/e2e/cov06f-serial-tracked-picking.spec.ts": {
+      "full_ms": 49831,
+      "p0_ms": 49831
+    },
+    "tests/e2e/cov06g-quality-fail-quarantine.spec.ts": {
+      "full_ms": 24293,
+      "p0_ms": 24293
+    },
+    "tests/e2e/cov06h-replenishment-execute.spec.ts": {
+      "full_ms": 25121,
+      "p0_ms": 25121
+    },
+    "tests/e2e/cov06i-serial-reserve.spec.ts": {
+      "full_ms": 23113,
+      "p0_ms": 23113
+    },
+    "tests/e2e/cov06k-warehouse-qc-location-ui.spec.ts": {
+      "full_ms": 19183,
+      "p0_ms": 19183
+    },
+    "tests/e2e/cov06l-serial-use-block.spec.ts": {
+      "full_ms": 37685,
+      "p0_ms": 37685
+    },
+    "tests/e2e/cov06m-replenishment-transfer-demand.spec.ts": {
+      "full_ms": 24882,
+      "p0_ms": 24882
+    },
+    "tests/e2e/cov06n-replenishment-scheduler.spec.ts": {
+      "full_ms": 171557,
+      "p0_ms": 171557
+    },
+    "tests/e2e/cov06o-replenishment-schedule.spec.ts": {
+      "full_ms": 28982,
+      "p0_ms": 28982
+    },
+    "tests/e2e/cov07-manufacturing-actual-costs.spec.ts": {
+      "full_ms": 19834,
+      "p0_ms": 19834
+    },
+    "tests/e2e/cov07-manufacturing-confirm.spec.ts": {
+      "full_ms": 22950,
+      "p0_ms": 22950
+    },
+    "tests/e2e/cov07-manufacturing-materials.spec.ts": {
+      "full_ms": 21809,
+      "p0_ms": 21809
+    },
+    "tests/e2e/cov07-manufacturing-production-close.spec.ts": {
+      "full_ms": 21856,
+      "p0_ms": 21856
+    },
+    "tests/e2e/cov07-manufacturing-workorder-execution.spec.ts": {
+      "full_ms": 36453,
+      "p0_ms": 36453
+    },
+    "tests/e2e/cov07-operator-lifecycle.spec.ts": {
+      "full_ms": 73854,
+      "p0_ms": 73854
+    },
+    "tests/e2e/cov07f-finished-output-scrap.spec.ts": {
+      "full_ms": 19052,
+      "p0_ms": 19052
+    },
+    "tests/e2e/cov07g-bom-byproducts.spec.ts": {
+      "full_ms": 23681,
+      "p0_ms": 23681
+    },
+    "tests/e2e/cov08-closed-period-post.spec.ts": {
+      "full_ms": 17410,
+      "p0_ms": 17410
+    },
+    "tests/e2e/cov08-finance-lifecycle.spec.ts": {
+      "full_ms": 44401,
+      "p0_ms": 44401
+    },
+    "tests/e2e/cov08-invoice-payment-recovery.spec.ts": {
+      "full_ms": 55536,
+      "p0_ms": 55536
+    },
+    "tests/e2e/cov08a-manual-invoice-effect.spec.ts": {
+      "full_ms": 9177,
+      "p0_ms": 9177
+    },
+    "tests/e2e/cov08b-bank-statement-reconcile.spec.ts": {
+      "full_ms": 11372,
+      "p0_ms": 11372
+    },
+    "tests/e2e/cov08c-period-close.spec.ts": {
+      "full_ms": 9490,
+      "p0_ms": 9490
+    },
+    "tests/e2e/cov08d-asset-lifecycle.spec.ts": {
+      "full_ms": 12311,
+      "p0_ms": 12311
+    },
+    "tests/e2e/cov08d2-asset-depreciation-disposal.spec.ts": {
+      "full_ms": 16122,
+      "p0_ms": 16122
+    },
+    "tests/e2e/cov08e-finance-certification.spec.ts": {
+      "full_ms": 9245,
+      "p0_ms": 9245
+    },
+    "tests/e2e/cov09-hr-leave-approval.spec.ts": {
+      "full_ms": 35472,
+      "p0_ms": 35472
+    },
+    "tests/e2e/cov09-hr-payroll-lifecycle.spec.ts": {
+      "full_ms": 41546,
+      "p0_ms": 41546
+    },
+    "tests/e2e/cov10-project-timesheet-validation.spec.ts": {
+      "full_ms": 55223,
+      "p0_ms": 55223
+    },
+    "tests/e2e/cov11-expense-sheet-lifecycle.spec.ts": {
+      "full_ms": 40511,
+      "p0_ms": 40511
+    },
+    "tests/e2e/cov12-subscription-invoice-run.spec.ts": {
+      "full_ms": 29921,
+      "p0_ms": 29921
+    },
+    "tests/e2e/cov12-subscription-lifecycle.spec.ts": {
+      "full_ms": 118303,
+      "p0_ms": 118303
+    },
+    "tests/e2e/cov13-pos-session-close.spec.ts": {
+      "full_ms": 10864,
+      "p0_ms": 10864
+    },
+    "tests/e2e/cov14-helpdesk-ticket-lifecycle.spec.ts": {
+      "full_ms": 21509,
+      "p0_ms": 21509
+    },
+    "tests/e2e/cov15-fleet-service-cost.spec.ts": {
+      "full_ms": 20143,
+      "p0_ms": 20143
+    },
+    "tests/e2e/cov16-iot-alert-resolve.spec.ts": {
+      "full_ms": 8712,
+      "p0_ms": 8712
+    },
+    "tests/e2e/cov17-proposal-approve-convert.spec.ts": {
+      "full_ms": 16897,
+      "p0_ms": 16897
+    },
+    "tests/e2e/cov18-document-lock-version.spec.ts": {
+      "full_ms": 19230,
+      "p0_ms": 19230
+    },
+    "tests/e2e/cov19-activity-completion.spec.ts": {
+      "full_ms": 9729,
+      "p0_ms": 9729
+    },
+    "tests/e2e/cov19-message-post.spec.ts": {
+      "full_ms": 7586,
+      "p0_ms": 7586
+    },
+    "tests/e2e/cov20-dashboard-lifecycle.spec.ts": {
+      "full_ms": 52474,
+      "p0_ms": 52474
+    },
+    "tests/e2e/cov20-report-run.spec.ts": {
+      "full_ms": 9417,
+      "p0_ms": 9417
+    },
+    "tests/e2e/cov21-approval-decision.spec.ts": {
+      "full_ms": 27765,
+      "p0_ms": 0
+    },
+    "tests/e2e/cov22-form-publish-import-commit.spec.ts": {
+      "full_ms": 18529,
+      "p0_ms": 0
+    },
+    "tests/e2e/cov23-operator-lifecycle.spec.ts": {
+      "full_ms": 114879,
+      "p0_ms": 114879
+    },
+    "tests/e2e/cov23-role-assignment.spec.ts": {
+      "full_ms": 51822,
+      "p0_ms": 51822
+    },
+    "tests/e2e/cov24-distributor-workspace.spec.ts": {
+      "full_ms": 50024,
+      "p0_ms": 50024
+    },
+    "tests/e2e/cov25-order-handoff-links.spec.ts": {
+      "full_ms": 70878,
+      "p0_ms": 70878
+    },
+    "tests/e2e/cov25-proposal-handoff-links.spec.ts": {
+      "full_ms": 22659,
+      "p0_ms": 22659
+    },
+    "tests/e2e/cov25-purchase-handoff-links.spec.ts": {
+      "full_ms": 51843,
+      "p0_ms": 51843
+    },
+    "tests/e2e/cov25-subscription-handoff-links.spec.ts": {
+      "full_ms": 31600,
+      "p0_ms": 31600
+    },
+    "tests/e2e/cov26-crm-sales-resilience.spec.ts": {
+      "full_ms": 38369,
+      "p0_ms": 0
+    },
+    "tests/e2e/cov26-reports-source-quality.spec.ts": {
+      "full_ms": 35292,
+      "p0_ms": 0
+    },
+    "tests/e2e/cov26-workforce-resilience.spec.ts": {
+      "full_ms": 31323,
+      "p0_ms": 0
+    },
+    "tests/e2e/crm-contact-identities-ui.spec.ts": {
+      "full_ms": 8548,
+      "p0_ms": 0
+    },
+    "tests/e2e/crm-duplicate-merge.spec.ts": {
+      "full_ms": 11179,
+      "p0_ms": 0
+    },
+    "tests/e2e/crm-mutations.spec.ts": {
+      "full_ms": 9643,
+      "p0_ms": 9643
+    },
+    "tests/e2e/crm-opportunity-stage.spec.ts": {
+      "full_ms": 21389,
+      "p0_ms": 9913
+    },
+    "tests/e2e/crm-read-isolation.spec.ts": {
+      "full_ms": 32324,
+      "p0_ms": 32324
+    },
+    "tests/e2e/documents-wave-a-lifecycle.spec.ts": {
+      "full_ms": 4761,
+      "p0_ms": 2980
+    },
+    "tests/e2e/documents-wave-b-lifecycle.spec.ts": {
+      "full_ms": 1467,
+      "p0_ms": 0
+    },
+    "tests/e2e/entity-export-policy.spec.ts": {
+      "full_ms": 2580,
+      "p0_ms": 2580
+    },
+    "tests/e2e/expenses-wave-lifecycle.spec.ts": {
+      "full_ms": 33531,
+      "p0_ms": 27501
+    },
+    "tests/e2e/finance-assets-close-tools.spec.ts": {
+      "full_ms": 7967,
+      "p0_ms": 0
+    },
+    "tests/e2e/finance-authoring.spec.ts": {
+      "full_ms": 57947,
+      "p0_ms": 0
+    },
+    "tests/e2e/finance-capture-tools.spec.ts": {
+      "full_ms": 8617,
+      "p0_ms": 0
+    },
+    "tests/e2e/finance-payment-tools.spec.ts": {
+      "full_ms": 9499,
+      "p0_ms": 0
+    },
+    "tests/e2e/finance-report-layout-tools.spec.ts": {
+      "full_ms": 9021,
+      "p0_ms": 0
+    },
+    "tests/e2e/finance-workflow-review.spec.ts": {
+      "full_ms": 24066,
+      "p0_ms": 0
+    },
+    "tests/e2e/first-org-personas.spec.ts": {
+      "full_ms": 54542,
+      "p0_ms": 54542
+    },
+    "tests/e2e/gov00-governed-execution.spec.ts": {
+      "full_ms": 3200,
+      "p0_ms": 0
+    },
+    "tests/e2e/helpdesk-mutations.spec.ts": {
+      "full_ms": 18383,
+      "p0_ms": 10280
+    },
+    "tests/e2e/hr-wave-lifecycle.spec.ts": {
+      "full_ms": 20725,
+      "p0_ms": 20725
+    },
+    "tests/e2e/import-rollback.spec.ts": {
+      "full_ms": 13205,
+      "p0_ms": 0
+    },
+    "tests/e2e/inventory-module.spec.ts": {
+      "full_ms": 40027,
+      "p0_ms": 0
+    },
+    "tests/e2e/inventory-mutations.spec.ts": {
+      "full_ms": 17120,
+      "p0_ms": 17120
+    },
+    "tests/e2e/iot-lifecycle.spec.ts": {
+      "full_ms": 2797,
+      "p0_ms": 2797
+    },
+    "tests/e2e/iot-read-isolation.spec.ts": {
+      "full_ms": 12729,
+      "p0_ms": 12729
+    },
+    "tests/e2e/manufacturing-mutations.spec.ts": {
+      "full_ms": 28488,
+      "p0_ms": 4681
+    },
+    "tests/e2e/mobile-money-payments.spec.ts": {
+      "full_ms": 3090,
+      "p0_ms": 0
+    },
+    "tests/e2e/module-smoke.spec.ts": {
+      "full_ms": 38125,
+      "p0_ms": 11268
+    },
+    "tests/e2e/mvp-ai-action-draft.spec.ts": {
+      "full_ms": 2978,
+      "p0_ms": 2978
+    },
+    "tests/e2e/mvp-ai-rag.spec.ts": {
+      "full_ms": 5262,
+      "p0_ms": 5262
+    },
+    "tests/e2e/mvp-invoice-correction.spec.ts": {
+      "full_ms": 63900,
+      "p0_ms": 63900
+    },
+    "tests/e2e/mvp-lead-to-cash.spec.ts": {
+      "full_ms": 178560,
+      "p0_ms": 178560
+    },
+    "tests/e2e/mvp-partial-fulfillment.spec.ts": {
+      "full_ms": 110220,
+      "p0_ms": 110220
+    },
+    "tests/e2e/mvp-procure-to-pay.spec.ts": {
+      "full_ms": 208959,
+      "p0_ms": 208959
+    },
+    "tests/e2e/mvp-sales-returns.spec.ts": {
+      "full_ms": 73456,
+      "p0_ms": 73456
+    },
+    "tests/e2e/o2c-certification.spec.ts": {
+      "full_ms": 197034,
+      "p0_ms": 197034
+    },
+    "tests/e2e/operational-messaging.spec.ts": {
+      "full_ms": 8152,
+      "p0_ms": 0
+    },
+    "tests/e2e/owner-reports.spec.ts": {
+      "full_ms": 4263,
+      "p0_ms": 0
+    },
+    "tests/e2e/parity-phase1-rbac-mutations.spec.ts": {
+      "full_ms": 5980,
+      "p0_ms": 5980
+    },
+    "tests/e2e/parity-phase2-forms-mutations.spec.ts": {
+      "full_ms": 23004,
+      "p0_ms": 23004
+    },
+    "tests/e2e/parity-phase3-approvals-documents-mutations.spec.ts": {
+      "full_ms": 23743,
+      "p0_ms": 0
+    },
+    "tests/e2e/parity-phase4-accounting-reports-mutations.spec.ts": {
+      "full_ms": 10261,
+      "p0_ms": 10261
+    },
+    "tests/e2e/parity-phase5-chatter-mutations.spec.ts": {
+      "full_ms": 5023,
+      "p0_ms": 0
+    },
+    "tests/e2e/phase-0-settings-smoke.spec.ts": {
+      "full_ms": 15327,
+      "p0_ms": 0
+    },
+    "tests/e2e/phase-1-quote-to-cash-smoke.spec.ts": {
+      "full_ms": 19777,
+      "p0_ms": 0
+    },
+    "tests/e2e/phase-10-overview-smoke.spec.ts": {
+      "full_ms": 9992,
+      "p0_ms": 0
+    },
+    "tests/e2e/phase-11-missing-modules-smoke.spec.ts": {
+      "full_ms": 14495,
+      "p0_ms": 0
+    },
+    "tests/e2e/phase-4-manufacturing-smoke.spec.ts": {
+      "full_ms": 19043,
+      "p0_ms": 0
+    },
+    "tests/e2e/phase-5-workforce-smoke.spec.ts": {
+      "full_ms": 32986,
+      "p0_ms": 0
+    },
+    "tests/e2e/phase-6-platform-smoke.spec.ts": {
+      "full_ms": 47713,
+      "p0_ms": 0
+    },
+    "tests/e2e/phase-7-finance-smoke.spec.ts": {
+      "full_ms": 17721,
+      "p0_ms": 0
+    },
+    "tests/e2e/phase-8-ai-comms-smoke.spec.ts": {
+      "full_ms": 11260,
+      "p0_ms": 0
+    },
+    "tests/e2e/phase-9-edge-smoke.spec.ts": {
+      "full_ms": 11466,
+      "p0_ms": 0
+    },
+    "tests/e2e/phone-first-contacts.spec.ts": {
+      "full_ms": 13107,
+      "p0_ms": 0
+    },
+    "tests/e2e/presentation-preview.spec.ts": {
+      "full_ms": 7378,
+      "p0_ms": 0
+    },
+    "tests/e2e/pretenant-agent-adversarial.spec.ts": {
+      "full_ms": 11915,
+      "p0_ms": 0
+    },
+    "tests/e2e/pretenant-communications-adversarial.spec.ts": {
+      "full_ms": 38766,
+      "p0_ms": 0
+    },
+    "tests/e2e/pretenant-ir-adversarial.spec.ts": {
+      "full_ms": 23703,
+      "p0_ms": 0
+    },
+    "tests/e2e/pretenant-mobile-resilience.spec.ts": {
+      "full_ms": 92074,
+      "p0_ms": 0
+    },
+    "tests/e2e/pretenant-payment-adversarial.spec.ts": {
+      "full_ms": 24336,
+      "p0_ms": 0
+    },
+    "tests/e2e/projects-wave-lifecycle.spec.ts": {
+      "full_ms": 16100,
+      "p0_ms": 16100
+    },
+    "tests/e2e/proposals-lifecycle.spec.ts": {
+      "full_ms": 7609,
+      "p0_ms": 7609
+    },
+    "tests/e2e/purchasing-module.spec.ts": {
+      "full_ms": 47156,
+      "p0_ms": 8934
+    },
+    "tests/e2e/realtime-smoke.spec.ts": {
+      "full_ms": 5299,
+      "p0_ms": 0
+    },
+    "tests/e2e/rwanda-accounting-alpha-rehearsal.spec.ts": {
+      "full_ms": 16,
+      "p0_ms": 0
+    },
+    "tests/e2e/sales-invoice-flow.spec.ts": {
+      "full_ms": 19193,
+      "p0_ms": 9052
+    },
+    "tests/e2e/sales-mutations.spec.ts": {
+      "full_ms": 7506,
+      "p0_ms": 7506
+    },
+    "tests/e2e/select-helper.spec.ts": {
+      "full_ms": 1450,
+      "p0_ms": 1450
+    },
+    "tests/e2e/subscription-smoke.spec.ts": {
+      "full_ms": 6772,
+      "p0_ms": 0
+    },
+    "tests/e2e/subscriptions-wave-lifecycle.spec.ts": {
+      "full_ms": 4510,
+      "p0_ms": 0
+    },
+    "tests/e2e/tasks-board-drag.spec.ts": {
+      "full_ms": 7013,
+      "p0_ms": 0
+    },
+    "tests/e2e/vertical-distributor.spec.ts": {
+      "full_ms": 3312,
+      "p0_ms": 0
+    },
+    "tests/e2e/workflows-gate-ui.spec.ts": {
+      "full_ms": 72853,
+      "p0_ms": 72853
+    }
+  }
+}

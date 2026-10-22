@@ -8,6 +8,7 @@ use stdb_client::{normalize_spacetime_identity_header, StdbClient};
 pub const PROJECTION_WORKER_SERVICE: &str = "projection_worker";
 pub const OWNER_REPORT_WORKER_SERVICE: &str = "owner_report_worker";
 pub const WORKFLOW_WORKER_SERVICE: &str = "workflow_worker";
+pub const REVIEWED_MAIL_DISPATCHER_SERVICE: &str = "reviewed_mail_dispatcher";
 pub const EXPENSE_WORKER_SERVICE: &str = "expense_integration_worker";
 pub const HR_WORKER_SERVICE: &str = "hr_integration_worker";
 pub const PROJECT_WORKER_SERVICE: &str = "project_integration_worker";

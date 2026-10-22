@@ -8,6 +8,7 @@ import {
   toCreateManualAccountInvoiceParams,
   toCreatePaymentParamsFromManualForm,
   toUpdateAccountTaxParams,
+  updateAccountMoveLineParamsToJson,
   updateAccountTaxParamsForWire,
 } from "./accounting-create-params"
 
@@ -136,6 +137,31 @@ test("manual payment params reject a missing business date", () => {
         198n,
       ),
     /valid business date is required/i,
+  )
+})
+
+test("move-line economic correction encodes the complete SATS option struct", () => {
+  assert.deepEqual(
+    updateAccountMoveLineParamsToJson({
+      quantity: 3,
+      priceUnit: 505,
+      expectedQuantity: 3,
+      expectedPriceUnit: 500,
+      companyId: 1n,
+    }),
+    {
+      quantity: { some: 3 },
+      price_unit: { some: 505 },
+      expected_quantity: { some: 3 },
+      expected_price_unit: { some: 500 },
+      company_id: { some: 1 },
+      name: { none: [] },
+      debit: { none: [] },
+      credit: { none: [] },
+      partner_id: { none: [] },
+      analytic_account_id: { none: [] },
+      metadata: { none: [] },
+    },
   )
 })
 

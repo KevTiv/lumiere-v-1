@@ -1,7 +1,9 @@
+import io
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import tarfile
 import tempfile
 import unittest
 
@@ -21,10 +23,13 @@ class E2eCiArtifactTests(unittest.TestCase):
         self.write("frontend/web/.next/BUILD_ID", "build-id")
         self.write("frontend/web/.next/server/chunk.js", "chunk")
         self.write("frontend/web/.next/cache/compiler.bin", "do-not-package")
+        self.staging = self.root / "staging"
+        self.staging.mkdir()
         self.env = {
             **os.environ,
             "CI": "true",
             "E2E_CI_ARTIFACT_ROOT": str(self.root),
+            "TMPDIR": str(self.staging),
         }
 
     def tearDown(self):
@@ -48,6 +53,40 @@ class E2eCiArtifactTests(unittest.TestCase):
         if check:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result
+
+    def snapshot_files(self):
+        return {
+            path.relative_to(self.root): (
+                path.read_bytes(),
+                path.stat().st_mode,
+                path.stat().st_mtime_ns,
+                path.stat().st_ino,
+            )
+            for path in self.root.rglob("*")
+            if path.is_file()
+        }
+
+    def rewrite_archive_member(self, relative, *, content=None, mode=None, remove=False):
+        archive = self.root / ".ci/e2e-build.tar.gz"
+        with tarfile.open(archive, "r:gz") as source:
+            members = [
+                (member, source.extractfile(member).read() if member.isfile() else None)
+                for member in source.getmembers()
+            ]
+        changed = False
+        with tarfile.open(archive, "w:gz") as destination:
+            for member, data in members:
+                if member.name.removeprefix("./") == relative:
+                    changed = True
+                    if remove:
+                        continue
+                    if content is not None:
+                        data = content.encode()
+                        member.size = len(data)
+                    if mode is not None:
+                        member.mode = mode
+                destination.addfile(member, io.BytesIO(data) if data is not None else None)
+        self.assertTrue(changed, f"missing archive member {relative}")
 
     def test_pack_install_and_verify_exact_commit(self):
         self.run_script("pack")
@@ -79,6 +118,59 @@ class E2eCiArtifactTests(unittest.TestCase):
         changed = self.run_script("verify", check=False)
         self.assertNotEqual(changed.returncode, 0)
 
+    def test_verify_archive_preserves_build_outputs_and_compiler_cache(self):
+        self.run_script("pack")
+        # The verifier must check the archive independently of existing outputs.
+        self.write("frontend/web/.next/server/chunk.js", "newer builder output")
+        self.write("spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm", "newer wasm")
+        self.write(".ci/e2e-build/local-marker", "keep existing artifacts")
+        before = self.snapshot_files()
+
+        self.run_script("verify-archive")
+
+        self.assertEqual(self.snapshot_files(), before)
+        self.assertEqual(list(self.staging.iterdir()), [])
+
+    def test_verify_archive_rejects_wrong_commit_without_changing_workspace(self):
+        self.run_script("pack")
+        before = self.snapshot_files()
+
+        result = self.run_script("verify-archive", "f" * 40, check=False)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.snapshot_files(), before)
+        self.assertEqual(list(self.staging.iterdir()), [])
+
+    def test_verify_archive_rejects_invalid_outputs_without_changing_workspace(self):
+        for name, mutation in (
+            ("changed bytes", {"content": "tampered binary"}),
+            ("not executable", {"mode": 0o644}),
+            ("missing binary", {"remove": True}),
+        ):
+            with self.subTest(name=name):
+                self.run_script("pack")
+                self.rewrite_archive_member(".ci/e2e-build/bin/api-server", **mutation)
+                before = self.snapshot_files()
+
+                result = self.run_script("verify-archive", check=False)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.snapshot_files(), before)
+                self.assertEqual(list(self.staging.iterdir()), [])
+
+    def test_verify_archive_rejects_missing_or_invalid_archive(self):
+        missing = self.run_script("verify-archive", check=False)
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn("missing archive", missing.stderr)
+
+        self.write(".ci/e2e-build.tar.gz", "not a gzip archive")
+        before = self.snapshot_files()
+        invalid = self.run_script("verify-archive", check=False)
+
+        self.assertNotEqual(invalid.returncode, 0)
+        self.assertEqual(self.snapshot_files(), before)
+        self.assertEqual(list(self.staging.iterdir()), [])
+
     def test_install_requires_ci_workspace(self):
         self.run_script("pack")
         env = {**self.env, "CI": "false"}
@@ -99,6 +191,9 @@ class E2eCiArtifactTests(unittest.TestCase):
         self.assertIn("needs: [scope, plan, build-e2e]", workflow)
         self.assertIn("name: e2e-build-${{ github.sha }}", workflow)
         self.assertIn('run: scripts/e2e-ci-artifact.sh install "$GITHUB_SHA"', workflow)
+        build_job = workflow.split("  build-e2e:\n", 1)[1].split("\n  e2e-smoke:\n", 1)[0]
+        self.assertIn('scripts/e2e-ci-artifact.sh verify-archive "$GITHUB_SHA"', build_job)
+        self.assertNotIn('scripts/e2e-ci-artifact.sh install "$GITHUB_SHA"', build_job)
         self.assertIn("E2E_PREBUILT: '1'", workflow)
         self.assertEqual(
             workflow.count("LUMIERE_ENABLE_DEV_REDUCERS=1 spacetime build --module-path ./spacetimedb"),

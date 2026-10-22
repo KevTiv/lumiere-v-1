@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request, type Response } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   callReducerOwner,
   fetchContactIdByName,
@@ -74,7 +75,7 @@ async function saleOrderScope(page: Page, saleOrderId: number) {
 
 async function selectProposal(page: Page, proposalId: number) {
   await gotoModule(page, "/proposals", "proposals")
-  await page.getByTestId("module-tab-proposals-proposals").click()
+  await selectModuleTab(page, "proposals", "proposals")
   await selectEntityRowById(page, proposalId)
 }
 

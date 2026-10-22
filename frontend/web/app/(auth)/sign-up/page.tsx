@@ -63,7 +63,8 @@ export default function SignUpPage() {
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {!useWorkOsAuth && (
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="email">{t("auth.fields.email")}</Label>
             <Input
@@ -108,13 +109,15 @@ export default function SignUpPage() {
           <Button type="submit" size="lg" className="w-full" disabled={loading}>
             {loading ? t("auth.signUp.submitting") : t("auth.signUp.submit")}
           </Button>
-        </form>
+          </form>
+        )}
 
         {useWorkOsAuth && (
-          <div className="space-y-3 border-t border-border pt-4">
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Access requires an approved invitation and organization membership.</p>
             <form action={redirectToWorkOsSignUp} className="space-y-2">
               <input type="hidden" name="returnTo" value="/onboarding" />
-              <Button type="submit" variant="outline" size="lg" className="w-full">
+              <Button type="submit" size="lg" className="w-full">
                 {t("auth.signUp.continueWithWorkOs")}
               </Button>
             </form>

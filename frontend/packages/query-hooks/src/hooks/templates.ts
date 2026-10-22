@@ -1,7 +1,7 @@
 "use client"
 
 
-import { stdbBffCommandPost } from "@lumiere/stdb/commands"
+import { stdbBffCommandPost, type StdbBffCommandInput } from "@lumiere/stdb/commands"
 import { documentExportUrl, type DocumentExportFormat, type DocumentExportKind, type DocumentPdfKind } from "@lumiere/stdb/commands";
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { CreateDocumentTemplateParams, CreateMailTemplateParams } from "@lumiere/stdb/types"
@@ -58,11 +58,19 @@ export function useMailTemplates(organizationId: number, enabled = true) {
   })
 }
 
+/** One canonical builder shared by ordinary templates and append-only invoice profile versions. */
+export function documentTemplateCreateRequest(
+  params: Partial<CreateDocumentTemplateParams>,
+  companyId: StdbBffCommandInput<"create_document_template">["companyId"] = null,
+) {
+  return stdbBffCommandPost("create_document_template", { companyId, params: stdbParamsToJson(params, "CreateDocumentTemplateParams") })
+}
+
 export function useCreateDocumentTemplate(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: Partial<CreateDocumentTemplateParams>) => {
-      const { urlPath, init } = stdbBffCommandPost("create_document_template", { companyId: null, params: stdbParamsToJson(params, "CreateDocumentTemplateParams") })
+      const { urlPath, init } = documentTemplateCreateRequest(params)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

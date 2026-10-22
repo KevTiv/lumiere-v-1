@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { cn } from "../lib/utils"
 import { ExternalLink } from "lucide-react"
 import { Badge } from "../components/badge"
 import { Button } from "../components/button"
@@ -10,7 +11,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../components/sheet"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/tabs"
+import { Tabs, TabsContent } from "../components/tabs"
+import { ContextTabsList, ContextTabsTrigger } from "../components/context-tabs"
 import { useErpSession } from "@lumiere/erp-session"
 import { RecordChatter } from "../crm-components/crm-record-chatter"
 import { EntityDetail } from "./entity-detail"
@@ -57,7 +59,7 @@ export function EntityRecordSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent className={cn("w-full overflow-y-auto", config.wide ? "sm:max-w-[min(1280px,calc(100vw-1rem))]" : "sm:max-w-lg")}>
         {record && (
           <>
             <SheetHeader>
@@ -89,28 +91,29 @@ export function EntityRecordSheet({
                 </div>
               )}
 
-              <Tabs defaultValue="overview" className="flex flex-col">
-                <TabsList variant="default" className="w-full flex flex-wrap justify-start gap-2">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
+              <Tabs defaultValue="overview" className="min-w-0 flex flex-col">
+                <ContextTabsList aria-label="Record views">
+                  <ContextTabsTrigger value="overview">Overview</ContextTabsTrigger>
                   {config.customTabs?.map((tab) => (
-                    <TabsTrigger
+                    <ContextTabsTrigger
                       key={tab.id}
+                      className="flex-none"
                       value={tab.id}
                       data-testid={`entity-record-sheet-tab-${tab.id}`}
                     >
                       {tab.label}
-                    </TabsTrigger>
+                    </ContextTabsTrigger>
                   ))}
                   {showDiscussion && (
-                    <TabsTrigger value="discussion" data-testid="entity-record-sheet-tab-discussion">
+                    <ContextTabsTrigger value="discussion" data-testid="entity-record-sheet-tab-discussion">
                       Discussion
-                    </TabsTrigger>
+                    </ContextTabsTrigger>
                   )}
-                  <TabsTrigger value="audit">Audit</TabsTrigger>
-                </TabsList>
+                  <ContextTabsTrigger value="audit">Audit</ContextTabsTrigger>
+                </ContextTabsList>
 
                 <TabsContent value="overview" className="mt-4">
-                  <EntityDetail config={config.detailConfig} data={record} />
+                  {config.overviewContent ? config.overviewContent(record) : <EntityDetail config={config.detailConfig} data={record} />}
                 </TabsContent>
 
                 {config.customTabs?.map((tab) => (

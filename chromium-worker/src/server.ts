@@ -1,6 +1,7 @@
 import http from "node:http";
 import puppeteer from "puppeteer-core";
 import { checkBrowserReady } from "./readiness.mjs";
+import { waitForPrintAssets } from "./print-assets.mjs";
 
 const PORT = Number(process.env.PORT ?? 8090);
 const EXECUTABLE_PATH =
@@ -125,6 +126,7 @@ async function renderPdf(body: Body) {
     try {
       await page.emulateMediaType(body.media === "screen" ? "screen" : "print");
       await page.setContent(html, { waitUntil: "domcontentloaded" });
+      await waitForPrintAssets(page);
       const pdf = await page.pdf({
         format: "A4",
         printBackground: true,

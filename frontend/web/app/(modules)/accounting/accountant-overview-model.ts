@@ -1,9 +1,14 @@
 import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { kpiDate } from "@lumiere/ui/lib/kpi-tiles"
 import { normalizedTag } from "@lumiere/erp-workflows"
+import {
+  projectPaymentAllocations,
+  type PaymentAllocationBalance,
+  type PaymentAllocationRow,
+} from "@lumiere/erp-shared/payment-allocation-projection"
 
 /** Read projection: enumerate supported fields while retaining runtime redaction checks. */
-export interface OverviewRow {
+export interface OverviewRow extends PaymentAllocationRow {
   id?: unknown
   organizationId?: unknown; organization_id?: unknown
   companyId?: unknown; company_id?: unknown
@@ -21,9 +26,13 @@ export interface OverviewRow {
   deletedAt?: unknown; deleted_at?: unknown
   name?: unknown; title?: unknown; ref?: unknown; reference?: unknown; code?: unknown
   statementId?: unknown; statement_id?: unknown
+  decimalPlaces?: unknown; decimal_places?: unknown
+  dateFrom?: unknown; date_from?: unknown; dateTo?: unknown; date_to?: unknown
+  totalPlanned?: unknown; total_planned?: unknown; totalPractical?: unknown; total_practical?: unknown
   isReconciled?: unknown; is_reconciled?: unknown
   reconciledInvoiceIds?: unknown; reconciled_invoice_ids?: unknown
   reconciledBillIds?: unknown; reconciled_bill_ids?: unknown
+  allocationBalance?: PaymentAllocationBalance
 }
 export interface OverviewCollection {
   rows: readonly OverviewRow[]
@@ -34,11 +43,19 @@ export interface AccountantOverviewData {
   companyId: bigint | string
   moves: OverviewCollection
   payments: OverviewCollection
+  /** Canonical ledger residual plus operational correction history; never inferred from invoice links. */
+  paymentAllocationSources?: {
+    moveLines: OverviewCollection
+    transactions: OverviewCollection
+    reversals: OverviewCollection
+  }
   bankStatements: OverviewCollection
   bankLines: OverviewCollection
   deadlines: OverviewCollection
   periods: OverviewCollection
   currencies: OverviewCollection
+  companies?: OverviewCollection
+  budgets?: OverviewCollection
 }
 export type OverviewQueueKey = "overdue" | "draft-invoices" | "draft-bills" | "bank-lines" | "unlinked-payments" | "deadlines" | "periods"
 export interface OverviewActivityMonth {
@@ -133,15 +150,19 @@ export function buildAccountantOverview(data: AccountantOverviewData, now = new 
   const unmatched = bucket(bankSource,
     (row) => cell(row, "isReconciled", "is_reconciled") === false,
     (row) => typeof cell(row, "isReconciled", "is_reconciled") === "boolean")
-  const payments = scoped(data.payments, data)
-  const unlinkedPayments = bucket(payments, (row) => {
-    const direction = overviewTag(cell(row, "paymentType", "payment_type"))
-    return overviewTag(row.state) === "paid" && ["inbound", "outbound"].includes(direction) &&
-      (cell(row, "reconciledInvoiceIds", "reconciled_invoice_ids") as unknown[]).length === 0 &&
-      (cell(row, "reconciledBillIds", "reconciled_bill_ids") as unknown[]).length === 0
-  }, (row) => overviewTag(row.state) !== "" && overviewTag(cell(row, "paymentType", "payment_type")) !== "" &&
-    Array.isArray(cell(row, "reconciledInvoiceIds", "reconciled_invoice_ids")) &&
-    Array.isArray(cell(row, "reconciledBillIds", "reconciled_bill_ids")))
+  const missingAllocationRead: OverviewCollection = { rows: [], state: { status: "partial", message: "Payment allocation sources are unavailable." } }
+  const allocationProjection = projectPaymentAllocations({
+    organizationId: data.organizationId, companyId: data.companyId, payments: data.payments,
+    moves: data.moves, currencies: data.currencies,
+    moveLines: data.paymentAllocationSources?.moveLines ?? missingAllocationRead,
+    transactions: data.paymentAllocationSources?.transactions ?? missingAllocationRead,
+    reversals: data.paymentAllocationSources?.reversals ?? missingAllocationRead,
+  })
+  const unallocatedPayments: OverviewCollection = {
+    state: allocationProjection.state,
+    rows: allocationProjection.rows.filter((balance) => balance.remainingMinor > 0n)
+      .map((balance) => ({ ...balance.row, allocationBalance: balance })),
+  }
   const activeDeadlines = bucket(scoped(data.deadlines, data, true), (row) => {
     const status = overviewTag(row.status)
     const due = overviewDueDate(row)
@@ -164,7 +185,7 @@ export function buildAccountantOverview(data: AccountantOverviewData, now = new 
   }
   const queues: Record<OverviewQueueKey, OverviewCollection> = {
     overdue, "draft-invoices": draftInvoices, "draft-bills": draftBills, "bank-lines": unmatched,
-    "unlinked-payments": unlinkedPayments, deadlines: activeDeadlines, periods: openPeriods,
+    "unlinked-payments": unallocatedPayments, deadlines: activeDeadlines, periods: openPeriods,
   }
   return {
     receivables, payables, overdue, unmatched, queues, statementsById,

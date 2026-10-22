@@ -7,7 +7,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "../components/dropdown-menu"
-import { TabsList, TabsTrigger } from "../components/tabs"
+import { ContextTabsList, ContextTabsTrigger } from "../components/context-tabs"
 import type { ModuleTab, ModuleWorkspaceNav } from "../lib/module-types"
 import { resolveWorkspaceNavigation } from "../lib/workspace-navigation"
 import { cn } from "../lib/utils"
@@ -28,7 +28,7 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
   const activeWorkspace = workspaces.find((group) => group.tabs.some((tab) => tab.id === activeTab))
   const activeOverflow = overflow.find((group) => group.tabs.some((tab) => tab.id === activeTab))
   const selectedTab = tabs.find((tab) => tab.id === activeTab)
-  const localTabs = activeWorkspace?.tabs ?? (selectedTab ? [selectedTab] : [])
+  const localTabs = activeWorkspace?.tabs ?? activeOverflow?.tabs ?? (selectedTab ? [selectedTab] : [])
   const navigate = (event: MouseEvent<HTMLAnchorElement>, tabId: string) => {
     // Preserve open-in-new-tab and other native link gestures.
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
@@ -61,11 +61,11 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
               <Button
                 variant={activeOverflow ? "secondary" : "ghost"}
                 size="sm"
-                className="h-9 gap-2 sm:ml-auto"
+                className="h-auto min-h-11 min-w-0 max-w-full gap-2 whitespace-normal text-left sm:ml-auto"
                 data-testid={`module-workspace-${moduleId}-overflow`}
               >
                 <Settings2 className="size-3.5" aria-hidden />
-                {config.overflowLabel ?? "Advanced / Configuration"}
+                <span className="min-w-0 [overflow-wrap:anywhere]">{config.overflowLabel ?? "Advanced / Configuration"}</span>
                 <ChevronDown className="size-3.5" aria-hidden />
               </Button>
             </DropdownMenuTrigger>
@@ -75,14 +75,14 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
                   {index > 0 && <DropdownMenuSeparator />}
                   <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
                   {group.tabs.map((tab) => (
-                    <DropdownMenuItem key={tab.id} asChild>
+                    <DropdownMenuItem key={tab.id} className="min-h-11" asChild>
                       <a
                         href={hrefForTab(tab.id)}
                         onClick={(event) => navigate(event, tab.id)}
                         aria-current={activeTab === tab.id ? "page" : undefined}
                         data-testid={`module-workspace-item-${moduleId}-${tab.id}`}
                       >
-                        <span className="flex-1">{tab.label}</span>
+                        <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{tab.label}</span>
                         {activeTab === tab.id && <Check className="size-4" aria-hidden />}
                       </a>
                     </DropdownMenuItem>
@@ -93,18 +93,17 @@ export function WorkspaceNav({ moduleId, tabs, config, activeTab, onTabChange, h
           </DropdownMenu>
         )}
       </nav>
-      <TabsList variant="line" data-ui="context-tabs" aria-label={`${activeWorkspace?.label ?? activeOverflow?.label ?? "Workspace"} views`} className="h-auto w-full flex-wrap justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto">
+      <ContextTabsList aria-label={`${activeWorkspace?.label ?? activeOverflow?.label ?? "Workspace"} views`}>
         {localTabs.map((tab) => (
-          <TabsTrigger
+          <ContextTabsTrigger
             key={tab.id}
             value={tab.id}
             data-testid={`module-tab-${moduleId}-${tab.id}`}
-            className={workspaceStyles.tabTrigger}
           >
             {tab.label}
-          </TabsTrigger>
+          </ContextTabsTrigger>
         ))}
-      </TabsList>
+      </ContextTabsList>
     </div>
   )
 }

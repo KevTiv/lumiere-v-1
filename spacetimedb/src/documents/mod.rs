@@ -11,6 +11,7 @@
 pub mod documents;
 pub mod drive_sync;
 pub mod esign;
+pub(crate) mod invoice_profile;
 pub mod knowledge;
 pub mod legal_hold;
 pub mod pack_locale;

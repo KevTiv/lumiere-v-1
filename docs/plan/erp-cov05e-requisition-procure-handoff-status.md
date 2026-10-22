@@ -56,9 +56,9 @@ only for denied-operation probes.
   `purchase_ids`, PO-owned receipt relation, received line quantity, and
   PO-owned `invoice_ids`; no newest-row or id-delta inference is used.
 - replay and denial probes preserve the exact canonical identities: stale
-  approval is 422, wrong-company conversion is 422, reader conversion is 403,
-  conversion replay returns the existing PO, bill replay is 422, and reader
-  bill creation is 403.
+  approval is 422, wrong-company conversion is 403 at the trusted operation
+  boundary, reader conversion is 403, conversion replay returns the existing
+  PO, bill replay is 422, and reader bill creation is 403.
 
 ## D/A/O/E evidence
 

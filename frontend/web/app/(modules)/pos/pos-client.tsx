@@ -16,7 +16,8 @@ import {
   type FormConfig,
 } from "@lumiere/ui"
 import type { PosFormAction } from "@lumiere/ui"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@lumiere/ui/components/tabs"
+import { Tabs, TabsContent } from "@lumiere/ui/components/tabs"
+import { WorkspaceTabsList as TabsList, WorkspaceTabsTrigger as TabsTrigger } from "@lumiere/ui/components/workspace-tabs"
 import { Button } from "@lumiere/ui/components/button"
 import { posModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePosModuleSubscription } from "@/lib/module-subscription-hooks"
