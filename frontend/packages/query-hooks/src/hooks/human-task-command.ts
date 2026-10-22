@@ -144,8 +144,28 @@ export function humanTaskCommandReadbackPath(
   return `${path}?${params}`
 }
 
-const object = (value: unknown): value is Record<string, unknown> =>
+const object = (value: unknown): value is object =>
   value != null && typeof value === "object" && !Array.isArray(value)
+
+/** Finite HTTP evidence fields remain unknown until the checks below validate them. */
+interface HumanTaskCommandEvidenceWire {
+  organizationId?: unknown
+  companyId?: unknown
+  taskId?: unknown
+  workflowInstanceId?: unknown
+  eventId?: unknown
+  actorIdentityHex?: unknown
+  actingForIdentityHex?: unknown
+  commandKind?: unknown
+  idempotencyKey?: unknown
+  inputHash?: unknown
+  decision?: unknown
+  priorRevision?: unknown
+  resultRevision?: unknown
+  resultStatus?: unknown
+}
+
+const evidenceObject = (value: unknown): value is HumanTaskCommandEvidenceWire => object(value)
 
 /**
  * Only actor-owned immutable receipt/event evidence proves this attempt. Task
@@ -160,9 +180,9 @@ export function resolveHumanTaskCommandEffect(
   const page = parseWorkBoardPage(value, { ...scope, view: "eligible" })
   if (page.data.length > 1) throw new AmbiguousOperationEffectError("Expected one exact workflow task")
   if (page.nextCursor !== null) throw new Error("Exact workflow readback must not be paginated")
-  const raw = object(value) ? value.commandEvidence : undefined
+  const raw = object(value) && "commandEvidence" in value ? value.commandEvidence : undefined
   if (raw == null) return null
-  if (!object(raw)) throw new Error("Invalid workflow command evidence")
+  if (!evidenceObject(raw)) throw new Error("Invalid workflow command evidence")
   const row = page.data[0]
   if (!row || String(row.id) !== expected.taskId) return null
   const numericFields = ["organizationId", "companyId", "taskId", "workflowInstanceId", "eventId", "priorRevision", "resultRevision"] as const
