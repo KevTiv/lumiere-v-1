@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import {
   QueryClient,
   QueryClientProvider,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
 import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
@@ -18,6 +19,11 @@ import type {
 import { ThemeProvider } from "../../../../../packages/ui/src/components/theme-provider"
 import { NavigationGuardProvider } from "../../../../../packages/ui/src/forms/navigation-guard-provider"
 import type { WorkScope } from "@lumiere/query-hooks/hooks/work-board-model"
+import { invalidateStdbQueryResources } from "@lumiere/query-hooks/hooks/stdb"
+import {
+  realtimeAuthorityKey,
+  type RealtimeAuthorityState,
+} from "@lumiere/query-hooks/hooks/realtime"
 
 const fixtureApi = createLumiereApiClient({ baseUrl: "" })
 const firstIdentity = "ab".repeat(32)
@@ -42,6 +48,51 @@ function fixtureUser(identity: string): User {
   }
 }
 
+function FixtureRBAC({
+  identity,
+  user,
+  policies,
+  children,
+}: {
+  identity: string
+  user: User
+  policies: PolicyRule[]
+  children: React.ReactNode
+}) {
+  const query = useQuery({
+    queryKey: ["auth-access", 7, identity],
+    queryFn: async ({ signal }) => {
+      const response = await fetch("/api/session/field-access", {
+        signal,
+        headers: { "x-fixture-actor": identity },
+      })
+      if (!response.ok) throw new Error("Synthetic authority refresh failed")
+      const body = (await response.json()) as {
+        identityHex: string
+        organizationId: number
+      }
+      if (body.identityHex !== identity || body.organizationId !== 7)
+        throw new Error("Synthetic authority context changed")
+      return body
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: "always",
+    refetchInterval: 15_000,
+    retry: false,
+  })
+  const available = !query.isError && !!query.data
+  return (
+    <RBACProvider
+      initialUser={available ? user : null}
+      initialRoles={[]}
+      initialPolicies={available ? policies : []}
+      permissionsReady={available}
+    >
+      {children}
+    </RBACProvider>
+  )
+}
+
 function Controls({
   onSwitchActor,
   onToggleAccess,
@@ -59,9 +110,40 @@ function Controls({
     const channel = new BroadcastChannel("synthetic-work-board-controls")
     channel.onmessage = (event: MessageEvent<unknown>) => {
       if (event.data === "refresh")
-        void queryClient.invalidateQueries({
-          queryKey: ["workflow-human-tasks"],
+        for (const resource of ["workflow-human-tasks", "activities"]) {
+          void queryClient.invalidateQueries({ queryKey: [resource] })
+        }
+      if (event.data === "realtime-source")
+        invalidateStdbQueryResources(queryClient, 7, ["purchase-orders"])
+      if (event.data === "realtime-auth")
+        invalidateStdbQueryResources(queryClient, 7, ["auth"])
+      if (
+        event.data === "socket-reconnecting" ||
+        event.data === "socket-subscribed" ||
+        event.data === "socket-retry" ||
+        event.data === "socket-initial-unavailable"
+      ) {
+        const key = realtimeAuthorityKey(
+          7,
+          session.activeCompanyId ?? 0,
+          session.identity ?? "",
+        )
+        const previous = queryClient.getQueryData<RealtimeAuthorityState>(key)
+        queryClient.setQueryData<RealtimeAuthorityState>(key, {
+          generation:
+            event.data === "socket-initial-unavailable"
+              ? 0
+              : event.data === "socket-retry"
+                ? (previous?.generation ?? 0)
+                : (previous?.generation ?? 0) + 1,
+          phase:
+            event.data === "socket-subscribed"
+              ? "subscribed"
+              : event.data === "socket-retry"
+                ? "connecting"
+                : "reconnecting",
         })
+      }
       if (event.data === "company")
         session.setActiveCompanyId?.(session.activeCompanyId === 11 ? 22 : 11)
       if (event.data === "actor") onSwitchActor()
@@ -187,11 +269,7 @@ export default function WorkBoardFixture() {
     <LumiereApiProvider client={fixtureApi}>
       <QueryClientProvider client={client}>
         <I18nProvider language="en">
-          <RBACProvider
-            initialUser={user}
-            initialRoles={[]}
-            initialPolicies={policies}
-          >
+          <FixtureRBAC identity={identity} user={user} policies={policies}>
             <ErpSessionProvider
               value={{
                 identity,
@@ -256,7 +334,7 @@ export default function WorkBoardFixture() {
                 </NavigationGuardProvider>
               </ThemeProvider>
             </ErpSessionProvider>
-          </RBACProvider>
+          </FixtureRBAC>
         </I18nProvider>
       </QueryClientProvider>
     </LumiereApiProvider>

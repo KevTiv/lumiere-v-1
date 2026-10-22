@@ -20,6 +20,7 @@ mod work_boards;
 pub(crate) use company_scope::allowed_company_ids;
 pub(crate) use work_boards::{
     read_work_board, work_source_for_model, WorkBoardRequest, WorkScope, WorkSource,
+    WorkTaskReadbackRequest,
 };
 
 use candidate_scope::query_human_task_inbox;

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
@@ -35,12 +35,29 @@ import {
 } from "@lumiere/query-hooks/hooks/approval-controls"
 import {
   approvalRecordHref,
+  newHumanTaskAttempt,
+  recheckHumanTaskCommandEffect,
   useClaimHumanTask,
   useDecideHumanTask,
+  type ClaimHumanTaskInput,
+  type DecideHumanTaskInput,
 } from "@lumiere/query-hooks/hooks/approvals"
+import {
+  humanTaskClaimExpectation,
+  humanTaskDecisionExpectation,
+  type HumanTaskCommandExpectation,
+} from "@lumiere/query-hooks/hooks/human-task-command"
+import {
+  AmbiguousOperationEffectError,
+  UnresolvedOperationEffectError,
+} from "@lumiere/query-hooks/hooks/operation-effect"
 
 const selectClass =
   "h-9 max-w-full rounded-md border bg-background px-2 text-sm"
+
+type FrozenCommand =
+  | { kind: "claim"; input: ClaimHumanTaskInput }
+  | { kind: "decision"; input: DecideHumanTaskInput }
 
 function taskTitle(row: WorkTaskRow): string {
   return (
@@ -54,18 +71,20 @@ export function WorkflowWorkContent({
   online,
   layout,
   navigationPending = false,
+  authorityRefreshing = false,
   onTeamChange,
 }: {
   scope: WorkBoardScope
   online: boolean
   layout: "board" | "list"
   navigationPending?: boolean
+  authorityRefreshing?: boolean
   onTeamChange: (team: string | null) => void
 }) {
   const { t } = useTranslation()
   const query = useWorkBoard(scope, online)
-  const claim = useClaimHumanTask(scope.organizationId)
-  const decide = useDecideHumanTask(scope.organizationId)
+  const claim = useClaimHumanTask(scope.organizationId, scope)
+  const decide = useDecideHumanTask(scope.organizationId, scope)
   const [review, setReview] = useState<{
     row: WorkTaskRow
     action?: WorkAction
@@ -74,7 +93,22 @@ export function WorkflowWorkContent({
   const [comment, setComment] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [unresolved, setUnresolved] =
+    useState<HumanTaskCommandExpectation | null>(null)
+  const [checkingOutcome, setCheckingOutcome] = useState(false)
+  const [preparingCommand, setPreparingCommand] = useState(false)
+  // Only the immutable receipt expectation survives dispatch. It contains no
+  // source fields or review comment, even if a presentation filter loses the row.
+  const attempt = useRef<HumanTaskCommandExpectation | symbol | null>(null)
+  const mounted = useRef(true)
   const submitting = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      attempt.current = null
+    }
+  }, [])
   // Failed refreshes hide retained cache data, including counts and the review sheet.
   const rows = useMemo(
     () =>
@@ -100,9 +134,16 @@ export function WorkflowWorkContent({
       ),
     [rows],
   )
-  const busy = claim.isPending || decide.isPending
+  const busy =
+    preparingCommand || claim.isPending || decide.isPending || checkingOutcome
   const disabled =
-    navigationPending || !online || query.isFetching || query.isError || busy
+    navigationPending ||
+    authorityRefreshing ||
+    !online ||
+    query.isFetching ||
+    query.isError ||
+    busy ||
+    unresolved != null
   const columns = WORK_STATUSES.map((status) => ({
     id: status,
     title: t(`workBoard.status.${status}`),
@@ -110,6 +151,79 @@ export function WorkflowWorkContent({
   const current = review
     ? rows.find((row) => String(row.id) === String(review.row.id))
     : undefined
+  const selectedActorUnavailable =
+    review != null &&
+    current != null &&
+    actor != null &&
+    resolveApprovalActor(current, actor) == null
+  const unresolvedCurrent = unresolved
+    ? rows.find((row) => String(row.id) === unresolved.taskId)
+    : undefined
+  useEffect(() => {
+    if (
+      query.isError ||
+      selectedActorUnavailable ||
+      (review && !query.isPending && !current)
+    ) {
+      setReview(null)
+      setActor(null)
+      setComment("")
+      setError(null)
+      setNotice(null)
+      // List omission can be the successful result of a claim in Available
+      // work. Clear sensitive review state now; exact authorized readback below
+      // distinguishes that omission from loss of visibility.
+      // A failed HTTP read cannot disprove an already dispatched command.
+      // It can only cancel preparation that has not reached dispatch yet.
+      if (typeof attempt.current === "symbol") {
+        attempt.current = null
+        setUnresolved(null)
+      }
+    }
+  }, [
+    current,
+    query.isError,
+    query.isPending,
+    review,
+    selectedActorUnavailable,
+  ])
+  useEffect(() => {
+    if (
+      !unresolved ||
+      unresolvedCurrent ||
+      !online ||
+      authorityRefreshing ||
+      query.isError ||
+      query.isPending
+    )
+      return
+    let cancelled = false
+    void recheckHumanTaskCommandEffect(scope, unresolved)
+      .then(({ effect, visible }) => {
+        if (cancelled || !mounted.current || attempt.current !== unresolved)
+          return
+        if (!visible || effect) {
+          attempt.current = null
+          setUnresolved(null)
+          if (effect) setNotice(t("workBoard.updated"))
+        }
+      })
+      // An unavailable read proves neither success nor failure. Keep only the
+      // generic unknown banner; a later explicit check never resends a command.
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [
+    unresolved,
+    unresolvedCurrent,
+    online,
+    authorityRefreshing,
+    query.isError,
+    query.isPending,
+    scope,
+    t,
+  ])
   let stale = false
   if (
     review &&
@@ -128,6 +242,7 @@ export function WorkflowWorkContent({
   }
   const actions = current && !stale ? workActionsForActor(current, actor) : []
   const openReview = (row: WorkTaskRow, action?: WorkAction) => {
+    if (unresolved && unresolved.taskId !== String(row.id)) return
     setReview({ row, action })
     setActor(resolveApprovalActor(row))
     setComment("")
@@ -137,7 +252,12 @@ export function WorkflowWorkContent({
   const submit = async (action: WorkAction) => {
     if (!review || !current || disabled || submitting.current) return
     submitting.current = true
+    setPreparingCommand(true)
     setError(null)
+    let command: FrozenCommand | null = null
+    let expected: HumanTaskCommandExpectation | null = null
+    const preparation = Symbol("workflow-command")
+    attempt.current = preparation
     try {
       const selection = approvalSelection(review.row, scope.companyId, actor)
       requireUnchangedApproval(selection, current)
@@ -150,42 +270,144 @@ export function WorkflowWorkContent({
       )
         throw new Error(t("workBoard.commentRequired"))
       if (action === "claim") {
-        await claim.mutateAsync({
-          companyId: selection.companyId,
-          taskId: selection.requestId,
-          expectedRevision: selection.expectedTaskRevision,
-          actingFor: selection.actingFor,
-        })
+        command = {
+          kind: "claim",
+          input: Object.freeze({
+            companyId: selection.companyId,
+            taskId: selection.requestId,
+            expectedRevision: selection.expectedTaskRevision,
+            actingFor: selection.actingFor,
+            attempt: newHumanTaskAttempt("claim"),
+          }),
+        }
       } else {
-        await decide.mutateAsync({
-          companyId: selection.companyId,
-          taskId: selection.requestId,
-          expectedTaskRevision: selection.expectedTaskRevision,
-          expectedInstanceRevision: selection.expectedInstanceRevision,
-          actingFor: selection.actingFor,
-          decision: {
-            tag:
-              action === "approve"
-                ? "Approve"
-                : action === "reject"
-                  ? "Reject"
-                  : "Complete",
-          },
-          comment: comment.trim() || null,
-        })
+        command = {
+          kind: "decision",
+          input: Object.freeze({
+            companyId: selection.companyId,
+            taskId: selection.requestId,
+            expectedTaskRevision: selection.expectedTaskRevision,
+            expectedInstanceRevision: selection.expectedInstanceRevision,
+            actingFor: selection.actingFor,
+            decision: Object.freeze({
+              tag:
+                action === "approve"
+                  ? "Approve"
+                  : action === "reject"
+                    ? "Reject"
+                    : "Complete",
+            }),
+            comment: comment.trim() || null,
+            attempt: newHumanTaskAttempt("decision"),
+          }),
+        }
       }
+      expected =
+        command.kind === "claim"
+          ? await humanTaskClaimExpectation(scope, command.input)
+          : await humanTaskDecisionExpectation(scope, command.input)
+      if (!mounted.current || attempt.current !== preparation) return
+      attempt.current = expected
+      setPreparingCommand(false)
+      if (command.kind === "claim") await claim.mutateAsync(command.input)
+      else await decide.mutateAsync(command.input)
+      if (!mounted.current || attempt.current !== expected) return
+      attempt.current = null
+      setUnresolved(null)
       setReview(null)
+      setActor(null)
+      setComment("")
       setNotice(t("workBoard.updated"))
     } catch (cause) {
+      if (!mounted.current || attempt.current !== (expected ?? preparation))
+        return
+      const outcomeUnknown =
+        cause instanceof UnresolvedOperationEffectError ||
+        cause instanceof AmbiguousOperationEffectError
+      if (expected && outcomeUnknown) {
+        setUnresolved(expected)
+      } else {
+        attempt.current = null
+        setUnresolved(null)
+      }
       setError(
-        cause instanceof Error ? cause.message : t("workBoard.updateFailed"),
+        outcomeUnknown
+          ? null
+          : cause instanceof Error
+            ? cause.message
+            : t("workBoard.updateFailed"),
       )
     } finally {
       // Response loss can follow a committed command. Reconcile instead of moving optimistically.
-      await query.refetch()
+      if (mounted.current) {
+        await query.refetch()
+        setPreparingCommand(false)
+      }
       submitting.current = false
     }
   }
+  const checkOutcome = async () => {
+    const expected = unresolved
+    if (
+      !expected ||
+      !online ||
+      authorityRefreshing ||
+      navigationPending ||
+      query.isFetching ||
+      query.isError ||
+      busy ||
+      submitting.current
+    )
+      return
+    submitting.current = true
+    setCheckingOutcome(true)
+    setError(null)
+    try {
+      const { effect, visible } = await recheckHumanTaskCommandEffect(
+        scope,
+        expected,
+      )
+      if (!mounted.current || attempt.current !== expected) return
+      if (!visible || effect) {
+        attempt.current = null
+        setUnresolved(null)
+        setReview(null)
+        setActor(null)
+        setComment("")
+        if (effect) setNotice(t("workBoard.updated"))
+      }
+    } catch {
+      // A denied or unavailable proof read is not a failed command. Retain the
+      // generic outcome state until current authorized reads resolve it.
+    } finally {
+      if (mounted.current) {
+        await query.refetch()
+        setCheckingOutcome(false)
+      }
+      submitting.current = false
+    }
+  }
+  const outcomeControls = unresolved && (
+    <div role="alert" className="space-y-2">
+      <p>{t("workBoard.outcomeUnknown")}</p>
+      <Button
+        variant="outline"
+        disabled={
+          !online ||
+          authorityRefreshing ||
+          navigationPending ||
+          query.isFetching ||
+          query.isError ||
+          busy
+        }
+        onClick={() => void checkOutcome()}
+      >
+        {checkingOutcome
+          ? t("workBoard.checkingOutcome")
+          : t("workBoard.checkOutcome")}
+      </Button>
+    </div>
+  )
   const reason = (row: WorkTaskRow) =>
     !online
       ? t("workBoard.offline")
@@ -194,10 +416,10 @@ export function WorkflowWorkContent({
         : workActionsForActor(row).length === 0
           ? t("workBoard.reviewActions")
           : undefined
-  const href = review
+  const href = current
     ? approvalRecordHref(
-        review.row.subjectModel ?? review.row.subject_model,
-        review.row.subjectId ?? review.row.subject_id,
+        current.subjectModel ?? current.subject_model,
+        current.subjectId ?? current.subject_id,
       )
     : undefined
   return (
@@ -371,28 +593,36 @@ export function WorkflowWorkContent({
         </>
       )}
       {error && !review && <p role="alert">{error}</p>}
+      {!review && outcomeControls}
       <Sheet
-        open={review != null && !query.isError}
+        open={
+          review != null &&
+          current != null &&
+          !query.isError &&
+          !selectedActorUnavailable
+        }
         onOpenChange={(open) => {
-          if (!open && !busy) setReview(null)
+          if (!open && !busy) {
+            setReview(null)
+            setActor(null)
+            setComment("")
+          }
         }}
       >
         <SheetContent className="overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>
-              {review ? taskTitle(review.row) : t("workBoard.assignment")}
+              {current ? taskTitle(current) : t("workBoard.assignment")}
             </SheetTitle>
             <SheetDescription>
               {t("workBoard.reviewDescription")}
             </SheetDescription>
           </SheetHeader>
-          {review && (
+          {review && current && (
             <div className="space-y-4 p-4">
-              <p className="text-sm">
-                {review.row.nodeKey ?? review.row.node_key}
-              </p>
+              <p className="text-sm">{current.nodeKey ?? current.node_key}</p>
               <Badge variant="secondary">
-                {t(`workBoard.status.${workStatus(review.row) ?? "Open"}`)}
+                {t(`workBoard.status.${workStatus(current) ?? "Open"}`)}
               </Badge>
               {href && (
                 <p>
@@ -401,13 +631,13 @@ export function WorkflowWorkContent({
                   </Link>
                 </p>
               )}
-              {approvalActorOptions(review.row).length > 0 && (
+              {approvalActorOptions(current).length > 0 && (
                 <label className="grid gap-1 text-sm">
                   {t("workBoard.actingAs")}
                   <select
                     className={selectClass}
                     value={actor ?? "select"}
-                    disabled={busy}
+                    disabled={busy || unresolved != null}
                     onChange={(event) => {
                       setActor(
                         event.target.value === "select"
@@ -420,10 +650,10 @@ export function WorkflowWorkContent({
                     <option value="select" disabled>
                       {t("workBoard.selectActor")}
                     </option>
-                    {review.row.directlyEligible && (
+                    {current.directlyEligible && (
                       <option value="">{t("workBoard.myself")}</option>
                     )}
-                    {approvalActorOptions(review.row).map((option) => (
+                    {approvalActorOptions(current).map((option) => (
                       <option
                         key={option.identityHex}
                         value={option.identityHex}
@@ -434,7 +664,9 @@ export function WorkflowWorkContent({
                   </select>
                 </label>
               )}
-              {stale || !current ? (
+              {unresolved ? (
+                outcomeControls
+              ) : stale || !current ? (
                 <div role="alert" className="space-y-2">
                   <p>{t("workBoard.stale")}</p>
                   {current && (
@@ -458,7 +690,7 @@ export function WorkflowWorkContent({
                       <Textarea
                         value={comment}
                         onChange={(event) => setComment(event.target.value)}
-                        disabled={busy}
+                        disabled={busy || unresolved != null}
                         rows={4}
                       />
                     </label>

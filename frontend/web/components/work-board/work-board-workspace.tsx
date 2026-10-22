@@ -24,14 +24,20 @@ import {
 } from "./work-board-permissions"
 import { WorkActivitiesContent } from "./work-activities-content"
 import { WorkflowWorkContent } from "./workflow-work-content"
+import { useWorkBoardAuthority } from "./work-board-authority"
 
 const selectClass =
   "h-9 max-w-full rounded-md border bg-background px-2 text-sm"
 
-function useOnline(): boolean {
-  const [online, setOnline] = useState(true)
+function useOnline() {
+  const [state, setState] = useState({ online: true, reconnect: 0 })
   useEffect(() => {
-    const update = () => setOnline(navigator.onLine)
+    const update = () =>
+      setState((previous) => {
+        const online = navigator.onLine
+        if (online === previous.online) return previous
+        return { online, reconnect: previous.reconnect + (online ? 1 : 0) }
+      })
     update()
     window.addEventListener("online", update)
     window.addEventListener("offline", update)
@@ -40,7 +46,7 @@ function useOnline(): boolean {
       window.removeEventListener("offline", update)
     }
   }, [])
-  return online
+  return state
 }
 
 export interface WorkBoardWorkspaceProps {
@@ -67,7 +73,7 @@ export function WorkBoardWorkspace({
   const router = useRouter()
   const pathname = usePathname()
   const [navigationPending, startNavigation] = useTransition()
-  const online = useOnline()
+  const { online, reconnect } = useOnline()
   const authorizationKey = JSON.stringify({ currentUser, roles, policies })
   const requestedScope = params.get("workScope")
   const scope =
@@ -126,6 +132,7 @@ export function WorkBoardWorkspace({
     view,
     team,
   }
+  const authority = useWorkBoardAuthority(boardScope, source, online, reconnect)
   return (
     <section className="min-w-0 space-y-4" aria-label={t("workBoard.title")}>
       {!embedded && (
@@ -217,6 +224,25 @@ export function WorkBoardWorkspace({
           </Button>
         </div>
       </div>
+      {online && authority.blocked && (
+        <div
+          role={authority.failed ? "alert" : "status"}
+          className="space-y-2 text-sm"
+        >
+          <p>
+            {t(
+              authority.failed
+                ? "workBoard.readFailed"
+                : "workBoard.refreshing",
+            )}
+          </p>
+          {authority.failed && (
+            <Button variant="outline" size="sm" onClick={authority.retry}>
+              {t("workBoard.refresh")}
+            </Button>
+          )}
+        </div>
+      )}
       {!ready ? (
         <p role="status">{t("workBoard.contextLoading")}</p>
       ) : !allowed ? (
@@ -228,6 +254,7 @@ export function WorkBoardWorkspace({
           online={online}
           layout={layout}
           navigationPending={navigationPending}
+          authorityRefreshing={authority.blocked}
           onTeamChange={(value) => updateParams({ workTeam: value })}
         />
       ) : (
@@ -237,6 +264,7 @@ export function WorkBoardWorkspace({
           online={online}
           layout={layout}
           navigationPending={navigationPending}
+          authorityRefreshing={authority.blocked}
           onTeamChange={(value) => updateParams({ workTeam: value })}
         />
       )}

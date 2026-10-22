@@ -17,7 +17,7 @@ use super::action_registry::{
 };
 use super::authorization::{
     authorize_workflow_decision, authorize_workflow_decision_for_actor,
-    WorkflowAuthorizationDecision, WorkflowAuthorizationRequest,
+    require_workflow_subject_read, WorkflowAuthorizationDecision, WorkflowAuthorizationRequest,
 };
 use super::definitions::{
     workflow_edge, workflow_node, WorkflowHumanTaskKind, WorkflowNodeKind, WorkflowTaskAssignment,
@@ -26,7 +26,7 @@ use super::definitions::{
 use super::runtime::{
     apply_runtime_event, workflow_instance, workflow_token, RuntimeEventContext, RuntimeMutation,
     RuntimeTransition, WorkflowAuthorizationOutcome, WorkflowCommandKind, WorkflowInstance,
-    WorkflowTokenState,
+    WorkflowInstanceState, WorkflowTokenState,
 };
 use std::collections::BTreeSet;
 
@@ -503,6 +503,10 @@ pub(crate) fn claim_workflow_human_task_for_actor(
 ) -> Result<WorkflowHumanTask, String> {
     validate_key(&params.idempotency_key, "idempotency key")?;
     validate_key(&params.correlation_id, "correlation id")?;
+    let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
+    let authorization =
+        authorize_task_actor(ctx, actor, &task, params.acting_for, "workflow_task:write")
+            .map_err(|error| format!("Permission denied: {error}"))?;
     let input_hash = hash_fields(&[
         organization_id.to_string(),
         params.company_id.to_string(),
@@ -518,9 +522,14 @@ pub(crate) fn claim_workflow_human_task_for_actor(
         &params.idempotency_key,
         &input_hash,
     )? {
-        return require_task(ctx, organization_id, params.company_id, receipt.task_id);
+        if receipt.created_by != actor {
+            return Err(
+                "Permission denied: workflow task claim receipt belongs to another actor"
+                    .to_string(),
+            );
+        }
+        return Ok(task);
     }
-    let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
     require_revision(&task, params.expected_revision)?;
     if task.assignment == WorkflowTaskAssignment::AllCandidates {
         return Err("AllCandidates tasks do not use exclusive claim".to_string());
@@ -528,8 +537,6 @@ pub(crate) fn claim_workflow_human_task_for_actor(
     if task.status != WorkflowHumanTaskStatus::Open {
         return Err("only an open workflow task can be claimed".to_string());
     }
-    let authorization =
-        authorize_task_actor(ctx, actor, &task, params.acting_for, "workflow_task:write")?;
     let next_revision = next_revision(task.revision)?;
     let updated = ctx.db.workflow_human_task().id().update(WorkflowHumanTask {
         status: WorkflowHumanTaskStatus::Claimed,
@@ -797,6 +804,74 @@ pub(crate) fn decide_workflow_human_task_for_actor(
     }
     crate::accounting::bank_settlement_lifecycle::synchronize_bank_task(ctx, &updated)?;
     Ok(updated)
+}
+
+/// Close outstanding task projections in the same transaction as cancellation.
+///
+/// The existing runtime Cancel event and command receipt are the canonical
+/// cancellation evidence. Task audit entries link to that command; frozen voter
+/// rows, successful task history and prior command receipts remain unchanged.
+pub(crate) fn cancel_active_workflow_human_tasks(
+    ctx: &ReducerContext,
+    instance: &WorkflowInstance,
+    cancellation_key: &str,
+    correlation_id: &str,
+    company_membership_bypass: bool,
+) -> Result<(), String> {
+    if instance.state != WorkflowInstanceState::Cancelled {
+        return Err("workflow task cancellation requires a cancelled instance".to_string());
+    }
+    let tasks: Vec<_> = ctx
+        .db
+        .workflow_human_task()
+        .human_task_by_instance()
+        .filter(&instance.id)
+        .filter(|task| {
+            matches!(
+                task.status,
+                WorkflowHumanTaskStatus::Open | WorkflowHumanTaskStatus::Claimed
+            )
+        })
+        .collect();
+    for task in &tasks {
+        if task.organization_id != instance.organization_id
+            || task.company_id != instance.company_id
+            || task.workflow_version_id != instance.workflow_version_id
+        {
+            return Err("workflow cancellation task scope is inconsistent".to_string());
+        }
+        next_revision(task.revision)?;
+    }
+    for task in tasks {
+        let revision = next_revision(task.revision)?;
+        ctx.db.workflow_human_task().id().update(WorkflowHumanTask {
+            status: WorkflowHumanTaskStatus::Cancelled,
+            revision,
+            correlation_id: correlation_id.to_string(),
+            updated_at: ctx.timestamp,
+            ..task.clone()
+        });
+        write_audit_log_v2(
+            ctx,
+            instance.organization_id,
+            AuditLogParams {
+                company_id: Some(instance.company_id),
+                table_name: "workflow_human_task",
+                record_id: task.id,
+                action: "CANCEL",
+                old_values: Some(serde_json::json!({"status": format!("{:?}", task.status), "revision": task.revision}).to_string()),
+                new_values: Some(serde_json::json!({"status": "Cancelled", "revision": revision}).to_string()),
+                changed_fields: vec!["status".to_string(), "revision".to_string()],
+                metadata: Some(serde_json::json!({
+                    "workflow_instance_id": instance.id,
+                    "cancellation_idempotency_key": cancellation_key,
+                    "correlation_id": correlation_id,
+                    "company_membership_bypass": company_membership_bypass,
+                }).to_string()),
+            },
+        );
+    }
+    Ok(())
 }
 
 fn require_current_guarded_task_snapshot(
@@ -1089,15 +1164,13 @@ fn authorize_task_actor(
         if !in_projection {
             return Err("workflow actor is outside the AllCandidates projection".to_string());
         }
-    } else {
-        let role_match = principal_has_candidate_role(ctx, task, principal);
-        let group_match = principal_has_candidate_group(ctx, task, principal);
-        let unit_match = principal_has_candidate_unit(ctx, task, principal);
-        if !role_match && !group_match && !unit_match {
-            return Err("workflow actor is outside the task candidate scopes".to_string());
-        }
     }
     let role_match = principal_has_candidate_role(ctx, task, principal);
+    let group_match = principal_has_candidate_group(ctx, task, principal);
+    let unit_match = principal_has_candidate_unit(ctx, task, principal);
+    if !role_match && !group_match && !unit_match {
+        return Err("workflow actor is outside the task candidate scopes".to_string());
+    }
     let candidate_role_ids = if role_match {
         task.candidate_role_ids.clone()
     } else {
@@ -1111,11 +1184,13 @@ fn authorize_task_actor(
         candidate_role_ids,
         required_permission: permission.to_string(),
     };
-    if actor == ctx.sender() {
+    let authorization = if actor == ctx.sender() {
         authorize_workflow_decision(ctx, &request)
     } else {
         authorize_workflow_decision_for_actor(ctx, actor, &request)
-    }
+    }?;
+    require_workflow_subject_read(ctx, task.organization_id, actor, &task.subject_model)?;
+    Ok(authorization)
 }
 
 fn principal_has_candidate_role(

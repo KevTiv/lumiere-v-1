@@ -753,6 +753,7 @@ pub fn test_bank_settlement_approval_and_last_cent(ctx: &ReducerContext) -> Resu
         permissions: vec![
             "workflow_task:approve".to_string(),
             "workflow_task:reject".to_string(),
+            "account_payment:read".to_string(),
             "payment:post".to_string(),
         ],
         is_system: false,

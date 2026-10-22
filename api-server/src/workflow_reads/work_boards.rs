@@ -5,8 +5,12 @@
 //! additionally requires an actor-authorized, field-projected source read.
 
 mod actions;
+mod guarded_actions;
 #[cfg(test)]
 mod http_tests;
+mod readback;
+
+pub(crate) use readback::WorkTaskReadbackRequest;
 
 use super::bounded_windows::{BoundedIdReader, ID_WINDOW};
 use super::candidate_scope::CandidateScope;
@@ -29,7 +33,7 @@ const MAX_PAGE_SIZE: u32 = 50;
 const BOARD_COLUMNS: &str = "id, organization_id, company_id, workflow_id, workflow_version_id, \
 workflow_instance_id, token_id, node_id, node_key, kind, assignment, candidate_role_ids, \
 candidate_group_ids, candidate_unit_ids, require_comment_on_reject, subject_model, subject_id, \
-condition_revision_hash, subject_revision_hash, status, revision, requested_by, requested_at, \
+condition_revision_hash, subject_revision_hash, guarded_action, status, revision, requested_by, requested_at, \
 claimed_by, claimed_at, decided_by, acting_for, decided_at, decision, correlation_id, created_at, updated_at";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -168,6 +172,7 @@ pub(crate) struct WorkBoardRequest {
     team: Option<WorkTeam>,
     cursor: Option<String>,
     limit: usize,
+    readback: Option<WorkTaskReadbackRequest>,
 }
 
 impl WorkBoardRequest {
@@ -211,7 +216,23 @@ impl WorkBoardRequest {
             team: team.map(WorkTeam::parse).transpose()?,
             cursor: cursor.map(str::to_owned),
             limit: limit as usize,
+            readback: None,
         }))
+    }
+
+    /// Exact command readback retains authorization and team scope while
+    /// ignoring presentation filters that the command may have changed.
+    pub(crate) fn with_readback(
+        mut self,
+        readback: Option<WorkTaskReadbackRequest>,
+    ) -> Result<Self, ApiError> {
+        if readback.is_some() && self.cursor.is_some() {
+            return Err(ApiError::BadRequest(
+                "cursor is not supported for an exact work task read".into(),
+            ));
+        }
+        self.readback = readback;
+        Ok(self)
     }
 
     fn cursor_prefix(&self, organization_id: u64, caller: &str) -> String {
@@ -241,9 +262,11 @@ impl WorkBoardRequest {
     }
 }
 
+#[derive(Default)]
 pub(crate) struct WorkBoardPage {
     pub rows: Vec<Value>,
     pub next_cursor: Option<String>,
+    pub command_evidence: Option<Value>,
 }
 
 fn decimal_id(value: &str) -> Option<u64> {
@@ -303,6 +326,9 @@ fn visible_row(
         || request.team.as_ref().is_some_and(|team| !team.matches(row))
     {
         return false;
+    }
+    if request.readback.is_some() {
+        return true;
     }
     match request.view {
         WorkView::Eligible => true,
@@ -379,10 +405,7 @@ pub(crate) async fn read_work_board(
         })
         .collect();
     if sources.is_empty() {
-        return Ok(WorkBoardPage {
-            rows: Vec::new(),
-            next_cursor: None,
-        });
+        return Ok(WorkBoardPage::default());
     }
     let predicate = scope_predicate(org, &request, &sources);
     let scan = BoundedIdReader::new(owner, "workflow_human_task", &predicate);
@@ -399,6 +422,17 @@ pub(crate) async fn read_work_board(
         sod_rules: &sod_rules,
     };
     let mut delegated_access = HashMap::<String, Option<FieldAccessContext>>::new();
+    if let Some(readback) = &request.readback {
+        return readback::read_exact_task(
+            context,
+            &request,
+            readback,
+            &predicate,
+            &projection,
+            &mut delegated_access,
+        )
+        .await;
+    }
     let mut rows = Vec::with_capacity(request.limit);
     let mut source_reads = 0;
     let mut seek_probes = 0;
@@ -427,29 +461,10 @@ pub(crate) async fn read_work_board(
             if !visible_row(&row, &request, org, &caller, &scope) {
                 continue;
             }
-            let Some(source) = source_for(&row, request.scope, access) else {
-                continue;
-            };
-            let Some(source_id) = number(&row, "subjectId", "subject_id").filter(|id| *id > 0)
-            else {
-                continue;
-            };
             source_reads += 1;
-            let source_row = match execute_authorized_resource_record(
-                context.client(),
-                source.resource,
-                org,
-                company,
-                source_id,
-                Some(access),
-            )
-            .await
+            if let Some((source, source_row)) =
+                read_board_source(context, &row, request.scope, company).await?
             {
-                Ok(row) => row,
-                Err(ApiError::NotFound(_) | ApiError::Forbidden(_)) => None,
-                Err(error) => return Err(error),
-            };
-            if let Some(source_row) = source_row {
                 let mut projected =
                     project_board_row(row, &source_row, source, &projection, &mut delegated_access)
                         .await?;
@@ -474,7 +489,41 @@ pub(crate) async fn read_work_board(
     } else {
         None
     };
-    Ok(WorkBoardPage { rows, next_cursor })
+    Ok(WorkBoardPage {
+        rows,
+        next_cursor,
+        command_evidence: None,
+    })
+}
+
+/// Shared source boundary for paged cards and exact command readback. Owner
+/// authority never substitutes for the actual actor's canonical record read.
+async fn read_board_source(
+    context: &TrustedOperationContext,
+    row: &Value,
+    scope: WorkScope,
+    company: u64,
+) -> Result<Option<(WorkSource, Value)>, ApiError> {
+    let Some(source) = source_for(row, scope, context.field_access()) else {
+        return Ok(None);
+    };
+    let Some(source_id) = number(row, "subjectId", "subject_id").filter(|id| *id > 0) else {
+        return Ok(None);
+    };
+    match execute_authorized_resource_record(
+        context.client(),
+        source.resource,
+        context.organization_id(),
+        company,
+        source_id,
+        Some(context.field_access()),
+    )
+    .await
+    {
+        Ok(row) => Ok(row.map(|row| (source, row))),
+        Err(ApiError::NotFound(_) | ApiError::Forbidden(_)) => Ok(None),
+        Err(error) => Err(error),
+    }
 }
 
 fn team_refs(row: &Value, scope: &CandidateScope, company: u64) -> Vec<Value> {
@@ -552,8 +601,16 @@ async fn project_board_row(
     let directly_eligible = scope.directly_eligible(&row);
     let mut options = scope.delegated_options(&row, caller);
     let assigned_to_me = identity(&row, "claimedBy", "claimed_by").as_deref() == Some(caller);
+    // Guarded adapters run as the actual JWT actor, even when workflow approval
+    // itself uses a delegated principal. Earlier quorum votes execute no adapter.
+    let guarded_approve_allowed =
+        guarded_actions::may_execute_approval(&row, access, unvoted_candidates.len());
     let mut row = project_human_task(row, &revisions);
-    let direct_actions = work_actions(
+    if let Some(object) = row.as_object_mut() {
+        object.remove("guardedAction");
+        object.remove("guarded_action");
+    }
+    let mut direct_actions = work_actions(
         &row,
         ActionContext {
             caller,
@@ -565,6 +622,8 @@ async fn project_board_row(
             unvoted_candidates: &unvoted_candidates,
         },
     );
+    direct_actions
+        .retain(|action| *action != actions::WorkAction::Approve || guarded_approve_allowed);
     for option in &mut options {
         let Some(principal) = option
             .get("identityHex")
@@ -584,7 +643,7 @@ async fn project_board_row(
         let eligible = principal_access.is_some_and(|access| {
             scope.delegated_action_eligible(&row, &principal, &access.role_ids)
         });
-        let actions = work_actions(
+        let mut actions = work_actions(
             &row,
             ActionContext {
                 caller,
@@ -596,6 +655,7 @@ async fn project_board_row(
                 unvoted_candidates: &unvoted_candidates,
             },
         );
+        actions.retain(|action| *action != actions::WorkAction::Approve || guarded_approve_allowed);
         if let Some(object) = option.as_object_mut() {
             object.insert("workActions".into(), json!(actions));
         }

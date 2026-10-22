@@ -8,6 +8,12 @@ import {
 import { stdbBffCallUrl } from "../../packages/stdb/src/commands/stdb-http"
 import type { WorkTaskRow } from "../../packages/query-hooks/src/hooks/work-board-model"
 import type { WorkActivityRow } from "../../packages/query-hooks/src/hooks/work-activities"
+import {
+  humanTaskClaimExpectation,
+  humanTaskDecisionExpectation,
+  type HumanTaskCommandExpectation,
+} from "../../packages/query-hooks/src/hooks/human-task-command"
+import { taskIdentityHex } from "../../packages/query-hooks/src/hooks/task-assignment"
 
 const actor = "ab".repeat(32)
 const delegate = "ef".repeat(32)
@@ -19,13 +25,29 @@ const completeActivityPath = stdbBffCallUrl("complete_activity")
 type FixtureTask = WorkTaskRow & { decidedBy?: string }
 type FixtureActivity = WorkActivityRow
 type FixtureWrite = { path: string; params: Record<string, unknown> }
+type FixtureCommandEvidence = HumanTaskCommandExpectation & {
+  workflowInstanceId: string
+  eventId: string
+  resultRevision: string
+  resultStatus: string
+}
 type FixtureState = {
   rows: FixtureTask[]
   activities: FixtureActivity[]
   activityReads: string[]
   writes: FixtureWrite[]
+  commandEvidence: FixtureCommandEvidence[]
+  commandReads: string[]
+  hideCommandEvidence: boolean
+  loseNextWriteReply: boolean
   unexpected: string[]
   denyReads: boolean
+  readFailureStatus: number
+  denyAuthority: boolean
+  authorityReads: number
+  scopedReads: number
+  authorityWait?: Promise<void>
+  boardWait?: Promise<void>
   rejectWrite: boolean
   holdNextWrite: boolean
   pendingWrite?: Route
@@ -66,6 +88,21 @@ const tag = (value: unknown): string => {
   return typeof object.tag === "string"
     ? object.tag
     : (Object.keys(object)[0] ?? "")
+}
+
+function optionalValue(value: unknown): unknown {
+  if (value == null || typeof value !== "object") return value
+  if ("some" in value) return optionalValue(value.some)
+  if ("none" in value) return null
+  return value
+}
+
+function decisionTag(value: unknown): "Approve" | "Reject" | "Complete" {
+  const decision = tag(value).toLowerCase()
+  if (decision === "approve") return "Approve"
+  if (decision === "reject") return "Reject"
+  if (decision === "complete") return "Complete"
+  throw new Error("Unexpected decision in the saved synthetic command")
 }
 
 async function fixtureBackend(page: Page): Promise<FixtureState> {
@@ -142,8 +179,16 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
     ],
     activityReads: [],
     writes: [],
+    commandEvidence: [],
+    commandReads: [],
+    hideCommandEvidence: false,
+    loseNextWriteReply: false,
     unexpected: [],
     denyReads: false,
+    readFailureStatus: 403,
+    denyAuthority: false,
+    authorityReads: 0,
+    scopedReads: 0,
     rejectWrite: false,
     holdNextWrite: false,
   }
@@ -156,6 +201,19 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
   await page.route("**/api/**", async (route) => {
     const request = route.request()
     const url = new URL(request.url())
+    if (
+      request.method() === "GET" &&
+      url.pathname === "/api/session/field-access"
+    ) {
+      state.authorityReads += 1
+      await state.authorityWait
+      if (state.denyAuthority)
+        return respond(route, { error: "Synthetic authority was revoked" }, 403)
+      return respond(route, {
+        identityHex: request.headers()["x-fixture-actor"] ?? actor,
+        organizationId: 7,
+      })
+    }
     if (request.method() === "GET" && url.pathname === "/api/query/companies") {
       return respond(route, {
         data: [
@@ -172,18 +230,22 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
         return respond(
           route,
           { error: "Synthetic assignment access was revoked" },
-          403,
+          state.readFailureStatus,
         )
       // The legacy canonical effect read is unpaged; the board supplies explicit filters.
       if (!url.searchParams.has("workScope"))
         return respond(route, { data: state.rows })
+      state.scopedReads += 1
+      await state.boardWait
       const companyId = Number(url.searchParams.get("companyId"))
       const module = url.searchParams.get("workScope")
       const view = url.searchParams.get("workView")
       const team = url.searchParams.get("workTeam")
+      const taskId = url.searchParams.get("taskId")
       const rows = state.rows.filter(
         (row) =>
           row.companyId === companyId &&
+          (!taskId || String(row.id) === taskId) &&
           (module === "finance" || row.workModule === module) &&
           (view !== "mine" || row.workAssignedToMe) &&
           (view !== "available" ||
@@ -198,7 +260,21 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
               (value) => `${value.kind}:${value.id}` === team,
             )),
       )
-      return respond(route, { data: rows, nextCursor: null })
+      const commandKind = url.searchParams.get("commandKind")
+      if (commandKind) state.commandReads.push(url.search)
+      const commandEvidence = state.hideCommandEvidence
+        ? null
+        : state.commandEvidence.find(
+            (evidence) =>
+              evidence.commandKind === commandKind &&
+              evidence.idempotencyKey ===
+                url.searchParams.get("idempotencyKey"),
+          )
+      return respond(route, {
+        data: rows,
+        nextCursor: null,
+        ...(commandKind ? { commandEvidence } : {}),
+      })
     }
     if (
       request.method() === "GET" &&
@@ -206,11 +282,13 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
       url.searchParams.has("workScope")
     ) {
       state.activityReads.push(url.search)
+      state.scopedReads += 1
+      await state.boardWait
       if (state.denyReads)
         return respond(
           route,
           { error: "Synthetic follow-up access was revoked" },
-          403,
+          state.readFailureStatus,
         )
       const companyId = Number(url.searchParams.get("companyId"))
       const module = url.searchParams.get("workScope")
@@ -280,6 +358,46 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
           { error: "Synthetic stale or unauthorized assignment action" },
           409,
         )
+      // Compute evidence from the saved command, never from a requested readback hash.
+      const scope = {
+        organizationId: 7,
+        companyId: Number(row.companyId),
+        actorIdentity: actor,
+        authorizationKey: "synthetic",
+        scope: "finance" as const,
+        view: "eligible" as const,
+      }
+      const commonInput = {
+        companyId: Number(params.companyId ?? params.company_id),
+        taskId,
+        actingFor: taskIdentityHex(
+          optionalValue(params.actingFor ?? params.acting_for),
+        ),
+        attempt: {
+          idempotencyKey: String(
+            params.idempotencyKey ?? params.idempotency_key,
+          ),
+          correlationId: String(params.correlationId ?? params.correlation_id),
+        },
+      }
+      const expectation =
+        url.pathname === claimPath
+          ? await humanTaskClaimExpectation(scope, {
+              ...commonInput,
+              expectedRevision: expected,
+            })
+          : await humanTaskDecisionExpectation(scope, {
+              ...commonInput,
+              expectedTaskRevision: expected,
+              expectedInstanceRevision: Number(
+                params.expectedInstanceRevision ??
+                  params.expected_instance_revision,
+              ),
+              decision: {
+                tag: decisionTag(params.decision),
+              },
+              comment: optionalValue(params.comment) as string | null,
+            })
       if (url.pathname === claimPath) {
         Object.assign(row, {
           status: "Claimed",
@@ -303,6 +421,17 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
           revision: expected + 1,
           workActions: [],
         })
+      }
+      state.commandEvidence.push({
+        ...expectation,
+        workflowInstanceId: String(row.workflowInstanceId),
+        eventId: String(1000 + state.commandEvidence.length),
+        resultRevision: String(row.revision),
+        resultStatus: tag(row.status),
+      })
+      if (state.loseNextWriteReply) {
+        state.loseNextWriteReply = false
+        return route.abort("connectionreset")
       }
       if (state.holdNextWrite) {
         state.holdNextWrite = false
@@ -515,6 +644,156 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     ).toHaveCount(0)
   })
 
+  test("a lost decision reply retains one attempt and checks only matching canonical evidence without resending", async ({
+    page,
+  }) => {
+    await openFixture(page)
+    await page.getByTestId("kanban-card-42").click()
+    const review = page.getByRole("dialog", { name: "Purchase review 42" })
+    await review.getByRole("textbox").fill("This is the one confirmed decision")
+    state.hideCommandEvidence = true
+    state.loseNextWriteReply = true
+    await review.getByRole("button", { name: "Approve", exact: true }).click()
+    await expect(review.getByRole("alert")).toContainText(
+      "Outcome not confirmed. Check again before starting another action.",
+    )
+    await expect(
+      review.getByRole("button", { name: "Approve", exact: true }),
+    ).toHaveCount(0)
+    const check = review.getByRole("button", {
+      name: "Check outcome",
+      exact: true,
+    })
+    await expect(check).toBeEnabled()
+    expect(state.writes).toHaveLength(1)
+    const proof = state.commandEvidence[0]!
+    // A different reviewer's receipt cannot prove this operator's command.
+    state.hideCommandEvidence = false
+    state.commandEvidence[0] = { ...proof, actorIdentityHex: delegate }
+    const before = state.commandReads.length
+    await check.click()
+    await expect.poll(() => state.commandReads.length).toBeGreaterThan(before)
+    await expect(check).toBeEnabled()
+    await expect(review.getByRole("alert")).toContainText(
+      "Outcome not confirmed",
+    )
+    expect(state.writes).toHaveLength(1)
+    state.commandEvidence[0] = proof
+    await check.click()
+    await expect(review).toHaveCount(0)
+    await expect(
+      page.getByTestId("kanban-column-Approved").getByTestId("kanban-card-42"),
+    ).toBeVisible()
+    expect(state.writes).toHaveLength(1)
+    for (const search of state.commandReads) {
+      const params = new URLSearchParams(search)
+      expect(params.get("idempotencyKey")).toBe(proof.idempotencyKey)
+      expect(params.get("inputHash")).toBe(proof.inputHash)
+      expect(params.get("commandKind")).toBe("decision")
+      expect(params.get("taskId")).toBe("42")
+      expect(params.get("workView")).toBe("eligible")
+    }
+  })
+
+  test("an unconfirmed claim leaving Available work retains a generic outcome check without retaining the review", async ({
+    page,
+  }) => {
+    state.rows = [task(41)]
+    await openFixture(page)
+    await page
+      .getByRole("combobox", { name: "Show", exact: true })
+      .selectOption("available")
+    await page.getByTestId("kanban-card-41").click()
+    const review = page.getByRole("dialog", { name: "Purchase review 41" })
+    state.hideCommandEvidence = true
+    state.loseNextWriteReply = true
+    await review.getByRole("button", { name: "Claim", exact: true }).click()
+    const check = page.getByRole("button", {
+      name: "Check outcome",
+      exact: true,
+    })
+    await expect(check).toBeEnabled()
+    await expect(review).toHaveCount(0)
+    await expect(page.getByTestId("kanban-card-41")).toHaveCount(0)
+    await expect(
+      page.getByText("Purchase review 41", { exact: true }),
+    ).toHaveCount(0)
+    await expect(
+      page.getByText(
+        "Outcome not confirmed. Check again before starting another action.",
+        { exact: true },
+      ),
+    ).toBeVisible()
+    expect(state.rows[0]?.status).toBe("Claimed")
+    expect(state.writes).toHaveLength(1)
+    const proof = state.commandEvidence[0]!
+    const before = state.commandReads.length
+    await check.click()
+    await expect.poll(() => state.commandReads.length).toBeGreaterThan(before)
+    await expect(check).toBeEnabled()
+    await control(page, "refresh")
+    await expect(check).toBeEnabled()
+    expect(state.writes).toHaveLength(1)
+    state.hideCommandEvidence = false
+    await check.click()
+    await expect(check).toHaveCount(0)
+    await expect(review).toHaveCount(0)
+    await expect(
+      page.getByText("Assignment updated and confirmed.", { exact: true }),
+    ).toBeVisible()
+    expect(state.writes).toHaveLength(1)
+    for (const search of state.commandReads) {
+      const params = new URLSearchParams(search)
+      expect(params.get("taskId")).toBe("41")
+      expect(params.get("workView")).toBe("eligible")
+      expect(params.get("idempotencyKey")).toBe(proof.idempotencyKey)
+      expect(params.get("inputHash")).toBe(proof.inputHash)
+      expect(params.get("commandKind")).toBe("claim")
+    }
+  })
+
+  test("a temporary board read failure clears review details but retains the unconfirmed command for read-only recovery", async ({
+    page,
+  }) => {
+    await openFixture(page)
+    await page.getByTestId("kanban-card-42").click()
+    const review = page.getByRole("dialog", { name: "Purchase review 42" })
+    await review.getByRole("textbox").fill("Clear this draft after read loss")
+    state.hideCommandEvidence = true
+    state.loseNextWriteReply = true
+    await review.getByRole("button", { name: "Approve", exact: true }).click()
+    const check = page.getByRole("button", {
+      name: "Check outcome",
+      exact: true,
+    })
+    await expect(check).toBeEnabled()
+    state.readFailureStatus = 503
+    state.denyReads = true
+    await control(page, "refresh")
+    await expect(review).toHaveCount(0)
+    await expect(page.getByTestId("kanban-card-42")).toHaveCount(0)
+    await expect(check).toBeDisabled()
+    await expect(
+      page.getByText(
+        "Outcome not confirmed. Check again before starting another action.",
+        { exact: true },
+      ),
+    ).toBeVisible()
+    state.denyReads = false
+    await control(page, "refresh")
+    await expect(page.getByTestId("kanban-card-42")).toBeVisible()
+    await expect(review).toHaveCount(0)
+    await expect(check).toBeEnabled()
+    state.hideCommandEvidence = false
+    await check.click()
+    await expect(check).toHaveCount(0)
+    await expect(review).toHaveCount(0)
+    await expect(
+      page.getByText("Assignment updated and confirmed.", { exact: true }),
+    ).toBeVisible()
+    expect(state.writes).toHaveLength(1)
+  })
+
   test("company and authorization changes remove old review state and revoked reads hide cached cards", async ({
     page,
   }) => {
@@ -602,6 +881,342 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
       .selectOption("workflow")
     await expect(page.getByTestId("kanban-card-41")).toBeVisible()
     await expect(page.getByTestId("kanban-card-71")).toHaveCount(0)
+  })
+
+  for (const source of ["workflow", "activities"] as const) {
+    test(`${source}: visibility loss while a command is pending discards its late review result`, async ({
+      page,
+    }) => {
+      await openFixture(page)
+      if (source === "activities")
+        await page
+          .getByRole("combobox", { name: "Work type", exact: true })
+          .selectOption("activities")
+      const id = source === "workflow" ? 42 : 71
+      const resource =
+        source === "workflow" ? "workflow-human-tasks" : "activities"
+      const exactId = source === "workflow" ? "taskId" : "activityId"
+      await page.getByTestId(`kanban-card-${id}`).click()
+      state.holdNextWrite = true
+      await page
+        .getByRole("dialog")
+        .getByRole("button", {
+          name: source === "workflow" ? "Approve" : "Complete",
+          exact: true,
+        })
+        .click()
+      await expect.poll(() => state.pendingWrite != null).toBe(true)
+      if (source === "workflow")
+        state.rows = state.rows.filter((row) => row.id !== id)
+      else state.activities = []
+      await control(page, "realtime-source")
+      await expect(page.getByRole("dialog")).toHaveCount(0)
+      await expect(page.getByTestId(`kanban-card-${id}`)).toHaveCount(0)
+      const settled = page.waitForResponse((response) => {
+        const url = new URL(response.url())
+        return (
+          url.pathname === `/api/query/${resource}` &&
+          url.searchParams.has("workScope") &&
+          !url.searchParams.has(exactId)
+        )
+      })
+      await state.pendingWrite!.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true }),
+      })
+      await settled
+      await expect(page.getByRole("dialog")).toHaveCount(0)
+      await expect(
+        page.getByRole("button", { name: "Check outcome", exact: true }),
+      ).toHaveCount(0)
+      await expect(
+        page.getByText(
+          source === "workflow"
+            ? "Assignment updated and confirmed."
+            : "Follow-up completed and confirmed.",
+          { exact: true },
+        ),
+      ).toHaveCount(0)
+      expect(state.writes).toHaveLength(1)
+    })
+
+    test(`${source}: a successful read that removes the reviewed row clears details and never reopens it`, async ({
+      page,
+    }) => {
+      await openFixture(page)
+      if (source === "activities")
+        await page
+          .getByRole("combobox", { name: "Work type", exact: true })
+          .selectOption("activities")
+      const id = source === "workflow" ? 42 : 71
+      const card = page.getByTestId(`kanban-card-${id}`)
+      await card.click()
+      const review = page.getByRole("dialog")
+      await expect(review).toBeVisible()
+      if (source === "workflow")
+        await review
+          .getByRole("textbox")
+          .fill("Discard this revoked review comment")
+      const rows = [...state.rows]
+      const activities = [...state.activities]
+      if (source === "workflow")
+        state.rows = state.rows.filter((row) => row.id !== id)
+      else state.activities = []
+      await control(page, "realtime-source")
+      await expect(card).toHaveCount(0)
+      await expect(review).toHaveCount(0)
+      await expect(
+        page.getByText(
+          source === "workflow"
+            ? "Purchase review 42"
+            : "Follow up supplier order",
+          { exact: true },
+        ),
+      ).toHaveCount(0)
+      state.rows = rows
+      state.activities = activities
+      await control(page, "realtime-source")
+      await expect(card).toBeVisible()
+      await expect(review).toHaveCount(0)
+      await card.click()
+      if (source === "workflow")
+        await expect(review.getByRole("textbox")).toHaveText("")
+      expect(state.writes).toHaveLength(0)
+    })
+
+    test(`${source}: recovery after a denied read requires a new review`, async ({
+      page,
+    }) => {
+      await openFixture(page)
+      if (source === "activities")
+        await page
+          .getByRole("combobox", { name: "Work type", exact: true })
+          .selectOption("activities")
+      const card = page.getByTestId(
+        `kanban-card-${source === "workflow" ? 42 : 71}`,
+      )
+      await card.click()
+      await expect(page.getByRole("dialog")).toBeVisible()
+      state.denyReads = true
+      await control(page, "refresh")
+      await expect(card).toHaveCount(0)
+      await expect(page.getByRole("dialog")).toHaveCount(0)
+      state.denyReads = false
+      await control(page, "refresh")
+      await expect(card).toBeVisible()
+      await expect(page.getByRole("dialog")).toHaveCount(0)
+      expect(state.writes).toHaveLength(0)
+    })
+  }
+
+  test("an open review displays only the latest authorized field projection", async ({
+    page,
+  }) => {
+    await openFixture(page)
+    await page.getByTestId("kanban-card-42").click()
+    const review = page.getByRole("dialog")
+    await expect(
+      review.getByRole("heading", { name: "Purchase review 42" }),
+    ).toBeVisible()
+    await expect(
+      review.getByRole("link", { name: "Open source record" }),
+    ).toBeVisible()
+    const row = state.rows.find((candidate) => candidate.id === 42)!
+    delete row.workSourceTitle
+    delete row.nodeKey
+    delete row.subjectModel
+    delete row.subjectId
+    await control(page, "realtime-source")
+    await expect(
+      review.getByRole("heading", { name: "Purchase review 42" }),
+    ).toHaveCount(0)
+    await expect(
+      review.getByText("Review supplier order", { exact: true }),
+    ).toHaveCount(0)
+    await expect(review.getByRole("link")).toHaveCount(0)
+    await expect(review.getByRole("heading", { name: "#42" })).toBeVisible()
+    expect(state.writes).toHaveLength(0)
+  })
+
+  test("a revoked selected delegate clears review details while its claimed row remains readable", async ({
+    page,
+  }) => {
+    const row = state.rows.find((candidate) => candidate.id === 43)!
+    Object.assign(row, {
+      status: "Claimed",
+      claimedBy: actor,
+      workAssignedToMe: true,
+    })
+    await openFixture(page)
+    await page.getByTestId("kanban-card-43").click()
+    const review = page.getByRole("dialog")
+    await review
+      .getByRole("combobox", { name: "Acting as", exact: true })
+      .selectOption(delegate)
+    await review.getByRole("textbox").fill("A review for the former principal")
+    row.actingForOptions = [
+      {
+        identityHex: secondDelegate,
+        label: "Delegated completer",
+        workActions: ["complete"],
+      },
+    ]
+    await control(page, "realtime-source")
+    await expect(review).toHaveCount(0)
+    await expect(page.getByTestId("kanban-card-43")).toBeVisible()
+    await page.getByTestId("kanban-card-43").click()
+    await expect(review).toBeVisible()
+    await expect(
+      review.getByRole("option", { name: "Delegated approver", exact: true }),
+    ).toHaveCount(0)
+    await expect(
+      review.getByRole("button", { name: "Approve", exact: true }),
+    ).toHaveCount(0)
+    await expect(review.getByRole("textbox")).toHaveText("")
+    await expect(
+      review.getByRole("button", { name: "Complete", exact: true }),
+    ).toBeEnabled()
+    expect(state.writes).toHaveLength(0)
+  })
+
+  test("reconnect waits for fresh authority and a subsequent scoped read before enabling actions", async ({
+    page,
+    context,
+  }) => {
+    await openFixture(page)
+    await page.getByTestId("kanban-card-42").click()
+    const approve = page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Approve", exact: true })
+    await expect(approve).toBeEnabled()
+    await context.setOffline(true)
+    await expect(approve).toBeDisabled()
+    const beforeAuthority = state.authorityReads
+    let releaseAuthority!: () => void
+    let releaseBoard!: () => void
+    state.authorityWait = new Promise((resolve) => {
+      releaseAuthority = resolve
+    })
+    try {
+      await context.setOffline(false)
+      await expect
+        .poll(() => state.authorityReads)
+        .toBeGreaterThan(beforeAuthority)
+      await expect(approve).toBeDisabled()
+      state.boardWait = new Promise((resolve) => {
+        releaseBoard = resolve
+      })
+      const beforeBoard = state.scopedReads
+      releaseAuthority()
+      await expect.poll(() => state.scopedReads).toBeGreaterThan(beforeBoard)
+      await expect(approve).toBeDisabled()
+      releaseBoard()
+      await expect(approve).toBeEnabled()
+      expect(state.writes).toHaveLength(0)
+    } finally {
+      releaseAuthority()
+      releaseBoard?.()
+      state.authorityWait = undefined
+      state.boardWait = undefined
+    }
+  })
+
+  test("an unavailable initial socket preserves actions backed by fresh HTTP reads", async ({
+    page,
+  }) => {
+    await openFixture(page)
+    await control(page, "socket-initial-unavailable")
+    await control(page, "socket-retry")
+    await expect(page.getByTestId("kanban-card-41")).toHaveAttribute(
+      "data-draggable",
+      "true",
+    )
+    await page.getByLabel("Synthetic module scope").selectOption("purchasing")
+    await page.getByTestId("kanban-card-42").click()
+    await expect(
+      page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Approve", exact: true }),
+    ).toBeEnabled()
+    expect(state.writes).toHaveLength(0)
+  })
+
+  test("a board mounted during a socket outage proves authority and rows over HTTP, then checks recovery again", async ({
+    page,
+  }) => {
+    await openFixture(page)
+    const beforeAuthority = state.authorityReads
+    let releaseAuthority!: () => void
+    let releaseBoard!: () => void
+    let releaseRecovery!: () => void
+    state.authorityWait = new Promise((resolve) => {
+      releaseAuthority = resolve
+    })
+    try {
+      await control(page, "socket-reconnecting")
+      await expect(page.getByTestId("kanban-card-41")).toHaveAttribute(
+        "data-draggable",
+        "false",
+      )
+      // Mount a new actual workspace after the outage was recorded in QueryClient.
+      await page.getByLabel("Synthetic module scope").selectOption("purchasing")
+      await page.getByTestId("kanban-card-42").click()
+      const approve = page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Approve", exact: true })
+      await expect
+        .poll(() => state.authorityReads)
+        .toBeGreaterThan(beforeAuthority)
+      await expect(approve).toBeDisabled()
+      const beforeBoard = state.scopedReads
+      state.boardWait = new Promise((resolve) => {
+        releaseBoard = resolve
+      })
+      releaseAuthority()
+      await expect.poll(() => state.scopedReads).toBeGreaterThan(beforeBoard)
+      await expect(approve).toBeDisabled()
+      releaseBoard()
+      await expect(approve).toBeEnabled()
+      // Retry attempts do not replace an already proved outage generation.
+      await control(page, "socket-retry")
+      await expect(approve).toBeEnabled()
+      const beforeRecovery = state.authorityReads
+      state.authorityWait = new Promise((resolve) => {
+        releaseRecovery = resolve
+      })
+      await control(page, "socket-subscribed")
+      await expect
+        .poll(() => state.authorityReads)
+        .toBeGreaterThan(beforeRecovery)
+      await expect(approve).toBeDisabled()
+      releaseRecovery()
+      await expect(approve).toBeEnabled()
+      expect(state.writes).toHaveLength(0)
+    } finally {
+      releaseAuthority?.()
+      releaseBoard?.()
+      releaseRecovery?.()
+    }
+  })
+
+  test("authority revocation while offline removes the review on reconnect", async ({
+    page,
+    context,
+  }) => {
+    await openFixture(page)
+    await page.getByTestId("kanban-card-42").click()
+    await context.setOffline(true)
+    await expect(
+      page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Approve", exact: true }),
+    ).toBeDisabled()
+    state.denyAuthority = true
+    await context.setOffline(false)
+    await expect(page.getByRole("dialog")).toHaveCount(0)
+    await expect(page.getByTestId("kanban-card-42")).toHaveCount(0)
+    expect(state.writes).toHaveLength(0)
   })
 
   test("an available follow-up completes only after confirmation and an exact scoped readback", async ({

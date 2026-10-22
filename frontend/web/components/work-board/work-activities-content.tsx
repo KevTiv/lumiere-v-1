@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
@@ -30,12 +30,14 @@ export function WorkActivitiesContent({
   online,
   layout,
   navigationPending = false,
+  authorityRefreshing = false,
   onTeamChange,
 }: {
   scope: WorkBoardScope
   online: boolean
   layout: "board" | "list"
   navigationPending?: boolean
+  authorityRefreshing?: boolean
   onTeamChange: (team: string | null) => void
 }) {
   const { t } = useTranslation()
@@ -45,6 +47,15 @@ export function WorkActivitiesContent({
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const submitting = useRef(false)
+  const mounted = useRef(true)
+  const pendingReview = useRef<WorkActivityRow | null>(null)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      pendingReview.current = null
+    }
+  }, [])
   const rows = useMemo(
     () =>
       query.isError
@@ -70,6 +81,14 @@ export function WorkActivitiesContent({
     [rows],
   )
   const current = review ? rows.find((row) => row.id === review.id) : undefined
+  useEffect(() => {
+    if (review && (query.isError || (!query.isPending && !current))) {
+      setReview(null)
+      setError(null)
+      setNotice(null)
+      pendingReview.current = null
+    }
+  }, [current, query.isError, query.isPending, review])
   const stale =
     !!review &&
     (!current ||
@@ -79,6 +98,7 @@ export function WorkActivitiesContent({
       current.resModel !== review.resModel)
   const disabled =
     navigationPending ||
+    authorityRefreshing ||
     !online ||
     query.isError ||
     query.isFetching ||
@@ -103,22 +123,26 @@ export function WorkActivitiesContent({
     )
       return
     submitting.current = true
+    pendingReview.current = review
     setError(null)
     try {
       await complete.mutateAsync({ activity: review })
+      if (!mounted.current || pendingReview.current !== review) return
       setReview(null)
       setNotice(t("workBoard.followUpCompleted"))
     } catch (cause) {
+      if (!mounted.current || pendingReview.current !== review) return
       setError(
         cause instanceof Error ? cause.message : t("workBoard.updateFailed"),
       )
     } finally {
-      await query.refetch()
+      pendingReview.current = null
+      if (mounted.current) await query.refetch()
       submitting.current = false
     }
   }
-  const href = review
-    ? approvalRecordHref(review.resModel, review.resId)
+  const href = current
+    ? approvalRecordHref(current.resModel, current.resId)
     : undefined
   return (
     <>
@@ -297,7 +321,7 @@ export function WorkActivitiesContent({
         </>
       )}
       <Sheet
-        open={review != null && !query.isError}
+        open={review != null && current != null && !query.isError}
         onOpenChange={(open) => {
           if (!open && !complete.isPending) setReview(null)
         }}
@@ -305,14 +329,14 @@ export function WorkActivitiesContent({
         <SheetContent className="overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>
-              {review ? title(review) : t("workBoard.followUp")}
+              {current ? title(current) : t("workBoard.followUp")}
             </SheetTitle>
             <SheetDescription>{t("workBoard.followUpReview")}</SheetDescription>
           </SheetHeader>
-          {review && (
+          {review && current && (
             <div className="space-y-4 p-4">
               <Badge variant="secondary">
-                {review.isDone
+                {current.isDone
                   ? t("workBoard.status.Completed")
                   : t("workBoard.status.Open")}
               </Badge>

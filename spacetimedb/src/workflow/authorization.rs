@@ -10,11 +10,11 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::{company, organization};
 use crate::core::permissions::{
-    org_permission, role, sod_conflict_rule, user_role_assignment, PermissionAction,
-    PermissionEffect, PermissionSubject,
+    effective_roles, org_permission, role, sod_conflict_rule, user_role_assignment,
+    PermissionAction, PermissionEffect, PermissionSubject,
 };
 use crate::core::users::{find_user_profile_for_organization, user_organization};
-use crate::helpers::{write_audit_log_v2, AuditLogParams};
+use crate::helpers::{roles_allow_permission, write_audit_log_v2, AuditLogParams};
 
 /// One organizational workflow delegation. `role_id = None` delegates all of
 /// the delegator's otherwise eligible workflow roles; `Some` delegates only that role.
@@ -229,6 +229,47 @@ pub(crate) fn current_workflow_roles(
 
     resolved.sort_by_key(|current| current.role_id);
     Ok(resolved)
+}
+
+/// Require the actual actor's current read permission for Finance task sources.
+///
+/// Delegation supplies workflow decision authority, not access to the source
+/// record. Use the shared resource policy so aliases, module grants and explicit
+/// denies match ordinary source reads. Other workflow subjects are unchanged.
+pub(crate) fn require_workflow_subject_read(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    actor: Identity,
+    subject_model: &str,
+) -> Result<(), String> {
+    let resource = match subject_model {
+        "purchase_order" => "purchase-orders",
+        "sale_order" => "sale-orders",
+        "account_move" => "account-moves",
+        "account_payment" => "account-payments",
+        "hr_expense_sheet" => "expense-sheets",
+        _ => return Ok(()),
+    };
+    let profile = find_user_profile_for_organization(ctx, actor, organization_id)
+        .ok_or("workflow actor profile not found")?;
+    if !profile.is_active {
+        return Err("workflow actor account is inactive".to_string());
+    }
+    let roles = effective_roles(ctx, organization_id, actor)?;
+    if !roles_allow_permission(
+        ctx,
+        organization_id,
+        actor,
+        &roles,
+        profile.is_superuser,
+        resource,
+        "read",
+    ) {
+        return Err(format!(
+            "workflow source read permission denied: {resource}"
+        ));
+    }
+    Ok(())
 }
 
 /// Re-evaluate configured SOD rules against every current role at decision time.

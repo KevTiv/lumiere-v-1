@@ -43,6 +43,14 @@ pub(crate) struct OrgQuery {
     task_id: Option<u64>,
     #[serde(rename = "activityId")]
     activity_id: Option<u64>,
+    #[serde(rename = "commandKind")]
+    command_kind: Option<String>,
+    #[serde(rename = "idempotencyKey")]
+    idempotency_key: Option<String>,
+    #[serde(rename = "inputHash")]
+    input_hash: Option<String>,
+    #[serde(rename = "actingFor")]
+    acting_for: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -146,6 +154,16 @@ pub(crate) async fn get_query(
     }
     context.require_current_placement(&state.organization_placements)?;
 
+    let task_readback = crate::workflow_reads::WorkTaskReadbackRequest::parse(
+        &resource,
+        q.work_scope.as_deref(),
+        q.task_id,
+        q.command_kind.as_deref(),
+        q.idempotency_key.as_deref(),
+        q.input_hash.as_deref(),
+        q.acting_for.as_deref(),
+    )?;
+
     if let Some(request) = activity_work::ActivityWorkRequest::parse(
         &resource,
         q.company_id,
@@ -182,11 +200,14 @@ pub(crate) async fn get_query(
                 "operationKey is not supported for a work board".into(),
             ));
         }
+        let request = request.with_readback(task_readback)?;
         let page = crate::workflow_reads::read_work_board(&state.stdb, &context, request).await?;
         context.require_current_placement(&state.organization_placements)?;
-        return Ok(Json(
-            json!({"data": page.rows, "nextCursor": page.next_cursor}),
-        ));
+        let mut response = json!({"data": page.rows, "nextCursor": page.next_cursor});
+        if q.task_id.is_some() {
+            response["commandEvidence"] = page.command_evidence.unwrap_or(Value::Null);
+        }
+        return Ok(Json(response));
     }
 
     if resource == "task-assignees" {

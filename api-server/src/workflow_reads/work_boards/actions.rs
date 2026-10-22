@@ -63,18 +63,45 @@ pub(super) struct ActionContext<'a> {
     pub unvoted_candidates: &'a [String],
 }
 
+fn has_current_actor_authority(row: &Value, context: &ActionContext<'_>) -> bool {
+    let Some(access) = context.access else {
+        return false;
+    };
+    let Some(requester) = identity(row, "requestedBy", "requested_by") else {
+        return false;
+    };
+    context.eligible
+        && !context.actor_has_sod_conflict
+        && !has_sod_conflict(access, context.sod_rules)
+        && requester != context.caller
+        && requester != context.principal
+}
+
+/// Evidence confirms a past command, so a completed task or recorded vote must
+/// not hide it. Current candidate/delegation, permission and SoD authority still
+/// apply; historical claim ownership alone never grants evidence access.
+pub(super) fn may_read_command_evidence(
+    row: &Value,
+    context: &ActionContext<'_>,
+    action: WorkAction,
+) -> bool {
+    let permission = match action {
+        WorkAction::Claim => "write",
+        WorkAction::Approve => "approve",
+        WorkAction::Reject => "reject",
+        WorkAction::Complete => "complete",
+    };
+    has_current_actor_authority(row, context)
+        && context
+            .access
+            .is_some_and(|access| permits(access, permission))
+}
+
 pub(super) fn work_actions(row: &Value, context: ActionContext<'_>) -> Vec<WorkAction> {
     let Some(access) = context.access else {
         return Vec::new();
     };
-    let Some(requester) = identity(row, "requestedBy", "requested_by") else {
-        return Vec::new();
-    };
-    if !context.eligible
-        || context.actor_has_sod_conflict
-        || has_sod_conflict(access, context.sod_rules)
-        || requester == context.caller
-        || requester == context.principal
+    if !has_current_actor_authority(row, &context)
         || number(row, "revision", "revision").is_none_or(|revision| revision == 0)
         || number(row, "instanceRevision", "instance_revision").is_none_or(|revision| revision == 0)
     {

@@ -15,6 +15,41 @@ import { useEffect, useRef } from "react"
 
 import { invalidateStdbQueryResources } from "./stdb"
 
+/** Authorized API work subscriptions emit invalidations only, without adding private tables to the browser row cache. */
+export const API_REALTIME_WORK_RESOURCES = [
+  "workflow-human-tasks",
+  "workflow-candidate-group-members",
+  "workflow-delegations",
+] as const
+
+export function withAuthorizedWorkRealtimeResources(
+  resources: readonly string[],
+  canReadWork: boolean,
+): readonly string[] {
+  return canReadWork
+    ? [...new Set([...resources, ...API_REALTIME_WORK_RESOURCES])]
+    : resources
+}
+
+export type RealtimeAuthorityState = {
+  generation: number
+  phase: "connecting" | "subscribed" | "reconnecting"
+}
+
+/** Client-only lifecycle signal; it contains no authority or record payload. */
+export function realtimeAuthorityKey(
+  organizationId: number,
+  companyId: number,
+  actorIdentity: string,
+) {
+  return [
+    "realtime-authority",
+    String(organizationId),
+    String(companyId),
+    actorIdentity,
+  ] as const
+}
+
 function httpBaseToRealtimeWsUrl(baseHttp: string): string {
   const u = new URL(baseHttp.replace(/\/$/, ""))
   const wsProto = u.protocol === "https:" ? "wss:" : "ws:"
@@ -23,8 +58,8 @@ function httpBaseToRealtimeWsUrl(baseHttp: string): string {
 
 export function resolveRealtimeWsUrl(sameOrigin = false): string {
   if (sameOrigin) {
-    if (typeof window === 'undefined') return ''
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    if (typeof window === "undefined") return ""
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:"
     return `${protocol}//${window.location.host}/v1/realtime/ws`
   }
   const explicit = process.env.NEXT_PUBLIC_REALTIME_WS_URL?.trim()
@@ -61,6 +96,7 @@ export function useLumiereRealtime(options: {
   organizationId?: number
   companyIds?: readonly number[]
   activeCompanyId?: number | null
+  actorIdentity?: string | null
   resources: readonly string[]
   enabled?: boolean
   /** Hosted sessions use host-only handshake cookies and must stay on the current origin. */
@@ -73,6 +109,7 @@ export function useLumiereRealtime(options: {
     organizationId,
     companyIds,
     activeCompanyId,
+    actorIdentity,
     resources,
     enabled = true,
     sameOrigin = false,
@@ -91,6 +128,43 @@ export function useLumiereRealtime(options: {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     let ws: WebSocket | null = null
     let attempt = 0
+    const authorityKey =
+      activeCompanyId != null && activeCompanyId > 0 && actorIdentity
+        ? realtimeAuthorityKey(organizationId, activeCompanyId, actorIdentity)
+        : null
+    let authorityGeneration = authorityKey
+      ? (queryClient.getQueryData<RealtimeAuthorityState>(authorityKey)
+          ?.generation ?? 0)
+      : 0
+    let subscribedConnection = false
+    if (authorityKey)
+      queryClient.setQueryDefaults(authorityKey, {
+        gcTime: Infinity,
+        staleTime: Infinity,
+      })
+    const publishAuthority = (
+      phase: RealtimeAuthorityState["phase"],
+      generation = authorityGeneration,
+    ) => {
+      if (!authorityKey) return
+      const previous =
+        queryClient.getQueryData<RealtimeAuthorityState>(authorityKey)
+      if (previous && previous.generation > generation) return
+      queryClient.setQueryData<RealtimeAuthorityState>(authorityKey, {
+        generation,
+        phase,
+      })
+    }
+    const advanceAuthority = (phase: RealtimeAuthorityState["phase"]) => {
+      if (!authorityKey) return
+      authorityGeneration =
+        Math.max(
+          authorityGeneration,
+          queryClient.getQueryData<RealtimeAuthorityState>(authorityKey)
+            ?.generation ?? 0,
+        ) + 1
+      publishAuthority(phase)
+    }
 
     const scheduleReconnect = () => {
       if (closed) {
@@ -105,7 +179,16 @@ export function useLumiereRealtime(options: {
     }
 
     const connect = async () => {
-      try { await beforeConnectRef.current?.() } catch {
+      if (closed) return
+      subscribedConnection = false
+      // An unavailable initial socket and repeated retries must not defeat
+      // fresh HTTP authorization. Only subscription gain/loss advances proof.
+      publishAuthority("connecting")
+      const generation = authorityGeneration
+      try {
+        await beforeConnectRef.current?.()
+      } catch {
+        if (!closed) publishAuthority("reconnecting", generation)
         scheduleReconnect()
         return
       }
@@ -120,28 +203,35 @@ export function useLumiereRealtime(options: {
       try {
         ws = new WebSocket(url)
       } catch (e) {
+        publishAuthority("reconnecting", generation)
         console.warn("[lumiere:realtime] WebSocket construct failed", e)
         scheduleReconnect()
         return
       }
+      const connection = ws
 
       ws.onopen = () => {
+        if (closed || ws !== connection) return
         attempt = 0
         const payload = {
           resources: [...resourcesRef.current],
           organizationId,
           companyIds: companyIds?.length ? [...companyIds] : [],
           activeCompanyId:
-            activeCompanyId != null && activeCompanyId > 0 ? activeCompanyId : null,
+            activeCompanyId != null && activeCompanyId > 0
+              ? activeCompanyId
+              : null,
         }
         try {
-          ws?.send(JSON.stringify(payload))
+          connection.send(JSON.stringify(payload))
         } catch (e) {
           console.warn("[lumiere:realtime] subscribe send failed", e)
+          connection.close()
         }
       }
 
       ws.onmessage = (ev) => {
+        if (closed || ws !== connection) return
         if (typeof ev.data !== "string") {
           return
         }
@@ -151,19 +241,37 @@ export function useLumiereRealtime(options: {
         } catch {
           return
         }
-        if (msg.type === "change" && Array.isArray(msg.resources) && msg.resources.length > 0) {
-          invalidateStdbQueryResources(queryClient, organizationId, msg.resources)
+        if (
+          msg.type === "change" &&
+          Array.isArray(msg.resources) &&
+          msg.resources.length > 0
+        ) {
+          invalidateStdbQueryResources(
+            queryClient,
+            organizationId,
+            msg.resources,
+          )
+        } else if (msg.type === "subscribed") {
+          if (!subscribedConnection) {
+            subscribedConnection = true
+            advanceAuthority("subscribed")
+          }
         } else if (msg.type === "error") {
           console.warn("[lumiere:realtime]", msg.error ?? "error")
         }
       }
 
       ws.onerror = () => {
-        ws?.close()
+        if (!closed && ws === connection) connection.close()
       }
 
       ws.onclose = () => {
+        if (closed || ws !== connection) return
         ws = null
+        if (subscribedConnection) {
+          subscribedConnection = false
+          advanceAuthority("reconnecting")
+        } else publishAuthority("reconnecting")
         if (!closed) {
           scheduleReconnect()
         }
@@ -174,6 +282,8 @@ export function useLumiereRealtime(options: {
 
     return () => {
       closed = true
+      if (subscribedConnection) advanceAuthority("reconnecting")
+      else publishAuthority("reconnecting")
       if (reconnectTimer != null) {
         clearTimeout(reconnectTimer)
       }
@@ -185,6 +295,7 @@ export function useLumiereRealtime(options: {
     organizationId,
     enabled,
     activeCompanyId,
+    actorIdentity,
     JSON.stringify(companyIds ?? []),
     resources,
   ])
