@@ -130,10 +130,13 @@ test.describe("Finance payment tools save workflows", { tag: "@dev-fixture" }, (
 
     // Diagnose incomplete ledger records before waiting on a disabled button.
     // This uses the same complete source set and fail-closed projection as UI.
-    const [payments, ledgerMoves, moveLines, transactions, reversals, currencies] = await Promise.all(
-      ["account-payments", "account-moves", "account-move-lines", "payment-transactions", "payment-reversals", "currencies"]
+    const [payments, ledgerMoves, moveLines, transactions, reversals] = await Promise.all(
+      ["account-payments", "account-moves", "account-move-lines", "payment-transactions", "payment-reversals"]
         .map((resource) => queryRows(page, resource)),
     )
+    const currencyResponse = await page.request.get("/api/bootstrap/currencies")
+    expect(currencyResponse.ok(), "Authorized bootstrap currency read failed").toBe(true)
+    const { data: currencies = [] } = await currencyResponse.json() as { data?: QueryRow[] }
     const read = (rows: QueryRow[]) => ({ rows, state: { status: "ready" as const } })
     const balances = projectPaymentAllocations({ organizationId, companyId: wallet.companyId,
       payments: read(payments), moves: read(ledgerMoves), moveLines: read(moveLines),
