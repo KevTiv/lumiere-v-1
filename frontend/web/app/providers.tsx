@@ -32,6 +32,7 @@ import { apiFetch } from "@/lib/api-fetch"
 import { EFFECTIVE_ACCESS_ROLE_ID } from "@lumiere/ui/lib/runtime-form-role"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { canReadWorkflowWork } from "../components/work-board/work-board-permissions"
+import { DocumentTemplateProvider } from "./document-template-provider"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
 function RBACBridge({
@@ -237,7 +238,9 @@ export function Providers({
                     organizationId={organizationId}
                   >
                     <LumiereRealtimeBridge organizationId={organizationId} />
-                    <NavigationGuardProvider>{children}</NavigationGuardProvider>
+                    <DocumentTemplateProvider>
+                      <NavigationGuardProvider>{children}</NavigationGuardProvider>
+                    </DocumentTemplateProvider>
                   </RBACBridge>
                 </ErpSessionBridge>
               </StdbSubscriptionProvider>

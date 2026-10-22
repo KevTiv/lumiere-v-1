@@ -12,6 +12,7 @@ pub(crate) mod accounting;
 mod attachment;
 mod financial;
 mod pivot;
+mod quotations;
 mod sales;
 
 use self::accounting::account_move_pdf;
@@ -37,6 +38,14 @@ pub fn router() -> Router<Arc<AppState>> {
         )
         .route("/documents/xlsx/pivot-table", post(pivot_table_xlsx))
         .route("/documents/pdf/sale-order/:order_id", get(sale_order_pdf))
+        .route(
+            "/documents/quotations/:order_id/preview",
+            post(quotations::preview),
+        )
+        .route(
+            "/documents/quotations/:order_id/generate",
+            post(quotations::generate),
+        )
         .route(
             "/documents/pdf/account-move/:move_id",
             get(account_move_pdf),

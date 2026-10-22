@@ -392,11 +392,13 @@ pub fn create_document_template(
     params: CreateDocumentTemplateParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "document_template", "create")?;
+    if let Some(company_id) = company_id {
+        require_company_in_organization(ctx, organization_id, company_id)?;
+    }
 
     if params.report_type == INVOICE_PROFILE_REPORT_TYPE {
         match company_id {
-            Some(company_id) => {
-                require_company_in_organization(ctx, organization_id, company_id)?;
+            Some(_) => {
                 check_permission(ctx, organization_id, "company", "write")?;
             }
             None => check_permission(ctx, organization_id, "organization", "write")?,
@@ -482,10 +484,109 @@ pub fn update_document_template(
     if template.company_id != company_id {
         return Err("document template does not belong to this company scope".to_string());
     }
+    if let Some(company_id) = company_id {
+        require_company_in_organization(ctx, organization_id, company_id)?;
+    }
     ensure_invoice_profile_update_allowed(&template.report_type, params.report_type.as_deref())?;
+    if params
+        .name
+        .as_ref()
+        .is_some_and(|name| name.trim().is_empty())
+    {
+        return Err("name is required".to_string());
+    }
+    if params
+        .body_html
+        .as_ref()
+        .is_some_and(|body_html| body_html.trim().is_empty())
+    {
+        return Err("body_html is required".to_string());
+    }
+
+    let changed_fields: Vec<String> = [
+        (
+            "name",
+            params
+                .name
+                .as_ref()
+                .is_some_and(|name| name.trim() != template.name),
+        ),
+        (
+            "report_type",
+            params
+                .report_type
+                .as_ref()
+                .is_some_and(|value| *value != template.report_type),
+        ),
+        (
+            "body_html",
+            params
+                .body_html
+                .as_ref()
+                .is_some_and(|value| *value != template.body_html),
+        ),
+        (
+            "header_html",
+            params
+                .header_html
+                .as_ref()
+                .is_some_and(|value| *value != template.header_html),
+        ),
+        (
+            "footer_html",
+            params
+                .footer_html
+                .as_ref()
+                .is_some_and(|value| *value != template.footer_html),
+        ),
+        (
+            "variable_bindings_json",
+            params
+                .variable_bindings_json
+                .as_ref()
+                .is_some_and(|value| *value != template.variable_bindings_json),
+        ),
+        (
+            "is_default",
+            params
+                .is_default
+                .is_some_and(|value| value != template.is_default),
+        ),
+        (
+            "is_active",
+            params
+                .is_active
+                .is_some_and(|value| value != template.is_active),
+        ),
+        (
+            "metadata",
+            params
+                .metadata
+                .as_ref()
+                .is_some_and(|value| Some(value) != template.metadata.as_ref()),
+        ),
+    ]
+    .into_iter()
+    .filter_map(|(field, changed)| changed.then(|| field.to_string()))
+    .collect();
+    if changed_fields.is_empty() {
+        return Ok(());
+    }
+
+    // Audit lifecycle values without copying the potentially large document body or metadata.
+    let old_values = serde_json::json!({
+        "name": template.name,
+        "report_type": template.report_type,
+        "is_default": template.is_default,
+        "is_active": template.is_active,
+    })
+    .to_string();
 
     let updated = DocumentTemplate {
-        name: params.name.unwrap_or(template.name),
+        name: params
+            .name
+            .map(|name| name.trim().to_string())
+            .unwrap_or(template.name),
         report_type: params.report_type.unwrap_or(template.report_type),
         body_html: params.body_html.unwrap_or(template.body_html),
         header_html: params.header_html.unwrap_or(template.header_html),
@@ -511,9 +612,17 @@ pub fn update_document_template(
             table_name: "document_template",
             record_id: template_id,
             action: "UPDATE",
-            old_values: None,
-            new_values: Some(serde_json::json!({ "name": updated.name }).to_string()),
-            changed_fields: vec!["name".to_string()],
+            old_values: Some(old_values),
+            new_values: Some(
+                serde_json::json!({
+                    "name": updated.name,
+                    "report_type": updated.report_type,
+                    "is_default": updated.is_default,
+                    "is_active": updated.is_active,
+                })
+                .to_string(),
+            ),
+            changed_fields,
             metadata: None,
         },
     );

@@ -29,6 +29,7 @@ import {
   serializeRichTextMarkdown,
 } from "@lumiere/ui/lib/rich-text-extensions"
 import { Popover, PopoverContent, PopoverTrigger } from "@lumiere/ui/components/popover"
+import { RichTextTemplatePicker } from "@lumiere/ui/components/rich-text-template-picker"
 
 type RichTextEditorProps = {
   /** Controlled Markdown value. */
@@ -60,7 +61,7 @@ type RichTextEditorProps = {
 }
 
 const LINE_HEIGHT_REM = 1.5
-const VERTICAL_PADDING_REM = 1.25
+const VERTICAL_PADDING_REM = 1.5
 
 type ToolbarButtonProps = {
   label: string
@@ -85,7 +86,7 @@ function ToolbarButton({
     <button
       type="button"
       className={cn(
-        "inline-flex size-11 shrink-0 touch-manipulation items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-muted aria-pressed:text-foreground sm:size-7 [&_svg]:size-4 sm:[&_svg]:size-3.5",
+        "inline-flex size-11 shrink-0 touch-manipulation items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-primary/10 aria-pressed:text-primary sm:size-8 [&_svg]:size-4 sm:[&_svg]:size-3.5",
         className
       )}
       aria-label={label}
@@ -191,7 +192,15 @@ function LinkControl({ editor, disabled }: { editor: Editor; disabled: boolean }
   )
 }
 
-function RichTextToolbar({ editor, disabled }: { editor: Editor; disabled: boolean }) {
+function RichTextToolbar({
+  editor,
+  disabled,
+  maxLength,
+}: {
+  editor: Editor
+  disabled: boolean
+  maxLength?: number
+}) {
   const state = useEditorState({
     editor,
     selector: ({ editor: current }) => ({
@@ -219,8 +228,13 @@ function RichTextToolbar({ editor, disabled }: { editor: Editor; disabled: boole
     <div
       role="toolbar"
       aria-label="Text formatting"
-      className="flex min-h-9 items-center overflow-x-auto border-b border-border/70 bg-muted/30 px-1.5 py-1"
+      className="flex min-h-10 items-center gap-0.5 overflow-x-auto border-b border-border/60 bg-muted/20 px-2 py-1"
     >
+      <RichTextTemplatePicker
+        editor={editor}
+        disabled={disabled}
+        maxLength={maxLength}
+      />
       <ToolbarButton label="Heading 1" active={state.h1} disabled={disabled} onClick={() => chain().toggleHeading({ level: 1 }).run()}>
         <Heading1 />
       </ToolbarButton>
@@ -294,7 +308,7 @@ function CharacterCounter({ editor, maxLength }: { editor: Editor; maxLength: nu
     <div
       aria-live="polite"
       className={cn(
-        "px-3 pb-1.5 text-right text-[11px] tabular-nums text-muted-foreground",
+        "px-4 pb-2 text-right text-[11px] tabular-nums text-muted-foreground",
         count >= maxLength && "text-destructive"
       )}
     >
@@ -340,7 +354,7 @@ function RichTextEditor({
 
   const attributes = React.useMemo(() => {
     const attrs: Record<string, string> = {
-      class: cn("min-w-0 px-3 py-2.5 outline-none", richTextContentClassName, contentClassName),
+      class: cn("min-w-0 px-4 py-3 outline-none", richTextContentClassName, contentClassName),
       role: "textbox",
       "aria-multiline": "true",
       style: `min-height: ${rows * LINE_HEIGHT_REM + VERTICAL_PADDING_REM}rem`,
@@ -410,17 +424,23 @@ function RichTextEditor({
       data-slot="rich-text-panel"
       data-disabled={disabled || undefined}
       className={cn(
-        "group/rich-text w-full overflow-hidden rounded-lg border border-input bg-background shadow-xs transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20 data-disabled:cursor-not-allowed data-disabled:bg-input/30 data-disabled:opacity-60 has-[[aria-invalid=true]]:border-destructive has-[[aria-invalid=true]]:ring-3 has-[[aria-invalid=true]]:ring-destructive/20 dark:bg-input/20 dark:data-disabled:bg-input/50 dark:has-[[aria-invalid=true]]:border-destructive/50 dark:has-[[aria-invalid=true]]:ring-destructive/40",
+        "group/rich-text w-full overflow-hidden rounded-xl border border-border/80 bg-background shadow-xs transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20 data-disabled:cursor-not-allowed data-disabled:bg-input/30 data-disabled:opacity-60 has-[[aria-invalid=true]]:border-destructive has-[[aria-invalid=true]]:ring-3 has-[[aria-invalid=true]]:ring-destructive/20 dark:bg-input/20 dark:data-disabled:bg-input/50 dark:has-[[aria-invalid=true]]:border-destructive/50 dark:has-[[aria-invalid=true]]:ring-destructive/40",
         className
       )}
     >
-      {editor && !readOnly ? <RichTextToolbar editor={editor} disabled={!editable} /> : null}
+      {editor && !readOnly ? (
+        <RichTextToolbar
+          editor={editor}
+          disabled={!editable}
+          maxLength={maxLength}
+        />
+      ) : null}
       {editor ? (
         <EditorContent editor={editor} />
       ) : (
         <div
           aria-hidden="true"
-          className={cn("px-3 py-2.5 whitespace-pre-wrap text-muted-foreground", richTextContentClassName)}
+          className={cn("px-4 py-3 whitespace-pre-wrap text-muted-foreground", richTextContentClassName)}
           style={{ minHeight: `${rows * LINE_HEIGHT_REM + VERTICAL_PADDING_REM}rem` }}
         >
           {value ?? defaultValue ?? placeholder}
