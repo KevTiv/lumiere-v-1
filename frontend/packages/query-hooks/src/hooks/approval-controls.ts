@@ -5,7 +5,7 @@ export type ApprovalControlRow = {
   revision?: number
   instanceRevision?: number
   instance_revision?: number
-  status?: string | { tag?: string }
+  status?: unknown
   assignment?: string | { tag?: string }
   actingForOptions?: Array<{ identityHex: string; label: string }>
   directlyEligible?: boolean
@@ -26,6 +26,19 @@ function positiveInteger(value: unknown, label: string): number {
 }
 
 export type ApprovalActorOption = { identityHex: string; label: string }
+
+/** Accept canonical string, tagged SDK, and single-variant HTTP SQL enums. */
+export function approvalTaskStatus(row: { status?: unknown }): string | undefined {
+  const raw = row.status
+  if (typeof raw === "string") return raw
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return undefined
+  const value = raw as { tag?: unknown; value?: unknown }
+  const keys = Object.keys(value)
+  if (typeof value.tag === "string") {
+    return keys.every((key) => key === "tag" || key === "value") ? value.tag : undefined
+  }
+  return keys.length === 1 ? keys[0] : undefined
+}
 
 function normalizedDelegates(row: ApprovalControlRow): ApprovalActorOption[] {
   const seen = new Set<string>()
@@ -57,7 +70,7 @@ export function resolveApprovalActor(row: ApprovalControlRow, requested?: string
 export function approvalSelection(row: ApprovalControlRow, operatingCompanyId: number, actingFor?: string | null): ApprovalSelection {
   const companyId = positiveInteger(row.companyId ?? row.company_id, "Approval company")
   if (companyId !== operatingCompanyId) throw new Error("Approval belongs to another company")
-  const status = typeof row.status === "string" ? row.status : row.status?.tag
+  const status = approvalTaskStatus(row)
   if (status !== "Open" && status !== "Claimed") throw new Error("Approval is no longer pending")
   const actor = resolveApprovalActor(row, actingFor)
   if (actor == null) throw new Error("Select an eligible approval principal")

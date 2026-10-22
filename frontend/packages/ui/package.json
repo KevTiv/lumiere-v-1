@@ -125,6 +125,8 @@
     "./lib/*": "./src/lib/*.ts",
     "./components/*": "./src/components/*.tsx",
     "./composed/*": "./src/composed/*.tsx",
+    "./kanban/*": "./src/kanban/*.tsx",
+    "./pages/module-view": "./src/pages/module-view.tsx",
     "./hooks/*": "./src/hooks/*.ts",
     "./map-components/*": "./src/map-components/*.tsx",
     "./stock-3d/warehouse-viewer": "./src/stock-3d/warehouse-viewer.tsx",

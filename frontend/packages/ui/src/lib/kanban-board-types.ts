@@ -12,6 +12,8 @@ export interface KanbanColumnDef {
 export interface KanbanBoardLabels {
   emptyColumn?: string
   wipLimitReached?: (limit: number) => string
+  pendingMove?: string
+  moveFailed?: string
 }
 
 export interface KanbanMoveEvent<T extends object = EntityRow> {
@@ -31,8 +33,28 @@ export interface KanbanBoardProps<T extends object = EntityRow> {
   getItemId: (item: T) => string
   getColumnId: (item: T) => string
   filterItem?: (item: T) => boolean
-  renderCard: (item: T, ctx: { isDragOverlay?: boolean; onClick?: () => void }) => ReactNode
-  onMove: KanbanMoveHandler<T>
+  renderCard: (
+    item: T,
+    ctx: {
+      isDragOverlay?: boolean
+      onClick?: () => void
+      isPending?: boolean
+      moveDisabledReason?: string
+    },
+  ) => ReactNode
+  /** Omit for a read-only board. Cards can still open their records. */
+  onMove?: KanbanMoveHandler<T>
+  /** Presentation affordance only; the server must authorize the actual transition. */
+  canMove?: (item: T, toColumnId: string) => boolean
+  isItemDraggable?: (item: T) => boolean
+  /** Keeps a card locked while the caller is awaiting canonical readback. */
+  isItemPending?: (item: T) => boolean
+  /** A nonempty reason disables moves and is shown on the card. */
+  moveDisabledReason?: (item: T) => string | undefined
+  onMoveError?: (
+    error: unknown,
+    event: KanbanMoveEvent<T>,
+  ) => void | Promise<void>
   onItemClick?: (item: T) => void
   labels?: KanbanBoardLabels
   className?: string

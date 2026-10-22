@@ -1,0 +1,264 @@
+"use client"
+
+import { useEffect, useMemo, useState } from "react"
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQueryClient,
+} from "@tanstack/react-query"
+import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
+import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
+import { I18nProvider } from "@lumiere/i18n"
+import { WorkBoardWorkspace } from "../../../../components/work-board/work-board-workspace"
+import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
+import type {
+  PolicyRule,
+  User,
+} from "../../../../../packages/ui/src/lib/rbac-types"
+import { ThemeProvider } from "../../../../../packages/ui/src/components/theme-provider"
+import { NavigationGuardProvider } from "../../../../../packages/ui/src/forms/navigation-guard-provider"
+import type { WorkScope } from "@lumiere/query-hooks/hooks/work-board-model"
+
+const fixtureApi = createLumiereApiClient({ baseUrl: "" })
+const firstIdentity = "ab".repeat(32)
+const secondIdentity = "cd".repeat(32)
+const scopes: WorkScope[] = [
+  "finance",
+  "purchasing",
+  "sales",
+  "accounting",
+  "expenses",
+]
+
+function fixtureUser(identity: string): User {
+  return {
+    id: identity,
+    name: "Synthetic finance reviewer",
+    email: "reviewer@example.test",
+    roles: ["fixture-reviewer"],
+    status: "active",
+    createdAt: "2026-10-22T09:00:00Z",
+    updatedAt: "2026-10-22T09:00:00Z",
+  }
+}
+
+function Controls({
+  onSwitchActor,
+  onToggleAccess,
+  onRefreshAuthorization,
+  allowed,
+}: {
+  onSwitchActor: () => void
+  onToggleAccess: () => void
+  onRefreshAuthorization: () => void
+  allowed: boolean
+}) {
+  const session = useErpSession()
+  const queryClient = useQueryClient()
+  useEffect(() => {
+    const channel = new BroadcastChannel("synthetic-work-board-controls")
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      if (event.data === "refresh")
+        void queryClient.invalidateQueries({
+          queryKey: ["workflow-human-tasks"],
+        })
+      if (event.data === "company")
+        session.setActiveCompanyId?.(session.activeCompanyId === 11 ? 22 : 11)
+      if (event.data === "actor") onSwitchActor()
+      if (event.data === "access") onToggleAccess()
+      if (event.data === "authorization") onRefreshAuthorization()
+    }
+    return () => channel.close()
+  }, [
+    queryClient,
+    session,
+    onSwitchActor,
+    onToggleAccess,
+    onRefreshAuthorization,
+  ])
+  return (
+    <section
+      aria-label="Synthetic work board controls"
+      className="flex flex-wrap items-center gap-2 text-sm"
+    >
+      <button
+        type="button"
+        className="rounded border px-3 py-2"
+        onClick={() =>
+          session.setActiveCompanyId?.(session.activeCompanyId === 11 ? 22 : 11)
+        }
+      >
+        Switch synthetic company
+      </button>
+      <button
+        type="button"
+        className="rounded border px-3 py-2"
+        onClick={onSwitchActor}
+      >
+        Switch synthetic actor
+      </button>
+      <button
+        type="button"
+        className="rounded border px-3 py-2"
+        onClick={onToggleAccess}
+      >
+        {allowed ? "Revoke synthetic access" : "Restore synthetic access"}
+      </button>
+      <button
+        type="button"
+        className="rounded border px-3 py-2"
+        onClick={onRefreshAuthorization}
+      >
+        Refresh synthetic authorization
+      </button>
+      <button
+        type="button"
+        className="rounded border px-3 py-2"
+        onClick={() =>
+          void queryClient.invalidateQueries({
+            queryKey: ["workflow-human-tasks"],
+          })
+        }
+      >
+        Refresh synthetic rows
+      </button>
+      <output
+        data-testid="work-board-fixture-scope"
+        className="w-full break-all text-xs text-muted-foreground"
+      >
+        Company {session.activeCompanyId ?? "none"}; actor {session.identity}
+      </output>
+    </section>
+  )
+}
+
+/** Production workspace with explicit synthetic session/grants; HTTP is intercepted by Playwright. */
+export default function WorkBoardFixture() {
+  const [client] = useState(
+    () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  )
+  const [identity, setIdentity] = useState(firstIdentity)
+  const [scope, setScope] = useState<WorkScope>("finance")
+  const [allowed, setAllowed] = useState(true)
+  const [authorizationVersion, setAuthorizationVersion] = useState(1)
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
+  const user = useMemo(() => fixtureUser(identity), [identity])
+  const policies = useMemo<PolicyRule[]>(
+    () =>
+      allowed
+        ? [
+            "workflow_human_task",
+            "workflow_human_tasks",
+            "module:workflows",
+            "module:purchasing",
+            "module:sales",
+            "module:accounting",
+            "module:expenses",
+            "activity",
+            "purchase_order",
+            "sale_order",
+            "account_move",
+            "hr_expense_sheet",
+          ]
+            .map(
+              (resource, index): PolicyRule => ({
+                id: `fixture-work-read-${authorizationVersion}-${index}`,
+                subject: "fixture-reviewer",
+                resource,
+                action: "read",
+                effect: "allow",
+              }),
+            )
+            .concat([
+              {
+                id: `fixture-activity-write-${authorizationVersion}`,
+                subject: "fixture-reviewer",
+                resource: "activity",
+                action: "write",
+                effect: "allow",
+              },
+            ])
+        : [],
+    [allowed, authorizationVersion],
+  )
+
+  return (
+    <LumiereApiProvider client={fixtureApi}>
+      <QueryClientProvider client={client}>
+        <I18nProvider language="en">
+          <RBACProvider
+            initialUser={user}
+            initialRoles={[]}
+            initialPolicies={policies}
+          >
+            <ErpSessionProvider
+              value={{
+                identity,
+                connected: true,
+                organizationId: 7,
+                companyIds: [11, 22],
+              }}
+            >
+              <ThemeProvider
+                defaultTheme="light"
+                storageKey="lumiere-work-board-fixture"
+              >
+                <NavigationGuardProvider>
+                  <main className="mx-auto min-w-0 max-w-screen-2xl space-y-4 p-4 sm:p-6">
+                    <p
+                      data-testid="work-board-fixture-disclosure"
+                      data-hydrated={hydrated}
+                      className="text-xs text-muted-foreground"
+                    >
+                      Synthetic work board UI. Session, permissions and HTTP
+                      responses are fixture boundaries; this does not
+                      authenticate or prove ERP backend behavior.
+                    </p>
+                    <Controls
+                      onSwitchActor={() =>
+                        setIdentity((current) =>
+                          current === firstIdentity
+                            ? secondIdentity
+                            : firstIdentity,
+                        )
+                      }
+                      onToggleAccess={() => setAllowed((current) => !current)}
+                      onRefreshAuthorization={() =>
+                        setAuthorizationVersion((current) => current + 1)
+                      }
+                      allowed={allowed}
+                    />
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      Synthetic module scope
+                      <select
+                        aria-label="Synthetic module scope"
+                        className="min-h-11 rounded border bg-background px-2"
+                        value={scope}
+                        onChange={(event) =>
+                          setScope(event.target.value as WorkScope)
+                        }
+                      >
+                        {scopes.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <WorkBoardWorkspace
+                      key={scope}
+                      organizationId={7}
+                      scope={scope}
+                      initialView="eligible"
+                    />
+                  </main>
+                </NavigationGuardProvider>
+              </ThemeProvider>
+            </ErpSessionProvider>
+          </RBACProvider>
+        </I18nProvider>
+      </QueryClientProvider>
+    </LumiereApiProvider>
+  )
+}

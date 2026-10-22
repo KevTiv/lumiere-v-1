@@ -21,7 +21,7 @@ import {
   type HumanTaskEffectProjection,
 } from "./human-task-effect"
 
-import { approvalSelection, requireUnchangedApproval, type ApprovalSelection } from "./approval-controls"
+import { approvalTaskStatus, approvalSelection, requireUnchangedApproval, type ApprovalSelection } from "./approval-controls"
 import { workflowDelegationMetadata } from "@lumiere/erp-shared/workflow-delegation"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
@@ -91,14 +91,7 @@ export type HumanTaskRow = {
 }
 
 function taskStatusTag(row: HumanTaskRow): string {
-  const s = row.status
-  if (typeof s === "string") return s
-  if (s && typeof s === "object" && "tag" in s && typeof s.tag === "string") return s.tag
-  if (s && typeof s === "object") {
-    const keys = Object.keys(s)
-    if (keys.length === 1) return keys[0]!
-  }
-  return ""
+  return approvalTaskStatus(row) ?? ""
 }
 
 export function humanTaskInboxQueryKey(organizationId: number, companyId?: number | null) {

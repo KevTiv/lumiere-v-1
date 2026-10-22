@@ -19,7 +19,9 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use stdb_auth::{has_resource_read_permission, registry_get};
 
+mod activity_work;
 mod replenishment;
+mod task_assignees;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct OrgQuery {
@@ -31,6 +33,16 @@ pub(crate) struct OrgQuery {
     #[serde(rename = "operationKey", alias = "operation_key")]
     operation_key: Option<String>,
     limit: Option<u32>,
+    #[serde(rename = "workScope")]
+    work_scope: Option<String>,
+    #[serde(rename = "workView")]
+    work_view: Option<String>,
+    #[serde(rename = "workTeam")]
+    work_team: Option<String>,
+    #[serde(rename = "taskId")]
+    task_id: Option<u64>,
+    #[serde(rename = "activityId")]
+    activity_id: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -133,6 +145,57 @@ pub(crate) async fn get_query(
         }
     }
     context.require_current_placement(&state.organization_placements)?;
+
+    if let Some(request) = activity_work::ActivityWorkRequest::parse(
+        &resource,
+        q.company_id,
+        q.work_scope.as_deref(),
+        q.work_view.as_deref(),
+        q.work_team.as_deref(),
+        q.cursor.as_deref(),
+        q.limit,
+        q.activity_id,
+    )? {
+        if q.operation_key.is_some() {
+            return Err(ApiError::BadRequest(
+                "operationKey is not supported for a work board".into(),
+            ));
+        }
+        let page = activity_work::read_activity_work(&state.stdb, &context, request).await?;
+        context.require_current_placement(&state.organization_placements)?;
+        return Ok(Json(
+            json!({"data": page.rows, "nextCursor": page.next_cursor}),
+        ));
+    }
+
+    if let Some(request) = crate::workflow_reads::WorkBoardRequest::parse(
+        &resource,
+        q.company_id,
+        q.work_scope.as_deref(),
+        q.work_view.as_deref(),
+        q.work_team.as_deref(),
+        q.cursor.as_deref(),
+        q.limit,
+    )? {
+        if q.operation_key.is_some() {
+            return Err(ApiError::BadRequest(
+                "operationKey is not supported for a work board".into(),
+            ));
+        }
+        let page = crate::workflow_reads::read_work_board(&state.stdb, &context, request).await?;
+        context.require_current_placement(&state.organization_placements)?;
+        return Ok(Json(
+            json!({"data": page.rows, "nextCursor": page.next_cursor}),
+        ));
+    }
+
+    if resource == "task-assignees" {
+        let data =
+            task_assignees::read_task_assignees(&state.stdb, &context, q.company_id, q.task_id)
+                .await?;
+        context.require_current_placement(&state.organization_placements)?;
+        return Ok(Json(json!({"data": data})));
+    }
 
     // Private workflow tables are not readable with the user JWT; use the module
     // owner token and enforce identity/company filters in `workflow_reads`.

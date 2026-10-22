@@ -1,4 +1,5 @@
 'use client';
+import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
@@ -10,7 +11,6 @@ import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@lumiere/i18n';
 import {
-  ModuleView,
   FormModal,
   CsvImportModal,
   RuntimeFormModal,
@@ -810,7 +810,7 @@ function SalesClientLoaded({
 
   const moduleConfig = useMemo(() => salesModuleConfig(t), [t]);
 
-  const salesTabIds = useMemo(() => moduleConfig.tabs.map((tab) => tab.id), [moduleConfig]);
+  const salesTabIds = useMemo(() => [...moduleConfig.tabs.map((tab) => tab.id), "work"], [moduleConfig]);
   const { activeTab, setActiveTab } = useModuleTab(
     moduleConfig.defaultTab ?? 'dashboard',
     salesTabIds,
@@ -2534,7 +2534,9 @@ function SalesClientLoaded({
 
   return (
     <>
-      <ModuleView
+      <ModuleWorkView
+        organizationId={organizationId}
+        workScope="sales"
         config={config}
         dashboardContent={<ModuleInsights input={{ module: "sales", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: ordersRead.state }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}

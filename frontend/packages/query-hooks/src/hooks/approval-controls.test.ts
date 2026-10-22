@@ -1,9 +1,19 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { approvalActorOptions, approvalSelection, requireUnchangedApproval, resolveApprovalActor } from "./approval-controls"
+import { approvalActorOptions, approvalSelection, approvalTaskStatus, requireUnchangedApproval, resolveApprovalActor } from "./approval-controls"
 
 const principal = "ab".repeat(32)
 const row = { id: 41, companyId: 7, revision: 3, instanceRevision: 9, status: "Open", directlyEligible: true, actingForOptions: [{ identityHex: principal, label: "Approver" }] }
+
+test("review controls decode each canonical status encoding and reject ambiguous variants", () => {
+  for (const status of ["Open", { tag: "Open" }, { Open: [] }]) {
+    assert.equal(approvalTaskStatus({ status }), "Open")
+    assert.equal(approvalSelection({ ...row, status }, 7).requestId, 41)
+  }
+  for (const status of [{ Open: [], Cancelled: [] }, { tag: "Open", Cancelled: [] }, [], null]) {
+    assert.equal(approvalTaskStatus({ status }), undefined)
+  }
+})
 
 test("approval retains exactly the operator's company and revisions", () => {
   assert.deepEqual(approvalSelection(row, 7), { requestId: 41, companyId: 7, expectedTaskRevision: 3, expectedInstanceRevision: 9, actingFor: null })
