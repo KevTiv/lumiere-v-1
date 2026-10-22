@@ -10,7 +10,7 @@ use std::{collections::BTreeSet, sync::Arc};
 
 use axum::{
     body::Bytes,
-    extract::{Path, Query, State},
+    extract::{Query, State},
     http::{HeaderMap, StatusCode},
     routing::get,
     Json, Router,
@@ -132,7 +132,6 @@ fn token_matches(expected: &str, provided: &str) -> bool {
 }
 
 async fn verify_meta_webhook(
-    Path((_organization_id, _account_id)): Path<(u64, u64)>,
     Query(query): Query<VerificationQuery>,
 ) -> Result<(StatusCode, String), ApiError> {
     let token = std::env::var(VERIFY_TOKEN_ENV)
@@ -165,31 +164,42 @@ fn required_string<'a>(row: &'a Value, field: &str) -> Result<&'a str, ApiError>
         .ok_or_else(|| ApiError::Unavailable("whatsapp provider account is incomplete".into()))
 }
 
+fn valid_meta_asset_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 32 && id.bytes().all(|byte| byte.is_ascii_digit())
+}
+
 async fn bound_account(
     state: &AppState,
-    organization_id: u64,
-    account_id: u64,
+    business_account_id: &str,
+    phone_number_id: &str,
 ) -> Result<BoundAccount, ApiError> {
-    // Only authenticated server-side SQL, never a caller-selected organization.
+    if !valid_meta_asset_id(business_account_id) || !valid_meta_asset_id(phone_number_id) {
+        return Err(ApiError::BadRequest("invalid meta business asset id".into()));
+    }
+    // Meta subscriptions normally share an app-level callback URL. Never
+    // derive organization scope from the request path or sender's phone.
+    // Lookup uses only the signed WABA + receiving phone-number IDs.
     let sql = format!(
-        "SELECT * FROM whatsapp_business_account WHERE organization_id = {organization_id} AND id = {account_id} LIMIT 2"
+        "SELECT * FROM whatsapp_business_account WHERE business_account_id = '{business_account_id}' AND phone_number_id = '{phone_number_id}' LIMIT 3"
     );
     let rows = state.stdb.query_sql(&sql).await.map_err(ApiError::unavailable)?;
     if rows.len() != 1 {
-        return Err(ApiError::NotFound("whatsapp provider account not found".into()));
+        return Err(ApiError::Unavailable(
+            "whatsapp business assets lack a unique active organization binding".into(),
+        ));
     }
     let row = &rows[0];
-    if row_u64(row, "organization_id") != Some(organization_id)
-        || row_u64(row, "id") != Some(account_id)
-        || row.get("is_active").and_then(Value::as_bool) != Some(true)
+    if row.get("is_active").and_then(Value::as_bool) != Some(true)
         || row.get("messaging_enabled").and_then(Value::as_bool) != Some(true)
         || row.get("webhook_enabled").and_then(Value::as_bool) != Some(true)
     {
         return Err(ApiError::Forbidden("whatsapp provider account is disabled".into()));
     }
     Ok(BoundAccount {
-        organization_id,
-        account_id,
+        organization_id: row_u64(row, "organization_id")
+            .ok_or_else(|| ApiError::Unavailable("whatsapp account lacks organization".into()))?,
+        account_id: row_u64(row, "id")
+            .ok_or_else(|| ApiError::Unavailable("whatsapp account lacks id".into()))?,
         company_id: row_u64(row, "company_id"),
         phone_number_id: required_string(row, "phone_number_id")?.to_owned(),
         business_account_id: required_string(row, "business_account_id")?.to_owned(),
@@ -384,7 +394,6 @@ async fn ingest_status(
 
 async fn receive_meta_webhook(
     State(state): State<Arc<AppState>>,
-    Path((organization_id, account_id)): Path<(u64, u64)>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
@@ -407,17 +416,22 @@ async fn receive_meta_webhook(
     if envelope.object != "whatsapp_business_account" {
         return Err(ApiError::BadRequest("not a whatsapp business webhook".into()));
     }
-    let account = bound_account(&state, organization_id, account_id).await?;
     for entry in envelope.entry {
-        if entry.id != account.business_account_id {
-            return Err(ApiError::Forbidden("webhook business account mismatch".into()));
-        }
         for change in entry.changes {
             if change.field != "messages" {
                 continue;
             }
-            if change.value.metadata.phone_number_id != account.phone_number_id {
-                return Err(ApiError::Forbidden("webhook sender number mismatch".into()));
+            let account = bound_account(
+                &state,
+                &entry.id,
+                &change.value.metadata.phone_number_id,
+            )
+            .await?;
+            // Redundant defense against ambiguous/mutated account mappings.
+            if account.business_account_id != entry.id
+                || account.phone_number_id != change.value.metadata.phone_number_id
+            {
+                return Err(ApiError::Forbidden("meta business asset binding changed".into()));
             }
             for message in change.value.messages {
                 ingest_message(&state, &account, message).await?;
@@ -434,7 +448,7 @@ async fn receive_meta_webhook(
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new().route(
-        "/webhooks/whatsapp/meta/:organization_id/:account_id",
+        "/webhooks/whatsapp/meta",
         get(verify_meta_webhook).post(receive_meta_webhook),
     )
 }
@@ -501,6 +515,13 @@ mod tests {
         assert_eq!(normalized_delivery_status("sent"), Some("sent"));
         assert_eq!(normalized_delivery_status("failed"), Some("failed"));
         assert_eq!(normalized_delivery_status("unknown"), None);
+    }
+
+    #[test]
+    fn meta_asset_id_never_becomes_sql_input_without_validation() {
+        assert!(valid_meta_asset_id("1234567890"));
+        assert!(!valid_meta_asset_id("1\' OR 1=1 --"));
+        assert!(!valid_meta_asset_id(""));
     }
 
     #[test]
