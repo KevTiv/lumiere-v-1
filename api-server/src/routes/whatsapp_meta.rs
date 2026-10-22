@@ -120,6 +120,21 @@ struct BoundAccount {
 struct ContactMatch {
     contact_id: u64,
     phone_identity_id: u64,
+    kind_rank: u8,
+}
+
+fn enum_tag(value: &Value) -> Option<&str> {
+    value
+        .as_str()
+        .or_else(|| value.get("tag").and_then(Value::as_str))
+}
+
+fn identity_kind_rank(row: &Value) -> Option<u8> {
+    match row.get("kind").and_then(enum_tag)? {
+        "WhatsApp" | "whatsapp" => Some(0),
+        "Primary" | "primary" => Some(1),
+        _ => None,
+    }
 }
 
 fn token_matches(expected: &str, provided: &str) -> bool {
@@ -266,6 +281,12 @@ async fn resolve_contact(
         {
             continue;
         }
+        let Some(kind_rank) = identity_kind_rank(&row) else {
+            continue;
+        };
+        if row.get("verification_state").and_then(enum_tag) == Some("OptedOut") {
+            continue;
+        }
         let (Some(contact_id), Some(phone_identity_id)) =
             (row_u64(&row, "contact_id"), row_u64(&row, "id"))
         else {
@@ -275,6 +296,7 @@ async fn resolve_contact(
         identities.push(ContactMatch {
             contact_id,
             phone_identity_id,
+            kind_rank,
         });
     }
     if contacts.len() != 1 || identities.is_empty() {
@@ -284,7 +306,7 @@ async fn resolve_contact(
             "whatsapp sender cannot be matched to one authorized contact".into(),
         ));
     }
-    identities.sort_by_key(|identity| identity.phone_identity_id);
+    identities.sort_by_key(|identity| (identity.kind_rank, identity.phone_identity_id));
     Ok(identities.remove(0))
 }
 
@@ -559,6 +581,14 @@ mod tests {
         assert!(valid_meta_asset_id("1234567890"));
         assert!(!valid_meta_asset_id("1\' OR 1=1 --"));
         assert!(!valid_meta_asset_id(""));
+    }
+
+    #[test]
+    fn selects_only_whatsapp_or_primary_identity_kinds() {
+        assert_eq!(identity_kind_rank(&json!({"kind":{"tag":"WhatsApp"}})), Some(0));
+        assert_eq!(identity_kind_rank(&json!({"kind":{"tag":"Primary"}})), Some(1));
+        assert_eq!(identity_kind_rank(&json!({"kind":{"tag":"MobileMoney"}})), None);
+        assert_eq!(enum_tag(&json!({"tag":"OptedOut"})), Some("OptedOut"));
     }
 
     #[test]
