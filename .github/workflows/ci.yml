@@ -150,6 +150,11 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::documents::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::company_scope::tests
 
+      - name: Managed document storage and scoped byte access
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib document_blob
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib config::tests::document_
+
       - name: C3 PostgreSQL projection matrix
         env:
           C3_TEST_PG: "1"

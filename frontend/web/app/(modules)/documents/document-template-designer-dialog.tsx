@@ -350,6 +350,7 @@ export function DocumentTemplateDesignerDialog({
       const uploaded = await uploadDocumentBlob({
         file,
         companyId: sourceCompany === null ? undefined : BigInt(sourceCompany),
+        purpose: "branding",
       })
       const pinned = `${uploaded.url}?sha256=${uploaded.checksum}`
       if (!isManagedInvoiceLogoUrl(pinned, organizationId))

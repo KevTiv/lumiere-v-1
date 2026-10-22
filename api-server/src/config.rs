@@ -5,6 +5,8 @@ use stdb_config::{
     runtime_is_production, DEFAULT_STDB_MODULE_DEV,
 };
 
+pub use crate::document_blob_store::{DocumentBlobS3Config, DocumentBlobStoreConfig};
+
 use crate::organization_placement::{
     ConfiguredPlacementResolver, INITIAL_CELL_ID, INITIAL_DURABLE_STORE_ID,
 };
@@ -42,8 +44,8 @@ pub struct Config {
     pub report_renderer_url: Option<String>,
     /// Durable backend shared by the API and owner-report worker.
     pub report_artifact_store: ReportArtifactStoreConfig,
-    /// Local object-store root for DMS document blobs (presign/upload/complete).
-    pub document_blob_dir: PathBuf,
+    /// Backend for document uploads, immutable generated files and branding.
+    pub document_blob_store: DocumentBlobStoreConfig,
     /// Bounded polling interval for the scheduled owner-report worker.
     pub owner_report_worker_poll_secs: u64,
     /// Stable worker name used for queue registration and heartbeats.
@@ -340,6 +342,17 @@ impl Config {
         let document_blob_dir = std::env::var("LUMIERE_DOCUMENT_BLOB_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| std::env::temp_dir().join("lumiere-document-blobs"));
+        let document_blob_store = parse_document_blob_store(
+            std::env::var("LUMIERE_DOCUMENT_BLOB_BACKEND").ok(),
+            document_blob_dir,
+            std::env::var("LUMIERE_DOCUMENT_S3_ENDPOINT").ok(),
+            std::env::var("LUMIERE_DOCUMENT_S3_BUCKET").ok(),
+            std::env::var("LUMIERE_DOCUMENT_S3_REGION").ok(),
+            std::env::var("LUMIERE_DOCUMENT_S3_ACCESS_KEY_ID").ok(),
+            std::env::var("LUMIERE_DOCUMENT_S3_SECRET_ACCESS_KEY").ok(),
+            std::env::var("LUMIERE_DOCUMENT_S3_PREFIX").ok(),
+            std::env::var("LUMIERE_DOCUMENT_S3_PATH_STYLE").ok(),
+        )?;
         let owner_report_worker_poll_secs = std::env::var("LUMIERE_OWNER_REPORT_WORKER_POLL_SECS")
             .ok()
             .and_then(|value| value.parse::<u64>().ok())
@@ -429,7 +442,7 @@ impl Config {
             cookie_secure,
             report_renderer_url,
             report_artifact_store,
-            document_blob_dir,
+            document_blob_store,
             owner_report_worker_poll_secs,
             owner_report_worker_name,
             owner_report_worker_port,
@@ -444,6 +457,102 @@ impl Config {
             workflow_external_webhook_url,
             workflow_external_webhook_timeout_ms,
         })
+    }
+}
+
+/// Local remains the explicit-compatible default until an operator completes a
+/// checksum-verified migration and selects S3. Invalid S3 never falls back to disk.
+#[allow(clippy::too_many_arguments)]
+fn parse_document_blob_store(
+    backend: Option<String>,
+    local_root: PathBuf,
+    endpoint: Option<String>,
+    bucket: Option<String>,
+    region: Option<String>,
+    access_key_id: Option<String>,
+    secret_access_key: Option<String>,
+    prefix: Option<String>,
+    path_style: Option<String>,
+) -> Result<DocumentBlobStoreConfig> {
+    let required = |name: &str, value: Option<String>| {
+        value
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+            .with_context(|| format!("{name} is required when document blob backend is s3"))
+    };
+    match backend
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("local")
+    {
+        "local" => Ok(DocumentBlobStoreConfig::Local { root: local_root }),
+        "s3" => {
+            let endpoint = required("LUMIERE_DOCUMENT_S3_ENDPOINT", endpoint)?;
+            let parsed = reqwest::Url::parse(&endpoint)
+                .context("LUMIERE_DOCUMENT_S3_ENDPOINT must be an HTTPS origin")?;
+            if parsed.scheme() != "https"
+                || parsed.host_str().is_none()
+                || !parsed.username().is_empty()
+                || parsed.password().is_some()
+                || parsed.query().is_some()
+                || parsed.fragment().is_some()
+                || parsed.path() != "/"
+            {
+                anyhow::bail!("LUMIERE_DOCUMENT_S3_ENDPOINT must be an HTTPS origin without credentials or a path");
+            }
+            let bucket = required("LUMIERE_DOCUMENT_S3_BUCKET", bucket)?;
+            if !(3..=63).contains(&bucket.len())
+                || !bucket.bytes().all(|byte| {
+                    byte.is_ascii_lowercase()
+                        || byte.is_ascii_digit()
+                        || matches!(byte, b'-' | b'.')
+                })
+                || bucket.starts_with(['-', '.'])
+                || bucket.ends_with(['-', '.'])
+            {
+                anyhow::bail!("LUMIERE_DOCUMENT_S3_BUCKET must be an S3 bucket name");
+            }
+            let prefix = prefix
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("document-blobs")
+                .trim_matches('/')
+                .to_owned();
+            if prefix.is_empty()
+                || prefix
+                    .split('/')
+                    .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+                || !prefix.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'/')
+                })
+            {
+                anyhow::bail!("LUMIERE_DOCUMENT_S3_PREFIX must be a safe object-key prefix");
+            }
+            let path_style = match path_style
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                None | Some("false" | "0") => false,
+                Some("true" | "1") => true,
+                _ => anyhow::bail!("LUMIERE_DOCUMENT_S3_PATH_STYLE must be true or false"),
+            };
+            Ok(DocumentBlobStoreConfig::S3(DocumentBlobS3Config {
+                endpoint: endpoint.trim_end_matches('/').to_owned(),
+                bucket,
+                region: required("LUMIERE_DOCUMENT_S3_REGION", region)?,
+                access_key_id: required("LUMIERE_DOCUMENT_S3_ACCESS_KEY_ID", access_key_id)?,
+                secret_access_key: required(
+                    "LUMIERE_DOCUMENT_S3_SECRET_ACCESS_KEY",
+                    secret_access_key,
+                )?,
+                prefix,
+                path_style,
+            }))
+        }
+        _ => anyhow::bail!("LUMIERE_DOCUMENT_BLOB_BACKEND must be local or s3"),
     }
 }
 
@@ -574,8 +683,8 @@ fn parse_projection_lag_budget(raw: Option<&str>) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_projection_lag_budget, parse_report_artifact_store, validate_dedicated_worker_token,
-        ReportArtifactStoreConfig,
+        parse_document_blob_store, parse_projection_lag_budget, parse_report_artifact_store,
+        validate_dedicated_worker_token, DocumentBlobStoreConfig, ReportArtifactStoreConfig,
     };
     use std::path::PathBuf;
 
@@ -687,5 +796,91 @@ mod tests {
             &peers
         )
         .is_ok());
+    }
+
+    fn document_s3(overrides: &[(&str, Option<&str>)]) -> anyhow::Result<DocumentBlobStoreConfig> {
+        let mut values = std::collections::HashMap::from([
+            ("backend", Some("s3")),
+            ("endpoint", Some("https://objects.example.test")),
+            ("bucket", Some("documents-test")),
+            ("region", Some("auto")),
+            ("access", Some("document-access-secret")),
+            ("secret", Some("document-signing-secret")),
+            ("prefix", None),
+            ("path_style", None),
+        ]);
+        for (key, value) in overrides {
+            values.insert(key, *value);
+        }
+        let get = |key: &str| values.get(key).copied().flatten().map(str::to_owned);
+        parse_document_blob_store(
+            get("backend"),
+            PathBuf::from("/data/document-blobs"),
+            get("endpoint"),
+            get("bucket"),
+            get("region"),
+            get("access"),
+            get("secret"),
+            get("prefix"),
+            get("path_style"),
+        )
+    }
+
+    #[test]
+    fn document_storage_preserves_local_until_explicit_s3_selection() {
+        let local = document_s3(&[("backend", None)]).unwrap();
+        assert!(
+            matches!(local, DocumentBlobStoreConfig::Local { root } if root == PathBuf::from("/data/document-blobs"))
+        );
+        assert!(document_s3(&[("backend", Some("unknown"))]).is_err());
+        let DocumentBlobStoreConfig::S3(config) = document_s3(&[]).unwrap() else {
+            panic!("expected s3");
+        };
+        assert_eq!(config.prefix, "document-blobs");
+        assert!(!config.path_style);
+        let debug = format!("{config:?}");
+        assert!(!debug.contains("document-access-secret"));
+        assert!(!debug.contains("document-signing-secret"));
+    }
+
+    #[test]
+    fn document_s3_rejects_missing_credentials_unsafe_origin_and_prefix() {
+        for key in ["endpoint", "bucket", "region", "access", "secret"] {
+            assert!(document_s3(&[(key, None)]).is_err(), "missing {key}");
+            assert!(document_s3(&[(key, Some("  "))]).is_err(), "empty {key}");
+        }
+        for endpoint in [
+            "http://objects.example.test",
+            "https://user:secret@objects.example.test",
+            "https://objects.example.test/path",
+            "https://objects.example.test?token=secret",
+            "https://objects.example.test#fragment",
+        ] {
+            assert!(document_s3(&[("endpoint", Some(endpoint))]).is_err());
+        }
+        for prefix in [
+            "../documents",
+            "documents/../files",
+            "documents//files",
+            "docs\\files",
+            "/",
+            "docs?token=x",
+        ] {
+            assert!(
+                document_s3(&[("prefix", Some(prefix))]).is_err(),
+                "{prefix}"
+            );
+        }
+        assert!(document_s3(&[("path_style", Some("maybe"))]).is_err());
+        assert!(document_s3(&[("bucket", Some("wrong/name"))]).is_err());
+        let DocumentBlobStoreConfig::S3(config) = document_s3(&[
+            ("path_style", Some("true")),
+            ("prefix", Some("private/documents")),
+        ])
+        .unwrap() else {
+            panic!("expected s3");
+        };
+        assert!(config.path_style);
+        assert_eq!(config.prefix, "private/documents");
     }
 }

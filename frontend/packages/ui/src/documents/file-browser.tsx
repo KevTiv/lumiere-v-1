@@ -34,6 +34,8 @@ import { EmptyStateCard } from "../components/empty-state-card"
 export interface FileBrowserFolder {
   id: string
   name: string
+  /** Parent in the actor-visible folder projection; null for a visible root. */
+  parentId: string | null
   fileCount: number
   /** Bytes in the folder's files. */
   totalSize: number
@@ -65,8 +67,8 @@ export interface FileBrowserProps {
   files: FileBrowserFile[]
   /** Uploads into the open folder (null: no folder). Omitted hides the upload button. */
   onUpload?: (files: File[], folderId: string | null) => Promise<void>
-  /** Omitted hides the new-folder button. */
-  onCreateFolder?: () => void
+  /** Creates inside the open folder. Omitted hides the new-folder button. */
+  onCreateFolder?: (parentId: string | null) => void
   onOpenFile?: (fileId: string) => void
   /** Remembers the grid/list choice under this key. */
   storageKey?: string
@@ -115,6 +117,34 @@ function readLayout(key: string | undefined): FileBrowserLayout | null {
   }
 }
 
+/** Only supplied folders participate in navigation; missing ancestors never become labels. */
+function folderNavigation(folders: readonly FileBrowserFolder[]) {
+  const byId = new Map(folders.map((folder) => [folder.id, folder]))
+  const parents = new Map(folders.map((folder) => [
+    folder.id,
+    folder.parentId && byId.has(folder.parentId) ? folder.parentId : null,
+  ]))
+  const visited = new Set<string>()
+  for (const folder of folders) {
+    const path: string[] = []
+    const positions = new Map<string, number>()
+    let id: string | null = folder.id
+    while (id !== null && !visited.has(id)) {
+      const cycleStart = positions.get(id)
+      if (cycleStart !== undefined) {
+        // Corrupt ancestry must neither trap navigation nor make visible folders unreachable.
+        for (const cyclicId of path.slice(cycleStart)) parents.set(cyclicId, null)
+        break
+      }
+      positions.set(id, path.length)
+      path.push(id)
+      id = parents.get(id) ?? null
+    }
+    for (const pathId of path) visited.add(pathId)
+  }
+  return { byId, parents }
+}
+
 export function FileBrowser({
   folders,
   files,
@@ -149,21 +179,42 @@ export function FileBrowser({
     }
   }
 
-  const openFolder = folderId ? folders.find((folder) => folder.id === folderId) ?? null : null
+  const navigation = useMemo(() => folderNavigation(folders), [folders])
+  const openFolder = folderId ? navigation.byId.get(folderId) ?? null : null
+  // Use the resolved folder immediately, before the effect clears obsolete selection state.
+  const activeFolderId = openFolder?.id ?? null
   // A folder deleted while open falls back to all files.
   useEffect(() => {
     if (folderId && !openFolder) setFolderId(null)
   }, [folderId, openFolder])
 
+  const childFolders = useMemo(
+    () => folders.filter((folder) => navigation.parents.get(folder.id) === activeFolderId),
+    [folders, navigation, activeFolderId],
+  )
+  const breadcrumbs = useMemo(() => {
+    const path: FileBrowserFolder[] = []
+    let id = activeFolderId
+    const seen = new Set<string>()
+    while (id !== null && !seen.has(id)) {
+      seen.add(id)
+      const folder = navigation.byId.get(id)
+      if (!folder) break
+      path.unshift(folder)
+      id = navigation.parents.get(id) ?? null
+    }
+    return path
+  }, [activeFolderId, navigation])
+
   const visibleFiles = useMemo(() => {
     const q = search.trim().toLowerCase()
     return files
-      .filter((file) => (folderId ? file.folderId === folderId : true))
+      .filter((file) => (activeFolderId ? file.folderId === activeFolderId : true))
       .filter(
         (file) => !q || file.name.toLowerCase().includes(q) || file.fileName.toLowerCase().includes(q),
       )
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
-  }, [files, folderId, search])
+  }, [files, activeFolderId, search])
 
   const formatDate = (ms: number | null) =>
     ms == null ? "—" : new Date(ms).toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })
@@ -173,7 +224,7 @@ export function FileBrowser({
     setUploading(true)
     setUploadError(null)
     try {
-      await onUpload(picked, folderId)
+      await onUpload(picked, activeFolderId)
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : String(error))
     } finally {
@@ -204,7 +255,7 @@ export function FileBrowser({
         </div>
         <div className="flex w-full gap-2 sm:ml-auto sm:w-auto">
           {onCreateFolder ? (
-            <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={onCreateFolder} data-testid="file-browser-new-folder">
+            <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => onCreateFolder(activeFolderId)} data-testid="file-browser-new-folder">
               <FolderPlus className="mr-2 h-4 w-4" />
               {t("documents.browser.newFolder")}
             </Button>
@@ -245,29 +296,50 @@ export function FileBrowser({
         </p>
       ) : null}
 
+      <nav aria-label={t("documents.browser.folders")}>
+        <ol className="flex flex-wrap items-center gap-1 text-sm">
+          <li>
+            {openFolder ? (
+              <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setFolderId(null)} data-testid="file-browser-root">
+                {t("documents.browser.allFiles")}
+              </button>
+            ) : (
+              <span aria-current="page">{t("documents.browser.allFiles")}</span>
+            )}
+          </li>
+          {breadcrumbs.map((folder) => (
+            <li key={folder.id} className="flex min-w-0 items-center gap-1">
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+              {folder.id === activeFolderId ? (
+                <span className="truncate font-medium" aria-current="page">{folder.name}</span>
+              ) : (
+                <button type="button" className="truncate text-muted-foreground hover:text-foreground" onClick={() => setFolderId(folder.id)}>
+                  {folder.name}
+                </button>
+              )}
+            </li>
+          ))}
+        </ol>
+      </nav>
+
       <section className="space-y-3" aria-labelledby="file-browser-folders">
         <h3 id="file-browser-folders" className="text-sm font-semibold text-foreground">
           {t("documents.browser.folders")}
         </h3>
-        {folders.length === 0 ? (
+        {childFolders.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
             {t("documents.browser.noFolders")}
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
-            {folders.map((folder, index) => {
-              const active = folder.id === folderId
+            {childFolders.map((folder, index) => {
               return (
                 <button
                   key={folder.id}
                   type="button"
-                  onClick={() => setFolderId(active ? null : folder.id)}
-                  aria-pressed={active}
+                  onClick={() => setFolderId(folder.id)}
                   data-testid={`file-browser-folder-${folder.id}`}
-                  className={cn(
-                    "flex flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-colors hover:border-primary/40",
-                    active && "border-primary ring-1 ring-primary/30",
-                  )}
+                  className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-xs transition-colors hover:border-primary/40"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className={cn("flex h-10 w-10 items-center justify-center rounded-lg", FOLDER_TILES[index % FOLDER_TILES.length])}>
@@ -307,14 +379,6 @@ export function FileBrowser({
       >
         <div className="flex items-center gap-2">
           <h3 id="file-browser-files" className="flex min-w-0 items-center gap-1 text-sm font-semibold">
-            {openFolder ? (
-              <>
-                <button type="button" className="text-muted-foreground hover:text-foreground" onClick={() => setFolderId(null)}>
-                  {t("documents.browser.allFiles")}
-                </button>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </>
-            ) : null}
             <span className="truncate">{sectionTitle}</span>
             <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs font-normal tabular-nums text-muted-foreground">
               {visibleFiles.length}
