@@ -638,10 +638,70 @@ async fn drop_database(pool: &Pool, database: &str) -> Result<()> {
 }
 
 #[tokio::test]
-async fn postgres_migration_19_adds_ai_recovery_attribution_20() -> Result<()> {
+async fn postgres_migration_19_adds_replenishment_schedule_readback_20() -> Result<()> {
     if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
         eprintln!(
-            "skipping postgres_migration_19_adds_ai_recovery_attribution_20 (set C4_TEST_PG=1 to run)"
+            "skipping postgres_migration_19_adds_replenishment_schedule_readback_20 (set C4_TEST_PG=1 to run)"
+        );
+        return Ok(());
+    }
+
+    let base_config = pg_pool::PgConfig::from_env()?;
+    let database = unique_database_name()?;
+    let admin_pool = admin_pool(&base_config)?;
+    create_database(&admin_pool, &database, &base_config.user).await?;
+
+    let mut test_config = base_config.clone();
+    test_config.database.clone_from(&database);
+    let test_pool = pg_pool::build_pool(&test_config)?;
+    let test_result = exercise_replenishment_schedule_readback_upgrade(&test_pool).await;
+    drop(test_pool);
+    let cleanup_result = drop_database(&admin_pool, &database).await;
+
+    test_result?;
+    cleanup_result?;
+    Ok(())
+}
+
+async fn exercise_replenishment_schedule_readback_upgrade(pool: &Pool) -> Result<()> {
+    let migration_20_index = MIGRATIONS
+        .iter()
+        .position(|migration| migration.version == 20)
+        .context("migration 20 is missing from the catalog")?;
+    let frozen_migration_20 = include_str!(
+        "../../../../lumiere-codegen/pg-migration-ledger/0020_durable_projection_delta.sql"
+    );
+    ensure!(MIGRATIONS[migration_20_index].name == "replenishment_schedule_readback");
+    ensure!(MIGRATIONS[migration_20_index].sql == frozen_migration_20);
+
+    apply_migration_prefix(pool, migration_20_index).await?;
+    let previous_history = applied_migration_history(pool).await?;
+    let columns = ["scheduled_run_job_id"];
+    for column in columns {
+        ensure!(!column_exists(pool, "replenishment_rule", column).await?);
+    }
+
+    ensure_schema(pool).await?;
+
+    ensure!(
+        applied_migration_history(pool).await?[..migration_20_index] == previous_history,
+        "AI recovery migration changed prior migration history"
+    );
+    ensure!(applied_checksum(pool, 20).await? == migration_checksum(frozen_migration_20));
+    for column in columns {
+        ensure!(column_exists(pool, "replenishment_rule", column).await?);
+    }
+
+    ensure_schema(pool).await?;
+    ensure!(migration_count(pool).await? == MIGRATIONS.len() as i64);
+    Ok(())
+}
+
+#[tokio::test]
+async fn postgres_migration_20_adds_ai_recovery_attribution_21() -> Result<()> {
+    if std::env::var("C4_TEST_PG").as_deref() != Ok("1") {
+        eprintln!(
+            "skipping postgres_migration_20_adds_ai_recovery_attribution_21 (set C4_TEST_PG=1 to run)"
         );
         return Ok(());
     }
@@ -664,17 +724,17 @@ async fn postgres_migration_19_adds_ai_recovery_attribution_20() -> Result<()> {
 }
 
 async fn exercise_ai_recovery_attribution_upgrade(pool: &Pool) -> Result<()> {
-    let migration_20_index = MIGRATIONS
+    let migration_21_index = MIGRATIONS
         .iter()
-        .position(|migration| migration.version == 20)
-        .context("migration 20 is missing from the catalog")?;
-    let frozen_migration_20 = include_str!(
-        "../../../../lumiere-codegen/pg-migration-ledger/0020_durable_projection_delta.sql"
+        .position(|migration| migration.version == 21)
+        .context("migration 21 is missing from the catalog")?;
+    let frozen_migration_21 = include_str!(
+        "../../../../lumiere-codegen/pg-migration-ledger/0021_durable_projection_delta.sql"
     );
-    ensure!(MIGRATIONS[migration_20_index].name == "ai_provider_attempt_recovery_attribution");
-    ensure!(MIGRATIONS[migration_20_index].sql == frozen_migration_20);
+    ensure!(MIGRATIONS[migration_21_index].name == "ai_provider_attempt_recovery_attribution");
+    ensure!(MIGRATIONS[migration_21_index].sql == frozen_migration_21);
 
-    apply_migration_prefix(pool, migration_20_index).await?;
+    apply_migration_prefix(pool, migration_21_index).await?;
     let previous_history = applied_migration_history(pool).await?;
     let columns = [
         "recovery_actor",
@@ -690,10 +750,10 @@ async fn exercise_ai_recovery_attribution_upgrade(pool: &Pool) -> Result<()> {
     ensure_schema(pool).await?;
 
     ensure!(
-        applied_migration_history(pool).await?[..migration_20_index] == previous_history,
+        applied_migration_history(pool).await?[..migration_21_index] == previous_history,
         "AI recovery migration changed prior migration history"
     );
-    ensure!(applied_checksum(pool, 20).await? == migration_checksum(frozen_migration_20));
+    ensure!(applied_checksum(pool, 21).await? == migration_checksum(frozen_migration_21));
     for column in columns {
         ensure!(column_exists(pool, "ai_provider_attempt", column).await?);
     }

@@ -2,11 +2,7 @@
 -- Migration version: 20
 -- Migration name: 0020_durable_projection_delta
 -- Checksum algorithm: sha256
--- Body checksum: sha256:52e870e8bd03b1b34754d556a29c1d638ed816c8afc6c19ce0263cfcf91f2a33
+-- Body checksum: sha256:fdf24a88bdd6cdb9876921944620e873ec0cb169daba1f9ffaa96ab8d1855ca3
 
--- Durable projection delta: ai_provider_attempt
-ALTER TABLE "ai_provider_attempt" ADD COLUMN IF NOT EXISTS "recovery_actor" TEXT;
-ALTER TABLE "ai_provider_attempt" ADD COLUMN IF NOT EXISTS "recovery_approval_id" TEXT;
-ALTER TABLE "ai_provider_attempt" ADD COLUMN IF NOT EXISTS "recovery_at" BIGINT;
-ALTER TABLE "ai_provider_attempt" ADD COLUMN IF NOT EXISTS "reconciliation_actor" TEXT;
-ALTER TABLE "ai_provider_attempt" ADD COLUMN IF NOT EXISTS "reconciliation_approval_id" TEXT;
+-- Durable projection delta: replenishment_rule
+ALTER TABLE "replenishment_rule" ADD COLUMN IF NOT EXISTS "scheduled_run_job_id" NUMERIC(20,0);

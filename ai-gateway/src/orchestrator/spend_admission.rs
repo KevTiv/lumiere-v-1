@@ -749,7 +749,7 @@ impl<'a> SpendAdmittedLlm<'a> {
             .await?
             .context("no price snapshot for the admitted provider, model and currency")?;
         let allowance = allowance(
-            prompt_bytes(req),
+            prompt_bytes(req)?,
             req.max_tokens,
             b.agent_max_tokens,
             b.context_window,
@@ -819,7 +819,14 @@ impl<'a> SpendAdmittedLlm<'a> {
 
 #[async_trait]
 impl LlmCompletion for SpendAdmittedLlm<'_> {
+    fn validate_request(&self, req: &LlmRequest) -> Result<()> {
+        self.inner.validate_request(req)
+    }
+
     async fn complete(&self, req: LlmRequest) -> Result<LlmResponse> {
+        // Deterministic transport rejection (including foreign native replay)
+        // must not create a reservation or an apparently dispatched attempt.
+        self.validate_request(&req)?;
         let organization_id = self.binding.organization_id;
         let call = self.next_call.fetch_add(1, Ordering::SeqCst);
         let step = self
@@ -946,11 +953,9 @@ fn ensure_binding(reservation: &Reservation, request: &ReserveRequest) -> Result
 }
 
 /// UTF-8 bytes the provider will receive for this attempt.
-fn prompt_bytes(req: &LlmRequest) -> usize {
-    let messages: usize = req
-        .messages
-        .iter()
-        .map(|message| match message {
+fn prompt_bytes(req: &LlmRequest) -> Result<usize> {
+    let messages = req.messages.iter().try_fold(0_usize, |total, message| {
+        let bytes = match message {
             LlmMessage::Text { role, content } => role.len() + content.len(),
             LlmMessage::AssistantToolCalls {
                 content,
@@ -971,14 +976,26 @@ fn prompt_bytes(req: &LlmRequest) -> usize {
                 name,
                 content,
             } => tool_call_id.as_deref().map_or(0, str::len) + name.len() + content.len(),
-        })
-        .sum();
+            // This is the full native assistant message, including its visible
+            // content and tool calls. Count it once, not again as normalized text.
+            LlmMessage::MistralAssistant(_) => {
+                message.mistral_replay_bytes(&req.provider, &req.model)?
+            }
+        };
+        total
+            .checked_add(bytes)
+            .context("provider prompt size overflow")
+    })?;
     let tools: usize = req
         .tools
         .iter()
         .map(|tool| serde_json::to_string(tool).map_or(0, |json| json.len()))
         .sum();
-    req.system.len() + messages + tools
+    req.system
+        .len()
+        .checked_add(messages)
+        .and_then(|bytes| bytes.checked_add(tools))
+        .context("provider prompt size overflow")
 }
 
 #[cfg(test)]
@@ -1033,6 +1050,7 @@ mod tests {
             termination: CompletionTermination::Complete,
             provider_done_reason: Some("stop".into()),
             thinking_observed: false,
+            mistral_replay: None,
         }
     }
 
@@ -1441,6 +1459,67 @@ mod tests {
             actor_identity: "actor:operator-1".into(),
             approval_id: "approval:spend-1".into(),
         }
+    }
+
+    #[tokio::test]
+    async fn invalid_transport_state_is_rejected_before_reservation_or_dispatch() {
+        struct InvalidTransport;
+        #[async_trait]
+        impl LlmCompletion for InvalidTransport {
+            fn validate_request(&self, _: &LlmRequest) -> Result<()> {
+                bail!("invalid native replay binding")
+            }
+
+            async fn complete(&self, _: LlmRequest) -> Result<LlmResponse> {
+                panic!("invalid transport request must never dispatch")
+            }
+        }
+        let ledger = FakeLedger::configured();
+        let provider = InvalidTransport;
+        let admitted =
+            SpendAdmittedLlm::with_clock(&provider, &ledger, binding(), fixed_clock).unwrap();
+
+        let error = admitted.complete(request()).await.unwrap_err();
+
+        assert!(error.to_string().contains("invalid native replay binding"));
+        assert!(ledger.writes().is_empty());
+        assert!(ledger.reservations.lock().unwrap().is_empty());
+        assert!(ledger.attempts.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn native_replay_is_counted_once_and_foreign_binding_cannot_be_estimated() {
+        let native = serde_json::json!({
+            "role": "assistant",
+            "content": [
+                {"type": "thinking", "signature": "opaque", "thinking": [
+                    {"type": "text", "text": "private provider state"}
+                ]},
+                {"type": "text", "text": "Visible answer"}
+            ]
+        });
+        let decoded = crate::providers::llm::decode_mistral_response(
+            serde_json::json!({
+                "model": "resolved-model",
+                "choices": [{"finish_reason": "stop", "message": native}]
+            }),
+            "mistral-small",
+        )
+        .unwrap();
+        let mut req = request();
+        let before = prompt_bytes(&req).unwrap();
+        req.messages.push(decoded.to_assistant_message());
+
+        assert_eq!(
+            prompt_bytes(&req).unwrap(),
+            before + native.to_string().len()
+        );
+        assert!(!format!("{req:?}").contains("private provider state"));
+        req.model = "different-model".into();
+        assert!(prompt_bytes(&req).is_err());
+        req.model = "mistral-small".into();
+        req.provider = "gemini".into();
+        assert!(prompt_bytes(&req).is_err());
     }
 
     #[tokio::test]
@@ -1903,7 +1982,7 @@ mod tests {
     fn prompt_bytes_counts_every_part_sent_to_the_provider() {
         let mut req = request();
         assert_eq!(
-            prompt_bytes(&req),
+            prompt_bytes(&req).unwrap(),
             "system".len() + "user".len() + "hello".len()
         );
         req.messages.push(LlmMessage::ToolResult {
@@ -1912,7 +1991,7 @@ mod tests {
             content: "rows".into(),
         });
         assert_eq!(
-            prompt_bytes(&req),
+            prompt_bytes(&req).unwrap(),
             "system".len() + "userhello".len() + "c1lookuprows".len()
         );
     }

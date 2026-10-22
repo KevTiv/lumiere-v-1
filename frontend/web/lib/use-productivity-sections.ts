@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { isWorkspaceSurfaceVisible, type WorkspaceProfile } from "@lumiere/ui/lib/workspace-profile"
 import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import {
@@ -31,6 +32,8 @@ export interface ProductivitySectionsOptions {
   quickActions?: QuickActionsWidget["data"]["actions"]
   /** Section ids are prefixed with this, so two dashboards never share one. */
   idPrefix: string
+  /** Only global Overview discovery uses the workspace profile; linked Project workflows stay intact. */
+  workspaceProfile?: WorkspaceProfile
 }
 
 /**
@@ -44,6 +47,7 @@ export function useProductivitySections({
   projects,
   quickActions,
   idPrefix,
+  workspaceProfile = "full",
 }: ProductivitySectionsOptions): DashboardSection[] {
   const { t } = useTranslation()
   const { identity } = useErpSession()
@@ -70,6 +74,7 @@ export function useProductivitySections({
       }
     }
 
+    const showProjects = isWorkspaceSurfaceVisible(workspaceProfile, "projects")
     const sections: DashboardSection[] = []
     if (quickActions && quickActions.length > 0) {
       sections.push({
@@ -103,7 +108,7 @@ export function useProductivitySections({
                 priorityLabel: (priority) => t(`projects.tasks.priority.${priority}`, { defaultValue: priority }),
                 now,
                 keep: ticked,
-              }),
+              }).map((task) => showProjects ? task : { ...task, href: "/tasks" }),
               onToggleDone: toggleDone,
               viewAllHref: "/tasks",
             },
@@ -113,25 +118,25 @@ export function useProductivitySections({
             title: t("workspace.widgets.calendar"),
             width: "1/3",
             component: MiniCalendarWidget,
-            data: { items: agendaItems(events, tasks), calendarHref: "/calendar" },
+            data: { items: agendaItems(events, tasks).map((item) => !showProjects && item.kind === "deadline" ? { ...item, href: "/tasks" } : item), calendarHref: "/calendar" },
           }),
         ],
       },
       {
         id: `${idPrefix}-projects`,
-        title: t("workspace.sections.projects"),
+        title: showProjects ? t("workspace.sections.projects") : undefined,
         widgets: [
-          customDashboardWidget({
+          ...(showProjects ? [customDashboardWidget({
             id: `${idPrefix}-project-progress`,
             title: t("workspace.widgets.projects"),
             width: "2/3",
             component: ProjectProgressWidget,
             data: { projects: projectProgress(projects, tasks, identityLabels) },
-          }),
+          })] : []),
           customDashboardWidget({
             id: `${idPrefix}-recent-notes`,
             title: t("workspace.widgets.notes"),
-            width: "1/3",
+            width: showProjects ? "1/3" : "full",
             component: RecentNotesWidget,
             data: { notes: recentNotes(articles) },
           }),
@@ -140,5 +145,5 @@ export function useProductivitySections({
     )
     return sections
     // updateTaskState is a stable mutation object; its identity changes with its status.
-  }, [t, identity, identityLabels, events, articles, tasks, projects, quickActions, idPrefix, ticked]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [t, identity, identityLabels, events, articles, tasks, projects, quickActions, idPrefix, ticked, workspaceProfile]) // eslint-disable-line react-hooks/exhaustive-deps
 }

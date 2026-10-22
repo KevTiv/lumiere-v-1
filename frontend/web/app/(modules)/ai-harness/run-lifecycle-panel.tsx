@@ -271,9 +271,9 @@ function LifecycleResult({ data, observation, loading, submit }: { data: RunLife
 
       {data.comparison ? (
         <Card>
-          <CardHeader><CardTitle className="text-base">Comparison</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t("aiHarness.runLifecycle.comparison")}</CardTitle></CardHeader>
           <CardContent className="text-sm">
-            <p>Run #{data.comparison.leftRunId} at cursor {data.comparison.leftContinuation.cursor} compared with run #{data.comparison.rightRunId} at cursor {data.comparison.rightContinuation.cursor}.</p>
+            <p>{t("aiHarness.runLifecycle.comparisonSummary", { leftRunId: data.comparison.leftRunId, leftCursor: data.comparison.leftContinuation.cursor, rightRunId: data.comparison.rightRunId, rightCursor: data.comparison.rightContinuation.cursor })}</p>
             {data.comparison.details ? (
               <div className="mt-3 flex flex-col gap-2 text-muted-foreground">
                 <p>Left: {data.comparison.details.leftStatus}, {data.comparison.details.leftStepCount} steps, {data.comparison.details.leftTokensUsed.toLocaleString()} tokens.</p>

@@ -5013,7 +5013,8 @@
     "group_id",
     "last_run",
     "next_run",
-    "metadata"
+    "metadata",
+    "scheduled_run_job_id"
   ],
   "ReportTemplate": [
     "description",

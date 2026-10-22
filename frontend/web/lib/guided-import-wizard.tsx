@@ -1,6 +1,8 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
+import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
+import { isWorkspaceImportTargetVisible } from "@lumiere/ui/lib/workspace-profile"
 import { useTranslation } from "@lumiere/i18n"
 import { assertCsvSafeForAi } from "@lumiere/erp-shared/csv-import-safety"
 import {
@@ -82,6 +84,7 @@ export type GuidedImportWizardProps = {
 
 export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) {
   const { t } = useTranslation()
+  const workspaceProfile = useWorkspaceProfile()
   const orgId = BigInt(organizationId)
 
   const analyze = useAnalyzeImportMapping()
@@ -217,6 +220,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
 
   const onEntityChange = useCallback(
     (nextKey: string) => {
+      if (!isWorkspaceImportTargetVisible(workspaceProfile, nextKey)) return
       setWizardKey(nextKey)
       resetFlow()
       setCsvText("")
@@ -226,7 +230,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       setSourceFormat("csv")
       setSourceSheetName(undefined)
     },
-    [resetFlow],
+    [resetFlow, workspaceProfile],
   )
 
   const onFile = useCallback(
@@ -536,7 +540,9 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
             </SelectTrigger>
             <SelectContent>
               {IMPORT_ENTITY_GROUPS.map((group) => {
-                const options = wizardEntitiesForGroup(group.key)
+                const options = wizardEntitiesForGroup(group.key).filter((option) =>
+                  isWorkspaceImportTargetVisible(workspaceProfile, option.wizardKey),
+                )
                 if (options.length === 0) return null
                 return (
                   <SelectGroup key={group.key}>

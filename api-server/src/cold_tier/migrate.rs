@@ -225,11 +225,20 @@ pub const MIGRATIONS: &[Migration] = &[
     },
     Migration {
         version: 20,
-        name: "ai_provider_attempt_recovery_attribution",
+        name: "replenishment_schedule_readback",
         change_set: 12,
         phase: MigrationPhase::Expand,
         sql: include_str!(
             "../../../lumiere-codegen/pg-migration-ledger/0020_durable_projection_delta.sql"
+        ),
+    },
+    Migration {
+        version: 21,
+        name: "ai_provider_attempt_recovery_attribution",
+        change_set: 13,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0021_durable_projection_delta.sql"
         ),
     },
 ];

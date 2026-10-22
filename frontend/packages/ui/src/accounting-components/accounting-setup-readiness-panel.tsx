@@ -1,5 +1,6 @@
 "use client";
 
+import { useId, useState } from "react";
 import { AlertCircle, CheckCircle2, Info } from "lucide-react";
 import { useTranslation } from "@lumiere/i18n";
 
@@ -27,6 +28,8 @@ export interface AccountingSetupReadinessPanelProps {
   action?: AccountingReadinessAction;
   onResolve?: (item: AccountingReadinessItem) => void;
   className?: string;
+  /** Keep global setup status brief outside setup and blocked workflow actions. */
+  compact?: boolean;
 }
 
 const ACTION_COPY: Record<
@@ -55,8 +58,11 @@ export function AccountingSetupReadinessPanel({
   action,
   onResolve,
   className,
+  compact = false,
 }: AccountingSetupReadinessPanelProps) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
   const readiness = evaluateAccountingSetupReadiness(setup, action);
   const actionCopy = action ? ACTION_COPY[action] : undefined;
   const title = readiness.isReady
@@ -102,9 +108,15 @@ export function AccountingSetupReadinessPanel({
             </CardDescription>
           </div>
         </div>
+        {compact && readiness.items.length > 0 ? <Button type="button" variant="outline" size="sm"
+          data-testid="accounting-setup-toggle" aria-expanded={expanded} aria-controls={detailsId}
+          onClick={() => setExpanded((value) => !value)}>
+          {expanded ? t("accounting.readiness.hideDetails", { defaultValue: "Hide setup details" })
+            : t("accounting.readiness.reviewDetails", { defaultValue: "Review setup ({{count}} required)", count: readiness.blockingItems.length })}
+        </Button> : null}
       </CardHeader>
-      {readiness.items.length > 0 ? (
-        <CardContent className="space-y-3">
+      {readiness.items.length > 0 && (!compact || expanded) ? (
+        <CardContent id={detailsId} className="flex flex-col gap-3">
           {readiness.items.map((item) => {
             const isBlocking = item.severity === "blocking";
             return (
