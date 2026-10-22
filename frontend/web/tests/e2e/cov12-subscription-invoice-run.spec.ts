@@ -374,6 +374,17 @@ test.describe(
       expect(payments).toHaveLength(1)
       const paymentId = scalarQueryId(payments[0]!.id)
       if (paymentId == null) throw new Error("Reconciled payment has no ID")
+      const paymentMoveId = scalarQueryId(payments[0]!.moveId ?? payments[0]!.move_id)
+      if (paymentMoveId == null) throw new Error("Reconciled payment has no ledger move")
+      const paymentLines = (await rows(page, "account-move-lines")).filter(
+        (line) => scalarQueryId(line.moveId ?? line.move_id) === paymentMoveId,
+      )
+      expect(paymentLines).toHaveLength(2)
+      for (const line of paymentLines) {
+        expect(scalarQueryId(line.paymentId ?? line.payment_id), "Subscription ledger line must identify its payment").toBe(paymentId)
+        expect(scalarQueryId(line.organizationId ?? line.organization_id)).toBe(organizationId)
+        expect(scalarQueryId(line.companyId ?? line.company_id)).toBe(companyId)
+      }
 
       await expect(page.getByTestId("form-modal-pay-subscription-invoice")).toBeHidden()
       const sheet = await openMountedSubscriptionHandoffs(page, subscriptionId)
