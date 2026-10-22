@@ -1,5 +1,7 @@
 "use client"
 
+import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
+import { isWorkspaceHrefVisible } from "@lumiere/ui/lib/workspace-profile"
 import Link from "next/link"
 import { AlertTriangleIcon, ArrowRightIcon, BellRingIcon, CircleDollarSignIcon, PackageSearchIcon } from "lucide-react"
 
@@ -29,7 +31,9 @@ const CONTROL_ITEMS: Array<{
 ]
 
 export function OwnerControlLoop(props: OwnerControlLoopProps) {
-  const values = Object.values(props)
+  const workspaceProfile = useWorkspaceProfile()
+  const visibleItems = CONTROL_ITEMS.filter((item) => isWorkspaceHrefVisible(workspaceProfile, item.href))
+  const values = visibleItems.map((item) => props[item.key])
   const hasIncompleteReads = values.some((value) => typeof value !== "number")
   const attentionCount = values.reduce<number>((total, value) => total + (typeof value === "number" ? value : 0), 0)
 
@@ -39,7 +43,7 @@ export function OwnerControlLoop(props: OwnerControlLoopProps) {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle>Owner control loop</CardTitle>
-            <CardDescription>Resolve today’s cash, stock, and customer exceptions from one queue.</CardDescription>
+            <CardDescription>Resolve today’s cash and customer exceptions from one queue.</CardDescription>
           </div>
           <Badge variant={attentionCount > 0 ? "destructive" : "secondary"}>
             {hasIncompleteReads ? "Attention total unavailable" : `${attentionCount} needing attention`}
@@ -47,7 +51,7 @@ export function OwnerControlLoop(props: OwnerControlLoopProps) {
         </div>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {CONTROL_ITEMS.map((item) => {
+        {visibleItems.map((item) => {
           const count = props[item.key]
           const Icon = item.icon
           return (

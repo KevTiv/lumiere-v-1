@@ -172,6 +172,9 @@ function fixtureTemplate(name: string) {
 }
 
 test.describe("Document template studio", { tag: ["@p0", "@document-templates"] }, () => {
+  // Bound individual actions so a blocked control retains its locator/call log.
+  test.use({ actionTimeout: 30_000, navigationTimeout: 45_000 })
+
   test("ordinary staff author, manage and reuse formatted text in a persisted CRM modal", async ({ browser, page: owner }) => {
     test.setTimeout(300_000)
     const companyId = await fetchDefaultCompanyId(owner)

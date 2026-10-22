@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState, useRef, useCallback, useEffect } from "react"
+import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -360,14 +362,15 @@ function OverviewClientLoaded({
   }, [messageBatches, operatingCompanyId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants])
 
   const router = useRouter()
+  const workspaceProfile = useWorkspaceProfile()
   const myWorkActions = useMemo(
     () => [
       { id: "new-task", label: t("workspace.actions.newTask"), icon: "plus", color: "blue" as const, onClick: () => router.push("/tasks") },
       { id: "upload", label: t("workspace.actions.upload"), icon: "upload", color: "green" as const, onClick: () => router.push("/documents?tab=documents") },
-      { id: "log-time", label: t("workspace.actions.logTime"), icon: "refresh", color: "orange" as const, onClick: () => router.push("/projects?tab=timesheets") },
+      ...(isWorkspaceSurfaceVisible(workspaceProfile, "projects") ? [{ id: "log-time", label: t("workspace.actions.logTime"), icon: "refresh", color: "orange" as const, onClick: () => router.push("/projects?tab=timesheets") }] : []),
       { id: "new-event", label: t("workspace.actions.newEvent"), icon: "calendar", color: "purple" as const, onClick: () => router.push("/calendar") },
     ],
-    [t, router],
+    [t, router, workspaceProfile],
   )
   const myWorkSections = useProductivitySections({
     organizationId: orgId,
@@ -375,6 +378,7 @@ function OverviewClientLoaded({
     projects: projectsQuery.data ?? [],
     quickActions: myWorkActions,
     idPrefix: "overview-work",
+    workspaceProfile,
   })
   const dashboardGridRef = useRef<HTMLDivElement>(null)
   const handleDashboardExport = useCallback(async () => {

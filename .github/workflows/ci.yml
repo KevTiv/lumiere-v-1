@@ -100,11 +100,27 @@ jobs:
 
       - uses: ./.github/actions/prepare-contracts
 
+      # CI and E2E compile the same Cargo dev dependencies. Share those
+      # artifacts across jobs; Cargo still rebuilds changed local crates and
+      # validates dependency/features/profile fingerprints. Keep native runner
+      # images separate, alongside rust-cache's compiler/flags/lockfile keys.
+      - name: Identify Rust dependency cache environment
+        id: rust-dependency-environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ImageOS:?runner image must be identified}"
+          : "${ImageVersion:?runner image version must be identified}"
+          printf 'image=%s-%s\n' "$ImageOS" "$ImageVersion" >> "$GITHUB_OUTPUT"
+
       - uses: Swatinem/rust-cache@v2
         with:
+          shared-key: workspace-dev-deps-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.rust-dependency-environment.outputs.image }}
           workspaces: |
             spacetimedb
             .
+          # Cache only third-party dependencies, keeping local source builds fresh.
+          cache-workspace-crates: false
           cache-on-failure: true
 
       # No `spacetime` CLI in this runner, so bindings can't be regenerated

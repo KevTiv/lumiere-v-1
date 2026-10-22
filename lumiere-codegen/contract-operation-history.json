@@ -3302,6 +3302,10 @@
       "name": "record_workflow_outbox_result",
       "shape_fingerprint": "sha256:482460a0832ff96b0552f8317e5a54cc1e26e147e05f891bc3fccaf3a0188fca"
     },
+    "erp.recover_ai_provider_attempt": {
+      "name": "recover_ai_provider_attempt",
+      "shape_fingerprint": "sha256:d2c72d17ee3e3344476b43726e8db93bb3456ef88d0bd11b430f7d5ae4b86168"
+    },
     "erp.refresh_capacity_forecast": {
       "name": "refresh_capacity_forecast",
       "shape_fingerprint": "sha256:6361ff5536eaee003d3b0d204b16501fef17aeb2953da5ce687116fe5833484e"
@@ -3745,6 +3749,10 @@
     "erp.run_ai_intelligence_events_tests": {
       "name": "run_ai_intelligence_events_tests",
       "shape_fingerprint": "sha256:2071b25e5137007b1b695f0c7974cd3d11b81b2d33bb373ff4a274c52f890a79"
+    },
+    "erp.run_ai_spend_recovery_tests": {
+      "name": "run_ai_spend_recovery_tests",
+      "shape_fingerprint": "sha256:1c9cfe0d48de65ca8f44a405095af6626639bd2a1969912b61c824bb79d2a2dc"
     },
     "erp.run_all_accounting_tests": {
       "name": "run_all_accounting_tests",
@@ -5264,7 +5272,7 @@
     },
     "erp.update_document_template": {
       "name": "update_document_template",
-      "shape_fingerprint": "sha256:78c9315f271c46bd821a431c611f58224feb11e6e406e64f26e0dd0bcb85bb5c"
+      "shape_fingerprint": "sha256:176a29288c4d8cdd1c18267504968b8744390c836ae7172234fb5c8bc75c9edc"
     },
     "erp.update_employee": {
       "name": "update_employee",
@@ -6090,12 +6098,12 @@
       "reason": "release on top of v0.3.128: add abandon_bank_statement_settlement, claim_reviewed_mail_delivery, create_purchase_order_once, receive_po_line_once, resubmit_bank_statement_settlement, reverse_bank_statement_settlement, run_purchasing_keyed_operations_test; change the shape of add_workflow_human_task_comment, cancel_workflow, claim_workflow_human_task, decide_workflow_human_task, invalidate_workflow_human_task, post_payment, reconcile_account_bank_statement_line"
     },
     {
-      "previous_release": "v0.3.134",
-      "previous_ir_sha256": "sha256:66fd185df8844d495bbffec404524029d85c7fa0744817de19c1aaefd3bcf479",
+      "previous_release": "v0.3.129",
+      "previous_ir_sha256": "sha256:dfc31a6c53f8d328e2bdd3701d005c2c91c8ae540ebff742ee15ae23e8d7dcf2",
       "previous_operations_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
-      "current_operations_fingerprint": "sha256:bb46fa73705a0db32b7fbfb3ca938a63759d5d5d192b57e29ad0660ef8b4041d",
-      "operation_count": 1458,
-      "reason": "release on top of v0.3.134: add none; change the shape of update_document_template"
+      "current_operations_fingerprint": "sha256:dabb7e25e0676bf5ead1d543c0334b5f6bbea847fe49c8979e2c7460c49331bd",
+      "operation_count": 1460,
+      "reason": "Add approved AI provider recovery operations on top of released v0.3.129 while preserving every released operation shape."
     }
   ]
 }

@@ -26,6 +26,15 @@ on:
       - crates/policy-core/**
       - lumiere-codegen/**
       - crates/stdb-auth/assets/resource_registry.json
+      # Contract pins are part of the release invariant. A pin-only change must
+      # run this workflow so an inconsistent manifest/dependency cannot land.
+      - Cargo.toml
+      - Cargo.lock
+      - release-compatibility-manifest.json
+      - frontend/packages/presentation-core/package.json
+      - frontend/packages/query-hooks/package.json
+      - frontend/packages/stdb/package.json
+      - frontend/pnpm-lock.yaml
       - .github/workflows/build-contracts-module.yml
       - .github/workflows/release-contracts.yml
       - .github/actions/setup-contracts-ssh/action.yml

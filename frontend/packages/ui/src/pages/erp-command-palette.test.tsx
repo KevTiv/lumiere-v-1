@@ -1,6 +1,8 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { useState } from "react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
+import { WorkspaceProfileProvider } from "../lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible, type WorkspaceProfile } from "../lib/workspace-profile"
 import { ErpCommandPalette } from "./erp-command-palette"
 
 const push = vi.fn()
@@ -33,7 +35,7 @@ vi.mock("@/lib/rbac-context", () => ({
   }),
 }))
 vi.mock("../lib/navigation-catalog", () => ({
-  buildNavGroups: () => [
+  buildNavGroups: (_t: unknown, options?: { workspaceProfile?: WorkspaceProfile }) => [
     {
       label: "Modules",
       items: [
@@ -43,7 +45,7 @@ vi.mock("../lib/navigation-catalog", () => ({
         { surfaceId: "purchasing", label: "Purchasing", href: "/purchasing", icon: () => null, resource: "module:purchasing" },
       ],
     },
-  ],
+  ].map((group) => ({ ...group, items: group.items.filter((item) => isWorkspaceSurfaceVisible(options?.workspaceProfile ?? "full", item.surfaceId)) })),
 }))
 vi.mock("@lumiere/query-hooks/hooks/crm", () => ({ useContacts: rowsHook("contact") }))
 vi.mock("@lumiere/query-hooks/hooks/sales", () => ({ useSaleOrders: rowsHook("sale_order") }))
@@ -108,6 +110,18 @@ function type(text: string) {
 }
 
 describe("ErpCommandPalette records", () => {
+  it("does not query or offer hidden modules under the Finance Alpha provider", () => {
+    render(<WorkspaceProfileProvider value="finance-alpha"><ErpCommandPalette recordHref={recordHref} /></WorkspaceProfileProvider>)
+    act(() => { fireEvent.keyDown(window, { key: "k", ctrlKey: true }) })
+    expect(screen.queryByRole("option", { name: "Inventory" })).toBeNull()
+    type("acme")
+    expect(hookCalls.names).toContain("sale_order")
+    expect(hookCalls.names).not.toContain("product")
+    expect(hookCalls.names).not.toContain("stock_picking")
+    expect(screen.queryByTestId("erp-command-palette-record-product-5")).toBeNull()
+    expect(screen.getByTestId("erp-command-palette-record-sale_order-1")).toBeTruthy()
+  })
+
   it("opens from the workspace search control and keeps shortcut and navigation state synchronized", () => {
     function WorkspaceSearch() {
       const [open, setOpen] = useState(false)
@@ -119,6 +133,11 @@ describe("ErpCommandPalette records", () => {
     }
     render(<WorkspaceSearch />)
     fireEvent.click(screen.getByRole("button", { name: "Search workspace" }))
+    const dialog = screen.getByRole("dialog", {
+      name: "Command Palette",
+      description: "Search modules, quick actions and records",
+    })
+    expect(within(dialog).getByRole("heading", { name: "Command Palette" })).toBeTruthy()
     expect(screen.getByRole("combobox")).toBeTruthy()
     type("so00")
     fireEvent.click(screen.getByTestId("erp-command-palette-record-sale_order-1"))

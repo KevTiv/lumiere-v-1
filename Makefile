@@ -890,7 +890,7 @@ e2e-docker:
 	'
 
 e2e-smoke:
-	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" E2E_PREBUILT="$(E2E_PREBUILT)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(value E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" E2E_PREBUILT="$(E2E_PREBUILT)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
@@ -1069,7 +1069,7 @@ e2e-smoke:
 			fi; \
 		done; \
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
-		pnpm exec playwright install chromium; \
+		if [ "$${E2E_BROWSER_READY:-0}" != "1" ]; then pnpm exec playwright install chromium; fi; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
 		if [ "$${E2E_SUITE:-full}" = "p0" ]; then \
 			PW_ARGS+=(--grep @p0); \
@@ -1084,6 +1084,10 @@ e2e-smoke:
 			PW_ARGS+=("$${SPEC_FILES[@]}"); \
 		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
 			PW_ARGS+=(--grep-invert @ai-live); \
+		fi; \
+		if [ "$${E2E_SUITE:-full}" != "targeted" ] && [ -n "$${E2E_SPEC_FILES:-}" ]; then \
+			read -r -a SPEC_FILES <<< "$$E2E_SPEC_FILES"; \
+			PW_ARGS+=("$${SPEC_FILES[@]}"); \
 		fi; \
 		if [ -n "$${E2E_SHARD:-}" ]; then echo "[e2e] Shard $$E2E_SHARD"; PW_ARGS+=(--shard "$$E2E_SHARD"); fi; \
 		PORT="" \
