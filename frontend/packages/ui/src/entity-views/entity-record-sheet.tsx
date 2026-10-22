@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { cn } from "../lib/utils"
 import { ExternalLink } from "lucide-react"
 import { Badge } from "../components/badge"
 import { Button } from "../components/button"
@@ -58,7 +59,7 @@ export function EntityRecordSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+      <SheetContent className={cn("w-full overflow-y-auto", config.wide ? "sm:max-w-[min(1280px,calc(100vw-1rem))]" : "sm:max-w-lg")}>
         {record && (
           <>
             <SheetHeader>
@@ -90,12 +91,13 @@ export function EntityRecordSheet({
                 </div>
               )}
 
-              <Tabs defaultValue="overview" className="flex flex-col">
+              <Tabs defaultValue="overview" className="min-w-0 flex flex-col">
                 <ContextTabsList aria-label="Record views">
                   <ContextTabsTrigger value="overview">Overview</ContextTabsTrigger>
                   {config.customTabs?.map((tab) => (
                     <ContextTabsTrigger
                       key={tab.id}
+                      className="flex-none"
                       value={tab.id}
                       data-testid={`entity-record-sheet-tab-${tab.id}`}
                     >
@@ -111,7 +113,7 @@ export function EntityRecordSheet({
                 </ContextTabsList>
 
                 <TabsContent value="overview" className="mt-4">
-                  <EntityDetail config={config.detailConfig} data={record} />
+                  {config.overviewContent ? config.overviewContent(record) : <EntityDetail config={config.detailConfig} data={record} />}
                 </TabsContent>
 
                 {config.customTabs?.map((tab) => (

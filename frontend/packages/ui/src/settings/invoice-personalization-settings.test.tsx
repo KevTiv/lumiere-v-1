@@ -29,14 +29,15 @@ function customizeTerms(text: string) {
   fireEvent.change(screen.getByTestId("invoice-profile-terms"), { target: { value: text } })
 }
 const clickSave = () => fireEvent.click(screen.getByTestId("invoice-profile-save"))
-const terms = () => screen.getByTestId("invoice-profile-terms") as HTMLTextAreaElement
+const terms = () => screen.getByTestId("invoice-profile-terms") as HTMLElement & { value: string }
 
 describe("invoice personalization settings", () => {
   it("inherits organization defaults and publishes an explicit empty company override only after readback", async () => {
     const input = props()
     render(<InvoicePersonalizationEditor {...input} />)
     expect(terms().value).toBe("Organization terms")
-    expect(terms().disabled).toBe(true)
+    expect(terms().getAttribute("aria-disabled")).toBe("true")
+    expect(terms().getAttribute("contenteditable")).toBe("false")
     customizeTerms("")
     clickSave()
     await screen.findByText("Published version #11 for Alpha company.")
@@ -127,7 +128,8 @@ describe("invoice personalization settings", () => {
     clickSave()
     await screen.findByRole("button", { name: "Check saved version" })
     expect(screen.queryByTestId("invoice-profile-save")).toBeNull()
-    expect(terms().disabled).toBe(true)
+    expect(terms().getAttribute("aria-disabled")).toBe("true")
+    expect(terms().getAttribute("contenteditable")).toBe("false")
     rerender(<InvoicePersonalizationEditor {...input} state={{ status: "denied" }} />)
     fireEvent.click(screen.getByRole("button", { name: "Check saved version" }))
     await waitFor(() => expect(onCheck).toHaveBeenCalledWith(expect.objectContaining({ name: "Exact uncertain profile", companyId: "2", values: { terms: "Unknown outcome terms" } })))

@@ -1,6 +1,34 @@
 use anyhow::{Context, Result};
 use stdb_config::{env_stdb_host_or_next_public, normalize_stdb_http_host, runtime_is_production};
 
+/// Explicit Mistral reasoning effort, for models admitted by configuration.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MistralReasoningEffort {
+    None,
+    High,
+}
+
+impl MistralReasoningEffort {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::High => "high",
+        }
+    }
+}
+
+impl std::str::FromStr for MistralReasoningEffort {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value.trim() {
+            "none" => Ok(Self::None),
+            "high" => Ok(Self::High),
+            _ => anyhow::bail!("MISTRAL_REASONING_EFFORT must be none or high"),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Config {
     pub port: u16,
@@ -57,6 +85,10 @@ pub struct Config {
     /// `docs/plans/ai-harness-completion-issues.md`.
     pub ollama_supports_tool_calling: bool,
     pub mistral_api_key: Option<String>,
+    /// Optional transport default, limited to `mistral_reasoning_models`.
+    pub mistral_reasoning_effort: Option<MistralReasoningEffort>,
+    /// Exact, case-sensitive model IDs supporting explicit reasoning controls.
+    pub mistral_reasoning_models: Vec<String>,
     pub google_api_key: Option<String>,
     pub gemini_embed_model: String,
 
@@ -96,6 +128,10 @@ impl Config {
     }
 
     pub fn from_env() -> Result<Self> {
+        let (mistral_reasoning_effort, mistral_reasoning_models) = parse_mistral_reasoning(
+            std::env::var("MISTRAL_REASONING_EFFORT").ok().as_deref(),
+            std::env::var("MISTRAL_REASONING_MODELS").ok().as_deref(),
+        )?;
         let google_api_key = std::env::var("GOOGLE_API_KEY")
             .ok()
             .or_else(|| std::env::var("GEMINI_API_KEY").ok())
@@ -194,6 +230,8 @@ impl Config {
                 .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
                 .unwrap_or(false),
             mistral_api_key: std::env::var("MISTRAL_API_KEY").ok(),
+            mistral_reasoning_effort,
+            mistral_reasoning_models,
             google_api_key,
             gemini_embed_model: std::env::var("GEMINI_EMBED_MODEL")
                 .unwrap_or_else(|_| "text-embedding-004".to_string()),
@@ -239,6 +277,34 @@ impl Config {
                 .filter(|v| !v.trim().is_empty()),
         })
     }
+}
+
+fn parse_mistral_reasoning(
+    effort: Option<&str>,
+    models: Option<&str>,
+) -> Result<(Option<MistralReasoningEffort>, Vec<String>)> {
+    let effort = effort
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::parse)
+        .transpose()?;
+    let mut allowed_models = Vec::new();
+    if let Some(models) = models.map(str::trim).filter(|value| !value.is_empty()) {
+        for model in models.split(',').map(str::trim) {
+            if model.is_empty() || model.contains('*') || model.chars().any(char::is_whitespace) {
+                anyhow::bail!("MISTRAL_REASONING_MODELS must contain comma-separated exact model IDs without wildcards or whitespace");
+            }
+            if !allowed_models.iter().any(|allowed| allowed == model) {
+                allowed_models.push(model.to_string());
+            }
+        }
+    }
+    if effort.is_some() && allowed_models.is_empty() {
+        anyhow::bail!(
+            "MISTRAL_REASONING_EFFORT requires a nonempty MISTRAL_REASONING_MODELS allowlist"
+        );
+    }
+    Ok((effort, allowed_models))
 }
 
 fn validate_certification_identity(
@@ -330,6 +396,63 @@ fn parse_certification_timeout(value: Option<String>) -> Result<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mistral_reasoning_defaults_preserve_provider_behavior() {
+        assert_eq!(parse_mistral_reasoning(None, None).unwrap(), (None, vec![]));
+        assert_eq!(
+            parse_mistral_reasoning(Some("  "), Some("  ")).unwrap(),
+            (None, vec![])
+        );
+    }
+
+    #[test]
+    fn mistral_reasoning_effort_is_typed_and_requires_admitted_models() {
+        for (wire, effort) in [
+            ("none", MistralReasoningEffort::None),
+            ("high", MistralReasoningEffort::High),
+        ] {
+            let (parsed, models) =
+                parse_mistral_reasoning(Some(wire), Some("mistral-large-4")).unwrap();
+            assert_eq!(parsed, Some(effort));
+            assert_eq!(effort.as_str(), wire);
+            assert_eq!(models, ["mistral-large-4"]);
+            assert!(parse_mistral_reasoning(Some(wire), None).is_err());
+            assert!(parse_mistral_reasoning(Some(wire), Some(" ")).is_err());
+        }
+        for invalid in ["HIGH", "None", "medium", "true", "high,none"] {
+            assert!(parse_mistral_reasoning(Some(invalid), Some("mistral-large-4")).is_err());
+        }
+        assert_eq!(
+            " high ".parse::<MistralReasoningEffort>().unwrap(),
+            MistralReasoningEffort::High
+        );
+        assert!("".parse::<MistralReasoningEffort>().is_err());
+    }
+
+    #[test]
+    fn mistral_reasoning_allowlist_preserves_exact_ids_without_a_default() {
+        let (effort, models) = parse_mistral_reasoning(
+            None,
+            Some(" mistral-large-4, mistral-large-4-0,mistral-large-4,Mistral-Large-4 "),
+        )
+        .unwrap();
+        assert_eq!(effort, None);
+        assert_eq!(
+            models,
+            ["mistral-large-4", "mistral-large-4-0", "Mistral-Large-4"]
+        );
+        for invalid in [
+            "*",
+            "mistral-*",
+            ",",
+            "mistral-large-4,",
+            "large 4",
+            "large\n4",
+        ] {
+            assert!(parse_mistral_reasoning(None, Some(invalid)).is_err());
+        }
+    }
 
     #[test]
     fn certification_identity_must_be_configured_as_a_pair() {

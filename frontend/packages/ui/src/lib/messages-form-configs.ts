@@ -82,7 +82,7 @@ export const newMessageBatchForm = (t: TFunction): FormConfig => ({
     { id: "templateId", name: "templateId", type: "select", label: "Message template", required: true, width: "1/2", options: emptySelect },
     { id: "channel", name: "channel", type: "select", label: "Channel", required: true, width: "1/2", defaultValue: "WhatsApp", options: [{ value: "WhatsApp", label: "WhatsApp" }, { value: "Sms", label: "SMS" }, { value: "Email", label: "Email" }, { value: "InApp", label: "In-app" }] },
     { id: "subjectModel", name: "subjectModel", type: "text", label: "Subject model", required: true, width: "1/2", defaultValue: "account.move" },
-    { id: "candidateContactIds", name: "candidateContactIds", type: "textarea", label: "Recipient contact IDs", placeholder: "1, 2, 3", required: true, width: "full", rows: 2 },
+    { id: "candidateContactIds", name: "candidateContactIds", type: "textarea", format: "plain", label: "Recipient contact IDs", placeholder: "1, 2, 3", required: true, width: "full", rows: 2 },
   ] }],
 })
 
@@ -120,7 +120,7 @@ export const newInvoiceReminderBatchForm = (t: TFunction): FormConfig => ({
   sections: [{ id: "reminder", fields: [
     { id: "templateId", name: "templateId", type: "select", label: t("messages.forms.invoiceReminder.template"), required: true, width: "1/2", options: emptySelect },
     { id: "channel", name: "channel", type: "select", label: t("messages.forms.invoiceReminder.channel"), required: true, defaultValue: "WhatsApp", width: "1/2", options: [{ value: "WhatsApp", label: "WhatsApp" }, { value: "Sms", label: "SMS" }, { value: "Email", label: "Email" }, { value: "InApp", label: "In-app" }] },
-    { id: "invoiceIds", name: "invoiceIds", type: "textarea", label: t("messages.forms.invoiceReminder.invoices"), description: t("messages.forms.invoiceReminder.invoicesHint"), required: true, width: "full", rows: 3 },
+    { id: "invoiceIds", name: "invoiceIds", type: "textarea", format: "plain", label: t("messages.forms.invoiceReminder.invoices"), description: t("messages.forms.invoiceReminder.invoicesHint"), required: true, width: "full", rows: 3 },
   ] }],
 })
 

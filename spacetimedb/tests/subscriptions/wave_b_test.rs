@@ -4,7 +4,8 @@ use spacetimedb::{ReducerContext, Table};
 use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
-use crate::accounting::journal_entries::account_move;
+use crate::accounting::journal_entries::{account_move, account_move_line};
+use crate::accounting::payments::account_payment;
 use crate::accounting::tax_management::{
     account_tax, account_tax_group, create_account_tax, create_account_tax_group,
     CreateAccountTaxGroupParams, CreateAccountTaxParams,
@@ -713,13 +714,34 @@ pub fn test_pay_subscription_invoice_clears_residual(ctx: &ReducerContext) -> Re
         ref_: Some(format!("SUB-PAY-REF-{sub_id}")),
         memo: Some("Wave B pay".into()),
     };
-    pay_subscription_invoice(
-        ctx,
-        org_id,
-        company_id,
-        sub_id,
-        payment_params.clone(),
-    )?;
+    pay_subscription_invoice(ctx, org_id, company_id, sub_id, payment_params.clone())?;
+
+    let payment_ref = format!("SUB-PAY-REF-{sub_id}");
+    let payment = ctx
+        .db
+        .account_payment()
+        .iter()
+        .find(|row| row.organization_id == org_id && row.ref_.as_deref() == Some(&payment_ref))
+        .ok_or("subscription ledger payment missing")?;
+    let payment_move_id = payment.move_id.ok_or("subscription payment move missing")?;
+    let lines: Vec<_> = ctx
+        .db
+        .account_move_line()
+        .move_line_by_move()
+        .filter(&payment_move_id)
+        .collect();
+    if payment.state != PaymentState::Paid
+        || lines.len() != 2
+        || lines.iter().any(|line| {
+            line.payment_id != Some(payment.id)
+                || line.organization_id != org_id
+                || line.company_id != company_id
+        })
+    {
+        return Err(
+            "subscription payment ledger lines must link to the exact posted payment".into(),
+        );
+    }
 
     let inv = ctx
         .db
@@ -741,13 +763,7 @@ pub fn test_pay_subscription_invoice_clears_residual(ctx: &ReducerContext) -> Re
     }
     let paid_state = inv.payment_state.clone();
     let paid_write_date = inv.write_date;
-    match pay_subscription_invoice(
-        ctx,
-        org_id,
-        company_id,
-        sub_id,
-        payment_params,
-    ) {
+    match pay_subscription_invoice(ctx, org_id, company_id, sub_id, payment_params) {
         Err(error)
             if error.contains("paid")
                 || error.contains("residual")

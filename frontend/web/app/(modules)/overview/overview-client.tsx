@@ -1,6 +1,8 @@
 "use client"
 
 import { useMemo, useState, useRef, useCallback, useEffect } from "react"
+import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
 import { useRouter } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -29,6 +31,7 @@ import { useTasks, useProjects, type ProjectTask, type ProjectProject } from "@l
 import { useContacts, type Contact } from "@lumiere/query-hooks/hooks/crm"
 import { useAiActionDraftInboxCount } from "@lumiere/query-hooks/hooks/ai-action-drafts"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
+import { useExpenseSheetsToApprove } from "@lumiere/query-hooks/hooks/expenses"
 import { useMessageBatches } from "@lumiere/query-hooks/hooks/messages"
 import { OwnerControlLoop } from "./owner-control-loop"
 import { useProductivitySections } from "@/lib/use-productivity-sections"
@@ -152,6 +155,7 @@ function OverviewClientLoaded({
   const paymentTransactionsQuery = usePaymentTransactions(orgId)
   const paymentReconciliationsQuery = usePaymentReconciliations(orgId)
   const messageBatchesQuery = useMessageBatches(orgId)
+  const expenseApprovalsQuery = useExpenseSheetsToApprove(orgId)
   const aiDraftsQuery = useAiActionDraftInboxCount(
     organizationId,
     operatingCompanyId != null && operatingCompanyId > 0,
@@ -354,20 +358,22 @@ function OverviewClientLoaded({
     const overdueInvoices = scopedMoves.filter((row) => {
       const move = row as Record<string, unknown>
       const due = timestampMs(move.invoiceDateDue)
-      return moveTypeTagFromRow(move) === "OutInvoice" && Number(move.amountResidual ?? 0) > 0 && due != null && due < Date.now()
+      return enumTag(move.state) === "Posted" && moveTypeTagFromRow(move) === "OutInvoice" && Number(move.amountResidual ?? 0) > 0 && due != null && due < Date.now()
     }).length
-    return { overdueInvoices, unreconciledPayments, lowStockProducts, pendingMessageApprovals }
+    const draftBills = scopedMoves.filter((row) => enumTag(row.moveType) === "InInvoice" && enumTag(row.state) === "Draft").length
+    return { overdueInvoices, unreconciledPayments, lowStockProducts, pendingMessageApprovals, draftBills }
   }, [messageBatches, operatingCompanyId, paymentReconciliations, paymentTransactions, products, scopedMoves, stockQuants])
 
   const router = useRouter()
+  const workspaceProfile = useWorkspaceProfile()
   const myWorkActions = useMemo(
     () => [
       { id: "new-task", label: t("workspace.actions.newTask"), icon: "plus", color: "blue" as const, onClick: () => router.push("/tasks") },
       { id: "upload", label: t("workspace.actions.upload"), icon: "upload", color: "green" as const, onClick: () => router.push("/documents?tab=documents") },
-      { id: "log-time", label: t("workspace.actions.logTime"), icon: "refresh", color: "orange" as const, onClick: () => router.push("/projects?tab=timesheets") },
+      ...(isWorkspaceSurfaceVisible(workspaceProfile, "projects") ? [{ id: "log-time", label: t("workspace.actions.logTime"), icon: "refresh", color: "orange" as const, onClick: () => router.push("/projects?tab=timesheets") }] : []),
       { id: "new-event", label: t("workspace.actions.newEvent"), icon: "calendar", color: "purple" as const, onClick: () => router.push("/calendar") },
     ],
-    [t, router],
+    [t, router, workspaceProfile],
   )
   const myWorkSections = useProductivitySections({
     organizationId: orgId,
@@ -375,6 +381,7 @@ function OverviewClientLoaded({
     projects: projectsQuery.data ?? [],
     quickActions: myWorkActions,
     idPrefix: "overview-work",
+    workspaceProfile,
   })
   const dashboardGridRef = useRef<HTMLDivElement>(null)
   const handleDashboardExport = useCallback(async () => {
@@ -400,6 +407,12 @@ function OverviewClientLoaded({
             })}
           </section>
           <OwnerControlLoop
+            companyReady={operatingCompanyId != null && operatingCompanyId > 0}
+            draftBills={movesState ?? ownerControlLoop.draftBills}
+            expenseApprovals={resourceStatusLabel(overviewResourceStatus(expenseApprovalsQuery))
+              ?? ((expenseApprovalsQuery.data ?? []).some((row) => !(Number(row.companyId ?? row.company_id) > 0))
+                ? "Scope unavailable"
+                : (expenseApprovalsQuery.data ?? []).filter((row) => matchesCompany(row, operatingCompanyId)).length)}
             overdueInvoices={movesState ?? ownerControlLoop.overdueInvoices}
             unreconciledPayments={paymentsState ?? ownerControlLoop.unreconciledPayments}
             lowStockProducts={stockState ?? ownerControlLoop.lowStockProducts}

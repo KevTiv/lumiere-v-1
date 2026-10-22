@@ -64,6 +64,25 @@ test("operational allocation and document write-off use the canonical payment re
   assert.equal(withWrittenOffDocument.rows[0]?.remainingMinor, 2000n)
 })
 
+test("subscription clearing links keep unrelated operational allocations available", () => {
+  const subscriptionLine = line(202, { moveId: 102, paymentId: undefined, amountResidual: 0 })
+  const mixed = sources({
+    payments: read([payment(), payment(2)]), moves: read([move(), move(102)]),
+    transactions: read([transaction()]), moveLines: read([line(), subscriptionLine]),
+  })
+  // A fully settled subscription payment still needs its canonical reverse
+  // link. Its zero residual must not hide an incomplete ledger record.
+  const incomplete = projectPaymentAllocations(mixed)
+  assert.equal(incomplete.state.status, "partial")
+  assert.deepEqual(incomplete.rows, [])
+  const linked = projectPaymentAllocations({ ...mixed,
+    moveLines: read([line(), { ...subscriptionLine, paymentId: 2 }]),
+  })
+  assert.equal(linked.state.status, "ready")
+  assert.equal(linked.rows.find((row) => row.transactionId === "301")?.remainingMinor, 10000n)
+  assert.equal(linked.rows.find((row) => row.paymentId === "2")?.remainingMinor, 0n)
+})
+
 test("a last cent left by earlier partial payments remains available and disappears only after final settlement", () => {
   const almostSettled = projectPaymentAllocations(sources({ moveLines: read([line(201, { amountResidual: 100 - 99.99 })]) }))
   assert.equal(almostSettled.state.status, "ready")
@@ -165,6 +184,20 @@ test("duplicates, incomplete rows and cross-currency or cross-partner references
   for (const extra of invalid) {
     const result = projectPaymentAllocations(sources(extra))
     assert.equal(result.state.status, "partial", JSON.stringify(extra))
+    assert.deepEqual(result.rows, [])
+  }
+})
+
+test("a valid new operational payment cannot mask an incomplete posted seed ledger", () => {
+  const valid = { transactions: read([transaction()]) }
+  // Legacy demo rows used these combinations. Fix the fixture ledger instead
+  // of ignoring unrelated posted rows or presenting missing balances as zero.
+  for (const extra of [
+    { ...valid, payments: read([payment(), payment(2, { moveId: undefined, amount: 3600 })]) },
+    { transactions: read([transaction(), transaction(302, { accountPaymentId: undefined })]) },
+  ]) {
+    const result = projectPaymentAllocations(sources(extra))
+    assert.equal(result.state.status, "partial")
     assert.deepEqual(result.rows, [])
   }
 })
