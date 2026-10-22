@@ -1177,13 +1177,13 @@ function ExpensesClientLoaded({
         config={config}
         dashboardContent={<ModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
-        dataState={{ expenses: expensesState, "expense-sheets": sheetsState }}
+        dataState={dataState}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
         isPending={isFormMutationPending}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? expenseFormConfig}
         isPending={isFormMutationPending}
@@ -1197,6 +1197,7 @@ function ExpensesClientLoaded({
 
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          sourceState={csvKind === "expense" ? expensesRead.state : sheetsRead.state}
           trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={csvKind === "expense" ? "hr_expense" : "hr_expense_sheet"}
@@ -1207,13 +1208,14 @@ function ExpensesClientLoaded({
           templateFileName={`${csvKind}-import-template.csv`}
           isPending={isFormMutationPending}
           onImport={async (text) => {
+            if (!csvUsable) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
             if (csvKind === "expense") await csvImports.importExpense.mutateAsync(text)
             else await csvImports.importExpenseSheet.mutateAsync(text)
           }}
         />
       ) : null}
 
-      <Dialog open={rowAction !== null} onOpenChange={(open) => !open && setRowAction(null)}>
+      <Dialog open={rowAction !== null && rowActionUsable} onOpenChange={(open) => !open && setRowAction(null)}>
         <DialogContent className={rowAction?.tabId === "expenses" ? "max-h-[90dvh] overflow-y-auto sm:max-w-[min(1280px,calc(100vw-1rem))]" : "sm:max-w-md"}>
           <DialogHeader>
             <DialogTitle>

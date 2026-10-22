@@ -1,7 +1,7 @@
 'use client';
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
-import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleInsights } from "../../../components/module-insights"
 
 import { phCapture } from '@/lib/posthog-browser';
