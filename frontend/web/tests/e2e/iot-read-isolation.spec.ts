@@ -220,5 +220,27 @@ test.describe("IoT HTTP company isolation", { tag: "@p0" }, () => {
         expect(response.status(), resource).toBe(403)
       }
     })
+
+    // The organization administrator is allowed to select a sibling company,
+    // but the selected company must still constrain every returned row. The
+    // company-bound member above separately proves that callers cannot expand
+    // their own scope by forging this query parameter.
+    for (const resource of [
+      "iot-actions",
+      "iot-alerts",
+      "iot-devices",
+      "iot-hubs",
+      "iot-pairing-tokens",
+      "iot-telemetry",
+      "iot-thresholds",
+    ]) {
+      const response = await page.request.get(`/api/query/${resource}?companyId=${branchCompanyId}`)
+      expect(response.ok(), resource).toBe(true)
+      const body = (await response.json()) as { data?: QueryRow[] }
+      expect(
+        (body.data ?? []).every((row) => rowCompanyId(row) === branchCompanyId),
+        `${resource} leaked a row from another company`,
+      ).toBe(true)
+    }
   })
 })

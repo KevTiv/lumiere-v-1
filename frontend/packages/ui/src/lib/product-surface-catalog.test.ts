@@ -9,6 +9,7 @@ import {
   PRODUCT_SURFACES,
   getProductSurface,
   getProductSurfaceForPathname,
+  isFirstOrgRouteAdmitted,
   isFirstOrgSurfaceAdmitted,
 } from "./product-surface-catalog"
 
@@ -42,6 +43,48 @@ describe("first-org product surface census", () => {
     expect(
       hrefs.filter((href): href is `/${string}` => href !== null).sort(),
     ).toEqual(currentModuleRouteHrefs())
+  })
+
+  it("shows only finance navigation in the alpha profile while settings remains in REVIEW", () => {
+    const memberGroups = buildNavGroups((key) => key, {
+      firstOrgProfile: true,
+      isAdmin: false,
+    })
+    expect(memberGroups.map((group) => group.label)).toEqual(["nav.groups.finance"])
+    expect(memberGroups.flatMap((group) => group.items.map((item) => item.surfaceId))).toEqual([
+      "accounting",
+      "sales",
+      "crm",
+      "purchasing",
+      "reports",
+      "subscriptions",
+      "expenses",
+    ])
+
+    const adminIds = buildNavGroups((key) => key, {
+      firstOrgProfile: true,
+      isAdmin: true,
+    }).flatMap((group) => group.items.map((item) => item.surfaceId))
+    expect(adminIds).toEqual([
+      "accounting",
+      "sales",
+      "crm",
+      "purchasing",
+      "reports",
+      "subscriptions",
+      "expenses",
+    ])
+  })
+
+  it("keeps supporting ERP routes available without adding them to alpha navigation", () => {
+    expect(isFirstOrgSurfaceAdmitted("inventory", true)).toBe(false)
+    expect(isFirstOrgRouteAdmitted("inventory", true)).toBe(true)
+    expect(isFirstOrgRouteAdmitted("documents", false)).toBe(true)
+    expect(isFirstOrgRouteAdmitted("hr", true)).toBe(false)
+    expect(isFirstOrgRouteAdmitted("manufacturing", true)).toBe(false)
+    expect(isFirstOrgRouteAdmitted("forensics", true)).toBe(false)
+    expect(isFirstOrgRouteAdmitted("map", true)).toBe(false)
+    expect(isFirstOrgRouteAdmitted("ai-harness", true)).toBe(false)
   })
 
   it("keeps every navigation destination aligned with the product surface authority", () => {

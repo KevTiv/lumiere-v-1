@@ -5,6 +5,7 @@ import {
   chooseFirstOption,
   chooseSelectOptionByLabel,
   expectNoAppError,
+  expectModuleTabSurface,
   expectSeededText,
   fillField,
   gotoModule,
@@ -60,9 +61,9 @@ async function openAndAssertAccountingTab(page: Page, tabId: AccountingTabId) {
   await expect.poll(() => new URL(page.url()).searchParams.get("tab")).toBe(
     tabId === "dashboard" ? null : tabId,
   )
+  await expect(tab).toHaveCount(1, { timeout: 30_000 })
   await expect(tab).toHaveAttribute("aria-selected", "true")
-  await expect(page.locator('[data-testid^="module-panel-accounting-"]:visible')).toHaveCount(1)
-  await expect(page.getByTestId(`module-panel-accounting-${tabId}`)).toBeVisible()
+  await expectModuleTabSurface(page, "accounting", tabId)
 }
 
 async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {
@@ -163,13 +164,22 @@ async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {
 
 test.describe("Accounting module e2e", () => {
   test("renders accounting shell and each tab without errors", { tag: "@p0" }, async ({ page }) => {
-    // Exercise every preserved deep link; each is a full navigation with fresh scoped reads.
+    // Exercise every canonical destination through its task area and scoped reads.
     test.setTimeout(240_000)
-    await gotoModule(page, "/accounting", "accounting")
-    await expect(page.getByRole("navigation", { name: "Accounting workspaces" }).getByRole("link")).toHaveCount(7)
-    await expect(page.getByRole("button", { name: "Advanced / Configuration" })).toBeVisible()
+    await test.step("Open Accounting and validate task-area navigation", async () => {
+      await gotoModule(page, "/accounting", "accounting")
+      const areaTrigger = page.getByTestId("module-area-accounting")
+      await expect(areaTrigger).toBeVisible()
+      await expect(areaTrigger).toHaveAttribute("role", "combobox")
+      const areas = JSON.parse(await areaTrigger.getAttribute("data-tab-areas") ?? "{}") as Record<string, string>
+      // Task areas mount only their own triggers; the map must still preserve
+      // every canonical destination covered by the business assertions below.
+      expect(Object.keys(areas).sort()).toEqual([...ACCOUNTING_TAB_IDS].sort())
+    }, { timeout: 30_000 })
     for (const tabId of ACCOUNTING_TAB_IDS) {
-      await assertAccountingTabRenders(page, tabId)
+      await test.step(`Accounting destination: ${tabId}`, async () => {
+        await assertAccountingTabRenders(page, tabId)
+      }, { timeout: 30_000 })
     }
   })
 
@@ -306,7 +316,7 @@ test.describe("Accounting module e2e", () => {
     await expectNoAppError(page)
   })
 
-  test("overview and configuration actions open journal entry, bill, and tax forms", async ({ page }) => {
+  test("overview and task-area actions open journal entry, bill, and tax forms", async ({ page }) => {
     await gotoModule(page, "/accounting", "accounting")
     await openAccountingTab(page, "dashboard")
 
@@ -319,12 +329,12 @@ test.describe("Accounting module e2e", () => {
     await page.getByTestId("quick-action-create_bill").click()
     const billModal = page.getByTestId("create-invoice-modal")
     await expect(billModal).toBeVisible()
-    await expect(billModal.getByRole("heading", { name: /bill/i })).toBeVisible()
+    await expect(billModal.getByRole("heading", { name: "Create Vendor Bill", exact: true })).toBeVisible()
+    await expect(billModal.getByRole("heading", { name: "Vendor bill", exact: true })).toBeVisible()
     await billModal.getByRole("button", { name: /^cancel$/i }).click()
     await expect(billModal).toBeHidden()
 
-    await page.getByTestId("module-workspace-accounting-overflow").click()
-    await page.getByTestId("module-workspace-item-accounting-taxes").click()
+    await openAccountingTab(page, "taxes")
     await expect(page.getByTestId("module-tab-accounting-taxes")).toHaveAttribute("aria-selected", "true")
     await page.getByTestId("module-create-accounting-taxes").click()
     const taxModal = page.getByTestId("form-modal-new-tax")

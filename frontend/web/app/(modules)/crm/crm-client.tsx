@@ -1,5 +1,8 @@
 "use client"
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
+import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { ModuleInsights, type InsightPeriodRange } from "../../../components/module-insights"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
@@ -181,6 +184,7 @@ import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useModuleTab } from "@/hooks/use-module-tab"
 import { useModuleFilters } from "@/hooks/use-module-filters"
+import { runtimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 export { CRM_UI_REDUCERS } from "@/lib/crm-ui-reducers"
 
@@ -351,7 +355,7 @@ function CrmClientLoaded({
   const { t } = useTranslation()
   const router = useRouter()
   const { currentUser } = useRBAC()
-  const runtimeRoleId = currentUser?.roles[0]
+  const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const { orgId } = orgBigInts(organizationId)
   const ownerLabelMap = useIdentityLabelMap(organizationId)
 
@@ -426,6 +430,7 @@ function CrmClientLoaded({
   const [workflowSubmitError, setWorkflowSubmitError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<CrmCsvImportKind | null>(null)
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRangeValue>("30d")
+  const [insightPeriodRange, setInsightPeriodRange] = useState<InsightPeriodRange | null>(null)
 
   const leadsRead = moduleCollection(useLeads(orgId, initialLeads))
   const leads = leadsRead.rows
@@ -1950,12 +1955,14 @@ function CrmClientLoaded({
             create_forecast_snapshot: () => {
               if (!operatingCompanyId || operatingCompanyId === 0n) return
               const now = Date.now()
-              const endMsSafe = endMs > startMs ? endMs : now
+              const snapshotStart = insightPeriodRange?.startMs ?? startMs
+              const snapshotEnd = insightPeriodRange?.endMs ?? endMs
+              const endMsSafe = snapshotEnd > snapshotStart ? snapshotEnd : now
               createForecastSnapshot
                 .mutateAsync({
                   companyId: operatingCompanyId,
                   params: {
-                    periodStart: stbTimestampFromDate(new Date(startMs)),
+                    periodStart: stbTimestampFromDate(new Date(snapshotStart)),
                     periodEnd: stbTimestampFromDate(new Date(endMsSafe)),
                     ownerId: undefined,
                     metadata: undefined,
@@ -2078,7 +2085,7 @@ function CrmClientLoaded({
         }
         return w
           })
-  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, dashboardTimeRange, t, navigateToLeadsByState, opportunityStages, forecastSnapshots, createForecastSnapshot, operatingCompanyId])
+  }, [leads, opportunities, contacts, moduleConfig, opportunityStageOptions, stageById, dashboardTimeRange, insightPeriodRange, t, navigateToLeadsByState, opportunityStages, forecastSnapshots, createForecastSnapshot, operatingCompanyId])
 
   const config = useMemo(
     () =>
@@ -2103,7 +2110,8 @@ function CrmClientLoaded({
     [leads, enrichedOpportunities, opportunityLines, contacts, activities, contactTags, contactCategories, contactSegments],
   )
 
-  const { data: kpiCurrencies = [] } = useCurrencies()
+  const currenciesQuery = useCurrencies()
+  const { data: kpiCurrencies = [] } = currenciesQuery
   const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
     () => ({
       opportunities: {
@@ -2503,6 +2511,7 @@ function CrmClientLoaded({
     <>
       <ModuleView
         config={config}
+        dashboardContent={<ModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: opportunitiesRead.state }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange} />}
         data={data}
         dataLoading={dataLoading}
         dataState={dataState}

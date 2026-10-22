@@ -8,8 +8,8 @@ import { moduleTabDestination } from '@/lib/module-tab-navigation'
  * Synchronises the active module tab with the URL's `?tab=` search param.
  * Falls back to defaultTab if the param is absent or not in validTabs.
  *
- * Defaults to replacing history. Workspaces can opt into push so Back restores
- * the previous workspace and its record filters.
+ * Defaults to pushing history so Back restores the previous workspace and its
+ * record filters, matching the shared ModuleView navigation.
  *
  * @example
  *   const { activeTab, setActiveTab } = useModuleTab(
@@ -20,7 +20,7 @@ import { moduleTabDestination } from '@/lib/module-tab-navigation'
 export function useModuleTab(
   defaultTab: string,
   validTabs: string[],
-  { history = 'replace' }: { history?: 'push' | 'replace' } = {},
+  { history = 'push' }: { history?: 'push' | 'replace' } = {},
 ) {
   const searchParams = useSearchParams()
   const router = useRouter()

@@ -514,6 +514,8 @@ mod tests {
                 .collect(),
             identity_hex: "01".repeat(32),
             field_permissions: Vec::new(),
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         }
     }
 
@@ -533,23 +535,6 @@ mod tests {
     // Hostile rows deliberately bypass WHERE evaluation to exercise post-filters.
     async fn http_fixture(replies: Vec<(&'static str, Vec<Value>)>) -> HttpFixture {
         use axum::{routing::post, Json, Router};
-        // Company scope now resolves active persisted roles before accepting a
-        // company-bound membership. These fixtures deliberately have no admin grant.
-        let replies: Vec<_> = replies
-            .into_iter()
-            .flat_map(|reply| {
-                let has_membership = reply.0 == "user_organization" && !reply.1.is_empty();
-                let mut expanded = vec![reply];
-                if has_membership {
-                    expanded.extend([
-                        ("user_organization", vec![]),
-                        ("user_role_assignment", vec![]),
-                        ("role", vec![]),
-                    ]);
-                }
-                expanded
-            })
-            .collect();
         let queries = Arc::new(Mutex::new(Vec::new()));
         let recorded = queries.clone();
         let pending = Arc::new(Mutex::new(VecDeque::from(replies)));
@@ -560,8 +545,18 @@ mod tests {
                 let pending = pending.clone();
                 async move {
                     recorded.lock().unwrap().push(sql.clone());
-                    let (table, rows) =
-                        pending.lock().unwrap().pop_front().expect("unexpected SQL");
+                    let authority = if sql.starts_with("SELECT role_id FROM user_organization") {
+                        Some(("user_organization", vec![json!({"role_id":7})]))
+                    } else if sql.starts_with("SELECT role_id, expires_at FROM user_role_assignment") {
+                        Some(("user_role_assignment", vec![]))
+                    } else if sql.starts_with("SELECT id, name, permissions, is_active FROM role") {
+                        Some(("role", vec![json!({"id":7,"name":"accountant","permissions":[],"is_active":true})]))
+                    } else { None };
+                    if authority.is_some() && !sql.contains(" FROM role ") {
+                        assert!(sql.contains(&format!("user_identity = 0x{}", "01".repeat(32))));
+                    }
+                    let (table, rows) = authority.unwrap_or_else(||
+                        pending.lock().unwrap().pop_front().expect("unexpected SQL"));
                     assert!(sql.contains(&format!(" FROM {table} WHERE ")), "{sql}");
                     assert!(sql.contains("organization_id = 42"), "{sql}");
                     assert!(!sql.contains("SELECT *") && !sql.contains(" IN "), "{sql}");
@@ -652,14 +647,13 @@ mod tests {
         let queries = fixture.queries.lock().unwrap();
         assert_eq!(queries.len(), 5);
         assert_membership_query(&queries[0], &access);
-        let queries = &queries[3..];
         let columns = resolve_http_sql_columns("profit-loss-lines", Some(&access)).unwrap();
-        assert!(queries[1].starts_with(&format!(
+        assert!(queries[4].starts_with(&format!(
             "SELECT {} FROM profit_loss_line ",
             columns.join(", ")
         )));
-        assert!(queries[1].contains("organization_id = 42 AND company_id = 198"));
-        assert!(queries[1].contains("report_id"));
+        assert!(queries[4].contains("organization_id = 42 AND company_id = 198"));
+        assert!(queries[4].contains("report_id"));
     }
 
     #[tokio::test]
@@ -763,19 +757,18 @@ mod tests {
             let queries = fixture.queries.lock().unwrap();
             assert_eq!(queries.len(), 6);
             assert_membership_query(&queries[0], &access);
-            let queries = &queries[3..];
             let columns = resolve_http_sql_columns(resource, Some(&access)).unwrap();
-            assert!(queries[2].starts_with(&format!(
+            assert!(queries[5].starts_with(&format!(
                 "SELECT {} FROM {child_table} ",
                 columns.join(", ")
             )));
-            assert!(!queries[2].contains("company_id"));
+            assert!(!queries[5].contains("company_id"));
             if reminder {
-                assert_eq!(queries[1], "SELECT id, organization_id, company_id, deleted_at FROM tax_deadline WHERE organization_id = 42");
-                assert!(!queries[2].contains("tax_deadline_id ="));
+                assert_eq!(queries[4], "SELECT id, organization_id, company_id, deleted_at FROM tax_deadline WHERE organization_id = 42");
+                assert!(!queries[5].contains("tax_deadline_id ="));
             } else {
-                assert!(queries[1].ends_with("WHERE organization_id = 42 AND company_id = 198"));
-                assert!(queries[2].ends_with("WHERE organization_id = 42 AND (import_id = 11)"));
+                assert!(queries[4].ends_with("WHERE organization_id = 42 AND company_id = 198"));
+                assert!(queries[5].ends_with("WHERE organization_id = 42 AND (import_id = 11)"));
             }
         }
     }

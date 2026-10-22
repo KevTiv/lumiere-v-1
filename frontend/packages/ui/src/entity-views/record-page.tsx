@@ -14,7 +14,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "../components/breadcrumb"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/tabs"
+import { Tabs, TabsContent } from "../components/tabs"
+import { ContextTabsList, ContextTabsTrigger } from "../components/context-tabs"
 import { workspaceStyles } from "../lib/workspace-styles"
 
 export interface RecordPageCrumb {
@@ -135,22 +136,17 @@ export function RecordPage({
 
       <Tabs value={activeTab} onValueChange={(tabId) => onTabChange(String(tabId))} className="flex min-w-0 flex-col">
         <div className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
-          <TabsList
-            variant="line"
-            data-ui="context-tabs"
-            className="h-auto w-max min-w-full justify-start gap-1 border-b border-border p-0 group-data-horizontal/tabs:h-auto"
-          >
+          <ContextTabsList aria-label="Record views">
             {tabs.map((tab) => (
-              <TabsTrigger
+              <ContextTabsTrigger
                 key={tab.id}
                 value={tab.id}
                 data-testid={`${testIdPrefix}-tab-${tab.id}`}
-                className={workspaceStyles.tabTrigger}
               >
                 {tab.label}
-              </TabsTrigger>
+              </ContextTabsTrigger>
             ))}
-          </TabsList>
+          </ContextTabsList>
         </div>
         {tabs.map((tab) => (
           <TabsContent key={tab.id} value={tab.id} className="mt-6">

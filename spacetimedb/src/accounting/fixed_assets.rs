@@ -9,6 +9,7 @@
 /// ## Tables
 /// - `AccountAsset` — Fixed asset records with depreciation tracking
 /// - `AccountAssetDepreciationLine` — Individual depreciation entries
+use chrono::{DateTime, Months, Utc};
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::analytic_accounting::account_analytic_account;
@@ -1087,6 +1088,105 @@ pub fn create_depreciation_line(
     Ok(())
 }
 
+struct DepreciationBoardValue {
+    amount: f64,
+    date: Timestamp,
+    remaining: f64,
+    depreciated: f64,
+}
+
+/// Date each saved installment from the original anchor, retaining month-end clamping.
+/// Amount policy belongs to the depreciation method below; balances use its actual sum.
+fn depreciation_board_values(
+    first_date: Timestamp,
+    period_months: u32,
+    depreciable_amount: f64,
+    amounts: &[f64],
+) -> Result<Vec<DepreciationBoardValue>, String> {
+    let anchor = DateTime::<Utc>::from_timestamp_micros(first_date.to_micros_since_unix_epoch())
+        .ok_or("depreciation start date is out of range")?;
+    let mut values = Vec::with_capacity(amounts.len());
+    let mut depreciated = 0.0;
+    for amount in amounts.iter().copied().filter(|amount| *amount > 0.0) {
+        let index = u32::try_from(values.len()).map_err(|_| "too many depreciation periods")?;
+        let months = period_months
+            .checked_mul(index)
+            .ok_or("depreciation date is out of range")?;
+        let date = anchor
+            .checked_add_months(Months::new(months))
+            .ok_or("depreciation date is out of range")?;
+        depreciated += amount;
+        values.push(DepreciationBoardValue {
+            amount,
+            date: Timestamp::from_micros_since_unix_epoch(date.timestamp_micros()),
+            remaining: (depreciable_amount - depreciated).max(0.0),
+            depreciated,
+        });
+    }
+    Ok(values)
+}
+
+#[cfg(test)]
+mod depreciation_board_tests {
+    use super::*;
+
+    fn date(iso: &str) -> Timestamp {
+        let value = DateTime::parse_from_rfc3339(iso).expect("valid test timestamp");
+        Timestamp::from_micros_since_unix_epoch(value.timestamp_micros())
+    }
+
+    #[test]
+    fn monthly_dates_stay_anchored_after_a_short_month() {
+        let values = depreciation_board_values(
+            date("2026-01-31T09:15:00.123456Z"),
+            1,
+            300.0,
+            &[100.0, 100.0, 100.0],
+        )
+        .expect("valid schedule");
+        assert_eq!(values[0].date, date("2026-01-31T09:15:00.123456Z"));
+        assert_eq!(values[1].date, date("2026-02-28T09:15:00.123456Z"));
+        assert_eq!(values[2].date, date("2026-03-31T09:15:00.123456Z"));
+    }
+
+    #[test]
+    fn annual_dates_clamp_leap_day_and_respect_method_period() {
+        let values =
+            depreciation_board_values(date("2024-02-29T00:00:00Z"), 12, 200.0, &[100.0, 100.0])
+                .expect("valid schedule");
+        assert_eq!(values[1].date, date("2025-02-28T00:00:00Z"));
+    }
+
+    #[test]
+    fn unequal_installments_use_the_actual_cumulative_sum() {
+        let values = depreciation_board_values(
+            date("2026-01-31T00:00:00Z"),
+            3,
+            1_000.0,
+            &[100.0, 90.0, 81.0],
+        )
+        .expect("valid schedule");
+        assert_eq!(values[1].date, date("2026-04-30T00:00:00Z"));
+        assert_eq!(values[2].date, date("2026-07-31T00:00:00Z"));
+        assert_eq!(values[1].depreciated, 190.0);
+        assert_eq!(values[1].remaining, 810.0);
+        assert_eq!(values[2].depreciated, 271.0);
+        assert_eq!(values[2].remaining, 729.0);
+        assert_eq!(values[2].amount, 81.0);
+    }
+
+    #[test]
+    fn out_of_range_dates_return_an_error_before_any_lines_are_saved() {
+        assert!(depreciation_board_values(
+            date("2026-01-31T00:00:00Z"),
+            u32::MAX,
+            300.0,
+            &[100.0, 100.0, 100.0],
+        )
+        .is_err());
+    }
+}
+
 #[spacetimedb::reducer]
 pub fn compute_depreciation_board(
     ctx: &ReducerContext,
@@ -1149,13 +1249,17 @@ pub fn compute_depreciation_board(
         }
     };
 
+    let board_values = depreciation_board_values(
+        asset
+            .first_depreciation_date
+            .unwrap_or(asset.acquisition_date),
+        asset.method_period,
+        depreciable_amount,
+        &depreciation_amounts,
+    )?;
     let mut sequence = 0;
-    let mut board_ids = Vec::new();
-    for amount in depreciation_amounts {
-        if amount <= 0.0 {
-            continue;
-        }
-
+    let mut board_ids = Vec::with_capacity(board_values.len());
+    for value in board_values {
         sequence += 1;
 
         let line = ctx
@@ -1171,12 +1275,10 @@ pub fn compute_depreciation_board(
                 move_id: None,
                 move_check: false,
                 move_posted_check: false,
-                amount,
-                depreciation_date: asset
-                    .first_depreciation_date
-                    .unwrap_or(asset.acquisition_date),
-                remaining_value: depreciable_amount - (amount * sequence as f64),
-                depreciated_value: amount * sequence as f64,
+                amount: value.amount,
+                depreciation_date: value.date,
+                remaining_value: value.remaining,
+                depreciated_value: value.depreciated,
                 create_uid: Some(ctx.sender()),
                 create_date: Some(ctx.timestamp),
                 write_uid: Some(ctx.sender()),

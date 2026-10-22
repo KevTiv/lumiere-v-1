@@ -610,11 +610,21 @@
   "AiProviderAttempt": [
     "failure_reason",
     "resolution",
+    "recovery_actor",
+    "recovery_approval_id",
+    "recovery_at",
+    "reconciliation_actor",
+    "reconciliation_approval_id",
     "dispatched_at",
     "finished_at"
   ],
   "AiProviderAttemptRead": [
-    "failure_reason"
+    "failure_reason",
+    "resolution",
+    "recovery_actor",
+    "recovery_approval_id",
+    "reconciliation_actor",
+    "reconciliation_approval_id"
   ],
   "AiReducerAllowlist": [
     "metadata"
@@ -845,6 +855,13 @@
   "BankMatchCandidate": [
     "rule_id"
   ],
+  "BankSettlementInvoiceSnapshot": [
+    "sale_order_id"
+  ],
+  "BankSettlementLineSnapshot": [
+    "matching_number_before",
+    "matching_label_before"
+  ],
   "BankStatementImport": [
     "file_name",
     "approved_statement_id",
@@ -858,6 +875,16 @@
     "description",
     "validation_error",
     "created_statement_line_id"
+  ],
+  "BankStatementSettlementAttempt": [
+    "previous_payment_id",
+    "recovery_key",
+    "recovery_reason",
+    "reversal_request_id",
+    "closed_at"
+  ],
+  "BankStatementSettlementReversal": [
+    "reversal_move_id"
   ],
   "BarcodeNomenclature": [
     "description",
@@ -2370,6 +2397,18 @@
   "CreatePurchaseContractParams": [
     "date_start",
     "date_end",
+    "metadata"
+  ],
+  "CreatePurchaseOrderOnceParams": [
+    "origin",
+    "partner_ref",
+    "notes",
+    "date_planned",
+    "payment_term_id",
+    "fiscal_position_id",
+    "incoterm_id",
+    "incoterm_location",
+    "is_quantity_copy",
     "metadata"
   ],
   "CreatePurchaseOrderParams": [
@@ -4552,6 +4591,13 @@
     "lot_id",
     "metadata"
   ],
+  "PurchaseReceiptOperation": [
+    "lot_id",
+    "move_id",
+    "picking_id",
+    "continuation_move_id",
+    "continuation_picking_id"
+  ],
   "PurchaseRequisition": [
     "origin",
     "ordering_date",
@@ -4707,6 +4753,11 @@
     "location_id",
     "lot_id",
     "metadata"
+  ],
+  "ReceivePoLineOnceParams": [
+    "lot_id",
+    "expected_move_id",
+    "expected_picking_id"
   ],
   "RecognizeAmortizationLineParams": [
     "reference",
@@ -4962,7 +5013,8 @@
     "group_id",
     "last_run",
     "next_run",
-    "metadata"
+    "metadata",
+    "scheduled_run_job_id"
   ],
   "ReportTemplate": [
     "description",
@@ -5268,6 +5320,9 @@
   ],
   "SetHelpdeskRelatedRecordParams": [
     "target"
+  ],
+  "SetMemberAccessParams": [
+    "job_title"
   ],
   "SetPurchaseApprovalDelegateParams": [
     "metadata"
@@ -5866,6 +5921,10 @@
     "metadata"
   ],
   "UpdateAccountMoveLineParams": [
+    "quantity",
+    "price_unit",
+    "expected_quantity",
+    "expected_price_unit",
     "company_id",
     "name",
     "debit",
@@ -6785,7 +6844,8 @@
     "name",
     "description",
     "permissions",
-    "is_active"
+    "is_active",
+    "metadata"
   ],
   "UpdateSaleOrderLineParams": [
     "product_id",

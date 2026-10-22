@@ -38,6 +38,7 @@ import {
 import { NotebookCellComponent } from "./notebook-cell"
 import type { Notebook, NotebookCell, CellOutput, KernelState } from "@/lib/notebook-types"
 import { mlSnippets, reportTemplates } from "@/lib/notebook-types"
+import { downloadTextFile } from "@/lib/ui-exports"
 
 interface NotebookPanelProps {
   open: boolean
@@ -198,6 +199,22 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [activeTab, setActiveTab] = useState<"notebook" | "files" | "variables">("notebook")
   const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
+
+  const handleSave = () => {
+    try {
+      window.localStorage.setItem(`lumiere.notebook.${notebook.id}`, JSON.stringify({ ...notebook, updatedAt: new Date() }))
+      setJustSaved(true)
+      window.setTimeout(() => setJustSaved(false), 2000)
+    } catch {
+      // storage unavailable (private mode / quota); nothing to persist to
+    }
+  }
+
+  const handleExport = () => {
+    const name = notebook.title.replace(/[^\w.-]+/g, "-").replace(/^-|-$/g, "") || "notebook"
+    downloadTextFile(`${name}.json`, JSON.stringify(notebook, null, 2), "application/json")
+  }
   const titleInputRef = useRef<HTMLInputElement>(null)
 
   const updateCell = useCallback((cellId: string, updates: Partial<NotebookCell>) => {
@@ -383,10 +400,10 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearAllOutputs} title="Clear Outputs">
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" title="Save">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave} title={justSaved ? "Saved" : "Save"}>
             <Save className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" title="Export">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExport} title="Export">
             <Download className="h-3.5 w-3.5" />
           </Button>
           <div className="w-px h-4 bg-border mx-1" />

@@ -401,6 +401,8 @@ mod draft_tests {
                 role_permissions: vec!["account-moves:read".into()],
                 identity_hex: "ab".repeat(32),
                 field_permissions: vec![],
+                role_ids: Vec::new(),
+                org_permissions: Vec::new(),
             }),
         };
         TrustedOperationContext::from_session(

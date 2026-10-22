@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Request, type Response } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   chooseFirstOption,
   chooseSelectOptionByLabel,
@@ -81,7 +82,7 @@ async function worklistSnapshot(page: Page, timesheetId: number) {
 
 async function runTimesheetAction(page: Page, timesheetId: number, actionId: string, reducer: string): Promise<Response> {
   await gotoModule(page, "/projects", "projects")
-  await page.getByTestId("module-tab-projects-timesheets").click()
+  await selectModuleTab(page, "projects", "timesheets")
   const timesheetRow = page.getByTestId(`entity-row-${timesheetId}`)
   await expect(timesheetRow).toBeVisible({ timeout: 30_000 })
   await timesheetRow.click()
@@ -96,7 +97,7 @@ async function runTimesheetAction(page: Page, timesheetId: number, actionId: str
 
 async function billTimesheetThroughUi(page: Page, timesheetId: number): Promise<Response> {
   await gotoModule(page, "/projects", "projects")
-  await page.getByTestId("module-tab-projects-timesheets").click()
+  await selectModuleTab(page, "projects", "timesheets")
   const timesheetRow = page.getByTestId(`entity-row-${timesheetId}`)
   await expect(timesheetRow).toBeVisible({ timeout: 30_000 })
   await timesheetRow.click()

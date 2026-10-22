@@ -9,6 +9,13 @@ import { downloadCsv, rowsToCsv } from "../lib/export-csv"
 import { Button } from "../components/button"
 import { humanizeEnumValue } from "../lib/entity-row-values"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/table"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/select"
 
 export interface EntityPivotViewProps {
   rows: Record<string, unknown>[]
@@ -22,8 +29,11 @@ export interface EntityPivotViewProps {
   className?: string
 }
 
-const selectClass =
-  "h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
+/** Compact toolbar sizing for the shared Select trigger. */
+const selectTriggerClass = "h-8 w-auto min-w-0 max-w-full"
+
+/** Radix Select cannot use "" as an item value; stands in for "no column grouping". */
+const NO_COLUMN = "__none__"
 
 export function EntityPivotView({
   rows,
@@ -121,45 +131,49 @@ export function EntityPivotView({
   const maxBar = Math.max(0, ...result.rows.map((row) => row.total.sums[0] ?? 0))
 
   return (
-    <div className={cn("space-y-4", className)} data-testid="entity-pivot">
+    <div className={cn("@container/entity-pivot min-w-0 space-y-4", className)} data-testid="entity-pivot">
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <label className="flex items-center gap-2">
+        <label className="flex max-w-full flex-wrap items-center gap-2">
           <span className="text-muted-foreground">{labels.groupBy}</span>
-          <select
-            className={selectClass}
-            data-testid="entity-pivot-group"
-            value={groupKey}
-            onChange={(event) => setGroupKey(event.target.value)}
-          >
-            {pivot.groupKeys.map((key) => (
-              <option key={key} value={key}>{fieldLabel(key)}</option>
-            ))}
-          </select>
+          <Select value={groupKey} onValueChange={setGroupKey}>
+            <SelectTrigger className={selectTriggerClass} data-testid="entity-pivot-group">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {pivot.groupKeys.map((key) => (
+                <SelectItem key={key} value={key}>{fieldLabel(key)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex max-w-full flex-wrap items-center gap-2">
           <span className="text-muted-foreground">{labels.columnsBy}</span>
-          <select
-            className={selectClass}
-            data-testid="entity-pivot-columns"
-            value={effectiveColumnKey ?? ""}
-            onChange={(event) => {
-              setColumnKey(event.target.value)
-              onColumnKeyChange?.(event.target.value)
+          <Select
+            value={effectiveColumnKey ?? NO_COLUMN}
+            onValueChange={(value) => {
+              const next = value === NO_COLUMN ? "" : value
+              setColumnKey(next)
+              onColumnKeyChange?.(next)
             }}
           >
-            <option value="">{labels.none}</option>
-            {pivot.groupKeys
-              .filter((key) => key !== groupKey)
-              .map((key) => (
-                <option key={key} value={key}>{fieldLabel(key)}</option>
-              ))}
-          </select>
+            <SelectTrigger className={selectTriggerClass} data-testid="entity-pivot-columns">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_COLUMN}>{labels.none}</SelectItem>
+              {pivot.groupKeys
+                .filter((key) => key !== groupKey)
+                .map((key) => (
+                  <SelectItem key={key} value={key}>{fieldLabel(key)}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
         </label>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="ml-auto"
+          className="ml-auto h-auto min-h-7 max-w-full whitespace-normal"
           onClick={exportCsv}
           disabled={result.rows.length === 0}
           data-testid="entity-pivot-export"
@@ -224,7 +238,10 @@ export function EntityPivotView({
                   const value = row.total.sums[0] ?? 0
                   const width = maxBar > 0 ? Math.max(0, (value / maxBar) * 100) : 0
                   return (
-                    <li key={row.value} className="grid grid-cols-[8rem_1fr_auto] items-center gap-3 text-sm">
+                    <li
+                      key={row.value}
+                      className="grid min-w-0 grid-cols-1 gap-1.5 text-sm @md/entity-pivot:grid-cols-[minmax(0,8rem)_minmax(0,1fr)_minmax(0,auto)] @md/entity-pivot:items-center @md/entity-pivot:gap-3"
+                    >
                       <span className="truncate text-muted-foreground">{row.label}</span>
                       <span className="h-3 rounded bg-muted">
                         <span
@@ -233,7 +250,9 @@ export function EntityPivotView({
                           data-testid={`entity-pivot-bar-${row.value}`}
                         />
                       </span>
-                      <span className="tabular-nums">{money(value, firstMeasure)}</span>
+                      <span className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">
+                        {money(value, firstMeasure)}
+                      </span>
                     </li>
                   )
                 })}

@@ -90,16 +90,33 @@ test("bank lines inherit company scope from their parent statement, never from a
   assert.deepEqual(denied.rows, [])
 })
 
-test("unlinked payments require posted state, ordinary direction and both explicit empty link arrays", () => {
-  const payment = (id: number, extra: OverviewRow = {}) => ({ id, companyId: 7, state: "Paid", paymentType: "Inbound", reconciledInvoiceIds: [], reconciledBillIds: [], ...extra })
-  const result = buildAccountantOverview(data({ payments: read([
-    payment(1), payment(2, { state: "NotPaid" }), payment(3, { state: "Reversed" }),
-    payment(4, { paymentType: "Transfer" }), payment(5, { reconciledInvoiceIds: [100] }),
-    payment(6, { reconciledBillIds: [101] }), payment(7, { companyId: 8 }),
-  ]) }), NOW)
-  assert.deepEqual(result.queues["unlinked-payments"].rows.map((row) => row.id), [1])
-  const redacted = buildAccountantOverview(data({ payments: read([payment(8, { reconciledBillIds: undefined })]) }), NOW)
-  assert.equal(redacted.queues["unlinked-payments"].state.status, "partial")
+test("unallocated payments include partial allocations with invoice links and show exact remaining funds", () => {
+  const payment = (id: number, extra: OverviewRow = {}) => ({
+    id, organizationId: 42, companyId: 7, currencyId: 1, partnerId: 10, amount: 100,
+    state: "Paid", paymentType: "Inbound", moveId: id + 100, reconciledInvoiceIds: [999], reconciledBillIds: [], ...extra,
+  })
+  const input = data({
+    payments: read([payment(1), payment(2), payment(3, { state: "NotPaid" }), payment(4, { state: "Reversed" })]),
+    currencies: read([{ id: 1, decimalPlaces: 2 }]),
+    moves: read([move(101, { moveType: "Entry" }), move(102, { moveType: "Entry" })]),
+    paymentAllocationSources: {
+      transactions: read(), reversals: read(), moveLines: read([
+        { id: 201, organizationId: 42, companyId: 7, moveId: 101, paymentId: 1, partnerId: 10, currencyId: 1, companyCurrencyId: 1, parentState: "Posted", accountInternalType: "receivable", balance: -100, amountResidual: 25 },
+        { id: 202, organizationId: 42, companyId: 7, moveId: 102, paymentId: 2, partnerId: 10, currencyId: 1, companyCurrencyId: 1, parentState: "Posted", accountInternalType: "receivable", balance: -100, amountResidual: 0 },
+      ]),
+    },
+  })
+  const queue = buildAccountantOverview(input, NOW).queues["unlinked-payments"]
+  assert.equal(queue.state.status, "ready")
+  assert.deepEqual(queue.rows.map((row) => row.id), [1])
+  assert.equal(queue.rows[0]?.allocationBalance?.remainingMinor, 2500n)
+  assert.equal(queue.rows[0]?.allocationBalance?.allocatedMinor, 7500n)
+  input.paymentAllocationSources!.moveLines.state = { status: "denied" }
+  const unavailable = buildAccountantOverview(input, NOW).queues["unlinked-payments"]
+  assert.equal(unavailable.state.status, "denied")
+  assert.deepEqual(unavailable.rows, [])
+  const unwired = buildAccountantOverview(data({ payments: read([payment(1)]) }), NOW).queues["unlinked-payments"]
+  assert.equal(unwired.state.status, "partial")
 })
 
 test("a missing residual or reconciliation flag is unavailable rather than an invented zero", () => {

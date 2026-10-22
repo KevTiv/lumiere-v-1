@@ -6,6 +6,7 @@ import {
   activeTabEntityTable,
   callReducerBff,
   fetchDefaultCompanyId,
+  fetchSessionOrganizationId,
   gotoApprovals,
   gotoModule,
   scalarQueryId,
@@ -53,6 +54,38 @@ async function exactActiveApprovalTaskIds(page: Page, orderId: number, companyId
   })
 }
 
+function statusTag(status: unknown): string {
+  if (typeof status === "string") return status
+  if (status && typeof status === "object" && "tag" in status) return String((status as { tag?: unknown }).tag ?? "")
+  return status && typeof status === "object" ? (Object.keys(status)[0] ?? "") : ""
+}
+
+/**
+ * Guarded-action discovery admits exactly one published workflow per action, so
+ * the seeded `seed.sales-approval` (gated on the unreachable ToApprove state)
+ * must be retired before this test publishes its own sale-order approval.
+ */
+async function retireSeedSalesApproval(page: Page, organizationId: number) {
+  const workflows = await page.request.get("/api/query/workflows")
+  expect(workflows.ok()).toBe(true)
+  const seedIds = new Set(
+    (((await workflows.json()) as { data?: Array<Record<string, unknown>> }).data ?? [])
+      .filter((row) => (row.workflowKey ?? row.workflow_key) === "seed.sales-approval")
+      .map((row) => scalarQueryId(row.id)),
+  )
+  if (seedIds.size === 0) return
+  const versions = await page.request.get("/api/query/workflow-versions")
+  expect(versions.ok()).toBe(true)
+  for (const row of ((await versions.json()) as { data?: Array<Record<string, unknown>> }).data ?? []) {
+    if (!seedIds.has(scalarQueryId(row.workflowId ?? row.workflow_id)) || statusTag(row.status) !== "Published") continue
+    await callReducerBff(page, "retire_workflow_version", [
+      organizationId,
+      scalarQueryId(row.id),
+      scalarQueryId(row.draftRevision ?? row.draft_revision),
+    ])
+  }
+}
+
 function isCanonicalOrderUrl(url: URL, orderId: number): boolean {
   return (
     url.pathname === "/sales" &&
@@ -64,6 +97,7 @@ function isCanonicalOrderUrl(url: URL, orderId: number): boolean {
 
 async function expectCanonicalOrderFocus(page: Page, orderId: number) {
   await expect(page).toHaveURL((url) => isCanonicalOrderUrl(url, orderId))
+  await expect(page.getByTestId("module-tab-sales-orders")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("module-tab-sales-orders")).toHaveAttribute("aria-selected", "true")
 
   const table = activeTabEntityTable(page)
@@ -105,10 +139,10 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
         if (tasks.length === 1) taskId = tasks[0]!
         return tasks.length
       }).toBe(1)
-      // The candidate-scoped inbox does not expose an admin-only task to its
-      // requester. The Sales client must keep the outcome unknown rather than
-      // infer a task by order state, name, or time.
-      expect(await exactActiveApprovalTaskIds(requester, orderId, companyId)).toEqual([])
+      // The sales role has no workflow-read grant: its private candidate inbox
+      // must fail closed before exposing the admin-only approval task.
+      const requesterInbox = await requester.request.get("/api/query/workflow-human-tasks-inbox")
+      expect(requesterInbox.status()).toBe(403)
       expect(await fetchOrderPickings(page, orderId, companyId)).toEqual([])
 
       await gotoApprovals(page)

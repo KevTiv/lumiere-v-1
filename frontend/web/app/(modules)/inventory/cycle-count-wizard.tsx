@@ -5,6 +5,13 @@ import { useTranslation } from '@lumiere/i18n';
 import { Button, EntityView, cn } from '@lumiere/ui';
 import { Input } from '@lumiere/ui';
 import { Label } from '@lumiere/ui';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { qualityAlertsTableConfig } from '@lumiere/ui';
 import {
   useCreateCycleCountPlan,
@@ -139,36 +146,36 @@ export function CycleCountWizard({
   const locOpts = locations.map((l) => {
     const id = strId(l.id);
     return (
-      <option key={id} value={id}>
+      <SelectItem key={id} value={id}>
         {String(l.completeName ?? l.name ?? id)}
-      </option>
+      </SelectItem>
     );
   });
 
   const countOpts = cycleCounts.map((c) => {
     const id = strId(c.id);
     return (
-      <option key={id} value={id}>
+      <SelectItem key={id} value={id}>
         {`${id} — ${String(c.name ?? 'Count')} (${String(c.state ?? '—')})`}
-      </option>
+      </SelectItem>
     );
   });
 
   const productOpts = products.map((p) => {
     const id = strId(p.id);
     return (
-      <option key={id} value={id}>
+      <SelectItem key={id} value={id}>
         {String(p.name ?? p.defaultCode ?? id)}
-      </option>
+      </SelectItem>
     );
   });
 
   const uomOpts = uoms.map((u) => {
     const id = strId(u.id);
     return (
-      <option key={id} value={id}>
+      <SelectItem key={id} value={id}>
         {String(u.name ?? id)}
-      </option>
+      </SelectItem>
     );
   });
 
@@ -244,15 +251,12 @@ export function CycleCountWizard({
               <Label htmlFor="cc-loc">
                 {t('inventory.cycleCountWizard.locationId')}
               </Label>
-              <select
-                id="cc-loc"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3"
-                value={locationId}
-                onChange={(e) => setLocationId(e.target.value)}
-              >
-                <option value="">—</option>
-                {locOpts}
-              </select>
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger id="cc-loc">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>{locOpts}</SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="cc-name">
@@ -359,17 +363,15 @@ export function CycleCountWizard({
             <Label htmlFor="cc-id">
               {t('inventory.cycleCountWizard.cycleCountId')}
             </Label>
-            <select
-              id="cc-id"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3"
+            <Select
               value={cycleCountId === '' ? '' : strId(cycleCountId)}
-              onChange={(e) =>
-                setCycleCountId(e.target.value === '' ? '' : e.target.value)
-              }
+              onValueChange={setCycleCountId}
             >
-              <option value="">—</option>
-              {countOpts}
-            </select>
+              <SelectTrigger id="cc-id">
+                <SelectValue placeholder="—" />
+              </SelectTrigger>
+              <SelectContent>{countOpts}</SelectContent>
+            </Select>
           </div>
           <Button
             type="button"
@@ -396,29 +398,23 @@ export function CycleCountWizard({
               <Label htmlFor="cc-prod">
                 {t('inventory.cycleCountWizard.productId')}
               </Label>
-              <select
-                id="cc-prod"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3"
-                value={recProductId}
-                onChange={(e) => setRecProductId(e.target.value)}
-              >
-                <option value="">—</option>
-                {productOpts}
-              </select>
+              <Select value={recProductId} onValueChange={setRecProductId}>
+                <SelectTrigger id="cc-prod">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>{productOpts}</SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="cc-rec-loc">
                 {t('inventory.cycleCountWizard.recordLocationId')}
               </Label>
-              <select
-                id="cc-rec-loc"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3"
-                value={recLocId}
-                onChange={(e) => setRecLocId(e.target.value)}
-              >
-                <option value="">—</option>
-                {locOpts}
-              </select>
+              <Select value={recLocId} onValueChange={setRecLocId}>
+                <SelectTrigger id="cc-rec-loc">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>{locOpts}</SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="cc-qty">
@@ -434,15 +430,12 @@ export function CycleCountWizard({
               <Label htmlFor="cc-uom">
                 {t('inventory.cycleCountWizard.uomId')}
               </Label>
-              <select
-                id="cc-uom"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3"
-                value={recUom}
-                onChange={(e) => setRecUom(e.target.value)}
-              >
-                <option value="">—</option>
-                {uomOpts}
-              </select>
+              <Select value={recUom} onValueChange={setRecUom}>
+                <SelectTrigger id="cc-uom">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>{uomOpts}</SelectContent>
+              </Select>
             </div>
           </div>
           <Button

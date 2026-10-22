@@ -1,11 +1,13 @@
 # syntax=docker/dockerfile:1
 FROM node:22-bookworm-slim AS base
-RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
-    apt-get update && \
+# Railway's Dockerfile builder accepts cache mounts only. Use the system CA
+# bundle here; optional BuildKit secret mounts reject the entire build there.
+RUN apt-get update && \
     apt-get install --yes --no-install-recommends ca-certificates git && \
     rm -rf /var/lib/apt/lists/* && \
     npm install --global pnpm@10.31.0 --strict-ssl=true
+
+FROM dopplerhq/cli:3.75.1@sha256:f2ffb55128ed895ca3ee7a64a394661e89aa16cf9f9e05cea24021a4ba062e75 AS doppler
 
 # --- deps ---
 FROM base AS deps
@@ -25,12 +27,7 @@ COPY packages/i18n/package.json ./packages/i18n/
 COPY vendor/ ./vendor/
 COPY scripts/verify-vendored-contracts.mjs ./scripts/verify-vendored-contracts.mjs
 RUN node ./scripts/verify-vendored-contracts.mjs
-RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then \
-      export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; \
-      export GIT_SSL_CAINFO=/run/secrets/proxy_ca; \
-    fi; \
-    pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # --- builder ---
 FROM deps AS builder
@@ -61,6 +58,10 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=::
 
+COPY --from=doppler /bin/doppler /usr/local/bin/doppler
+COPY web/scripts/doppler-entrypoint.sh /usr/local/bin/lumiere-with-secrets
+RUN chmod 0755 /usr/local/bin/lumiere-with-secrets
+
 RUN groupadd --system --gid 1001 nodejs \
     && useradd --system --uid 1001 --gid nodejs nextjs
 
@@ -70,4 +71,5 @@ COPY --from=builder --chown=nextjs:nodejs /app/web/public ./web/public
 
 USER nextjs
 EXPOSE 3000
+ENTRYPOINT ["/usr/local/bin/lumiere-with-secrets"]
 CMD ["node", "web/server.js"]

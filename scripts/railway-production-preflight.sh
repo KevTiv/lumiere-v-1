@@ -68,7 +68,17 @@ while IFS= read -r service; do
     failures=$((failures + 1))
   fi
 
-  if [[ "$(jq '.requiredVariables // {} | length' <<<"$service")" == 0 ]]; then
+  max_replicas="$(jq -r '.localStorage.maxReplicas // empty' <<<"$service")"
+  if [[ -n "$max_replicas" ]] && ! jq -e --arg name "$name" --argjson maximum "$max_replicas" '
+    [.[] | select(.name == $name)][0].regions
+    | (map(.configured) | add) as $total
+    | $total >= 1 and $total <= $maximum
+  ' >/dev/null <<<"$services_json"; then
+    echo "[railway-preflight] $name local document storage requires at most $max_replicas configured replica(s)" >&2
+    failures=$((failures + 1))
+  fi
+
+  if [[ "$(jq '(.requiredVariables // {} | length) + (.optionalFeatures // [] | length)' <<<"$service")" == 0 ]]; then
     continue
   fi
 
@@ -79,6 +89,36 @@ while IFS= read -r service; do
     --environment "$RAILWAY_ENVIRONMENT" \
     --service "$name" \
     --json)"
+
+  requirements="$(jq -c '.requiredVariables // {}' <<<"$service")"
+  while IFS= read -r feature; do
+    feature_name="$(jq -r '.name' <<<"$feature")"
+    selection_variable="$(jq -r '.selectionVariable' <<<"$feature")"
+    selection="${!selection_variable-}"
+    if [[ -n "$selection" && "$selection" != true && "$selection" != false ]]; then
+      die "$selection_variable must be true or false"
+    fi
+    configured=false
+    jq -e --argjson keys "$(jq '.configuredVariables' <<<"$feature")" '
+      . as $variables | any($keys[]; . as $key |
+        $variables | has($key) and (.[$key] == null or .[$key] != ""))
+    ' >/dev/null <<<"$variables_json" && configured=true
+    if [[ "$selection" != true && "$configured" != true ]]; then
+      echo "[railway-preflight] optional $name feature is unconfigured: $feature_name"
+      continue
+    fi
+    requirements="$(jq -c --argjson feature "$feature" '. + $feature.requiredVariables' <<<"$requirements")"
+    while IFS= read -r pair; do
+      first="$(jq -r '.[0]' <<<"$pair")"
+      second="$(jq -r '.[1]' <<<"$pair")"
+      if jq -e --arg first "$first" --arg second "$second" '
+        .[$first] != null and .[$first] != "" and .[$first] == .[$second]
+      ' >/dev/null <<<"$variables_json"; then
+        echo "[railway-preflight] $name requires distinct $first and $second" >&2
+        failures=$((failures + 1))
+      fi
+    done < <(jq -c '.distinctSecrets // [] | .[]' <<<"$feature")
+  done < <(jq -c '.optionalFeatures // [] | .[]' <<<"$service")
 
   while IFS= read -r requirement; do
     variable="$(jq -r '.key' <<<"$requirement")"
@@ -116,6 +156,13 @@ while IFS= read -r service; do
             (test("localhost|127\\.0\\.0\\.1|replace|placeholder"; "i") | not))
         ' >/dev/null <<<"$variables_json" && valid=true
         ;;
+      email)
+        jq -e --arg key "$variable" '
+          has($key) and (.[$key] | type == "string" and length <= 320 and
+            test("^[^<>\\r\\n]*<?[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}>?$") and
+            (test("replace|placeholder|localhost|example\\.com|resend\\.dev"; "i") | not))
+        ' >/dev/null <<<"$variables_json" && valid=true
+        ;;
       non-placeholder)
         jq -e --arg key "$variable" '
           has($key) and (.[$key] | type == "string" and length > 0 and
@@ -131,7 +178,7 @@ while IFS= read -r service; do
       echo "[railway-preflight] $name is missing or has invalid $variable ($kind)" >&2
       failures=$((failures + 1))
     fi
-  done < <(jq -c '.requiredVariables // {} | to_entries[]' <<<"$service")
+  done < <(jq -c 'to_entries[]' <<<"$requirements")
 done < <(jq -c '.services[]' "$MANIFEST")
 
 (( failures == 0 )) || die "$failures production topology requirement(s) failed"

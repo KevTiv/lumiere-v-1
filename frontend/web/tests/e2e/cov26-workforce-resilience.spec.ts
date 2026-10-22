@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   expectFormModalVisible,
   expectNoAppError,
   gotoModule,
@@ -59,7 +60,7 @@ test.describe("COV-26 workforce module resilience", { tag: ["@cov09", "@cov10", 
 
       for (const module of MODULES) {
         await gotoModule(page, module.href, module.moduleId)
-        await page.getByTestId(`module-tab-${module.moduleId}-${module.tabId}`).click()
+        await selectModuleTab(page, module.moduleId, module.tabId)
         await expectNoHorizontalOverflow(page, `${module.label} at ${width}px`)
 
         const create = page.getByTestId(`module-create-${module.moduleId}-${module.tabId}`)
@@ -83,7 +84,7 @@ test.describe("COV-26 workforce module resilience", { tag: ["@cov09", "@cov10", 
     for (const module of MODULES) {
       await gotoModule(page, module.href, module.moduleId)
       await waitForBffQueryMinRows(page, `/api/query/${module.resource}`)
-      await page.getByTestId(`module-tab-${module.moduleId}-${module.tabId}`).click()
+      await selectModuleTab(page, module.moduleId, module.tabId)
 
       const search = page.getByRole("textbox", { name: "Search records" })
       await search.fill(`cov26-no-match-${module.moduleId}-${Date.now()}`)
@@ -101,7 +102,7 @@ test.describe("COV-26 workforce module resilience", { tag: ["@cov09", "@cov10", 
       await signIn(page, "fixture.reader@example.test", PERSONA_PASSWORD)
       for (const module of MODULES) {
         await gotoModule(page, module.href, module.moduleId)
-        await page.getByTestId(`module-tab-${module.moduleId}-${module.tabId}`).click()
+        await selectModuleTab(page, module.moduleId, module.tabId)
         await expect(page.getByTestId(`module-create-${module.moduleId}-${module.tabId}`)).toBeHidden()
       }
       await expectNoAppError(page)
@@ -119,20 +120,20 @@ test.describe("COV-26 workforce module resilience", { tag: ["@cov09", "@cov10", 
       const canonicalId = scalarQueryId(beforeRows[0]?.id)
       if (canonicalId == null) throw new Error(`${module.resource} requires one seeded canonical row`)
 
-      await gotoModule(page, module.href, module.moduleId)
+      await gotoModule(page, `${module.href}&filter=id:${canonicalId}`, module.moduleId)
+      await expect(page.getByTestId(`entity-row-${canonicalId}`)).toBeVisible()
       await context.setOffline(true)
       await page.waitForTimeout(500)
       await context.setOffline(false)
 
-      const refetch = page.waitForResponse(
-        (response) => response.url().includes(`/api/query/${module.resource}`) && response.ok(),
-        { timeout: 30_000 },
-      )
+      // SSR prefetch and subscriptions can satisfy the reloaded view without
+      // another browser query. Check the live read and exact displayed row.
       await page.reload({ waitUntil: "domcontentloaded" })
-      const response = await refetch
+      const response = await page.request.get(`/api/query/${module.resource}`)
+      expect(response.ok()).toBe(true)
       const rows = ((await response.json()) as { data?: Array<{ id?: unknown }> }).data ?? []
       expect(rows.map((row) => scalarQueryId(row.id))).toContain(canonicalId)
-      await page.getByTestId(`module-tab-${module.moduleId}-${module.tabId}`).click()
+      await selectModuleTab(page, module.moduleId, module.tabId)
       await expect(page.getByTestId(`entity-row-${canonicalId}`)).toBeVisible()
       await expectNoAppError(page)
     }

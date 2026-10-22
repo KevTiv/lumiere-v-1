@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect } from "react"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
+import { isWorkspaceFormModuleVisible } from "../lib/workspace-profile"
 import { useTranslation } from "@lumiere/i18n"
 import { toast } from "sonner"
 import { useErpSession } from "@lumiere/erp-session"
@@ -18,7 +20,7 @@ import { useRBAC } from "@/lib/rbac-context"
 import { formRegistry } from "../forms/config/registry"
 import type { FormRegistryEntry, FormModuleMetadata, FieldType, ParsedFormField } from "../forms/config/types"
 import { generateCustomFieldId, parseRoleConfig } from "../forms/config/types"
-import { toCreateRoleConfigParams, toCreateUserCustomFieldParams } from "@lumiere/erp-shared/forms-create-params"
+import { toCreateRoleConfigParams } from "@lumiere/erp-shared/forms-create-params"
 import { useFormConfiguration } from "../forms/hooks/use-form-config"
 import { ConfigurableForm } from "../forms/components/configurable-form"
 import { pushRegistryFormToDatabase } from "../forms/utils/push-registry-form"
@@ -29,7 +31,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { ContextTabsList as TabsList, ContextTabsTrigger as TabsTrigger } from "../components/context-tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Select,
@@ -57,7 +60,6 @@ import {
   GripVertical,
   Pencil,
   Trash2,
-  Copy,
   Eye,
   EyeOff,
   MoreVertical,
@@ -66,8 +68,6 @@ import {
   ChevronRight,
   AlertCircle,
   RotateCcw,
-  Download,
-  Upload,
   LayoutGrid,
   List,
   // Module icons
@@ -131,7 +131,11 @@ export function UnifiedFormConfigSettings({ className }: UnifiedFormConfigSettin
   const [selectedModule, setSelectedModule] = useState<string | null>(null)
   const [selectedForm, setSelectedForm] = useState<FormRegistryEntry | null>(null)
 
-  const modules = useMemo(() => formRegistry.getModules(), [])
+  const workspaceProfile = useWorkspaceProfile()
+  const modules = useMemo(
+    () => formRegistry.getModules().filter((module) => isWorkspaceFormModuleVisible(workspaceProfile, module.id)),
+    [workspaceProfile],
+  )
 
   const moduleForms = useMemo(() => {
     if (!selectedModule) return []
@@ -588,11 +592,10 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
       ) : null}
 
       <Tabs defaultValue="fields" className="w-full flex flex-col">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 lg:max-w-3xl">
+        <TabsList scrollable className="justify-start">
           <TabsTrigger value="fields">{t("settings.formConfig.tabs.fields")}</TabsTrigger>
           <TabsTrigger value="roles">{t("settings.formConfig.tabs.roles")}</TabsTrigger>
           <TabsTrigger value="preview">{t("settings.formConfig.tabs.preview")}</TabsTrigger>
-          <TabsTrigger value="import">{t("settings.formConfig.tabs.importExport")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="fields" className="space-y-4">
@@ -718,47 +721,6 @@ function FormConfigurationDetail({ className, formEntry, onBack }: FormConfigura
               }
             />
           </div>
-        </TabsContent>
-
-        <TabsContent value="import" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">{t("settings.formConfig.export.title")}</CardTitle>
-                <CardDescription>{t("settings.formConfig.export.description")}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button className="w-full gap-2" type="button" disabled>
-                  <Download className="h-4 w-4" />
-                  {t("settings.formConfig.export.button")}
-                </Button>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">{t("settings.formConfig.import.title")}</CardTitle>
-                <CardDescription>{t("settings.formConfig.import.description")}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button variant="outline" className="w-full gap-2" type="button" disabled>
-                  <Upload className="h-4 w-4" />
-                  {t("settings.formConfig.import.button")}
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t("settings.formConfig.resetDefaults.title")}</CardTitle>
-              <CardDescription>{t("settings.formConfig.resetDefaults.description")}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="destructive" className="gap-2" type="button" disabled>
-                <RotateCcw className="h-4 w-4" />
-                {t("settings.formConfig.resetDefaults.button")}
-              </Button>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
 
@@ -928,10 +890,6 @@ function FieldConfigCard({
                 <DropdownMenuItem onClick={onEdit}>
                   <Pencil className="h-4 w-4 mr-2" />
                   {t("settings.formConfig.fieldCard.edit")}
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Copy className="h-4 w-4 mr-2" />
-                  {t("settings.formConfig.fieldCard.duplicate")}
                 </DropdownMenuItem>
                 {!field.isSystem && (
                   <DropdownMenuItem

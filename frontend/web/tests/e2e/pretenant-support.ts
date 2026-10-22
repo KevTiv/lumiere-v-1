@@ -462,15 +462,15 @@ export function seededRng(seed: number): () => number {
 
 /**
  * Let the request reach the server (so the mutation commits) and then drop the response,
- * modelling a mobile network losing the reply. Applies to the first matching request only.
+ * modelling a mobile network losing the reply. Applies to the first matching POST only;
+ * background collection reads must not consume the mutation's injected failure.
  */
 export async function loseNextResponse(page: Page, urlPart: string): Promise<{ lost: () => boolean }> {
   let lost = false
   await page.route(
     (url) => matchesOperationFaultTarget(url, urlPart),
     async (route) => {
-      if (route.request().method() !== "POST") return route.continue()
-      if (lost) return route.continue()
+      if (route.request().method() !== "POST" || lost) return route.continue()
       lost = true
       await route.fetch()
       await route.abort("connectionreset")

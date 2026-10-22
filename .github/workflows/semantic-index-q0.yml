@@ -108,4 +108,6 @@ jobs:
         run: pnpm --dir web test:unit
 
       - name: Frontend typecheck
-        run: pnpm --filter ./web exec tsc --noEmit
+        # This job has no incremental-state cache. Check the full project without
+        # retaining build metadata on each cold checkout; CI owns the cached check.
+        run: pnpm --filter ./web exec tsc --noEmit --incremental false

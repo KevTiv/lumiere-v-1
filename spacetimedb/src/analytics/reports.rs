@@ -429,6 +429,7 @@ fn is_owner_report_key(key: &str) -> bool {
             | "purchase_spend_v1"
             | "payment_fee_summary_v1"
             | "monthly_owner_report_v1"
+            | "margin_supply_outlook_v1"
     )
 }
 
@@ -1759,7 +1760,11 @@ pub fn update_saved_report(
     if existing.company_id != company_id {
         return Err("Saved report does not belong to this company".to_string());
     }
-    if params.name.as_ref().is_some_and(|name| name.trim().is_empty()) {
+    if params
+        .name
+        .as_ref()
+        .is_some_and(|name| name.trim().is_empty())
+    {
         return Err("Saved report name is required".to_string());
     }
     let next_row_dimension = params

@@ -90,10 +90,15 @@ import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow'
 import { useStockQuantWorkflow } from '@lumiere/query-hooks/hooks/stock-quant-workflow';
 import { useQualityCheckFailWorkflow } from '@lumiere/query-hooks/hooks/quality-check-fail-workflow';
 import { useReplenishmentExecutionWorkflow } from '@lumiere/query-hooks/hooks/replenishment-execution-workflow';
+import { useReplenishmentScheduleWorkflow } from '@lumiere/query-hooks/hooks/replenishment-schedule-workflow';
 import { useSerialReserveWorkflow } from '@lumiere/query-hooks/hooks/serial-reserve-workflow';
 import { useSerialUseWorkflow } from '@lumiere/query-hooks/hooks/serial-use-workflow';
 import { useSerialBlockWorkflow } from '@lumiere/query-hooks/hooks/serial-block-workflow';
-import { planPartialDelivery, variantTag } from '@lumiere/erp-workflows';
+import {
+  planPartialDelivery,
+  replenishmentScheduleState,
+  variantTag,
+} from '@lumiere/erp-workflows';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import type { KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
 import { transferKpis } from './transfer-kpis';
@@ -1228,13 +1233,10 @@ function InventoryClientLoaded({
     operatingCompanyId,
     workflowSurface,
   );
-  const scheduleReplenishmentRun = useScheduleReplenishmentRun(
+  const replenishmentSchedule = useReplenishmentScheduleWorkflow(
     orgId,
     operatingCompanyId,
-  );
-  const cancelReplenishmentRun = useCancelReplenishmentRun(
-    orgId,
-    operatingCompanyId,
+    workflowSurface,
   );
   const createStockQuant = useCreateStockQuant(orgId, {
     companyId: operatingCompanyId ?? undefined,
@@ -4164,25 +4166,40 @@ function InventoryClientLoaded({
                 {
                   id: 'schedule-replenishment-run',
                   label: t('inventory.replenishmentActions.scheduleRun'),
-                  icon: ListChecks,
+                  icon: Play,
                   requiresSelection: true,
-                  isApplicable: (rows) => rows.every((row) => row.active === true),
-                  successMessage: t('common.actionCompleted', { action: t('inventory.replenishmentActions.scheduleRun') }),
-                  onClick: async (rows) => {
+                  isApplicable: (rows) => {
+                    if (rows.length !== 1) return false;
+                    const state = replenishmentScheduleState(rows[0] ?? {});
+                    return state.readable && state.jobId === null;
+                  },
+                  onClick: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null)
-                      await scheduleReplenishmentRun.mutateAsync(id);
+                    if (id != null) {
+                      void replenishmentSchedule.schedule(String(id), {
+                        navigateToNext: true,
+                      });
+                    }
                   },
                 },
                 {
                   id: 'cancel-replenishment-run',
-                  label: t('inventory.replenishmentActions.cancelSchedule'),
-                  icon: ListChecks,
+                  label: t('inventory.replenishmentActions.cancelRun'),
+                  icon: XCircle,
+                  variant: 'destructive',
                   requiresSelection: true,
-                  successMessage: t('common.actionCompleted', { action: t('inventory.replenishmentActions.cancelSchedule') }),
-                  onClick: async (rows) => {
+                  isApplicable: (rows) => {
+                    if (rows.length !== 1) return false;
+                    const state = replenishmentScheduleState(rows[0] ?? {});
+                    return state.readable && state.jobId !== null;
+                  },
+                  onClick: (rows) => {
                     const id = rows[0]?.id as ScalarId | undefined;
-                    if (id != null) await cancelReplenishmentRun.mutateAsync(id);
+                    if (id != null) {
+                      void replenishmentSchedule.cancel(String(id), {
+                        navigateToNext: true,
+                      });
+                    }
                   },
                 },
               ],
@@ -4891,8 +4908,7 @@ function InventoryClientLoaded({
     cancelWarehouseTask,
     updateWarehouseTaskStatus,
     executeReplenishmentRule,
-    scheduleReplenishmentRun,
-    cancelReplenishmentRun,
+    replenishmentSchedule,
     startQualityCheck,
     openQualityAlert,
     solveQualityAlert,
@@ -5457,6 +5473,7 @@ function InventoryClientLoaded({
       addMemberToQualityTeam,
       removeMemberFromQualityTeam,
       executeReplenishmentRule,
+      replenishmentSchedule,
       createStockQuant,
       updateStockQuantQuantity,
       updateStockProductionLot,

@@ -55,6 +55,26 @@ const pendingU5 = (
   canonicalFor,
 })
 
+const alphaFinanceSurface = (
+  id: string,
+  href: `/${string}`,
+  target: "t0-business" | "t0-horizontal",
+  owner: string,
+  requiredCapability: Resource,
+): ProductSurfaceDefinition => ({
+  id,
+  kind: "route",
+  href,
+  classification: "admitted-t0",
+  target,
+  firstOrgExposure: "enabled",
+  owner,
+  requiredRole: null,
+  requiredCapability,
+  minimumEvidence: "finance alpha operator workflow",
+  hiddenReason: null,
+})
+
 /**
  * Canonical first-test-organization product-surface denominator.
  *
@@ -71,31 +91,31 @@ export const PRODUCT_SURFACES: readonly ProductSurfaceDefinition[] = [
     "dashboard:overview",
   ),
   pendingU5("tasks", "/tasks", "t0-horizontal", "COV-10", "dashboard:tasks"),
-  pendingU5(
+  alphaFinanceSurface(
     "accounting",
     "/accounting",
     "t0-business",
     "COV-08",
     "module:accounting",
   ),
-  pendingU5("sales", "/sales", "t0-business", "COV-04", "module:sales"),
-  pendingU5("crm", "/crm", "t0-business", "COV-03", "module:crm"),
-  pendingU5(
+  alphaFinanceSurface("sales", "/sales", "t0-business", "COV-04", "module:sales"),
+  alphaFinanceSurface("crm", "/crm", "t0-business", "COV-03", "module:crm"),
+  alphaFinanceSurface(
     "purchasing",
     "/purchasing",
     "t0-business",
     "COV-05",
     "module:purchasing",
   ),
-  pendingU5("reports", "/reports", "t0-horizontal", "COV-20", "module:reports"),
-  pendingU5(
+  alphaFinanceSurface("reports", "/reports", "t0-horizontal", "COV-20", "module:reports"),
+  alphaFinanceSurface(
     "subscriptions",
     "/subscriptions",
     "t0-business",
     "COV-12",
     "module:subscriptions",
   ),
-  pendingU5(
+  alphaFinanceSurface(
     "expenses",
     "/expenses",
     "t0-business",
@@ -373,6 +393,30 @@ export function isFirstOrgSurfaceAdmitted(
   const surface = getProductSurface(surfaceId)
   if (surface.firstOrgExposure === "enabled") return true
   return surface.firstOrgExposure === "admin-only" && isAdmin
+}
+
+const FIRST_ORG_FINANCE_SUPPORT_ROUTE_IDS = new Set([
+  "tasks",
+  "inventory",
+  "workflows",
+  "approvals",
+  "documents",
+  "calendar",
+  "messages",
+])
+
+/**
+ * Alpha navigation is deliberately smaller than the set of usable routes.
+ * This explicit allowlist keeps cross-module Finance links working without
+ * making every review-state module reachable by a guessed URL.
+ */
+export function isFirstOrgRouteAdmitted(
+  surfaceId: string,
+  isAdmin: boolean,
+): boolean {
+  const surface = getProductSurface(surfaceId)
+  if (isFirstOrgSurfaceAdmitted(surfaceId, isAdmin)) return true
+  return FIRST_ORG_FINANCE_SUPPORT_ROUTE_IDS.has(surface.id)
 }
 
 export const FIRST_ORG_QUICK_ACTION_SURFACE_IDS = [

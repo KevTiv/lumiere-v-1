@@ -11,6 +11,20 @@ import {
 } from "./stdb-params-json"
 
 describe("stdbParamsToJson", () => {
+  it("encodes complete update_role compatibility params for revocation and clearing", () => {
+    for (const permissions of [["organization:read"], []]) {
+      assert.deepEqual(encodeReducerCallArgs("update_role", [7, {
+        permissions: { some: permissions },
+      }]), [7, {
+        permissions: { some: permissions },
+        name: { none: [] },
+        description: { none: [] },
+        is_active: { none: [] },
+        metadata: { none: [] },
+      }])
+    }
+  })
+
   it("encodes requisition line optional fields for typed commands and compat calls", () => {
     const params = {
       lines: [
@@ -25,6 +39,17 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(stdbParamsToJson(params, "CreatePurchaseRequisitionParams").lines, expected)
     const encoded = encodeReducerCallArgs("create_purchase_requisition", [1, params])
     assert.deepEqual((encoded[1] as Record<string, unknown>).lines, expected)
+  })
+
+  it("preserves optional permission-list presence, including an explicit clear", () => {
+    for (const permissions of [["contact:read"], []]) {
+      assert.deepEqual(stdbParamsToJson({ permissions }, "UpdateRoleParams").permissions, { some: permissions })
+      assert.deepEqual(stdbParamsToJson({ permissions }, "CreateRoleParams").permissions, permissions)
+      assert.deepEqual(stdbParamsToJson({ permissions: { some: permissions } }, "UpdateRoleParams").permissions, { some: permissions })
+    }
+    assert.deepEqual(stdbParamsToJson({}, "UpdateRoleParams").permissions, { none: [] })
+    assert.deepEqual(stdbParamsToJson({ permissions: null }, "UpdateRoleParams").permissions, { none: [] })
+    assert.deepEqual(stdbParamsToJson({ roleIds: [1n, 2n] }), { role_ids: [1, 2] })
   })
 
   it("fills every Option field of nested BOM lines", () => {
@@ -44,6 +69,38 @@ describe("stdbParamsToJson", () => {
         child_bom_id: { none: [] },
         metadata: { none: [] },
       },
+    ])
+  })
+
+  it("encodes statement import row decimal amounts, timestamps, zero and missing values as SATS Options", () => {
+    const timestamp = { microsSinceUnixEpoch: 1_791_244_800_000_000n }
+    const params = stdbParamsToJson({
+      fileName: "bank.csv", idempotencyKey: "bank-reviewed-key", openingBalance: 10,
+      rows: [
+        { rowNumber: 2, date: timestamp, amount: 125.5, reference: "TX-1", description: "Transfer" },
+        { rowNumber: 3, amount: 0 },
+        { rowNumber: 4 },
+      ],
+    }, "StageBankStatementImportParams")
+    assert.deepEqual(params.rows, [
+      { row_number: 2, date: { some: { __timestamp_micros_since_unix_epoch__: 1_791_244_800_000_000 } }, amount: { some: 125.5 }, reference: { some: "TX-1" }, description: { some: "Transfer" } },
+      { row_number: 3, amount: { some: 0 }, date: { none: [] }, reference: { none: [] }, description: { none: [] } },
+      { row_number: 4, date: { none: [] }, amount: { none: [] }, reference: { none: [] }, description: { none: [] } },
+    ])
+    assert.deepEqual(params.file_name, { some: "bank.csv" })
+    assert.equal(params.opening_balance, 10)
+    assert.deepEqual(stdbParamsToJson(params, "StageBankStatementImportParams"), params)
+  })
+
+  it("fills every Option field of nested purchase requisition lines", () => {
+    const params = stdbParamsToJson(
+      {
+        lines: [{ productId: 7n, productUom: 1n, productUomQty: 2, name: "Bolts", sequence: 10 }],
+      },
+      "CreatePurchaseRequisitionParams",
+    )
+    assert.deepEqual(params.lines, [
+      { product_id: 7, product_uom: 1, product_uom_qty: 2, name: { some: "Bolts" }, sequence: { some: 10 } },
     ])
   })
 
@@ -344,6 +401,22 @@ describe("stdbParamsToJson", () => {
     assert.deepEqual(params.sale_order_id, { some: 8 })
     assert.deepEqual(params.return_reason, { some: "defective" })
     assert.deepEqual(line.sale_order_line_id, { none: [] })
+    assert.equal(line.product_id, 3)
+  })
+
+  it("stdbParamsToJson SATS-encodes nested purchase requisition line Option fields", () => {
+    const params = stdbParamsToJson({
+      lines: [{
+        productId: 3n,
+        productUom: 1n,
+        productUomQty: 2,
+        name: "Operator requisition",
+        sequence: 10,
+      }],
+    }, "CreatePurchaseRequisitionParams")
+    const line = (params.lines as Record<string, unknown>[])[0]
+    assert.deepEqual(line.name, { some: "Operator requisition" })
+    assert.deepEqual(line.sequence, { some: 10 })
     assert.equal(line.product_id, 3)
   })
 

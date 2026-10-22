@@ -37,6 +37,7 @@ import {
   Users,
 } from "lucide-react"
 
+import { isWorkspaceSurfaceVisible, type WorkspaceProfile } from "./workspace-profile"
 import type { Resource } from "./rbac-types"
 import { isFirstOrgSurfaceAdmitted } from "./product-surface-catalog"
 
@@ -54,6 +55,7 @@ export interface NavGroup {
 }
 
 export interface NavigationCatalogOptions {
+  workspaceProfile?: WorkspaceProfile
   firstOrgProfile?: boolean
   isAdmin?: boolean
 }
@@ -134,13 +136,14 @@ export function buildNavGroups(
     },
   ]
 
-  if (!options.firstOrgProfile) return groups
+  if (!options.firstOrgProfile && (!options.workspaceProfile || options.workspaceProfile === "full")) return groups
 
   return groups
     .map((group) => ({
       ...group,
       items: group.items.filter((item) =>
-        isFirstOrgSurfaceAdmitted(item.surfaceId, options.isAdmin ?? false),
+        isWorkspaceSurfaceVisible(options.workspaceProfile ?? "full", item.surfaceId) &&
+        (!options.firstOrgProfile || isFirstOrgSurfaceAdmitted(item.surfaceId, options.isAdmin ?? false)),
       ),
     }))
     .filter((group) => group.items.length > 0)
