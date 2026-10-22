@@ -29,7 +29,8 @@ use stdb_client::StdbClient;
 const MAX_WINDOWS: usize = 4;
 const MAX_SOURCE_READS: usize = 100;
 const MAX_PAGE_SIZE: u32 = 50;
-// No snapshots, guarded-action input, decision comments or free-text metadata.
+// No snapshots, decision comments or free-text metadata. guarded_action is read
+// only for operation authorization and removed by project_work_task before HTTP output.
 const BOARD_COLUMNS: &str = "id, organization_id, company_id, workflow_id, workflow_version_id, \
 workflow_instance_id, token_id, node_id, node_key, kind, assignment, candidate_role_ids, \
 candidate_group_ids, candidate_unit_ids, require_comment_on_reject, subject_model, subject_id, \
@@ -893,7 +894,7 @@ mod tests {
     }
 
     #[test]
-    fn detailed_owner_read_is_bounded_and_excludes_source_payloads() {
+    fn detailed_owner_read_is_bounded_and_limits_internal_payloads() {
         let sql = super::super::bounded_windows::window_sql(
             "workflow_human_task",
             BOARD_COLUMNS,
@@ -905,7 +906,11 @@ mod tests {
             "organization_id = 42 AND company_id = 7 AND (subject_model = 'purchase_order')"
         ));
         assert!(sql.contains("id > 0 AND id <= 128 LIMIT 128"));
-        assert!(!sql.contains("guarded_action"));
+        // The final-approval capability needs the guard internally. HTTP tests
+        // verify that neither spelling of this field reaches the response.
+        assert!(sql.contains("guarded_action"));
+        assert!(!sql.contains("condition_snapshot"));
+        assert!(!sql.contains("metadata"));
         assert!(!sql.contains("decision_comment"));
         assert!(!sql.contains("SELECT *"));
         assert!(!sql.contains("ORDER BY"));

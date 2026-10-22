@@ -94,6 +94,23 @@ fn require_ui_child_read_permission(
         "document-signature-requests" | "document-legal-holds" | "document-external-refs" => {
             documents::has_document_read_permission(field_access)
         }
+        resource if crate::workflow_reads::is_private_workflow_resource(resource) => {
+            // Match the owner-read route's canonical workflow permission. Private
+            // projections are not registry entries and have no independent role grant.
+            let permission_resource = if registry_get(resource).is_some() {
+                resource
+            } else {
+                "workflows"
+            };
+            field_access.is_some_and(|access| {
+                !stdb_auth::resource_read_denied(access, permission_resource)
+                    && (has_resource_read_permission(Some(access), permission_resource)
+                        || access.role_permissions.iter().any(|permission| {
+                            permission == "module:workflows:read"
+                                || permission == "module:workflows:*"
+                        }))
+            })
+        }
         _ => {
             stdb_auth::session_read_resource(resource)
                 || has_resource_read_permission(field_access, resource)
@@ -722,6 +739,58 @@ mod tests {
             );
         }
         assert!(require_ui_child_read_permission("leads", 42, &identity, Some(&access)).is_err());
+    }
+
+    #[test]
+    fn private_workflow_reads_reuse_canonical_grants_and_preserve_denials_and_scope() {
+        let identity = "ab".repeat(32);
+        for resource in [
+            "workflow-human-tasks-inbox",
+            "workflow-human-tasks",
+            "workflow-human-task-events",
+        ] {
+            for grant in ["workflow:read", "module:workflows:read"] {
+                let mut access = authoritative_access(grant);
+                access.identity_hex = identity.clone();
+                assert!(
+                    require_ui_child_read_permission(resource, 42, &identity, Some(&access))
+                        .is_ok()
+                );
+                assert!(
+                    require_ui_child_read_permission(resource, 43, &identity, Some(&access))
+                        .is_err()
+                );
+                assert!(require_ui_child_read_permission(
+                    resource,
+                    42,
+                    &"cd".repeat(32),
+                    Some(&access)
+                )
+                .is_err());
+                assert!(require_ui_child_read_permission(resource, 42, &identity, None).is_err());
+                for denied_resource in [resource, "workflow"] {
+                    let mut denied = access.clone();
+                    denied.org_permissions.push(stdb_auth::ActionPermission {
+                        resource: denied_resource.into(),
+                        action: "read".into(),
+                        allow: false,
+                    });
+                    assert!(
+                        require_ui_child_read_permission(resource, 42, &identity, Some(&denied))
+                            .is_err(),
+                        "{resource}: denied {denied_resource}"
+                    );
+                }
+            }
+            for grant in ["workflow:write", "purchase_order:read", "organization:read"] {
+                let mut access = authoritative_access(grant);
+                access.identity_hex = identity.clone();
+                assert!(
+                    require_ui_child_read_permission(resource, 42, &identity, Some(&access))
+                        .is_err()
+                );
+            }
+        }
     }
 
     #[test]

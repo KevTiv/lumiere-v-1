@@ -2297,8 +2297,13 @@ export async function waitForPendingApprovalRequest(
   resId: number,
 ): Promise<number> {
   const deadline = Date.now() + 30_000
+  let lastRead = "not queried"
   while (Date.now() < deadline) {
     const res = await page.request.get("/api/query/workflow-human-tasks-inbox")
+    lastRead = `HTTP ${res.status()}`
+    if (!res.ok()) {
+      throw new Error(`pending human task inbox denied for ${model}#${resId}: ${lastRead}: ${await res.text()}`)
+    }
     if (res.ok()) {
       const json = (await res.json()) as {
         data?: Array<{
@@ -2314,6 +2319,7 @@ export async function waitForPendingApprovalRequest(
           summary?: { subjectModel?: unknown; subjectId?: unknown }
         }>
       }
+      lastRead += `, ${json.data?.length ?? 0} visible tasks`
       const row = (json.data ?? []).find((r) => {
         const subjectModel =
           r.subjectModel ??
@@ -2345,7 +2351,7 @@ export async function waitForPendingApprovalRequest(
     }
     await page.waitForTimeout(250)
   }
-  throw new Error(`pending human task not found for ${model}#${resId}`)
+  throw new Error(`pending human task not found for ${model}#${resId} (${lastRead})`)
 }
 
 export async function rejectApprovalRequestViaUi(
