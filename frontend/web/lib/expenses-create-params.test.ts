@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { describe, it } from "node:test"
 
 import {
+  expenseQuantity,
   newExpenseClientRequestId,
   parseAttachmentIds,
   toCreateExpenseParams,
@@ -49,6 +50,16 @@ describe("expense operator create params", () => {
     assert.equal(params.clientRequestId, "expense-fixed-retry-key")
     assert.equal(params.employeeId, 7n)
     assert.equal(params.currencyId, 2n)
+  })
+
+  it("treats an untouched quantity input as one unit", () => {
+    const params = toCreateExpenseParams(
+      { employeeId: "7", name: "Taxi", date: "2026-10-13", totalAmount: "12", quantity: "" },
+      { currencyId: "2", pricelistId: "4" },
+    )
+    assert.equal(params?.quantity, 1)
+    assert.equal(expenseQuantity(undefined), 1)
+    assert.equal(expenseQuantity("3"), 3)
   })
 
   it("generates non-empty command identities and rejects invalid attachment ids", () => {

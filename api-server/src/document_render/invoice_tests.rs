@@ -11,6 +11,90 @@ fn saved_snapshot() -> Value {
     })
 }
 
+fn buyer_snapshot() -> Value {
+    let mut snapshot = saved_snapshot();
+    snapshot["schemaVersion"] = json!(2);
+    snapshot["buyer"] = json!({ "partnerId": "4", "name": "Buyer legal name", "address": ["Billing street", "Kigali"], "taxId": "BUYER-TIN", "registrationNumber": "BUYER-REG", "email": "billing@example.test", "phone": "+250123" });
+    snapshot
+}
+
+#[test]
+fn v2_buyer_legal_identity_is_captured_and_v1_remains_explicitly_unavailable() {
+    let mut mv = invoice();
+    mv["metadata"] = json!({"invoiceDocument":buyer_snapshot()});
+    mv["invoicePartnerDisplayName"] = json!("Changed current display name");
+    let document = project(&mv, &[]);
+    assert!(document.buyer_available);
+    assert_eq!(document.customer.name, "Buyer legal name");
+    assert_eq!(document.customer.tax_id, "BUYER-TIN");
+    assert_eq!(document.customer.address, ["Billing street", "Kigali"]);
+    let html = render_invoice_html(&document, None);
+    assert!(html.contains("BUYER-REG"));
+    assert!(!html.contains("Changed current display name"));
+    let original = project(&invoice(), &[]);
+    assert!(!original.buyer_available);
+    assert!(original.customer.address.is_empty());
+    assert!(render_invoice_html(&original, None)
+        .contains("Billing address and tax identity were not captured"));
+}
+
+#[test]
+fn malformed_future_or_cross_linked_buyer_snapshots_fail_closed() {
+    for buyer in [
+        Value::Null,
+        json!({}),
+        json!({ "partnerId":"5", "name":"Foreign", "address":[], "taxId":"", "registrationNumber":"", "email":"", "phone":"" }),
+        json!({ "partnerId":"4", "name":" ", "address":[], "taxId":"", "registrationNumber":"", "email":"", "phone":"" }),
+    ] {
+        let mut snapshot = buyer_snapshot();
+        snapshot["buyer"] = buyer;
+        let mut mv = invoice();
+        mv["metadata"] = json!({"invoiceDocument":snapshot});
+        assert!(document_snapshot(&mv).is_err());
+    }
+    for version in [1, 3] {
+        let mut snapshot = buyer_snapshot();
+        snapshot["schemaVersion"] = json!(version);
+        let mut mv = invoice();
+        mv["metadata"] = json!({"invoiceDocument":snapshot});
+        assert!(document_snapshot(&mv).is_err());
+    }
+    let mut snapshot = buyer_snapshot();
+    snapshot["buyer"]["taxId"] = json!("x".repeat(257));
+    let mut mv = invoice();
+    mv["metadata"] = json!({"invoiceDocument":snapshot});
+    assert!(document_snapshot(&mv).is_err());
+    mv["moveType"] = json!("InInvoice");
+    assert!(document_snapshot(&mv).expect("unsupported role").is_none());
+}
+
+#[test]
+fn draft_preview_preserves_captured_buyer_without_crm_and_missing_partner_stays_v1() {
+    let mut mv = invoice();
+    mv["state"] = json!("Draft");
+    mv["metadata"] = json!({"invoiceDocument":buyer_snapshot()});
+    let snapshot = draft_invoice_snapshot(&mv, 7, Some(&draft_company()), &[])
+        .expect("draft")
+        .expect("snapshot");
+    assert_eq!(snapshot.schema_version, 2);
+    assert_eq!(
+        snapshot.buyer.as_ref().expect("buyer").name,
+        "Buyer legal name"
+    );
+    let document = project_invoice(&mv, &[], Some(snapshot), None, None).expect("draft projection");
+    assert!(render_invoice_html(&document, None)
+        .contains("refreshed from the linked contact when issued"));
+    mv["metadata"] = json!({"notes":"Incomplete generic draft"});
+    mv["partnerId"] = Value::Null;
+    let snapshot = draft_invoice_snapshot(&mv, 7, Some(&draft_company()), &[])
+        .expect("incomplete draft")
+        .expect("snapshot");
+    assert_eq!(snapshot.schema_version, 1);
+    assert!(snapshot.buyer.is_none());
+    mv["metadata"] = json!({"invoiceDocument":{"schemaVersion":2}});
+    assert!(draft_invoice_snapshot(&mv, 7, Some(&draft_company()), &[]).is_err());
+}
+
 fn invoice() -> Value {
     json!({
         "id": "42", "organizationId": "7", "companyId": "3", "currencyId": "90",

@@ -1,4 +1,5 @@
 'use client';
+import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 
 import { useMemo, useState } from 'react';
 import { useTranslation } from '@lumiere/i18n';
@@ -19,6 +20,7 @@ import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
 import {
   useAccountAccounts,
   useAccountJournals,
+  useAccountTaxes,
   useAccountPaymentTerms,
 } from '@lumiere/query-hooks/hooks/accounting';
 import { useContacts } from '@lumiere/query-hooks/hooks/crm';
@@ -50,11 +52,13 @@ import {
 } from '@/lib/purchasing-create-params';
 import {
   enumTag,
+  billTaxOptions,
   purchaseOrderHeaderDefaults,
   purchaseOrderLineEditDefaults,
   toReceiveLineInput,
   toUpdatePurchaseOrderHeaderArgs,
 } from './purchase-order-forms';
+import { runtimeFormRoleId } from '@lumiere/ui/lib/runtime-form-role';
 
 type PurchasingWorkflow = ReturnType<typeof usePurchasingWorkflow>;
 type Row = Record<string, unknown>;
@@ -96,6 +100,7 @@ export function useBillFormConfig(organizationId: number) {
   const { orgId } = orgBigInts(organizationId);
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
+  const { data: taxes = [] } = useAccountTaxes(orgId);
 
   return useMemo(() => {
     const { journalOptions, expenseOptions, payableOptions } = billLookupOptions(
@@ -107,8 +112,9 @@ export function useBillFormConfig(organizationId: number) {
       journalId: journalOptions,
       defaultExpenseAccountId: expenseOptions,
       payableAccountId: payableOptions,
+      taxId: billTaxOptions(t, taxes as Row[]),
     });
-  }, [t, accountJournals, accountAccounts]);
+  }, [t, accountJournals, accountAccounts, taxes]);
 }
 
 interface CreateBillDialogProps {
@@ -141,7 +147,7 @@ export function CreateBillFromPurchaseOrderDialog({
       moduleId="purchasing"
       formId="create-bill-from-purchase-order"
       organizationId={organizationId}
-      roleId={currentUser?.roles[0]}
+      roleId={resolveRuntimeFormRoleId(currentUser?.roles)}
       preferStdbVisibility
       foldCustomFieldsIntoMetadata={false}
       closeOnSubmit={false}
@@ -350,7 +356,7 @@ export function PurchaseOrderFormDialog({
       staticConfig={config}
       moduleId="purchasing"
       organizationId={organizationId}
-      roleId={currentUser?.roles[0]}
+      roleId={resolveRuntimeFormRoleId(currentUser?.roles)}
       preferStdbVisibility
       closeOnSubmit={false}
       submitError={error}

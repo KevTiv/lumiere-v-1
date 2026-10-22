@@ -11,6 +11,7 @@ export async function expectExactRecordFocus(page: Page, target: RecordTarget) {
     url.searchParams.get("tab") === target.tab &&
     url.searchParams.getAll("filter").length === 1 &&
     url.searchParams.get("filter") === `id:${target.id}`)
+  await expect(page.getByTestId(tabTestId(target))).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId(tabTestId(target))).toHaveAttribute("aria-selected", "true")
   const table = activeTabEntityTable(page)
   await expect(table.getByTestId(`entity-row-${target.id}`)).toBeVisible({ timeout: 30_000 })

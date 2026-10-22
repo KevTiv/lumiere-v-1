@@ -2,6 +2,7 @@ import { bootstrapFixtureAccountSession } from './fixture-account'
 import { expect, request as playwrightRequest, test, type Browser, type Page, type Request } from "@playwright/test"
 
 import {
+  selectModuleTab,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
   callReducerBff,
@@ -132,7 +133,7 @@ test.describe("COV-21 exact human-task decision", { tag: ["@dev-fixture", "@cov2
 
       try {
         await gotoModule(page, "/purchasing", "purchasing")
-      await page.getByTestId("module-tab-purchasing-orders").click()
+      await selectModuleTab(page, "purchasing", "orders")
       await page.getByTestId("module-create-purchasing-orders").click()
       await expect(page.getByTestId("form-modal-new-purchase-order")).toBeVisible()
       await chooseSelectOptionByLabel(page, "partnerId", VENDOR_NAME)
@@ -140,7 +141,7 @@ test.describe("COV-21 exact human-task decision", { tag: ["@dev-fixture", "@cov2
       await fillField(page, "origin", origin)
       const [createPoRes] = await Promise.all([
         page.waitForResponse(
-          (res) => matchesOperationResponse(res, "create_purchase_order") && res.ok(),
+          (res) => matchesOperationResponse(res, "erp.create_purchase_order_once") && res.ok(),
           { timeout: 30_000 },
         ),
         submitForm(page, "new-purchase-order"),
@@ -150,7 +151,7 @@ test.describe("COV-21 exact human-task decision", { tag: ["@dev-fixture", "@cov2
       const orderId = await fetchPurchaseOrderIdByExactOrigin(page, vendorPartnerId, origin)
       const orderLabel = await fetchPurchaseOrderSelectLabel(page, orderId)
 
-      await page.getByTestId("module-tab-purchasing-lines").click()
+      await selectModuleTab(page, "purchasing", "lines")
       await page.getByTestId("entity-action-pol-add-form").click()
       await expect(page.getByTestId("form-modal-add-purchase-order-line")).toBeVisible()
       await chooseSelectOptionByLabel(page, "orderId", orderLabel)
@@ -167,7 +168,7 @@ test.describe("COV-21 exact human-task decision", { tag: ["@dev-fixture", "@cov2
       ])
       expect(lineRes.ok()).toBe(true)
 
-      await page.getByTestId("module-tab-purchasing-orders").click()
+      await selectModuleTab(page, "purchasing", "orders")
       await selectEntityRowById(page, orderId)
       await waitForEntityActionEnabled(page, "entity-action-po-confirm")
       await page.getByTestId("entity-action-po-confirm").click()

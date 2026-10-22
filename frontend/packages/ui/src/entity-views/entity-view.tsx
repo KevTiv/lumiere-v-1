@@ -24,6 +24,13 @@ import { formatEntityFieldValue, getRowField, resolveCurrencyCode } from "../lib
 import { Input } from "../components/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Button } from "../components/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/select"
 
 interface EntityViewProps {
   config: EntityViewConfig
@@ -404,6 +411,7 @@ export function EntityView({
           {surfaceMode === "table" ? (
             <EntityTable
               config={tableConfig}
+              densityKey={config.id}
               data={data}
               aiFocusRowKey={aiFocusRowKey}
               onRowClick={onRowClick}
@@ -436,21 +444,21 @@ export function EntityView({
                 />
               ) : null}
               {boardFilterDefs.map((filter) => (
-                <select
-                  key={filter.key}
-                  aria-label={filter.label}
-                  className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground"
-                  data-testid={`entity-board-filter-${filter.key}`}
-                  value={boardFilters[filter.key] ?? ALL_FILTER_VALUE}
-                  onChange={(event) =>
-                    setBoardFilters((prev) => ({ ...prev, [filter.key]: event.target.value }))
-                  }
-                >
-                  <option value={ALL_FILTER_VALUE}>{filter.label}</option>
-                  {filter.options!.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
+                <Select key={filter.key} value={boardFilters[filter.key] ?? ALL_FILTER_VALUE} onValueChange={(value) => setBoardFilters((prev) => ({ ...prev, [filter.key]: value }))}>
+                  <SelectTrigger
+                    className="h-8 w-auto min-w-36"
+                    aria-label={filter.label}
+                    data-testid={`entity-board-filter-${filter.key}`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL_FILTER_VALUE}>{filter.label}</SelectItem>
+                    {filter.options!.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ))}
                 </div>
               ) : null}
@@ -476,6 +484,7 @@ export function EntityView({
       return (
         <EntityTable
           config={tableConfig}
+          densityKey={config.id}
           data={data}
           aiFocusRowKey={aiFocusRowKey}
           onRowClick={onRowClick}

@@ -27,6 +27,7 @@ import {
   type FormConfig,
 } from '@lumiere/ui';
 import { Badge } from '@lumiere/ui/components/badge';
+import { MarkdownView } from '@lumiere/ui/components/markdown-view';
 import { Skeleton } from '@lumiere/ui/components/skeleton';
 import { useUsers } from '@lumiere/query-hooks/hooks/crm';
 import {
@@ -304,9 +305,9 @@ function MessagePageLoaded({
             label: t('common.overview', { defaultValue: 'Overview' }),
             content: (
               <div className="space-y-6">
-                <p className="max-w-3xl whitespace-pre-wrap break-words text-sm" data-testid="message-body">
-                  {String(message.body ?? '')}
-                </p>
+                <div className="max-w-3xl" data-testid="message-body">
+                  <MarkdownView value={String(message.body ?? '')} />
+                </div>
                 <EntityDetail config={detailConfig} data={message} />
               </div>
             ),
@@ -329,7 +330,7 @@ function MessagePageLoaded({
                         </span>
                         <span>{new Date(Number(reply.date ?? 0) / 1000).toLocaleString(i18n.language)}</span>
                       </div>
-                      <p className="whitespace-pre-wrap break-words">{String(reply.body ?? '')}</p>
+                      <MarkdownView value={String(reply.body ?? '')} />
                       <Link className="mt-1 inline-block text-xs text-primary hover:underline" href={`/messages/${String(reply.id)}`}>
                         {t('messages.page.openReply', { defaultValue: 'Open' })}
                       </Link>

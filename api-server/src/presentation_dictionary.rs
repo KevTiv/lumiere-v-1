@@ -9,7 +9,7 @@ use stdb_auth::{has_resource_read_permission, resolve_http_sql_columns, FieldAcc
 use thiserror::Error;
 
 const RESOURCE: &str = "account-moves";
-const CONTRACT_PIN: &str = "v0.3.117";
+const CONTRACT_PIN: &str = "v0.3.136";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -83,6 +83,8 @@ mod tests {
 
     fn access(fields: Vec<&str>) -> FieldAccessContext {
         FieldAccessContext {
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
             organization_id: 7,
             role_id: 9,
             role_name: "reader".into(),
@@ -130,7 +132,7 @@ mod tests {
         assert_eq!(capability.acquisition_route, "/v1/query/account-moves");
         assert_eq!(capability.company_scope_input, "companyId");
         assert_eq!(capability.acquisition_authorization, "reauthorize-on-read");
-        assert_eq!(capability.contract_pin, "v0.3.117");
+        assert_eq!(capability.contract_pin, "v0.3.136");
         assert_eq!(capability.field_naming, "sql-column");
         assert!(capability.fields.contains(&"id".into()));
         assert!(capability.fields.contains(&"organization_id".into()));
@@ -158,7 +160,7 @@ mod tests {
             "lumiere-contracts = { path = \"vendor/lumiere-contracts/crates/lumiere-contracts\""
         ));
         let release = include_str!("../../release-compatibility-manifest.json");
-        assert!(release.contains("\"version\": \"0.3.117\""));
-        assert!(release.contains("\"revision\": \"391586254630c1805310c77bf9c5a5e904ce593b\""));
+        assert!(release.contains("\"version\": \"0.3.136\""));
+        assert!(release.contains("\"revision\": \"be7c9a9ef2e5f3cb76886a41c6ed34901b15b97a\""));
     }
 }

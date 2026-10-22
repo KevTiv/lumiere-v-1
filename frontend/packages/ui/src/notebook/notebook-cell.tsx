@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { MarkdownView } from "@/components/ui/markdown-view"
 import {
   Play,
   Square,
@@ -270,9 +271,11 @@ export function NotebookCellComponent({
             className="text-xs cursor-text min-h-[60px] font-sans prose prose-sm dark:prose-invert max-w-none"
             onClick={() => setIsEditing(true)}
           >
-            <div className="whitespace-pre-wrap">
-              {cell.content || <span className="text-muted-foreground/50">Enter markdown...</span>}
-            </div>
+            {cell.content ? (
+              <MarkdownView value={cell.content} className="[&_.ProseMirror]:text-xs" />
+            ) : (
+              <span className="text-muted-foreground/50">Enter markdown...</span>
+            )}
           </div>
         )}
       </div>

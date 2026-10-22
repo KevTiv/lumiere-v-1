@@ -13,9 +13,11 @@ on:
       - ai-gateway/**
       - crates/**
       - scripts/prepare-vendored-contracts-rust.sh
+      - scripts/sync-directory.py
       - scripts/lumiere-runtime-entrypoint.sh
       - scripts/tests/lumiere-runtime-entrypoint.test.sh
       - scripts/tests/rust-runtime-image-contract.test.sh
+      - scripts/measure-ci-builds.py
       - Makefile
       - release-compatibility-manifest.json
       - lumiere-codegen/**
@@ -32,9 +34,11 @@ on:
       - ai-gateway/**
       - crates/**
       - scripts/prepare-vendored-contracts-rust.sh
+      - scripts/sync-directory.py
       - scripts/lumiere-runtime-entrypoint.sh
       - scripts/tests/lumiere-runtime-entrypoint.test.sh
       - scripts/tests/rust-runtime-image-contract.test.sh
+      - scripts/measure-ci-builds.py
       - Makefile
       - release-compatibility-manifest.json
       - lumiere-codegen/**
@@ -56,6 +60,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  cache-inventory:
+    name: Inspect cache retention
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Read cache inventory without modifying entries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/measure-ci-builds.py --inventory-only --repository "$REPOSITORY" --output .ci/cache-inventory
+      - name: Summarize retained cache entries
+        run: cat .ci/cache-inventory/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rust-runtime-cache-inventory-${{ github.run_id }}
+          path: .ci/cache-inventory
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60

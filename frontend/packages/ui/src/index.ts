@@ -29,6 +29,7 @@ export * from "./lib/kanban-board-types";
 export * from "./kanban/kanban-board";
 export * from "./kanban/kanban-column";
 export * from "./kanban/kanban-draggable-card";
+export * from "./kanban/kanban-card";
 export * from "./lib/entity-configs";
 
 // Modular forms
@@ -89,6 +90,8 @@ export * from "./lib/hr-form-configs";
 export * from "./lib/documents-entity-configs";
 export * from "./lib/documents-form-configs";
 export * from "./documents/record-attachments-panel";
+export * from "./documents/file-browser";
+export * from "./productivity/productivity-widgets";
 export * from "./lib/calendar-types";
 export * from "./lib/calendar-entity-configs";
 export * from "./lib/calendar-form-configs";
@@ -130,6 +133,12 @@ export * from "./pages/dashboard-workspace";
 export * from "./pages/dashboard-widget-renderer";
 export * from "./pages/stored-dashboard-view";
 export * from "./lib/dashboard-types";
+export * from "./lib/chart-format";
+export * from "./charts/combo-trend-chart";
+export * from "./charts/step-anomaly-chart";
+export * from "./charts/ranked-bar-list";
+export * from "./charts/segmented-share-bar";
+export * from "./charts/radial-gauge";
 export * from "./lib/dashboard-config";
 export * from "./lib/dashboard-drill-down";
 export * from "./lib/stored-dashboard-drill-target";
@@ -240,8 +249,23 @@ export * from "./hooks/use-toast";
 // Accounting components
 export * from "./accounting-components/invoice-list-view";
 export * from "./accounting-components/invoice-detail-modal";
+export * from "./accounting-components/invoice-composer";
+export * from "./accounting-components/invoice-preview";
+export * from "./accounting-components/invoice-preview-model";
+export * from "./accounting-components/invoice-math";
+export * from "./accounting-components/printable-invoice";
+export * from "./accounting-components/invoice-print";
 export * from "./accounting-components/create-invoice-modal";
 export * from "./accounting-components/bills-list-view";
+export * from "./accounting-components/bill-intake-review";
+export * from "./accounting-components/bill-source-documents";
+export * from "./accounting-components/accounting-worklist-model";
+export * from "./accounting-components/accounting-worklist-toolbar";
+export * from "./accounting-components/reconciliation-workbench";
+export * from "./accounting-components/reconciliation-workbench-model";
+export * from "./accounting-components/invoice-email-review-dialog";
+export * from "./accounting-components/invoice-email-review";
+export * from "./accounting-components/collections-workspace";
 export * from "./crm-components/crm-utm-settings";
 export * from "./crm-components/crm-record-chatter";
 export * from "./crm-components/chatter-attachments";
@@ -317,3 +341,6 @@ export * from "./hooks/use-identity-label-map";
 export * from "./forms/navigation-guard-provider";
 
 export { useUnsavedChangesGuard } from "./forms/use-unsaved-changes-guard"
+
+export { DashboardWidgetRenderer } from "./pages/dashboard-widget-renderer"
+export * from "./accounting-components/asset-depreciation-schedule";

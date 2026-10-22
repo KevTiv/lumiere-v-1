@@ -7,6 +7,7 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   callReducerOwner,
   expectNoAppError,
@@ -25,7 +26,7 @@ const some = <T>(value: T) => ({ some: value })
 const none = { none: [] as [] }
 
 async function openHrTab(page: Page, tabId: string) {
-  await page.getByTestId(`module-tab-hr-${tabId}`).click()
+  await selectModuleTab(page, "hr", tabId)
 }
 
 async function fetchFirstCompanyId(page: Page): Promise<number> {

@@ -14,6 +14,7 @@ import {
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
 
 import {
+  selectModuleTab,
   fetchDefaultCompanyId,
   fetchFirstWarehouseId,
   gotoModule,
@@ -373,7 +374,7 @@ async function runMoActionViaUi(
   produceQty?: number,
 ) {
   await gotoModule(page, "/manufacturing", "manufacturing")
-  await page.getByTestId("module-tab-manufacturing-orders").click()
+  await selectModuleTab(page, "manufacturing", "orders")
   const panel = page.locator('[role="tabpanel"]:visible')
   await panel.getByLabel("Search records").fill(origin)
   const row = panel.getByTestId(`entity-row-${moId}`)

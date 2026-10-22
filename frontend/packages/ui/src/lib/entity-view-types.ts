@@ -104,6 +104,11 @@ export interface EntityFilter {
   type: "select" | "text"
   options?: Array<{ value: string; label: string }>
   placeholder?: string
+  /**
+   * Shows the options as a multi-select facet (checkboxes with row counts) instead of a single
+   * select. Rows matching any ticked option pass.
+   */
+  faceted?: boolean
 }
 
 // ─── Action ─────────────────────────────────────────────────────────────────
@@ -137,6 +142,20 @@ export interface EntityAction extends EntityPermissioned {
   onClick: (selectedRows: EntityRow[]) => void | Promise<unknown>
 }
 
+/** An entry of a row's "⋯" menu; it acts on that one row. */
+export interface EntityRowAction extends EntityPermissioned {
+  id: string
+  label: string
+  icon?: ComponentType<{ className?: string }>
+  /** Styles the item as destructive (delete, cancel). */
+  destructive?: boolean
+  /** Presentation-only: false disables the item for this row. */
+  isApplicable?: (row: EntityRow) => boolean
+  confirm?: EntityActionConfirmation
+  successMessage?: string
+  onClick: (row: EntityRow) => void | Promise<unknown>
+}
+
 export interface EntityActionConfirmation {
   title: string
   /** Text, or a function of the selected rows for wording that depends on the selection. */
@@ -167,6 +186,10 @@ export interface EntityTableConfig {
    * Set false when toolbar actions (e.g. import) should not hijack row clicks.
    */
   rowSelectionToggleOnClick?: boolean
+  /** Shows row checkboxes even without selection actions (e.g. to export the selection). */
+  selectable?: boolean
+  /** Per-row "⋯" menu in a trailing column. */
+  rowActions?: EntityRowAction[]
   emptyMessage?: string
   emptyState?: {
     title?: string

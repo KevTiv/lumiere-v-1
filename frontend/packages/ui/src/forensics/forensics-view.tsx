@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { WorkspaceTabsList as TabsList, WorkspaceTabsTrigger as TabsTrigger } from "../components/workspace-tabs"
 import {
   Select,
   SelectContent,
@@ -16,12 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Search,
   Plus,
@@ -32,9 +27,10 @@ import {
   Clock,
   FileText,
   BarChart3,
-  ChevronDown,
   Download,
 } from "lucide-react"
+import { downloadCsv } from "@/lib/export-csv"
+import { forensicReportsToCsv } from "@/lib/ui-exports"
 import { ReportCard } from "./report-card"
 import { ReportDetailModal } from "./report-detail-modal"
 import { CreateReportModal } from "./create-report-modal"
@@ -192,20 +188,15 @@ export function ForensicsView({ className }: ForensicsViewProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                {t("forensics.view.export")}
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem>{t("forensics.view.exportPdf")}</DropdownMenuItem>
-              <DropdownMenuItem>{t("forensics.view.exportCsv")}</DropdownMenuItem>
-              <DropdownMenuItem>{t("forensics.view.exportExcel")}</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={filteredReports.length === 0}
+            onClick={() => downloadCsv("forensic-reports", forensicReportsToCsv(filteredReports))}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {t("forensics.view.exportCsv")}
+          </Button>
           <Button onClick={() => setIsCreateOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             {t("forensics.view.newReport")}
@@ -274,7 +265,7 @@ export function ForensicsView({ className }: ForensicsViewProps) {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="w-fit mb-4">
+        <TabsList className="mb-4">
           <TabsTrigger value="reports" className="gap-2">
             <FileText className="h-4 w-4" />
             {t("forensics.view.tabReports")}

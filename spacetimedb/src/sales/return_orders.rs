@@ -758,6 +758,7 @@ pub fn create_credit_note_from_return_order(
         ctx,
         organization_id,
         company_id,
+        Some(partner_invoice_id),
         source_metadata.as_deref(),
     )?;
 

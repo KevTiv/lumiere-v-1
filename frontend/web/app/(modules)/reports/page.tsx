@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { ReportsClient } from "./reports-client"
 
 const SSR_RESOURCES = [
@@ -20,7 +20,7 @@ export default async function ReportsPage() {
   }
 
   const [reports, balances, templates, scheduled, metrics, dashboards, widgets] =
-    await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+    await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <ReportsClient

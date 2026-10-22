@@ -14,6 +14,11 @@ function optionalString(v: unknown): string | undefined {
   return s === "" ? undefined : s
 }
 
+/** An untouched quantity input submits "", which must mean the default single unit, not 0. */
+export function expenseQuantity(v: unknown): number {
+  return v == null || String(v).trim() === "" ? 1 : Number(v)
+}
+
 function requiredTimestamp(v: unknown): CreateExpenseParams["date"] | null {
   if (v == null || String(v).trim() === "") return null
   const d = new Date(String(v))
@@ -100,9 +105,6 @@ export function toCreateExpenseParams(
   if (employeeId === undefined || parsedCurrencyId === undefined || date === null) return null
 
   const lineKind = parseLineKind(formData.lineKind)
-  // Optional numeric inputs are empty strings, not undefined. A blank quantity
-  // means one item; Number("") would instead send zero and fail reducer validation.
-  const quantity = optionalString(formData.quantity) ?? "1"
   const mileageDistance =
     formData.mileageDistance != null && String(formData.mileageDistance).trim() !== ""
       ? Number(formData.mileageDistance)
@@ -117,7 +119,7 @@ export function toCreateExpenseParams(
     name: String(formData.name ?? ""),
     date,
     unitAmount: Number(formData.totalAmount ?? formData.unitAmount ?? 0),
-    quantity: Number(quantity),
+    quantity: expenseQuantity(formData.quantity),
     currencyId: parsedCurrencyId,
     description: optionalString(formData.description),
     productId: optionalBigIntU64(formData.productId),

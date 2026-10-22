@@ -37,6 +37,8 @@ The ERP can reach T0 without waiting for the AI harness. Consequential AI/offlin
 
 This plan closes a different gap: **module-wide product coverage**. A few excellent verticals are not sufficient if the same organization can open Fleet, Helpdesk, POS, Manufacturing, Expenses, Documents, or Settings and encounter materially shallower behavior.
 
+[UI container overflow remediation](./ui-container-overflow-remediation-plan.md) scopes the shared toolbar, record-sheet tabs, detail values and mapped collection layouts that support responsive usability. Its container-level browser evidence complements document-level overflow checks; source review alone does not certify these layouts.
+
 `module-by-module-maintainability-plan.md` remains the authority for code readability and ownership cleanup. Maintainability acceptance is useful but does not certify product usability.
 
 The repository's historical frontend expansion plan and reducer coverage matrix are discovery inputs only. Re-audit the current tree before implementation; do not copy historical missing-route claims after those routes have been added.

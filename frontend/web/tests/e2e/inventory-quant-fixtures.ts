@@ -10,6 +10,7 @@ import {
   activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
+  chooseSelectOptionByTriggerValue,
   fetchDefaultCompanyId,
   fetchFirstUomId,
   fillField,
@@ -576,7 +577,7 @@ export async function moveQuantViaInventoryUi(
   quantity: number,
 ): Promise<void> {
   await gotoModule(page, "/inventory", "inventory")
-  await page.getByTestId("module-tab-inventory-stock").click()
+  await selectModuleTab(page, "inventory", "stock")
   await selectEntityRowById(page, quantId)
   await page.getByTestId("entity-action-move-stock-quant").click()
   await expect(page.getByTestId("form-modal-move-stock-quant")).toBeVisible({
@@ -618,7 +619,7 @@ export async function runCycleCountToPostedViaWizardUi(
   await gotoModule(page, "/inventory", "inventory")
   await selectModuleTab(page, "inventory", "cycle-wizard")
 
-  await page.locator("#cc-loc").selectOption(String(params.locationId))
+  await chooseSelectOptionByTriggerValue(page, page.locator("#cc-loc"), params.locationId)
   await page.getByTestId("cycle-wizard-create-plan").click()
 
   await expect(page.getByTestId("cycle-wizard-start-session")).toBeEnabled({
@@ -627,10 +628,10 @@ export async function runCycleCountToPostedViaWizardUi(
   await page.getByTestId("cycle-wizard-start-session").click()
 
   await expect(page.locator("#cc-prod")).toBeVisible({ timeout: 30_000 })
-  await page.locator("#cc-prod").selectOption(String(params.productId))
-  await page.locator("#cc-rec-loc").selectOption(String(params.locationId))
+  await chooseSelectOptionByTriggerValue(page, page.locator("#cc-prod"), params.productId)
+  await chooseSelectOptionByTriggerValue(page, page.locator("#cc-rec-loc"), params.locationId)
   await page.locator("#cc-qty").fill(String(params.countedQty))
-  await page.locator("#cc-uom").selectOption(String(params.uomId))
+  await chooseSelectOptionByTriggerValue(page, page.locator("#cc-uom"), params.uomId)
   await page.getByTestId("cycle-wizard-record-line").click()
 
   await expect(page.getByTestId("cycle-wizard-validate")).toBeEnabled({
@@ -783,6 +784,89 @@ export async function createReplenishmentRuleViaUi(
       { timeout: 30_000 },
     ),
     submitForm(page, "new-replenishment-rule"),
+  ])
+}
+
+export async function fetchReplenishmentRuleIdByLocation(
+  page: Page,
+  productId: number,
+  locationId: number,
+): Promise<number> {
+  const response = await page.request.get("/api/query/replenishment-rules")
+  if (!response.ok()) throw new Error("Failed to query replenishment rules")
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const matches = (payload.data ?? []).filter(
+    (row) =>
+      scalarQueryId(row.productId ?? row.product_id) === productId &&
+      scalarQueryId(row.locationId ?? row.location_id) === locationId,
+  )
+  if (matches.length !== 1) {
+    throw new Error(`Expected exactly one replenishment rule, got ${matches.length}`)
+  }
+  const id = scalarQueryId(matches[0]?.id)
+  if (id == null) throw new Error("Replenishment rule has no id")
+  return id
+}
+
+export async function fetchReplenishmentScheduledRunJobId(
+  page: Page,
+  ruleId: number,
+): Promise<number | null> {
+  const response = await page.request.get("/api/query/replenishment-rules")
+  if (!response.ok()) throw new Error("Failed to query replenishment rules")
+  const payload = (await response.json()) as {
+    data?: Array<Record<string, unknown>>
+  }
+  const row = (payload.data ?? []).find(
+    (candidate) => scalarQueryId(candidate.id) === ruleId,
+  )
+  if (!row) throw new Error(`Replenishment rule ${ruleId} was not found`)
+  const hasPointer =
+    Object.prototype.hasOwnProperty.call(row, "scheduledRunJobId") ||
+    Object.prototype.hasOwnProperty.call(row, "scheduled_run_job_id")
+  if (!hasPointer) {
+    throw new Error("Replenishment scheduler pointer is not projected")
+  }
+  return (
+    scalarQueryId(row.scheduledRunJobId ?? row.scheduled_run_job_id) ?? null
+  )
+}
+
+export async function scheduleReplenishmentRunViaUi(
+  page: Page,
+  ruleId: number,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "replenishment")
+  await selectEntityRowById(page, ruleId)
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "schedule_replenishment_run") &&
+        response.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("entity-action-schedule-replenishment-run").click(),
+  ])
+}
+
+export async function cancelReplenishmentRunViaUi(
+  page: Page,
+  ruleId: number,
+): Promise<void> {
+  await gotoModule(page, "/inventory", "inventory")
+  await selectModuleTab(page, "inventory", "replenishment")
+  await selectEntityRowById(page, ruleId)
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        matchesOperationResponse(response, "cancel_replenishment_run") &&
+        response.ok(),
+      { timeout: 30_000 },
+    ),
+    page.getByTestId("entity-action-cancel-replenishment-run").click(),
   ])
 }
 

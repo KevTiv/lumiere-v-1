@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test"
 
 import { matchesOperationResponse } from "./operation-response"
 import {
+  selectModuleTab,
   activeTabEntityTable,
   clickEntityActionAndWaitForReducer,
   fillField,
@@ -82,7 +83,7 @@ export async function runPickingActionViaInventoryUi(
   } as const
 
   await gotoModule(page, "/inventory", "inventory")
-  await page.getByTestId("module-tab-inventory-transfers").click()
+  await selectModuleTab(page, "inventory", "transfers")
   await selectEntityRowById(page, pickingId)
   await clickEntityActionAndWaitForReducer(
     page,
@@ -162,7 +163,7 @@ export async function partialValidatePickingViaInventoryUi(
   quantityDone: number,
 ): Promise<void> {
   await gotoModule(page, "/inventory", "inventory")
-  await page.getByTestId("module-tab-inventory-transfers").click()
+  await selectModuleTab(page, "inventory", "transfers")
   await selectEntityRowById(page, pickingId)
   await page.getByTestId("entity-action-partial-validate-picking").click()
   await expect(

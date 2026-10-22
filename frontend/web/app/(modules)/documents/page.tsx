@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { DocumentsClient } from "./documents-client"
 
 const SSR_RESOURCES = [
@@ -28,7 +28,7 @@ export default async function DocumentsPage() {
     folders,
     processingJobs,
     insights,
-  ] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  ] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <DocumentsClient

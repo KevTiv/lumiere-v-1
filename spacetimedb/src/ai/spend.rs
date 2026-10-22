@@ -1,7 +1,8 @@
 //! Durable, integer-based AI spend admission and settlement.
 //!
 //! Gateway activation requires a released contract and a trusted principal
-//! explicitly granted `ai_spend/reserve` and `ai_spend/settle` permissions.
+//! explicitly granted `ai_spend/reserve`, `ai_spend/settle`, and the separately
+//! provisioned `ai_spend/reconcile` recovery permission.
 
 use spacetimedb::{reducer, ReducerContext, SpacetimeType, Table, Timestamp};
 
@@ -17,13 +18,19 @@ const MAX_REQUEST_KEY_LEN: usize = 256;
 const MAX_PRICE_UNITS_PER_1K: u64 = 1_000_000_000_000;
 const MAX_ALLOWANCE_TOKENS: u32 = 10_000_000;
 const MAX_ATTEMPT_NOTE_LEN: usize = 1_024;
+const MAX_RECOVERY_ACTOR_LEN: usize = 160;
+const MAX_APPROVAL_ID_LEN: usize = 160;
 
 const RESERVATION_RESERVED: &str = "reserved";
+const RESERVATION_RELEASED: &str = "released";
 const ATTEMPT_ACCEPTED: &str = "accepted";
 const ATTEMPT_DISPATCHED: &str = "dispatched";
 const ATTEMPT_SUCCEEDED: &str = "succeeded";
 const ATTEMPT_FAILED: &str = "failed";
 const ATTEMPT_OUTCOME_UNKNOWN: &str = "outcome_unknown";
+const ATTEMPT_ABANDONED: &str = "abandoned";
+const RECOVERY_MARK_UNKNOWN: &str = "mark_outcome_unknown";
+const RECOVERY_ABANDON_ACCEPTED: &str = "abandon_accepted";
 
 /// Immutable integer price snapshot. Monetary amounts are always millionths
 /// of the named currency (micro-USD, for example); prices are per 1,000 tokens.
@@ -99,7 +106,8 @@ pub struct AiSpendReservation {
     pub settled_units: u64,
     pub input_token_allowance: u32,
     pub output_token_allowance: u32,
-    /// reserved | settled; reserved is deliberately terminal only by settle.
+    /// reserved | settled | released. Release is allowed only while its
+    /// provider attempt is still accepted and therefore never dispatched.
     pub status: String,
     pub reserved_by: spacetimedb::Identity,
     pub settled_by: Option<spacetimedb::Identity>,
@@ -134,13 +142,21 @@ pub struct AiProviderAttempt {
     pub request_key: String,
     pub provider: String,
     pub model: String,
-    /// accepted | dispatched | succeeded | failed | outcome_unknown
+    /// accepted | dispatched | succeeded | failed | outcome_unknown | abandoned
     pub status: String,
     pub input_tokens: u32,
     pub output_tokens: u32,
     pub failure_reason: Option<String>,
     /// Required explanation when an `outcome_unknown` attempt is reconciled.
     pub resolution: Option<String>,
+    /// Attributable recovery command that moved a stranded dispatched attempt
+    /// to outcome_unknown, or abandoned an accepted pre-dispatch attempt.
+    pub recovery_actor: Option<String>,
+    pub recovery_approval_id: Option<String>,
+    pub recovery_at: Option<Timestamp>,
+    /// Attributable approved command that resolved outcome_unknown.
+    pub reconciliation_actor: Option<String>,
+    pub reconciliation_approval_id: Option<String>,
     pub accepted_by: spacetimedb::Identity,
     pub write_uid: spacetimedb::Identity,
     pub created_at: Timestamp,
@@ -211,6 +227,18 @@ pub struct ReconcileAiProviderAttemptParams {
     pub input_tokens: u32,
     pub output_tokens: u32,
     pub resolution: String,
+    pub actor_identity: String,
+    pub approval_id: String,
+}
+
+#[derive(SpacetimeType, Clone, Debug)]
+pub struct RecoverAiProviderAttemptParams {
+    pub attempt_id: u64,
+    /// mark_outcome_unknown | abandon_accepted
+    pub action: String,
+    pub resolution: String,
+    pub actor_identity: String,
+    pub approval_id: String,
 }
 
 /// Configure an agent's integer budget and create a new immutable price
@@ -642,6 +670,11 @@ pub fn accept_ai_provider_attempt(
         output_tokens: 0,
         failure_reason: None,
         resolution: None,
+        recovery_actor: None,
+        recovery_approval_id: None,
+        recovery_at: None,
+        reconciliation_actor: None,
+        reconciliation_approval_id: None,
         accepted_by: ctx.sender(),
         write_uid: ctx.sender(),
         created_at: ctx.timestamp,
@@ -738,22 +771,83 @@ pub fn record_ai_provider_attempt_result(
 /// Resolve an `outcome_unknown` attempt with an explicit explanation. This is a
 /// separate trusted capability from recording ordinary results.
 #[reducer]
+pub fn recover_ai_provider_attempt(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: RecoverAiProviderAttemptParams,
+) -> Result<(), String> {
+    check_permission(ctx, organization_id, "ai_spend", "reconcile")?;
+    validate_recovery_attribution(
+        &params.actor_identity,
+        &params.approval_id,
+        &params.resolution,
+    )?;
+    let attempt = load_attempt(ctx, organization_id, params.attempt_id)?;
+    let action = params.action.trim();
+    let command = match action {
+        RECOVERY_MARK_UNKNOWN => AttemptCommand::RecoverUnknown,
+        RECOVERY_ABANDON_ACCEPTED => AttemptCommand::Abandon,
+        _ => return Err("unknown provider attempt recovery action".into()),
+    };
+    let replayed = attempt.resolution.as_deref() == Some(params.resolution.as_str())
+        && attempt.recovery_actor.as_deref() == Some(params.actor_identity.as_str())
+        && attempt.recovery_approval_id.as_deref() == Some(params.approval_id.as_str());
+    let next = match attempt_transition(&attempt.status, command)? {
+        AttemptTransition::Replay if replayed => return Ok(()),
+        AttemptTransition::Replay => {
+            return Err("recovery replay has different attribution or resolution".into())
+        }
+        AttemptTransition::Apply(next) => next,
+    };
+
+    if next == ATTEMPT_ABANDONED {
+        release_accepted_reservation(ctx, &attempt)?;
+    }
+    let previous = attempt.status.clone();
+    let row = AiProviderAttempt {
+        status: next.into(),
+        failure_reason: (next == ATTEMPT_OUTCOME_UNKNOWN).then(|| params.resolution.clone()),
+        resolution: Some(params.resolution),
+        recovery_actor: Some(params.actor_identity),
+        recovery_approval_id: Some(params.approval_id),
+        recovery_at: Some(ctx.timestamp),
+        finished_at: (next == ATTEMPT_ABANDONED).then_some(ctx.timestamp),
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..attempt
+    };
+    ctx.db.ai_provider_attempt().id().update(row.clone());
+    audit_attempt(
+        ctx,
+        &row,
+        "UPDATE",
+        Some(&previous),
+        "recovered provider attempt",
+    );
+    Ok(())
+}
+
+/// Resolve an `outcome_unknown` attempt with an explicit approved command.
+#[reducer]
 pub fn reconcile_ai_provider_attempt(
     ctx: &ReducerContext,
     organization_id: u64,
     params: ReconcileAiProviderAttemptParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "ai_spend", "settle")?;
+    check_permission(ctx, organization_id, "ai_spend", "reconcile")?;
     let attempt = load_attempt(ctx, organization_id, params.attempt_id)?;
-    if params.resolution.trim().is_empty() {
-        return Err("reconciliation requires a resolution".into());
-    }
-    validate_note(Some(&params.resolution))?;
+    validate_recovery_attribution(
+        &params.actor_identity,
+        &params.approval_id,
+        &params.resolution,
+    )?;
     let command = AttemptCommand::Reconcile(params.status.trim());
     let usage = (params.input_tokens, params.output_tokens);
     let replayed = attempt.input_tokens == params.input_tokens
         && attempt.output_tokens == params.output_tokens
-        && attempt.resolution.as_deref() == Some(params.resolution.as_str());
+        && attempt.resolution.as_deref() == Some(params.resolution.as_str())
+        && attempt.reconciliation_actor.as_deref() == Some(params.actor_identity.as_str())
+        && attempt.reconciliation_approval_id.as_deref() == Some(params.approval_id.as_str());
     let next = match attempt_transition(&attempt.status, command)? {
         AttemptTransition::Replay if replayed => return Ok(()),
         AttemptTransition::Replay => {
@@ -768,6 +862,8 @@ pub fn reconcile_ai_provider_attempt(
         input_tokens: params.input_tokens,
         output_tokens: params.output_tokens,
         resolution: Some(params.resolution),
+        reconciliation_actor: Some(params.actor_identity),
+        reconciliation_approval_id: Some(params.approval_id),
         finished_at: Some(ctx.timestamp),
         write_uid: ctx.sender(),
         write_date: ctx.timestamp,
@@ -789,6 +885,8 @@ enum AttemptCommand<'a> {
     Dispatch,
     Result(&'a str),
     Reconcile(&'a str),
+    RecoverUnknown,
+    Abandon,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -835,6 +933,16 @@ fn attempt_transition(
                 _ => Err("only an outcome_unknown attempt can be reconciled".into()),
             }
         }
+        AttemptCommand::RecoverUnknown => match current {
+            ATTEMPT_DISPATCHED => Ok(AttemptTransition::Apply(ATTEMPT_OUTCOME_UNKNOWN)),
+            ATTEMPT_OUTCOME_UNKNOWN => Ok(AttemptTransition::Replay),
+            _ => Err("only a dispatched attempt can be recovered as outcome_unknown".into()),
+        },
+        AttemptCommand::Abandon => match current {
+            ATTEMPT_ACCEPTED => Ok(AttemptTransition::Apply(ATTEMPT_ABANDONED)),
+            ATTEMPT_ABANDONED => Ok(AttemptTransition::Replay),
+            _ => Err("only an accepted pre-dispatch attempt can be abandoned".into()),
+        },
     }
 }
 
@@ -891,6 +999,87 @@ fn validate_note(note: Option<&str>) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_recovery_attribution(
+    actor_identity: &str,
+    approval_id: &str,
+    resolution: &str,
+) -> Result<(), String> {
+    for (label, value, max) in [
+        ("actor identity", actor_identity, MAX_RECOVERY_ACTOR_LEN),
+        ("approval id", approval_id, MAX_APPROVAL_ID_LEN),
+        ("resolution", resolution, MAX_ATTEMPT_NOTE_LEN),
+    ] {
+        if value.trim().is_empty() {
+            return Err(format!("recovery {label} is required"));
+        }
+        if value != value.trim() {
+            return Err(format!(
+                "recovery {label} must not have surrounding whitespace"
+            ));
+        }
+        if value.len() > max {
+            return Err(format!("recovery {label} is too long"));
+        }
+        if value.chars().any(char::is_control) {
+            return Err(format!("recovery {label} contains control characters"));
+        }
+    }
+    Ok(())
+}
+
+fn release_accepted_reservation(
+    ctx: &ReducerContext,
+    attempt: &AiProviderAttempt,
+) -> Result<(), String> {
+    let reservation = ctx
+        .db
+        .ai_spend_reservation()
+        .id()
+        .find(&attempt.reservation_id)
+        .ok_or_else(|| "reservation not found".to_string())?;
+    if reservation.organization_id != attempt.organization_id
+        || reservation.company_id != attempt.company_id
+        || reservation.agent_id != attempt.agent_id
+        || reservation.run_id != attempt.run_id
+        || reservation.request_key != attempt.request_key
+    {
+        return Err("accepted attempt reservation binding is invalid".into());
+    }
+    if reservation.status == RESERVATION_RELEASED {
+        return Ok(());
+    }
+    if reservation.status != RESERVATION_RESERVED {
+        return Err("only reserved pre-dispatch spend can be released".into());
+    }
+    let budget = ctx
+        .db
+        .ai_spend_budget()
+        .ai_spend_budget_by_agent_period()
+        .filter((&reservation.agent_id, &reservation.billing_period))
+        .find(|row| {
+            row.organization_id == attempt.organization_id && row.currency == reservation.currency
+        })
+        .ok_or_else(|| "budget not found".to_string())?;
+    let outstanding_units = budget
+        .outstanding_units
+        .checked_sub(reservation.reserved_units)
+        .ok_or_else(|| "budget outstanding spend is below the reservation".to_string())?;
+    ctx.db.ai_spend_budget().id().update(AiSpendBudget {
+        outstanding_units,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        ..budget
+    });
+    ctx.db
+        .ai_spend_reservation()
+        .id()
+        .update(AiSpendReservation {
+            status: RESERVATION_RELEASED.into(),
+            ..reservation
+        });
+    Ok(())
+}
+
 fn audit_attempt(
     ctx: &ReducerContext,
     row: &AiProviderAttempt,
@@ -915,6 +1104,10 @@ fn audit_attempt(
                     "reservation_id": row.reservation_id,
                     "input_tokens": row.input_tokens,
                     "output_tokens": row.output_tokens,
+                    "recovery_actor": row.recovery_actor,
+                    "recovery_approval_id": row.recovery_approval_id,
+                    "reconciliation_actor": row.reconciliation_actor,
+                    "reconciliation_approval_id": row.reconciliation_approval_id,
                 })
                 .to_string(),
             ),
@@ -1177,7 +1370,12 @@ mod tests {
             Ok(Apply(ATTEMPT_DISPATCHED))
         );
         assert_eq!(attempt_transition(ATTEMPT_DISPATCHED, Dispatch), Ok(Replay));
-        for terminal in [ATTEMPT_SUCCEEDED, ATTEMPT_FAILED, ATTEMPT_OUTCOME_UNKNOWN] {
+        for terminal in [
+            ATTEMPT_SUCCEEDED,
+            ATTEMPT_FAILED,
+            ATTEMPT_OUTCOME_UNKNOWN,
+            ATTEMPT_ABANDONED,
+        ] {
             assert!(
                 attempt_transition(terminal, Dispatch).is_err(),
                 "{terminal}"
@@ -1220,6 +1418,43 @@ mod tests {
                 .is_err()
         );
         assert!(attempt_transition(ATTEMPT_SUCCEEDED, Reconcile(ATTEMPT_FAILED)).is_err());
+    }
+
+    #[test]
+    fn recovery_never_authorizes_redispatch_or_abandons_after_dispatch() {
+        use AttemptCommand::*;
+        use AttemptTransition::*;
+        assert_eq!(
+            attempt_transition(ATTEMPT_DISPATCHED, RecoverUnknown),
+            Ok(Apply(ATTEMPT_OUTCOME_UNKNOWN))
+        );
+        assert_eq!(
+            attempt_transition(ATTEMPT_OUTCOME_UNKNOWN, RecoverUnknown),
+            Ok(Replay)
+        );
+        assert!(attempt_transition(ATTEMPT_ACCEPTED, RecoverUnknown).is_err());
+        assert_eq!(
+            attempt_transition(ATTEMPT_ACCEPTED, Abandon),
+            Ok(Apply(ATTEMPT_ABANDONED))
+        );
+        assert_eq!(attempt_transition(ATTEMPT_ABANDONED, Abandon), Ok(Replay));
+        assert!(attempt_transition(ATTEMPT_DISPATCHED, Abandon).is_err());
+        assert!(attempt_transition(ATTEMPT_ABANDONED, Dispatch).is_err());
+    }
+
+    #[test]
+    fn recovery_attribution_is_required_bounded_and_printable() {
+        assert!(validate_recovery_attribution("actor", "approval", "verified").is_ok());
+        assert!(validate_recovery_attribution("", "approval", "verified").is_err());
+        assert!(validate_recovery_attribution("actor", "", "verified").is_err());
+        assert!(validate_recovery_attribution("actor", "approval", "\n").is_err());
+        assert!(validate_recovery_attribution(" actor", "approval", "verified").is_err());
+        assert!(validate_recovery_attribution(
+            &"a".repeat(MAX_RECOVERY_ACTOR_LEN + 1),
+            "approval",
+            "verified",
+        )
+        .is_err());
     }
 
     #[test]

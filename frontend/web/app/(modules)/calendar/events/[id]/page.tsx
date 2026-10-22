@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { CalendarEventPageClient } from "./event-page-client"
 
 const SSR_RESOURCES = ["calendar-events"] as const
@@ -15,7 +15,7 @@ export default async function CalendarEventPage({ params }: CalendarEventPagePro
     return <CalendarEventPageClient eventId={id} />
   }
 
-  const [events] = await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+  const [events] = await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return <CalendarEventPageClient eventId={id} initialEvents={events} organizationId={session.organizationId} />
 }

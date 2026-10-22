@@ -1,5 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
+import type { FormModalProps } from "../forms/form-modal"
+import type { RuntimeFormModalProps } from "../forms/runtime-form-modal"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { ModuleConfig } from "../lib/module-types"
 import type { PolicyRule, Role, User } from "../lib/rbac-types"
@@ -28,10 +30,18 @@ vi.mock("../entity-views/entity-view", () => ({
   EntityView: ({ headerAction, isLoading }: { headerAction?: ReactNode; isLoading?: boolean }) => <div data-testid="entity-view" data-loading={String(isLoading)}>{headerAction}</div>,
 }))
 vi.mock("../entity-views/entity-record-sheet", () => ({ EntityRecordSheet: () => null }))
-vi.mock("../forms/form-modal", () => ({ FormModal: ({ open }: { open: boolean }) => (open ? <div data-testid="create-form" /> : null) }))
-vi.mock("../forms/runtime-form-modal", () => ({ RuntimeFormModal: () => null }))
-vi.mock("./dashboard-grid", () => ({ DashboardGrid: () => null }))
-vi.mock("./dashboard-header", () => ({ DashboardHeader: () => null }))
+vi.mock("../forms/form-modal", () => ({
+  FormModal: ({ open, renderPreview }: FormModalProps) => open
+    ? <div data-testid="create-form">{renderPreview?.({ name: "Draft order" })}</div>
+    : null,
+}))
+vi.mock("../forms/runtime-form-modal", () => ({
+  RuntimeFormModal: ({ open, renderPreview }: RuntimeFormModalProps) => open
+    ? <div data-testid="create-form">{renderPreview?.({ name: "Draft order" })}</div>
+    : null,
+}))
+vi.mock("./dashboard-grid", () => ({ DashboardGrid: () => <div data-testid="legacy-dashboard-grid" /> }))
+vi.mock("./dashboard-header", () => ({ DashboardHeader: ({ timeRange, onExport }: { timeRange?: string; onExport?: () => void }) => <div data-testid="dashboard-header-contract" data-time-range={timeRange ?? "none"} data-has-export={String(Boolean(onExport))} /> }))
 vi.mock("../lib/export-dashboard-png", () => ({ exportDashboardToPng: vi.fn() }))
 
 import type { ModuleDataState } from "../lib/module-data-state"
@@ -81,6 +91,32 @@ function renderView(opts: { permissions: PolicyRule[]; ready?: boolean; state?: 
 beforeAll(() => {
   // jsdom lacks scrollIntoView, which ModuleView calls for the active tab.
   Element.prototype.scrollIntoView = vi.fn()
+})
+
+describe("ModuleView scoped dashboard composition", () => {
+  const dashboardConfig: ModuleConfig = { ...config, defaultTab: "dashboard", tabs: [{ id: "dashboard", label: "Overview", type: "dashboard", sections: [] }, ...config.tabs] }
+  const view = (content?: ReactNode, state?: ModuleDataState) => <RBACProvider initialUser={user} initialRoles={[role([])]} initialPolicies={[]}><ModuleView config={dashboardConfig} dashboardContent={content} dashboardTimeRange="30d" onDashboardTimeRangeChange={() => {}} dataState={state ? { dashboard: state } : undefined} /></RBACProvider>
+  it("lets the scoped composition own controls and exports without also rendering legacy figures", () => {
+    render(view(<div>Scoped financial overview</div>))
+    expect(screen.getByText("Scoped financial overview")).toBeTruthy()
+    expect(screen.queryByTestId("legacy-dashboard-grid")).toBeNull()
+    expect(screen.getByTestId("dashboard-header-contract").dataset.timeRange).toBe("none")
+    expect(screen.getByTestId("dashboard-header-contract").dataset.hasExport).toBe("false")
+    fireEvent.click(screen.getByRole("link", { name: "Orders" }))
+    expect(screen.queryByText("Scoped financial overview")).toBeNull()
+    expect(screen.getByTestId("entity-view")).toBeTruthy()
+  })
+  it("leaves legacy dashboard rendering, controls and export available to other modules", () => {
+    render(view())
+    expect(screen.getByTestId("legacy-dashboard-grid")).toBeTruthy()
+    expect(screen.getByTestId("dashboard-header-contract").dataset.timeRange).toBe("30d")
+    expect(screen.getByTestId("dashboard-header-contract").dataset.hasExport).toBe("true")
+  })
+  it("honors dashboard denial before rendering custom or legacy content", () => {
+    render(view(<div>Scoped financial overview</div>, { status: "denied" }))
+    expect(screen.queryByText("Scoped financial overview")).toBeNull()
+    expect(screen.queryByTestId("legacy-dashboard-grid")).toBeNull()
+  })
 })
 afterEach(() => {
   cleanup()
@@ -173,7 +209,10 @@ describe("ModuleView collection states", () => {
   })
 
   it("leaves tab order and arrow navigation to the tab primitive", async () => {
-    const twoTabs = { ...config, tabs: [...config.tabs, { ...config.tabs[0]!, id: "other", label: "Other" }] }
+    const twoTabs = { ...config,
+      tabGroups: [{ label: "Orders workspace", tabIds: ["orders", "other"] }],
+      tabs: [...config.tabs, { ...config.tabs[0]!, id: "other", label: "Other" }],
+    }
     render(<RBACProvider initialUser={user} initialRoles={[role([])]} initialPolicies={[]}>
       <ModuleView config={twoTabs} />
     </RBACProvider>)
@@ -189,6 +228,22 @@ describe("ModuleView collection states", () => {
 })
 
 describe("ModuleView dialogs follow collection availability", () => {
+  it.each([false, true])("forwards the tab preview to the create dialog (runtime=%s)", (runtime) => {
+    const preview = vi.fn((_tabId, values) => <output>{String(values.name)}</output>)
+    render(
+      <RBACProvider initialUser={user} initialRoles={[role([rule("sale_order", "create")])]} initialPolicies={[]}>
+        <ModuleView
+          config={config}
+          runtimeForms={runtime ? { organizationId: 1 } : undefined}
+          renderCreatePreview={preview}
+        />
+      </RBACProvider>,
+    )
+    fireEvent.click(screen.getByTestId("module-create-sales-orders"))
+    expect(screen.getByText("Draft order")).toBeTruthy()
+    expect(preview).toHaveBeenCalledWith("orders", { name: "Draft order" }, config.tabs[0]!.createForm)
+  })
+
   it("closes an open create form when the collection becomes denied and keeps it closed on recovery", () => {
     const view = (state: ModuleDataState) => (
       <RBACProvider initialUser={user} initialRoles={[role([rule("sale_order", "create")])]} initialPolicies={[]}>
@@ -202,6 +257,37 @@ describe("ModuleView dialogs follow collection availability", () => {
     expect(screen.queryByTestId("create-form")).toBeNull()
     rerender(view({ status: "ready" }))
     expect(screen.getByTestId("entity-view")).toBeTruthy()
+    expect(screen.queryByTestId("create-form")).toBeNull()
+  })
+})
+
+
+describe("ModuleView opt-in create form retention", () => {
+  const twoTabs: ModuleConfig = { ...config, tabs: [...config.tabs, { id: "other", label: "Other", type: "custom", customContent: "Other workspace" }] }
+  const view = (activeTab: string, onOpenFormChange?: (tab: string | null) => void, state?: ModuleDataState) => (
+    <RBACProvider initialUser={user} initialRoles={[role([rule("sale_order", "create")])]} initialPolicies={[]}>
+      <ModuleView config={twoTabs} activeTab={activeTab} onOpenFormChange={onOpenFormChange} dataState={state ? { orders: state } : undefined} />
+    </RBACProvider>
+  )
+  it("retains the original form and reports its workspace after navigating, then clears it on source denial", async () => {
+    const onOpen = vi.fn()
+    const { rerender } = render(view("orders", onOpen))
+    fireEvent.click(screen.getByTestId("module-create-sales-orders"))
+    expect(screen.getByTestId("create-form")).toBeTruthy()
+    expect(onOpen).toHaveBeenLastCalledWith("orders")
+    rerender(view("other", onOpen))
+    expect(screen.getByTestId("create-form")).toBeTruthy()
+    expect(screen.getByText("Other workspace")).toBeTruthy()
+    expect(onOpen).toHaveBeenLastCalledWith("orders")
+    rerender(view("other", onOpen, { status: "denied" }))
+    await waitFor(() => expect(screen.queryByTestId("create-form")).toBeNull())
+    expect(onOpen).toHaveBeenLastCalledWith(null)
+  })
+  it("preserves the existing unmount behavior without the opt-in callback", () => {
+    const { rerender } = render(view("orders"))
+    fireEvent.click(screen.getByTestId("module-create-sales-orders"))
+    expect(screen.getByTestId("create-form")).toBeTruthy()
+    rerender(view("other"))
     expect(screen.queryByTestId("create-form")).toBeNull()
   })
 })

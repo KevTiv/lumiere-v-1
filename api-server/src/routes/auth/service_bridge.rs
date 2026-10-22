@@ -54,6 +54,50 @@ pub(super) async fn workos_bridge(
     })))
 }
 
+pub(super) async fn workos_status(
+    State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Value>, ApiError> {
+    let token = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .ok_or(ApiError::Unauthorized)?;
+    let binding = crate::session::workos::verify_binding(&state, token, false).await?;
+    let rows =
+        crate::session::membership_rows_for_identity(&state, &binding.identity_hex, false).await?;
+    let memberships: Vec<_> = rows
+        .iter()
+        .filter(|row| {
+            binding.organization_id.is_none_or(|org| {
+                row.get("organizationId")
+                    .or_else(|| row.get("organization_id"))
+                    .and_then(|v| v.as_u64().or_else(|| v.as_str()?.parse().ok()))
+                    == Some(org)
+            })
+        })
+        .collect();
+    let active = memberships
+        .iter()
+        .filter(|row| {
+            row.get("isActive")
+                .or_else(|| row.get("is_active"))
+                .and_then(Value::as_bool)
+                == Some(true)
+        })
+        .count();
+    let status = if active == 1 {
+        "ready"
+    } else if !memberships.is_empty() {
+        "membership_suspended"
+    } else if binding.organization_id.is_none() && rows.is_empty() {
+        "onboarding"
+    } else {
+        "invitation_required"
+    };
+    Ok(Json(json!({"status":status})))
+}
+
 pub(super) async fn bootstrap_credential(
     State(state): State<Arc<AppState>>,
     headers: axum::http::HeaderMap,

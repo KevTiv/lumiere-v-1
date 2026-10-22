@@ -24,6 +24,8 @@ pub enum ReportKey {
     PaymentFeeSummaryV1,
     #[serde(rename = "monthly_owner_report_v1")]
     MonthlyOwnerReportV1,
+    #[serde(rename = "margin_supply_outlook_v1")]
+    MarginSupplyOutlookV1,
 }
 
 impl ReportKey {
@@ -39,6 +41,7 @@ impl ReportKey {
             Self::PurchaseSpendV1 => "purchase_spend_v1",
             Self::PaymentFeeSummaryV1 => "payment_fee_summary_v1",
             Self::MonthlyOwnerReportV1 => "monthly_owner_report_v1",
+            Self::MarginSupplyOutlookV1 => "margin_supply_outlook_v1",
         }
     }
 }
@@ -64,6 +67,7 @@ impl FromStr for ReportKey {
             "purchase_spend_v1" => Ok(Self::PurchaseSpendV1),
             "payment_fee_summary_v1" => Ok(Self::PaymentFeeSummaryV1),
             "monthly_owner_report_v1" => Ok(Self::MonthlyOwnerReportV1),
+            "margin_supply_outlook_v1" => Ok(Self::MarginSupplyOutlookV1),
             _ => Err(()),
         }
     }
@@ -75,6 +79,55 @@ pub struct ReportPreviewRequest {
     pub company_id: u64,
     pub date: String,
     pub timezone: String,
+    #[serde(default)]
+    pub scenario: Option<MarginSupplyScenario>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MarginSupplyScenarioSource {
+    Manual,
+    ControlledCsv,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MarginSupplyScenarioProvenance {
+    pub source: MarginSupplyScenarioSource,
+    #[serde(default)]
+    pub file_name: Option<String>,
+    #[serde(default)]
+    pub imported_at: Option<String>,
+    #[serde(default)]
+    pub row_number: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MarginSupplyScenario {
+    /// Percentage change applied to unit cost snapshots.
+    pub input_cost_change_pct: f64,
+    /// Percentage change applied to historical product demand.
+    pub demand_change_pct: f64,
+    /// Additional supplier/replenishment lead days.
+    pub lead_time_change_days: i32,
+    /// Advisory margin threshold. It never changes a product price.
+    pub target_margin_pct: f64,
+    /// Optional bounded provenance for a manual or controlled CSV assumption.
+    #[serde(default)]
+    pub provenance: Option<MarginSupplyScenarioProvenance>,
+}
+
+impl Default for MarginSupplyScenario {
+    fn default() -> Self {
+        Self {
+            input_cost_change_pct: 0.0,
+            demand_change_pct: 0.0,
+            lead_time_change_days: 0,
+            target_margin_pct: 25.0,
+            provenance: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

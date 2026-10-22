@@ -9,6 +9,7 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 use spacetimedb::{ReducerContext, Table};
 
+use crate::accounting::relations::require_contact_in_scope;
 use crate::core::organization::{company, require_company_in_organization};
 use crate::documents::templates::document_template;
 
@@ -218,6 +219,62 @@ struct Seller {
     website: String,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Buyer {
+    partner_id: String,
+    name: String,
+    address: Vec<String>,
+    tax_id: String,
+    registration_number: String,
+    email: String,
+    phone: String,
+}
+
+/// Promote only a newly captured document; never enrich an issued V1 snapshot.
+fn with_trusted_buyer(metadata: String, buyer: Option<Buyer>) -> Result<String, String> {
+    let Some(buyer) = buyer else {
+        return Ok(metadata);
+    };
+    if buyer
+        .partner_id
+        .parse::<u64>()
+        .ok()
+        .is_none_or(|id| id == 0)
+        || buyer.name.trim().is_empty()
+    {
+        return Err("invoice buyer identity is unavailable".to_string());
+    }
+    for (field, value, limit) in [
+        ("buyer.name", &buyer.name, 1024),
+        ("buyer.taxId", &buyer.tax_id, 256),
+        ("buyer.registrationNumber", &buyer.registration_number, 256),
+        ("buyer.email", &buyer.email, 254),
+        ("buyer.phone", &buyer.phone, 64),
+    ] {
+        bounded_text(field, value, limit)?;
+    }
+    if buyer.address.len() > 12 {
+        return Err("invoice buyer address exceeds 12 lines".to_string());
+    }
+    for line in &buyer.address {
+        bounded_text("buyer.address", line, 2048)?;
+    }
+    let mut value: Value = serde_json::from_str(&metadata)
+        .map_err(|_| "captured invoice metadata is malformed".to_string())?;
+    let snapshot = value
+        .get_mut("invoiceDocument")
+        .and_then(Value::as_object_mut)
+        .ok_or("captured invoice document is unavailable")?;
+    snapshot.insert("schemaVersion".to_string(), Value::from(2));
+    snapshot.insert(
+        "buyer".to_string(),
+        serde_json::to_value(buyer)
+            .map_err(|_| "invoice buyer snapshot could not be captured".to_string())?,
+    );
+    Ok(value.to_string())
+}
+
 fn metadata_object(raw: Option<&str>) -> Result<Map<String, Value>, String> {
     let Some(raw) = raw.filter(|raw| !raw.trim().is_empty()) else {
         return Ok(Map::new());
@@ -332,6 +389,7 @@ pub(crate) fn capture_invoice_document_metadata(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
+    partner_id: Option<u64>,
     metadata: Option<&str>,
 ) -> Result<String, String> {
     require_company_in_organization(ctx, organization_id, company_id)?;
@@ -380,7 +438,41 @@ pub(crate) fn capture_invoice_document_metadata(
         organization_id,
         company_id,
     );
-    build_document_metadata(metadata, organization_id, seller, profile, versions)
+    let buyer = partner_id
+        .map(|partner_id| {
+            let contact = require_contact_in_scope(
+                ctx,
+                organization_id,
+                company_id,
+                partner_id,
+                "invoice buyer",
+            )?;
+            Ok::<_, String>(Buyer {
+                partner_id: partner_id.to_string(),
+                name: contact.name,
+                address: [
+                    contact.street,
+                    contact.street2,
+                    contact.city,
+                    contact.state_code,
+                    contact.zip,
+                    contact.country_code,
+                ]
+                .into_iter()
+                .flatten()
+                .filter(|line| !line.trim().is_empty())
+                .collect(),
+                tax_id: contact.tax_id.unwrap_or_default(),
+                registration_number: contact.company_registry.unwrap_or_default(),
+                email: contact.email.unwrap_or_default(),
+                phone: contact.phone.unwrap_or_default(),
+            })
+        })
+        .transpose()?;
+    with_trusted_buyer(
+        build_document_metadata(metadata, organization_id, seller, profile, versions)?,
+        buyer,
+    )
 }
 
 #[cfg(test)]
@@ -667,5 +759,74 @@ mod tests {
         wrong_model.model = "sale_order".into();
         let selected = selected_versions([at_limit, inactive, generic, wrong_model], 42, 7);
         assert_eq!(selected[0].as_ref().map(|row| row.id), Some(1));
+    }
+
+    fn buyer() -> Buyer {
+        Buyer {
+            partner_id: "19".into(),
+            name: "Buyer Legal Ltd".into(),
+            address: vec!["Billing street".into(), "Kigali".into()],
+            tax_id: "BUYER-TIN".into(),
+            registration_number: "BUYER-REG".into(),
+            email: "billing@example.test".into(),
+            phone: String::new(),
+        }
+    }
+
+    #[test]
+    fn trusted_buyer_promotes_new_capture_to_v2_without_trusting_client_snapshot() {
+        let raw = snapshot(
+            Some(
+                r#"{"custom":true,"invoiceDocument":{"schemaVersion":2,"buyer":{"name":"Forged"}}}"#,
+            ),
+            [None, None],
+        );
+        let captured: Value = serde_json::from_str(
+            &with_trusted_buyer(raw.to_string(), Some(buyer())).expect("capture buyer"),
+        )
+        .expect("metadata");
+        assert_eq!(captured["invoiceDocument"]["schemaVersion"], 2);
+        assert_eq!(captured["invoiceDocument"]["buyer"]["partnerId"], "19");
+        assert_eq!(
+            captured["invoiceDocument"]["buyer"]["name"],
+            "Buyer Legal Ltd"
+        );
+        assert_eq!(
+            captured["invoiceDocument"]["buyer"]["address"],
+            serde_json::json!(["Billing street", "Kigali"])
+        );
+        assert_eq!(captured["custom"], true);
+        let mut later = buyer();
+        later.name = "Changed CRM name".into();
+        let changed: Value = serde_json::from_str(
+            &with_trusted_buyer(raw.to_string(), Some(later)).expect("later capture"),
+        )
+        .expect("metadata");
+        assert_ne!(
+            captured["invoiceDocument"]["buyer"],
+            changed["invoiceDocument"]["buyer"]
+        );
+        assert_eq!(captured["invoiceDocument"]["buyer"]["taxId"], "BUYER-TIN");
+    }
+
+    #[test]
+    fn missing_partner_preserves_generic_draft_v1_and_buyer_bounds_fail_explicitly() {
+        let raw = snapshot(None, [None, None]).to_string();
+        assert_eq!(
+            with_trusted_buyer(raw.clone(), None).expect("incomplete draft"),
+            raw
+        );
+        let mut invalid = buyer();
+        invalid.name = " ".into();
+        assert!(with_trusted_buyer(raw.clone(), Some(invalid)).is_err());
+        let mut invalid = buyer();
+        invalid.tax_id = "é".repeat(129);
+        assert!(with_trusted_buyer(raw.clone(), Some(invalid)).is_err());
+        let mut invalid = buyer();
+        invalid.address = vec!["line".into(); 13];
+        assert!(with_trusted_buyer(raw.clone(), Some(invalid)).is_err());
+        let mut invalid = buyer();
+        invalid.phone = "bad\0phone".into();
+        assert!(with_trusted_buyer(raw, Some(invalid)).is_err());
     }
 }

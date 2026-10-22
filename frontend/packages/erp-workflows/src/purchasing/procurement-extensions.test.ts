@@ -13,6 +13,7 @@ import {
   isPurchaseReturnConfirmable,
   isPurchaseReturnCreditable,
   observeBlanketRelease,
+  observeApprovedSupplierIntake,
   observeLandedCostApplied,
   observeConfirmedPurchaseReturn,
   observeReturnVendorCredit,
@@ -20,6 +21,17 @@ import {
 } from "./procurement-extensions"
 
 const noop = async () => ({ outcome: "applied" as const, affectedResources: [] })
+
+test("intake approval observes the exact selected vendor, not state alone", () => {
+  const input = { intakeId: "4", partnerId: "19" }
+  assert.deepEqual(observeApprovedSupplierIntake(input, [{ id: 4, state: "Approved", partnerId: 19 }]), { outcome: "applied" })
+  assert.deepEqual(observeApprovedSupplierIntake(input, [{ id: 4, state: { tag: "Approved" }, partner_id: "19" }]), { outcome: "applied" })
+  for (const rows of [[], [{ id: 5, state: "Approved", partnerId: 19 }],
+    [{ id: 4, state: "Submitted", partnerId: 19 }], [{ id: 4, state: "Approved", partnerId: 20 }],
+    [{ id: 4, state: "Approved" }]]) {
+    assert.deepEqual(observeApprovedSupplierIntake(input, rows), {})
+  }
+})
 
 test("intake review/approve/hold/reject gates mirror the reducers, including enum-shaped state", () => {
   assert.ok(isIntakeReviewable({ state: "Submitted" }))
@@ -32,15 +44,12 @@ test("intake review/approve/hold/reject gates mirror the reducers, including enu
   for (const state of ["Approved", "Rejected", "Onboarded"]) assert.ok(!isIntakeRejectable({ state }), state)
 })
 
-test("intake dispatch prepares the row's ids, the partner and a default reason", () => {
+test("intake approval collects a vendor instead of dispatching an absent partner", () => {
   const row = { id: 4, partnerId: 9, state: "UnderReview" }
   assert.deepEqual(reviewSupplierIntakeAction({ label: "Review", execute: noop }).prepare?.(row), { intakeId: "4" })
-  assert.deepEqual(approveSupplierIntakeAction({ label: "Approve", execute: noop }).prepare?.(row), {
-    intakeId: "4",
-    partnerId: "9",
-  })
-  // No linked partner yet: an empty id lets the command report a typed validation error.
-  assert.equal(approveSupplierIntakeAction({ label: "Approve", execute: noop }).prepare?.({ id: 5 }).partnerId, "")
+  const approval = approveSupplierIntakeAction({ label: "Approve", execute: noop })
+  assert.equal(approval.kind, "form")
+  assert.equal(approval.prepare, undefined)
   assert.deepEqual(
     holdSupplierIntakeAction({ label: "Hold", defaultReason: "Held", execute: noop }).prepare?.(row),
     { intakeId: "4", reason: "Held" },

@@ -1,0 +1,29 @@
+name: Measure CI builds
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect recent CI timings and cache inventory
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/measure-ci-builds.py --repository "$REPOSITORY" --output .ci/build-measurement
+      - name: Publish measurement summary
+        run: cat .ci/build-measurement/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-build-measurement-${{ github.run_id }}
+          path: .ci/build-measurement
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

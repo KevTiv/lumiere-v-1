@@ -1,444 +1,373 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { useTranslation } from "@lumiere/i18n"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ChevronDown, LayoutGrid, List, Search, Table2, Users } from "lucide-react"
+import { Input } from "../components/input"
+import { Badge } from "../components/badge"
+import { Button } from "../components/button"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
-import { taskPriorityOutlineBadgeClass } from "@/lib/theme-colors"
-import {
-  Search,
-  Plus,
-  Users,
-  Calendar,
-  LayoutGrid,
-  List,
-  MoreHorizontal,
-  Target,
-  TrendingUp,
-  CheckCircle2,
-} from "lucide-react"
-import { TaskCardContent } from "./task-card"
+} from "../components/select"
+import { cn } from "../lib/utils"
+import type { KanbanColumnDef } from "../lib/kanban-board-types"
 import { KanbanBoard } from "../kanban/kanban-board"
-import { TaskDetailModal } from "./task-detail-modal"
-import { CreateTaskModal } from "./create-task-modal"
 import {
-  defaultColumns,
-  sampleTasks,
-  sampleTeamMembers,
-  sampleSprint,
-  type Task,
-  type TaskPriority,
-  type TaskStatus,
-} from "@/lib/task-board-types"
-import { TablePager, usePagedRows } from "../components/table-pager"
+  AvatarStack,
+  KanbanCardContent,
+  type KanbanCardPerson,
+} from "../kanban/kanban-card"
+import { TASK_PRIORITY_TONES } from "../lib/task-priority"
 
-interface TaskBoardViewProps {
+/** A task as the board shows it; callers map their rows into this shape. */
+export interface TaskBoardItem {
+  id: string
+  title: string
+  /** Board column (the task's state). */
+  columnId: string
+  projectId?: string
+  projectName?: string
+  /** Backend priority code: "0" normal, "1" low, "2" high, "3" urgent. */
+  priority: string
+  assignees: KanbanCardPerson[]
+  /** Deadline in epoch milliseconds. */
+  dueAt: number | null
+  isClosed: boolean
+  commentCount: number
+  attachmentCount: number
+  /** 0–100. */
+  progress: number | null
+}
+
+export type TaskBoardViewMode = "board" | "list" | "table"
+
+const VIEW_MODES: readonly TaskBoardViewMode[] = ["board", "list", "table"]
+const ALL = "__all__"
+const UNASSIGNED = "__unassigned__"
+
+
+export interface TaskBoardViewProps {
+  items: TaskBoardItem[]
+  columns: KanbanColumnDef[]
+  onMove: (taskId: string, toColumnId: string) => void | Promise<void>
+  onTaskClick?: (taskId: string) => void
+  /** Column "+" buttons; omitted hides them. */
+  onCreateInColumn?: (columnId: string) => void
+  priorityLabel: (priority: string) => string
+  /** Options of the project filter; omitted hides it. */
+  projects?: ReadonlyArray<{ value: string; label: string }>
+  /** Table mode content for the tasks that pass the toolbar filters. Omitted hides the mode. */
+  renderTable?: (visibleTaskIds: ReadonlySet<string>) => ReactNode
+  /** Remembers the chosen mode under this key. */
+  storageKey?: string
   className?: string
 }
 
-export function TaskBoardView({ className }: TaskBoardViewProps) {
+function isOverdue(item: TaskBoardItem, now: number): boolean {
+  return !item.isClosed && item.dueAt != null && item.dueAt < now
+}
+
+function readStoredMode(key: string | undefined, allowed: readonly TaskBoardViewMode[]): TaskBoardViewMode | null {
+  if (!key) return null
+  try {
+    const stored = window.localStorage.getItem(key)
+    return allowed.find((mode) => mode === stored) ?? null
+  } catch {
+    return null
+  }
+}
+
+export function TaskBoardView({
+  items,
+  columns,
+  onMove,
+  onTaskClick,
+  onCreateInColumn,
+  priorityLabel,
+  projects,
+  renderTable,
+  storageKey,
+  className,
+}: TaskBoardViewProps) {
   const { t, i18n } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language
-  const statusLabels: Record<TaskStatus, string> = {
-    backlog: t("tasks.statuses.backlog"),
-    todo: t("tasks.statuses.todo"),
-    "in-progress": t("tasks.statuses.in-progress"),
-    review: t("tasks.statuses.review"),
-    done: t("tasks.statuses.done"),
-  }
-  const priorityLabels: Record<TaskPriority, string> = {
-    low: t("tasks.priorities.low"),
-    medium: t("tasks.priorities.medium"),
-    high: t("tasks.priorities.high"),
-    urgent: t("tasks.priorities.urgent"),
-  }
-  const sprintStatusLabels = {
-    planning: t("tasks.sprint.statuses.planning"),
-    active: t("tasks.sprint.statuses.active"),
-    completed: t("tasks.sprint.statuses.completed"),
-  }
-  const [tasks, setTasks] = useState<Task[]>(sampleTasks)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [filterAssignee, setFilterAssignee] = useState<string>("all")
-  const [viewMode, setViewMode] = useState<"board" | "list">("board")
+  const modes = renderTable ? VIEW_MODES : VIEW_MODES.filter((mode) => mode !== "table")
+  const [viewMode, setViewMode] = useState<TaskBoardViewMode>("board")
+  const [search, setSearch] = useState("")
+  const [projectFilter, setProjectFilter] = useState(ALL)
+  const [assigneeFilter, setAssigneeFilter] = useState(ALL)
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set())
 
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((task) => {
-      const matchesSearch =
-        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.labels.some((label) =>
-          label.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      const matchesAssignee =
-        filterAssignee === "all" ||
-        (filterAssignee === "unassigned" && !task.assigneeId) ||
-        task.assigneeId === filterAssignee
-      return matchesSearch && matchesAssignee
-    })
-  }, [tasks, searchQuery, filterAssignee])
+  // Restored after mount so server and client markup agree.
+  useEffect(() => {
+    const stored = readStoredMode(storageKey, modes)
+    if (stored) setViewMode(stored)
+  }, [storageKey, renderTable !== undefined]) // modes only change with renderTable
 
-  // Sprint stats
-  const sprintStats = useMemo(() => {
-    const total = tasks.length
-    const done = tasks.filter((t) => t.status === "done").length
-    const inProgress = tasks.filter((t) => t.status === "in-progress").length
-    const totalPoints = tasks.reduce((acc, t) => acc + (t.storyPoints || 0), 0)
-    const completedPoints = tasks
-      .filter((t) => t.status === "done")
-      .reduce((acc, t) => acc + (t.storyPoints || 0), 0)
-    return { total, done, inProgress, totalPoints, completedPoints }
-  }, [tasks])
-
-  const handleTaskClick = (task: Task) => {
-    setSelectedTask(task)
-    setIsDetailModalOpen(true)
-  }
-
-  const handleTaskSave = (updatedTask: Task) => {
-    setTasks((prev) =>
-      prev.map((task) => (task.id === updatedTask.id ? updatedTask : task))
-    )
-    setSelectedTask(updatedTask)
-  }
-
-  const handleCreateTask = (newTask: Omit<Task, "id" | "key" | "createdAt" | "updatedAt" | "comments" | "attachments">) => {
-    const task: Task = {
-      ...newTask,
-      id: `task-${Date.now()}`,
-      key: `ERP-${100 + tasks.length + 1}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      comments: [],
-      attachments: [],
+  const changeMode = (mode: TaskBoardViewMode) => {
+    setViewMode(mode)
+    if (!storageKey) return
+    try {
+      window.localStorage.setItem(storageKey, mode)
+    } catch {
+      /* not remembered */
     }
-    setTasks((prev) => [...prev, task])
-    setIsCreateModalOpen(false)
   }
 
-  const tasksPager = usePagedRows(filteredTasks)
+  const people = useMemo(() => {
+    const byId = new Map<string, KanbanCardPerson>()
+    for (const item of items) for (const person of item.assignees) byId.set(person.id, person)
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [items])
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return items.filter((item) => {
+      if (projectFilter !== ALL && item.projectId !== projectFilter) return false
+      if (assigneeFilter === UNASSIGNED && item.assignees.length > 0) return false
+      if (
+        assigneeFilter !== ALL &&
+        assigneeFilter !== UNASSIGNED &&
+        !item.assignees.some((person) => person.id === assigneeFilter)
+      ) {
+        return false
+      }
+      if (!q) return true
+      return (
+        item.title.toLowerCase().includes(q) || (item.projectName ?? "").toLowerCase().includes(q)
+      )
+    })
+  }, [items, search, projectFilter, assigneeFilter])
+
+  const visibleIds = useMemo(() => new Set(visible.map((item) => item.id)), [visible])
+  const now = Date.now()
+
+  const formatDue = (ms: number | null) =>
+    ms == null ? undefined : new Date(ms).toLocaleDateString(locale, { month: "short", day: "numeric" })
+
+  const cardLabels = {
+    comments: (count: number) => t("tasks.card.comments", { count }),
+    attachments: (count: number) => t("tasks.card.attachments", { count }),
+    progress: t("tasks.card.progress"),
+  }
+
+  const priorityBadge = (priority: string) => ({
+    label: priorityLabel(priority),
+    tone: TASK_PRIORITY_TONES[priority] ?? "neutral",
+  })
+
+  const modeIcon = { board: LayoutGrid, list: List, table: Table2 } as const
+  const modeLabel = {
+    board: t("tasks.board.boardView"),
+    list: t("tasks.board.listView"),
+    table: t("tasks.board.tableView"),
+  }
+
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      {/* Sprint Header */}
-      <div className="shrink-0 mb-6 p-4 bg-card border border-border rounded-lg">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold">{sampleSprint.name}</h2>
-            <p className="text-sm text-muted-foreground">{sampleSprint.goal}</p>
-          </div>
-          <Badge
-            variant={sampleSprint.status === "active" ? "default" : "secondary"}
-            className="capitalize"
-          >
-            {sprintStatusLabels[sampleSprint.status]}
-          </Badge>
+    <div className={cn("flex min-h-0 flex-col gap-4", className)} data-testid="task-board-view">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={t("tasks.board.searchPlaceholder")}
+            aria-label={t("tasks.board.searchPlaceholder")}
+            className="pl-9"
+          />
         </div>
-
-        {/* Sprint Stats */}
-        <div className="grid grid-cols-4 gap-4">
-          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="p-2 bg-info/10 rounded-lg">
-              <Target className="h-5 w-5 text-info" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{sprintStats.total}</p>
-              <p className="text-xs text-muted-foreground">{t("tasks.stats.totalTasks")}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="p-2 bg-warning/10 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-warning" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{sprintStats.inProgress}</p>
-              <p className="text-xs text-muted-foreground">{t("tasks.statuses.in-progress")}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="p-2 bg-success/10 rounded-lg">
-              <CheckCircle2 className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{sprintStats.done}</p>
-              <p className="text-xs text-muted-foreground">{t("tasks.stats.completed")}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-            <div className="p-2 bg-category-3/10 rounded-lg">
-              <Calendar className="h-5 w-5 text-category-3" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">
-                {sprintStats.completedPoints}/{sprintStats.totalPoints}
-              </p>
-              <p className="text-xs text-muted-foreground">{t("tasks.fields.storyPoints")}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div className="shrink-0 flex items-center justify-between gap-4 mb-4">
-        <div className="flex items-center gap-3 flex-1">
-          {/* Search */}
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder={t("tasks.board.searchPlaceholder")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-
-          {/* Assignee Filter */}
-          <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-            <SelectTrigger className="w-48">
-              <Users className="h-4 w-4 mr-2" />
-              <SelectValue placeholder={t("tasks.board.assigneeFilterPlaceholder")} />
+        {projects && projects.length > 0 ? (
+          <Select value={projectFilter} onValueChange={(value) => setProjectFilter(String(value))}>
+            <SelectTrigger className="w-full sm:w-48" aria-label={t("tasks.board.allProjects")}>
+              <SelectValue placeholder={t("tasks.board.allProjects")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t("tasks.board.allMembers")}</SelectItem>
-              <SelectItem value="unassigned">{t("tasks.assignee.unassigned")}</SelectItem>
-              {sampleTeamMembers.map((member) => (
-                <SelectItem key={member.id} value={member.id}>
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-5 w-5">
-                      <AvatarFallback className="text-[10px]">
-                        {member.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </AvatarFallback>
-                    </Avatar>
-                    {member.name}
-                  </div>
+              <SelectItem value={ALL}>{t("tasks.board.allProjects")}</SelectItem>
+              {projects.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-
-          {/* Team Members */}
-          <div className="flex items-center -space-x-2">
-            {sampleTeamMembers.slice(0, 5).map((member) => (
-              <Avatar
-                key={member.id}
-                className="h-8 w-8 border-2 border-background"
-                title={member.name}
-              >
-                <AvatarFallback className="text-xs">
-                  {member.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
+        ) : null}
+        <Select value={assigneeFilter} onValueChange={(value) => setAssigneeFilter(String(value))}>
+          <SelectTrigger className="w-full sm:w-48" aria-label={t("tasks.board.assigneeFilterPlaceholder")}>
+            <Users className="mr-1 h-4 w-4 text-muted-foreground" />
+            <SelectValue placeholder={t("tasks.board.assigneeFilterPlaceholder")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>{t("tasks.board.allMembers")}</SelectItem>
+            <SelectItem value={UNASSIGNED}>{t("tasks.assignee.unassigned")}</SelectItem>
+            {people.map((person) => (
+              <SelectItem key={person.id} value={person.id}>
+                {person.name}
+              </SelectItem>
             ))}
-            {sampleTeamMembers.length > 5 && (
-              <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center text-xs font-medium">
-                +{sampleTeamMembers.length - 5}
-              </div>
-            )}
+          </SelectContent>
+        </Select>
+        {people.length > 0 ? (
+          <div className="hidden lg:block">
+            <AvatarStack people={people} size="md" max={5} />
           </div>
-        </div>
+        ) : null}
 
-        {/* View Toggle and Create */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center border border-border rounded-lg p-1">
-            <Button
-              variant={viewMode === "board" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 px-2"
-              onClick={() => setViewMode("board")}
-              aria-label={t("tasks.board.boardView")}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              size="sm"
-              className="h-7 px-2"
-              onClick={() => setViewMode("list")}
-              aria-label={t("tasks.board.listView")}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-          <Button onClick={() => setIsCreateModalOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            {t("tasks.actions.create")}
-          </Button>
+        <div
+          className="flex items-center rounded-lg border border-border p-1 sm:ml-auto"
+          role="group"
+          aria-label={t("common.entityView.toggleLabel", { defaultValue: "Switch view" })}
+        >
+          {modes.map((mode) => {
+            const Icon = modeIcon[mode]
+            return (
+              <Button
+                key={mode}
+                variant={viewMode === mode ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 gap-1.5 px-2"
+                onClick={() => changeMode(mode)}
+                aria-pressed={viewMode === mode}
+                data-testid={`task-view-${mode}`}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{modeLabel[mode]}</span>
+              </Button>
+            )
+          })}
         </div>
       </div>
 
-      {/* Board View */}
-      {viewMode === "board" && (
-        <KanbanBoard
-          columns={defaultColumns.map((column) => ({
-            id: column.id,
-            title: statusLabels[column.id],
-            colorClass: column.color,
-            limit: column.limit,
-          }))}
-          items={filteredTasks as unknown as Record<string, unknown>[]}
-          getItemId={(item) => String(item.id ?? "")}
-          getColumnId={(item) => String(item.status ?? "")}
-          renderCard={(item) => <TaskCardContent task={item as unknown as Task} />}
-          onItemClick={(item) => handleTaskClick(item as unknown as Task)}
-          onMove={({ itemId, toColumnId }) => {
-            setTasks((prev) =>
-              prev.map((task) =>
-                task.id === itemId
-                  ? {
-                      ...task,
-                      status: toColumnId as TaskStatus,
-                      updatedAt: new Date().toISOString(),
-                    }
-                  : task,
-              ),
-            )
-          }}
+      {viewMode === "board" ? (
+        <KanbanBoard<TaskBoardItem>
+          columns={columns}
+          items={visible}
+          getItemId={(item) => item.id}
+          getColumnId={(item) => item.columnId}
+          onItemClick={onTaskClick ? (item) => onTaskClick(item.id) : undefined}
+          onAddItem={onCreateInColumn}
+          onMove={({ itemId, toColumnId }) => onMove(itemId, toColumnId)}
           labels={{
             emptyColumn: t("tasks.board.dropTasksHere"),
             wipLimitReached: (limit) => t("tasks.board.wipLimitReached", { limit }),
           }}
-          className="flex-1"
+          className="min-h-0 flex-1"
+          renderCard={(item) => (
+            <KanbanCardContent
+              title={item.title}
+              subtitle={item.projectName}
+              priority={priorityBadge(item.priority)}
+              assignees={item.assignees}
+              dueLabel={formatDue(item.dueAt)}
+              overdue={isOverdue(item, now)}
+              commentCount={item.commentCount}
+              attachmentCount={item.attachmentCount}
+              progress={item.progress}
+              labels={cardLabels}
+            />
+          )}
         />
-      )}
+      ) : null}
 
-      {/* List View */}
-      {viewMode === "list" && (
-        <div className="flex-1 overflow-auto">
-          <table className="w-full">
-            <thead className="sticky top-0 bg-background border-b border-border">
-              <tr className="text-left text-sm text-muted-foreground">
-                <th className="p-3 font-medium">{t("tasks.fields.key")}</th>
-                <th className="p-3 font-medium">{t("tasks.fields.title")}</th>
-                <th className="p-3 font-medium">{t("tasks.fields.status")}</th>
-                <th className="p-3 font-medium">{t("tasks.fields.priority")}</th>
-                <th className="p-3 font-medium">{t("tasks.fields.assignee")}</th>
-                <th className="p-3 font-medium">{t("tasks.fields.dueDate")}</th>
-                <th className="p-3 font-medium w-12"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {tasksPager.pageRows.map((task) => (
-                <tr
-                  key={task.id}
-                  className="border-b border-border hover:bg-muted/50 cursor-pointer"
-                  onClick={() => handleTaskClick(task)}
+      {viewMode === "list" ? (
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto" data-testid="task-list-view">
+          {columns.map((column) => {
+            const rows = visible.filter((item) => item.columnId === column.id)
+            const isCollapsed = collapsed.has(column.id)
+            return (
+              <section key={column.id} className="overflow-hidden rounded-xl border border-border bg-card">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-muted/40"
+                  aria-expanded={!isCollapsed}
+                  onClick={() =>
+                    setCollapsed((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(column.id)) next.delete(column.id)
+                      else next.add(column.id)
+                      return next
+                    })
+                  }
                 >
-                  <td className="p-3 text-sm font-mono text-muted-foreground">
-                    {task.key}
-                  </td>
-                  <td className="p-3 text-sm font-medium">{task.title}</td>
-                  <td className="p-3">
-                    <Badge variant="outline" className="capitalize">
-                      {statusLabels[task.status]}
-                    </Badge>
-                  </td>
-                  <td className="p-3">
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "capitalize",
-                        taskPriorityOutlineBadgeClass[task.priority]
-                      )}
-                    >
-                      {priorityLabels[task.priority]}
-                    </Badge>
-                  </td>
-                  <td className="p-3">
-                    {task.assigneeName ? (
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {task.assigneeName
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm">{task.assigneeName}</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        {t("tasks.assignee.unassigned")}
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-3 text-sm">
-                    {task.dueDate
-                      ? new Date(task.dueDate).toLocaleDateString(locale)
-                      : "-"}
-                  </td>
-                  <td className="p-3">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label={t("tasks.actions.openMenu", { key: task.key })}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleTaskClick(task)}>
-                          {t("tasks.actions.viewDetails")}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>{t("common.edit")}</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">
-                          {t("common.delete")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <TablePager {...tasksPager} />
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
+                  {column.colorClass ? <span className={cn("h-2.5 w-2.5 rounded-full", column.colorClass)} /> : null}
+                  <span className="text-sm font-semibold">{column.title}</span>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground">
+                    {rows.length}
+                  </span>
+                </button>
+                {!isCollapsed ? (
+                  rows.length === 0 ? (
+                    <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
+                      {t("tasks.board.emptyColumn")}
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-border border-t border-border">
+                      {rows.map((item) => {
+                        const overdue = isOverdue(item, now)
+                        const badge = priorityBadge(item.priority)
+                        return (
+                          <li key={item.id}>
+                            <button
+                              type="button"
+                              className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-left hover:bg-muted/40 sm:flex-nowrap"
+                              onClick={onTaskClick ? () => onTaskClick(item.id) : undefined}
+                              data-testid={`task-list-row-${item.id}`}
+                            >
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-medium">{item.title}</span>
+                                {item.projectName ? (
+                                  <span className="block truncate text-xs text-muted-foreground">{item.projectName}</span>
+                                ) : null}
+                              </span>
+                              <Badge
+                                variant={
+                                  badge.tone === "neutral"
+                                    ? "secondary"
+                                    : badge.tone
+                                }
+                                className="h-5 px-1.5 text-[10px]"
+                              >
+                                {badge.label}
+                              </Badge>
+                              <span
+                                className={cn(
+                                  "w-16 text-xs tabular-nums text-muted-foreground",
+                                  overdue && "font-medium text-destructive",
+                                )}
+                              >
+                                {formatDue(item.dueAt) ?? "—"}
+                              </span>
+                              <span className="flex w-20 justify-end">
+                                {item.assignees.length > 0 ? (
+                                  <AvatarStack people={item.assignees} />
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">
+                                    {t("tasks.assignee.unassigned")}
+                                  </span>
+                                )}
+                              </span>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )
+                ) : null}
+              </section>
+            )
+          })}
         </div>
-      )}
+      ) : null}
 
-      {/* Task Detail Modal */}
-      <TaskDetailModal
-        task={selectedTask}
-        open={isDetailModalOpen}
-        onOpenChange={setIsDetailModalOpen}
-        onSave={handleTaskSave}
-        teamMembers={sampleTeamMembers}
-      />
-
-      {/* Create Task Modal */}
-      <CreateTaskModal
-        open={isCreateModalOpen}
-        onOpenChange={setIsCreateModalOpen}
-        onCreate={handleCreateTask}
-        teamMembers={sampleTeamMembers}
-      />
+      {viewMode === "table" && renderTable ? (
+        <div className="min-h-0 flex-1 overflow-y-auto" data-testid="task-table-view">
+          {renderTable(visibleIds)}
+        </div>
+      ) : null}
     </div>
   )
 }

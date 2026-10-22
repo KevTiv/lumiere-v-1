@@ -16,15 +16,6 @@ beforeAll(() => {
   }
 })
 
-// The real Select imports a web-only path alias that vitest cannot resolve.
-vi.mock("../components/select", () => ({
-  Select: () => null,
-  SelectContent: () => null,
-  SelectItem: () => null,
-  SelectTrigger: () => null,
-  SelectValue: () => null,
-}))
-
 // AI suggestions are not under test and need a query client.
 vi.mock("@lumiere/query-hooks/hooks/ai-forms", () => ({
   useAiFormSuggest: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
@@ -87,5 +78,14 @@ describe("searchable select field in a form dialog", () => {
 
     await new Promise((resolve) => setTimeout(resolve, 100))
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+})
+
+
+describe("plain select field accessibility", () => {
+  it("exposes the visible field label as the picker accessible name", () => {
+    const plain: FormConfig = { ...config, sections: [{ ...config.sections![0], fields: [{ ...config.sections![0].fields[0], searchable: false }] }] }
+    render(<FormModal open onOpenChange={() => {}} config={plain} onSubmit={vi.fn()} showSubmitSuccessToast={false} />)
+    expect(screen.getByRole("combobox", { name: /Partner/ })).toBeTruthy()
   })
 })

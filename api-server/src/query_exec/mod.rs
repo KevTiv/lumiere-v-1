@@ -59,7 +59,7 @@ use documents::{read_document_templates, read_mail_templates};
 use hr::{maybe_log_hr_pii_read, read_direct_reports, read_employees, read_my_employee};
 use messaging::read_queued_mail_messages;
 pub(crate) use row_values::{
-    filter_and_strip_archived, filter_and_strip_soft_deleted, has_iot_read_permission, row_u64,
+    filter_and_strip_soft_deleted, filter_resource_archived_rows, has_iot_read_permission, row_u64,
 };
 #[cfg(test)]
 use row_values::{
@@ -95,11 +95,10 @@ fn require_ui_child_read_permission(
             documents::has_document_read_permission(field_access)
         }
         _ => {
-            let Some(parent) = accounting_read_permission_resource(resource) else {
-                return Ok(());
-            };
-            has_resource_read_permission(field_access, resource)
-                || has_resource_read_permission(field_access, parent)
+            stdb_auth::session_read_resource(resource)
+                || has_resource_read_permission(field_access, resource)
+                || accounting_read_permission_resource(resource)
+                    .is_some_and(|parent| has_resource_read_permission(field_access, parent))
         }
     };
     let context_matches = field_access.is_some_and(|access| {
@@ -111,7 +110,10 @@ fn require_ui_child_read_permission(
                     identity_sql_literal(&access.identity_hex).ok().as_ref() == Some(&identity)
                 })
     });
-    if !allowed || !context_matches {
+    if !allowed
+        || !context_matches
+        || field_access.is_some_and(|a| stdb_auth::resource_read_denied(a, resource))
+    {
         return Err(ApiError::Forbidden(format!(
             "Read permission denied for resource '{resource}'"
         )));
@@ -138,6 +140,27 @@ pub async fn execute_resource_query(
 }
 
 pub async fn execute_resource_query_for_company(
+    client: &StdbClient,
+    resource: &str,
+    organization_id: u64,
+    identity_hex: &str,
+    field_access: Option<&FieldAccessContext>,
+    requested_company_id: Option<u64>,
+) -> Result<Vec<Value>, ApiError> {
+    let mut rows = read_resource_query_for_company(
+        client,
+        resource,
+        organization_id,
+        identity_hex,
+        field_access,
+        requested_company_id,
+    )
+    .await?;
+    row_values::preserve_query_timestamp_precision(&mut rows);
+    Ok(rows)
+}
+
+async fn read_resource_query_for_company(
     client: &StdbClient,
     resource: &str,
     organization_id: u64,
@@ -546,13 +569,18 @@ pub async fn execute_resource_query_for_company(
         rows.retain(|row| row_company_matches(row, company_id, false));
     }
     if let Some(company_id) = accounting_company_id {
-        rows.retain(|row| {
-            row_company_matches(
-                row,
-                company_id,
-                optional_company_accounting_resource(resource),
-            )
-        });
+        // saved-reports is company-filtered in SQL, but its current restricted
+        // projection intentionally omits company_id. Other accounting resources
+        // retain the defense-in-depth row check because they project the field.
+        if resource != "saved-reports" {
+            rows.retain(|row| {
+                row_company_matches(
+                    row,
+                    company_id,
+                    optional_company_accounting_resource(resource),
+                )
+            });
+        }
     }
     if let Some(company_id) = iot_company_id {
         rows.retain(|row| row_company_matches(row, company_id, false));
@@ -571,9 +599,7 @@ pub async fn execute_resource_query_for_company(
         filter_and_strip_soft_deleted(&mut rows);
     }
 
-    if resource == "contact-phone-identities" || resource == "payment-accounts" {
-        filter_and_strip_archived(&mut rows);
-    }
+    filter_resource_archived_rows(resource, &mut rows);
 
     registered::sort_registered_rows(resource, &mut rows);
 
@@ -661,7 +687,41 @@ mod tests {
             role_permissions: vec![permission.into()],
             identity_hex: "actor".into(),
             field_permissions: Vec::new(),
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         }
+    }
+
+    #[test]
+    fn runtime_form_metadata_reads_require_the_active_tenant_context_and_honor_denies() {
+        let identity = "ab".repeat(32);
+        let mut access = authoritative_access("organization:read");
+        access.identity_hex = identity.clone();
+        for resource in [
+            "form-configs",
+            "form-config-fields",
+            "form-role-configs",
+            "form-field-labels",
+            "user-custom-fields",
+        ] {
+            assert!(
+                require_ui_child_read_permission(resource, 42, &identity, Some(&access)).is_ok()
+            );
+            assert!(
+                require_ui_child_read_permission(resource, 43, &identity, Some(&access)).is_err()
+            );
+            assert!(require_ui_child_read_permission(resource, 42, &identity, None).is_err());
+            let mut denied = access.clone();
+            denied.org_permissions.push(stdb_auth::ActionPermission {
+                resource: resource.into(),
+                action: "read".into(),
+                allow: false,
+            });
+            assert!(
+                require_ui_child_read_permission(resource, 42, &identity, Some(&denied)).is_err()
+            );
+        }
+        assert!(require_ui_child_read_permission("leads", 42, &identity, Some(&access)).is_err());
     }
 
     #[test]
@@ -731,7 +791,7 @@ mod tests {
                 );
             }
         }
-        assert!(require_ui_child_read_permission("products", 42, &identity, None).is_ok());
+        assert!(require_ui_child_read_permission("products", 42, &identity, None).is_err());
     }
 
     #[tokio::test]
@@ -1150,6 +1210,7 @@ mod tests {
             "payment-reconciliations",
             "payment-reversals",
             "payment-transactions",
+            "saved-reports",
             "tax-deadlines",
             "tax-groups",
             "tax-schedules",

@@ -128,7 +128,8 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	local-start local-stop local-publish local-reset local-test local-logs \
 	stack-init stack-up stack-up-iot stack-down \
 	codegen-all codegen-check api-run \
-	cloud-wasm cloud-publish cloud-reset cloud-test cloud-logs
+	cloud-wasm cloud-publish cloud-reset cloud-test cloud-logs \
+	identity-bootstrap-plan identity-bootstrap-apply identity-rotate-apply
 
 help-legacy:
 	@echo "Usage: make <target>"
@@ -228,8 +229,20 @@ help:
 	$(call print-command,cloud-reset,DESTRUCTIVE: clear the Maincloud database and republish.)
 	$(call print-command,cloud-test,Run core reducer tests against Maincloud.)
 	$(call print-command,cloud-logs,Tail Maincloud module logs.)
+	$(call print-command,identity-bootstrap-plan,Validate and print the redacted production identity plan.)
+	$(call print-command,identity-bootstrap-apply,Mint and publish initial production service identities.)
+	$(call print-command,identity-rotate-apply,Rotate drained production service identities.)
 	@printf "\nCompatibility aliases: check, build, start, stop, publish, publish-clear, test, logs,\n"
 	@printf "generate-stdb-ts-sdk, generate-stdb-rust-sdk, init-stack, docker-dev, and publish-cloud.\n"
+
+identity-bootstrap-plan:
+	node scripts/bootstrap-production-identities.mjs --mode bootstrap
+
+identity-bootstrap-apply:
+	node scripts/bootstrap-production-identities.mjs --apply --mode bootstrap
+
+identity-rotate-apply:
+	node scripts/bootstrap-production-identities.mjs --apply --mode rotate
 
 help-e2e:
 	@printf "E2E commands (all use local SpacetimeDB and write logs under .tmp/e2e):\n"
@@ -405,6 +418,9 @@ e2e-smoke-setup:
 					fi; \
 				done; \
 				echo "[e2e] Domain reducer tests passed."; \
+				if [ "$${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
+					spacetime call "$(E2E_DB)" run_all_inventory_tests --server local --no-config || exit 1; \
+				fi; \
 				if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 					for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
 						echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
@@ -874,7 +890,7 @@ e2e-docker:
 	'
 
 e2e-smoke:
-	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" E2E_PREBUILT="$(E2E_PREBUILT)" /bin/bash -c 'set -euo pipefail; \
+	@env PATH="$(E2E_PATH):$$PATH" E2E_SUITE="$(E2E_SUITE)" E2E_WORKERS="$(E2E_WORKERS)" E2E_SPEC_FILES="$(value E2E_SPEC_FILES)" E2E_SHARD="$(E2E_SHARD)" E2E_PREBUILT="$(E2E_PREBUILT)" /bin/bash -c 'set -euo pipefail; \
 		ROOT="$$(pwd)"; \
 		LOG_DIR="$$ROOT/.tmp/e2e"; \
 		mkdir -p "$$LOG_DIR"; \
@@ -949,6 +965,9 @@ e2e-smoke:
 				fi; \
 			done; \
 			echo "[e2e] Domain reducer tests passed."; \
+			if [ "$${E2E_RUN_INVENTORY_AGGREGATE:-0}" = "1" ]; then \
+				spacetime call "$(E2E_DB)" run_all_inventory_tests --server local --no-config || exit 1; \
+			fi; \
 			if [ "$${E2E_RUN_DOMAIN_AGGREGATES:-0}" = "1" ]; then \
 				for _aggregate_reducer in run_all_inventory_tests run_all_analytics_tests; do \
 					echo "[e2e] Calling $$_aggregate_reducer aggregate..."; \
@@ -1050,7 +1069,7 @@ e2e-smoke:
 			fi; \
 		done; \
 		echo "[e2e] Running Playwright ($${E2E_SUITE:-full} suite, workers=$$E2E_WORKERS)..."; \
-		pnpm exec playwright install chromium; \
+		if [ "$${E2E_BROWSER_READY:-0}" != "1" ]; then pnpm exec playwright install chromium; fi; \
 		PW_ARGS=(--workers "$$E2E_WORKERS"); \
 		if [ "$${E2E_SUITE:-full}" = "p0" ]; then \
 			PW_ARGS+=(--grep @p0); \
@@ -1065,6 +1084,10 @@ e2e-smoke:
 			PW_ARGS+=("$${SPEC_FILES[@]}"); \
 		elif [ "$${E2E_REQUIRE_AI:-0}" != "1" ]; then \
 			PW_ARGS+=(--grep-invert @ai-live); \
+		fi; \
+		if [ "$${E2E_SUITE:-full}" != "targeted" ] && [ -n "$${E2E_SPEC_FILES:-}" ]; then \
+			read -r -a SPEC_FILES <<< "$$E2E_SPEC_FILES"; \
+			PW_ARGS+=("$${SPEC_FILES[@]}"); \
 		fi; \
 		if [ -n "$${E2E_SHARD:-}" ]; then echo "[e2e] Shard $$E2E_SHARD"; PW_ARGS+=(--shard "$$E2E_SHARD"); fi; \
 		PORT="" \
@@ -1229,7 +1252,8 @@ check-codegen-pinned: check-agent-capabilities-pinned check-operation-history-pi
 contracts-staging-from-pinned:
 	@bash scripts/prepare-vendored-contracts-rust.sh
 	@cargo fetch --quiet
-	@CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
+	@set -euo pipefail; \
+	CHECKOUT="$$(bash scripts/resolve-pinned-contracts.sh)"; \
 	if [ -z "$$CHECKOUT" ] || [ ! -d "$$CHECKOUT/crates/lumiere-contracts/src/bindings" ]; then \
 		echo "contracts-staging-from-pinned: could not resolve the pinned lumiere-contracts checkout" >&2; \
 		exit 1; \
@@ -1244,11 +1268,12 @@ contracts-staging-from-pinned:
 			exit 1; \
 		fi; \
 	done; \
-	rm -rf .contracts-staging; \
-	mkdir -p .contracts-staging/bindings .contracts-staging/manifests .contracts-staging/ts/generated .contracts-staging/ir; \
-	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." .contracts-staging/bindings/; \
-	cp -R "$$CHECKOUT/manifests/." .contracts-staging/manifests/; \
-	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." .contracts-staging/ir/; fi; \
+	STAGING="$$(mktemp -d)"; \
+	trap 'rm -rf "$$STAGING"' EXIT; \
+	mkdir -p "$$STAGING/bindings" "$$STAGING/manifests" "$$STAGING/ts/generated" "$$STAGING/ir"; \
+	cp -R "$$CHECKOUT/crates/lumiere-contracts/src/bindings/." "$$STAGING/bindings/"; \
+	cp -R "$$CHECKOUT/manifests/." "$$STAGING/manifests/"; \
+	if [ -d "$$CHECKOUT/ir" ]; then cp -R "$$CHECKOUT/ir/." "$$STAGING/ir/"; fi; \
 	V2_PIN="$$CHECKOUT/ir/PIN-v2.json"; \
 	if [ ! -f "$$V2_PIN" ]; then V2_PIN="$$CHECKOUT/ir/PIN.json"; fi; \
 	python3 scripts/verify-contract-ir.py \
@@ -1262,9 +1287,10 @@ contracts-staging-from-pinned:
 		python3 scripts/verify-agent-capability-artifact.py \
 			"$$CHECKOUT/ir/agent-capability-registry-v1.json"; \
 	fi; \
-	cp -R "$$CHECKOUT/packages/contracts/src/generated/." .contracts-staging/ts/generated/; \
-	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" .contracts-staging/ts/; \
-	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" .contracts-staging/ts/; \
+	cp -R "$$CHECKOUT/packages/contracts/src/generated/." "$$STAGING/ts/generated/"; \
+	cp "$$CHECKOUT/packages/contracts/src/stdb-generated-sql-columns.json" "$$STAGING/ts/"; \
+	cp "$$CHECKOUT/packages/contracts/src/stdb-reducer-invalidation.ts" "$$STAGING/ts/"; \
+	python3 scripts/sync-directory.py "$$STAGING" .contracts-staging; \
 	echo "contracts-staging-from-pinned: populated .contracts-staging/ from $$CHECKOUT"
 
 # CI-safe reducer drift check. Unlike full bindings drift, schema retrieval is

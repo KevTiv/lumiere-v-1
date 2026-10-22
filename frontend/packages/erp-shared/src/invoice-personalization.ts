@@ -12,12 +12,29 @@ export type InvoiceProfileValues = Partial<Record<Exclude<InvoiceProfileField, "
 export type InvoicePersonalizationProfile = Record<Exclude<InvoiceProfileField, "accent">, string> & { accent: InvoiceAccent | "" }
 export interface InvoiceContentOverrides { schemaVersion: 1; notice?: string; terms?: string; paymentInstructions?: string; footer?: string }
 export interface InvoiceProfileVersionIds { organization: string | null; company: string | null }
-export interface InvoiceDocumentSnapshot {
-  schemaVersion: 1
+export interface InvoiceBuyerSnapshot {
+  partnerId: string
+  name: string
+  address: string[]
+  taxId: string
+  registrationNumber: string
+  email: string
+  phone: string
+}
+interface InvoiceDocumentSnapshotBase {
   profileVersionIds: InvoiceProfileVersionIds
   seller: { name: string; address: string[]; taxId: string; registrationNumber: string; email: string; phone: string; website: string }
   profile: InvoicePersonalizationProfile
   notes: string
+}
+/** V1 issued documents are immutable: an absent buyer must never resolve from today's CRM. */
+export type InvoiceDocumentSnapshot = InvoiceDocumentSnapshotBase & (
+  | { schemaVersion: 1; buyer?: never }
+  | { schemaVersion: 2; buyer: InvoiceBuyerSnapshot }
+)
+
+export function invoiceBuyerSnapshot(snapshot: InvoiceDocumentSnapshot): InvoicePersonalizationRead<InvoiceBuyerSnapshot> {
+  return snapshot.schemaVersion === 2 ? { status: "valid", value: snapshot.buyer } : { status: "missing" }
 }
 export type InvoicePersonalizationRead<T> = { status: "missing" } | { status: "valid"; value: T } | { status: "invalid"; error: string }
 export interface InvoiceProfileVersion { id: string; organizationId: string; companyId: string | null; name: string; values: InvoiceProfileValues }
@@ -240,8 +257,13 @@ export function parseInvoiceDocumentSnapshot(metadata: unknown, organizationId?:
   const parsed = section(metadata, "invoiceDocument")
   if (parsed.status !== "valid") return parsed
   const snapshot = parsed.value
-  if (snapshot.schemaVersion !== 1) return invalid("Invoice document schema version is unsupported")
-  if (Object.keys(snapshot).some((key) => !["schemaVersion", "profileVersionIds", "seller", "profile", "notes"].includes(key))) return invalid("Invoice document contains an unsupported field")
+  if (snapshot.schemaVersion !== 1 && snapshot.schemaVersion !== 2) return invalid("Invoice document schema version is unsupported")
+  const allowed = ["schemaVersion", "profileVersionIds", "seller", "profile", "notes", ...(snapshot.schemaVersion === 2 ? ["buyer"] : [])]
+  if (Object.keys(snapshot).some((key) => !allowed.includes(key))) return invalid("Invoice document contains an unsupported field")
+  if (snapshot.schemaVersion === 2) {
+    const buyer = validateInvoiceBuyer(snapshot.buyer)
+    if (buyer.status !== "valid") return buyer
+  }
   if (!object(snapshot.profileVersionIds) || Object.keys(snapshot.profileVersionIds).length !== 2 || !has(snapshot.profileVersionIds, "organization") || !has(snapshot.profileVersionIds, "company")) return invalid("Invoice profile version references are malformed")
   for (const id of Object.values(snapshot.profileVersionIds)) if (id !== null && (typeof id !== "string" || !invoiceProfileId(id))) return invalid("Invoice profile version reference is invalid")
   const profile = validateInvoiceProfileValues(snapshot.profile, organizationId)
@@ -259,6 +281,39 @@ export function parseInvoiceDocumentSnapshot(metadata: unknown, organizationId?:
 }
 
 export const readInvoiceDocumentSnapshot = parseInvoiceDocumentSnapshot
+
+function validateInvoiceBuyer(value: unknown): InvoicePersonalizationRead<InvoiceBuyerSnapshot> {
+  if (!object(value) || Object.keys(value).some((key) => !["partnerId", "name", "address", "taxId", "registrationNumber", "email", "phone"].includes(key))) return invalid("Invoice buyer is malformed")
+  if (typeof value.partnerId !== "string" || !invoiceProfileId(value.partnerId)) return invalid("Invoice buyer reference is invalid")
+  for (const [key, limit] of [["name", 1024], ["taxId", 256], ["registrationNumber", 256], ["email", 254], ["phone", 64]] as const) {
+    const error = textError(value[key], `buyer.${key}`, limit)
+    if (error) return invalid(error)
+  }
+  if (!(value.name as string).trim()) return invalid("Invoice buyer name is unavailable")
+  if (!Array.isArray(value.address) || value.address.length > 12 || value.address.some((line) => textError(line, "buyer.address", 2048))) return invalid("Invoice buyer address is malformed")
+  return valid(value as unknown as InvoiceBuyerSnapshot)
+}
+
+/** Exact authorized draft contact only. Explicit null is known-empty; missing fields may be redacted. */
+export interface InvoiceBuyerContact {
+  id?: unknown; organizationId?: unknown; organization_id?: unknown; companyId?: unknown; company_id?: unknown
+  name?: unknown; street?: unknown; street2?: unknown; city?: unknown; stateCode?: unknown; state_code?: unknown
+  zip?: unknown; countryCode?: unknown; country_code?: unknown; taxId?: unknown; tax_id?: unknown
+  companyRegistry?: unknown; company_registry?: unknown; email?: unknown; phone?: unknown
+  deletedAt?: unknown; deleted_at?: unknown; mergeTargetId?: unknown; merge_target_id?: unknown
+}
+export function invoiceBuyerFromContact(contact: InvoiceBuyerContact | null | undefined, organizationId: string | number | bigint, companyId: string | number | bigint, partnerId: string | number | bigint): InvoicePersonalizationRead<InvoiceBuyerSnapshot> {
+  const read = (camel: keyof InvoiceBuyerContact, snake: keyof InvoiceBuyerContact = camel): unknown => contact && (has(contact, camel) ? contact[camel] : has(contact, snake) ? contact[snake] : undefined)
+  if (!contact || !invoiceProfileId(organizationId) || !invoiceProfileId(companyId) || !invoiceProfileId(partnerId) || invoiceProfileId(read("id")) !== invoiceProfileId(partnerId) || invoiceProfileId(read("organizationId", "organization_id")) !== invoiceProfileId(organizationId)) return invalid("Invoice buyer scope is unavailable")
+  const scope = read("companyId", "company_id")
+  if (scope !== null && invoiceProfileId(scope) !== invoiceProfileId(companyId)) return invalid("Invoice buyer belongs to another company or its scope is unavailable")
+  if (read("deletedAt", "deleted_at") !== null || read("mergeTargetId", "merge_target_id") !== null) return invalid("Invoice buyer active state is unavailable")
+  const fields = [["street", "street"], ["street2", "street2"], ["city", "city"], ["stateCode", "state_code"], ["zip", "zip"], ["countryCode", "country_code"], ["taxId", "tax_id"], ["companyRegistry", "company_registry"], ["email", "email"], ["phone", "phone"]] as const
+  const values = fields.map(([camel, snake]) => read(camel, snake))
+  if (values.some((value) => value !== null && typeof value !== "string")) return invalid("Invoice buyer legal fields are unavailable")
+  const text = (index: number) => typeof values[index] === "string" ? values[index] as string : ""
+  return validateInvoiceBuyer({ partnerId: String(partnerId), name: read("name"), address: values.slice(0, 6).filter((value): value is string => typeof value === "string" && value.trim() !== ""), taxId: text(6), registrationNumber: text(7), email: text(8), phone: text(9) })
+}
 
 /** Header inspection is followed by browser decoding before any upload. SVG is never supported. */
 export function inspectInvoiceLogo(bytes: Uint8Array, mimeType: string): { width: number; height: number; mimeType: "image/png" | "image/jpeg" } {

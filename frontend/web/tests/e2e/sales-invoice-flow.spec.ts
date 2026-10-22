@@ -2,6 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 import { expect, test } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   chooseSelectOptionByLabel,
   expectNoAppError,
@@ -72,7 +73,7 @@ test.describe("Sales and invoice flow e2e", { tag: "@dev-fixture" }, () => {
 
   test("sales dashboard quick action opens new sale order form", async ({ page }) => {
     await gotoModule(page, "/sales", "sales")
-    await page.getByTestId("module-tab-sales-dashboard").click()
+    await selectModuleTab(page, "sales", "dashboard")
 
     await page.getByTestId("quick-action-create_sale_order").click()
     await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
@@ -358,7 +359,7 @@ test.describe("SAL-004: Full SO → Invoice creation flow", { tag: "@p0" }, () =
 
       // ── Step 7: Navigate to Sales → Orders and select the SO ─────────────────
       await gotoModule(page, "/sales", "sales")
-      await page.getByTestId("module-tab-sales-orders").click()
+      await selectModuleTab(page, "sales", "orders")
       await page
         .locator('[role="tabpanel"]:visible')
         .getByRole("textbox", { name: "Search records" })

@@ -21,6 +21,7 @@ use crate::document_render::{
 };
 use crate::error::ApiError;
 use crate::query_exec::execute_resource_query;
+use crate::session::ApiSession;
 use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session};
@@ -36,8 +37,29 @@ pub(super) async fn account_move_pdf(
     let session = resolve_session(&state, &headers, &cookies)
         .await?
         .ok_or(ApiError::Unauthorized)?;
-    let org_id = require_org(&session)?;
+    let pdf_bytes = render_account_move_pdf(&state, &session, move_id, None).await?;
+    attachment_response(
+        format!("account-move-{move_id}.pdf"),
+        "application/pdf",
+        pdf_bytes,
+    )
+}
 
+pub(crate) struct InvoicePdfReview<'a> {
+    pub organization_id: u64,
+    pub company_id: u64,
+    pub revision: &'a [Value],
+}
+
+/// Render through the same managed document pipeline as the authenticated download.
+/// Reviewed attachments additionally require the original posted invoice revision.
+pub(crate) async fn render_account_move_pdf(
+    state: &AppState,
+    session: &ApiSession,
+    move_id: u64,
+    review: Option<InvoicePdfReview<'_>>,
+) -> Result<Vec<u8>, ApiError> {
+    let org_id = require_org(session)?;
     let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
     let client = trusted.client();
     let moves = execute_resource_query(
@@ -57,6 +79,16 @@ pub(super) async fn account_move_pdf(
     }
     let company_id = row_u64(&mv, &["companyId", "company_id"])
         .ok_or_else(|| ApiError::Conflict("invoice company is unavailable".into()))?;
+    if let Some(review) = review {
+        if review.organization_id != org_id
+            || review.company_id != company_id
+            || !invoice_revision_matches(&mv, review.revision)
+        {
+            return Err(ApiError::Conflict(
+                "invoice changed or is unreadable since email review".into(),
+            ));
+        }
+    }
     let draft_profile = needs_draft_profile(&mv);
     let snapshot = if draft_profile {
         None
@@ -131,17 +163,69 @@ pub(super) async fn account_move_pdf(
         ))
     };
 
-    let pdf_bytes = render_pdf(
-        &state,
+    render_pdf(
+        state,
         &render_invoice_html(&document, logo_uri.as_deref()),
         move_id,
     )
-    .await?;
-    attachment_response(
-        format!("account-move-{move_id}.pdf"),
-        "application/pdf",
-        pdf_bytes,
-    )
+    .await
+}
+
+/// Compare serialized SATS field names/variants without treating missing scope as inheritance.
+pub(crate) fn invoice_revision_matches(row: &Value, revision: &[Value]) -> bool {
+    let get = |camel: &str, snake: &str| row.get(camel).or_else(|| row.get(snake));
+    let tag = |value: Option<&Value>| -> Option<String> {
+        let value = value?;
+        if let Some(text) = value.as_str() {
+            return Some(text.into());
+        }
+        if let Some(text) = value.get("tag").and_then(Value::as_str) {
+            return Some(text.into());
+        }
+        let object = value.as_object()?;
+        if object.len() != 1 {
+            return None;
+        }
+        let (key, payload) = object.iter().next()?;
+        if !(payload.as_array().is_some_and(Vec::is_empty)
+            || payload.as_object().is_some_and(serde_json::Map::is_empty))
+        {
+            return None;
+        }
+        Some(
+            key.split('_')
+                .map(|part| {
+                    let mut chars = part.chars();
+                    chars
+                        .next()
+                        .map(|first| first.to_uppercase().collect::<String>() + chars.as_str())
+                        .unwrap_or_default()
+                })
+                .collect(),
+        )
+    };
+    if revision.len() != 7 {
+        return false;
+    }
+    let state = tag(get("state", "state"));
+    let move_type = tag(get("moveType", "move_type"));
+    let amount = get("amountTotal", "amount_total").and_then(Value::as_f64);
+    state.as_deref() == Some("Posted")
+        && matches!(move_type.as_deref(), Some("OutInvoice" | "OutRefund"))
+        && revision[0].as_str() == state.as_deref()
+        && revision[1].as_str() == move_type.as_deref()
+        && amount.is_some_and(f64::is_finite)
+        && revision[2].as_f64() == amount
+        && revision[3].as_str()
+            == row_u64(row, &["currencyId", "currency_id"])
+                .map(|id| id.to_string())
+                .as_deref()
+        && revision[4].as_str() == get("name", "name").and_then(Value::as_str)
+        && revision[5].as_str()
+            == get("invoicePartnerDisplayName", "invoice_partner_display_name")
+                .filter(|value| value.is_null() || value.is_string())
+                .map(|value| value.as_str().unwrap_or_default())
+        && get("metadata", "metadata").is_some_and(|value| value == &revision[6])
 }
 
 fn unique_record(rows: &[Value], id: u64) -> Option<&Value> {
@@ -175,9 +259,20 @@ async fn render_pdf(state: &AppState, html: &str, move_id: u64) -> Result<Vec<u8
             "invoice renderer did not return a PDF".into(),
         ));
     }
-    let bytes = response.bytes().await.map_err(|error| {
-        ApiError::Unavailable(format!("invoice PDF could not be read: {error}"))
-    })?;
+    let mut response = response;
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| ApiError::Unavailable("invoice PDF could not be read".into()))?
+    {
+        if bytes.len() + chunk.len() > 8 * 1024 * 1024 {
+            return Err(ApiError::Unavailable(
+                "invoice PDF exceeds the supported 8 MiB size".into(),
+            ));
+        }
+        bytes.extend_from_slice(&chunk);
+    }
     if !bytes.starts_with(b"%PDF-") {
         return Err(ApiError::Unavailable(
             "invoice renderer returned an invalid PDF".into(),

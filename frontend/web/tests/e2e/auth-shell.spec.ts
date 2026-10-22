@@ -8,13 +8,11 @@ import {
 } from "./helpers"
 
 test.describe("public access", { tag: "@unauthenticated" }, () => {
-  test("root landing page is public", async ({ page }) => {
+  test("private alpha redirects the anonymous root to sign-in", async ({ page }) => {
     await page.goto("/")
-
-    await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByRole("heading", { name: /run your operations/i })).toBeVisible()
-    await expect(page.getByRole("link", { name: /sign in/i })).toBeVisible()
-    await expect(page.getByRole("link", { name: /create account/i })).toBeVisible()
+    await expect(page).toHaveURL(/\/sign-in(?:\?|$)/)
+    await expect(page.getByRole("heading", { name: /run your operations/i })).toBeHidden()
+    await expect(page.getByTestId("overview-dashboard")).toBeHidden()
   })
 
   test("overview redirects unauthenticated users to sign-in", async ({ page }) => {
