@@ -52,6 +52,7 @@ impl LlmCompletion for ObservedProvider {
             bail!("phase4 injected ambiguous provider timeout");
         }
         Ok(LlmResponse {
+            mistral_replay: None,
             text: "this recovery response must never be dispatched".to_string(),
             input_tokens: 1,
             output_tokens: 1,
