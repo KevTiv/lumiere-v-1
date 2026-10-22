@@ -15710,5 +15710,68 @@
       "logTime": "Log time",
       "newEvent": "New event"
     }
+  },
+  "financeReview": {
+    "view": "Review view",
+    "sideBySide": "Side by side",
+    "currency": "Currency",
+    "expenseDetails": "Expense details",
+    "receipt": "Receipt",
+    "expenseDraft": "Expense draft",
+    "unsaved": "Unsaved input. The server confirms the saved result.",
+    "employee": "Employee",
+    "amountInput": "Entered amount",
+    "distance": "Distance",
+    "days": "Days",
+    "chooseReceipt": "Choose a receipt to review it beside the expense details.",
+    "density": "Row density",
+    "comfortable": "Comfortable",
+    "compact": "Compact",
+    "selectCompany": "Select a company",
+    "queueTitle": "Finance work queue",
+    "queueScope": "Open work for the active company. Counts reflect loaded records and are independent of the dashboard date range.",
+    "queueIncomplete": "Some counts unavailable",
+    "queueCount": "{{count}} queues need attention",
+    "sourceUnavailable": "The source file could not be loaded.",
+    "sourceLoading": "Preview loading or unavailable for this file type. Use the download link when available.",
+    "downloadSource": "Download source",
+    "sourceTitle": "Source document",
+    "sourceDescription": "Saved evidence linked to this record.",
+    "evidenceUnavailable": "Evidence is unavailable. This does not mean no document is attached.",
+    "attachedUnavailable": "The attached receipt is unavailable in the current company or access scope.",
+    "noSource": "No source document is available in your current access scope.",
+    "savedDetails": "Saved details",
+    "queues": {
+      "overdueInvoices": {
+        "title": "Overdue customer balances",
+        "description": "Review open receivables and follow up from accounting.",
+        "action": "Open invoices"
+      },
+      "unreconciledPayments": {
+        "title": "Reconciliation exceptions",
+        "description": "Match posted provider transactions to invoices or bills.",
+        "action": "Reconcile payments"
+      },
+      "lowStockProducts": {
+        "title": "Low-stock alerts",
+        "description": "Review replenishment priorities and current stock availability.",
+        "action": "Open inventory"
+      },
+      "pendingMessageApprovals": {
+        "title": "Message approvals",
+        "description": "Approve or reject invoice reminders and customer batches.",
+        "action": "Review messages"
+      },
+      "draftBills": {
+        "title": "Draft vendor bills",
+        "description": "Check vendor details, lines and evidence before posting.",
+        "action": "Review bills"
+      },
+      "expenseApprovals": {
+        "title": "Expense reports to review",
+        "description": "Open submitted reports and review their receipts and approval history.",
+        "action": "Review reports"
+      }
+    }
   }
 }

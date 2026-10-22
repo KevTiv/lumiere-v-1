@@ -47,6 +47,27 @@ const seller = { name: "Alpha Legal Company", address: ["123 Main Street", "Pari
 const snapshot: InvoiceDocumentSnapshot = { schemaVersion: 1, profileVersionIds: { organization: "1", company: "2" }, seller, profile, notes: "Saved invoice notes" }
 
 describe("invoice workspace", () => {
+  it.each(["invoice", "bill"] as const)("mounts the %s review workspace and preserves real draft fields across views", (kind) => {
+    const onSave = vi.fn()
+    render(<CreateInvoiceModal {...options} kind={kind} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} />)
+    const review = screen.getByTestId("finance-review-workspace")
+    const editor = within(review).getByTestId("finance-review-editor")
+    const preview = within(review).getByTestId("finance-review-document")
+    expect(editor.hidden).toBe(false)
+    expect(preview.hidden).toBe(false)
+    fillInvoice()
+    const description = screen.getByTestId("create-invoice-line-description") as HTMLInputElement
+    for (const name of ["accounting.authoring.documentPreview", "accounting.authoring.editDocument", "financeReview.sideBySide"]) {
+      fireEvent.click(within(review).getByRole("tab", { name }))
+      expect(document.querySelector('[data-testid="create-invoice-line-description"]')).toBe(description)
+      expect(description.value).toBe("Alpha services")
+      expect((within(review).getByTestId("create-invoice-line-unit-price") as HTMLInputElement).value).toBe("120")
+    }
+    expect(within(review).getAllByTestId("create-invoice-line-description")).toHaveLength(1)
+    expect(review.contains(screen.getByTestId("create-invoice-save-draft"))).toBe(false)
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
   it("prefills defaults, stores explicit clears separately from notes, and leaves snapshots server-owned", async () => {
     configuredFields.fields = [{ fieldId: "custom:purchase_reference", label: "Purchase reference", isEnabled: true, validation: { required: false } }]
     const onSave = vi.fn().mockResolvedValue({ kind: "outcome-unknown" })
@@ -193,9 +214,9 @@ describe("invoice workspace", () => {
     render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={vi.fn()} onCheckStatus={vi.fn()} />)
     fillInvoice()
     fireEvent.click(screen.getByTestId("create-invoice-preview-toggle"))
-    expect(screen.getByTestId("create-invoice-preview-toggle").getAttribute("aria-pressed")).toBe("true")
+    expect(screen.getByTestId("create-invoice-preview-toggle").getAttribute("aria-selected")).toBe("true")
     expect(within(screen.getByRole("article", { name: "Document preview" })).getByText("Alpha services")).toBeTruthy()
-    fireEvent.click(screen.getByText("Edit details"))
+    fireEvent.click(screen.getByRole("tab", { name: "accounting.authoring.editDocument" }))
     expect((screen.getByTestId("create-invoice-line-unit-price") as HTMLInputElement).value).toBe("120")
   })
 
