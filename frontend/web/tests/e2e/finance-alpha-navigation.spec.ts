@@ -6,6 +6,16 @@ const HIDDEN = ["inventory", "distributor", "pos", "manufacturing", "map", "flee
 const sidebar = (page: Page) => page.locator('[data-testid="dashboard-sidebar"]:visible')
 
 async function expectFinanceNavigation(page: Page) {
+  if (await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches)) {
+    const toggle = page.getByTestId("workspace-navigation-toggle")
+    await expect(toggle).toBeVisible()
+    if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+      await toggle.focus()
+      await expect(toggle).toBeFocused()
+      await toggle.press("Enter")
+      await expect(toggle).toHaveAttribute("aria-expanded", "true")
+    }
+  }
   await expect(sidebar(page)).toHaveCount(1)
   await expect.poll(() => sidebar(page).locator("nav a").evaluateAll((links) =>
     links.map((link) => link.getAttribute("href")?.slice(1)).sort(),
@@ -43,8 +53,14 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
       await page.setViewportSize({ width, height: 900 })
       await gotoModule(page, "/reports", "reports")
       await expectFinanceNavigation(page)
-      await sidebar(page).getByRole("button", { name: "Collapse navigation", exact: true }).click()
-      await expectFinanceNavigation(page)
+      if (width < 768) {
+        await sidebar(page).getByRole("button", { name: "Close navigation", exact: true }).click()
+        await expect(sidebar(page)).toHaveCount(0)
+        await expect(page.getByTestId("workspace-navigation-toggle")).toHaveAttribute("aria-expanded", "false")
+      } else {
+        await sidebar(page).getByRole("button", { name: "Collapse navigation", exact: true }).click()
+        await expectFinanceNavigation(page)
+      }
       await page.keyboard.press("Control+k")
       const palette = page.getByRole("dialog", { name: "Command Palette", exact: true })
       await expect(palette).toBeVisible()
@@ -61,6 +77,8 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
       await palette.getByRole("combobox").fill("Inventory")
       await expect(palette.getByRole("option", { name: "Inventory", exact: true })).toHaveCount(0)
       await page.keyboard.press("Escape")
+      await expect(palette).toBeHidden()
+      await expectFinanceNavigation(page)
       await sidebar(page).getByTestId("sidebar-link-accounting").click()
       await expect(page).toHaveURL(/\/accounting$/)
       await page.goBack()

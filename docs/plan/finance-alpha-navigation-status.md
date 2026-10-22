@@ -38,3 +38,11 @@ This profile does not authorize a route or operation. It intersects with the exi
 The first receipt browser assertion matched both a visible and a hidden Next.js cached tab. The final assertion scopes the visible module and still requires the exact receipt URL, selected tab, single row, and ID filter.
 
 CI remains a separate exact-head gate. No live Alpha deployment or data changes were made. This is navigation containment, not module certification.
+
+## Current-main integration
+
+Integrated main `68af4d68` and retargeted #243 to main after #242 merged. The command palette now keeps its title and description inside the portalled dialog content, so modal accessibility isolation preserves its name. A shared UI regression asserts that the open dialog contains its named heading and exposes its description.
+
+The 390px navigation scenario opens the real mobile drawer by keyboard before inspecting Finance links, verifies its close action, and reopens it after the palette and route navigation. Desktop coverage retains the collapsed-sidebar checks. Visibility, permission, exact receipt handoff and no-business-write assertions remain enforced.
+
+Local validation: all 928 shared UI tests across 142 files pass, including the title regression (which fails with the old placement). UI and web TypeScript and changed UI lint pass; Playwright discovers all five Finance navigation cases plus authentication setup. Full release E2E and fresh security checks are selected for the pushed head. The flagged Compose placeholder file is byte-for-byte identical to main; no scanner suppression or credential change was introduced.
