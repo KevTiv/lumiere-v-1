@@ -155,7 +155,7 @@ async function reloadContactDescription(page: Page, contact: ContactRow): Promis
 
 async function openTemplatePicker(page: Page, modal: Locator, search: string) {
   await modal.getByRole("button", { name: "Insert text template", exact: true }).click()
-  await page.getByRole("textbox", { name: "Search text templates", exact: true }).fill(search)
+  await page.getByRole("searchbox", { name: "Search text templates", exact: true }).fill(search)
 }
 
 function fixtureTemplate(name: string) {
