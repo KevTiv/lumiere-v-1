@@ -12,7 +12,7 @@ use axum::{
     body::Bytes,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -126,8 +126,8 @@ fn token_matches(expected: &str, provided: &str) -> bool {
     let provided: [u8; 32] = Sha256::digest(provided.as_bytes()).into();
     expected
         .iter()
-        .zip(provided)
-        .fold(0_u8, |different, (a, b)| different | (a ^ b))
+        .zip(provided.iter())
+        .fold(0_u8, |different, (a, b)| different | (*a ^ *b))
         == 0
 }
 
@@ -290,12 +290,12 @@ async fn ingest_message(
     let identity = resolve_contact(state, account, &message.from).await?;
     let payload = json!({
         "provider_account_id": account.account_id,
-        "provider_event_id": message.id,
+        "provider_event_id": &message.id,
         "event_fingerprint": event_fingerprint(&message)?,
         "contact_id": identity.contact_id,
         "phone_identity_id": identity.phone_identity_id,
         "external_thread_id": format!("meta:{}:{}", account.account_id, message.from),
-        "provider_message_id": message.id,
+        "provider_message_id": &message.id,
         "body": body,
     });
     dispatch_internal_reducer(
@@ -359,11 +359,11 @@ async fn ingest_status(
     };
     let payload = json!({
         "provider_account_id": account.account_id,
-        "provider_event_id": format!("meta:{}:{}:{}", event.id, event.status, event.timestamp.as_deref().unwrap_or("unknown")),
+        "provider_event_id": format!("meta:{}", event_fingerprint(&event)?),
         "event_fingerprint": event_fingerprint(&event)?,
         "conversation_id": conversation_id,
         "conversation_message_id": conversation_message_id,
-        "provider_message_id": event.id,
+        "provider_message_id": &event.id,
         "operational_message_id": operational_message_id,
         "status": status,
         "failure_reason": match failure_reason {
