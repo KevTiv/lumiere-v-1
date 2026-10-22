@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import {
+  selectModuleTab,
   chooseSelectOptionByLabel, fetchAccountSelectLabelByInternalType, fetchSalesInvoiceJournalLabel, fillField,
   gotoModule, isoDate, scalarQueryId, selectEntityRowById, signIn, smokeName, submitForm,
 } from "./helpers"
@@ -28,7 +29,7 @@ test.describe("COV-25 subscription invoices and canonical payment projection", {
     for (let index = 0; index < 2; index += 1) {
       const runKey = smokeName(`cov25-run-${index}`)
       await gotoModule(page, "/subscriptions", "subscriptions")
-      await page.getByTestId("module-tab-subscriptions-subscriptions").click()
+      await selectModuleTab(page, "subscriptions", "subscriptions")
       await selectEntityRowById(page, subscriptionId)
       await page.getByTestId("entity-action-gen-inv").click()
       await expect(page.getByTestId("form-modal-generate-subscription-invoice")).toBeVisible()

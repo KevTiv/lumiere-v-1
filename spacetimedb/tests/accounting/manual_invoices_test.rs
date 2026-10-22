@@ -172,7 +172,7 @@ pub fn test_manual_invoice_is_atomic_balanced_and_idempotent(
         invoice_payment_term_id: None,
         ref_: Some(format!("manual-invoice-{}", fixture.company_id)),
         payment_reference: Some(format!("manual-payment-{}", fixture.company_id)),
-        metadata: Some(r#"{"test":"manual_invoice"}"#.to_string()),
+        metadata: Some(r#"{"test":"manual_invoice","notes":"Operator notes","invoiceContent":{"schemaVersion":1,"notice":"Customer notice"},"invoiceDocument":{"seller":{"name":"Forged client seller"}}}"#.to_string()),
         lines: vec![ManualAccountInvoiceLineInput {
             account_id: revenue_account_id,
             name: "Consulting services".to_string(),
@@ -217,6 +217,29 @@ pub fn test_manual_invoice_is_atomic_balanced_and_idempotent(
         .id()
         .find(&receipt.result_id)
         .ok_or("manual invoice receipt result move missing")?;
+    let initial_metadata = move_record.metadata.clone();
+    let metadata: serde_json::Value = serde_json::from_str(
+        initial_metadata
+            .as_deref()
+            .ok_or("manual invoice snapshot missing")?,
+    )
+    .map_err(|error| format!("manual invoice metadata invalid: {error}"))?;
+    if metadata["invoiceDocument"]["seller"]["name"] == "Forged client seller"
+        || metadata["invoiceDocument"]["schemaVersion"] != 2
+        || metadata["invoiceDocument"]["buyer"]["partnerId"]
+            != move_record
+                .partner_id
+                .map(|id| id.to_string())
+                .unwrap_or_default()
+        || metadata["invoiceDocument"]["profile"]["notice"] != "Customer notice"
+        || metadata["invoiceDocument"]["notes"] != "Operator notes"
+        || metadata["test"] != "manual_invoice"
+    {
+        return Err(
+            "manual invoice snapshot did not preserve content or replace client forgery"
+                .to_string(),
+        );
+    }
     if move_record.organization_id != fixture.organization_id
         || move_record.company_id != fixture.company_id
         || move_record.move_type != MoveType::OutInvoice
@@ -266,6 +289,16 @@ pub fn test_manual_invoice_is_atomic_balanced_and_idempotent(
     }
 
     create_manual_account_invoice(ctx, fixture.organization_id, params.clone())?;
+    if ctx
+        .db
+        .account_move()
+        .id()
+        .find(&move_record.id)
+        .and_then(|row| row.metadata)
+        != initial_metadata
+    {
+        return Err("manual invoice receipt replay rewrote its document snapshot".to_string());
+    }
     let replay_move_count = ctx
         .db
         .account_move()

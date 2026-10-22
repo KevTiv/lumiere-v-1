@@ -1,6 +1,8 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
+import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
+import { isWorkspaceImportTargetVisible } from "@lumiere/ui/lib/workspace-profile"
 import { useTranslation } from "@lumiere/i18n"
 import { assertCsvSafeForAi } from "@lumiere/erp-shared/csv-import-safety"
 import {
@@ -38,6 +40,15 @@ import {
   type FormConfig,
 } from "@lumiere/ui"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { phCapture } from "@/lib/posthog-browser"
 import {
   defaultDuplicateActions,
@@ -58,6 +69,9 @@ import {
 } from "@/lib/import-spreadsheet-file"
 import { previewAllImportRows } from "@/lib/import-preview-batches"
 
+/** Radix Select cannot use "" as an item value; stands in for "no template". */
+const NO_TEMPLATE = "__none__"
+
 type WizardStep = "upload" | "analyze" | "map" | "preview" | "import"
 
 function importJobCount(job: ImportJobRow, camel: keyof ImportJobRow, snake: keyof ImportJobRow) {
@@ -70,6 +84,7 @@ export type GuidedImportWizardProps = {
 
 export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) {
   const { t } = useTranslation()
+  const workspaceProfile = useWorkspaceProfile()
   const orgId = BigInt(organizationId)
 
   const analyze = useAnalyzeImportMapping()
@@ -205,6 +220,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
 
   const onEntityChange = useCallback(
     (nextKey: string) => {
+      if (!isWorkspaceImportTargetVisible(workspaceProfile, nextKey)) return
       setWizardKey(nextKey)
       resetFlow()
       setCsvText("")
@@ -214,7 +230,7 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       setSourceFormat("csv")
       setSourceSheetName(undefined)
     },
-    [resetFlow],
+    [resetFlow, workspaceProfile],
   )
 
   const onFile = useCallback(
@@ -518,49 +534,55 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
       <div className="flex flex-wrap gap-3 items-end">
         <label className="text-sm space-y-1">
           <span className="block text-muted-foreground">{t("settings.import.entity", "Entity")}</span>
-          <select
-            className="border rounded px-2 py-1 text-sm min-w-[200px]"
-            value={wizardKey}
-            onChange={(e) => onEntityChange(e.target.value)}
-            data-testid="guided-import-entity"
-          >
-            {IMPORT_ENTITY_GROUPS.map((group) => {
-              const options = wizardEntitiesForGroup(group.key)
-              if (options.length === 0) return null
-              return (
-                <optgroup key={group.key} label={group.label}>
-                  {options.map((opt: ImportEntityOption) => (
-                    <option key={opt.wizardKey} value={opt.wizardKey}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </optgroup>
-              )
-            })}
-          </select>
+          <Select value={wizardKey} onValueChange={onEntityChange}>
+            <SelectTrigger className="min-w-[200px]" data-testid="guided-import-entity">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {IMPORT_ENTITY_GROUPS.map((group) => {
+                const options = wizardEntitiesForGroup(group.key).filter((option) =>
+                  isWorkspaceImportTargetVisible(workspaceProfile, option.wizardKey),
+                )
+                if (options.length === 0) return null
+                return (
+                  <SelectGroup key={group.key}>
+                    <SelectLabel>{group.label}</SelectLabel>
+                    {options.map((opt: ImportEntityOption) => (
+                      <SelectItem key={opt.wizardKey} value={opt.wizardKey}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )
+              })}
+            </SelectContent>
+          </Select>
         </label>
 
         <label className="text-sm space-y-1">
           <span className="block text-muted-foreground">
             {t("settings.import.savedTemplate", "Saved template")}
           </span>
-          <select
-            className="border rounded px-2 py-1 text-sm min-w-[200px]"
-            value={selectedTemplateId ?? ""}
-            onChange={(e) => {
-              const next = e.target.value || null
+          <Select
+            value={selectedTemplateId ?? NO_TEMPLATE}
+            onValueChange={(value) => {
+              const next = value === NO_TEMPLATE ? null : value
               setSelectedTemplateId(next)
               applyTemplateMapping(next)
             }}
-            data-testid="guided-import-template"
           >
-            <option value="">{t("settings.import.noTemplate", "— None —")}</option>
-            {entityTemplates.map((row) => (
-              <option key={String(row.id)} value={String(row.id)}>
-                {row.name} ({row.useCount ?? row.use_count ?? 0})
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="min-w-[200px]" data-testid="guided-import-template">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_TEMPLATE}>{t("settings.import.noTemplate", "— None —")}</SelectItem>
+              {entityTemplates.map((row) => (
+                <SelectItem key={String(row.id)} value={String(row.id)}>
+                  {row.name} ({row.useCount ?? row.use_count ?? 0})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
 
         <label className="text-sm space-y-1">
@@ -695,21 +717,25 @@ export function GuidedImportWizard({ organizationId }: GuidedImportWizardProps) 
                         <td className="p-2">{item.match.matchReason}</td>
                         <td className="p-2">{item.match.existingId}</td>
                         <td className="p-2">
-                          <select
-                            className="border rounded px-1 py-0.5"
+                          <Select
                             value={item.action}
-                            onChange={(e) =>
-                              setDuplicateAction(item.rowIndex, e.target.value as ImportDuplicateAction)
+                            onValueChange={(value) =>
+                              setDuplicateAction(item.rowIndex, value as ImportDuplicateAction)
                             }
                           >
-                            <option value="skip">{t("settings.import.duplicateSkip", "Skip row")}</option>
-                            <option value="import">
-                              {t("settings.import.duplicateImport", "Import anyway")}
-                            </option>
-                            <option value="update" disabled>
-                              {t("settings.import.duplicateUpdate", "Update existing")}
-                            </option>
-                          </select>
+                            <SelectTrigger className="h-8 w-40">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="skip">{t("settings.import.duplicateSkip", "Skip row")}</SelectItem>
+                              <SelectItem value="import">
+                                {t("settings.import.duplicateImport", "Import anyway")}
+                              </SelectItem>
+                              <SelectItem value="update" disabled>
+                                {t("settings.import.duplicateUpdate", "Update existing")}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
                         </td>
                       </tr>
                     ))}

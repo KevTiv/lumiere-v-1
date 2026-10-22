@@ -118,6 +118,8 @@ pub fn test_bootstrap_new_tenant_records_complete_commit(
         ("purchasing", "add-purchase-order-line", 5),
         ("sales", "create-invoice-from-sale-order", 9),
         ("purchasing", "create-bill-from-purchase-order", 10),
+        ("purchasing", "new-purchase-requisition", 10),
+        ("purchasing", "new-supplier-intake", 7),
     ] {
         let configs: Vec<_> = ctx
             .db

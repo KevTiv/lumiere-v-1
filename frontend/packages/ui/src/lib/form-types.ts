@@ -35,8 +35,8 @@ export interface BaseField {
   width?: FieldWidth
   className?: string
   defaultValue?: unknown
-  /** When set, field is shown only if `values[field] === equals` (string compare). */
-  visibleWhen?: { field: string; equals: string }
+  /** Show a field for one value or a fixed set of values (string comparison). */
+  visibleWhen?: { field: string; equals: string } | { field: string; oneOf: readonly string[] }
   validation?: {
     min?: number
     max?: number
@@ -64,6 +64,20 @@ export interface TextareaField extends BaseField {
   type: "textarea"
   defaultValue?: string
   rows?: number
+  /**
+   * `markdown` (default) edits with the rich text editor. `plain` keeps a bare
+   * textarea for raw HTML, code or ID lists that must not be reformatted.
+   */
+  format?: "markdown" | "plain"
+}
+
+/** Field names whose values are machine-read (IDs, CSV, JSON, HTML, templates). */
+const RAW_TEXT_FIELD_NAME = /(Ids|Json|Csv|Data|Domain|Html|Values|Prompt|Template|Expression|Sql)$/
+
+/** Whether a textarea field should use the bare textarea instead of the rich text editor. */
+export function isPlainTextareaField(field: Pick<TextareaField, "name" | "format">): boolean {
+  if (field.format) return field.format === "plain"
+  return RAW_TEXT_FIELD_NAME.test(field.name)
 }
 
 export interface SelectField extends BaseField {
@@ -125,6 +139,8 @@ export interface CustomField extends BaseField {
   type: "custom"
   component: ComponentType<{
     field: CustomField
+    /** Current form values for dependent record choices. */
+    values?: FormValues
     value: unknown
     onChange: (value: unknown) => void
     error?: string
@@ -173,6 +189,11 @@ export interface FormConfig {
   onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
   onCancel?: () => void
 }
+
+/** Values at the existing dynamic form submission boundary, also used by local previews. */
+export type FormValues = Parameters<NonNullable<FormConfig["onSubmit"]>>[0]
+
+export type FormPreviewRenderer = (values: FormValues) => import("react").ReactNode
 
 export interface AiFormAssistConfig {
   enabled?: boolean

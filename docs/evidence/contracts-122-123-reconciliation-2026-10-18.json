@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "purpose": "Immutable-release reconciliation evidence; observations are not a Git ancestry claim or a deployed database transition approval",
+  "reviewed_alpha_source": "d073a0fcf9c666b69025b7e10763d6fb6c006e04",
+  "reviewed_main_source": "66fef29eda129de500e9ff380fe82c851d236504",
+  "published_122": {
+    "contracts_commit": "b2c43fd99b5e0938da3f9a33908d0029cabb9163",
+    "source_commit": "44848106c3aa763c456844a4346ea717e59369e0",
+    "ir_sha256": "0656e152af761f88c2bbfd4693029196bdc3f7e0bd32af63d3ec248f92157213",
+    "schema_hash": "sha256:af93dcf3cfbaa629257deea922fe9b5b0fb3843cf4c3227bf4ef48d9edd25217",
+    "counts": {
+      "operations": 1458,
+      "resources": 371,
+      "tables": 515,
+      "types": 1398
+    },
+    "history_sha256": "6cea15985f0919ec871792754a4c4cf4a254401204d03f8e92999ffa5049bf68",
+    "history_revision_count": 30
+  },
+  "published_123": {
+    "commit": "355c98d34415b268804d4399c9bb3670036fe1d3",
+    "source_commit": "834500364eba29a29840a4539a689ffe409cc13c",
+    "ir_sha256": "058376eec556dd0aeadb74bfef11f7432f273ac70975d7e2a0cba3ed33c55f4e",
+    "ir_matches_pin": true,
+    "archive_sha256": "56bc80b60e270800e67d5052c984fb790edd216d1a70a9014185e7ffa3d8b753",
+    "release_124_tag_observed_absent": true,
+    "schema_hash": "sha256:7f64f6aedd23c1c324ad77d6ef8550b12ff60803c36da9571fe2783e2c139af6",
+    "counts": {
+      "operations": 1451,
+      "resources": 369,
+      "tables": 511,
+      "types": 1386
+    },
+    "history_sha256": "fc82b1b867924d50196427ec556ffbbf42606c826d37ea428080fc2be04487b9",
+    "history_revision_count": 28
+  },
+  "abi_comparison": {
+    "123_is_alpha_superset": false,
+    "operation_122_only": [
+      "abandon_bank_statement_settlement",
+      "claim_reviewed_mail_delivery",
+      "create_purchase_order_once",
+      "receive_po_line_once",
+      "resubmit_bank_statement_settlement",
+      "reverse_bank_statement_settlement",
+      "run_purchasing_keyed_operations_test"
+    ],
+    "operation_123_only": [],
+    "shared_operation_changes_are_invalidations_only": [
+      "add_workflow_human_task_comment",
+      "cancel_workflow",
+      "claim_workflow_human_task",
+      "decide_workflow_human_task",
+      "invalidate_workflow_human_task",
+      "post_payment",
+      "reconcile_account_bank_statement_line"
+    ],
+    "resource_122_only": [
+      "purchase-order-creations",
+      "purchase-receipt-operations"
+    ],
+    "resource_123_only": [],
+    "table_122_only": [
+      "bank_statement_settlement_attempt",
+      "bank_statement_settlement_reversal",
+      "purchase_order_creation_operation",
+      "purchase_receipt_operation"
+    ],
+    "table_123_only": [],
+    "shared_table_schemas_equal": true,
+    "type_122_only": [
+      "AbandonBankStatementSettlementParams",
+      "BankSettlementInvoiceSnapshot",
+      "BankSettlementLineSnapshot",
+      "BankSettlementSaleOrderDelta",
+      "BankStatementSettlementAttempt",
+      "BankStatementSettlementReversal",
+      "CreatePurchaseOrderOnceParams",
+      "PurchaseOrderCreationOperation",
+      "PurchaseReceiptOperation",
+      "ReceivePoLineOnceParams",
+      "ResubmitBankStatementSettlementParams",
+      "ReverseBankStatementSettlementParams"
+    ],
+    "type_123_only": [],
+    "named_type_differences": {
+      "SetMemberAccessParams": "123 adds required expected_access_revision:U64; union must retain",
+      "UpdateAccountMoveLineParams": "123 omits122 quantity,price_unit,expected_quantity,expected_price_unit; union must retain",
+      "GuardedActionKey": "123 omits122 reverseBankStatementSettlement variant; union must retain"
+    }
+  },
+  "history_reconciliation": {
+    "shared_prefix_revision_count": 27,
+    "exact_123_divergent_revision": {
+      "previous_release": "v0.3.109",
+      "previous_ir_sha256": "sha256:7cc56b148646660b0c43d4b3332cb1855c273c84e09ef36eafad1ee5913a2152",
+      "previous_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
+      "current_operations_fingerprint": "sha256:c6c1a33c18c0d7619085bf68d32900965f112a9b94564182a92a0f7fcc189bbb",
+      "operation_count": 1451,
+      "reason": "Complete hosted WorkOS identity and access lifecycle: atomic invitation acceptance, member access updates, editable role metadata and matching source contracts."
+    },
+    "exact_122_divergent_tail": [
+      {
+        "previous_release": "v0.3.109",
+        "previous_ir_sha256": "sha256:7cc56b148646660b0c43d4b3332cb1855c273c84e09ef36eafad1ee5913a2152",
+        "previous_operations_fingerprint": "sha256:bfd111e979bdaf3a8238b7f6e8eff2a2a039a4d3c163ec41994f707f7030d56e",
+        "current_operations_fingerprint": "sha256:6e5694ae968ca8a791ca4f744c0028d7887742c0fa0ecbb5f9374198450797bf",
+        "operation_count": 1452,
+        "reason": "release on top of v0.3.109: add create_purchase_order_once, receive_po_line_once, run_purchasing_keyed_operations_test; change the shape of none"
+      },
+      {
+        "previous_release": "v0.3.120",
+        "previous_ir_sha256": "sha256:aa4c2a9d049b36e51aab0f30e5848e17e12cee9330e222f4402da430181e5d3b",
+        "previous_operations_fingerprint": "sha256:6e5694ae968ca8a791ca4f744c0028d7887742c0fa0ecbb5f9374198450797bf",
+        "current_operations_fingerprint": "sha256:c6c1a33c18c0d7619085bf68d32900965f112a9b94564182a92a0f7fcc189bbb",
+        "operation_count": 1451,
+        "reason": "Record the exact published v0.3.121 onboarding snapshot after v0.3.120; its source history overwrote the prior revision and its omitted purchasing operations are restored in the following union"
+      },
+      {
+        "previous_release": "v0.3.121",
+        "previous_ir_sha256": "sha256:d0fe132ffd28e5f3fb32ac4f35b5dd8d6433b0bbc664ed3ce9d6268a536128a9",
+        "previous_operations_fingerprint": "sha256:c6c1a33c18c0d7619085bf68d32900965f112a9b94564182a92a0f7fcc189bbb",
+        "current_operations_fingerprint": "sha256:3a8993d7d95caf74de5e34e84127c25efe54338812c2bc3e10de0d8feadff80f",
+        "operation_count": 1458,
+        "reason": "Accounting alpha: guarded bank approval recovery and coordinated reversal, private reviewed mail claim, and resource invalidations; preserve published onboarding and restore v0.3.120 purchasing operations and optional accounting fields"
+      }
+    ],
+    "retired_ids_equal": true,
+    "decision": "Retain exact30 alpha revisions. History schema3 has one linear fingerprint predecessor and cannot represent independent release parents. Do not synthesize122-to123 lineage. After fresh union IR is checked, append an explicitly described reconciliation revision anchored122; cite independent123 commit/IR and named-type ABI in reason, including when operation-set fingerprint is unchanged."
+  },
+  "postgres_lineage": {
+    "canonical_catalog": {
+      "17": "purchasing_keyed_operations",
+      "18": "durable_invite_acceptance_receipts",
+      "19": "bank_statement_settlement_lifecycle",
+      "20": "platform_identity_lifecycle"
+    },
+    "pending_version": 21,
+    "released_sql_sha256": {
+      "HEAD_platform": "ad8823e85c47ed369fe231f8e4f457602fe336780e00f9ae53ee2e9d7b7b7572",
+      "origin/main_platform": "ad8823e85c47ed369fe231f8e4f457602fe336780e00f9ae53ee2e9d7b7b7572",
+      "0001": {
+        "HEAD": "5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
+        "origin/main": "5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab"
+      },
+      "0011": {
+        "HEAD": "15e0a40dc9c99df670e6d4e2a970541ac11ee4c39fd6357d3d10dee03d193080",
+        "origin/main": "15e0a40dc9c99df670e6d4e2a970541ac11ee4c39fd6357d3d10dee03d193080"
+      },
+      "0012": {
+        "HEAD": "ea4cc157bc6750ccfee3f6645d51491c6c87480048e185f97dcdfd34489acde1",
+        "origin/main": "ea4cc157bc6750ccfee3f6645d51491c6c87480048e185f97dcdfd34489acde1"
+      },
+      "0013": {
+        "HEAD": "a06969f4217bd58dba68cc5291fab2699a1252e6c9269e3bc86e3eb2cd4f719e",
+        "origin/main": "a06969f4217bd58dba68cc5291fab2699a1252e6c9269e3bc86e3eb2cd4f719e"
+      },
+      "0014": {
+        "HEAD": "cf436ddd59cf2e2105bc7639ce4d8b1a3a3cd7906383a4e01fba60a2d595b84c",
+        "origin/main": "cf436ddd59cf2e2105bc7639ce4d8b1a3a3cd7906383a4e01fba60a2d595b84c"
+      },
+      "0015": {
+        "HEAD": "37d2a92ba194b6ebf66e44e08dbbe67036288122babd2eec6e4d0bdf93ad30ab",
+        "origin/main": "37d2a92ba194b6ebf66e44e08dbbe67036288122babd2eec6e4d0bdf93ad30ab"
+      },
+      "0017": {
+        "HEAD": "f9c3f61b1058be93c55d019df9bb9274da739eeaf980c300f6abc2cc8db6ff4c",
+        "origin/main": null
+      },
+      "0018": {
+        "HEAD": "5c7a4b494dab5c4beb43d69159a11420c8536a102e2b74a598d19b9cea712789",
+        "origin/main": "5c7a4b494dab5c4beb43d69159a11420c8536a102e2b74a598d19b9cea712789"
+      },
+      "0019": {
+        "HEAD": "7bb7d3fae3e39ea01a76e9ead0704156da8cc500fefd7b04ceb7942149fc24dc",
+        "origin/main": null
+      }
+    },
+    "all13_shared_published_sql_files_equal": true,
+    "new_123_sql_files": [],
+    "catalog1_to16_inputs_equal": true,
+    "platform_identity_ddl_20_vs_17_equal": true,
+    "platform_identity_ddl_sha256": "ad8823e85c47ed369fe231f8e4f457602fe336780e00f9ae53ee2e9d7b7b7572",
+    "access_revision_requires_new_pg_ddl": false,
+    "gate": "Main123 recorded platform_identity_lifecycle at17; canonical122 records purchasing_keyed_operations at17 and same platform DDL at20. A17platform database is incompatible with canonical catalog20. Audit and fail closed; do not rewrite version/name/checksum or auto-adopt. A separately reviewed transition requires actual database history/schema facts. Fresh/canonical122 lineage retains17/18/19/20 unchanged."
+  },
+  "metadata_resolution": {
+    "reducer_exposure": "Alpha is exact superset of all main exposure entries; no shared entry differs",
+    "reducer_stdb_invalidation": "Alpha is exact superset of all main invalidation entries; no shared entry differs",
+    "alpha_only_exposures": [
+      "abandon_bank_statement_settlement",
+      "claim_reviewed_mail_delivery",
+      "create_purchase_order_once",
+      "receive_po_line_once",
+      "resubmit_bank_statement_settlement",
+      "reverse_bank_statement_settlement",
+      "run_purchasing_keyed_operations_test"
+    ],
+    "alpha_only_invalidation_overrides": [
+      "abandon_bank_statement_settlement",
+      "add_workflow_human_task_comment",
+      "cancel_workflow",
+      "claim_reviewed_mail_delivery",
+      "claim_workflow_human_task",
+      "decide_workflow_human_task",
+      "invalidate_workflow_human_task",
+      "post_payment",
+      "reconcile_account_bank_statement_line",
+      "resubmit_bank_statement_settlement",
+      "reverse_bank_statement_settlement"
+    ]
+  },
+  "next_release": {
+    "tentative_version": "0.3.124",
+    "remote_124_tag_observed_absent": true,
+    "publish_parent": "355c98d34415b268804d4399c9bb3670036fe1d3",
+    "requirements": "Fresh frozen-source WASM/schema/SDK/IR generation; union retains122 additions plus123 access revision; append reviewed history reconciliation; immutable candidate and coherent pins/checks; recheck tag availability; separate publication decision",
+    "no_publication_or_database_mutation_performed": true
+  }
+}

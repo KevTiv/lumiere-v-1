@@ -1,127 +1,116 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   createExpenseReceiptAndResolveId,
   useCreateExpense,
-  useCreateExpenseIntegrationIntent,
   useExpenseMileageRates,
   useExpensePerDiemRates,
 } from "@lumiere/query-hooks/hooks/expenses"
+import { fetchQueryList } from "@lumiere/query-hooks/http"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useEmployees } from "@lumiere/query-hooks/hooks/hr"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
-import { Button } from "@lumiere/ui"
-import { expenseRateRowsToSelectOptions } from "@/lib/form-lookup"
-import { stbTimestampFromDate } from "@/lib/stb-timestamp"
+import { Button } from "@lumiere/ui/components/button"
+import { Input } from "@lumiere/ui/components/input"
+import { Checkbox } from "@lumiere/ui/components/checkbox"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@lumiere/ui/components/field"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@lumiere/ui/components/card"
+import { Alert, AlertDescription } from "@lumiere/ui/components/alert"
+import { Badge } from "@lumiere/ui/components/badge"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@lumiere/ui/components/select"
+import { expenseRateRowsToSelectOptions } from "../../../lib/form-lookup"
+import { uploadDocumentBlob } from "../../../lib/document-blob-upload"
 import {
   discardExpenseCapture,
   enqueueExpenseCapture,
   getOrCreateExpenseCaptureDeviceId,
   listQueuedExpenseCaptures,
-  markExpenseCaptureError,
-  markExpenseCaptureSynced,
   newExpenseClientRequestId,
-  requeueExpenseCapture,
+  saveExpenseCaptureCheckpoint,
+  type ExpenseCaptureOutboxItem,
   type ExpenseCapturePayload,
-} from "@/lib/expense-capture-outbox"
-import { newExpenseReceiptClientRequestId } from "@/lib/expenses-create-params"
-import type {
-  CreateExpenseParams,
-  ExpenseLineKind,
-  ExpensePaymentMode,
-} from "@lumiere/stdb/types"
+} from "../../../lib/expense-capture-outbox"
+import { newExpenseReceiptClientRequestId } from "../../../lib/expenses-create-params"
+import { expenseCompanyLookupRows } from "./expense-capture-input"
+import { captureFileMatches, syncExpenseCapture } from "./expense-capture-sync"
+import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
+import { CaptureAttachmentPreview } from "./capture-attachment-preview"
 
-function lineKindTag(kind: ExpenseCapturePayload["lineKind"]): ExpenseLineKind {
-  return { tag: kind } as ExpenseLineKind
-}
-
-function payloadToCreateParams(
-  payload: ExpenseCapturePayload,
-  clientRequestId: string,
-  attachmentIds: bigint[],
-  paymentMode: ExpensePaymentMode,
-): Partial<CreateExpenseParams> {
-  return {
-    employeeId: BigInt(payload.employeeId),
-    name: payload.name,
-    date: stbTimestampFromDate(new Date(payload.date)),
-    unitAmount: payload.unitAmount,
-    quantity: payload.quantity,
-    currencyId: BigInt(payload.currencyId),
-    description: payload.description,
-    taxIds: [],
-    attachmentIds,
-    projectId: payload.projectId ? BigInt(payload.projectId) : undefined,
-    lineKind: lineKindTag(payload.lineKind),
-    mileageDistance: payload.mileageDistance,
-    mileageRateId: payload.mileageRateId ? BigInt(payload.mileageRateId) : undefined,
-    perDiemDays: payload.perDiemDays,
-    perDiemRateId: payload.perDiemRateId ? BigInt(payload.perDiemRateId) : undefined,
-    clientRequestId,
-    paymentMode,
-    merchantKey: payload.merchantKey,
-  }
-}
-
-function delayedSyncPayloadJson(
-  payload: ExpenseCapturePayload,
-  clientRequestId: string,
-  attachmentIds: number[],
-): string {
-  return JSON.stringify({
-    employee_id: Number(payload.employeeId),
-    currency_id: Number(payload.currencyId),
-    name: payload.name,
-    unit_amount: payload.unitAmount,
-    quantity: payload.quantity,
-    description: payload.description,
-    client_request_id: clientRequestId,
-    attachment_ids: attachmentIds,
-    project_id: payload.projectId ? Number(payload.projectId) : undefined,
-    payment_mode: payload.paymentMode ?? "OutOfPocket",
-    merchant_key: payload.merchantKey,
-  })
-}
-
-export function ExpensesCapturePanel({ organizationId }: { organizationId: number }) {
+export function ExpensesCapturePanel({
+  organizationId,
+}: {
+  organizationId: number
+}) {
   const { t } = useTranslation()
   const orgId = BigInt(organizationId)
-  const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
-  const createExpense = useCreateExpense(orgId, operatingCompanyId)
-  const createIntent = useCreateExpenseIntegrationIntent(orgId, operatingCompanyId)
+  const companyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const createExpense = useCreateExpense(orgId, companyId)
   const { data: employees = [] } = useEmployees(orgId)
   const { data: pricelists = [] } = usePricelists(orgId)
   const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
   const { data: perDiemRates = [] } = useExpensePerDiemRates(orgId)
-  const mileageRateOptions = useMemo(
-    () => expenseRateRowsToSelectOptions(mileageRates),
-    [mileageRates],
+  const scopedEmployees = expenseCompanyLookupRows(employees, orgId, companyId)
+  const mileageOptions = expenseRateRowsToSelectOptions(
+    expenseCompanyLookupRows(mileageRates, orgId, companyId),
   )
-  const perDiemRateOptions = useMemo(
-    () => expenseRateRowsToSelectOptions(perDiemRates),
-    [perDiemRates],
+  const dailyOptions = expenseRateRowsToSelectOptions(
+    expenseCompanyLookupRows(perDiemRates, orgId, companyId),
   )
-
-  const deviceId = useMemo(() => getOrCreateExpenseCaptureDeviceId(), [])
+  const [deviceId, setDeviceId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
+  const [files] = useState(() => new Map<string, File>())
+  const fileInput = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    try {
+      setDeviceId(getOrCreateExpenseCaptureDeviceId())
+    } catch {
+      setError(
+        t("expenses.capture.attachments.storageUnavailable", {
+          defaultValue:
+            "Local queue storage is unavailable. No capture can be saved on this device.",
+        }),
+      )
+    }
+  }, [t])
   const queued = useMemo(
-    () => listQueuedExpenseCaptures(organizationId, deviceId),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [organizationId, deviceId, tick, busy],
+    () => (deviceId ? listQueuedExpenseCaptures(organizationId, deviceId) : []),
+    [organizationId, deviceId, tick],
   )
-
   const [employeeId, setEmployeeId] = useState("")
   const [pricelistId, setPricelistId] = useState("")
   const [name, setName] = useState("")
   const [amount, setAmount] = useState("")
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [hasReceipt, setHasReceipt] = useState(true)
-  const [paymentMode, setPaymentMode] = useState<"OutOfPocket" | "CorporateCard">("OutOfPocket")
-  const [lineKind, setLineKind] = useState<ExpenseCapturePayload["lineKind"]>("Standard")
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [paymentMode, setPaymentMode] = useState<
+    "OutOfPocket" | "CorporateCard"
+  >("OutOfPocket")
+  const [lineKind, setLineKind] =
+    useState<ExpenseCapturePayload["lineKind"]>("Standard")
   const [receiptNote, setReceiptNote] = useState("")
   const [mileageDistance, setMileageDistance] = useState("")
   const [mileageRateId, setMileageRateId] = useState("")
@@ -129,16 +118,40 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
   const [perDiemRateId, setPerDiemRateId] = useState("")
 
   const buildPayload = (): ExpenseCapturePayload | null => {
-    const pl = pricelists.find((p) => String(p.id) === pricelistId)
-    const currencyId = pl?.currencyId
-    if (!employeeId || !currencyId || !name.trim()) return null
-    if (lineKind === "Mileage" && (!mileageDistance || !mileageRateId)) return null
-    if (lineKind === "PerDiem" && (!perDiemDays || !perDiemRateId)) return null
+    const currencyId = pricelists.find(
+      (row) => String(row.id) === pricelistId,
+    )?.currencyId
+    if (
+      !scopedEmployees.some((row) => String(row.id) === employeeId) ||
+      !currencyId ||
+      !name.trim() ||
+      companyId <= 0n ||
+      !date ||
+      !Number.isFinite(new Date(date).getTime())
+    )
+      return null
+    if (
+      lineKind === "Standard" &&
+      (!amount.trim() || !Number.isFinite(Number(amount)) || Number(amount) < 0)
+    )
+      return null
+    if (
+      lineKind === "Mileage" &&
+      (!(Number(mileageDistance) > 0) ||
+        !mileageOptions.some((option) => option.value === mileageRateId))
+    )
+      return null
+    if (
+      lineKind === "PerDiem" &&
+      (!(Number(perDiemDays) > 0) ||
+        !dailyOptions.some((option) => option.value === perDiemRateId))
+    )
+      return null
     return {
       employeeId,
       name: name.trim(),
       date,
-      unitAmount: Number(amount || 0),
+      unitAmount: lineKind === "Standard" ? Number(amount) : 0,
       quantity: 1,
       currencyId: String(currencyId),
       description: receiptNote.trim() || undefined,
@@ -146,395 +159,735 @@ export function ExpensesCapturePanel({ organizationId }: { organizationId: numbe
       lineKind,
       paymentMode,
       mileageDistance:
-        lineKind === "Mileage" && mileageDistance ? Number(mileageDistance) : undefined,
-      mileageRateId: lineKind === "Mileage" && mileageRateId ? mileageRateId : undefined,
-      perDiemDays: lineKind === "PerDiem" && perDiemDays ? Number(perDiemDays) : undefined,
-      perDiemRateId: lineKind === "PerDiem" && perDiemRateId ? perDiemRateId : undefined,
+        lineKind === "Mileage" ? Number(mileageDistance) : undefined,
+      mileageRateId: lineKind === "Mileage" ? mileageRateId : undefined,
+      perDiemDays: lineKind === "PerDiem" ? Number(perDiemDays) : undefined,
+      perDiemRateId: lineKind === "PerDiem" ? perDiemRateId : undefined,
     }
   }
 
-  const resolveAttachmentIds = async (payload: ExpenseCapturePayload): Promise<bigint[]> => {
-    if (!payload.hasReceipt) return []
-    const receiptClientRequestId = newExpenseReceiptClientRequestId()
-    const storageKey = `capture:${deviceId}:${receiptClientRequestId}`
-    const receiptId = await createExpenseReceiptAndResolveId(orgId, {
-      companyId: operatingCompanyId,
-      employeeId: BigInt(payload.employeeId),
-      storageKey,
-      clientRequestId: receiptClientRequestId,
-      fileName: "capture-receipt",
-      mimeType: "application/octet-stream",
-    })
-    return [receiptId]
-  }
-
-  const syncOne = async (payload: ExpenseCapturePayload, clientRequestId: string) => {
-    const attachmentIds = await resolveAttachmentIds(payload)
-    const attachmentNums = attachmentIds.map((id) => Number(id))
-    const mode = {
-      tag: (payload.paymentMode ?? "OutOfPocket") as "OutOfPocket" | "CorporateCard",
-    } as ExpensePaymentMode
+  const syncOne = async (item: ExpenseCaptureOutboxItem) => {
+    if (!deviceId) return
+    setStatus(null)
     try {
-      await createIntent.mutateAsync({
-        intentType: "delayed_sync",
-        idempotencyKey: clientRequestId,
-        deviceId,
-        payload: delayedSyncPayloadJson(payload, clientRequestId, attachmentNums),
-      })
-      await createExpense.mutateAsync(
-        payloadToCreateParams(payload, clientRequestId, attachmentIds, mode),
+      const result = await syncExpenseCapture(
+        item,
+        { organizationId: orgId, companyId },
+        files.get(item.clientRequestId),
+        {
+          readExpenses: () =>
+            fetchQueryList(
+              "/api/query/expenses",
+              "Unable to confirm the expense capture",
+            ),
+          readReceipts: () =>
+            fetchQueryList(
+              "/api/query/expense-receipts",
+              "Unable to confirm the receipt",
+            ),
+          upload: (file, scopeCompanyId) =>
+            uploadDocumentBlob({ file, companyId: scopeCompanyId }),
+          register: (params) => createExpenseReceiptAndResolveId(orgId, params),
+          create: (params) => createExpense.mutateAsync(params),
+          save: (next) => {
+            saveExpenseCaptureCheckpoint(organizationId, deviceId, next)
+            setTick((value) => value + 1)
+          },
+        },
       )
-    } catch {
-      await createExpense.mutateAsync(
-        payloadToCreateParams(payload, clientRequestId, attachmentIds, mode),
+      if (result.syncState === "synced") {
+        files.delete(result.clientRequestId)
+        setStatus(
+          t("expenses.capture.attachments.confirmed", {
+            id: result.expenseId,
+            defaultValue: "Expense {{id}} is confirmed in the saved records.",
+          }),
+        )
+      } else if (result.syncState === "rejected") {
+        setStatus(null)
+        setError(
+          result.lastError ??
+            t("expenses.capture.attachments.rejected", {
+              defaultValue:
+                "The server rejected this capture. Retry after the cause is corrected, or discard it and capture corrected values.",
+            }),
+        )
+      } else
+        setStatus(
+          t("expenses.capture.attachments.outcomeUnknown", {
+            defaultValue:
+              "The expense result is not confirmed. Check its status; no automatic resend will occur.",
+          }),
+        )
+    } catch (cause) {
+      setStatus(null)
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : t("expenses.capture.attachments.failed", {
+              defaultValue: "Capture failed",
+            }),
       )
+      setTick((value) => value + 1)
     }
   }
 
   const captureDelayedSync = async () => {
     const payload = buildPayload()
-    if (!payload) {
+    if (!payload || !deviceId) {
       setError(t("expenses.capture.validation"))
       return
     }
-    const clientRequestId = newExpenseClientRequestId()
-    enqueueExpenseCapture(organizationId, {
-      clientRequestId,
-      deviceId,
-      payload,
-    })
-    setBusy(true)
+    if (
+      hasReceipt &&
+      (!receiptFile ||
+        receiptFile.size === 0 ||
+        !(
+          receiptFile.type.startsWith("image/") ||
+          receiptFile.type === "application/pdf"
+        ))
+    ) {
+      setError(
+        t("expenses.capture.attachments.fileRequired", {
+          defaultValue:
+            "Choose a non-empty image or PDF receipt, or clear the receipt checkbox.",
+        }),
+      )
+      return
+    }
     setError(null)
+    setStatus(null)
+    const clientRequestId = newExpenseClientRequestId()
     try {
-      await syncOne(payload, clientRequestId)
-      markExpenseCaptureSynced(organizationId, deviceId, clientRequestId)
+      const item = enqueueExpenseCapture(organizationId, {
+        clientRequestId,
+        deviceId,
+        companyId: String(companyId),
+        payload,
+        receipt:
+          hasReceipt && receiptFile
+            ? {
+                state: "queued",
+                clientRequestId: newExpenseReceiptClientRequestId(),
+                fileName: receiptFile.name,
+                mimeType: receiptFile.type,
+                fileSize: receiptFile.size,
+                lastModified: receiptFile.lastModified,
+              }
+            : undefined,
+      })
+      if (receiptFile && hasReceipt) files.set(clientRequestId, receiptFile)
+      setTick((value) => value + 1)
       setName("")
       setAmount("")
       setReceiptNote("")
-      setError(t("expenses.capture.queuedSynced"))
-    } catch (e) {
-      markExpenseCaptureError(
-        organizationId,
-        deviceId,
-        clientRequestId,
-        e instanceof Error ? e.message : String(e),
+      setReceiptFile(null)
+      if (fileInput.current) fileInput.current.value = ""
+      setStatus(
+        t("expenses.capture.attachments.queued", {
+          defaultValue: "Capture queued on this device.",
+        }),
       )
-      setError(t("expenses.capture.queuedOffline"))
-    } finally {
-      setBusy(false)
-      setTick((n) => n + 1)
-    }
-  }
-
-  const flushQueue = async () => {
-    setBusy(true)
-    setError(null)
-    try {
-      for (const item of listQueuedExpenseCaptures(organizationId, deviceId)) {
-        if (item.syncState === "conflict") continue
-        try {
-          await syncOne(item.payload, item.clientRequestId)
-          markExpenseCaptureSynced(organizationId, deviceId, item.clientRequestId)
-        } catch (e) {
-          markExpenseCaptureError(
-            organizationId,
-            deviceId,
-            item.clientRequestId,
-            e instanceof Error ? e.message : String(e),
-          )
-        }
+      if (navigator.onLine) {
+        setBusy(true)
+        await syncOne(item)
       }
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : t("expenses.capture.attachments.queueFailed", {
+              defaultValue:
+                "The capture could not be saved in the local queue.",
+            }),
+      )
     } finally {
       setBusy(false)
-      setTick((n) => n + 1)
     }
   }
 
-  const retryItem = async (clientRequestId: string) => {
-    requeueExpenseCapture(organizationId, deviceId, clientRequestId)
-    setTick((n) => n + 1)
-    const item = listQueuedExpenseCaptures(organizationId, deviceId).find(
-      (i) => i.clientRequestId === clientRequestId,
-    )
-    if (!item) return
+  const runQueued = async (items: ExpenseCaptureOutboxItem[]) => {
     setBusy(true)
     setError(null)
+    setStatus(null)
     try {
-      await syncOne(item.payload, item.clientRequestId)
-      markExpenseCaptureSynced(organizationId, deviceId, item.clientRequestId)
-      setError(t("expenses.capture.queuedSynced"))
-    } catch (e) {
-      markExpenseCaptureError(
-        organizationId,
-        deviceId,
-        item.clientRequestId,
-        e instanceof Error ? e.message : String(e),
-      )
-      setError(t("expenses.capture.conflictHelp"))
+      for (const item of items) await syncOne(item)
     } finally {
       setBusy(false)
-      setTick((n) => n + 1)
     }
   }
-
-  const discardItem = (clientRequestId: string) => {
-    discardExpenseCapture(organizationId, deviceId, clientRequestId)
-    setTick((n) => n + 1)
+  const reattach = (item: ExpenseCaptureOutboxItem, file: File | undefined) => {
+    if (!file || !item.receipt) return
+    if (!captureFileMatches(file, item.receipt)) {
+      setError(
+        t("expenses.capture.attachments.originalFile", {
+          defaultValue:
+            "Select the original receipt file with the same name, size, type, and modified date.",
+        }),
+      )
+      return
+    }
+    files.set(item.clientRequestId, file)
+    setError(null)
+    setTick((value) => value + 1)
   }
 
   return (
-    <div
-      className="rounded-lg border p-4 space-y-3 mb-4"
+    <Card
       data-testid="expenses-capture-panel"
+      className="min-w-0 max-w-full [overflow-wrap:anywhere] [&_button]:h-auto [&_button]:min-h-7 [&_button]:min-w-0 [&_button]:max-w-full [&_button]:whitespace-normal"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-medium">{t("expenses.capture.title")}</h2>
-          <p className="text-xs text-muted-foreground">{t("expenses.capture.description")}</p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy || queued.length === 0}
-          onClick={() => void flushQueue()}
-          data-testid="expenses-capture-flush"
-        >
-          {t("expenses.capture.flushQueue")} ({queued.length})
-        </Button>
-      </div>
-
-      {error && (
-        <p className="text-sm text-muted-foreground" role="status" data-testid="expenses-capture-status">
-          {error}
-        </p>
-      )}
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        <label className="text-xs space-y-1">
-          <span>{t("expenses.forms.newExpense.fields.employeeId")}</span>
-          <select
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-            data-testid="expenses-capture-employee"
-          >
-            <option value="">{t("expenses.forms.newExpense.fields.employeePlaceholder")}</option>
-            {employees.map((e) => (
-              <option key={String(e.id)} value={String(e.id)}>
-                {String(e.name ?? e.id)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs space-y-1">
-          <span>{t("expenses.forms.newExpense.fields.pricelistId")}</span>
-          <select
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={pricelistId}
-            onChange={(e) => setPricelistId(e.target.value)}
-            data-testid="expenses-capture-pricelist"
-          >
-            <option value="">{t("expenses.forms.newExpense.fields.pricelistPlaceholder")}</option>
-            {pricelists.map((p) => (
-              <option key={String(p.id)} value={String(p.id)}>
-                {String(p.name ?? p.id)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-xs space-y-1 sm:col-span-2">
-          <span>{t("expenses.forms.newExpense.fields.name")}</span>
-          <input
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            data-testid="expenses-capture-name"
-          />
-        </label>
-        <label className="text-xs space-y-1">
-          <span>{t("expenses.forms.newExpense.fields.totalAmount")}</span>
-          <input
-            type="number"
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            data-testid="expenses-capture-amount"
-          />
-        </label>
-        <label className="text-xs space-y-1">
-          <span>{t("expenses.forms.newExpense.fields.date")}</span>
-          <input
-            type="date"
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </label>
-        <label className="text-xs space-y-1">
-          <span>{t("expenses.forms.newExpense.fields.lineKind")}</span>
-          <select
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={lineKind}
-            onChange={(e) => setLineKind(e.target.value as ExpenseCapturePayload["lineKind"])}
-          >
-            <option value="Standard">{t("expenses.forms.newExpense.fields.lineKindStandard")}</option>
-            <option value="Mileage">{t("expenses.forms.newExpense.fields.lineKindMileage")}</option>
-            <option value="PerDiem">{t("expenses.forms.newExpense.fields.lineKindPerDiem")}</option>
-          </select>
-        </label>
-        <label className="text-xs space-y-1">
-          <span>{t("expenses.forms.newExpense.fields.paymentMode")}</span>
-          <select
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={paymentMode}
-            onChange={(e) =>
-              setPaymentMode(e.target.value as "OutOfPocket" | "CorporateCard")
+      <CardHeader className="min-w-0 max-w-full">
+        <div className="flex min-w-0 max-w-full flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 max-w-full">
+            <CardTitle>{t("expenses.capture.title")}</CardTitle>
+            <CardDescription>
+              {t("expenses.capture.description")}
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={
+              busy ||
+              !queued.some(
+                (item) =>
+                  item.syncState === "queued" || item.syncState === "error",
+              )
             }
+            onClick={() =>
+              void runQueued(
+                queued.filter(
+                  (item) =>
+                    item.syncState === "queued" || item.syncState === "error",
+                ),
+              )
+            }
+            data-testid="expenses-capture-flush"
           >
-            <option value="OutOfPocket">
-              {t("expenses.forms.newExpense.fields.paymentModeOutOfPocket")}
-            </option>
-            <option value="CorporateCard">
-              {t("expenses.forms.newExpense.fields.paymentModeCorporateCard")}
-            </option>
-          </select>
-        </label>
-        {lineKind === "Mileage" ? (
-          <>
-            <label className="text-xs space-y-1">
-              <span>{t("expenses.forms.newExpense.fields.mileageDistance")}</span>
-              <input
-                type="number"
-                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                value={mileageDistance}
-                onChange={(e) => setMileageDistance(e.target.value)}
-                data-testid="expenses-capture-distance"
-              />
-            </label>
-            <label className="text-xs space-y-1">
-              <span>{t("expenses.forms.newExpense.fields.mileageRateId")}</span>
-              <select
-                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                value={mileageRateId}
-                onChange={(e) => setMileageRateId(e.target.value)}
-                data-testid="expenses-capture-mileage-rate"
-              >
-                <option value="">
-                  {mileageRateOptions.length === 0
-                    ? t("expenses.forms.newExpense.fields.noMileageRates")
-                    : t("expenses.forms.newExpense.fields.rateIdPlaceholder")}
-                </option>
-                {mileageRateOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
+            {t("expenses.capture.flushQueue")} ({queued.length})
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="flex min-w-0 max-w-full flex-col gap-4">
+        <Alert>
+          <AlertDescription>
+            {t("expenses.capture.attachments.persistenceLimit", {
+              defaultValue:
+                "Capture details and completed upload checkpoints are saved on this device. Unuploaded file bytes stay in this capture panel only. After leaving this panel or reloading, reattach the original file before syncing.",
+            })}
+          </AlertDescription>
+        </Alert>
+        {error ? (
+          <Alert variant="destructive">
+            <AlertDescription data-testid="expenses-capture-status">
+              {error}
+            </AlertDescription>
+          </Alert>
         ) : null}
-        {lineKind === "PerDiem" ? (
-          <>
-            <label className="text-xs space-y-1">
-              <span>{t("expenses.forms.newExpense.fields.perDiemDays")}</span>
-              <input
-                type="number"
-                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                value={perDiemDays}
-                onChange={(e) => setPerDiemDays(e.target.value)}
-                data-testid="expenses-capture-per-diem-days"
-              />
-            </label>
-            <label className="text-xs space-y-1">
-              <span>{t("expenses.forms.newExpense.fields.perDiemRateId")}</span>
-              <select
-                className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-                value={perDiemRateId}
-                onChange={(e) => setPerDiemRateId(e.target.value)}
-                data-testid="expenses-capture-per-diem-rate"
-              >
-                <option value="">
-                  {perDiemRateOptions.length === 0
-                    ? t("expenses.forms.newExpense.fields.noPerDiemRates")
-                    : t("expenses.forms.newExpense.fields.rateIdPlaceholder")}
-                </option>
-                {perDiemRateOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
+        {status ? (
+          <p
+            role="status"
+            className="text-sm text-muted-foreground"
+            data-testid="expenses-capture-status"
+          >
+            {status}
+          </p>
         ) : null}
-        <label className="text-xs space-y-1 sm:col-span-2">
-          <span>{t("expenses.forms.newExpense.fields.description")}</span>
-          <input
-            className="w-full rounded-md border bg-background px-2 py-1.5 text-sm"
-            value={receiptNote}
-            onChange={(e) => setReceiptNote(e.target.value)}
-          />
-        </label>
-        <label className="text-xs flex items-center gap-2 sm:col-span-2">
-          <input
-            type="checkbox"
-            checked={hasReceipt}
-            onChange={(e) => setHasReceipt(e.target.checked)}
-          />
-          <span>{t("expenses.forms.newExpense.fields.hasReceipt")}</span>
-        </label>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          size="sm"
-          disabled={busy}
-          onClick={() => void captureDelayedSync()}
-          data-testid="expenses-capture-submit"
-        >
-          {t("expenses.capture.submit")}
-        </Button>
-      </div>
-
-      {queued.length > 0 && (
-        <ul className="text-xs text-muted-foreground space-y-2" data-testid="expenses-capture-queue">
-          {queued.map((item) => (
-            <li
-              key={item.clientRequestId}
-              className="flex flex-wrap items-center justify-between gap-2 rounded border px-2 py-1.5"
-              data-testid={`expenses-capture-item-${item.syncState}`}
+        <FinanceReviewWorkspace
+          editorLabel={t("financeReview.expenseDetails", { defaultValue: "Expense details" })}
+          previewLabel={t("financeReview.receipt", { defaultValue: "Receipt" })}
+          editor={<FieldGroup className="grid min-w-0 grid-cols-1 sm:grid-cols-2">
+          <Field className="min-w-0">
+            <FieldLabel htmlFor="capture-employee">
+              {t("expenses.forms.newExpense.fields.employeeId")}
+            </FieldLabel>
+            <Select value={employeeId} onValueChange={setEmployeeId}>
+              <SelectTrigger
+                className="min-w-0 max-w-full"
+                id="capture-employee"
+                data-testid="expenses-capture-employee"
+              >
+                <SelectValue
+                  placeholder={t(
+                    "expenses.forms.newExpense.fields.employeePlaceholder",
+                  )}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {scopedEmployees.map((row) => (
+                    <SelectItem key={String(row.id)} value={String(row.id)}>
+                      {String(row.name)}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field className="min-w-0">
+            <FieldLabel htmlFor="capture-pricelist">
+              {t("expenses.forms.newExpense.fields.pricelistId")}
+            </FieldLabel>
+            <Select value={pricelistId} onValueChange={setPricelistId}>
+              <SelectTrigger
+                className="min-w-0 max-w-full"
+                id="capture-pricelist"
+                data-testid="expenses-capture-pricelist"
+              >
+                <SelectValue
+                  placeholder={t(
+                    "expenses.forms.newExpense.fields.pricelistPlaceholder",
+                  )}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {pricelists.map((row) => (
+                    <SelectItem key={String(row.id)} value={String(row.id)}>
+                      {String(row.name)}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field className="min-w-0 sm:col-span-2">
+            <FieldLabel htmlFor="capture-name">
+              {t("expenses.forms.newExpense.fields.name")}
+            </FieldLabel>
+            <Input
+              id="capture-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              data-testid="expenses-capture-name"
+            />
+          </Field>
+          <Field className="min-w-0">
+            <FieldLabel htmlFor="capture-kind">
+              {t("expenses.forms.newExpense.fields.lineKind")}
+            </FieldLabel>
+            <Select
+              value={lineKind}
+              onValueChange={(value) =>
+                setLineKind(value as ExpenseCapturePayload["lineKind"])
+              }
             >
-              <span>
-                {item.payload.name} · {item.syncState}
-                {item.lastError ? ` — ${item.lastError}` : ""}
-              </span>
-              <span className="flex gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void retryItem(item.clientRequestId)}
-                  data-testid="expenses-capture-retry"
+              <SelectTrigger
+                className="min-w-0 max-w-full"
+                id="capture-kind"
+                data-testid="expenses-capture-kind"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="Standard">
+                    {t("expenses.forms.newExpense.fields.lineKindStandard")}
+                  </SelectItem>
+                  <SelectItem value="Mileage">
+                    {t("expenses.forms.newExpense.fields.lineKindMileage")}
+                  </SelectItem>
+                  <SelectItem value="PerDiem">
+                    {t("expenses.forms.newExpense.fields.lineKindPerDiem")}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field className="min-w-0">
+            <FieldLabel htmlFor="capture-date">
+              {t("expenses.forms.newExpense.fields.date")}
+            </FieldLabel>
+            <Input
+              id="capture-date"
+              type="date"
+              value={date}
+              onChange={(event) => setDate(event.target.value)}
+            />
+          </Field>
+          {lineKind === "Standard" ? (
+            <Field className="min-w-0">
+              <FieldLabel htmlFor="capture-amount">
+                {t("expenses.forms.newExpense.fields.totalAmount")}
+              </FieldLabel>
+              <Input
+                id="capture-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                data-testid="expenses-capture-amount"
+              />
+            </Field>
+          ) : null}
+          {lineKind === "Mileage" ? (
+            <>
+              <Field className="min-w-0">
+                <FieldLabel htmlFor="capture-distance">
+                  {t("expenses.forms.newExpense.fields.mileageDistance")}
+                </FieldLabel>
+                <Input
+                  id="capture-distance"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={mileageDistance}
+                  onChange={(event) => setMileageDistance(event.target.value)}
+                  data-testid="expenses-capture-distance"
+                />
+              </Field>
+              <Field className="min-w-0">
+                <FieldLabel htmlFor="capture-mileage-rate">
+                  {t("expenses.forms.newExpense.fields.mileageRateId")}
+                </FieldLabel>
+                <Select value={mileageRateId} onValueChange={setMileageRateId}>
+                  <SelectTrigger
+                    className="min-w-0 max-w-full"
+                    id="capture-mileage-rate"
+                    data-testid="expenses-capture-mileage-rate"
+                  >
+                    <SelectValue
+                      placeholder={t(
+                        "expenses.forms.newExpense.fields.rateIdPlaceholder",
+                      )}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {mileageOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </>
+          ) : null}
+          {lineKind === "PerDiem" ? (
+            <>
+              <Field className="min-w-0">
+                <FieldLabel htmlFor="capture-days">
+                  {t("expenses.forms.newExpense.fields.perDiemDays")}
+                </FieldLabel>
+                <Input
+                  id="capture-days"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={perDiemDays}
+                  onChange={(event) => setPerDiemDays(event.target.value)}
+                  data-testid="expenses-capture-per-diem-days"
+                />
+              </Field>
+              <Field className="min-w-0">
+                <FieldLabel htmlFor="capture-daily-rate">
+                  {t("expenses.forms.newExpense.fields.perDiemRateId")}
+                </FieldLabel>
+                <Select value={perDiemRateId} onValueChange={setPerDiemRateId}>
+                  <SelectTrigger
+                    className="min-w-0 max-w-full"
+                    id="capture-daily-rate"
+                    data-testid="expenses-capture-per-diem-rate"
+                  >
+                    <SelectValue
+                      placeholder={t(
+                        "expenses.forms.newExpense.fields.rateIdPlaceholder",
+                      )}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {dailyOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </>
+          ) : null}
+          <Field className="min-w-0">
+            <FieldLabel htmlFor="capture-payment">
+              {t("expenses.forms.newExpense.fields.paymentMode")}
+            </FieldLabel>
+            <Select
+              value={paymentMode}
+              onValueChange={(value) =>
+                setPaymentMode(value as "OutOfPocket" | "CorporateCard")
+              }
+            >
+              <SelectTrigger id="capture-payment">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="OutOfPocket">
+                    {t(
+                      "expenses.forms.newExpense.fields.paymentModeOutOfPocket",
+                    )}
+                  </SelectItem>
+                  <SelectItem value="CorporateCard">
+                    {t(
+                      "expenses.forms.newExpense.fields.paymentModeCorporateCard",
+                    )}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field className="min-w-0 sm:col-span-2">
+            <FieldLabel htmlFor="capture-note">
+              {t("expenses.forms.newExpense.fields.description")}
+            </FieldLabel>
+            <Input
+              id="capture-note"
+              value={receiptNote}
+              onChange={(event) => setReceiptNote(event.target.value)}
+            />
+          </Field>
+          <Field orientation="horizontal" className="min-w-0 sm:col-span-2">
+            <Checkbox
+              id="capture-has-receipt"
+              checked={hasReceipt}
+              onCheckedChange={(checked) => {
+                setHasReceipt(checked === true)
+                if (!checked) {
+                  setReceiptFile(null)
+                  if (fileInput.current) fileInput.current.value = ""
+                }
+              }}
+              data-testid="expenses-capture-has-receipt"
+            />
+            <FieldLabel htmlFor="capture-has-receipt">
+              {t("expenses.forms.newExpense.fields.hasReceipt")}
+            </FieldLabel>
+          </Field>
+          {hasReceipt ? (
+            <Field className="min-w-0 sm:col-span-2">
+              <FieldLabel htmlFor="capture-file">
+                {t("expenses.forms.newExpense.fields.receiptFile")}
+              </FieldLabel>
+              <Input
+                ref={fileInput}
+                id="capture-file"
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(event) =>
+                  setReceiptFile(event.target.files?.[0] ?? null)
+                }
+                data-testid="expenses-capture-file"
+              />
+              <FieldDescription>
+                {t("expenses.capture.attachments.fileHint", {
+                  defaultValue:
+                    "Attach an image or PDF. A note alone is not a receipt.",
+                })}
+              </FieldDescription>
+            </Field>
+          ) : null}
+        </FieldGroup>}
+          preview={<div className="flex flex-col gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>{name || t("financeReview.expenseDraft", { defaultValue: "Expense draft" })}</CardTitle>
+                <CardDescription>{t("financeReview.unsaved", { defaultValue: "Unsaved input. The server confirms the saved result." })}</CardDescription>
+              </CardHeader>
+              <CardContent><dl className="grid grid-cols-2 gap-3 text-sm">
+                <dt>{t("financeReview.employee", { defaultValue: "Employee" })}</dt><dd>{String(scopedEmployees.find((row) => String(row.id) === employeeId)?.name ?? "—")}</dd>
+                <dt>{lineKind === "Mileage" ? t("financeReview.distance", { defaultValue: "Distance" }) : lineKind === "PerDiem" ? t("financeReview.days", { defaultValue: "Days" }) : t("financeReview.amountInput", { defaultValue: "Entered amount" })}</dt><dd className="text-right tabular-nums">{(lineKind === "Mileage" ? mileageDistance : lineKind === "PerDiem" ? perDiemDays : amount) || "—"}</dd>
+              </dl></CardContent>
+            </Card>
+            {hasReceipt && receiptFile ? <CaptureAttachmentPreview file={receiptFile} /> : <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">{t("financeReview.chooseReceipt", { defaultValue: "Choose a receipt to review it beside the expense details." })}</p>}
+          </div>}
+        />
+        <div>
+          <Button
+            type="button"
+            size="sm"
+            disabled={busy || !deviceId || companyId <= 0n}
+            onClick={() => void captureDelayedSync()}
+            data-testid="expenses-capture-submit"
+          >
+            {t("expenses.capture.submit")}
+          </Button>
+        </div>
+        {queued.length > 0 ? (
+          <ul
+            className="flex flex-col gap-3"
+            data-testid="expenses-capture-queue"
+          >
+            {queued.map((item) => {
+              const file = files.get(item.clientRequestId)
+              const missing =
+                item.payload.hasReceipt && !item.receipt?.uploaded && !file
+              const unknown =
+                item.syncState === "unknown" || item.syncState === "submitting"
+              return (
+                <li
+                  key={item.clientRequestId}
+                  className="flex flex-col gap-3 rounded-lg border p-3"
+                  data-testid={`expenses-capture-item-${item.syncState}`}
                 >
-                  {t("expenses.capture.retry")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => discardItem(item.clientRequestId)}
-                  data-testid="expenses-capture-discard"
-                >
-                  {t("expenses.capture.discard")}
-                </Button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <strong>{item.payload.name}</strong>
+                    <Badge
+                      variant="outline"
+                      className="min-w-0 max-w-full whitespace-normal"
+                    >
+                      {unknown
+                        ? t("expenses.capture.attachments.awaiting", {
+                            defaultValue: "Awaiting confirmation",
+                          })
+                        : item.syncState === "rejected" ||
+                            item.syncState === "error" ||
+                            item.syncState === "conflict"
+                          ? t("expenses.capture.attachments.failed", {
+                              defaultValue: "Capture failed",
+                            })
+                          : t("expenses.capture.attachments.queuedLabel", {
+                              defaultValue: "Queued",
+                            })}
+                    </Badge>
+                    {item.receipt ? (
+                      <Badge
+                        variant="secondary"
+                        className="min-w-0 max-w-full whitespace-normal"
+                      >
+                        {item.receipt.state === "attached"
+                          ? t("expenses.capture.attachments.attached", {
+                              defaultValue: "Receipt attached",
+                            })
+                          : item.receipt.state === "uploading" && busy
+                            ? t("expenses.capture.attachments.uploading", {
+                                defaultValue: "Uploading receipt",
+                              })
+                            : item.receipt.state === "failed"
+                              ? t(
+                                  "expenses.capture.attachments.receiptFailed",
+                                  { defaultValue: "Receipt failed" },
+                                )
+                              : t(
+                                  "expenses.capture.attachments.receiptQueued",
+                                  { defaultValue: "Receipt queued" },
+                                )}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  {item.receipt ? (
+                    <p className="text-sm text-muted-foreground">
+                      {item.receipt.fileName}
+                    </p>
+                  ) : null}
+                  {!item.companyId ||
+                  (item.payload.hasReceipt && !item.receipt) ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("expenses.capture.attachments.legacy", {
+                        defaultValue:
+                          "This older capture cannot be resumed safely. Discard it and capture it again.",
+                      })}
+                    </p>
+                  ) : item.companyId !== String(companyId) ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("expenses.capture.attachments.companyMismatch", {
+                        defaultValue:
+                          "Switch to the company saved with this capture before syncing.",
+                      })}
+                    </p>
+                  ) : null}
+                  {item.syncState === "rejected" ? (
+                    <p className="text-sm text-muted-foreground">
+                      {t("expenses.capture.attachments.rejected", {
+                        defaultValue:
+                          "The server rejected this capture. Retry after the cause is corrected, or discard it and capture corrected values.",
+                      })}
+                    </p>
+                  ) : null}
+                  {item.lastError ? (
+                    <p role="alert" className="text-sm text-destructive">
+                      {item.lastError}
+                    </p>
+                  ) : null}
+                  {missing ? (
+                    <Field className="min-w-0">
+                      <FieldLabel htmlFor={`reattach-${item.clientRequestId}`}>
+                        {t("expenses.capture.attachments.reattach", {
+                          defaultValue: "Reattach the original receipt",
+                        })}
+                      </FieldLabel>
+                      <Input
+                        id={`reattach-${item.clientRequestId}`}
+                        type="file"
+                        accept="image/*,application/pdf"
+                        disabled={busy || !item.receipt}
+                        onChange={(event) =>
+                          reattach(item, event.target.files?.[0])
+                        }
+                        data-testid="expenses-capture-reattach"
+                      />
+                    </Field>
+                  ) : null}
+                  {file ? (
+                    <CaptureAttachmentPreview
+                      file={file}
+                      attached={item.receipt?.state === "attached"}
+                    />
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        busy ||
+                        item.companyId !== String(companyId) ||
+                        (missing && !unknown)
+                      }
+                      onClick={() => void runQueued([item])}
+                      data-testid="expenses-capture-retry"
+                    >
+                      {unknown
+                        ? t("expenses.capture.attachments.checkStatus", {
+                            defaultValue: "Check status",
+                          })
+                        : item.syncState === "rejected"
+                          ? t("expenses.capture.attachments.retryRejected", {
+                              defaultValue: "Retry rejected capture",
+                            })
+                          : t("expenses.capture.retry")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        if (deviceId)
+                          discardExpenseCapture(
+                            organizationId,
+                            deviceId,
+                            item.clientRequestId,
+                          )
+                        files.delete(item.clientRequestId)
+                        setTick((value) => value + 1)
+                      }}
+                      data-testid="expenses-capture-discard"
+                    >
+                      {t("expenses.capture.discard")}
+                    </Button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        ) : null}
+      </CardContent>
+    </Card>
   )
 }

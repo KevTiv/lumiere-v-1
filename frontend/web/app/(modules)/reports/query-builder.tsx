@@ -487,8 +487,8 @@ export function QueryBuilder({
             </div>
           ) : null}
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="@container/filters space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <Label>{t("reports.queryBuilder.filters")}</Label>
               <Button
                 type="button"
@@ -503,14 +503,18 @@ export function QueryBuilder({
               </Button>
             </div>
             {filters.map((filter, index) => (
-              <div key={index} className="flex items-center gap-2">
+              <div
+                key={index}
+                className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 @xl/filters:grid-cols-[minmax(0,1fr)_10rem_minmax(0,1fr)_auto]"
+                data-testid="qb-filter-row"
+              >
                 <Select
                   value={filter.field}
                   onValueChange={(v) =>
                     setFilters((prev) => prev.map((f, i) => (i === index ? { ...f, field: v } : f)))
                   }
                 >
-                  <SelectTrigger className="flex-1">
+                  <SelectTrigger className="col-span-2 min-w-0 @xl/filters:col-span-1">
                     <SelectValue placeholder="—" />
                   </SelectTrigger>
                   <SelectContent className="max-h-72">
@@ -531,7 +535,7 @@ export function QueryBuilder({
                     )
                   }
                 >
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="col-span-2 min-w-0 @xl/filters:col-span-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -543,7 +547,7 @@ export function QueryBuilder({
                   </SelectContent>
                 </Select>
                 <Input
-                  className="flex-1"
+                  className="min-w-0"
                   value={filter.value}
                   onChange={(e) =>
                     setFilters((prev) =>

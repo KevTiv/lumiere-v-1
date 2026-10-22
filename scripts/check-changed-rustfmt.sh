@@ -49,7 +49,7 @@ for file in "${changed_files[@]}"; do
   esac
 
   case "$scope:$file" in
-    workspace:api-server/*.rs|workspace:ai-gateway/*.rs|workspace:iot-gateway/*.rs|workspace:lumiere-codegen/*.rs|workspace:crates/stdb-config/*.rs|workspace:crates/stdb-client/*.rs|workspace:crates/stdb-auth/*.rs|workspace:crates/presentation-core/*.rs)
+    workspace:api-server/*.rs|workspace:ai-gateway/*.rs|workspace:iot-gateway/*.rs|workspace:lumiere-codegen/*.rs|workspace:crates/stdb-config/*.rs|workspace:crates/stdb-client/*.rs|workspace:crates/stdb-auth/*.rs|workspace:crates/presentation-core/*.rs|workspace:crates/policy-core/*.rs)
       rust_files+=("$file")
       ;;
     spacetimedb:spacetimedb/*.rs)

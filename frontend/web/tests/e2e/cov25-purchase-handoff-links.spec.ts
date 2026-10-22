@@ -27,6 +27,7 @@ async function expectBillFocus(page: Page, billId: number) {
     && url.searchParams.get("tab") === "journal-entries"
     && url.searchParams.getAll("filter").length === 1
     && url.searchParams.get("filter") === `id:${billId}`)
+  await expect(page.getByTestId("module-tab-accounting-journal-entries")).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId("module-tab-accounting-journal-entries")).toHaveAttribute("aria-selected", "true")
   const table = activeTabEntityTable(page)
   await expect(table.getByTestId(`entity-row-${billId}`)).toBeVisible()

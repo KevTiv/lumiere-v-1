@@ -1,5 +1,5 @@
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverPrefetchQueryLists } from "@/lib/server-query"
 import { IotClient } from "./iot-client"
 
 const SSR_RESOURCES = [
@@ -19,7 +19,7 @@ export default async function IotPage() {
   }
 
   const [devices, hubs, pairingTokens, actions, telemetry, alerts, thresholds] =
-    await serverFetchQueryListsRequired(session, SSR_RESOURCES)
+    await serverPrefetchQueryLists(session, SSR_RESOURCES)
 
   return (
     <IotClient

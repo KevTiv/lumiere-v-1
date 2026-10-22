@@ -128,4 +128,113 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn replenishment_projection_exposes_scheduler_state() {
+        let entry =
+            registry_get("replenishment-rules").expect("replenishment rules must be registered");
+
+        for field in ["last_run", "next_run", "metadata"] {
+            assert!(
+                entry
+                    .default_restricted
+                    .iter()
+                    .any(|candidate| candidate == field),
+                "replenishment projection must expose {field}"
+            );
+        }
+    }
+
+    #[test]
+    fn finance_workflow_projections_expose_owner_fields() {
+        for (resource, fields) in [
+            (
+                "account-move-lines",
+                &["amount_residual", "currency_id", "journal_id"][..],
+            ),
+            (
+                "payment-transactions",
+                &[
+                    "partner_id",
+                    "partner_type",
+                    "currency_id",
+                    "payment_account_id",
+                ][..],
+            ),
+            (
+                "payment-reconciliations",
+                &["currency_id", "reversed_reconciliation_id"][..],
+            ),
+            (
+                "expenses",
+                &[
+                    "client_request_id",
+                    "attachment_ids",
+                    "has_receipt",
+                    "currency_id",
+                    "date",
+                    "unit_amount",
+                    "quantity",
+                    "description",
+                    "tax_ids",
+                    "product_id",
+                    "account_id",
+                    "analytic_account_id",
+                    "project_id",
+                    "line_kind",
+                    "mileage_distance",
+                    "mileage_rate_id",
+                    "per_diem_days",
+                    "per_diem_rate_id",
+                    "payment_mode",
+                    "merchant_key",
+                ][..],
+            ),
+            (
+                "report-templates",
+                &[
+                    "company_id",
+                    "orientation",
+                    "paper_format",
+                    "template_content",
+                    "write_date",
+                ][..],
+            ),
+        ] {
+            let entry = registry_get(resource).expect("finance resource must be registered");
+            for field in fields {
+                assert!(
+                    entry
+                        .default_restricted
+                        .iter()
+                        .any(|candidate| candidate == field),
+                    "{resource} must expose {field} for the existing workflow"
+                );
+            }
+            assert!(entry
+                .mandatory
+                .iter()
+                .any(|field| field == "organization_id"));
+        }
+    }
+
+    #[test]
+    fn asset_and_period_projections_expose_exact_owner_scope_and_relations() {
+        for (resource, fields) in [
+            (
+                "account-assets",
+                &["organization_id", "depreciation_board_ids"][..],
+            ),
+            ("account-periods", &["organization_id"][..]),
+        ] {
+            let entry = registry_get(resource).expect("accounting resource must be registered");
+            for field in fields {
+                assert!(entry
+                    .default_restricted
+                    .iter()
+                    .any(|column| column == field));
+            }
+            assert!(entry.mandatory.iter().any(|column| column == "company_id"));
+        }
+    }
 }

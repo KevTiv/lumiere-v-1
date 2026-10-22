@@ -2,8 +2,8 @@
 
 import { useTranslation } from "@lumiere/i18n"
 import { cn } from "../lib/utils"
-import type { FormField } from "../lib/form-types"
-import { fieldWidthClasses } from "../lib/form-types"
+import type { FormField, FormValues } from "../lib/form-types"
+import { fieldWidthClasses, isPlainTextareaField } from "../lib/form-types"
 import { Input } from "../components/input"
 import { Textarea } from "../components/textarea"
 import { Checkbox } from "../components/checkbox"
@@ -24,7 +24,7 @@ import {
 } from "./utils/radix-select-empty-value"
 
 const inputBase =
-  "bg-background border-input focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:border-ring transition-[border-color,box-shadow,background-color] duration-150"
+  "bg-background border-input focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-ring transition-[border-color,box-shadow,background-color] duration-150"
 
 function autoCompleteForField(field: FormField): string | undefined {
   if (field.autoComplete) return field.autoComplete
@@ -45,6 +45,7 @@ function inputModeForField(field: FormField): FormField["inputMode"] {
 
 interface FormFieldRendererProps {
   field: FormField
+  values?: FormValues
   value: unknown
   onChange: (value: unknown) => void
   error?: string
@@ -56,6 +57,7 @@ interface FormFieldRendererProps {
 
 export function FormFieldRenderer({
   field,
+  values,
   value,
   onChange,
   error,
@@ -121,6 +123,7 @@ export function FormFieldRenderer({
       case "textarea":
         return (
           <Textarea
+            variant={isPlainTextareaField(field) ? "plain" : "rich"}
             id={field.id}
             name={field.name}
             data-testid={`form-field-${field.name}`}
@@ -162,6 +165,7 @@ export function FormFieldRenderer({
             disabled={field.disabled}
           >
             <SelectTrigger
+              id={field.id}
               data-testid={`form-field-${field.name}`}
               className={cn(
                 "w-full",
@@ -231,6 +235,7 @@ export function FormFieldRenderer({
             <Checkbox
               id={field.id}
               data-testid={`form-field-${field.name}`}
+              aria-label={field.label}
               checked={(value as boolean) || false}
               onCheckedChange={onChange}
               disabled={field.disabled}
@@ -267,6 +272,7 @@ export function FormFieldRenderer({
             <Switch
               id={field.id}
               data-testid={`form-field-${field.name}`}
+              aria-label={field.label}
               checked={(value as boolean) || false}
               onCheckedChange={onChange}
               disabled={field.disabled}
@@ -362,6 +368,7 @@ export function FormFieldRenderer({
         return (
           <CustomComponent
             field={field}
+            values={values}
             value={value}
             onChange={onChange}
             error={error}

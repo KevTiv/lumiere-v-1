@@ -42,7 +42,8 @@ export async function exact(page: Page, resource: string, recordId: number): Pro
 // Unrelated parallel creates do not participate in fixture readback.
 export async function create<K extends StdbBffNamedReducerKey>(page: Page, resource: string, operation: K, input: StdbBffCommandInput<K>, matchesFixture: (row: Row) => boolean, observe: () => Promise<Row[]> = () => rows(page, resource)): Promise<Row> {
   expect((await observe()).filter(matchesFixture), `${resource} fixture key must be unused`).toHaveLength(0)
-  expect((await command(page, operation, input)).ok()).toBe(true)
+  const response = await command(page, operation, input)
+  expect(response.ok(), `${operation}: ${await response.text()}`).toBe(true)
   let created: Row | undefined
   await expect.poll(async () => {
     const matches = (await observe()).filter(matchesFixture)
@@ -67,7 +68,7 @@ export async function product(page: Page): Promise<Row> {
   }, row => value(row, "defaultCode", "default_code") === fixtureCode &&
     id(row, "organizationId", "organization_id") === id(category, "organizationId", "organization_id"))
 }
-export async function location(page: Page, companyId: number, scrapLocation = false): Promise<Row> {
+export async function location(page: Page, companyId: number, scrapLocation = false, usage: "internal" | "customer" = "internal"): Promise<Row> {
   const fixtureBarcode = `cov-location-${randomUUID()}`
   const organizationId = await fetchSessionOrganizationId(page)
   // Supplemental setup observer only: barcode is persisted but omitted by the BFF projection.
@@ -117,7 +118,7 @@ export async function location(page: Page, companyId: number, scrapLocation = fa
   return create(page, "stock-locations", "create_company_stock_location", {
     companyId,
     params: stdbParamsToJson({
-      name: smokeName("cov-location"), usage: "internal", locationCategory: "internal",
+      name: smokeName("cov-location"), usage, locationCategory: "internal",
       parentPath: "/", childLeft: 0, childRight: 1, scrapLocation, returnLocation: false,
       active: true, posx: 0, posy: 0, posz: 0, cyclicInventoryFrequency: 0,
       locationId: null, completeName: null, valuationInAccountId: null,
@@ -172,6 +173,7 @@ export async function prepareOutput(page: Page, companyId: number, moId: number)
 }
 export async function openRow(page: Page, tab: "orders" | "boms", recordId: number) {
   await gotoModule(page, `/manufacturing?tab=${tab}&filter=id:${recordId}`, "manufacturing")
+  await expect(page.getByTestId(`module-tab-manufacturing-${tab}`)).toHaveCount(1, { timeout: 30_000 })
   await expect(page.getByTestId(`module-tab-manufacturing-${tab}`)).toHaveAttribute("aria-selected", "true")
   const panel = page.locator('[role="tabpanel"]:visible')
   await panel.getByTestId(`entity-row-${recordId}`).click()
@@ -191,4 +193,38 @@ export async function quantQuantity(page: Page, companyId: number, productId: nu
     id(row, "locationId", "location_id") === locationId)
   if (matches.length > 1) throw new Error("Ambiguous exact fixture quant")
   return matches.length === 0 ? 0 : Number(matches[0]!.quantity)
+}
+/**
+ * Material consumption costs exactly one plain quant (no lot, package or owner)
+ * of the component at the MO source location, so product, internal location and
+ * available stock must be chosen together rather than from an arbitrary picking.
+ */
+export async function stockedComponentSource(page: Page, companyId: number, requiredQty: number): Promise<{ productId: number; uomId: number; locationId: number }> {
+  const [quants, locations, products] = await Promise.all([rows(page, "stock-quants"), rows(page, "stock-locations"), rows(page, "products")])
+  const internal = new Set(locations.filter(row => tag(value(row, "usage", "usage")).toLowerCase() === "internal").map(row => id(row)))
+  const uomByProduct = new Map(products.flatMap(row => {
+    const tracking = tag(value(row, "tracking", "tracking")).toLowerCase()
+    const type = String(value(row, "type", "type_") ?? "").toLowerCase()
+    const uomId = scalarQueryId(value(row, "uomId", "uom_id"))
+    return uomId != null && tracking !== "lot" && tracking !== "serial" && type !== "service" ? [[id(row), uomId] as const] : []
+  }))
+  const plain = quants.filter(row =>
+    scalarQueryId(value(row, "companyId", "company_id")) === companyId &&
+    value(row, "lotId", "lot_id") == null && value(row, "packageId", "package_id") == null && value(row, "ownerId", "owner_id") == null)
+  const identities = new Map<string, Row[]>()
+  for (const row of plain) {
+    const key = `${id(row, "productId", "product_id")}:${id(row, "locationId", "location_id")}`
+    identities.set(key, [...(identities.get(key) ?? []), row])
+  }
+  for (const matches of identities.values()) {
+    const quant = matches[0]!
+    const productId = id(quant, "productId", "product_id")
+    const locationId = id(quant, "locationId", "location_id")
+    const uomId = uomByProduct.get(productId)
+    if (matches.length !== 1 || uomId == null || !internal.has(locationId)) continue
+    if (Number(quant.quantity) >= requiredQty && Number(value(quant, "availableQuantity", "available_quantity")) >= requiredQty) {
+      return { productId, uomId, locationId }
+    }
+  }
+  throw new Error(`No untracked product with one plain internal quant holding ${requiredQty} units`)
 }

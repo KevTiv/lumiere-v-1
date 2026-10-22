@@ -346,6 +346,69 @@ fn records_valid_delegation_identities(ctx: &ReducerContext) -> Result<(), Strin
     {
         return Err("delegated decision did not retain actor/principal/role evidence".to_string());
     }
+    ctx.db
+        .workflow_delegation()
+        .id()
+        .update(WorkflowDelegation {
+            is_active: false,
+            ..delegation
+        });
+    let revoked = authorize_workflow_decision_for_actor(
+        ctx,
+        actor,
+        &request(
+            &fixture,
+            requester,
+            Some(delegator),
+            vec![approver_role],
+            "workflow_task:approve",
+        ),
+    )
+    .err()
+    .ok_or("revoked delegation retained decision authority")?;
+    assert_error_contains(&revoked, "no effective workflow delegation")?;
+    let row = ctx
+        .db
+        .workflow_delegation()
+        .iter()
+        .find(|row| {
+            row.organization_id == fixture.organization_id
+                && row.delegator_identity == delegator
+                && row.delegatee_identity == actor
+        })
+        .ok_or("delegation missing")?;
+    ctx.db
+        .workflow_delegation()
+        .id()
+        .update(WorkflowDelegation {
+            is_active: true,
+            ..row
+        });
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&delegator)
+        .find(|row| row.organization_id == fixture.organization_id)
+        .ok_or("delegator membership missing")?;
+    ctx.db.user_organization().id().update(UserOrganization {
+        role_id: member_role,
+        ..membership
+    });
+    let lost_role = authorize_workflow_decision_for_actor(
+        ctx,
+        actor,
+        &request(
+            &fixture,
+            requester,
+            Some(delegator),
+            vec![approver_role],
+            "workflow_task:approve",
+        ),
+    )
+    .err()
+    .ok_or("delegation retained a revoked principal role")?;
+    assert_error_contains(&lost_role, "no effective workflow delegation")?;
     Ok(())
 }
 

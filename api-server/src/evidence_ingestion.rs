@@ -69,9 +69,8 @@ struct CurrentDocument {
 }
 
 fn value_u64(row: &Value, camel: &str, snake: &str) -> Option<u64> {
-    row.get(camel)
-        .or_else(|| row.get(snake))
-        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+    // Company and current-version IDs are nullable SATS values on document rows.
+    crate::query_exec::row_u64(row, camel, snake).ok().flatten()
 }
 
 fn value_text<'a>(row: &'a Value, camel: &str, snake: &str) -> Option<&'a str> {
@@ -773,6 +772,25 @@ pub(crate) fn router() -> Router<Arc<AppState>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn document_scope_and_current_version_decode_nullable_sats_ids() {
+        let row =
+            serde_json::json!({"company_id": {"some": 7}, "current_version_id": {"some": ["19"]}});
+        assert_eq!(value_u64(&row, "companyId", "company_id"), Some(7));
+        assert_eq!(
+            value_u64(&row, "currentVersionId", "current_version_id"),
+            Some(19)
+        );
+        for invalid in [
+            serde_json::json!({"none": []}),
+            serde_json::json!({"some": "bad"}),
+            serde_json::json!(null),
+        ] {
+            let row = serde_json::json!({"companyId": invalid});
+            assert_eq!(value_u64(&row, "companyId", "company_id"), None);
+        }
+    }
 
     #[test]
     fn extracts_only_bounded_server_owned_utf8_text() {

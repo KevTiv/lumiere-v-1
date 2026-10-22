@@ -1,4 +1,5 @@
 "use client"
+import { organizationCsvImportTable, trackedImportCompanyId } from "./organization-csv-import"
 
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -50,8 +51,18 @@ import {
 } from "../lib/organization-company-form-configs"
 import { createCountryForm, createCurrencyForm } from "../lib/settings-platform-form-configs"
 import { useRBAC } from "@/lib/rbac-context"
+import { useWorkspaceProfile } from "../lib/workspace-profile-context"
+import { isWorkspaceSurfaceVisible } from "../lib/workspace-profile"
 import { cn } from "@/lib/utils"
 import { CountryPackReadinessPanel } from "./country-pack-readiness-panel"
+import { InvoicePersonalizationSettings, type UploadInvoiceLogo } from "./invoice-personalization-settings"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/select"
 
 type OrgMasterCsvKind =
   | "country"
@@ -75,12 +86,13 @@ function companyIdFromForm(data: Record<string, unknown>): string {
  * Manages organization-level settings via the upsert_organization_settings reducer.
  * This connects to SpacetimeDB for persistent organization configuration.
  */
-export function OrganizationSettings() {
+export function OrganizationSettings({ uploadInvoiceLogo }: { uploadInvoiceLogo?: UploadInvoiceLogo } = {}) {
   const { t } = useTranslation()
+  const workspaceProfile = useWorkspaceProfile()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const { organizationId } = useErpSession()
+  const { organizationId, activeCompanyId, activeCompanyReady } = useErpSession()
   const [csvKind, setCsvKind] = useState<OrgMasterCsvKind | null>(null)
   const [referenceModal, setReferenceModal] = useState<"country" | "currency" | null>(null)
   const [referenceError, setReferenceError] = useState<string | null>(null)
@@ -717,6 +729,8 @@ export function OrganizationSettings() {
         </Card>
       ) : null}
 
+      {orgReady ? <InvoicePersonalizationSettings organizationId={orgId} companyId={selectedCompanyId || null} companyName={strVal(selectedCompany?.name)} company={selectedCompany} uploadInvoiceLogo={uploadInvoiceLogo} /> : null}
+
       {orgReady && selectedCompanyId ? (
         <CountryPackReadinessPanel
           definitions={countryPackCatalog.data ?? []}
@@ -863,19 +877,18 @@ export function OrganizationSettings() {
                 <div className="grid max-w-xl gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="delegated-admin-company">{t("settings.organization.privacy.delegatedAdminCompany")}</Label>
-                    <select
-                      id="delegated-admin-company"
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-                      value={selectedCompanyId}
-                      onChange={(e) => setSelectedCompanyId(e.target.value)}
-                    >
-                      <option value="">{t("settings.organization.privacy.delegatedAdminCompanyPlaceholder")}</option>
-                      {companies.map((c) => (
-                        <option key={String(c.id)} value={String(c.id)}>
-                          {strVal(c.name)}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                      <SelectTrigger id="delegated-admin-company">
+                        <SelectValue placeholder={t("settings.organization.privacy.delegatedAdminCompanyPlaceholder")} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((c) => (
+                          <SelectItem key={String(c.id)} value={String(c.id)}>
+                            {strVal(c.name)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="delegated-admin-identity">{t("settings.organization.privacy.delegatedAdminIdentity")}</Label>
@@ -1124,7 +1137,7 @@ export function OrganizationSettings() {
                 {t("settings.organization.csvImport.toolbarRoles")}
               </Button>
             ) : null}
-            {canImportCsv("aiAgent") ? (
+            {isWorkspaceSurfaceVisible(workspaceProfile, "ai-skills") && canImportCsv("aiAgent") ? (
               <Button type="button" variant="outline" size="sm" onClick={() => setCsvKind("aiAgent")}>
                 {t("settings.organization.csvImport.toolbarAiAgents")}
               </Button>
@@ -1290,6 +1303,11 @@ export function OrganizationSettings() {
 
       {csvKind && csvFormConfig && hasValidOrganizationId(organizationId) ? (
         <CsvImportModal
+          organizationId={orgBigInt}
+          tableName={organizationCsvImportTable(csvKind)}
+          trackedImport={{
+            companyId: trackedImportCompanyId(activeCompanyId, activeCompanyReady),
+          }}
           key={csvKind}
           onClose={() => setCsvKind(null)}
           config={csvFormConfig}

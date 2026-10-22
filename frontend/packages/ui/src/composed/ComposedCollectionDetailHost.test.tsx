@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 import type { PreviewResponse } from "@lumiere/presentation-core/preview-contract"
 import { ComposedCollectionDetailHost } from "./ComposedCollectionDetailHost"
+import { workspaceStyles } from "../lib/workspace-styles"
 
 const preview = {
   definition: {
@@ -34,6 +35,21 @@ describe("ComposedCollectionDetailHost", () => {
   it("shows an explicit bounded-sample notice", () => {
     render(<ComposedCollectionDetailHost preview={preview} />)
     expect(screen.getByTestId("composed-truncated-receivables").textContent).toContain("Preview limit reached")
+  })
+
+  it("styles persisted collection/detail nodes through the shared renderer roles", () => {
+    const definitionBeforeRender = JSON.stringify(preview.definition)
+    render(<ComposedCollectionDetailHost preview={preview} />)
+    for (const id of ["composed-collection-receivables", "composed-detail-receivable-detail"]) {
+      const card = screen.getByTestId(id)
+      for (const token of workspaceStyles.surface.split(" ")) expect(card.classList.contains(token)).toBe(true)
+      const title = card.querySelector('[data-slot="card-title"]')!
+      for (const token of workspaceStyles.sectionTitle.split(" ")) expect(title.classList.contains(token)).toBe(true)
+    }
+    expect(screen.getByRole("table").closest('[data-slot="table-container"]')?.classList.contains("overflow-x-auto")).toBe(true)
+    expect(JSON.stringify(preview.definition)).toBe(definitionBeforeRender)
+    fireEvent.keyDown(screen.getByTestId("composed-row-receivables-r1"), { key: "Enter" })
+    expect(screen.getByTestId("composed-detail-value-receivable-detail-reference").textContent).toBe("SO-1")
   })
 
   it.each([

@@ -25,6 +25,10 @@ pub fn test_cannot_edit_posted_move_line(ctx: &ReducerContext) -> Result<(), Str
         fixture.organization_id,
         line.id,
         UpdateAccountMoveLineParams {
+            quantity: None,
+            price_unit: None,
+            expected_quantity: None,
+            expected_price_unit: None,
             company_id: Some(fixture.company_id),
             name: Some("Edited after post".to_string()),
             debit: None,

@@ -214,6 +214,30 @@ export async function serverFetchQueryListsRequired<const T extends readonly Que
   }
 }
 
+/**
+ * Independent module prefetches: a denied resource has no seed, so the client
+ * performs its authoritative read and displays that resource's permission state.
+ * Do not turn a denial into a successful empty cache entry or abort sibling tabs.
+ * Operational failures still fail the server render; required reads use the
+ * stricter helper above.
+ */
+export async function serverPrefetchQueryLists<const T extends readonly QueryResourceKey[]>(
+  session: ApiSession,
+  resources: T,
+): Promise<{
+  [K in keyof T]: T[K] extends QueryResourceKey ? ServerQueryRowFor<T[K]>[] | undefined : never
+}> {
+  const states = await Promise.all(
+    resources.map((resource) => serverFetchQueryListState(session, resource)),
+  )
+  return states.map((state, index) => state.status === "denied"
+    ? undefined
+    : requireServerQueryRows(state, resources[index] ?? "unknown"),
+  ) as {
+    [K in keyof T]: T[K] extends QueryResourceKey ? ServerQueryRowFor<T[K]>[] | undefined : never
+  }
+}
+
 /** Token-based fetch for session bootstrap (e.g. `user-organization` before org id is known). */
 export async function serverFetchQueryListWithCredentialsAllowEmpty<K extends QueryResourceKey>(
   creds: ServerQueryCredentials,

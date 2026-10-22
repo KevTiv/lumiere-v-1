@@ -9,6 +9,7 @@
 import { expect, test, type Page } from "@playwright/test"
 
 import {
+  selectModuleTab,
   callReducerBff,
   callReducerOwner,
   expectNoAppError,
@@ -260,7 +261,7 @@ test.describe("PRO-007 proposal → publish → convert lifecycle @proposals @p0
     // projects-wave-lifecycle.spec.ts.
     await page.reload()
     await gotoModule(page, "/proposals", "proposals")
-    await page.getByTestId("module-tab-proposals-proposals").click()
+    await selectModuleTab(page, "proposals", "proposals")
     await selectEntityRowByText(page, proposalTitle)
     await expectNoAppError(page)
   })

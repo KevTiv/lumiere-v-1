@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { getStdbSession } from "@/lib/api-session"
-import { serverFetchQueryListState, serverFetchQueryListsRequired } from "@/lib/server-query"
+import { serverFetchQueryListState, serverPrefetchQueryLists } from "@/lib/server-query"
 import { PurchasingClient } from "./purchasing-client"
 
 const SSR_RESOURCES = [
@@ -21,7 +21,7 @@ export default async function PurchasingPage() {
   }
 
   const [records, contactsState] = await Promise.all([
-    serverFetchQueryListsRequired(session, SSR_RESOURCES),
+    serverPrefetchQueryLists(session, SSR_RESOURCES),
     serverFetchQueryListState(session, "contacts"),
   ])
   const [

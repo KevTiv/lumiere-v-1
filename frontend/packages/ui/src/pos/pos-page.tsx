@@ -27,7 +27,6 @@ import {
   Receipt,
   RotateCcw,
   Tag,
-  User,
   Grid3x3,
   LayoutList,
 } from "lucide-react"
@@ -417,9 +416,6 @@ export function POSPage({
             )}
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
-              <User className="h-3.5 w-3.5" />
-            </Button>
             {cart.length > 0 && (
               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={clearCart}>
                 <RotateCcw className="h-3.5 w-3.5" />

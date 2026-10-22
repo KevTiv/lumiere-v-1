@@ -1,14 +1,15 @@
 "use client"
 
+import { WorkspaceProfileProvider } from "@lumiere/ui/lib/workspace-profile-context"
 import { Suspense, useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react"
 import {
   DashboardSidebar,
+  DashboardWorkspace,
   ErpCommandPalette,
   AIChatPanel,
   NotebookPanel,
   JournalPanel,
   ChatterUploaderProvider,
-  HeaderTrailingProvider,
   NotificationBell,
   recentNotifications,
 } from "@lumiere/ui"
@@ -194,7 +195,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     try {
       await createSession.mutateAsync({
         session_key: sessionKey,
-        title: "ERP Assistant",
+        title: "Lumière Assistant",
         route,
         module: module ?? null,
         active_tab: activeTab ?? null,
@@ -572,6 +573,7 @@ function ModulesContent({
   const [isAIChatDocked, setIsAIChatDocked] = useState(false)
   const [isNotebookOpen, setIsNotebookOpen] = useState(false)
   const [isJournalOpen, setIsJournalOpen] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const { organizationId } = useErpSession()
   const orgId = organizationId ?? 0
   const orgReady = organizationId != null && organizationId > 0
@@ -594,55 +596,62 @@ function ModulesContent({
 
   return (
     <ErpAiChatControllerProvider open={openAiChat}>
-      <HeaderTrailingProvider value={orgReady ? <HeaderNotificationBell organizationId={orgId} /> : null}>
-      <div className="flex h-screen overflow-hidden bg-muted/30 text-foreground">
-        <DashboardSidebar
-          firstOrgProfile={firstOrgProfile}
-          forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
-          navBadges={navBadges}
-          onOpenJournal={() => setIsJournalOpen(true)}
-          onOpenNotebook={() => setIsNotebookOpen(true)}
-          onOpenAIChat={openAiChat}
-          onSignOut={() => void performSignOut()}
-          userProfile={currentUserProfile.data}
-        />
-        <main className="flex-1 overflow-auto scroll-smooth">
-          <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-7">{children}</div>
-        </main>
+      <DashboardWorkspace
+        forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
+        onOpenSearch={() => setIsSearchOpen(true)}
+        notifications={orgReady ? <HeaderNotificationBell organizationId={orgId} /> : null}
+        sidebar={
+          <DashboardSidebar
+            firstOrgProfile={firstOrgProfile}
+            forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
+            navBadges={navBadges}
+            onOpenJournal={() => setIsJournalOpen(true)}
+            onOpenNotebook={() => setIsNotebookOpen(true)}
+            onOpenAIChat={openAiChat}
+            onSignOut={() => void performSignOut()}
+            userProfile={currentUserProfile.data}
+          />
+        }
+        overlays={
+          <>
+            <ErpAiChatPanel
+              open={isAIChatOpen}
+              onClose={() => {
+                setIsAIChatOpen(false)
+                setIsAIChatDocked(false)
+              }}
+              docked={isAIChatDocked}
+              onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
+              config={{
+                title: "Lumière Assistant",
+                welcomeMessage: "Explore your business, prepare a draft, or turn an insight into a report.",
+                placeholder: "Ask about your work or describe what you need...",
+              }}
+            />
 
-        <ErpAiChatPanel
-          open={isAIChatOpen}
-          onClose={() => {
-            setIsAIChatOpen(false)
-            setIsAIChatDocked(false)
-          }}
-          docked={isAIChatDocked}
-          onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
-          config={{
-            title: "Lumière Assistant",
-            welcomeMessage: "Explore your business, prepare a draft, or turn an insight into a report.",
-            placeholder: "Ask about your work or describe what you need...",
-          }}
-        />
+            <NotebookPanel
+              open={isNotebookOpen}
+              onClose={() => setIsNotebookOpen(false)}
+              onAIChat={openAiChat}
+              dataContext={{}}
+            />
 
-        <NotebookPanel
-          open={isNotebookOpen}
-          onClose={() => setIsNotebookOpen(false)}
-          onAIChat={openAiChat}
-          dataContext={{}}
-        />
+            <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
 
-        <JournalPanel open={isJournalOpen} onClose={() => setIsJournalOpen(false)} />
-
-        <ErpCommandPalette
-          firstOrgProfile={firstOrgProfile}
-          recordHref={recordPageHref}
-          onOpenAIChat={openAiChat}
-          onOpenNotebook={() => setIsNotebookOpen(true)}
-          onOpenJournal={() => setIsJournalOpen(true)}
-        />
-      </div>
-      </HeaderTrailingProvider>
+            <ErpCommandPalette
+              open={isSearchOpen}
+              onOpenChange={setIsSearchOpen}
+              firstOrgProfile={firstOrgProfile}
+              recordHref={recordPageHref}
+              onOpenAIChat={openAiChat}
+              onOpenNotebook={() => setIsNotebookOpen(true)}
+              onOpenJournal={() => setIsJournalOpen(true)}
+            />
+          </>
+        }
+      >
+        {children}
+      </DashboardWorkspace>
     </ErpAiChatControllerProvider>
   )
 }
@@ -655,12 +664,14 @@ export default function ModulesShell({
   firstOrgProfile?: boolean
 }) {
   return (
-    <Suspense fallback={null}>
-      <ErpAiRouteContextProvider>
-        <ChatterUploaderProvider value={useWebChatterUploader}>
-          <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
-        </ChatterUploaderProvider>
-      </ErpAiRouteContextProvider>
-    </Suspense>
+    <WorkspaceProfileProvider value="finance-alpha">
+      <Suspense fallback={null}>
+        <ErpAiRouteContextProvider>
+          <ChatterUploaderProvider value={useWebChatterUploader}>
+            <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+          </ChatterUploaderProvider>
+        </ErpAiRouteContextProvider>
+      </Suspense>
+    </WorkspaceProfileProvider>
   )
 }

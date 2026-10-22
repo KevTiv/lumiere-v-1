@@ -190,11 +190,12 @@ export function useCreateDocument(organizationId: bigint, companyId: bigint) {
  * `create_document` returns nothing, so this reads `documents` before and after and resolves the
  * created row (new id, same blob url + checksum, same host record). Resolves its `{resource,id}`.
  */
-export function useCreateDocumentWithRef(organizationId: bigint, companyId: bigint) {
+export function useCreateDocumentWithRef(organizationId: bigint, companyId: bigint, options?: { mayDispatch?: () => boolean }) {
   const qc = useQueryClient()
   return useMutation<CanonicalRecordRef, Error, CreateDocumentParams>({
     mutationFn: async (params) => {
       const before = await fetchQueryList("/api/query/documents", "Failed to read documents")
+      if (options?.mayDispatch && !options.mayDispatch()) throw new Error("Document scope or permissions changed before submission")
       const { urlPath, init } = stdbBffCommandPost("create_document", { companyId: companyId, params: stdbParamsToJson(params as object, "CreateDocumentParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallErrorDocuments(r))

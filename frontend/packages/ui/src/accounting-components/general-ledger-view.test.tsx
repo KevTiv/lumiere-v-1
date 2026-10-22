@@ -39,4 +39,16 @@ describe("GeneralLedgerView accounting migration actions", () => {
       }),
     ).toBeNull()
   })
+  it("posts a selected draft vendor bill using the ledger action", () => {
+    const onPostMove = vi.fn()
+    const move = { id: 7, name: "BILL7", state: "Draft", moveType: "InInvoice" }
+
+    render(<GeneralLedgerView moves={[move]} onPostMove={onPostMove} />)
+
+    fireEvent.click(screen.getByTestId("entity-row-7"))
+    fireEvent.click(screen.getByTestId("general-ledger-post-move"))
+
+    expect(onPostMove).toHaveBeenCalledExactlyOnceWith(move)
+  })
+
 })

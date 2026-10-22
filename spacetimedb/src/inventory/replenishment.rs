@@ -58,6 +58,13 @@ pub struct ReplenishmentRule {
     pub last_run: Option<Timestamp>,
     pub next_run: Option<Timestamp>,
     pub metadata: Option<String>,
+    /// `scheduled_id` of the rule's pending `ReplenishmentRunJob`, or `None` when
+    /// the rule is not opted into automatic runs. Maintained only by
+    /// `schedule_replenishment_run`, `cancel_replenishment_run` and
+    /// `run_scheduled_replenishment`; it is the exact, queryable readback for the
+    /// (private) job table.
+    #[default(None::<u64>)]
+    pub scheduled_run_job_id: Option<u64>,
 }
 
 /// Stock Reorder Group
@@ -516,6 +523,7 @@ pub fn create_replenishment_rule(
         last_run: params.last_run,
         next_run: params.next_run,
         metadata: params.metadata,
+        scheduled_run_job_id: None,
     });
 
     write_audit_log_v2(
@@ -769,11 +777,7 @@ fn rule_run_job_exists(ctx: &ReducerContext, rule_id: u64) -> bool {
         .is_some()
 }
 
-fn replacement_run_job_exists(
-    ctx: &ReducerContext,
-    rule_id: u64,
-    fired_scheduled_id: u64,
-) -> bool {
+fn replacement_run_job_exists(ctx: &ReducerContext, rule_id: u64, fired_scheduled_id: u64) -> bool {
     ctx.db
         .replenishment_run_job()
         .replenishment_run_job_by_rule()
@@ -815,12 +819,16 @@ pub fn schedule_replenishment_run(
     let when = rule
         .next_run
         .unwrap_or(ctx.timestamp + std::time::Duration::from_secs(86400));
-    ctx.db.replenishment_run_job().insert(ReplenishmentRunJob {
+    let job = ctx.db.replenishment_run_job().insert(ReplenishmentRunJob {
         scheduled_id: 0,
         scheduled_at: ScheduleAt::Time(when),
         organization_id,
         company_id,
         rule_id,
+    });
+    ctx.db.replenishment_rule().id().update(ReplenishmentRule {
+        scheduled_run_job_id: Some(job.scheduled_id),
+        ..rule
     });
 
     write_audit_log_v2(
@@ -873,7 +881,16 @@ pub fn cancel_replenishment_run(
         .map(|job| job.scheduled_id)
         .collect();
     for scheduled_id in jobs {
-        ctx.db.replenishment_run_job().scheduled_id().delete(&scheduled_id);
+        ctx.db
+            .replenishment_run_job()
+            .scheduled_id()
+            .delete(&scheduled_id);
+    }
+    if rule.scheduled_run_job_id.is_some() {
+        ctx.db.replenishment_rule().id().update(ReplenishmentRule {
+            scheduled_run_job_id: None,
+            ..rule
+        });
     }
 
     write_audit_log_v2(
@@ -909,6 +926,14 @@ pub fn run_scheduled_replenishment(
         return Ok(());
     };
     if !rule.active {
+        // Deactivated since scheduling: this was the last run, so drop the
+        // pointer to the (now fired) job instead of leaving it dangling.
+        if rule.scheduled_run_job_id.is_some() {
+            ctx.db.replenishment_rule().id().update(ReplenishmentRule {
+                scheduled_run_job_id: None,
+                ..rule
+            });
+        }
         return Ok(());
     }
 
@@ -938,12 +963,16 @@ pub fn run_scheduled_replenishment(
     let next_when = updated_rule
         .next_run
         .unwrap_or(ctx.timestamp + std::time::Duration::from_secs(86400));
-    ctx.db.replenishment_run_job().insert(ReplenishmentRunJob {
+    let next_job = ctx.db.replenishment_run_job().insert(ReplenishmentRunJob {
         scheduled_id: 0,
         scheduled_at: ScheduleAt::Time(next_when),
         organization_id: job.organization_id,
         company_id: job.company_id,
         rule_id: job.rule_id,
+    });
+    ctx.db.replenishment_rule().id().update(ReplenishmentRule {
+        scheduled_run_job_id: Some(next_job.scheduled_id),
+        ..updated_rule
     });
 
     Ok(())

@@ -842,6 +842,8 @@ mod tests {
             role_permissions: vec!["contact:read".to_string()],
             identity_hex: "a".repeat(64),
             field_permissions: vec![],
+            role_ids: Vec::new(),
+            org_permissions: Vec::new(),
         };
         assert!(ensure_ai_skill_access(Some(&denied), "read").is_err());
 
