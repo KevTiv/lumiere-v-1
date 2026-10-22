@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react"
 import { cn } from "@/lib/utils"
 import type { EntryTableConfig, EntryData, TableColumn } from "@/lib/entry-table-types"
+import { downloadCsv } from "@/lib/export-csv"
+import { entryRowsToCsv } from "@/lib/ui-exports"
 import { EntryTableCell } from "./entry-table-cell"
 import { EntryDetailModal } from "./entry-detail-modal"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -178,7 +180,12 @@ export function EntryTableViewer({
           </div>
           <div className="flex items-center gap-2">
             {features.export && (
-              <Button variant="outline" size="sm" className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => downloadCsv(config.title || config.id, entryRowsToCsv(config.columns, sortedData))}
+              >
                 <Download className="h-4 w-4" />
                 Export
               </Button>

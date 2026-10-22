@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { FinanceReviewWorkspace } from '@lumiere/ui/composed/finance-review-workspace';
+import { ExpenseSourcePreview } from '../../../../../components/finance-source-preview';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { FileText, ListOrdered } from 'lucide-react';
 import { useTranslation } from '@lumiere/i18n';
@@ -352,6 +354,10 @@ function ExpenseReportPageLoaded({
         config={{
           titleKey: 'name',
           statusKey: 'state',
+          wide: true,
+          overviewContent: (record) => <FinanceReviewWorkspace editorLabel={t('financeReview.savedDetails', { defaultValue: 'Saved details' })}
+            editor={<EntityDetail config={{ mode: "detail", sections: [{ id: "line", fields: lineColumns.filter((column) => column.key !== "name").map(({ width: _width, ...field }) => field) }] }} data={record} />}
+            preview={<ExpenseSourcePreview organizationId={orgId} companyId={operatingCompanyId} record={record} />} />,
           detailConfig: {
             mode: 'detail',
             sections: [

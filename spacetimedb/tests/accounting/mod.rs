@@ -181,6 +181,8 @@ pub fn run_accounting_payment_management_test(ctx: &ReducerContext) -> Result<()
         .map_err(|e| format!("payment_transaction_fee_and_void: {e}"))?;
     payment_management_test::test_payment_allocation_updates_ledger_and_reverses(ctx)
         .map_err(|e| format!("payment_allocation_ledger_mutation: {e}"))?;
+    payment_management_test::test_seed_payment_ledger_and_partial_report_balance(ctx)
+        .map_err(|e| format!("seed_payment_ledger_and_owner_report_balance: {e}"))?;
     crate::pretenant_cert::payments_cert::run_payments_certification(ctx)?;
     crate::pretenant_cert::state_machine_cert::run_payments_state_machine(ctx)?;
     log::info!("✅ run_accounting_payment_management_test complete");

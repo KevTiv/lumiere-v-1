@@ -292,6 +292,10 @@ const HTTP_SQL_EXCLUDED_COLUMNS: Record<string, Set<string>> = {
 
 /** Per-resource columns selected even when globally excluded (e.g. metadata for credit-note linkage). */
 const HTTP_SQL_INCLUDED_COLUMNS: Record<string, Set<string>> = {
+  // Match the Rust policy for exact finance owner relations. Field grants
+  // resolve before this filter; these exceptions never add unselected fields.
+  'account-assets': new Set(['depreciation_board_ids']),
+  'expenses': new Set(['attachment_ids', 'tax_ids']),
   'purchase-requisitions': new Set(['purchase_ids']),
   'account-moves': new Set(['metadata']),
   'mail-messages': new Set(['metadata']),

@@ -752,16 +752,16 @@ export function AIChatPanel({
                       </AvatarFallback>
                     </Avatar>
                     <div className={cn(
-                      "flex flex-col gap-0.5 max-w-[85%]",
+                      "flex min-w-0 flex-col gap-0.5 max-w-[85%]",
                       message.role === "user" ? "items-end" : "items-start"
                     )}>
                       <div className={cn(
-                        "rounded-xl px-3 py-2 text-xs",
+                        "min-w-0 max-w-full rounded-xl px-3 py-2 text-xs",
                         message.role === "user"
                           ? "bg-primary text-primary-foreground rounded-br-sm"
                           : "bg-muted rounded-bl-sm"
                       )}>
-                        <p className="whitespace-pre-wrap">{message.content}</p>
+                        <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
                       </div>
                       {message.role === "assistant" && message.sources != null && message.sources.length > 0 && (
                         <div className="mt-1 max-w-[95%] rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-[10px] text-muted-foreground">

@@ -240,7 +240,6 @@ import {
   mailFollowersTableConfig,
   newMailMessageForm,
   subscribeToRecordForm,
-  unsubscribeFromRecordForm,
   iotPairingTokensTableConfig,
   iotHubsTableConfig,
   iotDevicesTableConfig,
@@ -421,6 +420,16 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
   description: "Financial overview — P&L, cash position, and budget tracking",
   defaultTab: "dashboard",
   workspaceNav: accountingWorkspaceNavigation(t),
+  tabNavigation: "areas",
+  tabGroups: [
+    { label: t("accounting.navigation.receivables", { defaultValue: "Receivables" }), tabIds: ["invoices", "credit-control"] },
+    { label: t("accounting.navigation.payables", { defaultValue: "Payables" }), tabIds: ["bills"] },
+    { label: t("accounting.navigation.cashBank", { defaultValue: "Cash & Bank" }), tabIds: ["payments", "payment-operations", "bank-statements", "reconciliation-widgets", "fx-revaluation"] },
+    { label: t("modules.tabGroups.ledger", { defaultValue: "Ledger" }), tabIds: ["journal-entries", "move-lines", "budgets", "analytic", "analytic-lines", "analytic-distribution"] },
+    { label: t("accounting.navigation.assets", { defaultValue: "Assets" }), tabIds: ["fixed-assets", "amortization"] },
+    { label: t("modules.tabGroups.close", { defaultValue: "Close" }), tabIds: ["period-close", "consolidation", "intercompany-transactions"] },
+    { label: t("modules.tabGroups.setup", { defaultValue: "Setup" }), tabIds: ["accounts", "account-journals", "fiscal-years", "account-periods", "taxes", "tax-groups", "tax-jurisdictions", "tax-schedules", "tax-deadlines", "payment-terms", "payment-term-lines", "intercompany-rules"] },
+  ],
   tabs: [
     {
       id: "dashboard",

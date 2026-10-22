@@ -3,6 +3,44 @@
 use serde_json::Value;
 use stdb_auth::{has_resource_read_permission, FieldAccessContext};
 
+/// Keep timestamp microseconds exact when query JSON is read by JavaScript.
+///
+/// Only direct, single-key timestamp wire objects are changed. Arbitrary nested
+/// JSON (including metadata), scalar amounts, and record IDs retain their values.
+pub(crate) fn preserve_query_timestamp_precision(rows: &mut [Value]) {
+    const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
+
+    for row in rows {
+        let Some(fields) = row.as_object_mut() else {
+            continue;
+        };
+        for (field, value) in fields {
+            if matches!(
+                field.as_str(),
+                "metadata" | "metadataJson" | "metadata_json"
+            ) {
+                continue;
+            }
+            let Some(timestamp) = value.as_object_mut().filter(|object| object.len() == 1) else {
+                continue;
+            };
+            let key = if timestamp.contains_key("microsSinceUnixEpoch") {
+                "microsSinceUnixEpoch"
+            } else {
+                "__timestamp_micros_since_unix_epoch__"
+            };
+            let Some(micros) = timestamp.get_mut(key) else {
+                continue;
+            };
+            if let Some(exact) = micros.as_i64() {
+                if !(-MAX_SAFE_INTEGER..=MAX_SAFE_INTEGER).contains(&exact) {
+                    *micros = Value::String(exact.to_string());
+                }
+            }
+        }
+    }
+}
+
 pub(crate) fn row_not_soft_deleted(r: &Value) -> bool {
     match r.get("deletedAt").or_else(|| r.get("deleted_at")) {
         None | Some(Value::Null) => true,
@@ -51,6 +89,15 @@ pub(crate) fn filter_and_strip_archived(rows: &mut Vec<Value>) {
     rows.retain(|r| row_not_archived(r));
     for row in rows.iter_mut() {
         strip_archived_fields(row);
+    }
+}
+
+pub(crate) fn filter_resource_archived_rows(resource: &str, rows: &mut Vec<Value>) {
+    match resource {
+        // The generated payment-account read contract requires archive proof.
+        "payment-accounts" => rows.retain(row_not_archived),
+        "contact-phone-identities" => filter_and_strip_archived(rows),
+        _ => {}
     }
 }
 
@@ -152,4 +199,105 @@ pub(crate) fn row_identity_option_is(
 
 pub(crate) fn sort_rows_by_id_desc(rows: &mut [Value]) {
     rows.sort_by(|a, b| row_id_u64(b).cmp(&row_id_u64(a)));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn query_timestamp_precision_preserves_exact_unsafe_i64_values() {
+        for micros in [
+            9_007_199_254_740_992_i64,
+            -9_007_199_254_740_992_i64,
+            19_912_435_200_000_001_i64,
+            -19_912_435_200_000_001_i64,
+            i64::MIN,
+            i64::MAX,
+        ] {
+            let mut rows = vec![json!({"dateFrom": {"microsSinceUnixEpoch": micros}})];
+            preserve_query_timestamp_precision(&mut rows);
+            let wire = rows[0]["dateFrom"]["microsSinceUnixEpoch"]
+                .as_str()
+                .expect("unsafe timestamp must be an exact decimal string");
+            assert_eq!(wire, micros.to_string());
+            assert_eq!(wire.parse::<i64>().expect("valid i64 timestamp"), micros);
+        }
+    }
+
+    #[test]
+    fn query_timestamp_precision_keeps_safe_numbers_and_existing_strings() {
+        for micros in [0_i64, 9_007_199_254_740_991, -9_007_199_254_740_991] {
+            let mut rows = vec![json!({"dateTo": {"microsSinceUnixEpoch": micros}})];
+            let original = rows.clone();
+            preserve_query_timestamp_precision(&mut rows);
+            assert_eq!(rows, original);
+        }
+        let mut rows = vec![json!({
+            "dateTo": {"microsSinceUnixEpoch": "19912435200000001"}
+        })];
+        let original = rows.clone();
+        preserve_query_timestamp_precision(&mut rows);
+        assert_eq!(rows, original);
+    }
+
+    #[test]
+    fn query_timestamp_precision_handles_canonical_timestamp_wrapper() {
+        let mut rows = vec![json!({
+            "dateFrom": {"__timestamp_micros_since_unix_epoch__": 19_912_435_200_000_001_i64}
+        })];
+        preserve_query_timestamp_precision(&mut rows);
+        assert_eq!(
+            rows[0]["dateFrom"]["__timestamp_micros_since_unix_epoch__"],
+            "19912435200000001"
+        );
+    }
+
+    #[test]
+    fn query_timestamp_precision_does_not_rewrite_other_row_data() {
+        let mut rows = vec![json!({
+            "id": 19_912_435_200_000_001_i64,
+            "amount": -19_912_435_200_000_001_i64,
+            "metadata": {"microsSinceUnixEpoch": 19_912_435_200_000_001_i64},
+            "metadataJson": {"microsSinceUnixEpoch": 19_912_435_200_000_001_i64},
+            "metadata_json": {"microsSinceUnixEpoch": 19_912_435_200_000_001_i64},
+            "details": {"dateFrom": {"microsSinceUnixEpoch": 19_912_435_200_000_001_i64}},
+            "lines": [{"amount": 19_912_435_200_000_001_i64}],
+            "custom": {"microsSinceUnixEpoch": 19_912_435_200_000_001_i64, "label": "custom"},
+            "invalidDate": {"microsSinceUnixEpoch": 1.5},
+            "dateFrom": null
+        })];
+        let original = rows.clone();
+        preserve_query_timestamp_precision(&mut rows);
+        assert_eq!(rows, original);
+    }
+
+    #[test]
+    fn payment_account_archive_filter_keeps_live_proof_and_excludes_archived_rows() {
+        let mut rows = vec![
+            json!({"id": 1, "archivedAt": null}),
+            json!({"id": 2, "archived_at": {"none": []}}),
+            json!({"id": 3, "archivedAt": {"microsSinceUnixEpoch": 100}}),
+            json!({"id": 4, "archived_at": {"some": {"microsSinceUnixEpoch": 100}}}),
+        ];
+        filter_resource_archived_rows("payment-accounts", &mut rows);
+        assert_eq!(
+            rows,
+            vec![
+                json!({"id": 1, "archivedAt": null}),
+                json!({"id": 2, "archived_at": {"none": []}}),
+            ]
+        );
+    }
+
+    #[test]
+    fn contact_phone_archive_filter_retains_existing_strip_behavior() {
+        let mut rows = vec![
+            json!({"id": 1, "archivedAt": null}),
+            json!({"id": 2, "archivedAt": {"microsSinceUnixEpoch": 100}}),
+        ];
+        filter_resource_archived_rows("contact-phone-identities", &mut rows);
+        assert_eq!(rows, vec![json!({"id": 1})]);
+    }
 }

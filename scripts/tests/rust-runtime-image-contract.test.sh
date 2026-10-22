@@ -39,6 +39,32 @@ dockerfile_commands = "\n".join(
     line for line in dockerfile.splitlines() if not line.lstrip().startswith("#")
 )
 builder_commands, _, runtime_commands = dockerfile_commands.partition("\nFROM debian:")
+planner, separator, application = builder_commands.partition("\nFROM chef AS builder\n")
+if not separator or "RUN cargo chef prepare --recipe-path /app/recipe.json" not in planner:
+    raise SystemExit("runtime image must prepare a dependency recipe in a separate planner stage")
+dependencies, separator, _ = application.partition("COPY release-compatibility-manifest.json ./")
+if not separator or "COPY --from=planner /app/recipe.json ./recipe.json" not in dependencies:
+    raise SystemExit("runtime dependency stage must consume only the prepared recipe")
+if re.search(r"^COPY (?!\-\-from=planner /app/recipe.json)", dependencies, re.MULTILINE):
+    raise SystemExit("application sources must not invalidate the dependency compilation layer")
+if "cargo install cargo-chef --version 0.1.73 --locked" not in planner:
+    raise SystemExit("runtime dependency builder must pin cargo-chef with its lockfile")
+if "cargo chef cook --locked --release" not in dependencies:
+    raise SystemExit("runtime dependencies must compile in the locked production release profile")
+if "RUN scripts/prepare-vendored-contracts-rust.sh" not in application:
+    raise SystemExit("runtime application stage must replace dummy contracts with verified real contracts")
+
+# Keep dependency feature selection aligned with both application build commands.
+def selected_targets(commands, prefix):
+    selections = []
+    for command in commands.split(prefix)[1:]:
+        command = command.split("&&", 1)[0]
+        selections.append((re.findall(r"-p\s+([a-z0-9-]+)", command),
+                           re.findall(r"--bin\s+([a-z0-9-]+)", command)))
+    return selections
+
+if selected_targets(dependencies, "cargo chef cook ") != selected_targets(application, "cargo build "):
+    raise SystemExit("dependency recipe and application must build the same packages and binaries")
 builder_sources = {
     source.removeprefix("./").rstrip("/")
     for line in builder_commands.splitlines()
