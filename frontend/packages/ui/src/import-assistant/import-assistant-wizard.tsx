@@ -69,6 +69,8 @@ import {
   mappingRecordFromLineBundle,
 } from "./import-mapping-table"
 import { ImportPreviewGrid } from "./import-preview-grid"
+import type { ModuleDataState } from "../lib/module-data-state"
+import { ModuleDataNotice } from "../pages/module-data-notice"
 import {
   ImportTemplateControls,
   priorMappingsFromTemplate,
@@ -86,6 +88,8 @@ export type ImportAssistantWizardProps = {
   title: string
   onImport: (csvData: string) => Promise<void>
   isImportPending?: boolean
+  /** Gate new work without discarding an already submitted import or its results. */
+  sourceState?: ModuleDataState
   importBundle?: ImportBundleDefinition
   onImportLines?: (lineCsv: string) => Promise<void>
   resolveOrderIds?: (refs: string[]) => Promise<Map<string, string>>
@@ -106,6 +110,7 @@ export function ImportAssistantWizard({
   title,
   onImport,
   isImportPending = false,
+  sourceState,
   importBundle,
   onImportLines,
   resolveOrderIds,
@@ -141,6 +146,17 @@ export function ImportAssistantWizard({
   const [templateSaveName, setTemplateSaveName] = useState("")
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null)
   const [rollingBackJobId, setRollingBackJobId] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submissionStarted, setSubmissionStarted] = useState(false)
+  const submissionStartedRef = useRef(false)
+  const importCompletedRef = useRef(false)
+  const sourceReady = sourceState === undefined || sourceState.status === "ready"
+  const sourceReadyRef = useRef(sourceReady)
+  const sourceEpochRef = useRef(0)
+  if (sourceReadyRef.current && !sourceReady) sourceEpochRef.current += 1
+  sourceReadyRef.current = sourceReady
+  const importBusy = isImportPending || isSubmitting
+  const showDraft = sourceReady || submissionStarted
   const finalizedJobIdRef = useRef<string | null>(null)
 
   const entityTemplates = templatesForEntity(
@@ -179,14 +195,25 @@ export function ImportAssistantWizard({
     setTemplateSaveName("")
     setAppliedTemplateId(null)
     setRollingBackJobId(null)
+    setIsSubmitting(false)
+    setSubmissionStarted(false)
+    submissionStartedRef.current = false
+    importCompletedRef.current = false
     finalizedJobIdRef.current = null
     analyze.reset()
     preview.reset()
   }, [analyze, preview])
 
   useEffect(() => {
-    if (!open) reset()
-  }, [open, reset])
+    if (!open && !isSubmitting) reset()
+  }, [open, isSubmitting, reset])
+
+  useEffect(() => {
+    if (sourceReady || submissionStartedRef.current) return
+    setPreviewResult(null)
+    setLinePreviewResult(null)
+    setStep((current) => current === "preview" ? "map" : current)
+  }, [sourceReady])
 
   const finalizeAssistantJob = useCallback(
     async (job: ImportJobRow | undefined) => {
@@ -219,7 +246,7 @@ export function ImportAssistantWizard({
   }, [step, trackJobs, jobsQuery.refetch, errorsQuery.refetch])
 
   useEffect(() => {
-    if (step !== "done" || !latestJob?.id) return
+    if (step !== "done" || !importCompletedRef.current || !latestJob?.id) return
     const jobId = String(latestJob.id)
     if (finalizedJobIdRef.current === jobId) return
     finalizedJobIdRef.current = jobId
@@ -228,7 +255,7 @@ export function ImportAssistantWizard({
 
   const handleRollbackJob = useCallback(
     async (job: ImportJobRow) => {
-      if (!job.id) return
+      if (!sourceReadyRef.current || importBusy || !job.id) return
       const jobId = String(job.id)
       setRollingBackJobId(jobId)
       setError(null)
@@ -242,10 +269,12 @@ export function ImportAssistantWizard({
         setRollingBackJobId(null)
       }
     },
-    [rollbackJob, t],
+    [importBusy, rollbackJob, t],
   )
 
   const handleFileChange = async (file: File | undefined) => {
+    if (!sourceReadyRef.current || importBusy || submissionStartedRef.current) return
+    const sourceEpoch = sourceEpochRef.current
     setError(null)
     setPreviewResult(null)
     setAnalysis(null)
@@ -253,6 +282,7 @@ export function ImportAssistantWizard({
 
     try {
       const text = await file.text()
+      if (!sourceReadyRef.current || sourceEpoch !== sourceEpochRef.current) return
       const parsed = parseCsvText(text)
       const report = assertCsvSafeForAi(parsed.headers, parsed.rows.slice(0, 50))
       setFileName(file.name)
@@ -320,6 +350,8 @@ export function ImportAssistantWizard({
   }, [open, initialRetry, importBundle?.key, importBundle?.lineEntity, targetEntity])
 
   const runAnalyze = async () => {
+    if (!sourceReadyRef.current || importBusy || submissionStartedRef.current || analyze.isPending) return
+    const sourceEpoch = sourceEpochRef.current
     setError(null)
     setPreviewResult(null)
     setAppliedTemplateId(selectedTemplateId)
@@ -333,6 +365,7 @@ export function ImportAssistantWizard({
         ...(priorMappings ? { priorMappings } : {}),
         ...(importBundle ? { bundleKey: importBundle.key } : {}),
       })
+      if (!sourceReadyRef.current || sourceEpoch !== sourceEpochRef.current) return
       setAnalysis(result)
       setMapping(mappingRecordFromAnalysis(result))
       setLineMapping(mappingRecordFromLineBundle(result))
@@ -343,6 +376,7 @@ export function ImportAssistantWizard({
   }
 
   const handleSaveTemplate = async () => {
+    if (!sourceReadyRef.current || importBusy || submissionStartedRef.current) return
     setError(null)
     try {
       await saveTemplate.mutateAsync({
@@ -358,7 +392,7 @@ export function ImportAssistantWizard({
   }
 
   const handleDeleteTemplate = async () => {
-    if (!selectedTemplateId) return
+    if (!sourceReadyRef.current || importBusy || submissionStartedRef.current || !selectedTemplateId) return
     setError(null)
     try {
       await deleteTemplate.mutateAsync(BigInt(selectedTemplateId))
@@ -371,6 +405,8 @@ export function ImportAssistantWizard({
   }
 
   const runPreview = async () => {
+    if (!sourceReadyRef.current || importBusy || submissionStartedRef.current || preview.isPending) return
+    const sourceEpoch = sourceEpochRef.current
     setError(null)
     try {
       const result = await preview.mutateAsync({
@@ -380,6 +416,7 @@ export function ImportAssistantWizard({
         mapping,
         maxRows: 25,
       })
+      if (!sourceReadyRef.current || sourceEpoch !== sourceEpochRef.current) return
       setPreviewResult(result)
       if (bundleActive && lineAnalysis && Object.keys(lineMapping).length > 0) {
         const lineResult = await preview.mutateAsync({
@@ -389,6 +426,7 @@ export function ImportAssistantWizard({
           mapping: lineMapping,
           maxRows: 25,
         })
+        if (!sourceReadyRef.current || sourceEpoch !== sourceEpochRef.current) return
         setLinePreviewResult(lineResult)
       } else {
         setLinePreviewResult(null)
@@ -400,7 +438,17 @@ export function ImportAssistantWizard({
   }
 
   const runImport = async () => {
+    if (!sourceReadyRef.current || importBusy || submissionStartedRef.current || !canImport) return
     setError(null)
+    setIsSubmitting(true)
+    const sourceEpoch = sourceEpochRef.current
+    const markSubmitted = () => {
+      submissionStartedRef.current = true
+      setSubmissionStarted(true)
+    }
+    const requireReady = () => {
+      if (!sourceReadyRef.current || sourceEpoch !== sourceEpochRef.current) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
+    }
     try {
       if (bundleActive && importBundle && onImportLines && Object.keys(lineMapping).length > 0) {
         const linkColumn =
@@ -418,10 +466,14 @@ export function ImportAssistantWizard({
           parentLinkSourceColumn: linkColumn,
         })
         const parentCsv = buildBundleParentCsv(split.parentHeaders, split.parentRows, mapping)
+        requireReady()
+        markSubmitted()
         await onImport(parentCsv)
+        requireReady()
         const orderIdByRef = resolveOrderIds
           ? await resolveOrderIds(split.parentLinkValues)
           : new Map<string, string>()
+        requireReady()
         const lineCsv = buildBundleLineCsv(
           headers,
           split.lineRows,
@@ -434,18 +486,27 @@ export function ImportAssistantWizard({
         }
       } else {
         const canonical = buildCanonicalCsv(headers, rows, mapping)
+        requireReady()
+        markSubmitted()
         await onImport(canonical)
       }
+      importCompletedRef.current = true
       setTrackJobs(true)
       setStep("done")
       onSuccess?.({ fileName, rowCount: rows.length, mapping })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      if (submissionStartedRef.current) {
+        setTrackJobs(true)
+        setStep("done")
+      }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleRetryFailedRows = () => {
-    if (!failedRowNumbers.length) return
+    if (!sourceReadyRef.current || importBusy || !failedRowNumbers.length) return
     const filtered = filterRowsForRetry(headers, rows, failedRowNumbers)
     setRows(filtered.rows)
     setFileName(buildRetryFileName(fileName))
@@ -454,6 +515,9 @@ export function ImportAssistantWizard({
     setIsRetrySession(true)
     setTrackJobs(false)
     finalizedJobIdRef.current = null
+    submissionStartedRef.current = false
+    importCompletedRef.current = false
+    setSubmissionStarted(false)
     setStep("map")
   }
 
@@ -461,13 +525,15 @@ export function ImportAssistantWizard({
   const linePreviewErrors =
     linePreviewResult?.validation_errors.filter((item) => item.severity === "error") ?? []
   const canImport =
+    sourceReady && !submissionStarted &&
+    previewResult != null &&
     previewErrors.length === 0 &&
     linePreviewErrors.length === 0 &&
-    !isImportPending &&
+    !importBusy &&
     !preview.isPending
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => { if (!importBusy) onOpenChange(next) }}>
       <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -475,6 +541,8 @@ export function ImportAssistantWizard({
         </DialogHeader>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+          <ModuleDataNotice state={sourceState} />
+          {sourceState?.status === "loading" ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p> : null}
           <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
             <Badge variant={step === "upload" ? "default" : "outline"}>
               1. {t("common.importAssistant.stepUpload")}
@@ -503,7 +571,7 @@ export function ImportAssistantWizard({
             </div>
           ) : null}
 
-          {step === "upload" ? (
+          {step === "upload" && sourceReady ? (
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="import-assistant-file">{t("common.csvImport.fileLabel")}</Label>
@@ -554,7 +622,7 @@ export function ImportAssistantWizard({
             </div>
           ) : null}
 
-          {step === "map" && analysis ? (
+          {step === "map" && analysis && sourceReady ? (
             <div className="space-y-4">
               {bundleActive ? (
                 <p className="text-sm text-muted-foreground">
@@ -594,7 +662,7 @@ export function ImportAssistantWizard({
             </div>
           ) : null}
 
-          {step === "preview" && previewResult ? (
+          {step === "preview" && previewResult && showDraft ? (
             <div className="space-y-4">
               <ImportPreviewGrid preview={previewResult} />
               {linePreviewResult ? (
@@ -613,10 +681,10 @@ export function ImportAssistantWizard({
                 errors={(errorsQuery.data ?? []) as ImportJobErrorRow[]}
                 isLoading={jobsQuery.isLoading || String(latestJob?.status ?? "") === "pending"}
                 fileName={fileName}
-                onRetryFailedRows={handleRetryFailedRows}
+                onRetryFailedRows={sourceReady ? handleRetryFailedRows : undefined}
                 retryRowCount={failedRowNumbers.length}
                 onRollback={
-                  latestJob ? () => void handleRollbackJob(latestJob) : undefined
+                  sourceReady && latestJob ? () => void handleRollbackJob(latestJob) : undefined
                 }
                 isRollbackPending={
                   rollingBackJobId != null &&
@@ -626,7 +694,7 @@ export function ImportAssistantWizard({
               <ImportJobHistoryPanel
                 jobs={entityJobs}
                 rollingBackJobId={rollingBackJobId}
-                onRollback={(job) => void handleRollbackJob(job)}
+                onRollback={sourceReady ? (job) => void handleRollbackJob(job) : undefined}
               />
             </div>
           ) : null}
@@ -648,7 +716,7 @@ export function ImportAssistantWizard({
                 type="button"
                 variant="outline"
                 onClick={() => setStep(step === "preview" ? "map" : "upload")}
-                disabled={analyze.isPending || preview.isPending || isImportPending}
+                disabled={!sourceReady || submissionStarted || analyze.isPending || preview.isPending || importBusy}
               >
                 {t("common.back")}
               </Button>
@@ -658,7 +726,7 @@ export function ImportAssistantWizard({
               <Button
                 type="button"
                 onClick={() => void runAnalyze()}
-                disabled={!csvText || analyze.isPending || !!error}
+                disabled={!sourceReady || importBusy || !csvText || analyze.isPending || !!error}
               >
                 {analyze.isPending ? (
                   <>
@@ -672,7 +740,7 @@ export function ImportAssistantWizard({
             ) : null}
 
             {step === "map" ? (
-              <Button type="button" onClick={() => void runPreview()} disabled={preview.isPending}>
+              <Button type="button" onClick={() => void runPreview()} disabled={!sourceReady || importBusy || preview.isPending}>
                 {preview.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -686,7 +754,7 @@ export function ImportAssistantWizard({
 
             {step === "preview" ? (
               <Button type="button" onClick={() => void runImport()} disabled={!canImport}>
-                {isImportPending ? (
+                {importBusy ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     {t("common.csvImport.submit")}
