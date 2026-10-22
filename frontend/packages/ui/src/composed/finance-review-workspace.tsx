@@ -8,12 +8,13 @@ import { cn } from "../lib/utils"
 type ReviewMode = "review" | "edit" | "document"
 
 /** One mounted editor and preview: changing the view never resets input or selected files. */
-export function FinanceReviewWorkspace({ editor, preview, context, editorLabel, previewLabel }: {
+export function FinanceReviewWorkspace({ editor, preview, context, editorLabel, previewLabel, previewTabTestId }: {
   editor: ReactNode
   preview: ReactNode
   context?: ReactNode
   editorLabel?: string
   previewLabel?: string
+  previewTabTestId?: string
 }) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<ReviewMode>("review")
@@ -24,7 +25,7 @@ export function FinanceReviewWorkspace({ editor, preview, context, editorLabel, 
         <TabsList aria-label={t("financeReview.view", { defaultValue: "Review view" })} className="h-auto min-h-10 max-w-full flex-wrap">
           <TabsTrigger value="review">{t("financeReview.sideBySide", { defaultValue: "Side by side" })}</TabsTrigger>
           <TabsTrigger value="edit">{editorLabel ?? t("accounting.authoring.editDocument", { defaultValue: "Edit document" })}</TabsTrigger>
-          <TabsTrigger value="document">{previewLabel ?? t("accounting.authoring.documentPreview", { defaultValue: "Document preview" })}</TabsTrigger>
+          <TabsTrigger value="document" data-testid={previewTabTestId}>{previewLabel ?? t("accounting.authoring.documentPreview", { defaultValue: "Document preview" })}</TabsTrigger>
         </TabsList>
         <TabsContent value={mode} keepMounted>
           <div className={cn("grid min-w-0 items-start gap-5", mode === "review" && "xl:grid-cols-2")}>

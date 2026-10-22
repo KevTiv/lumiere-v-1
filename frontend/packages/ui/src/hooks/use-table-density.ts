@@ -9,15 +9,21 @@ export function useTableDensity(listKey?: string) {
   const [loadedKey, setLoadedKey] = useState<string | undefined>()
   useEffect(() => {
     let next: TableDensity = "comfortable"
+    let readableKey: string | undefined
     try {
-      if (listKey && localStorage.getItem(`${listKey}:density`) === "compact") next = "compact"
+      if (listKey) {
+        if (localStorage.getItem(`${listKey}:density`) === "compact") next = "compact"
+        readableKey = listKey
+      }
     } catch { /* Storage can be unavailable. */ }
     setDensity(next)
-    setLoadedKey(listKey)
+    setLoadedKey(readableKey)
   }, [listKey])
-  useEffect(() => {
+  const updateDensity = (next: TableDensity) => {
+    setDensity(next)
     if (!listKey || loadedKey !== listKey) return
-    try { localStorage.setItem(`${listKey}:density`, density) } catch { /* Keep the in-memory choice. */ }
-  }, [density, listKey, loadedKey])
-  return [density, setDensity] as const
+    try { localStorage.setItem(`${listKey}:density`, next) }
+    catch { setLoadedKey(undefined) /* Keep the in-memory choice. */ }
+  }
+  return [density, updateDensity] as const
 }

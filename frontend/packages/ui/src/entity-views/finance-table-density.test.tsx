@@ -14,6 +14,18 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 describe("Finance table density", () => {
+  it("does not write defaults or attempt persistence when storage reads are blocked", () => {
+    const write = vi.spyOn(localStorage, "setItem")
+    const read = vi.spyOn(localStorage, "getItem").mockImplementation(() => { throw new DOMException("Blocked", "SecurityError") })
+    render(table("bills", true))
+    expect(write).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "Compact", exact: true }))
+    expect(screen.getByTestId("entity-table").getAttribute("data-density")).toBe("compact")
+    expect(write).not.toHaveBeenCalled()
+    read.mockRestore()
+    write.mockRestore()
+  })
+
   it("preserves selected records while changing density and restores the local preference", async () => {
     const view = render(table("bills"))
     fireEvent.click(screen.getByTestId("entity-select-row-1"))
