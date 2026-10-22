@@ -543,9 +543,14 @@ impl ReasoningProvider for RoutedReasoningProvider<'_> {
                     self.run_id,
                 )?;
                 let scope = next_call_scope(IntelligenceRole::Reasoning, &self.next_scope)?;
+                // The profile is the model ceiling; the agent remains the
+                // shared budget owner. Build the request with their minimum
+                // before any spend reservation or provider dispatch.
+                let mut effective_profile = profile.clone();
+                effective_profile.max_tokens = binding.agent_max_tokens;
                 let admitted =
                     SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
-                match AgentLoopReasoner::from_profile(&admitted, &profile)
+                match AgentLoopReasoner::from_profile(&admitted, &effective_profile)
                     .reason(request.clone())
                     .await
                 {

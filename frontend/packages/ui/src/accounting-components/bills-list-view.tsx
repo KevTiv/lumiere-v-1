@@ -15,6 +15,7 @@ export interface BillsListViewProps extends AccountingWorklistProps {
   onSelectBill?: (bill: AccountMove) => void
   onCreateBill?: () => void
   onPayBill?: (bill: AccountMove) => void
+  onDownloadBill?: (bill: AccountMove) => void
   onRecalculateTotals?: (bill: AccountMove) => void
   intake?: { lines: readonly BillIntakeLine[]; sourceState: ModuleDataState; renderDocuments?: (bill: AccountMove) => ReactNode }
 }
@@ -24,6 +25,7 @@ export function BillsListView({
   onSelectBill,
   onCreateBill,
   onPayBill,
+  onDownloadBill,
   intake,
   ...props
 }: BillsListViewProps) {
@@ -37,6 +39,7 @@ export function BillsListView({
       onSelect={onSelectBill}
       onCreate={onCreateBill}
       onPay={onPayBill}
+      onDownload={onDownloadBill}
     />
     </div>
   )

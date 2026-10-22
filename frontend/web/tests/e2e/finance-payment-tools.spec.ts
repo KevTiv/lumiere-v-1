@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import { stdbTimestampToDate } from "@lumiere/erp-shared/timestamp-values"
+import { projectPaymentAllocations } from "@lumiere/erp-shared/payment-allocation-projection"
 import { statementImportIdempotencyKey } from "../../lib/statement-import-csv"
 import { callReducerBff, chooseSelectOptionByTriggerValue, fetchAccountIdByCode, fetchDefaultCompanyId, fetchSessionOrganizationId, gotoModule, smokeName } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
@@ -127,8 +128,27 @@ test.describe("Finance payment tools save workflows", { tag: "@dev-fixture" }, (
     expect(await activeRelations()).toHaveLength(0)
     const writes = observeWrites(page, "allocate_payment_transaction")
 
+    // Diagnose incomplete ledger records before waiting on a disabled button.
+    // This uses the same complete source set and fail-closed projection as UI.
+    const [payments, ledgerMoves, moveLines, transactions, reversals] = await Promise.all(
+      ["account-payments", "account-moves", "account-move-lines", "payment-transactions", "payment-reversals"]
+        .map((resource) => queryRows(page, resource)),
+    )
+    const currencyResponse = await page.request.get("/api/bootstrap/currencies")
+    expect(currencyResponse.ok(), "Authorized bootstrap currency read failed").toBe(true)
+    const { data: currencies = [] } = await currencyResponse.json() as { data?: QueryRow[] }
+    const read = (rows: QueryRow[]) => ({ rows, state: { status: "ready" as const } })
+    const balances = projectPaymentAllocations({ organizationId, companyId: wallet.companyId,
+      payments: read(payments), moves: read(ledgerMoves), moveLines: read(moveLines),
+      transactions: read(transactions), reversals: read(reversals), currencies: read(currencies),
+    })
+    expect(balances.state, "Payment ledger sources must support allocation").toEqual({ status: "ready" })
+    expect(balances.rows.find((row) => row.transactionId === String(transactionId))?.remainingMinor).toBe(10_000n)
+
     await gotoModule(page, "/accounting?tab=payment-operations", "accounting")
-    await page.getByTestId(`payment-operation-${transactionId}`).getByRole("button", { name: "Allocate", exact: true }).click()
+    const allocate = page.getByTestId(`payment-operation-${transactionId}`).getByRole("button", { name: "Allocate", exact: true })
+    await expect(allocate).toBeEnabled()
+    await allocate.click()
     const preview = page.getByTestId("payment-allocation-review")
     await expect(preview).toContainText(marker)
     await expect(preview).toContainText("Unsaved allocation")

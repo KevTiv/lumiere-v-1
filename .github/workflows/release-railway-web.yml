@@ -99,6 +99,7 @@ jobs:
 
           test -f "$runtime_root/frontend/web/server.js"
           cp .github/railway/web-standalone.Dockerfile "$dockerfile"
+          cp frontend/web/scripts/doppler-entrypoint.sh "$release_root/frontend/web/doppler-entrypoint.sh"
 
           # The service is configured with rootDirectory=/frontend and
           # dockerfilePath=web/Dockerfile, so preserve that archive layout.

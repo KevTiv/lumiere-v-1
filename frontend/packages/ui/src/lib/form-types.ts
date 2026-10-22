@@ -64,6 +64,20 @@ export interface TextareaField extends BaseField {
   type: "textarea"
   defaultValue?: string
   rows?: number
+  /**
+   * `markdown` (default) edits with the rich text editor. `plain` keeps a bare
+   * textarea for raw HTML, code or ID lists that must not be reformatted.
+   */
+  format?: "markdown" | "plain"
+}
+
+/** Field names whose values are machine-read (IDs, CSV, JSON, HTML, templates). */
+const RAW_TEXT_FIELD_NAME = /(Ids|Json|Csv|Data|Domain|Html|Values|Prompt|Template|Expression|Sql)$/
+
+/** Whether a textarea field should use the bare textarea instead of the rich text editor. */
+export function isPlainTextareaField(field: Pick<TextareaField, "name" | "format">): boolean {
+  if (field.format) return field.format === "plain"
+  return RAW_TEXT_FIELD_NAME.test(field.name)
 }
 
 export interface SelectField extends BaseField {
