@@ -1,6 +1,12 @@
 import type { ReactNode } from "react"
 import type { DashboardSection } from "./dashboard-types"
-import type { EntityDetailConfig, EntitySurfacePermission, EntityViewConfig, BadgeVariant } from "./entity-view-types"
+import type {
+  EntityDetailConfig,
+  EntitySurfacePermission,
+  EntityViewConfig,
+  EntityRow,
+  BadgeVariant,
+} from "./entity-view-types"
 import type { FormConfig } from "./form-types"
 import type { KanbanColumnDef, KanbanMoveHandler } from "./kanban-board-types"
 
@@ -28,6 +34,9 @@ export interface EntityRecordSheetConfig {
   statusBadgeLabels?: Record<string, string>
   /** Overview tab field layout */
   detailConfig: EntityDetailConfig
+  /** Optional contextual review content; the original detail config remains available. */
+  overviewContent?: (record: EntityRow) => ReactNode
+  wide?: boolean
   /** Additional tabs rendered as ReactNode slots */
   customTabs?: EntityRecordSheetTab[]
   /** Optional action buttons rendered in the header area */
@@ -94,7 +103,9 @@ export interface ModuleConfig {
    * listed remain individual workspaces; large sets move into the overflow menu.
    */
   tabGroups?: ModuleTabGroup[]
-  /** Curated job-oriented groups; all modules use the same WorkspaceNav renderer. */
+  /** Show one task area at a time, preserving canonical links to every tab. */
+  tabNavigation?: "areas"
+  /** Curated job-oriented groups for modules using WorkspaceNav. */
   workspaceNav?: ModuleWorkspaceNav
 }
 
@@ -117,9 +128,7 @@ export interface ModuleTabGroup {
   tabIds: readonly string[]
 }
 
-export type ModuleTabRowItem =
-  | { kind: "group"; label: string }
-  | { kind: "tab"; tab: ModuleTab }
+export type ModuleTabRowItem = { kind: "group"; label: string } | { kind: "tab"; tab: ModuleTab }
 
 /** Tab row in display order, with a group label before each group's tabs. */
 export function buildModuleTabRow(
@@ -130,8 +139,12 @@ export function buildModuleTabRow(
   const groupOf = new Map<string, number>()
   groups.forEach((group, index) => group.tabIds.forEach((id) => groupOf.set(id, index)))
   const firstGrouped = tabs.findIndex((tab) => groupOf.has(tab.id))
-  const leading = tabs.filter((tab, index) => !groupOf.has(tab.id) && (firstGrouped < 0 || index < firstGrouped))
-  const trailing = tabs.filter((tab, index) => !groupOf.has(tab.id) && firstGrouped >= 0 && index > firstGrouped)
+  const leading = tabs.filter(
+    (tab, index) => !groupOf.has(tab.id) && (firstGrouped < 0 || index < firstGrouped),
+  )
+  const trailing = tabs.filter(
+    (tab, index) => !groupOf.has(tab.id) && firstGrouped >= 0 && index > firstGrouped,
+  )
   const row: ModuleTabRowItem[] = leading.map((tab) => ({ kind: "tab", tab }))
   groups.forEach((group, index) => {
     const members = tabs.filter((tab) => groupOf.get(tab.id) === index)
@@ -141,4 +154,32 @@ export function buildModuleTabRow(
   })
   trailing.forEach((tab) => row.push({ kind: "tab", tab }))
   return row
+}
+
+export interface ModuleNavigationArea {
+  id: string
+  label: string
+  tabIds: string[]
+}
+
+/** Areas only organize existing tabs. They do not grant access or create destinations. */
+export function buildModuleNavigationAreas(
+  tabs: readonly ModuleTab[],
+  groups: readonly ModuleTabGroup[] | undefined,
+  overviewLabel: string,
+): ModuleNavigationArea[] {
+  const assigned = new Set<string>()
+  const areas: ModuleNavigationArea[] = []
+  for (const group of groups ?? []) {
+    const members = tabs
+      .filter((tab) => group.tabIds.includes(tab.id) && !assigned.has(tab.id))
+      .map((tab) => tab.id)
+    if (!members.length) continue
+    members.forEach((id) => assigned.add(id))
+    areas.push({ id: members[0]!, label: group.label, tabIds: members })
+  }
+  const remaining = tabs.filter((tab) => !assigned.has(tab.id)).map((tab) => tab.id)
+  return remaining.length
+    ? [{ id: remaining[0]!, label: overviewLabel, tabIds: remaining }, ...areas]
+    : areas
 }

@@ -138,16 +138,18 @@ use crate::accounting::intercompany::{
     intercompany_rule, intercompany_transaction, IntercompanyRule, IntercompanyTransaction,
 };
 use crate::accounting::journal_entries::{
-    account_move, account_move_line, AccountMove, AccountMoveLine,
+    account_move, account_move_line, reconcile_payment_with_invoice, AccountMove, AccountMoveLine,
 };
 use crate::accounting::payment_management::{
-    payment_account, payment_fee, payment_reconciliation, payment_transaction, PaymentAccount,
-    PaymentFee, PaymentReconciliation, PaymentTransaction,
+    allocate_payment_transaction, payment_account, payment_fee, payment_transaction,
+    AllocatePaymentParams, PaymentAccount, PaymentFee, PaymentTransaction,
 };
 use crate::accounting::payment_terms::{
     account_payment_term, account_payment_term_line, AccountPaymentTerm, AccountPaymentTermLine,
 };
-use crate::accounting::payments::{account_payment, AccountPayment};
+use crate::accounting::payments::{
+    account_payment, insert_balanced_payment_lines_and_post, AccountPayment,
+};
 use crate::accounting::tax_management::{
     account_tax, account_tax_group, tax_deadline, tax_jurisdiction, tax_schedule, AccountTax,
     AccountTaxGroup, TaxDeadline, TaxJurisdiction, TaxSchedule,
@@ -1091,6 +1093,87 @@ fn ensure_canonical_e2e_seed_rows(
         });
     }
     Ok(())
+}
+
+/// Materialize seed payments through the same balanced posting helper as real
+/// payments. Allocation is performed separately by the real reconciliation
+/// reducers; a Paid fixture must never imply an empty or already-cleared move.
+pub(crate) fn seed_posted_payment(
+    ctx: &ReducerContext,
+    payment: AccountPayment,
+) -> Result<AccountPayment, String> {
+    if payment.state != PaymentState::NotPaid || payment.move_id.is_some() {
+        return Err("seed payment must start as an unposted draft".to_string());
+    }
+    let company_currency_id = ctx
+        .db
+        .company()
+        .id()
+        .find(&payment.company_id)
+        .ok_or("seed payment company not found")?
+        .currency_id;
+    let amount = payment.amount;
+    let move_record = ctx.db.account_move().insert(AccountMove {
+        id: 0,
+        organization_id: payment.organization_id,
+        name: payment.name.clone().ok_or("seed payment needs a name")?,
+        ref_: payment.ref_.clone(),
+        move_type: MoveType::Entry,
+        auto_post: false,
+        state: AccountMoveState::Draft,
+        date: payment.date,
+        invoice_date: None,
+        invoice_date_due: None,
+        invoice_payment_term_id: None,
+        invoice_origin: None,
+        invoice_partner_display_name: None,
+        invoice_cash_rounding_id: None,
+        payment_reference: payment.memo.clone(),
+        partner_shipping_id: None,
+        sale_order_id: None,
+        partner_id: Some(payment.partner_id),
+        commercial_partner_id: Some(payment.partner_id),
+        partner_bank_id: None,
+        fiscal_position_id: None,
+        invoice_user_id: None,
+        invoice_incoterm_id: None,
+        incoterm_location: None,
+        campaign_id: None,
+        source_id: None,
+        medium_id: None,
+        company_id: payment.company_id,
+        journal_id: payment.journal_id,
+        currency_id: payment.currency_id,
+        company_currency_id,
+        amount_untaxed: amount,
+        amount_tax: 0.0,
+        amount_total: amount,
+        amount_residual: 0.0,
+        amount_untaxed_signed: amount,
+        amount_tax_signed: 0.0,
+        amount_total_signed: amount,
+        amount_total_in_currency_signed: amount,
+        amount_residual_signed: 0.0,
+        to_check: false,
+        posted_before: false,
+        is_storno: false,
+        is_move_sent: false,
+        secure_sequence_number: None,
+        invoice_has_outstanding: false,
+        payment_state: PaymentState::Paid,
+        restrict_mode_hash_table: false,
+        create_uid: Some(ctx.sender()),
+        create_date: Some(ctx.timestamp),
+        write_uid: Some(ctx.sender()),
+        write_date: Some(ctx.timestamp),
+        metadata: Some("{\"seed\":true}".to_string()),
+    });
+    let (move_record, _, _) = insert_balanced_payment_lines_and_post(ctx, &payment, move_record)?;
+    Ok(ctx.db.account_payment().id().update(AccountPayment {
+        move_id: Some(move_record.id),
+        state: PaymentState::Paid,
+        ..payment
+    }))
 }
 
 #[spacetimedb::reducer]
@@ -2525,8 +2608,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         amount_by_group: None,
         amount_tax: 0.0,
         amount_total: 3_600.0,
-        amount_paid: 3_600.0,
-        amount_residual: 0.0,
+        amount_paid: 0.0,
+        amount_residual: 3_600.0,
         amount_to_invoice: 0.0,
         margin: 1_200.0,
         note: None,
@@ -3478,19 +3561,19 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         amount_untaxed: 3_600.0,
         amount_tax: 0.0,
         amount_total: 3_600.0,
-        amount_residual: 0.0,
+        amount_residual: 3_600.0,
         amount_untaxed_signed: 3_600.0,
         amount_tax_signed: 0.0,
         amount_total_signed: 3_600.0,
         amount_total_in_currency_signed: 3_600.0,
-        amount_residual_signed: 0.0,
+        amount_residual_signed: 3_600.0,
         to_check: false,
         posted_before: true,
         is_storno: false,
         is_move_sent: true,
         secure_sequence_number: None,
         invoice_has_outstanding: false,
-        payment_state: PaymentState::Paid,
+        payment_state: PaymentState::NotPaid,
         restrict_mode_hash_table: false,
         create_uid: None,
         create_date: None,
@@ -3522,8 +3605,8 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         balance: 3_600.0,
         currency_id: usd_currency_id,
         amount_currency: 3_600.0,
-        amount_residual: 0.0,
-        amount_residual_currency: 0.0,
+        amount_residual: 3_600.0,
+        amount_residual_currency: 3_600.0,
         debit: 3_600.0,
         credit: 0.0,
         debit_currency: 3_600.0,
@@ -4829,28 +4912,47 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
 
     // ── 5.5 Payments ──────────────────────────────────────────────────────────
-    let payment1 = ctx.db.account_payment().insert(AccountPayment {
-        id: 0,
-        organization_id: org_id,
-        company_id: company_id,
-        name: Some("PAY-0001".to_string()),
-        move_id: None,
-        reversal_move_id: None,
-        payment_type: PaymentType::InBound,
-        partner_type: PartnerType::Customer,
-        partner_id: contact_acme.id,
-        amount: 3_600.0,
-        currency_id: usd_currency_id,
-        date: ctx.timestamp,
-        journal_id: journal_sales.id,
-        ref_: Some("INV/2024/00001".to_string()),
-        memo: Some("Payment for laptop invoice".to_string()),
-        reconciled_invoice_ids: vec![invoice1.id],
-        reconciled_bill_ids: vec![],
-        state: PaymentState::Paid,
-        created_at: ctx.timestamp,
-        create_uid: seeder,
-    });
+    let payment1 = seed_posted_payment(
+        ctx,
+        ctx.db.account_payment().insert(AccountPayment {
+            id: 0,
+            organization_id: org_id,
+            company_id: company_id,
+            name: Some("PAY-0001".to_string()),
+            move_id: None,
+            reversal_move_id: None,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: contact_acme.id,
+            amount: 3_600.0,
+            currency_id: usd_currency_id,
+            date: ctx.timestamp,
+            journal_id: journal_bank.id,
+            ref_: Some("INV/2024/00001".to_string()),
+            memo: Some("Payment for laptop invoice".to_string()),
+            reconciled_invoice_ids: vec![invoice1.id],
+            reconciled_bill_ids: vec![],
+            state: PaymentState::NotPaid,
+            created_at: ctx.timestamp,
+            create_uid: seeder,
+        }),
+    )?;
+
+    reconcile_payment_with_invoice(
+        ctx,
+        org_id,
+        payment1.move_id.ok_or("seed payment move not found")?,
+        invoice1.id,
+    )?;
+    let settled_order = ctx
+        .db
+        .sale_order()
+        .id()
+        .find(&so1.id)
+        .ok_or("seed sales order missing")?;
+    if settled_order.amount_paid != so1.amount_total || settled_order.amount_residual != 0.0 {
+        return Err("seed payment must settle the linked sales order exactly once".to_string());
+    }
 
     let _ = ctx.db.account_payment().insert(AccountPayment {
         id: 0,
@@ -4899,28 +5001,31 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true,\"purpose\":\"owner_reports\"}".to_string()),
     });
 
-    let owner_receipt_payment = ctx.db.account_payment().insert(AccountPayment {
-        id: 0,
-        organization_id: org_id,
-        company_id: company_id,
-        name: Some("PAY-OWNER-0001".to_string()),
-        move_id: None,
-        reversal_move_id: None,
-        payment_type: PaymentType::InBound,
-        partner_type: PartnerType::Customer,
-        partner_id: contact_acme.id,
-        amount: 15_000.0,
-        currency_id: usd_currency_id,
-        date: ctx.timestamp,
-        journal_id: journal_bank.id,
-        ref_: Some("SEED-MTN-0001".to_string()),
-        memo: Some("Owner report seeded mobile-money receipt".to_string()),
-        reconciled_invoice_ids: vec![],
-        reconciled_bill_ids: vec![],
-        state: PaymentState::Paid,
-        created_at: ctx.timestamp,
-        create_uid: seeder,
-    });
+    let owner_receipt_payment = seed_posted_payment(
+        ctx,
+        ctx.db.account_payment().insert(AccountPayment {
+            id: 0,
+            organization_id: org_id,
+            company_id: company_id,
+            name: Some("PAY-OWNER-0001".to_string()),
+            move_id: None,
+            reversal_move_id: None,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: contact_acme.id,
+            amount: 15_000.0,
+            currency_id: usd_currency_id,
+            date: ctx.timestamp,
+            journal_id: journal_bank.id,
+            ref_: Some("SEED-MTN-0001".to_string()),
+            memo: Some("Owner report seeded mobile-money receipt".to_string()),
+            reconciled_invoice_ids: vec![],
+            reconciled_bill_ids: vec![],
+            state: PaymentState::NotPaid,
+            created_at: ctx.timestamp,
+            create_uid: seeder,
+        }),
+    )?;
 
     let owner_receipt_txn = ctx.db.payment_transaction().insert(PaymentTransaction {
         id: 0,
@@ -4967,6 +5072,20 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: None,
     });
 
+    let owner_unallocated_payment = seed_posted_payment(
+        ctx,
+        ctx.db.account_payment().insert(AccountPayment {
+            id: 0,
+            name: Some("PAY-OWNER-UNREC".to_string()),
+            move_id: None,
+            amount: 2_500.0,
+            ref_: Some("SEED-UNREC-0001".to_string()),
+            memo: Some("Unallocated owner-report receipt".to_string()),
+            state: PaymentState::NotPaid,
+            ..owner_receipt_payment.clone()
+        }),
+    )?;
+
     let _ = ctx.db.payment_transaction().insert(PaymentTransaction {
         id: 0,
         organization_id: org_id,
@@ -4983,7 +5102,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         currency_id: usd_currency_id,
         occurred_at: ctx.timestamp,
         status: PaymentTransactionStatus::Posted,
-        account_payment_id: None,
+        account_payment_id: Some(owner_unallocated_payment.id),
         source_entity: None,
         source_entity_id: None,
         evidence_document_ids: vec![],
@@ -4995,28 +5114,31 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true,\"purpose\":\"owner_reports_unreconciled\"}".to_string()),
     });
 
-    let owner_partial_payment = ctx.db.account_payment().insert(AccountPayment {
-        id: 0,
-        organization_id: org_id,
-        company_id: company_id,
-        name: Some("PAY-OWNER-0002".to_string()),
-        move_id: None,
-        reversal_move_id: None,
-        payment_type: PaymentType::InBound,
-        partner_type: PartnerType::Customer,
-        partner_id: contact_wayne.id,
-        amount: 5_000.0,
-        currency_id: usd_currency_id,
-        date: ctx.timestamp,
-        journal_id: journal_bank.id,
-        ref_: Some("INV/2026/00010".to_string()),
-        memo: Some("Partial receipt against Wayne invoice".to_string()),
-        reconciled_invoice_ids: vec![invoice_unpaid1.id],
-        reconciled_bill_ids: vec![],
-        state: PaymentState::Paid,
-        created_at: ctx.timestamp,
-        create_uid: seeder,
-    });
+    let owner_partial_payment = seed_posted_payment(
+        ctx,
+        ctx.db.account_payment().insert(AccountPayment {
+            id: 0,
+            organization_id: org_id,
+            company_id: company_id,
+            name: Some("PAY-OWNER-0002".to_string()),
+            move_id: None,
+            reversal_move_id: None,
+            payment_type: PaymentType::InBound,
+            partner_type: PartnerType::Customer,
+            partner_id: contact_wayne.id,
+            amount: 5_000.0,
+            currency_id: usd_currency_id,
+            date: ctx.timestamp,
+            journal_id: journal_bank.id,
+            ref_: Some("INV/2026/00010".to_string()),
+            memo: Some("Partial receipt against Wayne invoice".to_string()),
+            reconciled_invoice_ids: vec![invoice_unpaid1.id],
+            reconciled_bill_ids: vec![],
+            state: PaymentState::NotPaid,
+            created_at: ctx.timestamp,
+            create_uid: seeder,
+        }),
+    )?;
 
     let owner_partial_txn = ctx.db.payment_transaction().insert(PaymentTransaction {
         id: 0,
@@ -5046,40 +5168,21 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         metadata: Some("{\"seed\":true,\"purpose\":\"owner_reports_partial_ar\"}".to_string()),
     });
 
-    let _ = ctx
-        .db
-        .payment_reconciliation()
-        .insert(PaymentReconciliation {
-            id: 0,
-            organization_id: org_id,
-            company_id: company_id,
+    allocate_payment_transaction(
+        ctx,
+        org_id,
+        AllocatePaymentParams {
+            idempotency_key: format!("seed-owner-partial-{}", owner_partial_txn.id),
+            company_id,
             payment_transaction_id: owner_partial_txn.id,
-            account_payment_id: owner_partial_payment.id,
             allocated_move_line_id: invoice_unpaid1_ar_line.id,
             allocated_amount: 5_000.0,
             currency_id: usd_currency_id,
-            residual_before: 13_750.0,
-            residual_after: 8_750.0,
             write_off_amount: 0.0,
             write_off_account_id: None,
-            write_off_move_id: None,
-            is_reversal: false,
-            reversed_reconciliation_id: None,
-            created_at: ctx.timestamp,
-            created_by: seeder,
             metadata: Some("{\"seed\":true,\"purpose\":\"owner_reports_partial_ar\"}".to_string()),
-        });
-
-    ctx.db.account_move().id().update(AccountMove {
-        amount_residual: 8_750.0,
-        amount_residual_signed: 8_750.0,
-        ..invoice_unpaid1
-    });
-    ctx.db.account_move_line().id().update(AccountMoveLine {
-        amount_residual: 8_750.0,
-        amount_residual_currency: 8_750.0,
-        ..invoice_unpaid1_ar_line
-    });
+        },
+    )?;
 
     // ── 5.6 Tax Management ────────────────────────────────────────────────────
     let tax_group_vat = ctx.db.account_tax_group().insert(AccountTaxGroup {

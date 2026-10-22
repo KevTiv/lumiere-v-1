@@ -5,7 +5,7 @@ import type { CreateManualAccountInvoiceParams } from "@lumiere/query-hooks/hook
 import type { CanonicalRecordRef, OperationEffectOutcome } from "@lumiere/query-hooks/hooks/operation-effect"
 import { toCreateManualAccountInvoiceParams } from "@lumiere/erp-shared/accounting-create-params"
 import { useTranslation } from "@lumiere/i18n"
-import { Eye, FilePenLine, Plus, Trash2 } from "lucide-react"
+import { Eye, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { isCustomField } from "../forms/config/types"
 import { useFormConfiguration } from "../forms/hooks/use-form-config"
-import { cn } from "@/lib/utils"
+import { FinanceReviewWorkspace } from "../composed/finance-review-workspace"
 import { formatInvoiceMoney, InvoiceDocument } from "./invoice-document"
 import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
 import { parseInvoiceContent, parseInvoiceNotes, type InvoiceDocumentSnapshot, type InvoicePersonalizationProfile } from "@lumiere/erp-shared/invoice-personalization"
@@ -158,7 +158,6 @@ function ReleasedCreateInvoiceModal({
   const [unknownParams, setUnknownParams] = useState<CreateManualAccountInvoiceParams | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [mobileView, setMobileView] = useState<"edit" | "preview">("edit")
   const [draftCompanyId, setDraftCompanyId] = useState(companyId)
   const [formEdited, setFormEdited] = useState(false)
   const [contentOverrides, setContentOverrides] = useState<Partial<Record<ContentKey, string>>>({})
@@ -300,7 +299,7 @@ function ReleasedCreateInvoiceModal({
   const reset = () => {
     setPartnerId(""); setCounterpartAccountId(""); setJournalId(""); setInvoiceDate(today)
     setDueDate(""); setPaymentTermId(""); setReference(""); setPaymentReference(""); setNotes("")
-    setCustomValues({}); setLineItems([newLine()]); setRequestId(null); setUnknownParams(null); setError(null); setMobileView("edit")
+    setCustomValues({}); setLineItems([newLine()]); setRequestId(null); setUnknownParams(null); setError(null)
     setContentOverrides({}); setFormEdited(false); setDraftCompanyId(companyId); setDocumentDefaults(currentDefaults())
   }
   const resolve = (ref: CanonicalRecordRef) => { reset(); onResolved?.(ref); onClose() }
@@ -337,12 +336,9 @@ function ReleasedCreateInvoiceModal({
   return <Dialog open={open} onOpenChange={(next) => !next && close()}>
     <DialogContent data-testid="create-invoice-modal" className="flex h-[min(94dvh,960px)] max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1480px,calc(100%-3rem))]">
       <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 sm:px-6"><DialogTitle className="text-xl font-semibold tracking-tight">{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle><DialogDescription>Prepare the details and review the document before saving a draft.</DialogDescription></DialogHeader>
-      <div className="flex shrink-0 gap-1 border-b p-2 lg:hidden" role="group" aria-label="Invoice workspace view">
-        <Button type="button" variant={mobileView === "edit" ? "secondary" : "ghost"} aria-pressed={mobileView === "edit"} onClick={() => setMobileView("edit")}><FilePenLine className="mr-2 size-4" />Edit details</Button>
-        <Button type="button" data-testid="create-invoice-preview-toggle" variant={mobileView === "preview" ? "secondary" : "ghost"} aria-pressed={mobileView === "preview"} onClick={() => setMobileView("preview")}><Eye className="mr-2 size-4" />Preview</Button>
-      </div>
-      <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:overflow-hidden">
-      <div className={cn("min-w-0 overflow-y-auto px-5 py-6 sm:px-6 lg:block", mobileView === "preview" && "hidden")}>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+      <FinanceReviewWorkspace previewTabTestId="create-invoice-preview-toggle" editor={
+      <div className="min-w-0">
       {companyMismatch ? <p role="alert" className="mb-4 rounded-md border p-3 text-sm">This draft belongs to company #{String(draftCompanyId)}. Switch back to continue. Your entries and any previous action are preserved.</p> : null}
       {kind === "invoice" ? <ModuleDataNotice state={personalizationState} /> : null}
       {defaultsChanged ? <div role="status" className="mb-4 space-y-2 rounded-md border p-3 text-sm"><p>Company invoice settings changed. Review the latest defaults before saving. Your explicit changes and notes will be kept.</p><Button variant="outline" disabled={locked || saving} onClick={() => setDocumentDefaults(currentDefaults())}>Apply current invoice defaults</Button></div> : null}
@@ -386,7 +382,9 @@ function ReleasedCreateInvoiceModal({
         </section>
       </fieldset>
       </div>
-      <aside className={cn("min-w-0 overflow-y-auto bg-muted/40 p-4 sm:p-6 lg:block lg:border-l", mobileView === "edit" && "hidden")}><div className="mb-4 flex items-center gap-2 text-sm font-medium"><Eye className="size-4 text-muted-foreground" />Live preview</div><InvoiceDocument title={kind === "bill" ? "Vendor bill" : "Invoice"} reference={reference} partnerLabel={kind === "bill" ? "Vendor" : "Bill to"} partner={partnerOptions.find((option) => option.value === partnerId)?.label} date={invoiceDate} dueDate={dueDate} currency={currency} lines={lineItems} subtotal={subtotal} tax={totalTax} total={subtotal + totalTax} personalization={kind === "invoice" ? previewPersonalization : undefined} notes={notes} draft /></aside>
+      } preview={
+      <div className="min-w-0 rounded-xl bg-muted/40 p-4 sm:p-6"><div className="mb-4 flex items-center gap-2 text-sm font-medium"><Eye className="size-4 text-muted-foreground" />Live preview</div><InvoiceDocument title={kind === "bill" ? "Vendor bill" : "Invoice"} reference={reference} partnerLabel={kind === "bill" ? "Vendor" : "Bill to"} partner={partnerOptions.find((option) => option.value === partnerId)?.label} date={invoiceDate} dueDate={dueDate} currency={currency} lines={lineItems} subtotal={subtotal} tax={totalTax} total={subtotal + totalTax} personalization={kind === "invoice" ? previewPersonalization : undefined} notes={notes} draft /></div>
+      } />
       </div>
       {error ? <p role="alert" className="shrink-0 border-t bg-destructive/5 px-5 py-3 text-sm text-destructive">{error}</p> : null}
       <DialogFooter className="m-0 shrink-0 flex-row flex-wrap items-center justify-between gap-3 rounded-none bg-background px-5 sm:justify-between sm:px-6"><div className="mr-auto min-w-0 text-sm"><span className="text-muted-foreground">Total</span><p className="font-semibold tabular-nums [overflow-wrap:anywhere]">{money(subtotal + totalTax)}</p></div>{dirty && !locked ? <Button variant="ghost" onClick={() => void discard()} disabled={saving}>Discard draft</Button> : null}<Button variant="outline" onClick={close} disabled={saving}>{locked ? "Close and keep draft" : t("common.cancel")}</Button>{locked

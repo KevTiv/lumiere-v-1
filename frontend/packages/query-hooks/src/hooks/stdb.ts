@@ -185,6 +185,16 @@ export function invalidateStdbQueryResources(
  */
 type NamedReducerKey = Extract<StdbBffReducerKey, keyof OperationInputMap>
 
+
+/** Execute one generated named operation through the authenticated BFF transport. */
+export async function callStdbOperation<K extends NamedReducerKey>(
+  reducerName: K,
+  input: StdbBffCommandInput<K>,
+): Promise<Response> {
+  const { urlPath, init } = stdbBffCommandPost(reducerName, input)
+  return apiFetch(urlPath, init)
+}
+
 export function useStdbCallMutation<K extends NamedReducerKey>(
   reducerName: K,
   organizationId: bigint | number,
@@ -197,8 +207,7 @@ export function useStdbCallMutation<K extends NamedReducerKey>(
       : stdbInvalidationFor(reducerName)
   return useMutation<void, Error, StdbBffCommandInput<K>>({
     mutationFn: async (input) => {
-      const { urlPath, init } = stdbBffCommandPost(reducerName, input)
-      const r = await apiFetch(urlPath, init)
+      const r = await callStdbOperation(reducerName, input)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? `Reducer ${reducerName} failed`)
@@ -222,8 +231,7 @@ export function useStdbCallMutation<K extends NamedReducerKey>(
 export function useStdbReducer<K extends NamedReducerKey>(reducerName: K) {
   return useMutation<void, Error, StdbBffCommandInput<K>>({
     mutationFn: async (input) => {
-      const { urlPath, init } = stdbBffCommandPost(reducerName, input)
-      const r = await apiFetch(urlPath, init)
+      const r = await callStdbOperation(reducerName, input)
       if (!r.ok) {
         const json = await r.json().catch(() => ({})) as Record<string, unknown>
         throw new Error((json.error as string | undefined) ?? `Reducer ${reducerName} failed`)

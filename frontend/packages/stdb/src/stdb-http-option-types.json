@@ -610,11 +610,21 @@
   "AiProviderAttempt": {
     "failure_reason": "string",
     "resolution": "string",
+    "recovery_actor": "string",
+    "recovery_approval_id": "string",
+    "recovery_at": "timestamp",
+    "reconciliation_actor": "string",
+    "reconciliation_approval_id": "string",
     "dispatched_at": "timestamp",
     "finished_at": "timestamp"
   },
   "AiProviderAttemptRead": {
-    "failure_reason": "string"
+    "failure_reason": "string",
+    "resolution": "string",
+    "recovery_actor": "string",
+    "recovery_approval_id": "string",
+    "reconciliation_actor": "string",
+    "reconciliation_approval_id": "string"
   },
   "AiReducerAllowlist": {
     "metadata": "string"
@@ -5003,7 +5013,8 @@
     "group_id": "u64",
     "last_run": "timestamp",
     "next_run": "timestamp",
-    "metadata": "string"
+    "metadata": "string",
+    "scheduled_run_job_id": "u64"
   },
   "ReportTemplate": {
     "description": "string",

@@ -2108,6 +2108,8 @@ function SalesClientLoaded({
               customContent: (
                 <InvoiceListView
                   invoices={salesInvoices}
+                  onSelectInvoice={(inv) => router.push(`/accounting/invoices/${encodeURIComponent(String(inv.id))}`)}
+                  onCreateInvoice={() => router.push(buildModuleTabHref('accounting', 'invoices'))}
                   worklistScope={{ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }}
                   sourceState={mergeModuleStates([moduleQueryState(accountMovesQuery), moduleQueryState(currenciesQuery)])}
                   currencyOptions={invoiceCurrencyOptions}
@@ -2262,6 +2264,7 @@ function SalesClientLoaded({
       linesForSelectedReturn,
       returnOrderFormConfig,
       salesInvoices,
+      router,
       invoiceCurrencyOptions,
       accountMovesQuery,
       currenciesQuery,

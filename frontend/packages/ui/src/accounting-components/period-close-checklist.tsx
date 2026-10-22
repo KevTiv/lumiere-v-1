@@ -17,6 +17,8 @@ import {
 } from "lucide-react"
 import { useTranslation } from "@lumiere/i18n"
 import { accountPeriodStateTag } from "@lumiere/erp-shared/accounting-create-params"
+import { accountMoveHref } from "@lumiere/erp-shared/record-links"
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { kpiDate } from "@/lib/kpi-tiles"
 import { stbEnumTag } from "../lib/accounting-move-utils"
 import { mergeModuleStates, type ModuleDataState } from "../lib/module-data-state"
@@ -24,12 +26,15 @@ import { ModuleDataNotice } from "../pages/module-data-notice"
 import { periodReportHref } from "../lib/period-report-context"
 import { stbTimestampMicros, stbTimestampToExactIso } from "@lumiere/erp-shared/stb-timestamp"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/select"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/select"
 
 type StepStatus = "done" | "pending" | "blocked"
 
@@ -47,6 +52,16 @@ type CloseStep = {
 type ScopedCount = {
   available: boolean
   count: number
+  unknownCount: number
+  records: CloseReviewRecord[]
+}
+
+type CloseReviewRecord = {
+  id: string
+  label: string
+  date: string
+  amount?: string
+  statementId?: string
 }
 
 type PeriodCloseLookupRow = {
@@ -65,14 +80,13 @@ type PeriodCloseLookupRow = {
 }
 
 function rowCompanyId(row: PeriodCloseLookupRow): string | null {
-  const raw = row.companyId ?? row.company_id
-  return raw == null || raw === "" ? null : String(raw)
+  return parseStrictU64(row.companyId ?? row.company_id)?.toString() ?? null
 }
 
 function rowId(row: PeriodCloseLookupRow, ...keys: (keyof PeriodCloseLookupRow)[]): string | null {
   for (const key of keys) {
-    const raw = row[key]
-    if (raw != null && raw !== "") return String(raw)
+    const id = parseStrictU64(row[key])
+    if (id != null) return id.toString()
   }
   return null
 }
@@ -88,8 +102,18 @@ function rowDate(row: PeriodCloseLookupRow, ...keys: (keyof PeriodCloseLookupRow
   return null
 }
 
-function rowIsReconciled(row: PeriodCloseLookupRow): boolean {
-  return row.isReconciled === true || row.is_reconciled === true
+function rowIsReconciled(row: PeriodCloseLookupRow): boolean | null {
+  const value = row.isReconciled ?? row.is_reconciled
+  return typeof value === "boolean" ? value : null
+}
+
+function rowIdentityCounts(rows: readonly PeriodCloseLookupRow[]): Map<string, number> {
+  const counts = new Map<string, number>()
+  for (const row of rows) {
+    const id = parseStrictU64(row.id)?.toString()
+    if (id) counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  return counts
 }
 
 function isInPeriod(date: Date, dateFrom: Date, dateTo: Date): boolean {
@@ -107,8 +131,11 @@ function reportCoversPeriod(
   return reportFrom === dateFrom && reportTo === dateTo
 }
 
-function moveStateIsDraft(state: unknown): boolean {
-  return stbEnumTag(state).toLowerCase() === "draft"
+function moveStateIsDraft(state: unknown): boolean | null {
+  const tag = stbEnumTag(state).toLowerCase()
+  if (tag === "draft") return true
+  if (["posted", "cancelled", "cancel"].includes(tag)) return false
+  return null
 }
 
 function reportTypeIsVat(row: Record<string, unknown>): boolean {
@@ -150,6 +177,7 @@ function statusBadge(status: StepStatus, t: (key: string) => string) {
 export interface PeriodCloseChecklistProps {
   organizationId?: bigint
   companyId: bigint
+  companyLabel?: string
   fiscalYears: Record<string, unknown>[]
   accountPeriods: Record<string, unknown>[]
   moves: Record<string, unknown>[]
@@ -160,11 +188,16 @@ export interface PeriodCloseChecklistProps {
   /** Only explicitly applicable report policies may block closing. VAT is not universal. */
   requiredReports?: readonly ("trial-balance" | "vat-report")[]
   onNavigateToTab: (tabId: string) => void
+  dataState?: ModuleDataState
+  onClosePeriod?: (periodId: bigint) => Promise<unknown>
+  closePending?: boolean
+  onInspectBankLine?: (statementId: string, lineId: string) => void
 }
 
 export function PeriodCloseChecklist({
   organizationId,
   companyId,
+  companyLabel,
   fiscalYears,
   accountPeriods,
   moves,
@@ -174,11 +207,24 @@ export function PeriodCloseChecklist({
   sourceStates,
   requiredReports = [],
   onNavigateToTab,
+  dataState = { status: "ready" },
+  onClosePeriod,
+  closePending = false,
+  onInspectBankLine,
 }: PeriodCloseChecklistProps) {
   const { t } = useTranslation()
   const [targetPeriodId, setTargetPeriodId] = useState("")
+  const [reviewPeriodId, setReviewPeriodId] = useState<string | null>(null)
+  const [closing, setClosing] = useState(false)
+  const [closeError, setCloseError] = useState<string | null>(null)
+
   const [selectionCompany, setSelectionCompany] = useState(companyId)
-  useEffect(() => { setTargetPeriodId(""); setSelectionCompany(companyId) }, [companyId])
+  useEffect(() => {
+    setTargetPeriodId("")
+    setSelectionCompany(companyId)
+    setReviewPeriodId(null)
+    setCloseError(null)
+  }, [companyId])
   const stateFor = (...keys: PeriodCloseSource[]) => mergeModuleStates(keys.map((key) => sourceStates?.[key] ?? { status: "ready" }))
   const fiscalSource = stateFor("fiscalYears", "accountPeriods")
   const movesSource = stateFor("moves")
@@ -188,7 +234,7 @@ export function PeriodCloseChecklist({
   const companyFiscalYears = useMemo(
     () =>
       fiscalSource.status !== "ready" ? [] : fiscalYears.filter(
-        (fy) => String(fy.companyId ?? fy.company_id ?? "") === String(companyId),
+        (fy) => rowCompanyId(fy) === String(companyId),
       ),
     [fiscalYears, companyId, fiscalSource.status],
   )
@@ -196,12 +242,13 @@ export function PeriodCloseChecklist({
   const companyPeriods = useMemo(
     () =>
       fiscalSource.status !== "ready" ? [] : accountPeriods.filter(
-        (p) => String(p.companyId ?? p.company_id ?? "") === String(companyId),
+        (p) => rowCompanyId(p) === String(companyId),
       ),
     [accountPeriods, companyId, fiscalSource.status],
   )
 
-  const fiscalConfigured = companyFiscalYears.length > 0 && companyPeriods.length > 0
+  const fiscalConfigured =
+    dataState.status === "ready" && companyFiscalYears.length > 0 && companyPeriods.length > 0
 
   const targetPeriod = useMemo(
     () => {
@@ -222,33 +269,49 @@ export function PeriodCloseChecklist({
   }, [targetPeriod])
 
   const draftMoves = useMemo<ScopedCount>(() => {
-    if (!targetRange || movesSource.status !== "ready") return { available: false, count: 0 }
+    if (!targetRange || dataState.status !== "ready" || movesSource.status !== "ready")
+      return { available: false, count: 0, unknownCount: 0, records: [] }
     let available = true
     let count = 0
+    let unknownCount = 0
+    const records: CloseReviewRecord[] = []
+    const identities = rowIdentityCounts(moves)
     for (const move of moves) {
+      const isDraft = moveStateIsDraft(move.state)
+      if (isDraft === false) continue
       const moveCompanyId = rowCompanyId(move)
+      if (moveCompanyId != null && moveCompanyId !== String(companyId)) continue
+      const date = rowDate(move, "date")
+      if (date && !isInPeriod(date, targetRange.dateFrom, targetRange.dateTo)) continue
       if (moveCompanyId == null) {
         available = false
+        unknownCount += 1
         continue
       }
-      if (moveCompanyId !== String(companyId)) continue
-      const date = rowDate(move, "date")
       if (!date) {
         available = false
+        unknownCount += 1
         continue
       }
-      if (isInPeriod(date, targetRange.dateFrom, targetRange.dateTo) && !["draft", "posted", "cancelled", "cancel"].includes(stbEnumTag(move.state).toLowerCase())) {
+      const id = parseStrictU64(move.id)?.toString()
+      if (!id || identities.get(id) !== 1 || isDraft == null) {
         available = false
+        unknownCount += 1
+        continue
       }
-      if (isInPeriod(date, targetRange.dateFrom, targetRange.dateTo) && moveStateIsDraft(move.state)) {
-        count += 1
-      }
+      count += 1
+      records.push({
+        id,
+        label: String(move.name ?? move.ref ?? id),
+        date: date.toISOString().slice(0, 10),
+      })
     }
-    return { available, count }
-  }, [moves, companyId, targetRange, movesSource.status])
+    return { available, count, unknownCount, records }
+  }, [moves, companyId, targetRange, dataState.status, movesSource.status])
 
   const bankLines = useMemo<ScopedCount>(() => {
-    if (!targetRange || bankSource.status !== "ready") return { available: false, count: 0 }
+    if (!targetRange || dataState.status !== "ready" || bankSource.status !== "ready")
+      return { available: false, count: 0, unknownCount: 0, records: [] }
     const statementsById = new Map<string, PeriodCloseLookupRow[]>()
     for (const statement of bankStatements) {
       const statementId = rowId(statement, "id")
@@ -260,39 +323,67 @@ export function PeriodCloseChecklist({
 
     let available = true
     let count = 0
+    let unknownCount = 0
+    const records: CloseReviewRecord[] = []
+    const identities = rowIdentityCounts(bankStatementLines)
     for (const line of bankStatementLines) {
+      const reconciled = rowIsReconciled(line)
+      if (reconciled === true) continue
+      const date = rowDate(line, "date")
+      if (date && !isInPeriod(date, targetRange.dateFrom, targetRange.dateTo)) continue
       const statementId = rowId(line, "statementId", "statement_id")
       const matchingStatements = statementId == null ? [] : (statementsById.get(statementId) ?? [])
       if (matchingStatements.length !== 1) {
         available = false
+        unknownCount += 1
         continue
       }
       const statementCompanyId = rowCompanyId(matchingStatements[0])
       if (statementCompanyId == null) {
         available = false
+        unknownCount += 1
         continue
       }
       if (statementCompanyId !== String(companyId)) continue
-      const date = rowDate(line, "date")
       if (!date) {
         available = false
+        unknownCount += 1
         continue
       }
-      if (isInPeriod(date, targetRange.dateFrom, targetRange.dateTo) && !rowIsReconciled(line)) {
-        count += 1
+      const id = parseStrictU64(line.id)?.toString()
+      const parentId = parseStrictU64(statementId)?.toString()
+      const lineCompanyId = rowCompanyId(line)
+      if (
+        !id ||
+        !parentId ||
+        identities.get(id) !== 1 ||
+        reconciled == null ||
+        (lineCompanyId != null && lineCompanyId !== statementCompanyId)
+      ) {
+        available = false
+        unknownCount += 1
+        continue
       }
+      count += 1
+      records.push({
+        id,
+        statementId: parentId,
+        label: String(line.name ?? line.paymentRef ?? line.payment_ref ?? id),
+        date: date.toISOString().slice(0, 10),
+        amount: line.amount == null ? "—" : String(line.amount),
+      })
     }
-    return { available, count }
-  }, [bankStatements, bankStatementLines, companyId, targetRange, bankSource.status])
+    return { available, count, unknownCount, records }
+  }, [bankStatements, bankStatementLines, companyId, targetRange, dataState.status, bankSource.status])
 
   const periodReports = useMemo(() => {
-    if (!targetRange || reportsSource.status !== "ready") return []
+    if (!targetRange || dataState.status !== "ready" || reportsSource.status !== "ready") return []
     return financialReports.filter(
       (report) =>
         rowCompanyId(report) === String(companyId) &&
         reportCoversPeriod(report, targetRange.fromMicros, targetRange.toMicros),
     )
-  }, [financialReports, companyId, targetRange, reportsSource.status])
+  }, [financialReports, companyId, targetRange, reportsSource.status, dataState.status])
 
   const vatReady = useMemo(() => {
     return periodReports.some((r) => {
@@ -338,17 +429,17 @@ export function PeriodCloseChecklist({
         ? "done"
         : "pending"
     const closeStatus: StepStatus =
-      !fiscalConfigured || !hasTargetPeriod || !draftMoves.available || !bankLines.available
-      ? "blocked"
-      : draftMoves.count > 0 || bankLines.count > 0 ||
-        (requiredReports.includes("trial-balance") && !trialBalanceReady) ||
-        (requiredReports.includes("vat-report") && !vatReady)
+      !fiscalConfigured || !hasTargetPeriod
         ? "blocked"
         : targetPeriodState === "Closed"
           ? "done"
-          : targetPeriodState === "Open"
-            ? "pending"
-            : "blocked"
+          : !draftMoves.available || !bankLines.available || draftMoves.count > 0 || bankLines.count > 0 ||
+              (requiredReports.includes("trial-balance") && !trialBalanceReady) ||
+              (requiredReports.includes("vat-report") && !vatReady)
+            ? "blocked"
+            : targetPeriodState === "Open"
+              ? "pending"
+              : "blocked"
 
     return [
       {
@@ -364,7 +455,9 @@ export function PeriodCloseChecklist({
         id: "bank-recon",
         title: t("accounting.periodClose.steps.bankRecon.title"),
         description: bankLines.available
-          ? t("accounting.periodClose.steps.bankRecon.description", { count: bankLines.count })
+          ? t("accounting.periodClose.steps.bankRecon.description", {
+              count: bankLines.count,
+            })
           : t("accounting.periodClose.steps.bankRecon.scopeUnavailable", {
               defaultValue: "Bank statement ownership cannot be resolved for this period.",
             }),
@@ -377,7 +470,9 @@ export function PeriodCloseChecklist({
         id: "draft-moves",
         title: t("accounting.periodClose.steps.draftMoves.title"),
         description: draftMoves.available
-          ? t("accounting.periodClose.steps.draftMoves.description", { count: draftMoves.count })
+          ? t("accounting.periodClose.steps.draftMoves.description", {
+              count: draftMoves.count,
+            })
           : t("accounting.periodClose.steps.draftMoves.scopeUnavailable", {
               defaultValue: "Journal entry company or period ownership is unavailable.",
             }),
@@ -440,6 +535,92 @@ export function PeriodCloseChecklist({
   ])
 
   const doneCount = steps.filter((s) => s.status === "done").length
+  const periodName = String(targetPeriod?.name ?? targetPeriod?.code ?? targetPeriodId)
+  const periodDates = targetRange
+    ? `${targetRange.dateFrom.toISOString().slice(0, 10)} – ${targetRange.dateTo.toISOString().slice(0, 10)} (UTC)`
+    : "—"
+  const canClose =
+    targetPeriodState === "Open" &&
+    steps.find((step) => step.id === "close-period")?.status === "pending" &&
+    targetRange != null &&
+    dataState.status === "ready" &&
+    parseStrictU64(targetPeriod?.id) != null &&
+    onClosePeriod != null
+  const closeSelectedPeriod = async () => {
+    const periodId = parseStrictU64(targetPeriod?.id)
+    if (
+      !canClose ||
+      periodId == null ||
+      !onClosePeriod ||
+      closing ||
+      closePending ||
+      reviewPeriodId !== targetPeriodId
+    )
+      return
+    setClosing(true)
+    setCloseError(null)
+    try {
+      await onClosePeriod(periodId)
+      setReviewPeriodId(null)
+    } catch (cause) {
+      setCloseError(
+        cause instanceof Error
+          ? cause.message
+          : t("accounting.periodClose.review.failed", {
+              defaultValue:
+                "The close result could not be confirmed. Refresh the period before you try again.",
+            }),
+      )
+    } finally {
+      setClosing(false)
+    }
+  }
+  const reviewSummary = (
+    <dl
+      className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2"
+      data-testid="period-close-summary"
+    >
+      <div>
+        <dt className="text-muted-foreground">
+          {t("accounting.periodClose.review.company", { defaultValue: "Company" })}
+        </dt>
+        <dd>{companyLabel || String(companyId)}</dd>
+      </div>
+      <div>
+        <dt className="text-muted-foreground">
+          {t("accounting.periodClose.review.period", {
+            defaultValue: "Selected period",
+          })}
+        </dt>
+        <dd className="font-medium">{periodName}</dd>
+        <dd>{periodDates}</dd>
+      </div>
+      <div>
+        <dt className="text-muted-foreground">
+          {t("accounting.periodClose.review.state", {
+            defaultValue: "Saved period state",
+          })}
+        </dt>
+        <dd>{targetPeriodState || "—"}</dd>
+      </div>
+      <div>
+        <dt className="text-muted-foreground">
+          {t("accounting.periodClose.review.drafts", {
+            defaultValue: "Confirmed draft journal entries",
+          })}
+        </dt>
+        <dd>{dataState.status === "ready" && movesSource.status === "ready" ? draftMoves.count : "—"}</dd>
+      </div>
+      <div>
+        <dt className="text-muted-foreground">
+          {t("accounting.periodClose.review.bankLines", {
+            defaultValue: "Confirmed unreconciled bank lines",
+          })}
+        </dt>
+        <dd>{dataState.status === "ready" && bankSource.status === "ready" ? bankLines.count : "—"}</dd>
+      </div>
+    </dl>
+  )
 
   return (
     <div className="space-y-6 p-1" data-testid="period-close-checklist">
@@ -447,20 +628,35 @@ export function PeriodCloseChecklist({
         <h2 className="text-lg font-semibold">{t("accounting.periodClose.title")}</h2>
         <p className="text-sm text-muted-foreground">{t("accounting.periodClose.description")}</p>
         <p className="text-sm text-muted-foreground mt-1">
-          {t("accounting.periodClose.progress", { done: doneCount, total: steps.length })}
+          {t("accounting.periodClose.progress", {
+            done: doneCount,
+            total: steps.length,
+          })}
         </p>
         <label className="mt-4 block max-w-sm text-sm font-medium" htmlFor="period-close-target">
-          {t("accounting.periodClose.targetPeriod.label", { defaultValue: "Accounting period" })}
+          {t("accounting.periodClose.targetPeriod.label", {
+            defaultValue: "Accounting period",
+          })}
         </label>
         <Select
           value={selectionCompany === companyId ? targetPeriodId : ""}
           disabled={fiscalSource.status !== "ready"}
-          onValueChange={setTargetPeriodId}
+          onValueChange={(value) => {
+            setTargetPeriodId(value)
+            setReviewPeriodId(null)
+            setCloseError(null)
+          }}
         >
-          <SelectTrigger id="period-close-target" data-testid="period-close-target" className="mt-1 w-full max-w-sm">
-            <SelectValue placeholder={t("accounting.periodClose.targetPeriod.placeholder", {
-              defaultValue: "Select a period to evaluate",
-            })} />
+          <SelectTrigger
+            id="period-close-target"
+            data-testid="period-close-target"
+            className="w-full max-w-sm"
+          >
+            <SelectValue
+              placeholder={t("accounting.periodClose.targetPeriod.placeholder", {
+                defaultValue: "Select a period to evaluate",
+              })}
+            />
           </SelectTrigger>
           <SelectContent>
             {companyPeriods.map((period) => (
@@ -473,9 +669,54 @@ export function PeriodCloseChecklist({
         {targetRange ? <p className="mt-2 text-sm text-muted-foreground" data-testid="period-close-range">{t("accounting.periodClose.exactPeriod", { defaultValue: "Reviewing company {{company}} · {{from}} to {{to}}. Report evidence must cover these exact dates.", company: String(companyId), from: targetRange.dateFrom.toISOString().slice(0, 10), to: targetRange.dateTo.toISOString().slice(0, 10) })}</p> : null}
       </div>
 
+      {targetPeriod && targetRange ? (
+        <Card data-testid="period-close-review">
+          <CardHeader>
+            <CardTitle>
+              {t("accounting.periodClose.review.title", {
+                defaultValue: "Review this period",
+              })}
+            </CardTitle>
+            <CardDescription>
+              {t("accounting.periodClose.review.advisory", {
+                defaultValue:
+                  "This checklist is a review aid. The server validates the close action; it does not post drafts or reconcile bank lines for you.",
+              })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {reviewSummary}
+            {dataState.status !== "ready" ? (
+              <p role="alert">
+                {t("accounting.periodClose.review.dataUnavailable", {
+                  defaultValue:
+                    "Period review data is incomplete or unavailable. Counts and close readiness cannot be confirmed.",
+                })}
+              </p>
+            ) : null}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCloseError(null)
+                setReviewPeriodId(targetPeriodId)
+              }}
+              disabled={closing || closePending}
+            >
+              {t("accounting.periodClose.review.open", {
+                defaultValue: "Review close consequences",
+              })}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-4">
         {steps.map((step) => (
-          <Card key={step.id} data-testid={`period-close-step-${step.id}`} data-status={step.status}>
+          <Card
+            key={step.id}
+            data-testid={`period-close-step-${step.id}`}
+            data-status={step.status}
+          >
             <CardHeader className="pb-2">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="flex items-center gap-3">
@@ -491,10 +732,7 @@ export function PeriodCloseChecklist({
             <CardContent className="pt-0">
               {step.sourceState && step.sourceState.status !== "ready" ? <div className="mb-3">{step.sourceState.status === "loading" ? <p role="status" className="text-sm text-muted-foreground">{t("accounting.periodClose.sourceLoading", { defaultValue: "Loading the source records needed for this check." })}</p> : <ModuleDataNotice state={step.sourceState} />}</div> : null}
               {step.href ? (
-                <a
-                  href={step.href}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
+                <a href={step.href} className={buttonVariants({ variant: "outline", size: "sm" })}>
                   {t("accounting.periodClose.goToStep")}
                   <ExternalLink className="ml-2 h-4 w-4" />
                 </a>
@@ -508,10 +746,169 @@ export function PeriodCloseChecklist({
                   {t("accounting.periodClose.goToStep")}
                 </Button>
               ) : null}
+              {(step.id === "draft-moves" || step.id === "bank-recon") && targetRange
+                ? (() => {
+                    const inspection = step.id === "draft-moves" ? draftMoves : bankLines
+                    return (
+                      <div
+                        className="mt-4 space-y-2"
+                        data-testid={`period-close-records-${step.id}`}
+                      >
+                        {inspection.unknownCount > 0 ? (
+                          <p role="alert" className="text-sm">
+                            {t("accounting.periodClose.review.unverified", {
+                              defaultValue:
+                                "Unverified records: {{count}}. Their scope, identity, or saved state cannot be verified. They are not counted as selected-period records.",
+                              count: inspection.unknownCount,
+                            })}
+                          </p>
+                        ) : null}
+                        {inspection.records.length ? (
+                          <Table aria-label={step.title}>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>
+                                  {t("accounting.periodClose.review.record", {
+                                    defaultValue: "Exact record",
+                                  })}
+                                </TableHead>
+                                <TableHead>
+                                  {t("accounting.periodClose.review.date", {
+                                    defaultValue: "Date (UTC)",
+                                  })}
+                                </TableHead>
+                                {step.id === "bank-recon" ? (
+                                  <TableHead>
+                                    {t("accounting.periodClose.review.amount", {
+                                      defaultValue: "Saved amount",
+                                    })}
+                                  </TableHead>
+                                ) : null}
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {inspection.records.map((record) => (
+                                <TableRow key={record.id} data-record-id={record.id}>
+                                  <TableCell>
+                                    {record.statementId ? (
+                                      onInspectBankLine ? (
+                                        <Button
+                                          variant="link"
+                                          size="sm"
+                                          onClick={() =>
+                                            onInspectBankLine(record.statementId!, record.id)
+                                          }
+                                        >
+                                          {record.label} · #{record.id}
+                                        </Button>
+                                      ) : (
+                                        <span>
+                                          {record.label} · #{record.id}{" "}
+                                          <span className="text-muted-foreground">
+                                            (
+                                            {t("accounting.periodClose.review.statement", {
+                                              defaultValue: "Statement",
+                                            })}{" "}
+                                            #{record.statementId})
+                                          </span>
+                                        </span>
+                                      )
+                                    ) : (
+                                      <a
+                                        className="underline underline-offset-4"
+                                        href={accountMoveHref(record.id)}
+                                      >
+                                        {record.label} · #{record.id}
+                                      </a>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="whitespace-nowrap">{record.date}</TableCell>
+                                  {record.statementId ? (
+                                    <TableCell className="tabular-nums">{record.amount}</TableCell>
+                                  ) : null}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        ) : null}
+                      </div>
+                    )
+                  })()
+                : null}
             </CardContent>
           </Card>
         ))}
       </div>
+      <Dialog
+        open={reviewPeriodId != null && reviewPeriodId === targetPeriodId}
+        onOpenChange={(open) => {
+          if (!open && !closing && !closePending) setReviewPeriodId(null)
+        }}
+      >
+        <DialogContent
+          className="max-h-[85dvh] overflow-y-auto sm:max-w-xl"
+          showCloseButton={!closing && !closePending}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {t("accounting.periodClose.review.title", {
+                defaultValue: "Review this period",
+              })}
+            </DialogTitle>
+            <DialogDescription>
+              {t("accounting.periodClose.review.consequence", {
+                defaultValue:
+                  "Closing this period prevents new journal posting for dates in its range. It does not post drafts, reconcile bank lines, or generate reports.",
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          {reviewSummary}
+          {draftMoves.count > 0 || bankLines.count > 0 ? (
+            <p role="alert">
+              {t("accounting.periodClose.review.outstanding", {
+                defaultValue:
+                  "This period has outstanding records listed in the checklist. Review them before you close.",
+              })}
+            </p>
+          ) : null}
+          {!draftMoves.available || !bankLines.available ? (
+            <p role="alert">
+              {t("accounting.periodClose.review.unknown", {
+                defaultValue:
+                  "Some record scope or source data cannot be verified. The checklist cannot confirm that this period is ready to close.",
+              })}
+            </p>
+          ) : null}
+          {closeError ? (
+            <p role="alert" className="text-destructive">
+              {closeError}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={closing || closePending}
+              onClick={() => setReviewPeriodId(null)}
+            >
+              {t("accounting.periodClose.review.cancel", {
+                defaultValue: "Return to checklist",
+              })}
+            </Button>
+            {onClosePeriod ? (
+              <Button
+                disabled={!canClose || closing || closePending}
+                onClick={() => {
+                  void closeSelectedPeriod()
+                }}
+              >
+                {t("accounting.periodClose.review.close", {
+                  defaultValue: "Close selected period",
+                })}
+              </Button>
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

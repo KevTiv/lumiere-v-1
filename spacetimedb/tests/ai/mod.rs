@@ -5,6 +5,7 @@ pub mod decision_events_test;
 pub mod embedding_isolation_test;
 pub mod evidence_provenance_test;
 pub mod relational_integrity_test;
+pub mod spend_recovery_test;
 pub mod workflow_provenance_test;
 
 use spacetimedb::ReducerContext;
@@ -74,6 +75,15 @@ pub fn run_ai_intelligence_events_tests(ctx: &ReducerContext) -> Result<(), Stri
         .map_err(|e| format!("intelligence_event_status_fields_are_independent: {e}"))?;
     decision_events_test::test_intelligence_event_org_scope_enforced(ctx)
         .map_err(|e| format!("intelligence_event_org_scope_enforced: {e}"))?;
+    Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_ai_spend_recovery_tests(ctx: &ReducerContext) -> Result<(), String> {
+    spend_recovery_test::test_abandon_persists_and_releases_atomically(ctx)
+        .map_err(|e| format!("spend_recovery_atomic_release: {e}"))?;
+    spend_recovery_test::test_recovery_requires_reconcile_permission(ctx)
+        .map_err(|e| format!("spend_recovery_permission: {e}"))?;
     Ok(())
 }
 
@@ -190,6 +200,7 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_embedding_org_isolation_test(ctx)?;
     run_ai_capability_grants_tests(ctx)?;
     run_ai_intelligence_events_tests(ctx)?;
+    run_ai_spend_recovery_tests(ctx)?;
     run_ai_evidence_provenance_tests(ctx)?;
     run_workflow_provenance_tests(ctx)?;
     adversarial_drafts_test::test_correlated_draft_replay(ctx)?;

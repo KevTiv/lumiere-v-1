@@ -43,6 +43,11 @@ export async function uploadDocumentBlob(
     throw new Error("A non-empty file is required")
   }
 
+  const wireCompanyId = companyId === undefined ? undefined : Number(companyId)
+  if (wireCompanyId !== undefined && (!Number.isSafeInteger(wireCompanyId) || wireCompanyId <= 0)) {
+    throw new Error("The company ID cannot be represented safely by the upload service")
+  }
+
   const checksum = await sha256Hex(file)
   const contentType = file.type || "application/octet-stream"
 
@@ -53,7 +58,7 @@ export async function uploadDocumentBlob(
       fileName: file.name,
       contentType,
       contentLength: file.size,
-      companyId: companyId !== undefined ? Number(companyId) : undefined,
+      companyId: wireCompanyId,
       checksum,
       residency,
     }),

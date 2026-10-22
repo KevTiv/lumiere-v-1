@@ -207,3 +207,67 @@ describe("FormModal authoring preview", () => {
     expect(screen.queryByTestId("form-preview-new-note")).toBeNull()
   })
 })
+
+
+describe("FormModal dependent fields", () => {
+  const conditionalConfig: FormConfig = {
+    id: "conditional", title: "Conditional form", submitLabel: "Save",
+    sections: [{ id: "main", fields: [
+      { id: "method", name: "method", label: "Method", type: "text", defaultValue: "Linear" },
+      { id: "factor", name: "factor", label: "Factor", type: "number", required: true,
+        visibleWhen: { field: "method", oneOf: ["Degressive", "DegressiveThenLinear"] } },
+      { id: "dependent", name: "dependent", type: "custom", component: ({ values }) =>
+        <output data-testid="dependent-value">{String(values?.method)}</output> },
+    ] }],
+  }
+
+  it("skips hidden required fields and passes current values to custom pickers", async () => {
+    const onSubmit = vi.fn()
+    render(<FormModal open onOpenChange={vi.fn()} config={conditionalConfig} onSubmit={onSubmit} showSubmitSuccessToast={false} />)
+    expect(screen.queryByTestId("form-field-factor")).toBeNull()
+    expect(screen.getByTestId("dependent-value").textContent).toBe("Linear")
+    fireEvent.click(screen.getByTestId("form-submit-conditional"))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce())
+  })
+
+  it("validates visible required fields and retains an edited value when hidden", async () => {
+    const onSubmit = vi.fn()
+    render(<FormModal open onOpenChange={vi.fn()} config={conditionalConfig} onSubmit={onSubmit} showSubmitSuccessToast={false} />)
+    const method = screen.getByTestId("form-field-method")
+    fireEvent.change(method, { target: { value: "DegressiveThenLinear" } })
+    expect(screen.getByTestId("dependent-value").textContent).toBe("DegressiveThenLinear")
+    fireEvent.click(screen.getByTestId("form-submit-conditional"))
+    await waitFor(() => expect(screen.getByTestId("form-field-factor").getAttribute("aria-invalid")).toBe("true"))
+    expect(onSubmit).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByTestId("form-field-factor"), { target: { value: "0.2" } })
+    fireEvent.change(method, { target: { value: "Linear" } })
+    expect(screen.queryByTestId("form-field-factor")).toBeNull()
+    fireEvent.change(method, { target: { value: "Degressive" } })
+    expect((screen.getByTestId("form-field-factor") as HTMLInputElement).value).toBe("0.2")
+    fireEvent.click(screen.getByTestId("form-submit-conditional"))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ method: "Degressive", factor: 0.2 })))
+  })
+})
+
+
+describe("FormModal conditional file selection", () => {
+  it("clears a file when its input is hidden and requires a new choice when shown again", async () => {
+    const onSubmit = vi.fn()
+    const fileConfig: FormConfig = { id: "receipt", title: "Receipt", sections: [{ id: "main", fields: [
+      { id: "hasReceipt", name: "hasReceipt", type: "text", defaultValue: "true" },
+      { id: "receiptFile", name: "receiptFile", type: "file", required: true,
+        visibleWhen: { field: "hasReceipt", equals: "true" } },
+    ] }] }
+    render(<FormModal open onOpenChange={vi.fn()} config={fileConfig} onSubmit={onSubmit} showSubmitSuccessToast={false} />)
+    fireEvent.change(screen.getByTestId("form-field-receiptFile"), { target: { files: [new File(["receipt"], "receipt.pdf", { type: "application/pdf" })] } })
+    fireEvent.change(screen.getByTestId("form-field-hasReceipt"), { target: { value: "false" } })
+    expect(screen.queryByTestId("form-field-receiptFile")).toBeNull()
+    fireEvent.change(screen.getByTestId("form-field-hasReceipt"), { target: { value: "true" } })
+    fireEvent.click(screen.getByTestId("form-submit-receipt"))
+    await waitFor(() => expect(screen.getByTestId("form-field-receiptFile").getAttribute("aria-invalid")).toBe("true"))
+    expect(onSubmit).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByTestId("form-field-hasReceipt"), { target: { value: "false" } })
+    fireEvent.click(screen.getByTestId("form-submit-receipt"))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ hasReceipt: "false", receiptFile: undefined }))
+  })
+})

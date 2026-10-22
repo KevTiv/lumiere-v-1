@@ -84,7 +84,7 @@
       "evidence": [
         {
           "path": "frontend/packages/ui/src/forms/runtime-form-modal.tsx",
-          "markers": ["runtimeConfigFailureMode = \"block\"", "submissionDisabled={submissionBlocked}", "onSubmit={submissionBlocked ? undefined"]
+          "markers": ["runtimeConfigFailureMode = \"block\"", "submissionDisabled={submissionBlocked || submissionDisabled}", "onSubmit={submissionBlocked ? undefined"]
         }
       ]
     },
@@ -287,6 +287,7 @@
       "frontend/web/tests/e2e/crm-read-isolation.spec.ts",
       "frontend/web/tests/e2e/documents-wave-a-lifecycle.spec.ts",
       "frontend/web/tests/e2e/expenses-wave-lifecycle.spec.ts",
+      "frontend/web/tests/e2e/finance-payment-tools.spec.ts",
       "frontend/web/tests/e2e/helpdesk-mutations.spec.ts",
       "frontend/web/tests/e2e/helpers-legacy.ts",
       "frontend/web/tests/e2e/hr-wave-lifecycle.spec.ts",
