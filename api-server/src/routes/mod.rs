@@ -29,8 +29,8 @@ mod settings;
 mod statement_imports;
 mod statutory_adapters;
 mod vertical_packs;
-mod whatsapp_webhooks;
 mod whatsapp_meta;
+mod whatsapp_webhooks;
 
 use std::sync::Arc;
 
