@@ -16,6 +16,8 @@ export type DocumentBlobUploadOptions = {
   file: File
   companyId?: bigint
   residency?: string
+  /** Fixed by the API at reservation; selects the matching record access policy. */
+  purpose?: "document" | "branding" | "expense_receipt"
 }
 
 async function sha256Hex(file: File): Promise<string> {
@@ -38,7 +40,7 @@ async function readError(res: Response): Promise<string> {
 export async function uploadDocumentBlob(
   options: DocumentBlobUploadOptions,
 ): Promise<DocumentBlobUploadResult> {
-  const { file, companyId, residency } = options
+  const { file, companyId, residency, purpose = "document" } = options
   if (!file || file.size <= 0) {
     throw new Error("A non-empty file is required")
   }
@@ -61,6 +63,7 @@ export async function uploadDocumentBlob(
       companyId: wireCompanyId,
       checksum,
       residency,
+      purpose,
     }),
   })
   if (!presignRes.ok) {

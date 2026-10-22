@@ -261,7 +261,7 @@ function ExpensesClientLoaded({
         throw new Error(t("expenses.forms.capture.receiptRequired", { defaultValue: "Choose a receipt file, or clear the receipt checkbox." }))
       }
       const receiptId = await resolveReceiptAttempt(receiptFile, { organizationId: orgId, companyId: operatingCompanyId, employeeId }, {
-        upload: (file, companyId) => uploadDocumentBlob({ file, companyId }),
+        upload: (file, companyId) => uploadDocumentBlob({ file, companyId, purpose: "expense_receipt" }),
         register: (params, companyId) => createExpenseReceipt.mutateAsync({ ...params, companyId }),
         newRequestId: newExpenseReceiptClientRequestId,
       })
