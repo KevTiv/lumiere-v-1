@@ -30,6 +30,7 @@ mod statement_imports;
 mod statutory_adapters;
 mod vertical_packs;
 mod whatsapp_webhooks;
+mod whatsapp_meta;
 
 use std::sync::Arc;
 
@@ -67,4 +68,5 @@ pub fn domain_router() -> Router<Arc<AppState>> {
         .merge(rwanda_statutory_readiness::router())
         .merge(vertical_packs::router())
         .merge(whatsapp_webhooks::router())
+        .merge(whatsapp_meta::router())
 }
