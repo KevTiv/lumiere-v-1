@@ -93,8 +93,12 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
     const salesJournalId = scalarQueryId(journals.find((row) =>
       scalarQueryId(row.companyId ?? row.company_id) === companyId && row.code === "INV",
     )?.id)
+    // Other specs create suppliers in the same company. Inbound settlement
+    // requires a customer even though the trusted invoice fixture accepts a
+    // general contact; keep this positive fixture independent of read order.
     const partnerId = scalarQueryId((await queryRows(page, "contacts")).find((row) =>
-      scalarQueryId(row.companyId ?? row.company_id) === companyId,
+      scalarQueryId(row.companyId ?? row.company_id) === companyId &&
+      (row.isCustomer ?? row.is_customer) === true,
     )?.id)
     if (salesJournalId == null || partnerId == null) throw new Error("bank-link invoice fixture lookups missing")
     const invoiceReference = smokeName("cov08b-invoice")
