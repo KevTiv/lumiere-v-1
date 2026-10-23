@@ -25,7 +25,14 @@
 //! - usage above the reserved allowance: the module rejects the result and the
 //!   error propagates with the attempt dispatched and the reservation reserved.
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc, Mutex, OnceLock, Weak,
+    },
+    time::Duration,
+};
 
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
@@ -660,7 +667,17 @@ pub(super) struct SpendAdmittedLlm<'a> {
     clock: fn() -> DateTime<Utc>,
     call_scope: u32,
     next_call: AtomicU32,
+    profile_limits: Option<(Arc<tokio::sync::Semaphore>, Duration)>,
 }
+
+/// A dispatched attempt needs reconciliation before any retry or fallback.
+/// Retain the typed marker through anyhow contexts, including persistence errors.
+#[derive(Debug, thiserror::Error)]
+#[error("provider attempt requires reconciliation: {0}")]
+pub(super) struct UnresolvedProviderAttempt(#[source] anyhow::Error);
+
+type ProfilePermits = HashMap<(u64, String), Weak<tokio::sync::Semaphore>>;
+static PROFILE_PERMITS: OnceLock<Mutex<ProfilePermits>> = OnceLock::new();
 
 impl<'a> SpendAdmittedLlm<'a> {
     pub fn new(
@@ -678,6 +695,38 @@ impl<'a> SpendAdmittedLlm<'a> {
         call_scope: u32,
     ) -> Result<Self> {
         Self::with_clock_and_scope(inner, ledger, binding, Utc::now, call_scope)
+    }
+
+    /// Enforce immutable profile limits across concurrent runs in this gateway.
+    /// Each replica has its own permits; durable spend admission remains global.
+    pub fn with_profile_limits(
+        mut self,
+        profile: &super::model_configuration::ModelProfile,
+    ) -> Result<Self> {
+        if profile.timeout_ms == 0 || profile.max_concurrency == 0 {
+            bail!("profile timeout and concurrency limits must be positive");
+        }
+        let mut permits = PROFILE_PERMITS
+            .get_or_init(Mutex::default)
+            .lock()
+            .map_err(|_| anyhow::anyhow!("profile concurrency registry unavailable"))?;
+        permits.retain(|_, value| value.strong_count() > 0);
+        let key = (self.binding.organization_id, profile.reference.stable_ref());
+        let semaphore = permits
+            .get(&key)
+            .and_then(Weak::upgrade)
+            .unwrap_or_else(|| {
+                let semaphore = Arc::new(tokio::sync::Semaphore::new(
+                    profile.max_concurrency as usize,
+                ));
+                permits.insert(key, Arc::downgrade(&semaphore));
+                semaphore
+            });
+        self.profile_limits = Some((
+            semaphore,
+            Duration::from_millis(u64::from(profile.timeout_ms)),
+        ));
+        Ok(self)
     }
 
     fn with_clock(
@@ -713,6 +762,7 @@ impl<'a> SpendAdmittedLlm<'a> {
             clock,
             call_scope,
             next_call: AtomicU32::new(1),
+            profile_limits: None,
         })
     }
 
@@ -726,10 +776,11 @@ impl<'a> SpendAdmittedLlm<'a> {
             .reservation(b.organization_id, b.run_id, key)
             .await?
         {
-            bail!(
+            return Err(UnresolvedProviderAttempt(anyhow::anyhow!(
                 "spend attempt {key} already has a {} reservation; not redispatching",
                 existing.status
-            );
+            ))
+            .into());
         }
         let period = billing_period((self.clock)());
         let budget = self
@@ -808,10 +859,11 @@ impl<'a> SpendAdmittedLlm<'a> {
         // Only a freshly accepted attempt may be dispatched; recovering a
         // dispatched or finished row never authorizes calling the provider again.
         if attempt.status != ATTEMPT_ACCEPTED {
-            bail!(
+            return Err(UnresolvedProviderAttempt(anyhow::anyhow!(
                 "provider attempt {key} is already {}; not redispatching",
                 attempt.status
-            );
+            ))
+            .into());
         }
         Ok(attempt)
     }
@@ -827,6 +879,17 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
         // Deterministic transport rejection (including foreign native replay)
         // must not create a reservation or an apparently dispatched attempt.
         self.validate_request(&req)?;
+        // Queue before reserving spend. Timing out here cannot have a provider
+        // effect and must not leave a reservation or an accepted attempt.
+        let _permit = match &self.profile_limits {
+            Some((semaphore, timeout)) => Some(
+                tokio::time::timeout(*timeout, semaphore.acquire())
+                    .await
+                    .context("profile concurrency wait timed out before spend admission")?
+                    .context("profile concurrency limiter closed")?,
+            ),
+            None => None,
+        };
         let organization_id = self.binding.organization_id;
         let call = self.next_call.fetch_add(1, Ordering::SeqCst);
         let step = self
@@ -841,7 +904,15 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
             .mark_attempt_dispatched(organization_id, attempt.id)
             .await
             .with_context(|| format!("dispatch was not claimed for {key}; provider not called"))?;
-        let response = match self.inner.complete(req).await {
+        let completion = async {
+            match &self.profile_limits {
+                Some((_, timeout)) => tokio::time::timeout(*timeout, self.inner.complete(req))
+                    .await
+                    .context("profile provider deadline exceeded")?,
+                None => self.inner.complete(req).await,
+            }
+        };
+        let response = match completion.await {
             Ok(response) => response,
             Err(error) => {
                 // The provider may have run, so the outcome is unknown rather
@@ -854,10 +925,12 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
                     .await
                     .with_context(|| {
                         format!("could not record the unknown outcome of {key}: {error}")
-                    })?;
-                return Err(error.context(format!(
+                    })
+                    .map_err(UnresolvedProviderAttempt)?;
+                return Err(UnresolvedProviderAttempt(error.context(format!(
                     "provider dispatch failed for {key}; attempt left for reconciliation"
-                )));
+                )))
+                .into());
             }
         };
         let result = match definite_completion_failure(&response) {
@@ -876,7 +949,7 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
             .await
             .with_context(|| {
                 format!("recording the result of {key} failed; attempt and reservation left for reconciliation")
-            })?;
+            }).map_err(UnresolvedProviderAttempt)?;
         self.ledger
             .settle(
                 organization_id,
@@ -887,7 +960,8 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
             .await
             .with_context(|| {
                 format!("settlement failed for {key}; reservation left for reconciliation")
-            })?;
+            })
+            .map_err(UnresolvedProviderAttempt)?;
         Ok(response)
     }
 }
@@ -1446,6 +1520,94 @@ mod tests {
     }
 
     const KEY: &str = "h5:spend:run:42:step:1:attempt:0";
+
+    fn limited_profile(key: &str) -> super::super::model_configuration::ModelProfile {
+        let mut profile =
+            super::super::model_configuration::ModelProfile::legacy(&sample_agent(32_000));
+        profile.reference.key = key.into();
+        profile.timeout_ms = 10;
+        profile.max_concurrency = 1;
+        profile
+    }
+
+    #[tokio::test]
+    async fn profile_deadline_records_unknown_without_releasing_spend() {
+        struct HangingProvider;
+        #[async_trait]
+        impl LlmCompletion for HangingProvider {
+            async fn complete(&self, _: LlmRequest) -> Result<LlmResponse> {
+                std::future::pending().await
+            }
+        }
+        let ledger = FakeLedger::configured();
+        let provider = HangingProvider;
+        let admitted = SpendAdmittedLlm::with_clock(&provider, &ledger, binding(), fixed_clock)
+            .unwrap()
+            .with_profile_limits(&limited_profile("deadline-test"))
+            .unwrap();
+        let error = admitted.complete(request()).await.unwrap_err();
+        assert!(error.is::<UnresolvedProviderAttempt>());
+        assert!(format!("{error:#}").contains("deadline exceeded"));
+        assert_eq!(
+            ledger.attempts.lock().unwrap()[0].status,
+            ATTEMPT_OUTCOME_UNKNOWN
+        );
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
+        assert!(!ledger.writes().contains(&"settle".to_string()));
+    }
+
+    #[tokio::test]
+    async fn profile_queue_timeout_has_no_spend_or_provider_effect() {
+        let provider = Provider::new(Ok(response(40, 20)));
+        let ledger = FakeLedger::configured();
+        let profile = limited_profile("queue-test");
+        let first = admitted(&provider, &ledger)
+            .with_profile_limits(&profile)
+            .unwrap();
+        let second = admitted(&provider, &ledger)
+            .with_profile_limits(&profile)
+            .unwrap();
+        let semaphore = &first.profile_limits.as_ref().unwrap().0;
+        assert!(Arc::ptr_eq(
+            semaphore,
+            &second.profile_limits.as_ref().unwrap().0
+        ));
+        let permit = semaphore.acquire().await.unwrap();
+        let error = second.complete(request()).await.unwrap_err();
+        assert!(error.to_string().contains("before spend admission"));
+        assert_eq!(provider.calls(), 0);
+        assert!(ledger.writes().is_empty());
+        drop(permit);
+        second.complete(request()).await.unwrap();
+        assert_eq!(provider.calls(), 1);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_SETTLED
+        );
+    }
+
+    #[test]
+    fn profile_concurrency_does_not_cross_organizations() {
+        let provider = Provider::new(Ok(response(40, 20)));
+        let ledger = FakeLedger::configured();
+        let profile = limited_profile("tenant-limit-test");
+        let first = admitted(&provider, &ledger)
+            .with_profile_limits(&profile)
+            .unwrap();
+        let mut other = binding();
+        other.organization_id += 1;
+        let second = SpendAdmittedLlm::with_clock(&provider, &ledger, other, fixed_clock)
+            .unwrap()
+            .with_profile_limits(&profile)
+            .unwrap();
+        assert!(!Arc::ptr_eq(
+            &first.profile_limits.unwrap().0,
+            &second.profile_limits.unwrap().0
+        ));
+    }
 
     fn reconciliation(outcome: ReconciledOutcome) -> ProviderAttemptReconciliation {
         ProviderAttemptReconciliation {

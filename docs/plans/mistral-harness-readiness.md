@@ -1,5 +1,12 @@
 # Mistral harness readiness
 
+**Current implementation/provisioning status (2026-10-23):** see
+[Harness key readiness](../plan/harness-key-readiness-status.md). The assessment
+below is historical; the integration branch includes enforced routed profile
+deadlines/concurrency, uncertain-attempt retry fencing, legacy BFF retirement,
+and explicit provisioning/catalog/smoke tooling. Live deployment and real-provider
+admission remain separate gates.
+
 Assessed 2026-10-16 against application baseline `ff98a918` and the pinned
 `lumiere-contracts` 0.3.107 release. This is a source-backed integration
 assessment, not live-provider or deployment certification. Credentials are to

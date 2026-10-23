@@ -115,7 +115,11 @@ impl ModelProfile {
                 role.label()
             );
         }
-        if self.max_tokens == 0 || self.context_window == 0 || self.max_concurrency == 0 {
+        if self.max_tokens == 0
+            || self.context_window == 0
+            || self.max_concurrency == 0
+            || self.timeout_ms == 0
+        {
             bail!("model profile limits must be positive");
         }
         Ok(())

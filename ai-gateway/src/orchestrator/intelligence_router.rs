@@ -27,7 +27,9 @@ use super::{
     model_configuration::{
         IntelligenceRole, IntelligenceRoute, IntelligenceRouteResolver, ModelProfile,
     },
-    spend_admission::{spend_binding_for_profile, SpendAdmittedLlm, SpendLedger},
+    spend_admission::{
+        spend_binding_for_profile, SpendAdmittedLlm, SpendLedger, UnresolvedProviderAttempt,
+    },
     text_answer_gate::{gate_text_answer_with_passages_and_reviews, GatedTextAnswer, TextEvidence},
 };
 use crate::{
@@ -446,7 +448,8 @@ impl<'a> RoutedDecisionProvider<'a> {
             self.run_id,
         )?;
         let admitted =
-            SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, call_scope)?;
+            SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, call_scope)?
+                .with_profile_limits(profile)?;
         LlmDecisionAdapter::from_profile(&admitted, profile)
             .decide(request)
             .await
@@ -474,6 +477,7 @@ impl DecisionProvider for RoutedDecisionProvider<'_> {
                         self.run_shadows(&shadows, &request).await;
                         return Ok(response);
                     }
+                    Err(error) if error.is::<UnresolvedProviderAttempt>() => return Err(error),
                     Err(error) => failures.push(format!(
                         "{} attempt {}: {}",
                         profile.reference.stable_ref(),
@@ -549,12 +553,14 @@ impl ReasoningProvider for RoutedReasoningProvider<'_> {
                 let mut effective_profile = profile.clone();
                 effective_profile.max_tokens = binding.agent_max_tokens;
                 let admitted =
-                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
+                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?
+                        .with_profile_limits(&profile)?;
                 match AgentLoopReasoner::from_profile(&admitted, &effective_profile)
                     .reason(request.clone())
                     .await
                 {
                     Ok(response) => return Ok(response),
+                    Err(error) if error.is::<UnresolvedProviderAttempt>() => return Err(error),
                     Err(error) => failures.push(format!(
                         "{} attempt {}: {}",
                         profile.reference.stable_ref(),
@@ -627,12 +633,14 @@ impl GenerationProvider for RoutedGenerationProvider<'_> {
                 )?;
                 let scope = next_call_scope(IntelligenceRole::Generation, &self.next_scope)?;
                 let admitted =
-                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
+                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?
+                        .with_profile_limits(&profile)?;
                 match LlmGenerationAdapter::from_profile(&admitted, &profile)
                     .generate(request.clone())
                     .await
                 {
                     Ok(response) => return Ok(response),
+                    Err(error) if error.is::<UnresolvedProviderAttempt>() => return Err(error),
                     Err(error) => failures.push(format!(
                         "{} attempt {}: {}",
                         profile.reference.stable_ref(),
