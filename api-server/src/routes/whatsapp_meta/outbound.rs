@@ -1,6 +1,7 @@
-//! One-shot send transport; no browser/harness endpoint is mounted here.
-//! A canonical dispatch operation must supply FreshAuthorization before use.
-mod policy;
+//! Send-once Meta transport. Only a fresh, actor-bound reviewed source may call it.
+mod claim;
+pub(super) mod meta;
+pub(super) mod policy;
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -8,7 +9,7 @@ use anyhow::{bail, Result};
 use deadpool_postgres::Pool;
 use serde_json::{json, Value};
 
-use super::{protocol::fingerprint, store};
+use super::protocol::fingerprint;
 use policy::{payload, validate, FreshAuthorization, ReviewedMessage};
 
 pub(super) struct MetaTransport {
@@ -53,14 +54,15 @@ fn now_seconds() -> Result<u64> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())
 }
 
-/// Consume the durable attempt, refresh authorization, then send once.
-/// Unknown/attempted rows are NEVER automatically reclaimed. Acceptance is
-/// not represented as recipient delivery. No provider idempotency is assumed.
+/// Consume a durable attempt and revalidate immediately before contacting Meta.
+/// Unknown attempts are never automatically reclaimed. No provider idempotency
+/// guarantee is assumed, and HTTP acceptance is not recipient delivery.
 pub(super) async fn send_once(
     pool: &Pool,
     transport: &MetaTransport,
     message: &ReviewedMessage,
     token: &str,
+    daily_limit: u32,
     guard: &impl FreshAuthorization,
 ) -> Result<SendOutcome> {
     if token.trim().is_empty() {
@@ -78,44 +80,11 @@ pub(super) async fn send_once(
     ]));
     body["biz_opaque_callback_data"] = json!(intent);
     let digest = fingerprint(&json!([message.phone_number_id, body]));
-    store::verify(pool).await?;
-    let mut client = pool.get().await?;
-    let tx = client.transaction().await?;
-    let org = message.organization_id.to_string();
-    let company = message.company_id.to_string();
-    let account = message.account_id.to_string();
-    let operational = message.operational_message_id.to_string();
-    tx.execute(
-        "INSERT INTO lumiere_whatsapp.outbox \
-         (intent_key,organization_id,company_id,account_id,operational_message_id,review_digest,payload_digest) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7) \
-         ON CONFLICT (organization_id,operational_message_id) DO NOTHING",
-        &[&intent, &org, &company, &account, &operational, &message.review_digest, &digest],
-    )
-    .await?;
-    let row = tx
-        .query_one(
-            "SELECT intent_key,payload_digest,state FROM lumiere_whatsapp.outbox \
-             WHERE organization_id=$1 AND operational_message_id=$2 FOR UPDATE",
-            &[&org, &operational],
-        )
-        .await?;
-    if row.get::<_, String>(0) != intent || row.get::<_, String>(1) != digest {
-        bail!("whatsapp intent was already bound to different reviewed content");
-    }
-    if row.get::<_, String>(2) != "prepared" {
+    if !claim::acquire(pool, message, &intent, &digest, daily_limit).await? {
         return Ok(SendOutcome::AlreadyAttempted);
     }
-    tx.execute(
-        "UPDATE lumiere_whatsapp.outbox SET state='attempted',attempted_at=now() \
-         WHERE intent_key=$1 AND state='prepared'",
-        &[&intent],
-    )
-    .await?;
-    tx.commit().await?;
-    drop(client);
     // Lost claim acknowledgement stops before provider I/O. A crash after
-    // claiming leaves a non-replayable attempt requiring human inspection.
+    // claiming leaves an inspectable, non-replayable attempt.
     let still_authorized = match guard.refresh(message).await {
         Ok(current) => validate(message, &current, now_seconds()?).is_ok(),
         Err(_) => false,
@@ -201,10 +170,19 @@ async fn finish(pool: &Pool, intent: &str, outcome: &SendOutcome) -> Result<()> 
             &[&intent, &state, &provider],
         )
         .await?;
-    if count != 1 {
-        bail!("whatsapp acceptance recording is unconfirmed; do not resend");
+    if count == 1 {
+        return Ok(());
     }
-    Ok(())
+    // A signed status callback may already have bound this exact attempt.
+    let row = client.query_opt(
+        "SELECT provider_message_id FROM lumiere_whatsapp.outbox WHERE intent_key=$1 AND state='accepted'",
+        &[&intent],
+    ).await?;
+    let verified = row.and_then(|row| row.get::<_, Option<String>>(0));
+    if verified.as_deref().is_some_and(|id| provider.is_none_or(|expected| expected == id)) {
+        return Ok(());
+    }
+    bail!("whatsapp acceptance recording is unconfirmed; do not resend")
 }
 
 #[cfg(test)]

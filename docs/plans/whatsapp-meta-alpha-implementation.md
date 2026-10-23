@@ -1,79 +1,78 @@
-# WhatsApp Cloud API alpha — durable transport and release gates
+# WhatsApp alpha: reviewed text sending and incoming recovery
 
-## Current scope
+## Scope and readiness
 
-PR #251 now adds a durable inbound path, a guarded one-shot outbound transport primitive, and dispatch eligibility tests. This is not a complete live WhatsApp product. The native webhook is disabled by default. No production configuration, messages, credentials or database migrations have been applied by this PR.
+The operator flow now has source code for queue -> preview -> explicit confirmation -> one provider request -> acceptance readback -> signed delivery callback -> CRM reply. Live activation is a separate gate: no deployment, merchant credentials, database migration or real message was performed by this PR. Exact-head compilation, contract/runtime and browser tests must pass before release. Keep both provider feature flags off until the pilot checklist is complete.
 
-The first product acceptance goal remains: an authorized employee reviews an invoice reminder, sends it through the company's connected WhatsApp number, sees verified delivery, and receives a customer reply in the existing CRM thread. Incoming payment claims never post financial receipts.
+The previous 727eee3 baseline passed its Rust and disposable PostgreSQL recovery tests. That result does not certify the new operator UI, canonical queue linkage or transport migration 2.
 
-## Implemented source
+## Operator workflow
 
-| Component | Behavior |
-| --- | --- |
-| Native callback | GET challenge and POST raw-body HMAC verification at `/v1/webhooks/whatsapp/meta`; exact WABA + receiving-number mapping before tenant selection. Both methods require `LUMIERE_WHATSAPP_META_ENABLED=1`. |
-| Account and identity mapping | Handles the camelCase rows actually returned by `StdbClient::query_sql`, including unwrapped options. Missing or malformed company IDs fail closed instead of broadening scope. Wallet-only identities are not WhatsApp recipients. |
-| Durable inbox | One PostgreSQL transaction persists the entire verified event batch before HTTP 200. Message identity is independent of batching; identical events deduplicate. Conflicting content is retained separately in quarantine, never overwritten. |
-| Unknown contacts and media | Raw provider event metadata is preserved, including business-scoped sender IDs and media references. Unsupported events reach quarantine instead of exhausting Meta retries and disappearing. No external media URL is fetched. |
-| Inbox worker | `whatsapp-inbox-worker` claims with `FOR UPDATE SKIP LOCKED`, uses fenced 60-second leases, bounds canonical processing to 45 seconds, retries transient failures with backoff, and quarantines unresolved failures after ten attempts. Expired leases recover after restart. |
-| Canonical CRM handoff | Rechecks the original tenant/account/company binding and uses the existing provider-principal-protected reducers and immutable event receipts. Delayed callbacks do not have the old five-minute cutoff. `read` is projected as delivered while the original event remains retained. |
-| Operator retry | `--requeue ORG ACCOUNT EVENT` only requeues an exact scoped quarantine record, appends audit evidence, and cannot revive conflicting or processed records. It does not bypass canonical validation. |
-| Send primitive | A durable outbox intent freezes scope, review and payload digests. A claim is committed before one HTTP request. Fresh authorization is checked before claiming and immediately before network I/O. Attempted/unknown requests are not automatically replayed. |
-| Send policy | Explicit opt-in, opt-out, actor permission, sender state, quiet hours, exact reviewed sender/recipient/content, customer-message-based 24-hour reply window, and fresh approval of the exact Meta template are required by the policy checker. |
-| Result semantics | A valid provider message ID records acceptance, never recipient delivery. Timeout, malformed success or server error remain unknown; there is no invented provider idempotency guarantee. |
+In a contact's WhatsApp inbox, staff open the thread and choose **Queue for review**. Queueing does not send. With a configured sender, the canonical CRM reducer atomically creates the matching operational-message intent and binds the thread to the company sender. Browser input cannot choose provider IDs or inject an operational-message link.
 
-### Important outbound limit
+A queued row exposes **Review and send via WhatsApp**. The server reloads the current actor, company access, field policy, contact, phone identity, operational message, consent, sender and provider principal. The preview shows the masked recipient, verified sender name and exact body. The resulting immutable review is bound to this actor and message and expires after ten minutes.
 
-`outbound::send_once` is deliberately not exposed as an HTTP/harness endpoint and has no production caller. `FreshAuthorization` has no default implementation. A canonical reviewed-message operation, current permission/consent/template reads, scoped credential resolver and canonical provider-ID binding must land before enabling sending. The policy tests and transport primitive do not establish that these business integrations are complete.
+Staff choose either a reply within the verified 24-hour customer-service window or a current Meta-approved body-only utility template. The alpha supports at most 100 templates per sender and 20 positional text parameters. Named parameters, marketing, headers, footers, buttons and document-template attachments are not silently converted or omitted. A template's rendered text must equal the queued body; otherwise **Use this text in the composer** creates a new candidate for review while the old message remains unsent.
 
-## Storage ownership decision
+**Confirm and send once** repeats current authorization, consumes a durable per-message attempt, rechecks authorization immediately before I/O and performs one fixed-origin Meta request. HTTP acceptance is distinct from recipient delivery. An interrupted response remains unknown or attempted; refreshing status never submits another send. There is deliberately no reset-and-resend control for uncertain attempts.
 
-The private `lumiere_whatsapp` PostgreSQL schema owns transport receipts, leases, quarantined payloads and send attempts only. It cannot create contacts, change invoices, post payments or independently authorize an ERP operation. SpacetimeDB remains business authority; browser mutations still use the released IR contracts.
+Actual signed status callbacks correlate through the immutable review and durable intent, including callbacks arriving before the HTTP response. Correlation checks organization, account, company, original recipient and provider message ID. The existing provider-principal-protected CRM reducer alone records sent/delivered/failed on canonical business records. A chat saying “I paid” never posts money.
 
-This is an explicitly installed infrastructure schema with its own immutable checksum ledger, not a change to the already released ERP projection migration catalog. `whatsapp-inbox-worker --migrate` is the only DDL entrypoint. HTTP requests and normal workers verify the installed version and fail closed on missing/mismatched schema. A later SQL change requires a new reviewed migration version, not editing a deployed v1 body.
+The exception panel exposes only bounded, masked metadata to current integration/message administrators. After correcting a contact or processing issue they can requeue an exact company/account event with an audit reason. Conflicting provider payloads cannot be requeued. Unknown messages on organization-shared senders remain an administrative maintenance case until company ownership is established.
 
-The API and worker use the configured PG pool and existing TLS policy. The transport schema revokes PUBLIC access. Deployment must provision dedicated least-privilege runtime grants, encryption/backup coverage and approved payload retention before real tenant data is admitted. No public resource exposes raw inbox JSON. Quarantined media **references** are retained; media bytes are not downloaded, so this is not document archival.
+## Deployment configuration
 
-Limits: 1 MiB webhook body, 100 events per request, 10,000 outstanding events per receiving account. Exact retries still deduplicate at capacity. New writes fail rather than acknowledge unpersisted data when storage/capacity is unavailable.
+Use an exact web/API/module/contracts release set. This change preserves the published reducer/table signatures, but the SpacetimeDB module must be redeployed for the new queue-link behavior. Existing unlinked queued rows remain unavailable for sending; staff queue a new message after the module upgrade rather than guessing a link.
 
-## Deployment sequence (not executed)
+Required server configuration:
 
-1. Review transport storage ownership, privacy/retention, tenant placement and runtime grants. Validate the target database separately from existing ERP projection migrations.
-2. Configure `PG_*` using the established production TLS policy; run the built `whatsapp-inbox-worker --migrate` under the migration administrator. Subsequent workers must not have schema-management privileges.
-3. Configure `LUMIERE_WHATSAPP_META_ENABLED=1` in the test API and worker, plus server-only `LUMIERE_WHATSAPP_WEBHOOK_APP_SECRET` and `LUMIERE_WHATSAPP_META_VERIFY_TOKEN` in the API. These are distinct from the sender access token.
-4. Use the test app's HTTPS callback `/v1/webhooks/whatsapp/meta`. Subscribe to Meta's `messages` field only. Create an unambiguous active WABA + receiving-number binding and register the configured STDB server executor as the account's CRM provider principal. The internal account must permit both `messages` and `message_status` capabilities.
-5. Run the dedicated `whatsapp-inbox-worker` process with the expected source placement and `STDB_SERVER_TOKEN`. The API does not secretly start a worker. Rehearse known-contact text, unknown identity, media references, duplicate events, storage outage, worker restart and delayed statuses.
-6. Inspect scoped quarantine metadata through the operator database tools without exporting raw payloads. Fix the canonical contact/configuration where appropriate, then use `whatsapp-inbox-worker --requeue ORG ACCOUNT EVENT`. This is a privileged operator command, not a substitute for the planned user-facing RBAC triage UI.
-7. Keep outbound disabled until the remaining canonical bridge and live proof are complete. Never manually reset attempted/unknown outbox rows to trigger another send.
+- `LUMIERE_WHATSAPP_META_ENABLED=1`: enables signed ingestion and the incoming worker.
+- `LUMIERE_WHATSAPP_SEND_ENABLED=1`: independently enables user-reviewed sending. Leave off while configuring/testing ingestion.
+- `LUMIERE_WHATSAPP_GRAPH_VERSION`: an explicit supported `vN.N` Graph version selected and verified during enrollment.
+- `LUMIERE_WHATSAPP_WEBHOOK_APP_SECRET`: Meta app secret, server only.
+- `LUMIERE_WHATSAPP_META_VERIFY_TOKEN`: high-entropy GET challenge token, distinct from the app secret and phone access token.
+- `LUMIERE_WHATSAPP_ACCOUNT_TOKENS`: server-secret JSON array with string `organizationId`, `accountId`, `businessAccountId`, `phoneNumberId`, `credentialsReference`, and `accessToken`. Exactly one entry must match the stored sender. Never place tokens in CRM metadata, browser configuration, repository files or logs.
+- `LUMIERE_WHATSAPP_TIMEZONES`: server JSON map of `organizationId:accountId` to an IANA zone, such as `Africa/Kigali`, when quiet hours are configured. Missing or redacted quiet-hour facts block rather than guess.
+- The existing PostgreSQL configuration and server STDB token. Both API and incoming worker must use the intended tenant placement and the exact active registered CRM provider identity.
 
-## Remaining code and release gates
+Configure each sender's Meta WABA and phone-number IDs, company binding, active flags, positive daily limit and internal `messages`/`message_status` subscriptions. Set Meta's webhook to HTTPS `/v1/webhooks/whatsapp/meta` and subscribe to Meta's `messages` field. Verify the authenticated STDB token matches the unique active `crm_provider_principal` for the sender; a JWT identity hint is not evidence.
 
-- Canonical message review/claim and `FreshAuthorization` implementation: atomically bind the actor, current company permissions, exact recipient, source revision, consent and approved content; publish any changed IR contracts normally.
-- Meta template synchronization and expiry/approval refresh; retain original customer message timestamps for the service window. The current policy code accepts server facts but does not itself retrieve them.
-- Per-account credential resolution, budget/rate limiting, canonical provider-message-ID correlation, and reviewed unknown-send recovery. The prepared sender is not yet a runnable dispatch worker.
-- Authenticated CRM quarantine/status UI and controlled contact linking; attachments through the managed document system with scanning, retention and field authorization. Inbound attachments currently retain references only.
-- Regional tenant/source routing review: the worker currently uses the configured STDB source. Do not enable it for organizations placed on a different cell without authoritative placement resolution.
-- Queue health/oldest-age/capacity alerting, graceful shutdown, retention/purge policy, restricted grants and restore rehearsal.
-- Meta permissions/onboarding, template approvals, test sender and production business ownership. Provider credentials, real delivery and operator/browser acceptance remain external proof, not implied by unit tests.
+The deployment secret array is an assisted-onboarding alpha mechanism, not Embedded Signup or a token-vault UI. Meta business/app permissions, sender eligibility and account billing must be satisfied separately. Do not bypass Meta enrollment with staff personal numbers.
 
-## Validation
+## Permissions and consent
 
-Tests cover real camelCase database rows, malformed optional scope, retained unknown media/IDs, stable event keys, conflicting payload fingerprints, eligible contact identity selection, service-window boundaries, consent/permission revocation, recipient/sender changes, template approval freshness and uncertain provider outcomes.
+Grant the dedicated role permission string `operational_message:send` through the existing role permissions workflow to the intended sender staff. CRUD/write permissions alone do not authorize provider sending. Current read permissions and allowed fields are also required for CRM conversations/messages, contacts, contact phone identities, operational messages and contact communication preferences. A masked or omitted required source field stays unavailable; the sender cannot reveal it by switching to a privileged read path.
 
-A dedicated PostgreSQL integration test covers repeated callback deduplication, conflicting-event quarantine, competing workers, expired-lease recovery, stale-worker denial and exact-scope operator retry. CI adds these checks to the existing Rust job with a separate disposable `lumiere_whatsapp_test` database, not another full-stack workflow.
+The recipient must have an explicit company-scoped WhatsApp opt-in. Inbound STOP/unsubscribe commands persist suppression before acknowledgement; a delayed callback does not reopen a reply window. This alpha has no self-service STOP reset. A future separately reviewed re-consent workflow must not clear suppression implicitly.
+
+The sender's configured limit is capped at 1,000 attempts per rolling 24 hours and 20 per minute for alpha. Limits are acquired transactionally with the attempt. They limit volume, not a guaranteed monetary bill; Meta billing/rates remain external. Failed and unknown attempts still consume the conservative volume allowance.
+
+## Private transport storage and process
+
+Run the explicit administrative command once against the reviewed target database:
 
 ```sh
-cargo test --locked -p api-server --lib routes::whatsapp_meta
-# Dedicated localhost database only; never point this test at a tenant database.
-WHATSAPP_TEST_PG=1 PG_HOST=127.0.0.1 PG_DATABASE=lumiere_whatsapp_test \
-  cargo test --locked -p api-server --lib routes::whatsapp_meta \
-  -- --include-ignored --test-threads=1
+LUMIERE_BIN=whatsapp-inbox-worker lumiere-runtime-entrypoint --migrate
 ```
 
-No local Rust/compiler or live provider test result is claimed in this document. Exact-head CI and a deployed canonical-CRM proof remain required before merging/enabling.
+Normal API/worker startup does not apply DDL. Migration 1 remains byte-for-byte unchanged; migration 2 adds immutable reviews, recipient-window/suppression facts and provider-correlation indexes. A checksum mismatch stops startup. Review restricted database grants, encryption, backups, retention, log redaction and regional placement before activation. These tables are private transport evidence, not an alternative accounting/CRM authority.
 
-## References
+Run `whatsapp-inbox-worker` as a separately supervised service from the shared Rust runtime image, with `LUMIERE_BIN=whatsapp-inbox-worker`. The HTTP process accepts and durably stores events; the worker delivers them through canonical reducers with fenced leases and bounded retries. Monitor backlog, oldest unprocessed receipt, quarantine count and worker health. The existing CLI maintenance path remains `--requeue ORG ACCOUNT EVENT` for authorized operators; the user-facing path additionally enforces current company and actor authority.
 
-- Meta messaging policy: https://business.whatsapp.com/policy
-- Native webhooks: https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/overview
-- Existing provider authority: `spacetimedb/src/crm/inbox.rs`
-- Existing business messaging: `spacetimedb/src/core/operational_messaging.rs`
+## Validation and pilot acceptance
+
+Required proof includes:
+
+1. Two concurrent confirmations result in one attempted provider request; new review IDs cannot bypass the per-message claim.
+2. A lost HTTP response, process restart or unknown provider outcome cannot auto-resend. An early signed callback binds the exact original attempt, with wrong recipient/account/company denied.
+3. Revoked membership/send permission/consent, archived identities, altered body/recipient/sender/template or expired review block I/O. Quiet-hour and customer-window boundaries are enforced.
+4. A signed inbound message and duplicate produce one canonical CRM message. Late delivery events do not downgrade delivered state. Unknown contacts/media remain in durable quarantine.
+5. Current-actor triage is bounded, field-safe and company/account-scoped. Conflicting events remain blocked.
+6. Browser users can queue, inspect the exact review, confirm once and refresh acceptance/delivery without reposting. Switching organization/contact removes pending UI reviews.
+7. A controlled test-sender round trip proves queue -> send -> real callback -> reply, followed by explicit pilot acceptance with the organization's own permitted sender.
+
+Focused node tests: `node --import tsx --test lib/whatsapp-dispatch.test.ts` from `frontend/web`. Rust CI includes `routes::whatsapp_meta` tests and a disposable local `*_whatsapp_test` PostgreSQL database. No passing result for the new head is assumed merely because tests are present.
+
+## Deliberate remaining limits
+
+This is text/utility-template alpha, not all WhatsApp features. Media references are retained but media bytes, malware scanning, document ingestion and invoice PDF attachments are not implemented. Business-scoped IDs without a verified phone/contact mapping require triage. Bulk campaigns, marketing automation, embedded merchant signup, arbitrary template components, automatic re-consent and provider-certified production acceptance remain outside this slice. Copy-first messaging remains a fallback and never claims provider delivery.

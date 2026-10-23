@@ -19,6 +19,9 @@ use crate::types::{
     ContactIdentityKind, ContactVerificationState, MessageChannel, OperationalMessageStatus,
 };
 
+#[path = "inbox_dispatch.rs"]
+mod dispatch;
+
 const MAX_BODY_LEN: usize = 4000;
 
 // ── Tables ───────────────────────────────────────────────────────────────────
@@ -592,7 +595,8 @@ pub fn receive_crm_provider_message(
     params: ReceiveCrmProviderMessageParams,
 ) -> Result<(), String> {
     require_writes_unfenced(ctx, organization_id)?;
-    require_provider_principal(ctx, organization_id, params.provider_account_id, "messages")?;
+    let account =
+        require_provider_principal(ctx, organization_id, params.provider_account_id, "messages")?;
     validate_provider_identifier("provider event id", &params.provider_event_id)?;
     validate_provider_identifier("provider message id", &params.provider_message_id)?;
     validate_provider_identifier("external thread id", &params.external_thread_id)?;
@@ -615,6 +619,9 @@ pub fn receive_crm_provider_message(
     }
 
     let contact = load_active_contact(ctx, organization_id, params.contact_id)?;
+    if account.company_id.is_some_and(|id| contact.company_id != Some(id)) {
+        return Err("provider account and contact company differ".into());
+    }
     validate_phone_identity(
         ctx,
         organization_id,
@@ -659,7 +666,9 @@ pub fn receive_crm_provider_message(
             .filter(|conversation| {
                 conversation.organization_id == organization_id
                     && conversation.channel == MessageChannel::WhatsApp
-                    && conversation.provider_account_id.is_none()
+                    && conversation
+                        .provider_account_id
+                        .is_none_or(|id| id == params.provider_account_id)
                     && conversation.phone_identity_id == Some(params.phone_identity_id)
                     && conversation.status == "open"
                     && conversation.external_thread_id.is_none()
@@ -799,7 +808,7 @@ pub fn record_crm_provider_delivery(
     params: RecordCrmProviderDeliveryParams,
 ) -> Result<(), String> {
     require_writes_unfenced(ctx, organization_id)?;
-    require_provider_principal(
+    let account = require_provider_principal(
         ctx,
         organization_id,
         params.provider_account_id,
@@ -844,6 +853,7 @@ pub fn record_crm_provider_delivery(
     }
     if conversation.channel != MessageChannel::WhatsApp
         || conversation.provider_account_id != Some(params.provider_account_id)
+        || account.company_id.is_some_and(|id| id != conversation.company_id)
     {
         return Err("conversation does not belong to this whatsapp provider account".to_string());
     }
@@ -1121,6 +1131,7 @@ pub fn append_crm_conversation_message(
     params: AppendCrmConversationMessageParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "operational_message", "write")?;
+    require_writes_unfenced(ctx, organization_id)?;
     if params.body.is_empty() {
         return Err("message body cannot be empty".to_string());
     }
@@ -1152,6 +1163,8 @@ pub fn append_crm_conversation_message(
         identity_id,
     )?;
     validate_user_message_intent(ctx, &params, &conversation, &contact_row)?;
+    let (conversation, operational_message_id) =
+        dispatch::prepare(ctx, conversation, &params.body, &params.status)?;
 
     let message = ctx
         .db
@@ -1165,7 +1178,7 @@ pub fn append_crm_conversation_message(
             body: params.body.clone(),
             status: params.status.clone(),
             provider_message_id: params.provider_message_id,
-            operational_message_id: params.operational_message_id,
+            operational_message_id,
             created_at: ctx.timestamp,
             created_by: ctx.sender(),
             metadata: params.metadata,

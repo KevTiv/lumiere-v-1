@@ -1,0 +1,56 @@
+name: Prepare WhatsApp source checks
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - 'api-server/src/routes/whatsapp_meta/**'
+      - 'api-server/src/routes/whatsapp_meta.rs'
+      - 'spacetimedb/src/crm/inbox*.rs'
+      - 'frontend/web/**whatsapp**'
+      - 'frontend/web/app/(modules)/crm/**'
+      - 'scripts/whatsapp-candidate-finalize.py'
+      - '.github/workflows/whatsapp-format-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  format-candidate:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'codex/whatsapp-meta-alpha-webhooks-20261022'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Finalize and format the feature-branch candidate
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/whatsapp-candidate-finalize.py
+          mapfile -d '' rust_files < <(git diff --name-only --diff-filter=ACMR -z "$BASE"...HEAD -- 'api-server/src/routes/whatsapp*.rs' 'api-server/src/routes/whatsapp_meta/**/*.rs' 'spacetimedb/src/crm/inbox*.rs')
+          if ((${#rust_files[@]})); then
+            rustfmt --edition 2021 --config skip_children=true "${rust_files[@]}"
+          fi
+          mapfile -d '' web_files < <(git diff --name-only --diff-filter=ACMR -z "$BASE"...HEAD -- 'frontend/web/lib/whatsapp*.ts' 'frontend/web/app/(modules)/crm/*.tsx' 'frontend/web/app/api/whatsapp/**/*.ts' 'frontend/web/tests/e2e/whatsapp*.ts')
+          if ((${#web_files[@]})); then
+            npx --yes prettier@3.6.2 --no-semi --trailing-comma all --print-width 100 --write "${web_files[@]}"
+          fi
+          git add -- "${rust_files[@]}" "${web_files[@]}" frontend/web/package.json Dockerfile.rust-runtime scripts/lumiere-runtime-entrypoint.sh
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(whatsapp): finalize recovery UI, content limits and runtime packaging'
+          git push origin "HEAD:refs/heads/$BRANCH"

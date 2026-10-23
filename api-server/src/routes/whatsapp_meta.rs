@@ -1,6 +1,7 @@
 //! Native Meta webhook -> durable transport inbox -> canonical CRM reducer.
 //! A 200 acknowledges durable storage, not delivery or financial settlement.
 mod inbound;
+mod operator;
 mod outbound;
 mod protocol;
 mod store;
@@ -89,7 +90,6 @@ async fn prepare_batch(state: &AppState, envelope: Envelope) -> Result<Vec<Incom
     let mut events = Vec::new();
     for entry in envelope.entry {
         for change in entry.changes {
-            // Subscribe to messages only until other fields have typed handlers.
             if change.field != "messages" {
                 return Err(ApiError::BadRequest(
                     "unconfigured meta webhook field".into(),
@@ -110,7 +110,6 @@ async fn prepare_batch(state: &AppState, envelope: Envelope) -> Result<Vec<Incom
                     items.extend(array.iter().map(|payload| (kind, payload.clone())));
                 }
             }
-            // Preserve error-only/unrecognized values as triage events too.
             if items.is_empty() {
                 items.push(("other", change.value.clone()));
             }
@@ -161,8 +160,6 @@ async fn receive_webhook(
     tokio::time::timeout(Duration::from_secs(5), store::persist(pool, &events))
         .await
         .map_err(|_| ApiError::Unavailable("meta inbox persistence timed out".into()))?
-        // PostgreSQL constraint failures may include raw row data. Do not pass
-        // their source to the general API logger or return provider payloads.
         .map_err(|_| ApiError::Unavailable("meta inbox persistence failed".into()))?;
     Ok((
         StatusCode::OK,
@@ -176,10 +173,11 @@ pub fn router() -> Router<Arc<AppState>> {
             "/webhooks/whatsapp/meta",
             get(verify_webhook).post(receive_webhook),
         )
+        .merge(operator::router())
         .layer(DefaultBodyLimit::max(MAX_PAYLOAD_BYTES))
 }
 
-/// Standalone restart-safe worker. No customer tokens or HTTP send endpoint.
+/// Standalone restart-safe incoming worker. Outbound sends require the user API.
 /// --migrate is explicit and is never performed on normal startup.
 pub(crate) async fn run_worker() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -240,7 +238,6 @@ pub(crate) async fn run_worker() -> anyhow::Result<()> {
             .await
             .is_err()
         {
-            // Lost completion is replayed through the canonical event ledger.
             tracing::warn!(inbox_id = lease.id, "whatsapp completion is unconfirmed");
         }
     }

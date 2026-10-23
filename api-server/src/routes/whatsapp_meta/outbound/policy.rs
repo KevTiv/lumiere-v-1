@@ -1,4 +1,4 @@
-//! Pure send eligibility; facts must come from canonical, current authority.
+//! Pure send eligibility; facts come from current canonical authority, not JSON input.
 use anyhow::{bail, Result};
 use serde_json::{json, Value};
 
@@ -24,8 +24,7 @@ pub(crate) struct ReviewedMessage {
     pub content: Content,
 }
 
-/// Not deserializable from browser or model input. The eventual canonical
-/// dispatch adapter must load these facts independently of ReviewedMessage.
+/// Not deserializable from browser or model input.
 pub(crate) struct Eligibility {
     pub organization_id: u64,
     pub company_id: u64,
@@ -90,7 +89,7 @@ pub(crate) fn reviewed_payload_digest(message: &ReviewedMessage) -> Result<Strin
     ])))
 }
 
-pub(super) fn validate(message: &ReviewedMessage, current: &Eligibility, now: u64) -> Result<()> {
+pub(crate) fn validate(message: &ReviewedMessage, current: &Eligibility, now: u64) -> Result<()> {
     let requested = (
         message.organization_id,
         message.company_id,
@@ -143,6 +142,7 @@ pub(super) fn validate(message: &ReviewedMessage, current: &Eligibility, now: u6
                 || !fresh
                 || name.is_empty()
                 || language.is_empty()
+                || parameters.len() > 20
                 || parameters.iter().any(|value| value.len() > 4000)
             {
                 bail!("exact current Meta template approval is required");
@@ -231,5 +231,18 @@ mod tests {
         current.meta_approval_checked_at_seconds = Some(200);
         assert!(validate(&message, &current, 200).is_ok());
         assert!(validate(&message, &current, 261).is_err());
+    }
+
+    #[test]
+    fn inbound_stop_and_quiet_hours_override_valid_reviews() {
+        let (message, mut current) = fixture();
+        current.opted_out = true;
+        assert!(validate(&message, &current, 101).is_err());
+        current.opted_out = false;
+        current.quiet_hours_allow = false;
+        assert!(validate(&message, &current, 101).is_err());
+        current.quiet_hours_allow = true;
+        current.company_id = 99;
+        assert!(validate(&message, &current, 101).is_err());
     }
 }
