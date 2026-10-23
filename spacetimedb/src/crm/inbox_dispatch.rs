@@ -4,6 +4,10 @@ use spacetimedb::{ReducerContext, Table};
 
 use super::*;
 
+fn company_scope_allows(assigned: Option<u64>, target: u64) -> bool {
+    target > 0 && assigned.is_none_or(|company| company == target)
+}
+
 fn select_sender(candidates: &[(u64, bool, bool)]) -> Result<Option<u64>, String> {
     let company_owned = candidates.iter().any(|candidate| candidate.1);
     let scoped: Vec<_> = candidates
@@ -59,6 +63,16 @@ pub(super) fn prepare(
     let Some(account_id) = account_id else {
         return Ok((conversation, None));
     };
+    let membership = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&ctx.sender())
+        .find(|member| member.organization_id == organization_id && member.is_active)
+        .ok_or("active organization membership is required to queue provider messages")?;
+    if !company_scope_allows(membership.company_id, company_id) {
+        return Err("provider message company is outside the actor's membership".into());
+    }
     let account = load_active_provider_account(ctx, organization_id, account_id)?;
     if account.company_id.is_some_and(|id| id != company_id) {
         return Err("WhatsApp sender belongs to another company".into());
@@ -140,5 +154,18 @@ mod tests {
             Some(2)
         );
         assert!(select_sender(&[(1, true, true), (2, true, true)]).is_err());
+    }
+}
+
+#[cfg(test)]
+mod company_scope_tests {
+    use super::company_scope_allows;
+
+    #[test]
+    fn native_provider_queue_scope_cannot_cross_company_membership() {
+        assert!(company_scope_allows(None, 3));
+        assert!(company_scope_allows(Some(3), 3));
+        assert!(!company_scope_allows(Some(2), 3));
+        assert!(!company_scope_allows(None, 0));
     }
 }

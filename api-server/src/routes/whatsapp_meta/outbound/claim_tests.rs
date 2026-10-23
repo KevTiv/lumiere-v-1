@@ -182,3 +182,57 @@ async fn postgres_revocation_after_claim_prevents_provider_io() -> Result<()> {
     assert_eq!(state, "rejected");
     Ok(())
 }
+
+#[tokio::test]
+#[ignore = "requires WHATSAPP_TEST_PG=1 and a local *_whatsapp_test database"]
+async fn postgres_late_callbacks_never_extend_the_window_or_clear_stop() -> Result<()> {
+    let (pool, message) = fixture().await?;
+    let original = chrono::Utc::now().timestamp() - 60;
+    let raw = json!({"id":"wamid.window","from":message.recipient,"type":"text",
+        "text":{"body":"Hello"},"timestamp":original.to_string()});
+    let mut event = Incoming {
+        organization_id: message.organization_id,
+        account_id: 2,
+        company_id: Some(3),
+        business_account_id: "123".into(),
+        phone_number_id: "456".into(),
+        kind: "message".into(),
+        event_key: event_key("message", &raw),
+        fingerprint: fingerprint(&raw),
+        payload: raw,
+    };
+    store::persist(&pool, &[event.clone()]).await?;
+    store::persist(&pool, &[event.clone()]).await?;
+    event.payload["id"] = json!("wamid.old-stop");
+    event.payload["text"]["body"] = json!("STOP");
+    event.payload["timestamp"] = json!((original - 172800).to_string());
+    event.event_key = event_key("message", &event.payload);
+    event.fingerprint = fingerprint(&event.payload);
+    store::persist(&pool, &[event.clone()]).await?;
+    // A conflicting provider event is quarantined, not admitted as new facts.
+    event.payload["text"]["body"] = json!("Hello again");
+    event.payload["timestamp"] = json!(chrono::Utc::now().timestamp().to_string());
+    event.fingerprint = fingerprint(&event.payload);
+    store::persist(&pool, &[event.clone()]).await?;
+    let client = pool.get().await?;
+    let row = client.query_one(
+        "SELECT last_customer_seconds,stopped_at IS NOT NULL FROM lumiere_whatsapp.recipient_state \
+         WHERE organization_id=$1 AND account_id='2' AND recipient=$2",
+        &[&message.organization_id.to_string(), &message.recipient],
+    ).await?;
+    assert_eq!(row.get::<_, i64>(0), original);
+    assert!(row.get::<_, bool>(1), "a delayed event must not clear STOP");
+    client
+        .execute(
+            "DELETE FROM lumiere_whatsapp.inbox WHERE organization_id=$1",
+            &[&message.organization_id.to_string()],
+        )
+        .await?;
+    client
+        .execute(
+            "DELETE FROM lumiere_whatsapp.recipient_state WHERE organization_id=$1",
+            &[&message.organization_id.to_string()],
+        )
+        .await?;
+    Ok(())
+}

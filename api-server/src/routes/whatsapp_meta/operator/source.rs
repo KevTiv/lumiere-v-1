@@ -487,3 +487,19 @@ mod tests {
         assert!(!quiet_minute_allowed(100, 100, 200));
     }
 }
+
+#[cfg(test)]
+mod message_content_tests {
+    use super::message_body;
+    use serde_json::json;
+
+    #[test]
+    fn message_content_is_not_limited_to_provider_identifier_length() {
+        let normal = json!({"body": "x".repeat(1000)});
+        assert_eq!(message_body(&normal, "body").unwrap().len(), 1000);
+        assert!(message_body(&json!({"body": "x".repeat(4001)}), "body").is_err());
+        assert!(message_body(&json!({"body": "💡".repeat(1100)}), "body").is_err());
+        assert!(message_body(&json!({"body": null}), "body").is_err());
+        assert!(message_body(&json!({}), "body").is_err());
+    }
+}
