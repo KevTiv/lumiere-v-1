@@ -169,10 +169,19 @@ test.describe("O2C adversarial certification", { tag: "@p0" }, () => {
     })
     await page.getByTestId("entity-action-confirm-orders").click()
 
-    // The user is told the result is unknown, not that it failed or worked.
-    await expect(page.getByText(/Result unknown/i).first()).toBeVisible({ timeout: 30_000 })
+    // The mutation notice must never offer a resend. A collection's read-only
+    // recovery action may coexist with it while canonical readback is unavailable.
+    const unknownResult = page.locator("[data-sonner-toast]").filter({ hasText: /Result unknown/i }).first()
+    await expect(unknownResult).toBeVisible({ timeout: 30_000 })
     expect(injected.lost()).toBe(true)
-    await expect(page.getByRole("button", { name: "Retry" })).toHaveCount(0)
+    await expect(unknownResult.getByRole("button", { name: "Retry", exact: true })).toHaveCount(0)
+    const readNotice = page.getByRole("alert").filter({ hasText: /Records could not be loaded|Some records could not be refreshed/i })
+    await Promise.all([
+      page.waitForResponse((response) => new URL(response.url()).pathname === "/api/query/sale-orders"
+        && response.request().method() === "GET" && response.status() === 503),
+      readNotice.getByRole("button", { name: "Retry", exact: true }).click(),
+    ])
+    expect(dispatches, "Retrying a failed read must not resend the committed confirmation").toBe(1)
     holdReadback = false
     await page.reload({ waitUntil: "domcontentloaded" })
 

@@ -230,13 +230,36 @@ pub(super) async fn read_document_child_rows(
 pub(super) async fn read_document_templates(
     client: &StdbClient,
     organization_id: u64,
+    company_ids: &[u64],
+    field_access: Option<&FieldAccessContext>,
 ) -> Result<Vec<Value>, ApiError> {
+    let columns =
+        resolve_http_sql_columns("document-templates", field_access).map_err(ApiError::Internal)?;
     let sql = format!(
-        "SELECT id, organization_id, company_id, name, model, report_type, body_html, header_html, footer_html, variable_bindings_json, is_default, is_active, create_date, write_date, metadata FROM document_template WHERE organization_id = {organization_id}"
+        "SELECT {} FROM document_template WHERE organization_id = {organization_id}",
+        columns.join(", ")
     );
     let mut rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
+    rows.retain(|row| template_row_in_company_scope(row, organization_id, company_ids));
     sort_rows_by_id_desc(&mut rows);
     return Ok(rows);
+}
+
+fn template_row_in_company_scope(row: &Value, organization_id: u64, company_ids: &[u64]) -> bool {
+    if organization_id == 0
+        || document_row_id(row, "organizationId", "organization_id") != Some(organization_id)
+    {
+        return false;
+    }
+    // Missing or conflicting fields are not an organization-wide template.
+    match (row.get("companyId"), row.get("company_id")) {
+        (Some(Value::Null), None)
+        | (None, Some(Value::Null))
+        | (Some(Value::Null), Some(Value::Null)) => true,
+        (Some(Value::Null), Some(_)) | (Some(_), Some(Value::Null)) | (None, None) => false,
+        _ => document_row_id(row, "companyId", "company_id")
+            .is_some_and(|company_id| company_ids.contains(&company_id)),
+    }
 }
 
 pub(super) async fn read_mail_templates(

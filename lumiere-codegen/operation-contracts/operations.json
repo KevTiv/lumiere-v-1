@@ -2758,14 +2758,14 @@
       "semantic_kind": "command"
     },
     "update_document_template": {
-      "client_facing": false,
+      "client_facing": true,
       "codec": {
         "id": "spacetimedb-sats-json",
         "version": 1
       },
-      "evidence": "spacetimedb/src/documents/templates.rs:235 reducer body shows keyed overwrite/delete or recomputation; denied.",
+      "evidence": "spacetimedb/src/documents/templates.rs:update_document_template performs a permission-checked keyed update in the exact organization/company scope; invoice profiles remain immutable; session-exposed for template editing, deactivation and reactivation.",
       "idempotency": "idempotent",
-      "semantic_kind": "internal"
+      "semantic_kind": "command"
     },
     "update_fleet_vehicle": {
       "client_facing": true,

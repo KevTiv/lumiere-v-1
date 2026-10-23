@@ -429,6 +429,7 @@ pub fn test_documents_create_and_lock(ctx: &ReducerContext) -> Result<(), String
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     let checksum = "a".repeat(64);
+    let initial_metadata = r#"{"generatedQuotation":{"schemaVersion":1,"revision":"reviewed","templateSnapshot":{"name":"Original layout"}}}"#.to_string();
 
     create_document_folder(
         ctx,
@@ -480,7 +481,7 @@ pub fn test_documents_create_and_lock(ctx: &ReducerContext) -> Result<(), String
             retention_days: None,
             fiscal_kind: None,
             residency_region: None,
-            metadata: None,
+            metadata: Some(initial_metadata.clone()),
         },
     )?;
 
@@ -504,6 +505,45 @@ pub fn test_documents_create_and_lock(ctx: &ReducerContext) -> Result<(), String
         .ok_or("version missing")?;
     if version.organization_id != org_id {
         return Err("version organization_id mismatch".to_string());
+    }
+    if version.metadata.as_deref() != Some(initial_metadata.as_str()) {
+        return Err("initial document version lost its captured provenance".to_string());
+    }
+
+    update_document(
+        ctx,
+        org_id,
+        doc.id,
+        UpdateDocumentParams {
+            name: None,
+            description: None,
+            folder_id: None,
+            tag_ids: None,
+            is_favorite: None,
+            res_model: None,
+            res_id: None,
+            partner_id: None,
+            metadata: Some(r#"{"userNote":"A later document edit"}"#.to_string()),
+        },
+    )?;
+    let edited_document = ctx
+        .db
+        .document()
+        .id()
+        .find(&doc.id)
+        .ok_or("document gone after metadata edit")?;
+    let preserved_version = ctx
+        .db
+        .document_version()
+        .id()
+        .find(&version.id)
+        .ok_or("initial version gone after metadata edit")?;
+    if edited_document.metadata == version.metadata
+        || preserved_version.metadata.as_deref() != Some(initial_metadata.as_str())
+        || preserved_version.checksum != version.checksum
+        || preserved_version.url != version.url
+    {
+        return Err("editable document metadata changed its immutable initial version".to_string());
     }
 
     lock_document(ctx, org_id, doc.id, None)?;
@@ -606,6 +646,17 @@ pub fn test_documents_create_and_lock(ctx: &ReducerContext) -> Result<(), String
     }
     if versioned.url.as_deref() != Some(v2_url.as_str()) {
         return Err("document must mirror the current version blob".to_string());
+    }
+    let original = versions
+        .iter()
+        .find(|candidate| candidate.id == version.id)
+        .ok_or("initial version missing after new upload")?;
+    if original.metadata.as_deref() != Some(initial_metadata.as_str())
+        || original.url != version.url
+        || original.checksum != version.checksum
+        || original.is_current
+    {
+        return Err("new upload changed the initial output bytes or provenance".to_string());
     }
 
     // COV-18: a deleted document can be neither locked nor versioned.

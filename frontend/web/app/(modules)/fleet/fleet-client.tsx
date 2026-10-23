@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView, MissingOrganization, type EntityRow, type ModuleConfig } from "@lumiere/ui"
 import { fleetModuleConfig } from "@/lib/module-dashboard-configs"
@@ -54,11 +55,14 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
 
   useFleetModuleSubscription()
 
-  const { data: vehicles = initialVehicles ?? [] } = useFleetVehicles(orgId, initialVehicles)
+  const vehiclesRead = moduleCollection(useFleetVehicles(orgId, initialVehicles))
+  const vehicles = vehiclesRead.rows
   const { data: employees = [] } = useEmployees(orgId)
   const { data: serviceTypes = [] } = useFleetServiceTypes(orgId)
-  const { data: serviceRecords = [] } = useFleetServiceRecords(orgId)
-  const { data: inspections = [] } = useFleetInspections(orgId)
+  const serviceRecordsRead = moduleCollection(useFleetServiceRecords(orgId))
+  const serviceRecords = serviceRecordsRead.rows
+  const inspectionsRead = moduleCollection(useFleetInspections(orgId))
+  const inspections = inspectionsRead.rows
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const fleetActions = useFleetActions(orgId, company ?? undefined)
@@ -143,6 +147,12 @@ function FleetClientLoaded({ initialVehicles, organizationId }: FleetClientLoade
         "fleet-driver-assignment": vehicleRows,
         "fleet-service-records": withVehicleNames(serviceRecordRows as unknown as EntityRow[], vehicleRows),
         "fleet-inspections": withVehicleNames(inspectionRows as unknown as EntityRow[], vehicleRows),
+      }}
+      dataState={{
+        "fleet-vehicles": vehiclesRead.state,
+        "fleet-driver-assignment": vehiclesRead.state,
+        "fleet-service-records": serviceRecordsRead.state,
+        "fleet-inspections": inspectionsRead.state,
       }}
       isPending={fleetActions.isPending}
       onFormSubmit={async (_tabId, action, formData) => {

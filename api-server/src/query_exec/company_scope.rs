@@ -157,6 +157,31 @@ pub(crate) async fn resolve_membership_company_id(
     enforce_requested_company(allowed, requested_company_id, denied_message)
 }
 
+/// Template management may list every authorized company for an organization-wide
+/// member. A selected company narrows that list, while bound members never expand it.
+pub(crate) async fn resolve_template_company_ids(
+    client: &StdbClient,
+    organization_id: u64,
+    identity_hex: &str,
+    requested_company_id: Option<u64>,
+) -> Result<Vec<u64>, ApiError> {
+    if requested_company_id.is_none()
+        && has_organization_wide_company_access(client, organization_id, identity_hex).await?
+    {
+        return company_ids_for_organization(client, organization_id, None).await;
+    }
+    Ok(vec![
+        resolve_membership_company_id(
+            client,
+            organization_id,
+            identity_hex,
+            requested_company_id,
+            "Cannot query another company's document templates",
+        )
+        .await?,
+    ])
+}
+
 async fn has_organization_wide_company_access(
     client: &StdbClient,
     organization_id: u64,
