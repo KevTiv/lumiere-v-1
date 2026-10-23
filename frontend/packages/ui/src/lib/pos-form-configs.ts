@@ -52,7 +52,7 @@ export const posFormConfigs = (t: TFunction): Record<PosFormAction, FormConfig> 
         id: "terminal-status",
         fields: [
           { id: "terminal-status-value", type: "text", name: "status", label: t("pos.admin.forms.fields.status"), required: true },
-          { id: "terminal-revenue", type: "number", name: "dailyRevenue", label: t("pos.admin.forms.fields.dailyRevenue"), width: "1/2" },
+          { id: "terminal-revenue", type: "money", name: "dailyRevenue", label: t("pos.admin.forms.fields.dailyRevenue"), width: "1/2" },
           { id: "terminal-open-orders", type: "number", name: "openOrders", label: t("pos.admin.forms.fields.openOrders"), width: "1/2" },
         ],
       },
@@ -107,7 +107,7 @@ export const posFormConfigs = (t: TFunction): Record<PosFormAction, FormConfig> 
         id: "session",
         fields: [
           { id: "config-id", type: "select", name: "configId", label: t("pos.admin.forms.fields.config"), required: true, width: "1/2", options: [] },
-          { id: "opening-balance", type: "number", name: "openingBalance", label: t("pos.admin.forms.fields.openingBalance"), width: "1/2" },
+          { id: "opening-balance", type: "money", name: "openingBalance", label: t("pos.admin.forms.fields.openingBalance"), width: "1/2" },
         ],
       },
     ],
@@ -134,7 +134,7 @@ export const posFormConfigs = (t: TFunction): Record<PosFormAction, FormConfig> 
         id: "session",
         fields: [
           { id: "session-id", type: "select", name: "sessionId", label: t("pos.admin.forms.fields.session"), required: true, width: "1/2", options: [] },
-          { id: "closing-balance", type: "number", name: "closingBalance", label: t("pos.admin.forms.fields.closingBalance"), width: "1/2" },
+          { id: "closing-balance", type: "money", name: "closingBalance", label: t("pos.admin.forms.fields.closingBalance"), width: "1/2" },
         ],
       },
     ],

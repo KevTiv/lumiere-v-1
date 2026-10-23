@@ -466,7 +466,7 @@ export const completeDocumentProcessingJobForm = (t: TFunction): FormConfig => (
         {
           id: "cost",
           name: "cost",
-          type: "number",
+          type: "money",
           label: t("documents.forms.completeProcessingJob.fields.cost"),
           width: "1/2",
         },

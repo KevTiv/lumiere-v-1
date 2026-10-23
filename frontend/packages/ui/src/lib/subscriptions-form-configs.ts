@@ -308,7 +308,7 @@ export const newDeferredRevenueScheduleForm = (t: TFunction): FormConfig => ({
         {
           id: "totalAmount",
           name: "totalAmount",
-          type: "number",
+          type: "money",
           label: t("subscriptions.forms.deferredSchedule.fields.totalAmount"),
           required: true,
           width: "1/2",
@@ -316,7 +316,7 @@ export const newDeferredRevenueScheduleForm = (t: TFunction): FormConfig => ({
         {
           id: "recognizedAmount",
           name: "recognizedAmount",
-          type: "number",
+          type: "money",
           label: t("subscriptions.forms.deferredSchedule.fields.recognizedAmount"),
           placeholder: "0",
           width: "1/2",
@@ -668,7 +668,7 @@ export const paySubscriptionInvoiceForm = (t: TFunction): FormConfig => ({
         {
           id: "amount",
           name: "amount",
-          type: "number",
+          type: "money",
           label: t("subscriptions.forms.payInvoice.fields.amount", {
             defaultValue: "Amount (blank = residual)",
           }),
@@ -826,7 +826,7 @@ export const amendSubscriptionForm = (t: TFunction): FormConfig => ({
         {
           id: "newQuantity",
           name: "newQuantity",
-          type: "number",
+          type: "quantity",
           label: t("subscriptions.forms.amend.fields.newQuantity", { defaultValue: "New quantity" }),
           width: "1/2",
         },
@@ -988,7 +988,7 @@ export const ingestSubscriptionUsageEventForm = (t: TFunction): FormConfig => ({
         {
           id: "quantity",
           name: "quantity",
-          type: "number",
+          type: "quantity",
           label: t("subscriptions.forms.ingestUsage.fields.quantity", { defaultValue: "Quantity" }),
           required: true,
           width: "1/2",
@@ -1037,7 +1037,7 @@ export const createSubscriptionPriceTierForm = (t: TFunction): FormConfig => ({
         {
           id: "minQty",
           name: "minQty",
-          type: "number",
+          type: "quantity",
           label: t("subscriptions.forms.priceTier.fields.minQty", { defaultValue: "Min qty" }),
           required: true,
           defaultValue: 0,
@@ -1046,7 +1046,7 @@ export const createSubscriptionPriceTierForm = (t: TFunction): FormConfig => ({
         {
           id: "maxQty",
           name: "maxQty",
-          type: "number",
+          type: "quantity",
           label: t("subscriptions.forms.priceTier.fields.maxQty", {
             defaultValue: "Max qty (empty = open)",
           }),
@@ -1055,7 +1055,7 @@ export const createSubscriptionPriceTierForm = (t: TFunction): FormConfig => ({
         {
           id: "unitPrice",
           name: "unitPrice",
-          type: "number",
+          type: "money",
           label: t("subscriptions.forms.priceTier.fields.unitPrice", { defaultValue: "Unit price" }),
           required: true,
           width: "1/3",
@@ -1079,7 +1079,7 @@ export const setSubscriptionCommitmentForm = (t: TFunction): FormConfig => ({
         {
           id: "minAmount",
           name: "minAmount",
-          type: "number",
+          type: "money",
           label: t("subscriptions.forms.commitment.fields.minAmount", {
             defaultValue: "Minimum amount",
           }),

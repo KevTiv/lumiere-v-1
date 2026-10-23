@@ -6,6 +6,7 @@ import type { FormField, FormValues } from "../lib/form-types"
 import { fieldWidthClasses, isPlainTextareaField } from "../lib/form-types"
 import { Input } from "../components/input"
 import { Textarea } from "../components/textarea"
+import { NumericInput } from "../components/numeric-input"
 import { Checkbox } from "../components/checkbox"
 import { Switch } from "../components/switch"
 import { Label } from "../components/label"
@@ -114,6 +115,29 @@ export function FormFieldRenderer({
             min={field.validation?.min}
             max={field.validation?.max}
             inputMode={inputModeForField(field)}
+            aria-invalid={!!error}
+            aria-describedby={describedBy}
+            className={cn(inputBase, error && "border-destructive focus-visible:ring-destructive/20")}
+          />
+        )
+
+      case "money":
+      case "percent":
+      case "quantity":
+        return (
+          <NumericInput
+            id={field.id}
+            name={field.name}
+            data-testid={`form-field-${field.name}`}
+            kind={field.type}
+            currency={field.type === "money" ? field.currency : undefined}
+            unit={field.type === "quantity" ? field.unit : undefined}
+            decimals={field.decimals}
+            placeholder={field.placeholder}
+            value={value}
+            onValueChange={onChange}
+            disabled={field.disabled}
+            required={field.required}
             aria-invalid={!!error}
             aria-describedby={describedBy}
             className={cn(inputBase, error && "border-destructive focus-visible:ring-destructive/20")}

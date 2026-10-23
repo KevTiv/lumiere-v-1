@@ -7,6 +7,8 @@ import { useAiFormSuggest } from "@lumiere/query-hooks/hooks/ai-forms"
 import { cn } from "../lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
 import type { AiFormAssistConfig, FormConfig, FormField, FormPreviewRenderer, FormValues } from "../lib/form-types"
+import { isNumericField, numericFieldBounds } from "../lib/form-types"
+import { storedNumericValue } from "../lib/numeric-format"
 import { serializeAiFormSchema } from "../lib/ai-form-schema"
 import { FormFieldRenderer } from "./forms-field-render"
 import { formValuesDiffer } from "./use-unsaved-changes-guard"
@@ -109,6 +111,9 @@ export function ModularForm({
               values[field.name] = false
               break
             case "number":
+            case "money":
+            case "percent":
+            case "quantity":
               values[field.name] = ""
               break
             case "file":
@@ -289,6 +294,17 @@ export function ModularForm({
     }
     if (format === "url") {
       return t("common.validation.invalidUrl")
+    }
+
+    if (isNumericField(field)) {
+      // Unparseable text stays in the value so the field can say so instead of submitting it.
+      const numeric = storedNumericValue(value)
+      if (numeric === null) return t("common.validation.invalidNumber")
+      const { min, max } = numericFieldBounds(field)
+      if (numeric !== undefined) {
+        if (min !== undefined && numeric < min) return t("common.validation.min", { min })
+        if (max !== undefined && numeric > max) return t("common.validation.max", { max })
+      }
     }
 
     if (field.validation) {

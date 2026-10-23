@@ -240,7 +240,8 @@
       "max": "Maximum value is {{max}}",
       "invalidFormat": "Invalid format",
       "invalidEmail": "Invalid email address",
-      "invalidUrl": "Invalid web address"
+      "invalidUrl": "Invalid web address",
+      "invalidNumber": "Enter a number"
     },
     "form": {
       "unavailableSelection": "Unavailable selection: {{value}}"

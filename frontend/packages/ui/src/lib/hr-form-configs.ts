@@ -191,7 +191,7 @@ export const newContractForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "contract-wage",
-          type: "number",
+          type: "money",
           name: "wage",
           label: t("hr.forms.newContract.fields.wage"),
           placeholder: "0.00",
@@ -273,7 +273,7 @@ export const newPayslipForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "payslip-basic-wage",
-          type: "number",
+          type: "money",
           name: "basicWage",
           label: t("hr.forms.newPayslip.fields.basicWage"),
           placeholder: "0.00",
@@ -566,7 +566,7 @@ export const newSalaryRuleForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "rule-amount-fix",
-          type: "number",
+          type: "money",
           name: "amountFix",
           label: t("hr.forms.newSalaryRule.fields.amountFix"),
           width: "1/2",
@@ -787,7 +787,7 @@ export const editContractForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "contract-edit-wage",
-          type: "number",
+          type: "money",
           name: "wage",
           label: t("hr.forms.newContract.fields.wage"),
           width: "1/2",
