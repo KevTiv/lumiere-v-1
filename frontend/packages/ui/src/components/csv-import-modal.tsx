@@ -18,6 +18,8 @@ import { CsvImportHistory } from "../import-assistant/csv-import-history"
 import { AccountingImportReview } from "../import-assistant/accounting-import-review"
 import { accountingImportReview } from "../lib/accounting-import-review"
 import type { AbandonedAccountingImportCleanupProps } from "../import-assistant/abandoned-accounting-import-cleanup"
+import type { ModuleDataState } from "../lib/module-data-state"
+import { ModuleDataNotice } from "../pages/module-data-notice"
 import { Button } from "./button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog"
 import { Input } from "./input"
@@ -48,6 +50,8 @@ export interface CsvImportModalProps {
   abandonedAccountingCleanup?: Omit<AbandonedAccountingImportCleanupProps, "jobs">
   /** Optional app-level reader that converts CSV or spreadsheet files to canonical CSV text. */
   fileReader?: (file: File) => Promise<{ csvText: string }>
+  /** Gate new submissions without discarding an existing tracked request or its recovery UI. */
+  sourceState?: ModuleDataState
 }
 
 function downloadTemplate(columns: CsvImportColumns, fileName: string) {
@@ -79,6 +83,7 @@ export function CsvImportModal({
   trackedImport,
   abandonedAccountingCleanup,
   fileReader,
+  sourceState,
 }: CsvImportModalProps) {
   const { t } = useTranslation()
   const [fileName, setFileName] = useState("")
@@ -94,14 +99,18 @@ export function CsvImportModal({
   const fileReadId = useRef(0)
   const trackedMutation = useTrackedCsvImport()
   const trackSubmission = trackedImport && tableName && supportsTrackedCsvImport(tableName)
+  const sourceReady = sourceState === undefined || sourceState.status === "ready"
+  const sourceReadyRef = useRef(sourceReady)
+  sourceReadyRef.current = sourceReady
   const scope = `${organizationId ?? ""}:${trackedImport?.companyId ?? companyId ?? ""}:${tableName ?? ""}`
   const currentScope = useRef(scope)
   currentScope.current = scope
   const sourceScopeChanged = fileScope != null && fileScope !== scope
   const review = useMemo(() => csvText ? accountingImportReview(csvText, tableName) : null, [csvText, tableName])
-  const canSubmit = canSubmitCsvImport(analysis) && !sourceScopeChanged && (!review || (reviewed && !review.issues.length))
+  const canSubmit = sourceReady && canSubmitCsvImport(analysis) && !sourceScopeChanged && (!review || (reviewed && !review.issues.length))
 
   const handleFile = async (file: File | undefined) => {
+    if (!sourceReadyRef.current || busy || submitted || request) return
     const readId = ++fileReadId.current
     const selectedScope = scope
     setError(null)
@@ -114,11 +123,11 @@ export function CsvImportModal({
     if (!file) return
     try {
       const text = fileReader ? (await fileReader(file)).csvText : await file.text()
-      if (readId !== fileReadId.current || selectedScope !== currentScope.current) return
+      if (!sourceReadyRef.current || readId !== fileReadId.current || selectedScope !== currentScope.current) return
       setAnalysis(analyzeCsv(text, columns))
       setCsvText(text)
     } catch (cause) {
-      if (readId !== fileReadId.current || selectedScope !== currentScope.current) return
+      if (!sourceReadyRef.current || readId !== fileReadId.current || selectedScope !== currentScope.current) return
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {
       if (readId === fileReadId.current) setIsReading(false)
@@ -126,7 +135,7 @@ export function CsvImportModal({
   }
 
   const handleSubmit = async () => {
-    if (!canSubmit || isReading || isSubmitting || submitted) return
+    if (!sourceReadyRef.current || !canSubmit || busy || submitted || request) return
     setError(null)
     setIsSubmitting(true)
     try {
@@ -174,9 +183,12 @@ export function CsvImportModal({
         </DialogHeader>
 
         <div className="space-y-4">
+          <ModuleDataNotice state={sourceState} />
+          {sourceState?.status === "loading" ? <p role="status" className="text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p> : null}
           {request ? <CsvImportResult request={request} initialPending={isSubmitting} initialError={error} activeOrganizationId={organizationId} activeCompanyId={trackedImport?.companyId ?? companyId} onNewFile={() => {
+            if (!sourceReadyRef.current || busy) return
             setRequest(null); setSubmitted(false); setError(null); setAnalysis(null); setCsvText(""); setFileName(""); setReviewed(false); setFileScope(null)
-          }} /> : organizationId && (submitted || abandonedAccountingCleanup) ? (
+          }} /> : sourceReady && organizationId && (submitted || abandonedAccountingCleanup) ? (
             <CsvImportHistory
               organizationId={organizationId}
               tableName={tableName}
@@ -202,7 +214,7 @@ export function CsvImportModal({
                   ? ".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   : ".csv,text/csv,text/plain"
               }
-              disabled={busy}
+              disabled={busy || !sourceReady}
               onChange={(event) => void handleFile(event.target.files?.[0])}
             />
             {columns ? (
@@ -218,7 +230,7 @@ export function CsvImportModal({
             ) : null}
           </div>
 
-          {analysis ? (
+          {analysis && sourceReady ? (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
                 {t("common.csvImportDialog.rowCount", {
@@ -272,7 +284,7 @@ export function CsvImportModal({
           ) : null}
 
           </> : null}
-          {error && !request ? (
+          {error && !request && sourceReady ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
             </p>

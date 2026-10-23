@@ -2,8 +2,9 @@
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import {
   ModuleView,
@@ -14,7 +15,6 @@ import {
   newKnowledgeCategoryForm,
   newDocumentFolderForm,
   newDocumentProcessingJobForm,
-  newDocumentTemplateForm,
   newMailTemplateForm,
   uploadDocumentVersionForm,
   editKnowledgeArticleForm,
@@ -30,9 +30,12 @@ import {
   useFormDialog,
 } from "@lumiere/ui"
 import type { EntityAction, EntityViewConfig, FormConfig } from "@lumiere/ui"
+import type { EntityRow } from "@lumiere/ui/lib/entity-view-types"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState, type ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { documentsModuleConfig } from "@/lib/module-dashboard-configs"
 import { useDocumentsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -88,7 +91,7 @@ import type {
 import {
   useDocumentTemplates,
   useMailTemplates,
-  useCreateDocumentTemplate,
+  useUpdateDocumentTemplate,
   useCreateMailTemplate,
 } from "@lumiere/query-hooks/hooks/templates"
 import {
@@ -101,7 +104,6 @@ import {
   toCreateDocumentProcessingJobParams,
   toCreateKnowledgeArticleParams,
   toCreateKnowledgeCategoryParams,
-  toCreateDocumentTemplateParams,
   toCreateMailTemplateParams,
   toAddDocumentVersionParams,
   toUpdateKnowledgeArticleParams,
@@ -113,6 +115,7 @@ import { documentNameFromFile, toBrowserFiles, toBrowserFolders } from "./file-b
 import { FileBrowser } from "@lumiere/ui"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { documentFolderCanBeDeleted } from "./document-folder-gates"
+import { DocumentTemplateDesignerDialog, customizableDocumentTemplate, type DocumentTemplateDesignSource } from "./document-template-designer-dialog"
 import {
   canDeleteKnowledgeCategory,
   canRemoveArticleMember,
@@ -274,6 +277,15 @@ function DocumentsClientLoaded({
   const moduleConfig = useMemo(() => documentsModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
+  const session = useErpSession()
+  const { checkPermission, currentUser, permissionsReady } = useRBAC()
+  const templateScope = useMemo(() => ({ identity: session.identity, companyId: session.activeCompanyId }), [session.identity, session.activeCompanyId])
+  const templateScopeReady = session.organizationId === organizationId && session.activeCompanyReady === true && Boolean(session.identity) && session.identity !== "unknown" &&
+    (session.activeCompanyId === null || (typeof session.activeCompanyId === "number" && Number.isSafeInteger(session.activeCompanyId) && session.activeCompanyId > 0 && session.companyIds?.includes(session.activeCompanyId) === true))
+  const templatePermissionsReady = permissionsReady && currentUser?.id === session.identity
+  const templateScopeKey = JSON.stringify([organizationId, session.organizationId, session.identity, templateScopeReady, session.activeCompanyId])
+  const [templateDesigner, setTemplateDesigner] = useState<{ scopeKey: string; mode: "create" | "edit" | "duplicate"; template?: DocumentTemplateDesignSource } | null>(null)
+  useEffect(() => { setTemplateDesigner(null) }, [templateScopeKey])
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [csvKind, setCsvKind] = useState<"knowledge_category" | "knowledge_article" | null>(null)
   const [processingToolbarError, setProcessingToolbarError] = useState<string | null>(null)
@@ -288,18 +300,40 @@ function DocumentsClientLoaded({
   const router = useRouter()
   const identityLabels = useIdentityLabelMap(orgId)
 
-  const { data: documents = [] } = useDocuments(orgId, initialDocuments)
-  const { data: deletedDocuments = [] } = useDeletedDocuments(
-    orgId,
-    initialDeletedDocuments,
+  const documentsRead = moduleCollection(useDocuments(orgId, initialDocuments))
+  const documents = documentsRead.rows
+  const deletedDocumentsRead = moduleCollection(useDeletedDocuments(orgId, initialDeletedDocuments))
+  const deletedDocuments = deletedDocumentsRead.rows
+  const articlesRead = moduleCollection(useKnowledgeArticles(orgId, initialArticles))
+  const articles = articlesRead.rows
+  const categoriesRead = moduleCollection(useKnowledgeCategories(orgId, initialCategories))
+  const categories = categoriesRead.rows
+  const foldersRead = moduleCollection(useDocumentFolders(orgId, initialFolders))
+  const folders = foldersRead.rows
+  const processingJobsRead = moduleCollection(useAiDocumentProcessingJobs(orgId, initialProcessingJobs))
+  const processingJobs = processingJobsRead.rows
+  const aiInsightsRead = moduleCollection(useAiInsightsForOrg(orgId, initialAiInsights))
+  const aiInsights = aiInsightsRead.rows
+  const canReadTemplates = templateScopeReady && templatePermissionsReady && checkPermission("document_template", "read").allowed
+  const templatesQuery = useDocumentTemplates(
+    organizationId,
+    canReadTemplates,
+    templateScope,
   )
-  const { data: articles = [] } = useKnowledgeArticles(orgId, initialArticles)
-  const { data: categories = [] } = useKnowledgeCategories(orgId, initialCategories)
-  const { data: folders = [] } = useDocumentFolders(orgId, initialFolders)
-  const { data: processingJobs = [] } = useAiDocumentProcessingJobs(orgId, initialProcessingJobs)
-  const { data: aiInsights = [] } = useAiInsightsForOrg(orgId, initialAiInsights)
-  const { data: documentTemplates = [] } = useDocumentTemplates(organizationId)
-  const { data: mailTemplates = [] } = useMailTemplates(organizationId)
+  const templateDataState: ModuleDataState = !templateScopeReady || !templatePermissionsReady
+    ? { status: "loading" }
+    : !canReadTemplates ? { status: "denied", message: t("documents.designer.readDenied", { defaultValue: "You do not have access to this template library." }) }
+      : moduleQueryState({ ...templatesQuery, isLoading: templatesQuery.isPending })
+  const documentTemplates = canReadTemplates && canUseModuleData(templateDataState) ? templatesQuery.data ?? [] : []
+  const templateActionScope = useRef({ key: templateScopeKey, ready: false, create: false, write: false })
+  templateActionScope.current = {
+    key: templateScopeKey,
+    ready: canReadTemplates === true && canUseModuleData(templateDataState) && typeof session.activeCompanyId === "number",
+    create: templatePermissionsReady === true && checkPermission("document_template", "create").allowed === true,
+    write: templatePermissionsReady === true && checkPermission("document_template", "write").allowed === true,
+  }
+  const mailTemplatesRead = moduleCollection(useMailTemplates(organizationId))
+  const mailTemplates = mailTemplatesRead.rows
   const { data: aiAgents = [] } = useAiAgents(organizationId, organizationId > 0)
   const createDocument = useCreateDocument(orgId, operatingCompanyId)
   const updateDocument = useUpdateDocument(orgId)
@@ -325,13 +359,13 @@ function DocumentsClientLoaded({
   const updateKnowledgeCategory = useUpdateKnowledgeCategory(orgId)
   const deleteKnowledgeCategory = useDeleteKnowledgeCategory(orgId)
   const scheduleRetentionPurge = useScheduleDocumentRetentionPurge(orgId)
-  const { askForm, formDialog } = useFormDialog()
+  const { askForm, cancelForm, formDialog } = useFormDialog()
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const createKnowledgeCategory = useCreateKnowledgeCategory(orgId, operatingCompanyId)
   const createDocumentFolder = useCreateDocumentFolder(orgId)
   const updateDocumentFolder = useUpdateDocumentFolder(orgId)
   const deleteDocumentFolder = useDeleteDocumentFolder(orgId)
-  const createDocumentTemplate = useCreateDocumentTemplate(organizationId)
+  const updateDocumentTemplate = useUpdateDocumentTemplate(organizationId, templateScope)
   const createMailTemplate = useCreateMailTemplate(organizationId)
   const createProcessingJob = useCreateDocumentProcessingJob(orgId, operatingCompanyId)
   const completeProcessingJob = useCompleteDocumentProcessingJob(orgId)
@@ -339,7 +373,6 @@ function DocumentsClientLoaded({
   const acknowledgeInsight = useAcknowledgeInsight(orgId)
   const csvImports = useDocumentsCsvImportMutations(orgId)
   const versionFormConfig = useMemo(() => uploadDocumentVersionForm(t), [t])
-  const documentTemplateFormConfig = useMemo(() => newDocumentTemplateForm(t), [t])
   const mailTemplateFormConfig = useMemo(() => newMailTemplateForm(t), [t])
   const articleMemberFormConfig = useMemo(() => addArticleMemberForm(t), [t])
 
@@ -624,6 +657,85 @@ function DocumentsClientLoaded({
         return w
           })
   }, [documents, articles, moduleConfig, t, documentFormConfig, knowledgeArticleFormConfig])
+
+  const templateDesignerActions = useMemo<EntityAction[]>(() => {
+    const companyId = session.activeCompanyId
+    if (!templateScopeReady || typeof companyId !== "number" || !templatePermissionsReady || !canReadTemplates || !canUseModuleData(templateDataState)) return []
+    // Confirmation dialogs may retain an old action closure across a company
+    // switch. Re-check the live scope and permission before dispatching it.
+    const assertAction = (action: "create" | "write") => {
+      const current = templateActionScope.current
+      if (current.key !== templateScopeKey || !current.ready || !current[action]) throw new Error(t("documents.designer.actionScopeChanged", { defaultValue: "Your company or template permissions changed. Select the template again." }))
+    }
+    const sourceFor = (rows: EntityRow[]) => {
+      const row = rows.length === 1 ? documentTemplates.find((item) => String(item.id) === String(rows[0]?.id)) : undefined
+      return row ? customizableDocumentTemplate(row, organizationId, companyId) : null
+    }
+    const openExisting = (rows: EntityRow[], mode: "edit" | "duplicate") => {
+      assertAction(mode === "edit" ? "write" : "create")
+      const source = sourceFor(rows)
+      if (!source) throw new Error(t("documents.designer.selectSupported", { defaultValue: "Select a template created with the visual designer." }))
+      setDocumentToolbarError(null)
+      setTemplateDesigner({ scopeKey: templateScopeKey, mode, template: source })
+    }
+    return [
+      {
+        id: "design-document-template",
+        label: t("documents.designer.createAction", { defaultValue: "New template" }),
+        variant: "default",
+        permission: { resource: "document_template", action: "create" },
+        onClick: () => {
+          assertAction("create")
+          setDocumentToolbarError(null)
+          setTemplateDesigner({ scopeKey: templateScopeKey, mode: "create" })
+        },
+      },
+      {
+        id: "edit-document-template",
+        label: t("documents.designer.editAction", { defaultValue: "Edit template" }),
+        requiresSelection: true,
+        selection: "single",
+        permission: { resource: "document_template", action: "write" },
+        isApplicable: (rows) => Boolean(sourceFor(rows)),
+        onClick: (rows) => openExisting(rows, "edit"),
+      },
+      {
+        id: "duplicate-document-template",
+        label: t("documents.designer.copyAction", { defaultValue: "Duplicate template" }),
+        requiresSelection: true,
+        selection: "single",
+        permission: { resource: "document_template", action: "create" },
+        isApplicable: (rows) => Boolean(sourceFor(rows)),
+        onClick: (rows) => openExisting(rows, "duplicate"),
+      },
+      ...([false, true] as const).map((active): EntityAction => ({
+        id: active ? "reactivate-document-template" : "deactivate-document-template",
+        label: active ? t("documents.designer.reactivate", { defaultValue: "Reactivate" }) : t("documents.designer.deactivate", { defaultValue: "Deactivate" }),
+        requiresSelection: true,
+        selection: "single",
+        permission: { resource: "document_template", action: "write" },
+        isApplicable: (rows) => {
+          const source = sourceFor(rows)
+          return Boolean(source && (source.row.isActive ?? source.row.is_active ?? false) !== active)
+        },
+        confirm: active ? undefined : {
+          title: t("documents.designer.deactivateTitle", { defaultValue: "Deactivate this template?" }),
+          description: t("documents.designer.deactivateDescription", { defaultValue: "It will no longer appear in text fields or be available for new document output. Existing content stays unchanged, and you can reactivate it later." }),
+          confirmLabel: t("documents.designer.deactivate", { defaultValue: "Deactivate" }),
+          cancelLabel: t("common.cancel", { defaultValue: "Cancel" }),
+        },
+        successMessage: active ? t("documents.designer.reactivated", { defaultValue: "Template reactivated" }) : t("documents.designer.deactivated", { defaultValue: "Template deactivated" }),
+        onClick: async (rows) => {
+          assertAction("write")
+          const source = sourceFor(rows)
+          if (!source) throw new Error(t("documents.designer.selectSupported", { defaultValue: "Select a template created with the visual designer." }))
+          const sourceCompany = source.row.companyId !== undefined ? source.row.companyId : source.row.company_id
+          if (sourceCompany === undefined) throw new Error(t("documents.designer.scopeError", { defaultValue: "This template is no longer available in the current company." }))
+          await updateDocumentTemplate.mutateAsync({ templateId: source.row.id, companyId: sourceCompany, params: { isActive: active } })
+        },
+      })),
+    ]
+  }, [session.activeCompanyId, templateScopeReady, templatePermissionsReady, canReadTemplates, templateDataState.status, t, checkPermission, templateScopeKey, documentTemplates, organizationId, updateDocumentTemplate])
 
   const config = useMemo(
     () => ({
@@ -1003,9 +1115,40 @@ function DocumentsClientLoaded({
           }
         }
         if (tab.id === "document-templates" && tab.entityConfig) {
+          const entityConfig = withTableActions(tab.entityConfig, templateDesignerActions, true)
           return {
             ...tab,
-            createForm: documentTemplateFormConfig,
+            createForm: undefined,
+            createAction: undefined,
+            createLabel: undefined,
+            entityConfig: entityConfig.view.mode === "table" ? {
+              ...entityConfig,
+              title: t("documents.designer.libraryTitle", { defaultValue: "Document templates" }),
+              description: t("documents.designer.tableDescription", { defaultValue: "Reusable document layouts and text templates." }),
+              view: {
+                ...entityConfig.view,
+                searchPlaceholder: t("documents.designer.searchPlaceholder", { defaultValue: "Search templates…" }),
+                emptyState: {
+                  title: t("documents.designer.emptyTitle", { defaultValue: "Create your first reusable template" }),
+                  description: t("documents.designer.emptyDescription", { defaultValue: "Start with text for editor fields or design a quotation layout." }),
+                  primaryActionId: "design-document-template",
+                  learnHint: t("documents.designer.textHint", { defaultValue: "Insert active templates from the Templates menu in text fields." }),
+                },
+                filters: [{ key: "isActive", label: t("documents.designer.status", { defaultValue: "Status" }), type: "select" as const, options: [
+                  { value: "true", label: t("common.active", { defaultValue: "Active" }) },
+                  { value: "false", label: t("documents.designer.inactive", { defaultValue: "Inactive" }) },
+                ] }],
+                columns: entityConfig.view.columns.filter((column) => column.key !== "model" && column.key !== "isDefault").map((column) => column.key === "reportType" ? {
+                  ...column,
+                  label: t("documents.designer.kind", { defaultValue: "Template type" }),
+                  render: (value: unknown) => value === "lumiere-rich-text-template-v1"
+                    ? t("documents.designer.richText", { defaultValue: "Text for editor fields" })
+                    : value === "lumiere-document-layout-v1"
+                      ? t("documents.designer.document", { defaultValue: "Document layout" })
+                      : t("documents.designer.legacyType", { defaultValue: "Legacy template" }),
+                } : { ...column, label: column.key === "name" ? t("documents.documents.columns.name") : column.key === "isActive" ? t("common.active", { defaultValue: "Active" }) : column.label }),
+              },
+            } : entityConfig,
           }
         }
         if (tab.id === "mail-templates" && tab.entityConfig) {
@@ -1139,6 +1282,8 @@ function DocumentsClientLoaded({
       knowledgeArticleFormConfig,
       knowledgeCategoryFormConfig,
       documentFolderFormConfig,
+      mailTemplateFormConfig,
+      templateDesignerActions,
       processingJobFormConfig,
       folders,
     ],
@@ -1169,6 +1314,45 @@ function DocumentsClientLoaded({
     ],
   )
 
+  const dataState = {
+    dashboard: mergeModuleStates([documentsRead.state, articlesRead.state]),
+    documents: documentsRead.state,
+    "knowledge-base": articlesRead.state,
+    "knowledge-categories": categoriesRead.state,
+    "document-folders": foldersRead.state,
+    "documents-recycle-bin": deletedDocumentsRead.state,
+    "document-templates": templateDataState,
+    "mail-templates": mailTemplatesRead.state,
+    "document-processing": processingJobsRead.state,
+    "document-insights": aiInsightsRead.state,
+  }
+  type DocumentsTab = keyof typeof dataState
+  const tabUsable = (tab: DocumentsTab | undefined) => tab == null || canUseModuleData(dataState[tab])
+  const actionTabs: Record<string, DocumentsTab> = {
+    createDocument: "documents", uploadDocument: "documents", createArticle: "knowledge-base",
+    createKnowledgeCategory: "knowledge-categories", createDocumentFolder: "document-folders",
+    createDocumentTemplate: "document-templates", createMailTemplate: "mail-templates",
+    createDocumentProcessingJob: "document-processing",
+  }
+  const rowActionTabs: Record<NonNullable<DocumentRowAction>["action"], DocumentsTab> = {
+    updateDocument: "documents", uploadVersion: "documents", setRetention: "documents",
+    updateArticle: "knowledge-base", addArticleMember: "knowledge-base", updateFolder: "document-folders",
+  }
+  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action])
+  const csvSourceState = csvKind == null ? undefined : dataState[csvKind === "knowledge_category" ? "knowledge-categories" : "knowledge-base"]
+  const rowActionUsable = documentRowAction == null || tabUsable(rowActionTabs[documentRowAction.action])
+  const processingUsable = tabUsable("document-processing")
+  const insightsUsable = tabUsable("document-insights")
+  // Prompted category/article/retention dialogs read rows from these collections.
+  const promptsUsable = tabUsable("documents") && tabUsable("knowledge-base") && tabUsable("knowledge-categories")
+  useEffect(() => {
+    // Dialogs close when the collection their rows came from is denied or fails.
+    if (!quickActionUsable) setQuickActionForm(null)
+    if (!rowActionUsable) setDocumentRowAction(null)
+    if (!processingUsable) setCompleteModalRows(null)
+    if (!insightsUsable) setAckModalRows(null)
+    if (!promptsUsable) cancelForm()
+  }, [quickActionUsable, rowActionUsable, processingUsable, insightsUsable, promptsUsable, cancelForm])
   /** Stores the bytes, registers the document, then queues its evidence ingestion. */
   const uploadAndRegisterDocument = async (file: File, formData: DocumentUploadFields) => {
     const folderId = optionalBigIntU64(formData.folderId)
@@ -1215,6 +1399,7 @@ function DocumentsClientLoaded({
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    if (!tabUsable(actionTabs[action])) throw new Error("Required data is unavailable. Refresh and try again.")
     if (action === "createDocument" || action === "uploadDocument") {
       const file = firstFileFromFormValue(formData.file)
       if (!file) {
@@ -1236,10 +1421,6 @@ function DocumentsClientLoaded({
         companyId: operatingCompanyId,
         ...params,
       })
-    } else if (action === "createDocumentTemplate") {
-      const params = toCreateDocumentTemplateParams(formData)
-      if (!params) throw new Error("Document template params incomplete")
-      await createDocumentTemplate.mutateAsync(params)
     } else if (action === "createMailTemplate") {
       const params = toCreateMailTemplateParams(formData)
       if (!params) throw new Error("Mail template params incomplete")
@@ -1276,7 +1457,6 @@ function DocumentsClientLoaded({
     createDocumentFolder.isPending ||
     updateDocumentFolder.isPending ||
     deleteDocumentFolder.isPending ||
-    createDocumentTemplate.isPending ||
     createMailTemplate.isPending ||
     createProcessingJob.isPending ||
     completeProcessingJob.isPending ||
@@ -1297,8 +1477,19 @@ function DocumentsClientLoaded({
           {documentToolbarError}
         </p>
       ) : null}
-      {formDialog}
+      {promptsUsable && formDialog}
       {confirmDialogNode}
+      {templateDesigner && templateDesigner.scopeKey === templateScopeKey && templateScopeReady && session.identity && typeof session.activeCompanyId === "number" ? (
+        <DocumentTemplateDesignerDialog
+          key={`${templateDesigner.scopeKey}:${templateDesigner.mode}:${templateDesigner.template?.row.id ?? "new"}`}
+          organizationId={organizationId}
+          companyId={session.activeCompanyId}
+          identity={session.identity}
+          template={templateDesigner.template}
+          mode={templateDesigner.mode}
+          onClose={() => setTemplateDesigner(null)}
+        />
+      ) : null}
       <ModuleView
         config={{
           ...config,
@@ -1338,11 +1529,13 @@ function DocumentsClientLoaded({
           ),
         }}
         data={data}
+        dataState={dataState}
+        dataLoading={{ "document-templates": templateDataState.status === "loading" }}
         onFormSubmit={handleFormSubmit}
         isPending={isFormMutationPending}
       />
       <FormModal
-        open={quickActionForm !== null}
+        open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
         config={quickActionForm?.form ?? documentFormConfig}
         isPending={isFormMutationPending}
@@ -1355,6 +1548,7 @@ function DocumentsClientLoaded({
       />
       {csvKind && csvFormConfig ? (
         <CsvImportModal
+          sourceState={csvSourceState}
           trackedImport={{ companyId: operatingCompanyId }}
           organizationId={orgId}
           tableName={csvKind === "knowledge_category" ? "knowledge_article_category" : "knowledge_article"}
@@ -1371,7 +1565,7 @@ function DocumentsClientLoaded({
           }}
         />
       ) : null}
-      {documentRowAction ? (
+      {documentRowAction && rowActionUsable ? (
         <FormModal
           open
           onOpenChange={(o) => {
@@ -1465,7 +1659,7 @@ function DocumentsClientLoaded({
           }}
         />
       ) : null}
-      {completeModalRows?.length === 1 ? (
+      {completeModalRows?.length === 1 && processingUsable ? (
         <FormModal
           open
           onOpenChange={(o) => {
@@ -1524,7 +1718,7 @@ function DocumentsClientLoaded({
           }}
         />
       ) : null}
-      {ackModalRows && ackModalRows.length > 0 ? (
+      {ackModalRows && ackModalRows.length > 0 && insightsUsable ? (
         <FormModal
           open
           onOpenChange={(o) => {
