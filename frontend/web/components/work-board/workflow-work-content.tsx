@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@lumiere/ui/components/button"
@@ -15,6 +15,7 @@ import {
   SheetTitle,
 } from "@lumiere/ui/components/sheet"
 import { Textarea } from "@lumiere/ui/components/textarea"
+import { Field, FieldGroup, FieldLabel } from "@lumiere/ui/components/field"
 import { useWorkBoard } from "@lumiere/query-hooks/hooks/work-board"
 import {
   WORK_STATUSES,
@@ -99,6 +100,7 @@ export function WorkflowWorkContent({
   } | null>(null)
   const [actor, setActor] = useState<string | null>(null)
   const [comment, setComment] = useState("")
+  const commentId = useId()
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [unresolved, setUnresolved] =
@@ -746,19 +748,25 @@ export function WorkflowWorkContent({
                     </p>
                   )}
                   {actions.some((action) => action !== "claim") && (
-                    <label className="grid gap-2 text-sm">
-                      {t(
-                        actions.includes("resubmit")
-                          ? "workBoard.resubmissionReason"
-                          : "workBoard.comment",
-                      )}
-                      <Textarea
-                        value={comment}
-                        onChange={(event) => setComment(event.target.value)}
-                        disabled={busy || unresolved != null}
-                        rows={4}
-                      />
-                    </label>
+                    <FieldGroup>
+                      <Field data-disabled={busy || unresolved != null}>
+                        <FieldLabel htmlFor={commentId}>
+                          {t(
+                            actions.includes("resubmit")
+                              ? "workBoard.resubmissionReason"
+                              : "workBoard.comment",
+                          )}
+                        </FieldLabel>
+                        <Textarea
+                          id={commentId}
+                          variant="plain"
+                          value={comment}
+                          onChange={(event) => setComment(event.target.value)}
+                          disabled={busy || unresolved != null}
+                          rows={4}
+                        />
+                      </Field>
+                    </FieldGroup>
                   )}
                   {review.action && actions.includes(review.action) && (
                     <p className="text-sm font-medium">

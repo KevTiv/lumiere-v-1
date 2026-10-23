@@ -36,10 +36,9 @@ export async function seedWorkReviewWorkflow(
   let revision = seed.draftRevision
   // The runtime snapshot request must describe the same condition fields that
   // the guarded PO adapter pins when it starts an approval instance.
-  const updated = await postWorkCommand(owner, stdbBffCommandPost("update_workflow_draft", {
-    workflowVersionId: seed.versionId,
-    expectedRevision: revision,
-    params: stdbParamsToJson({
+  await callReducerOwner("update_workflow_draft", [
+    seed.organizationId, seed.versionId, revision,
+    stdbParamsToJson({
       name: key, description: null, trigger: { tag: "Manual" }, schemaVersion: 1,
       snapshotFields: [
         { fieldKey: "amount_total", valueType: { tag: "Money" }, nullable: false },
@@ -47,8 +46,7 @@ export async function seedWorkReviewWorkflow(
       ],
       metadata: null,
     }, "UpdateWorkflowDraftParams"),
-  }))
-  expect(updated.ok(), await updated.text()).toBe(true)
+  ])
   revision += 1
   for (const node of [
     {

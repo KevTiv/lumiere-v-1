@@ -539,7 +539,7 @@ fn ordinary_payment_recovery_excludes_bank_attempts(ctx: &ReducerContext) -> Res
     let role = seed_role(
         ctx,
         fixture.organization_id,
-        vec!["workflow_task:approve", "payment:read"],
+        vec!["workflow_task:approve", "account_payment:read"],
     );
     let reviewer = seed_member(ctx, &fixture, role, None);
     seed_published_gate(
@@ -612,10 +612,27 @@ fn ordinary_payment_recovery_excludes_bank_attempts(ctx: &ReducerContext) -> Res
                 created_by: ctx.sender(),
                 closed_at: None,
             });
-    let grants = [
+    let missing_source_read_grants = [
         "workflow_instance:create",
         "workflow_task:write",
         "payment:read",
+        "payment:post",
+    ];
+    with_operator_grants(ctx, &fixture, &missing_source_read_grants, || {
+        let before = workflow_counts(ctx, &fixture);
+        expect_error(
+            resubmit_workflow_human_task(ctx, fixture.organization_id, params.clone()),
+            "workflow source read permission denied: account-payments",
+        )?;
+        if workflow_counts(ctx, &fixture) != before {
+            return Err("source read denial changed workflow evidence".to_string());
+        }
+        Ok(())
+    })?;
+    let grants = [
+        "workflow_instance:create",
+        "workflow_task:write",
+        "account_payment:read",
         "payment:post",
     ];
     with_operator_grants(ctx, &fixture, &grants, || {
