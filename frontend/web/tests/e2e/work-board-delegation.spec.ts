@@ -68,7 +68,7 @@ async function assertOrdinaryActor(organizationId: number, actor: Actor) {
   expect(actorIdentity(profiles[0]!.identity)).toBe(actor.identityHex)
 }
 
-async function setDelegation(owner: Page, companyId: number, principal: Actor, delegate: Actor, active: boolean) {
+async function setDelegation(principalSession: Page, companyId: number, principal: Actor, delegate: Actor, active: boolean) {
   const now = Date.now()
   const metadata = active ? workflowDelegationMetadata(
     new Date(now - 60_000).toISOString(),
@@ -82,7 +82,7 @@ async function setDelegation(owner: Page, companyId: number, principal: Actor, d
     isActive: active,
     metadata,
   }, "SetPurchaseApprovalDelegateParams")
-  const response = await postWorkCommand(owner, stdbBffCommandPost("set_purchase_approval_delegate", { companyId, params }))
+  const response = await postWorkCommand(principalSession, stdbBffCommandPost("set_purchase_approval_delegate", { companyId, params }))
   expect(response.ok(), await response.text()).toBe(true)
 }
 
@@ -154,7 +154,7 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       // Source access and exact PO operation permissions alone do not make this
       // ordinary actor a candidate or give it a direct decision action.
       expect(await readWorkTask(delegatePage, scope, pending.taskId)).toBeUndefined()
-      await setDelegation(page, workflow.companyId, principal, delegate, true)
+      await setDelegation(principalPage, workflow.companyId, principal, delegate, true)
       delegationActive = true
       expect(await liveDelegations(workflow.organizationId, workflow.companyId, principal, delegate)).toHaveLength(1)
 
@@ -195,7 +195,7 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       expect(tagOf(body.params!.decision)).toBe("approve")
       expect(actorIdentity(canonicalOptionValue(body.params!.acting_for))).toBe(principal.identityHex)
 
-      await setDelegation(page, workflow.companyId, principal, delegate, false)
+      await setDelegation(principalPage, workflow.companyId, principal, delegate, false)
       delegationActive = false
       expect(await liveDelegations(workflow.organizationId, workflow.companyId, principal, delegate)).toHaveLength(0)
       const exactPath = `/api/query/workflow-human-tasks?companyId=${workflow.companyId}&workScope=purchasing&workView=eligible&taskId=${pending.taskId}`
@@ -221,7 +221,7 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
 
       // Restoring a fresh effective delegation may restore the card, but must
       // not reopen the old review or resurrect its captured comment/attempt.
-      await setDelegation(page, workflow.companyId, principal, delegate, true)
+      await setDelegation(principalPage, workflow.companyId, principal, delegate, true)
       delegationActive = true
       expect(await liveDelegations(workflow.organizationId, workflow.companyId, principal, delegate)).toHaveLength(1)
       const restored = delegatePage.getByRole("button", { name: title, exact: true })
@@ -233,7 +233,7 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeEnabled()
     } finally {
       if (pendingRoute) await pendingRoute.abort().catch(() => {})
-      if (delegationActive) await setDelegation(page, workflow.companyId, principal, delegate, false)
+      if (delegationActive) await setDelegation(sessions.pages[0]!, workflow.companyId, principal, delegate, false)
       await sessions.close()
       await workflow.retire()
     }

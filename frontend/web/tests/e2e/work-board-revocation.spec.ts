@@ -47,12 +47,13 @@ test.describe(
           `work-revoke-${revoke.replace(/ /g, "-")}`,
           WORK_REVIEWER_PERMISSIONS,
         )
-        const workflow = await seedWorkReviewWorkflow(page, [actor.roleId])
-        const sessions = await openActorPages(browser, [actor])
+        const observer = await provisionActor(page, "work-revocation-observer", WORK_REVIEWER_PERMISSIONS)
+        const workflow = await seedWorkReviewWorkflow(page, [actor.roleId, observer.roleId])
+        const sessions = await openActorPages(browser, [actor, observer])
         let pendingRoute: Route | undefined
         try {
-          const reviewer = sessions.pages[0]
-          if (!reviewer) throw new Error("Missing ordinary reviewer session")
+          const [reviewer, observerPage] = sessions.pages
+          if (!reviewer || !observerPage) throw new Error("Missing independent reviewer sessions")
           const scope = workScopeFor(workflow, actor)
           const pending = await createPendingWorkReview(page, reviewer)
           const before = await openWorkReview(reviewer, scope, pending.taskId)
@@ -129,19 +130,20 @@ test.describe(
           })
           await expectAccessDenied(replay)
 
-          // An independently authorized owner verifies no workflow or business
-          // effect was committed by either denied request.
-          const ownerRead = await page.request.get(exactPath)
-          expect(ownerRead.ok(), await ownerRead.text()).toBe(true)
-          const ownerRows = (await ownerRead.json()).data as Array<{
+          // A separate eligible reviewer observes the unchanged task; the setup
+          // owner independently checks the domain effect below. Neither gains
+          // candidate visibility by holding an administrative role.
+          const observerRead = await observerPage.request.get(exactPath)
+          expect(observerRead.ok(), await observerRead.text()).toBe(true)
+          const observerRows = (await observerRead.json()).data as Array<{
             id: number | string
             revision: number | string
             status: unknown
           }>
-          expect(ownerRows).toHaveLength(1)
-          expect(String(ownerRows[0]!.id)).toBe(String(pending.taskId))
-          expect(Number(ownerRows[0]!.revision)).toBe(Number(before.revision))
-          expect(approvalTaskStatus({ status: ownerRows[0]!.status })).toBe(
+          expect(observerRows).toHaveLength(1)
+          expect(String(observerRows[0]!.id)).toBe(String(pending.taskId))
+          expect(Number(observerRows[0]!.revision)).toBe(Number(before.revision))
+          expect(approvalTaskStatus({ status: observerRows[0]!.status })).toBe(
             approvalTaskStatus(before),
           )
           expect(

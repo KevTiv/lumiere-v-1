@@ -116,7 +116,7 @@ async function committedEvidence(page: Page, scope: EvidenceScope) {
   }
 }
 
-async function signalRejected(owner: Page, input: SignalWorkflowInput) {
+async function signalRejected(owner: Page, input: SignalWorkflowInput, expectedSnapshotHash: string) {
   const normalized = buildWorkflowSubjectSnapshotRequest(input)
   const request = await postWorkCommand(owner, stdbBffCommandPost("request_workflow_subject_snapshot", {
     companyId: normalized.companyId,
@@ -124,6 +124,7 @@ async function signalRejected(owner: Page, input: SignalWorkflowInput) {
   }))
   expect(request.ok(), await request.text()).toBe(true)
   const snapshot = selectWorkflowSubjectSnapshot(await queryRows(owner, "workflow-subject-snapshots"), input)
+  expect(snapshot.subject_revision_hash).toBe(expectedSnapshotHash)
   const response = await postWorkCommand(owner, stdbBffCommandPost("signal_workflow", {
     params: buildSignalWorkflowWireParams(input, snapshot),
   }))
@@ -170,6 +171,11 @@ test.describe("Finance work board native transaction rollback", { tag: ["@dev-fi
       expect(orderRows).toHaveLength(1)
       const evidenceScope: EvidenceScope = { ...workflow, taskId, instanceId, orderId, vendorId: positiveId(orderRows[0]!.partner_id, "vendor") }
 
+      const instances = await persistedRows(`SELECT subject_revision_hash FROM workflow_instance WHERE organization_id = ${workflow.organizationId} AND company_id = ${workflow.companyId} AND id = ${instanceId}`)
+      expect(instances).toHaveLength(1)
+      const frozenSnapshotHash = instances[0]!.subject_revision_hash
+      expect(typeof frozenSnapshotHash).toBe("string")
+
       // Existing public signal_workflow consumes the approval token along its
       // rejected edge without deciding the human task. This is fixture setup,
       // committed before the decision whose rollback is under test.
@@ -178,7 +184,7 @@ test.describe("Finance work board native transaction rollback", { tag: ["@dev-fi
         subjectModel: "purchase_order", subjectId: orderId,
         expectedRevision: reviewed.expectedInstanceRevision, signalKey: "rejected",
         idempotencyKey: smokeName("work-rollback-signal"), correlationId: smokeName("work-rollback-signal-correlation"),
-      })
+      }, String(frozenSnapshotHash))
       const before = await committedEvidence(page, evidenceScope)
       expect(before.tasks).toHaveLength(1)
       expect(before.instances).toHaveLength(1)
