@@ -47,6 +47,7 @@ import {
   contactTagRowsToSelectOptions,
   contactCategoryRowsToSelectOptions,
   contactSegmentRowsToSelectOptions,
+  taxRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   timestampToDateInputValue,
@@ -122,6 +123,7 @@ import {
 } from "@lumiere/query-hooks/hooks/crm"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
+import { useAccountTaxes } from "@lumiere/query-hooks/hooks/accounting"
 import type { EntityRecordSheetConfig, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { entityTableConfigFromView } from "@lumiere/ui/lib/entity-view-types"
 import {
@@ -457,6 +459,7 @@ function CrmClientLoaded({
   const { data: warehouses = [] } = useWarehouses(orgId)
   const { data: products = [] } = useProducts(orgId)
   const { data: uoms = [] } = useUoms(orgId)
+  const { data: accountTaxes = [] } = useAccountTaxes(orgId)
 
   const opportunityStageOptions = useMemo(
     () =>
@@ -633,8 +636,9 @@ function CrmClientLoaded({
         opportunityId: openOpportunityOptions,
         productId: productFieldOptions,
         uomId: uomFieldOptions,
+        taxIds: taxRowsToSelectOptions(accountTaxes, "Sale"),
       }),
-    [t, openOpportunityOptions, productFieldOptions, uomFieldOptions],
+    [t, openOpportunityOptions, productFieldOptions, uomFieldOptions, accountTaxes],
   )
 
   const createLead = useCreateLead(orgId)

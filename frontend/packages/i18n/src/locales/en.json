@@ -244,7 +244,13 @@
       "invalidNumber": "Enter a number"
     },
     "form": {
-      "unavailableSelection": "Unavailable selection: {{value}}"
+      "unavailableSelection": "Unavailable selection: {{value}}",
+      "multiSelect": {
+        "placeholder": "Add...",
+        "search": "Search...",
+        "empty": "No matches",
+        "remove": "Remove {{value}}"
+      }
     },
     "formPreview": {
       "label": "Preview"
@@ -2452,6 +2458,7 @@
       },
       "operationalPaymentTransaction": {
         "title": "Record payment transaction",
+        "evidenceDocumentIdsHint": "Comma-separated numeric IDs of documents in the Documents module (no document list is available to pick from here yet).",
         "description": "Capture the provider event before posting it to the accounting ledger.",
         "submit": "Record transaction",
         "account": "Payment account",
@@ -2741,8 +2748,8 @@
           "codePlaceholder": "Optional short code",
           "description": "Description",
           "descriptionPlaceholder": "Optional notes",
-          "accountIds": "Account IDs",
-          "accountIdsPlaceholder": "Comma or space separated, e.g. 6010, 6020",
+          "accountIds": "Accounts",
+          "accountIdsPlaceholder": "Add accounts...",
           "isActive": "Active"
         }
       },
@@ -3098,7 +3105,8 @@
           "date": "Date",
           "description": "Description",
           "tagIds": "Tag IDs",
-          "tagIdsHint": "Comma-separated numeric ids (optional)"
+          "tagIdsHint": "Comma-separated numeric ids (optional)",
+          "tagIdsDescription": "Analytic tags have no list to pick from here yet; enter their numeric IDs, e.g. 3, 8."
         }
       },
       "analyticDistribution": {
@@ -4143,9 +4151,9 @@
           "sequence": "Sequence",
           "name": "Description",
           "namePlaceholder": "Optional line description…",
-          "taxIds": "Tax IDs",
-          "taxIdsPlaceholder": "e.g. 1, 2",
-          "taxIdsHint": "Comma-separated tax record IDs (optional)"
+          "taxIds": "Taxes",
+          "taxIdsPlaceholder": "Add taxes...",
+          "taxIdsHint": "Sales taxes applied to this line (optional)"
         },
         "validation": {
           "requiredFields": "Select an opportunity, product, UoM, quantity, and unit price."
@@ -6497,13 +6505,13 @@
           "name": "Report name",
           "dateFrom": "From",
           "dateTo": "To",
-          "productIds": "Product IDs (comma-separated, optional)",
-          "lotIds": "Lot IDs (optional)",
-          "serialIds": "Serial IDs (optional)",
-          "locationIds": "Location IDs (optional)",
-          "warehouseIds": "Warehouse IDs (optional)",
-          "partnerIds": "Partner IDs (optional)",
-          "pickingTypeIds": "Picking type IDs (optional)",
+          "productIds": "Products (optional)",
+          "lotIds": "Lots (optional)",
+          "serialIds": "Serial numbers (optional)",
+          "locationIds": "Locations (optional)",
+          "warehouseIds": "Warehouses (optional)",
+          "partnerIds": "Partners (optional)",
+          "pickingTypeIds": "Operation types (optional)",
           "metadata": "Metadata (optional)"
         }
       },
@@ -8326,9 +8334,9 @@
         "fields": {
           "name": "Batch name",
           "namePlaceholder": "e.g. Morning picks",
-          "pickingIds": "Stock picking IDs",
-          "pickingIdsPlaceholder": "101, 102, 103",
-          "pickingIdsHint": "Comma-separated IDs from Inventory → deliveries / pickings. Leave empty to create an empty batch.",
+          "pickingIds": "Stock pickings",
+          "pickingIdsPlaceholder": "Add pickings...",
+          "pickingIdsHint": "Search deliveries / pickings by reference. Leave empty to create an empty batch.",
           "isWave": "Wave picking batch",
           "isWaveHint": "When enabled, the batch is created as a wave (multi-step picking) instead of a simple batch."
         }
@@ -8389,8 +8397,8 @@
           "deliveryType": "Delivery type",
           "integrationLevel": "Integration level",
           "invoicePolicy": "Invoice policy",
-          "priceRuleIds": "Price rule IDs",
-          "priceRuleIdsHint": "Comma-separated rule IDs from the Shipping price rules tab",
+          "priceRuleIds": "Price rules",
+          "priceRuleIdsHint": "Search the rules defined on the Shipping price rules tab",
           "margin": "Margin",
           "amount": "Amount",
           "fixedCharge": "Fixed charge",
@@ -8403,7 +8411,9 @@
           "getReturnLabelFromPortal": "Return label from portal",
           "useDetailedDeliveryDescription": "Detailed delivery description",
           "countryIds": "Country IDs (comma-separated)",
+          "countryIdsHint": "Numeric country record IDs, e.g. 1, 4, 7 (no country list is available to pick from here yet)",
           "stateIds": "State IDs (comma-separated)",
+          "stateIdsHint": "Numeric state record IDs, e.g. 12, 15 (no state list is available to pick from here yet)",
           "zipPrefixIds": "ZIP prefixes (comma-separated)"
         }
       },
@@ -8465,8 +8475,8 @@
           "durationMonths": "Months",
           "dateTo": "End date",
           "isNominative": "Nominative (named participants)",
-          "triggerProductIds": "Trigger product IDs",
-          "triggerProductIdsHint": "Comma-separated product IDs"
+          "triggerProductIds": "Trigger products",
+          "triggerProductIdsHint": "Search products whose purchase triggers this program"
         }
       },
       "newLoyaltyCard": {
@@ -8528,9 +8538,9 @@
           "sequence": "Sequence",
           "name": "Description",
           "namePlaceholder": "Optional line description…",
-          "taxIds": "Tax IDs",
-          "taxIdsPlaceholder": "e.g. 1, 2",
-          "taxIdsHint": "Comma-separated tax record IDs (optional)"
+          "taxIds": "Taxes",
+          "taxIdsPlaceholder": "Add taxes...",
+          "taxIdsHint": "Sales taxes applied to this line (optional)"
         }
       },
       "editSaleOrderLine": {
@@ -8870,6 +8880,7 @@
         "routingWorksheetBody": "Worksheet text (optional)",
         "routingWorksheetUrl": "Worksheet URL (optional)",
         "routingBlockedByIds": "Blocked by operation IDs (comma-separated, optional)",
+        "routingBlockedByIdsHint": "Routing operations have no list to pick from here yet; enter the numeric IDs of operations that must finish first.",
         "completeLogId": "Open productivity log ID",
         "logDescription": "Description",
         "logDescriptionPlaceholder": "What happened during this time entry?",
@@ -9761,6 +9772,7 @@
           "resId": "Linked record ID",
           "tagIds": "Tag IDs",
           "tagIdsHint": "Comma-separated numeric ids (optional)",
+          "tagIdsDescription": "Document tags have no list to pick from here yet; enter their numeric IDs, e.g. 3, 8.",
           "options": {
             "pdf": "PDF",
             "excel": "Excel",
@@ -10726,9 +10738,9 @@
           "deferredAccountId": "Deferred account",
           "expenseAccountId": "COGS / expense account (optional)",
           "expenseAccountIdPlaceholder": "Leave empty if not used",
-          "productCategoryIds": "Product category IDs",
-          "productIds": "Product IDs",
-          "idListPlaceholder": "Comma-separated numeric IDs, e.g. 1, 2, 3",
+          "productCategoryIds": "Product categories",
+          "productIds": "Products",
+          "idListPlaceholder": "Add...",
           "recognitionMethod": "Method",
           "recognitionPeriod": "Period",
           "priority": "Priority (higher runs first)",

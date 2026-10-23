@@ -84,6 +84,7 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
           type: "text",
           label: t("documents.forms.newDocument.fields.tagIds"),
           placeholder: t("documents.forms.newDocument.fields.tagIdsHint"),
+          description: t("documents.forms.newDocument.fields.tagIdsDescription"),
           width: "full",
         },
         {

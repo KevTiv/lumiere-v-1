@@ -5,7 +5,9 @@ import {
   accountJournalRowsToSelectOptions,
   contactRowsToAccountingPartnerSelectOptions,
   paymentJournalRowsToSelectOptions,
+  taxRowsToSelectOptions,
 } from "./form-lookup"
+import { idListTokens, parseU64IdList } from "./id-list"
 
 test("payment journal options include only reducer-compatible journal types", () => {
   const options = paymentJournalRowsToSelectOptions([
@@ -50,4 +52,27 @@ test("accounting payment partner options include customers and suppliers", () =>
       { value: "2", label: "Supplier" },
     ],
   )
+})
+
+test("tax options keep active taxes for the requested side or scope None", () => {
+  const rows = [
+    { id: 1n, name: "VAT 18%", active: true, typeTaxUse: { tag: "Sale" } },
+    { id: 2n, name: "Input VAT", active: true, typeTaxUse: { tag: "Purchase" } },
+    { id: 3n, name: "Exempt", active: true, type_tax_use: "None" },
+    { id: 4n, name: "Old VAT", active: false, typeTaxUse: { tag: "Sale" } },
+  ]
+  assert.deepEqual(taxRowsToSelectOptions(rows, "Sale"), [
+    { value: "1", label: "VAT 18%" },
+    { value: "3", label: "Exempt" },
+  ])
+  assert.deepEqual(taxRowsToSelectOptions(rows, "Purchase").map((option) => option.value), ["2", "3"])
+})
+
+test("id lists accept picked arrays and the older comma-separated text alike", () => {
+  assert.deepEqual(parseU64IdList(["1", "4", "7"]), [1n, 4n, 7n])
+  assert.deepEqual(parseU64IdList("1, 4 7;9"), [1n, 4n, 7n, 9n])
+  assert.deepEqual(parseU64IdList(""), [])
+  assert.deepEqual(parseU64IdList(undefined), [])
+  assert.deepEqual(idListTokens([" 2 ", ""]), ["2"])
+  assert.throws(() => parseU64IdList("1, x"))
 })

@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "../components/select"
 import { RecordPicker } from "../components/record-picker"
+import { MultiRecordPicker } from "../components/multi-record-picker"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -216,41 +217,23 @@ export function FormFieldRenderer({
         )
 
       case "multiselect":
+        // Disabled and no-longer-listed values stay selected as locked chips.
         return (
-          <select
+          <MultiRecordPicker
             id={field.id}
-            name={field.name}
-            data-testid={`form-field-${field.name}`}
-            multiple
             value={Array.isArray(value) ? value : []}
-            onChange={(event) => {
-              const selected = Array.from(event.target.selectedOptions, (option) => option.value)
-              // Disabled and no-longer-listed values cannot be edited here; keep them intact.
-              const retained = Array.isArray(value) ? value.filter((item) => {
-                const option = field.options.find((option) => option.value === item)
-                return !option || option.disabled
-              }) : []
-              onChange([...new Set([...retained, ...selected])])
-            }}
+            onChange={onChange}
+            options={field.options}
+            placeholder={field.placeholder || t("common.form.multiSelect.placeholder", { defaultValue: "Add..." })}
+            searchPlaceholder={t("common.form.multiSelect.search", { defaultValue: "Search..." })}
+            emptyText={t("common.form.multiSelect.empty", { defaultValue: "No matches" })}
+            removeLabel={(label) => t("common.form.multiSelect.remove", { value: label, defaultValue: "Remove {{value}}" })}
+            unavailableLabel={(missing) => t("common.form.unavailableSelection", { value: missing, defaultValue: "Unavailable selection: {{value}}" })}
             disabled={field.disabled}
-            required={field.required}
-            aria-invalid={!!error}
+            invalid={!!error}
+            data-testid={`form-field-${field.name}`}
             aria-describedby={describedBy}
-            className={cn("w-full rounded-md border p-2", inputBase, error && "border-destructive")}
-          >
-            {Array.isArray(value) ? value
-              .filter((selected) => !field.options.some((option) => option.value === selected))
-              .map((selected) => (
-                <option key={selected} value={selected} disabled>
-                  {t("common.form.unavailableSelection", { value: selected, defaultValue: "Unavailable selection: {{value}}" })}
-                </option>
-              )) : null}
-            {field.options.map((option) => (
-              <option key={option.value} value={option.value} disabled={option.disabled}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
         )
 
       case "checkbox":

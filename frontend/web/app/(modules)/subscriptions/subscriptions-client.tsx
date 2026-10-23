@@ -116,7 +116,7 @@ import { isSubscriptionActionApplicable, type SubscriptionActionId } from "./sub
 import { useSubscriptionActions, type SubscriptionDialogAction } from "./use-subscription-actions"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useSaleOrders, usePricelists, type SaleOrder, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
-import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
+import { useProductCategories, useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import type { ChartValueFormat } from "@lumiere/ui/lib/chart-format"
@@ -131,6 +131,7 @@ import {
   subscriptionPlanRowsToSelectOptions,
   pricelistRowsToSelectOptions,
   productRowsToSelectOptions,
+  productCategoryRowsToSelectOptions,
   accountJournalRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
   accountMoveRowsToSelectOptions,
@@ -257,6 +258,7 @@ function SubscriptionsClientLoaded({
   const { data: saleOrders = [] } = useSaleOrders(orgId, initialSaleOrders)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(orgId, initialProducts)
+  const { data: productCategories = [] } = useProductCategories(orgId)
   const { data: journals = [] } = useAccountJournals(orgId)
   const { data: accounts = [] } = useAccountAccounts(orgId)
   const { data: accountMoves = [], isLoading: accountMovesLoading, isError: accountMovesError, error: accountMovesFailure, refetch: refetchAccountMoves } = useAccountMoves(orgId)
@@ -403,8 +405,10 @@ function SubscriptionsClientLoaded({
         recognitionAccountId: accountFieldOptions,
         deferredAccountId: accountFieldOptions,
         expenseAccountId: [{ value: "", label: "—" }, ...accountFieldOptions.filter((o) => o.value !== "")],
+        productCategoryIds: productCategoryRowsToSelectOptions(productCategories),
+        productIds: productFieldOptions,
       }),
-    [t, accountFieldOptions],
+    [t, accountFieldOptions, productCategories, productFieldOptions],
   )
 
   const importPlanCsvFormConfig = useMemo(() => importSubscriptionPlanCsvForm(t), [t])

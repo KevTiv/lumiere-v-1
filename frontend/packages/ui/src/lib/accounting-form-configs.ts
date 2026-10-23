@@ -397,10 +397,11 @@ export const budgetPostForm = (t: TFunction): FormConfig => ({
         {
           id: "accountIds",
           name: "accountIds",
-          type: "text",
+          type: "multiselect",
           label: t("accounting.forms.budgetPost.fields.accountIds"),
           placeholder: t("accounting.forms.budgetPost.fields.accountIdsPlaceholder"),
           width: "full",
+          options: [],
         },
         {
           id: "isActive",
@@ -1837,6 +1838,7 @@ export const newAnalyticLineForm = (t: TFunction): FormConfig => ({
           type: "text",
           label: t("accounting.forms.analyticLine.fields.tagIds"),
           placeholder: t("accounting.forms.analyticLine.fields.tagIdsHint"),
+          description: t("accounting.forms.analyticLine.fields.tagIdsDescription"),
           width: "full",
         },
       ],
@@ -1934,6 +1936,7 @@ export const editAnalyticLineForm = (t: TFunction): FormConfig => ({
           type: "text",
           label: t("accounting.forms.analyticLine.fields.tagIds"),
           placeholder: t("accounting.forms.analyticLine.fields.tagIdsHint"),
+          description: t("accounting.forms.analyticLine.fields.tagIdsDescription"),
           width: "full",
         },
       ],
@@ -2409,7 +2412,7 @@ export const newOperationalPaymentTransactionForm = (t: TFunction): FormConfig =
       { id: "currencyId", name: "currencyId", type: "select", label: t("accounting.forms.operationalPaymentTransaction.currency"), required: true, width: "1/2", options: [] },
       { id: "sourceEntity", name: "sourceEntity", type: "text", label: "Source record type", width: "1/3" },
       { id: "sourceEntityId", name: "sourceEntityId", type: "number", label: "Source record ID", width: "1/3", validation: { min: 1 } },
-      { id: "evidenceDocumentIds", name: "evidenceDocumentIds", type: "text", label: "Evidence document IDs", width: "1/3" },
+      { id: "evidenceDocumentIds", name: "evidenceDocumentIds", type: "text", label: "Evidence document IDs", description: t("accounting.forms.operationalPaymentTransaction.evidenceDocumentIdsHint"), width: "1/3" },
     ],
   }],
 })

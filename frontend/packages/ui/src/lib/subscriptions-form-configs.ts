@@ -431,18 +431,20 @@ export const newRevenueRecognitionRuleForm = (t: TFunction): FormConfig => ({
         {
           id: "productCategoryIds",
           name: "productCategoryIds",
-          type: "text",
+          type: "multiselect",
           label: t("subscriptions.forms.recognitionRule.fields.productCategoryIds"),
           placeholder: t("subscriptions.forms.recognitionRule.fields.idListPlaceholder"),
           width: "full",
+          options: [],
         },
         {
           id: "productIds",
           name: "productIds",
-          type: "text",
+          type: "multiselect",
           label: t("subscriptions.forms.recognitionRule.fields.productIds"),
           placeholder: t("subscriptions.forms.recognitionRule.fields.idListPlaceholder"),
           width: "full",
+          options: [],
         },
         {
           id: "recognitionMethod",

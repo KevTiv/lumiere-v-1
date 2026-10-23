@@ -684,6 +684,7 @@ export function manufacturingWorkcenterRowActionForm(
             id: "routingBlockedByIds",
             name: "routingBlockedByIds",
             label: t("manufacturing.rowActions.form.routingBlockedByIds"),
+            description: t("manufacturing.rowActions.form.routingBlockedByIdsHint"),
             width: "full",
           },
         ],
