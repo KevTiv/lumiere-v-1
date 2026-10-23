@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { MessageCircleIcon, SendIcon } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { MessageCircleIcon } from "lucide-react"
 
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -22,16 +22,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { nullableBigIntU64 as asId, unwrapSome as optionValue } from "@lumiere/erp-shared/form-coercion"
+import {
+  nullableBigIntU64 as asId,
+  unwrapSome as optionValue,
+} from "@lumiere/erp-shared/form-coercion"
+import { WhatsAppDispatchAction } from "./whatsapp-dispatch-action"
+import { WhatsAppTriagePanel } from "./whatsapp-triage-panel"
 
 type Row = Record<string, unknown>
 
@@ -58,25 +57,36 @@ export interface CrmInboxPanelProps {
 export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps) {
   const { t } = useTranslation()
   const organization = BigInt(organizationId)
-  const { data: conversations = [], isLoading } = useCrmConversations(organization)
-  const { data: messages = [] } = useCrmConversationMessages(organization)
+  const conversationsQuery = useCrmConversations(organization)
+  const messagesQuery = useCrmConversationMessages(organization)
   const { data: phoneIdentities = [] } = useContactPhoneIdentities(organization)
   const openConversation = useOpenCrmConversation(organization)
   const appendMessage = useAppendCrmConversationMessage(organization)
   const updateConversation = useUpdateCrmConversation(organization)
   const [body, setBody] = useState("")
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setBody("")
+    setError(null)
+  }, [organizationId, contactId])
 
   const conversation = useMemo(() => {
-    return (
-      (conversations as Row[]).find((row) => {
-        if (asId(row.contactId ?? row.contact_id) !== contactId) return false
-        return String(row.status ?? "") !== "closed"
-      }) ?? null
+    const rows = ((conversationsQuery.data ?? []) as Row[]).filter(
+      (row) =>
+        asId(row.contactId ?? row.contact_id) === contactId &&
+        channelTag(row.channel) === "WhatsApp",
     )
-  }, [conversations, contactId])
+    // Prefer the open thread but retain a closed provider thread for explicit reopening.
+    return rows.find((row) => String(row.status) !== "closed") ?? rows[0] ?? null
+  }, [conversationsQuery.data, contactId])
 
   const conversationId = conversation ? asId(conversation.id) : null
-
+  const companyId = conversation ? asId(conversation.companyId ?? conversation.company_id) : null
+  const accountId = conversation
+    ? asId(optionValue(conversation.providerAccountId ?? conversation.provider_account_id))
+    : null
+  const closed = conversation?.status === "closed"
   const phoneIdentityId = useMemo(() => {
     const candidates = (phoneIdentities as Row[]).filter((row) =>
       isPhoneIdentityUsable(row, contactId),
@@ -87,10 +97,18 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
 
   const thread = useMemo(() => {
     if (!conversationId) return []
-    return (messages as Row[]).filter(
-      (row) => asId(row.conversationId ?? row.conversation_id) === conversationId,
-    )
-  }, [messages, conversationId])
+    return ((messagesQuery.data ?? []) as Row[])
+      .filter((row) => asId(row.conversationId ?? row.conversation_id) === conversationId)
+      .sort((left, right) => {
+        const a = asId(left.id) ?? 0n
+        const b = asId(right.id) ?? 0n
+        return a < b ? -1 : a > b ? 1 : 0
+      })
+  }, [messagesQuery.data, conversationId])
+
+  const showError = (cause: unknown) =>
+    setError(cause instanceof Error ? cause.message : "WhatsApp operation could not be confirmed")
+  const sourceError = conversationsQuery.isError || messagesQuery.isError
 
   return (
     <Card>
@@ -98,24 +116,27 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
         <CardTitle>{t("crm.inbox.title", "WhatsApp inbox")}</CardTitle>
         <CardDescription>
           {t(
-            "crm.inbox.description",
-            "CRM conversation thread for WhatsApp intents (delivery via workers).",
+            "crm.whatsapp.description",
+            "Queue a message, review its exact recipient and content, then confirm provider sending.",
           )}
         </CardDescription>
-        <CardAction className="flex gap-2">
+        <CardAction className="flex flex-wrap gap-2">
           {!conversation ? (
             <Button
               size="sm"
-              disabled={openConversation.isPending || phoneIdentityId == null}
+              disabled={openConversation.isPending || phoneIdentityId == null || sourceError}
               onClick={() =>
-                openConversation.mutate({
-                  contactId,
-                  channel: { tag: "WhatsApp" },
-                  phoneIdentityId: phoneIdentityId ?? undefined,
-                  externalThreadId: undefined,
-                  assignedUserId: undefined,
-                  metadata: undefined,
-                })
+                openConversation.mutate(
+                  {
+                    contactId,
+                    channel: { tag: "WhatsApp" },
+                    phoneIdentityId: phoneIdentityId ?? undefined,
+                    externalThreadId: undefined,
+                    assignedUserId: undefined,
+                    metadata: undefined,
+                  },
+                  { onError: showError },
+                )
               }
             >
               {t("crm.inbox.open", "Open thread")}
@@ -124,28 +145,40 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
             <Button
               size="sm"
               variant="outline"
-              disabled={updateConversation.isPending || !conversationId}
+              disabled={updateConversation.isPending || !conversationId || sourceError}
               onClick={() =>
                 conversationId &&
-                updateConversation.mutate({
-                  conversationId,
-                  params: {
-                    status: "closed",
-                    assignedUserId: undefined,
-                    externalThreadId: undefined,
-                    metadata: undefined,
+                updateConversation.mutate(
+                  {
+                    conversationId,
+                    params: {
+                      status: closed ? "open" : "closed",
+                      assignedUserId: undefined,
+                      externalThreadId: undefined,
+                      metadata: undefined,
+                    },
                   },
-                })
+                  { onError: showError },
+                )
               }
             >
-              {t("crm.inbox.close", "Close")}
+              {closed ? t("crm.whatsapp.reopen", "Reopen thread") : t("crm.inbox.close", "Close")}
             </Button>
           )}
         </CardAction>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {isLoading ? (
-          <p className="text-muted-foreground text-sm">{t("common.loading", "Loading…")}</p>
+      <CardContent className="min-w-0 space-y-4">
+        {(error || sourceError) && (
+          <p role="alert" className="break-words text-sm text-destructive">
+            {error ??
+              t(
+                "crm.whatsapp.sourceUnavailable",
+                "Conversation access is unavailable. Cached messages cannot authorize sending.",
+              )}
+          </p>
+        )}
+        {conversationsQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">{t("common.loading", "Loading…")}</p>
         ) : !conversation || !conversationId ? (
           <Empty>
             <EmptyHeader>
@@ -158,66 +191,95 @@ export function CrmInboxPanel({ organizationId, contactId }: CrmInboxPanelProps)
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
-        ) : (
+        ) : !sourceError ? (
           <>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge variant="secondary">{channelTag(conversation.channel)}</Badge>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+              <Badge variant="secondary">WhatsApp</Badge>
               <Badge variant="outline">{String(conversation.status)}</Badge>
-              {conversation.lastPreview || conversation.last_preview ? (
-                <span className="text-muted-foreground truncate">
-                  {String(optionValue(conversation.lastPreview ?? conversation.last_preview))}
-                </span>
-              ) : null}
+              <span className="min-w-0 truncate text-muted-foreground">
+                {String(optionValue(conversation.lastPreview ?? conversation.last_preview) ?? "")}
+              </span>
             </div>
-            <ul className="max-h-64 space-y-2 overflow-y-auto">
-              {thread.map((msg) => (
+            <ul className="max-h-[36rem] min-w-0 space-y-2 overflow-y-auto">
+              {thread.map((message) => (
                 <li
-                  key={String(msg.id)}
-                  className="rounded-md border border-border/70 px-3 py-2 text-sm"
+                  key={String(message.id)}
+                  className="min-w-0 rounded-md border border-border/70 px-3 py-2 text-sm"
                 >
-                  <div className="mb-1 flex items-center gap-2">
-                    <Badge variant="outline">{String(msg.direction)}</Badge>
-                    <span className="text-muted-foreground text-xs">{String(msg.status)}</span>
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">{String(message.direction)}</Badge>
+                    <span className="text-xs text-muted-foreground">{String(message.status)}</span>
                   </div>
-                  <p>{String(msg.body)}</p>
+                  <p className="whitespace-pre-wrap break-words">{String(message.body ?? "")}</p>
+                  {message.direction === "outbound" &&
+                    message.status === "queued" &&
+                    companyId &&
+                    !closed && (
+                      <WhatsAppDispatchAction
+                        key={`${organizationId}:${companyId}:${message.id}`}
+                        companyId={String(companyId)}
+                        messageId={String(message.id)}
+                        onUseTemplate={setBody}
+                      />
+                    )}
                 </li>
               ))}
             </ul>
-            <div className="space-y-2">
-              <Label htmlFor="crm-inbox-body">{t("crm.inbox.compose", "Outbound message")}</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="crm-inbox-body"
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  placeholder={t("crm.inbox.placeholder", "Type a message…")}
-                />
-                <Button
-                  size="sm"
-                  disabled={!body.trim() || appendMessage.isPending}
-                  onClick={() => {
-                    appendMessage.mutate(
-                      {
-                        conversationId,
-                        params: {
-                          direction: "outbound",
-                          body: body.trim(),
-                          status: "queued",
-                          providerMessageId: undefined,
-                          operationalMessageId: undefined,
-                          metadata: undefined,
+            {!closed && (
+              <div className="space-y-2">
+                <Label htmlFor={`crm-inbox-body-${contactId}`}>
+                  {t("crm.inbox.compose", "Outbound message")}
+                </Label>
+                <div className="flex min-w-0 flex-wrap gap-2">
+                  <Input
+                    id={`crm-inbox-body-${contactId}`}
+                    value={body}
+                    className="min-w-0 flex-1"
+                    maxLength={4000}
+                    onChange={(event) => setBody(event.target.value)}
+                    placeholder={t("crm.inbox.placeholder", "Type a message…")}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={!body.trim() || appendMessage.isPending}
+                    onClick={() => {
+                      setError(null)
+                      appendMessage.mutate(
+                        {
+                          conversationId,
+                          params: {
+                            direction: "outbound",
+                            body: body.trim(),
+                            status: "queued",
+                            providerMessageId: undefined,
+                            operationalMessageId: undefined,
+                            metadata: undefined,
+                          },
                         },
-                      },
-                      { onSuccess: () => setBody("") },
-                    )
-                  }}
-                >
-                  <SendIcon className="size-4" />
-                </Button>
+                        { onSuccess: () => setBody(""), onError: showError },
+                      )
+                    }}
+                  >
+                    {t("crm.whatsapp.queueForReview", "Queue for review")}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t(
+                    "crm.whatsapp.queueNotice",
+                    "Queueing does not send a WhatsApp message. A connected sender, recorded consent and a separate confirmation are required.",
+                  )}
+                </p>
               </div>
-            </div>
+            )}
+            {companyId && accountId && (
+              <WhatsAppTriagePanel
+                key={`${organizationId}:${companyId}:${accountId}`}
+                companyId={String(companyId)}
+                accountId={String(accountId)}
+              />
+            )}
           </>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   )

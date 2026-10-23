@@ -8,7 +8,7 @@ trap 'rm -rf "$TEST_BIN_DIR"' EXIT
 
 for binary in \
   api-server expense-integration-worker gateway hr-integration-worker owner-report-worker \
-  projection-worker project-integration-worker storage-migrate workflow-worker; do
+  projection-worker project-integration-worker storage-migrate workflow-worker whatsapp-inbox-worker; do
   sed "s/__BINARY__/$binary/" >"$TEST_BIN_DIR/$binary" <<'SCRIPT'
 #!/usr/bin/env sh
 printf '%s\n' '__BINARY__'
@@ -23,10 +23,13 @@ chmod +x "$TEST_BIN_DIR/entrypoint"
 
 for binary in \
   api-server expense-integration-worker gateway hr-integration-worker owner-report-worker \
-  projection-worker project-integration-worker storage-migrate workflow-worker; do
+  projection-worker project-integration-worker storage-migrate workflow-worker whatsapp-inbox-worker; do
   output="$(LUMIERE_BIN="$binary" "$TEST_BIN_DIR/entrypoint" first second)"
   [[ "$output" == "$binary"$'\nfirst\nsecond' ]]
 done
+
+output="$(LUMIERE_BIN=whatsapp-inbox-worker "$TEST_BIN_DIR/entrypoint" --migrate)"
+[[ "$output" == "whatsapp-inbox-worker"$'\n--migrate' ]]
 
 output="$(BIN=gateway "$TEST_BIN_DIR/entrypoint")"
 [[ "$output" == "gateway" ]]

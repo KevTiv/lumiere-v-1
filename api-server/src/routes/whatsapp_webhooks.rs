@@ -151,7 +151,7 @@ fn constant_time_eq_32(left: &[u8; 32], right: &[u8; 32]) -> bool {
         == 0
 }
 
-fn verify_signature(secret: &[u8], body: &[u8], header: &str) -> bool {
+pub(super) fn verify_signature(secret: &[u8], body: &[u8], header: &str) -> bool {
     let Some(hex_signature) = header.strip_prefix("sha256=") else {
         return false;
     };
