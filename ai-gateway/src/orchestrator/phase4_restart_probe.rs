@@ -73,12 +73,19 @@ pub(crate) async fn run_from_env() -> Result<()> {
     let host = required("STDB_HOST")?;
     require_loopback(&host)?;
     let module = required("STDB_MODULE")?;
-    if !module.starts_with("lumiere-v1-phase4-") && module != "lumiere-c7-ai-source" {
+    if !module.starts_with("lumiere-v1-phase4-")
+        && module != "lumiere-c7-ai-source"
+        && module != "lumiere-c7-ai-target"
+    {
         bail!(
-            "STDB_MODULE must use the disposable lumiere-v1-phase4- prefix or equal lumiere-c7-ai-source"
+            "STDB_MODULE must use the disposable lumiere-v1-phase4- prefix or equal lumiere-c7-ai-source/lumiere-c7-ai-target"
         );
     }
     let token = required("STDB_TOKEN")?;
+    let read_token = required("AI_SPEND_READ_STDB_TOKEN")?;
+    if read_token == token {
+        bail!("AI_SPEND_READ_STDB_TOKEN must be distinct from STDB_TOKEN");
+    }
     let organization_id = positive_u64("PHASE4_ORGANIZATION_ID")?;
     let company_id = positive_u64("PHASE4_COMPANY_ID")?;
     let agent_id = positive_u64("PHASE4_AGENT_ID")?;
@@ -89,7 +96,7 @@ pub(crate) async fn run_from_env() -> Result<()> {
     let mode = ProbeMode::from_env()?;
 
     let writer = StdbClient::new(host.clone(), module.clone(), token.clone());
-    let reader = StdbClient::new(host, module.clone(), token);
+    let reader = StdbClient::new(host, module.clone(), read_token);
     let ledger = StdbSpendLedger {
         writer: &writer,
         reader: &reader,
