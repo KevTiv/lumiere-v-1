@@ -31,7 +31,8 @@ pub fn run_all_workflow_foundation_tests(ctx: &ReducerContext) -> Result<(), Str
 
 #[spacetimedb::reducer]
 pub fn run_workflow_authorization_tests(ctx: &ReducerContext) -> Result<(), String> {
-    authorization_test::test_workflow_authorization(ctx)
+    authorization_test::test_workflow_authorization(ctx)?;
+    task_mutation_authorization_test::test_task_mutation_authorization(ctx)
 }
 
 #[spacetimedb::reducer]
@@ -51,7 +52,8 @@ pub fn run_workflow_delivery_tests(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_workflow_action_registry_tests(ctx: &ReducerContext) -> Result<(), String> {
-    action_registry_test::test_guarded_action_registry(ctx)
+    action_registry_test::test_guarded_action_registry(ctx)?;
+    recovery_test::test_workflow_recovery(ctx)
 }
 
 #[spacetimedb::reducer]

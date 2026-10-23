@@ -35,7 +35,7 @@
     "manifest_path": "manifests/durable-pg-schema-manifest.json",
     "checksum": "sha256:5598834cc650011744abb9b9ad090e6ba09bfc824bc6d853f89f34930ef8d9ab",
     "application_catalog_path": "api-server/src/cold_tier/migrate.rs",
-    "application_catalog_version": 21,
+    "application_catalog_version": 22,
     "application_catalog_checksum": "sha256:d56e20e8434919dc0ffce07f3369dd7a03a112cb289872bc868bbe461ada4b63"
   },
   "services": {

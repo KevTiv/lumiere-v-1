@@ -14,8 +14,8 @@ use crate::core::users::{
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::workflow::approvals::{
     claim_workflow_human_task_for_actor, decide_workflow_human_task_for_actor, workflow_human_task,
-    ClaimWorkflowHumanTaskParams, DecideWorkflowHumanTaskParams, WorkflowHumanTask,
-    WorkflowHumanTaskDecision, WorkflowHumanTaskStatus,
+    workflow_human_task_candidate, ClaimWorkflowHumanTaskParams, DecideWorkflowHumanTaskParams,
+    WorkflowHumanTask, WorkflowHumanTaskDecision, WorkflowHumanTaskStatus,
 };
 use crate::workflow::cancellation_repair::{
     repair_cancelled_workflow_tasks, workflow_cancellation_repair_receipt,
@@ -127,6 +127,37 @@ fn repair_preserves_history_and_reauthorizes_replay(
             },
         )?
     };
+    let electorate: Vec<_> = ctx
+        .db
+        .workflow_human_task_candidate()
+        .human_task_candidate_by_task()
+        .filter(&active_task.id)
+        .collect();
+    if all_candidates {
+        if electorate.len() != 2
+            || electorate
+                .iter()
+                .filter(|candidate| {
+                    candidate.candidate_identity == actor
+                        && candidate.decision == Some(WorkflowHumanTaskDecision::Approve)
+                        && candidate.decided_by == Some(actor)
+                })
+                .count()
+                != 1
+            || electorate
+                .iter()
+                .filter(|candidate| candidate.decision.is_none() && candidate.decided_by.is_none())
+                .count()
+                != 1
+        {
+            return Err(
+                "AllCandidates repair fixture must retain one vote in a two-person electorate"
+                    .to_string(),
+            );
+        }
+    } else if !electorate.is_empty() {
+        return Err("AnyCandidate repair fixture must not create a frozen electorate".to_string());
+    }
     cancel_workflow(
         ctx,
         fixture.organization_id,
@@ -462,7 +493,6 @@ fn assert_durable_repair_evidence(
         "workflow_command_receipt",
         "workflow_decision_event",
         "workflow_human_task",
-        "workflow_human_task_candidate",
         "workflow_human_task_event",
         "workflow_human_task_receipt",
         "workflow_cancellation_repair_receipt",
@@ -512,6 +542,38 @@ fn assert_durable_repair_evidence(
                 "repair durable commit omitted an exact {table} row"
             ));
         }
+    }
+    // Only AllCandidates materializes a frozen electorate. Compare the exact
+    // scoped rows, including retained votes, and reject extra or missing rows.
+    let mut expected_candidates = Vec::new();
+    for task_id in [repaired.id, preserved.id] {
+        for candidate in ctx
+            .db
+            .workflow_human_task_candidate()
+            .human_task_candidate_by_task()
+            .filter(&task_id)
+        {
+            expected_candidates.push(
+                serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(&candidate))
+                    .map_err(|error| error.to_string())?,
+            );
+        }
+    }
+    let durable_candidates: Vec<_> = durable_rows
+        .iter()
+        .filter(|(table, _)| *table == "workflow_human_task_candidate")
+        .map(|(_, row)| row)
+        .collect();
+    if durable_candidates.len() != expected_candidates.len()
+        || expected_candidates.iter().any(|expected| {
+            durable_candidates
+                .iter()
+                .filter(|row| **row == expected)
+                .count()
+                != 1
+        })
+    {
+        return Err("repair durable commit changed the exact candidate/vote evidence".to_string());
     }
     if !durable_rows.iter().any(|(table, row)| {
         *table == "audit_log"
