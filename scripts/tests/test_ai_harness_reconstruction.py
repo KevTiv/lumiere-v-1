@@ -49,6 +49,33 @@ class ReconstructionTests(unittest.TestCase):
         self.assertEqual(len(result["tables"]), 9)
         self.assertEqual(result["foreign_source_rows_excluded"], 1)
 
+    def test_http_sats_option_variants_preserve_the_complete_snapshot(self):
+        source, target = fixtures()
+        fields = {
+            "ai_action_draft": ("executed_at", "reviewed_by"),
+            "ai_capability_execution": ("output_json", "output_hash", "failure_reason"),
+        }
+        for snapshot in (source, target):
+            for table, names in fields.items():
+                for row in snapshot[table]:
+                    for name in names:
+                        value = row.get(name)
+                        if isinstance(value, dict) and "some" in value:
+                            row[name] = [0, value["some"]]
+                        elif value is None or value == {"none": []}:
+                            row[name] = [1, []]
+        result = verifier.verify_snapshots(source, target, 1)
+        self.assertEqual(len(result["tables"]), 9)
+        self.assertEqual(result["foreign_source_rows_excluded"], 1)
+
+    def test_http_option_payloads_cannot_hide_an_executed_pending_draft(self):
+        for value in ([1, ["unexpected"]], [True, []], [2, []], [0, 42]):
+            source, target = fixtures()
+            source["ai_action_draft"][0]["executed_at"] = copy.deepcopy(value)
+            target["ai_action_draft"][0]["executed_at"] = copy.deepcopy(value)
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                verifier.verify_snapshots(source, target, 1)
+
     def test_missing_table_or_row_is_not_a_vacuous_pass(self):
         for table in verifier.TABLES:
             source, target = fixtures()
