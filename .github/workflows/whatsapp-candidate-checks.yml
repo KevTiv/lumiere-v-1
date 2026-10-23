@@ -1,0 +1,43 @@
+name: Finalize WhatsApp candidate checks
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - '.github/workflows/whatsapp-candidate-checks.yml'
+      - 'scripts/whatsapp-candidate-checks.py'
+
+permissions:
+  contents: read
+
+jobs:
+  finalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'codex/whatsapp-meta-alpha-webhooks-20261022'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Complete catalog and focused safety checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/whatsapp-candidate-checks.py
+          rustfmt --edition 2021 --config skip_children=true \
+            spacetimedb/src/crm/inbox_dispatch.rs \
+            api-server/src/routes/whatsapp_meta/operator/source.rs \
+            api-server/src/routes/whatsapp_meta/outbound/claim_tests.rs
+          git add frontend/packages/i18n/src/locales/en.json \
+            spacetimedb/src/crm/inbox_dispatch.rs \
+            api-server/src/routes/whatsapp_meta/operator/source.rs \
+            api-server/src/routes/whatsapp_meta/outbound/claim_tests.rs
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(whatsapp): register operator copy and enforce native company scope'
+          git push origin HEAD:refs/heads/codex/whatsapp-meta-alpha-webhooks-20261022
