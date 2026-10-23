@@ -42,21 +42,26 @@ type RunBody = {
 function requireGovernedRuntime(): number {
   const rawAgentId = process.env.E2E_GOV00_AGENT_ID?.trim()
   const agentId = rawAgentId ? Number(rawAgentId) : 0
+  const unavailable = !Number.isSafeInteger(agentId) || agentId <= 0
+  if (unavailable && process.env.E2E_REQUIRE_AI === "1") {
+    throw new Error(
+      "E2E_REQUIRE_AI=1 requires a provisioned governed report-analysis runtime (set a positive E2E_GOV00_AGENT_ID)",
+    )
+  }
   test.skip(
-    !Number.isSafeInteger(agentId) || agentId <= 0,
+    unavailable,
     "requires a provisioned governed report-analysis runtime (set E2E_GOV00_AGENT_ID)",
   )
   return agentId
 }
 
-test.describe("GOV-00 governed execution", { tag: "@gov00" }, () => {
+test.describe("GOV-00 governed execution", { tag: ["@gov00", "@ai-live"] }, () => {
   test.setTimeout(180_000)
 
   test("authenticated BFF persists the governed report trace", async ({ page }) => {
+    const agentId = requireGovernedRuntime()
     await page.goto("/overview")
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
-
-    const agentId = requireGovernedRuntime()
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
     const response = await page.request.post("/api/ai/skills/report-analysis", {
