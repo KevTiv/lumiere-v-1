@@ -38,9 +38,9 @@ pub(crate) fn credential(
             && entry.phone_number_id == phone
             && entry.credentials_reference == reference
     });
-    let entry = matching.next().ok_or_else(|| {
-        anyhow::anyhow!("no deployment credential matches this WhatsApp sender")
-    })?;
+    let entry = matching
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("no deployment credential matches this WhatsApp sender"))?;
     if matching.next().is_some() || entry.access_token.trim().is_empty() {
         bail!("ambiguous or empty WhatsApp sender credential");
     }
@@ -65,9 +65,15 @@ pub(crate) fn render(body: &str, parameters: &[String]) -> Result<String> {
     while let Some(start) = remaining.find("{{") {
         output.push_str(&remaining[..start]);
         let tail = &remaining[start + 2..];
-        let end = tail.find("}}").ok_or_else(|| anyhow::anyhow!("invalid template"))?;
-        let index: usize = tail[..end].parse().map_err(|_| anyhow::anyhow!("invalid placeholder"))?;
-        let value = index.checked_sub(1).and_then(|index| parameters.get(index))
+        let end = tail
+            .find("}}")
+            .ok_or_else(|| anyhow::anyhow!("invalid template"))?;
+        let index: usize = tail[..end]
+            .parse()
+            .map_err(|_| anyhow::anyhow!("invalid placeholder"))?;
+        let value = index
+            .checked_sub(1)
+            .and_then(|index| parameters.get(index))
             .ok_or_else(|| anyhow::anyhow!("missing template parameter"))?;
         output.push_str(value);
         remaining = &tail[end + 2..];
@@ -133,16 +139,24 @@ impl MetaTransport {
         } else {
             "id,verified_name,display_phone_number"
         };
-        let mut response = self.http
-            .get(format!("https://graph.facebook.com/{}/{path}", self.version))
+        let mut response = self
+            .http
+            .get(format!(
+                "https://graph.facebook.com/{}/{path}",
+                self.version
+            ))
             .query(&[("fields", fields), ("limit", "100")])
             .bearer_auth(token)
-            .send().await.map_err(|_| anyhow::anyhow!("Meta lookup unavailable"))?;
+            .send()
+            .await
+            .map_err(|_| anyhow::anyhow!("Meta lookup unavailable"))?;
         if !response.status().is_success() {
             bail!("Meta rejected the sender or template lookup");
         }
         let mut bytes = Vec::new();
-        while let Some(chunk) = response.chunk().await
+        while let Some(chunk) = response
+            .chunk()
+            .await
             .map_err(|_| anyhow::anyhow!("Meta lookup response incomplete"))?
         {
             if bytes.len() + chunk.len() > 1048576 {
@@ -155,7 +169,9 @@ impl MetaTransport {
 
     pub(crate) async fn templates(&self, waba: &str, token: &str) -> Result<Vec<Template>> {
         let value = self.read_json(waba, "templates", token).await?;
-        let data = value.get("data").and_then(Value::as_array)
+        let data = value
+            .get("data")
+            .and_then(Value::as_array)
             .ok_or_else(|| anyhow::anyhow!("Meta template list is unavailable"))?;
         // Bounded alpha catalogue. No arbitrary provider-supplied paging URLs.
         if value.pointer("/paging/next").is_some() || data.len() > 100 {
@@ -169,7 +185,10 @@ impl MetaTransport {
         if value.get("id").and_then(Value::as_str) != Some(phone) {
             bail!("Meta sender identity mismatch");
         }
-        value.get("verified_name").and_then(Value::as_str).map(str::to_owned)
+        value
+            .get("verified_name")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
             .ok_or_else(|| anyhow::anyhow!("Meta sender is not ready"))
     }
 }
@@ -181,7 +200,10 @@ mod tests {
 
     #[test]
     fn template_rendering_is_single_pass_and_checks_parameters() {
-        assert_eq!(render("Hello {{1}}: {{2}}", &["{{2}}".into(), "42".into()]).unwrap(), "Hello {{2}}: 42");
+        assert_eq!(
+            render("Hello {{1}}: {{2}}", &["{{2}}".into(), "42".into()]).unwrap(),
+            "Hello {{2}}: 42"
+        );
         assert!(render("{{0}}", &["x".into()]).is_err());
         assert!(render("{{2}}", &["x".into()]).is_err());
     }

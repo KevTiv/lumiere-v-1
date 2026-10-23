@@ -32,7 +32,13 @@ pub(super) async fn acquire(
             "SELECT 1 FROM lumiere_whatsapp.dispatch_review \
              WHERE id=$1 AND organization_id=$2 AND company_id=$3 AND account_id=$4 \
              AND operational_message_id=$5 AND expires_at>now()",
-            &[&message.review_digest, &org, &company, &account, &operational],
+            &[
+                &message.review_digest,
+                &org,
+                &company,
+                &account,
+                &operational,
+            ],
         )
         .await?
         .is_none()

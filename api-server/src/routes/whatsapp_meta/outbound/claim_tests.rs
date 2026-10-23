@@ -3,7 +3,10 @@ use super::*;
 use crate::cold_tier::pg_pool::{build_pool, PgConfig};
 use crate::routes::whatsapp_meta::{
     operator::storage::correlate,
-    outbound::{policy::{Content, Eligibility, FreshAuthorization}, send_once, MetaTransport},
+    outbound::{
+        policy::{Content, Eligibility, FreshAuthorization},
+        send_once, MetaTransport,
+    },
     protocol::{event_key, fingerprint, Incoming},
 };
 use serde_json::json;
@@ -17,9 +20,13 @@ async fn fixture() -> Result<(Pool, ReviewedMessage)> {
     let pool = build_pool(&config)?;
     store::migrate(&pool).await?;
     let message = ReviewedMessage {
-        organization_id: rand::random::<u64>().max(1), company_id: 3, account_id: 2,
-        operational_message_id: 4, phone_number_id: "456".into(),
-        recipient: "250788123456".into(), review_digest: hex::encode(rand::random::<[u8; 32]>()),
+        organization_id: rand::random::<u64>().max(1),
+        company_id: 3,
+        account_id: 2,
+        operational_message_id: 4,
+        phone_number_id: "456".into(),
+        recipient: "250788123456".into(),
+        review_digest: hex::encode(rand::random::<[u8; 32]>()),
         content: Content::Reply("Approved message".into()),
     };
     insert_review(&pool, &message).await?;
@@ -50,17 +57,29 @@ async fn postgres_double_confirmation_unknown_recovery_and_callback_scope() -> R
     );
     assert_ne!(left?, right?, "only one confirmation may acquire a send");
     assert!(!acquire(&pool, &message, &intent, &digest, 10).await?);
-    assert!(acquire(&pool, &message, &intent, &"b".repeat(64), 10).await.is_err());
-    pool.get().await?.execute(
-        "UPDATE lumiere_whatsapp.outbox SET state='unknown' WHERE intent_key=$1", &[&intent],
-    ).await?;
+    assert!(acquire(&pool, &message, &intent, &"b".repeat(64), 10)
+        .await
+        .is_err());
+    pool.get()
+        .await?
+        .execute(
+            "UPDATE lumiere_whatsapp.outbox SET state='unknown' WHERE intent_key=$1",
+            &[&intent],
+        )
+        .await?;
     assert!(!acquire(&pool, &message, &intent, &digest, 10).await?);
     let raw = json!({"id":"wamid.test","status":"delivered","timestamp":"100",
         "recipient_id":message.recipient,"biz_opaque_callback_data":intent});
     let mut event = Incoming {
-        organization_id: message.organization_id, account_id: 2, company_id: Some(3),
-        business_account_id: "123".into(), phone_number_id: "456".into(), kind: "status".into(),
-        event_key: event_key("status", &raw), fingerprint: fingerprint(&raw), payload: raw,
+        organization_id: message.organization_id,
+        account_id: 2,
+        company_id: Some(3),
+        business_account_id: "123".into(),
+        phone_number_id: "456".into(),
+        kind: "status".into(),
+        event_key: event_key("status", &raw),
+        fingerprint: fingerprint(&raw),
+        payload: raw,
     };
     event.company_id = Some(9);
     assert!(correlate(&pool, &event).await.is_err());
@@ -85,19 +104,29 @@ async fn postgres_volume_and_expiry_fail_without_leaving_a_sendable_attempt() ->
     message.operational_message_id = 7;
     message.review_digest = hex::encode(rand::random::<[u8; 32]>());
     insert_review(&pool, &message).await?;
-    assert!(acquire(&pool, &message, &"c".repeat(64), &digest, 1).await.is_err());
+    assert!(acquire(&pool, &message, &"c".repeat(64), &digest, 1)
+        .await
+        .is_err());
     let client = pool.get().await?;
-    let count: i64 = client.query_one(
-        "SELECT count(*) FROM lumiere_whatsapp.outbox WHERE organization_id=$1",
-        &[&message.organization_id.to_string()],
-    ).await?.get(0);
-    assert_eq!(count, 1, "rejected rate admission must roll back the prepared row");
+    let count: i64 = client
+        .query_one(
+            "SELECT count(*) FROM lumiere_whatsapp.outbox WHERE organization_id=$1",
+            &[&message.organization_id.to_string()],
+        )
+        .await?
+        .get(0);
+    assert_eq!(
+        count, 1,
+        "rejected rate admission must roll back the prepared row"
+    );
     client.execute(
         "UPDATE lumiere_whatsapp.dispatch_review SET expires_at=now()-interval '1 second' WHERE id=$1",
         &[&message.review_digest],
     ).await?;
     drop(client);
-    assert!(acquire(&pool, &message, &"c".repeat(64), &digest, 10).await.is_err());
+    assert!(acquire(&pool, &message, &"c".repeat(64), &digest, 10)
+        .await
+        .is_err());
     Ok(())
 }
 
@@ -107,13 +136,19 @@ impl FreshAuthorization for RevokedAfterClaim {
     async fn refresh(&self, message: &ReviewedMessage) -> Result<Eligibility> {
         let first = self.0.fetch_add(1, Ordering::SeqCst) == 0;
         Ok(Eligibility {
-            organization_id: message.organization_id, company_id: message.company_id,
-            account_id: message.account_id, review_digest: message.review_digest.clone(),
+            organization_id: message.organization_id,
+            company_id: message.company_id,
+            account_id: message.account_id,
+            review_digest: message.review_digest.clone(),
             approved_payload_digest: super::super::policy::reviewed_payload_digest(message)?,
-            actor_can_send: first, sender_active: true, explicit_opt_in: true, opted_out: false,
+            actor_can_send: first,
+            sender_active: true,
+            explicit_opt_in: true,
+            opted_out: false,
             quiet_hours_allow: true,
             last_customer_message_seconds: Some(chrono::Utc::now().timestamp().max(0) as u64),
-            exact_meta_template_approved: false, meta_approval_checked_at_seconds: None,
+            exact_meta_template_approved: false,
+            meta_approval_checked_at_seconds: None,
         })
     }
 }
@@ -124,12 +159,26 @@ async fn postgres_revocation_after_claim_prevents_provider_io() -> Result<()> {
     let (pool, message) = fixture().await?;
     let guard = RevokedAfterClaim(AtomicUsize::new(0));
     let transport = MetaTransport::new("v0.0")?;
-    assert!(send_once(&pool, &transport, &message, "not-a-live-credential", 10, &guard).await.is_err());
+    assert!(send_once(
+        &pool,
+        &transport,
+        &message,
+        "not-a-live-credential",
+        10,
+        &guard
+    )
+    .await
+    .is_err());
     assert_eq!(guard.0.load(Ordering::SeqCst), 2);
-    let state: String = pool.get().await?.query_one(
-        "SELECT state FROM lumiere_whatsapp.outbox WHERE organization_id=$1",
-        &[&message.organization_id.to_string()],
-    ).await?.get(0);
+    let state: String = pool
+        .get()
+        .await?
+        .query_one(
+            "SELECT state FROM lumiere_whatsapp.outbox WHERE organization_id=$1",
+            &[&message.organization_id.to_string()],
+        )
+        .await?
+        .get(0);
     assert_eq!(state, "rejected");
     Ok(())
 }

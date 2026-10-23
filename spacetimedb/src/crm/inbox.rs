@@ -619,7 +619,10 @@ pub fn receive_crm_provider_message(
     }
 
     let contact = load_active_contact(ctx, organization_id, params.contact_id)?;
-    if account.company_id.is_some_and(|id| contact.company_id != Some(id)) {
+    if account
+        .company_id
+        .is_some_and(|id| contact.company_id != Some(id))
+    {
         return Err("provider account and contact company differ".into());
     }
     validate_phone_identity(
@@ -853,7 +856,9 @@ pub fn record_crm_provider_delivery(
     }
     if conversation.channel != MessageChannel::WhatsApp
         || conversation.provider_account_id != Some(params.provider_account_id)
-        || account.company_id.is_some_and(|id| id != conversation.company_id)
+        || account
+            .company_id
+            .is_some_and(|id| id != conversation.company_id)
     {
         return Err("conversation does not belong to this whatsapp provider account".to_string());
     }
@@ -882,8 +887,8 @@ pub fn record_crm_provider_delivery(
             "conversation message is not an outbound message for this conversation".to_string(),
         );
     }
-    let stale_sent = params.status == "sent"
-        && matches!(message.status.as_str(), "delivered" | "failed");
+    let stale_sent =
+        params.status == "sent" && matches!(message.status.as_str(), "delivered" | "failed");
     let transition_allowed = match params.status.as_str() {
         "sent" => message.status == "queued" || message.status == "sent",
         "delivered" => {

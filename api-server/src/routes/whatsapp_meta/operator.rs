@@ -16,7 +16,10 @@ use serde_json::{json, Value};
 use tower_cookies::Cookies;
 
 use super::{
-    outbound::{policy::{Eligibility, FreshAuthorization, ReviewedMessage}, send_once, SendOutcome},
+    outbound::{
+        policy::{Eligibility, FreshAuthorization, ReviewedMessage},
+        send_once, SendOutcome,
+    },
     protocol::{field, row_u64, text},
     require_enabled, store,
 };
@@ -44,7 +47,10 @@ struct DispatchRequest {
 }
 
 fn company(value: &str) -> Result<u64, ApiError> {
-    value.parse::<u64>().ok().filter(|id| *id > 0)
+    value
+        .parse::<u64>()
+        .ok()
+        .filter(|id| *id > 0)
         .ok_or_else(|| ApiError::BadRequest("invalid company identifier".into()))
 }
 
@@ -61,21 +67,43 @@ fn send_enabled() -> Result<(), ApiError> {
 }
 
 fn pool() -> Result<&'static deadpool_postgres::Pool, ApiError> {
-    pg_pool::required_pool().map_err(|_| ApiError::Unavailable("WhatsApp storage is unavailable".into()))
+    pg_pool::required_pool()
+        .map_err(|_| ApiError::Unavailable("WhatsApp storage is unavailable".into()))
 }
 
 async fn options(
-    State(state): State<Arc<AppState>>, headers: HeaderMap, cookies: Cookies,
-    Path(message_id): Path<u64>, Query(scope): Query<Scope>,
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(message_id): Path<u64>,
+    Query(scope): Query<Scope>,
 ) -> Result<Json<Value>, ApiError> {
     send_enabled()?;
-    store::verify(pool()?).await.map_err(|_| ApiError::Unavailable("WhatsApp migration is required".into()))?;
-    let source = source::load(&state, &headers, &cookies, scope.company_id, message_id, &Choice::Reply).await?;
-    let window_open = source.eligibility.last_customer_message_seconds
-        .is_some_and(|last| last <= now_seconds() && now_seconds() - last < 86400);
-    let transport_state = storage::state(pool()?, source.message.organization_id,
-        scope.company_id, source.message.operational_message_id).await
-        .map_err(|_| ApiError::Unavailable("WhatsApp status is unavailable".into()))?;
+    store::verify(pool()?)
+        .await
+        .map_err(|_| ApiError::Unavailable("WhatsApp migration is required".into()))?;
+    let source = source::load(
+        &state,
+        &headers,
+        &cookies,
+        scope.company_id,
+        message_id,
+        &Choice::Reply,
+    )
+    .await?;
+    let now = now_seconds();
+    let window_open = source
+        .eligibility
+        .last_customer_message_seconds
+        .is_some_and(|last| last <= now && now - last < 86400);
+    let transport_state = storage::state(
+        pool()?,
+        source.message.organization_id,
+        scope.company_id,
+        source.message.operational_message_id,
+    )
+    .await
+    .map_err(|_| ApiError::Unavailable("WhatsApp status is unavailable".into()))?;
     Ok(Json(json!({
         "messageId":message_id.to_string(), "body":match &source.message.content {
             super::outbound::policy::Content::Reply(body) => body.as_str(), _ => "",
@@ -89,23 +117,31 @@ async fn options(
 }
 
 async fn preview(
-    State(state): State<Arc<AppState>>, headers: HeaderMap, cookies: Cookies,
-    Path(message_id): Path<u64>, Json(request): Json<PreviewRequest>,
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(message_id): Path<u64>,
+    Json(request): Json<PreviewRequest>,
 ) -> Result<Json<Value>, ApiError> {
     send_enabled()?;
     let company = company(&request.company_id)?;
-    let mut source = source::load(&state, &headers, &cookies, company, message_id, &request.choice).await?;
-    let review = storage::save(pool()?, &mut source, &request.choice).await
-        .map_err(|_| ApiError::Conflict("message is ineligible, already attempted, or review storage is unavailable".into()))?;
-    let body = match &source.message.content {
-        super::outbound::policy::Content::Reply(body) => body.clone(),
-        super::outbound::policy::Content::Template { .. } => {
-            // Canonical queued content and exact Meta rendering were compared in load().
-            let context = source::context(&state, &headers, &cookies, company, true).await?;
-            let row = source::read(&state, &context, company, "crm-conversation-messages", message_id).await?;
-            text(&row, "body")?.to_owned()
-        }
-    };
+    let mut source = source::load(
+        &state,
+        &headers,
+        &cookies,
+        company,
+        message_id,
+        &request.choice,
+    )
+    .await?;
+    let review = storage::save(pool()?, &mut source, &request.choice)
+        .await
+        .map_err(|_| {
+            ApiError::Conflict(
+                "message is ineligible, already attempted, or review storage is unavailable".into(),
+            )
+        })?;
+    let body = source.body.clone();
     Ok(Json(json!({
         "reviewId":review.id, "messageId":message_id.to_string(),
         "senderName":source.sender_name, "recipient":source.masked_recipient,
@@ -125,33 +161,77 @@ impl FreshAuthorization for Guard<'_> {
     async fn refresh(&self, message: &ReviewedMessage) -> anyhow::Result<Eligibility> {
         send_enabled()?;
         let current = storage::review(
-            pool()?, message.organization_id, self.review.company_id, self.review.message_id,
-            &self.review.actor, &self.review.id,
-        ).await?;
+            pool()?,
+            message.organization_id,
+            self.review.company_id,
+            self.review.message_id,
+            &self.review.actor,
+            &self.review.id,
+        )
+        .await?;
         let mut source = source::load(
-            self.state, self.headers, self.cookies, current.company_id, current.message_id, &current.choice,
-        ).await?;
+            self.state,
+            self.headers,
+            self.cookies,
+            current.company_id,
+            current.message_id,
+            &current.choice,
+        )
+        .await?;
         storage::check_source(&current, &mut source)?;
         Ok(source.eligibility)
     }
 }
 
 async fn dispatch(
-    State(state): State<Arc<AppState>>, headers: HeaderMap, cookies: Cookies,
-    Path(message_id): Path<u64>, Json(request): Json<DispatchRequest>,
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(message_id): Path<u64>,
+    Json(request): Json<DispatchRequest>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     send_enabled()?;
     let company = company(&request.company_id)?;
     let context = source::context(&state, &headers, &cookies, company, true).await?;
     let org = context.organization_id();
-    let review = storage::review(pool()?, org, company, message_id, context.actor_identity(), &request.review_id)
-        .await.map_err(|_| ApiError::Conflict("review expired or is not available in this scope".into()))?;
-    let mut source = source::load(&state, &headers, &cookies, company, message_id, &review.choice).await?;
-    storage::check_source(&review, &mut source)
-        .map_err(|_| ApiError::Conflict("message or permissions changed; review again before sending".into()))?;
-    let guard = Guard { state: &state, headers: &headers, cookies: &cookies, review: &review };
+    let review = storage::review(
+        pool()?,
+        org,
+        company,
+        message_id,
+        context.actor_identity(),
+        &request.review_id,
+    )
+    .await
+    .map_err(|_| ApiError::Conflict("review expired or is not available in this scope".into()))?;
+    let mut source = source::load(
+        &state,
+        &headers,
+        &cookies,
+        company,
+        message_id,
+        &review.choice,
+    )
+    .await?;
+    storage::check_source(&review, &mut source).map_err(|_| {
+        ApiError::Conflict("message or permissions changed; review again before sending".into())
+    })?;
+    let guard = Guard {
+        state: &state,
+        headers: &headers,
+        cookies: &cookies,
+        review: &review,
+    };
     let transport = source::transport()?;
-    let result = send_once(pool()?, &transport, &source.message, &source.token, source.daily_limit, &guard).await;
+    let result = send_once(
+        pool()?,
+        &transport,
+        &source.message,
+        &source.token,
+        source.daily_limit,
+        &guard,
+    )
+    .await;
     // A send error can follow a committed claim. Never encourage a blind retry.
     let status = match result {
         Ok(SendOutcome::Accepted(_)) => "accepted",
@@ -159,22 +239,38 @@ async fn dispatch(
         Ok(SendOutcome::AlreadyAttempted) => "already_attempted",
         Ok(SendOutcome::Unknown) | Err(_) => "unknown",
     };
-    Ok((StatusCode::ACCEPTED, Json(json!({
-        "state":status, "messageId":message_id.to_string(), "canAutomaticallyRetry":false,
-        "notice":"Check message status before taking further action. This message will not be resent automatically.",
-    }))))
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({
+            "state":status, "messageId":message_id.to_string(), "canAutomaticallyRetry":false,
+            "notice":"Check message status before taking further action. This message will not be resent automatically.",
+        })),
+    ))
 }
 
 async fn status(
-    State(state): State<Arc<AppState>>, headers: HeaderMap, cookies: Cookies,
-    Path(message_id): Path<u64>, Query(scope): Query<Scope>,
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    cookies: Cookies,
+    Path(message_id): Path<u64>,
+    Query(scope): Query<Scope>,
 ) -> Result<Json<Value>, ApiError> {
     require_enabled()?;
     let context = source::context(&state, &headers, &cookies, scope.company_id, false).await?;
-    let row = source::read(&state, &context, scope.company_id, "crm-conversation-messages", message_id).await?;
+    let row = source::read(
+        &state,
+        &context,
+        scope.company_id,
+        "crm-conversation-messages",
+        message_id,
+    )
+    .await?;
     let transport = match row_u64(&row, "operational_message_id") {
-        Some(id) => storage::state(pool()?, context.organization_id(), scope.company_id, id).await
-            .map_err(|_| ApiError::Unavailable("dispatch status is unavailable; do not resend".into()))?,
+        Some(id) => storage::state(pool()?, context.organization_id(), scope.company_id, id)
+            .await
+            .map_err(|_| {
+                ApiError::Unavailable("dispatch status is unavailable; do not resend".into())
+            })?,
         None => json!({"state":"not_linked","providerAccepted":false}),
     };
     Ok(Json(json!({
@@ -200,10 +296,12 @@ mod tests {
     fn send_requests_cannot_supply_recipient_authority_or_provider_ids() {
         assert!(serde_json::from_value::<DispatchRequest>(json!({
             "companyId":"1","reviewId":"a","recipient":"250700000000"
-        })).is_err());
+        }))
+        .is_err());
         assert!(serde_json::from_value::<PreviewRequest>(json!({
-            "companyId":"1","choice":{"mode":"reply","actorCanSend":true}
-        })).is_err());
+            "companyId":"1","choice":{"mode":"reply"},"actorCanSend":true
+        }))
+        .is_err());
         assert!(company("0").is_err());
         assert!(company("1 OR 1=1").is_err());
         assert_eq!(company("9007199254740993").unwrap(), 9007199254740993);

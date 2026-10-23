@@ -63,10 +63,16 @@ pub(super) fn prepare(
     if account.company_id.is_some_and(|id| id != company_id) {
         return Err("WhatsApp sender belongs to another company".into());
     }
-    if !account.subscribed_webhook_events.iter().any(|event| event == "message_status") {
+    if !account
+        .subscribed_webhook_events
+        .iter()
+        .any(|event| event == "message_status")
+    {
         return Err("WhatsApp sender must subscribe to delivery status".into());
     }
-    let identity_id = conversation.phone_identity_id.ok_or("conversation lacks a recipient")?;
+    let identity_id = conversation
+        .phone_identity_id
+        .ok_or("conversation lacks a recipient")?;
     let operational = ctx.db.operational_message().insert(OperationalMessage {
         id: 0,
         organization_id,
@@ -103,10 +109,13 @@ pub(super) fn prepare(
             record_id: operational.id,
             action: "CREATE",
             old_values: None,
-            new_values: Some(serde_json::json!({
-                "status": "queued", "conversation_id": conversation.id,
-                "provider_account_id": account_id,
-            }).to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "status": "queued", "conversation_id": conversation.id,
+                    "provider_account_id": account_id,
+                })
+                .to_string(),
+            ),
             changed_fields: vec!["status".into()],
             metadata: None,
         },
@@ -121,9 +130,15 @@ mod tests {
     #[test]
     fn sender_selection_is_company_first_and_ambiguity_is_not_guessed() {
         assert_eq!(select_sender(&[]).unwrap(), None);
-        assert_eq!(select_sender(&[(1, false, true), (2, true, false)]).unwrap(), Some(2));
+        assert_eq!(
+            select_sender(&[(1, false, true), (2, true, false)]).unwrap(),
+            Some(2)
+        );
         assert!(select_sender(&[(1, true, false), (2, true, false)]).is_err());
-        assert_eq!(select_sender(&[(1, true, false), (2, true, true)]).unwrap(), Some(2));
+        assert_eq!(
+            select_sender(&[(1, true, false), (2, true, true)]).unwrap(),
+            Some(2)
+        );
         assert!(select_sender(&[(1, true, true), (2, true, true)]).is_err());
     }
 }

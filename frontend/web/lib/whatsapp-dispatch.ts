@@ -1,7 +1,15 @@
 import { z } from "zod"
 
 const transportSchema = z.object({
-  state: z.enum(["not_attempted", "not_linked", "prepared", "attempted", "accepted", "rejected", "unknown"]),
+  state: z.enum([
+    "not_attempted",
+    "not_linked",
+    "prepared",
+    "attempted",
+    "accepted",
+    "rejected",
+    "unknown",
+  ]),
   providerAccepted: z.boolean(),
 })
 

@@ -179,7 +179,10 @@ async fn finish(pool: &Pool, intent: &str, outcome: &SendOutcome) -> Result<()> 
         &[&intent],
     ).await?;
     let verified = row.and_then(|row| row.get::<_, Option<String>>(0));
-    if verified.as_deref().is_some_and(|id| provider.is_none_or(|expected| expected == id)) {
+    if verified
+        .as_deref()
+        .is_some_and(|id| provider.is_none_or(|expected| expected == id))
+    {
         return Ok(());
     }
     bail!("whatsapp acceptance recording is unconfirmed; do not resend")

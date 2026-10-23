@@ -74,24 +74,44 @@ pub(super) async fn account(
 }
 
 /// Read the authenticated transport identity, not a JWT payload or caller hint.
-pub(super) async fn provider_ready(state: &AppState, org: u64, account: u64) -> Result<(), ApiError> {
-    let actual = state.stdb.authenticated_identity().await.map_err(ApiError::unavailable)?;
-    let rows = state.stdb.query_sql(&format!(
-        "SELECT organization_id,provider_account_id,executor_identity,is_active \
+pub(super) async fn provider_ready(
+    state: &AppState,
+    org: u64,
+    account: u64,
+) -> Result<(), ApiError> {
+    let actual = state
+        .stdb
+        .authenticated_identity()
+        .await
+        .map_err(ApiError::unavailable)?;
+    let rows = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT organization_id,provider_account_id,executor_identity,is_active \
          FROM crm_provider_principal WHERE organization_id = {org} \
          AND provider_account_id = {account} AND is_active = true LIMIT 2"
-    )).await.map_err(ApiError::unavailable)?;
+        ))
+        .await
+        .map_err(ApiError::unavailable)?;
     let [row] = rows.as_slice() else {
-        return Err(ApiError::Unavailable("sender has no unique active CRM provider principal".into()));
+        return Err(ApiError::Unavailable(
+            "sender has no unique active CRM provider principal".into(),
+        ));
     };
-    let expected = field(row, "executor_identity").and_then(|value| {
-        value.as_str().or_else(|| value.get("__identity__").and_then(Value::as_str))
-    }).and_then(stdb_client::normalize_spacetime_identity_header);
+    let expected = field(row, "executor_identity")
+        .and_then(|value| {
+            value
+                .as_str()
+                .or_else(|| value.get("__identity__").and_then(Value::as_str))
+        })
+        .and_then(stdb_client::normalize_spacetime_identity_header);
     if expected.as_deref() != Some(actual.as_str())
         || row_u64(row, "organization_id") != Some(org)
         || row_u64(row, "provider_account_id") != Some(account)
     {
-        return Err(ApiError::Unavailable("sender CRM provider principal does not match the server".into()));
+        return Err(ApiError::Unavailable(
+            "sender CRM provider principal does not match the server".into(),
+        ));
     }
     Ok(())
 }
@@ -232,7 +252,8 @@ async fn delivery(state: &AppState, account: &Account, event: &Incoming) -> Resu
     };
     let pool = pg_pool::required_pool().map_err(ApiError::unavailable)?;
     let (conversation, message, operational) = super::operator::storage::correlate(pool, event)
-        .await.map_err(|_| ApiError::Unavailable("provider message correlation is pending".into()))?;
+        .await
+        .map_err(|_| ApiError::Unavailable("provider message correlation is pending".into()))?;
     let failure = if status == "failed" {
         json!({"some": "meta delivery failed"})
     } else {
