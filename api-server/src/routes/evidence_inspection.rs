@@ -64,6 +64,35 @@ struct RunEvidenceBody {
     run_id: u64,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct RunHistoryBody {
+    company_id: u64,
+    #[serde(default)]
+    cursor: Option<String>,
+    #[serde(default)]
+    limit: Option<u16>,
+}
+
+fn validate_run_history_body(body: &RunHistoryBody) -> Result<(), ApiError> {
+    if body.company_id == 0 {
+        return Err(ApiError::BadRequest(
+            "companyId must be a positive integer".into(),
+        ));
+    }
+    if body
+        .cursor
+        .as_deref()
+        .is_some_and(|cursor| cursor.is_empty() || cursor.len() > 32)
+        || body.limit.is_some_and(|limit| limit == 0 || limit > 50)
+    {
+        return Err(ApiError::BadRequest(
+            "run history pagination is invalid".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn is_stable_node_key(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
@@ -211,6 +240,23 @@ async fn export_run_evidence(
     Ok(response)
 }
 
+async fn run_history(
+    State(state): State<Arc<AppState>>,
+    org: OrgSession,
+    Json(body): Json<RunHistoryBody>,
+) -> Result<Response, ApiError> {
+    validate_run_history_body(&body)?;
+    forward_evidence_read(
+        &state,
+        org,
+        body.company_id,
+        "/v1/evidence/runs/history",
+        json!({ "cursor": body.cursor, "limit": body.limit }),
+        "Run history",
+    )
+    .await
+}
+
 /// The reviewer's queue for the caller's own company: pending and flagged
 /// claims and decisions, their sources and affected workflow steps.
 async fn review_queue(
@@ -308,6 +354,7 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/ai/evidence/inspect", post(inspect_evidence))
         .route("/ai/evidence/runs/inspect", post(inspect_run_evidence))
         .route("/ai/evidence/runs/export", post(export_run_evidence))
+        .route("/ai/evidence/runs/history", post(run_history))
         .route("/ai/evidence/review-queue", post(review_queue))
         .route_layer(middleware::from_fn(no_store))
 }
@@ -417,6 +464,29 @@ mod tests {
                 .extend(extra.as_object().expect("extra object").clone());
             assert!(serde_json::from_value::<RunEvidenceBody>(body).is_err());
         }
+    }
+
+    #[test]
+    fn run_history_accepts_only_bounded_pagination_intent() {
+        assert!(serde_json::from_value::<RunHistoryBody>(json!({
+            "companyId": 9,
+            "cursor": "AQID",
+            "limit": 20
+        }))
+        .is_ok());
+        for invalid in [
+            json!({"companyId": 9, "limit": 0}),
+            json!({"companyId": 9, "limit": 51}),
+            json!({"companyId": 9, "cursor": "x".repeat(33)}),
+        ] {
+            let body: RunHistoryBody = serde_json::from_value(invalid).expect("shape");
+            assert!(validate_run_history_body(&body).is_err());
+        }
+        assert!(serde_json::from_value::<RunHistoryBody>(json!({
+            "companyId": 9,
+            "organizationId": 7
+        }))
+        .is_err());
     }
 
     #[test]
