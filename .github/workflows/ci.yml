@@ -33,7 +33,7 @@ jobs:
       - name: Test external readiness probe
         run: node scripts/tests/test-compose-readiness.mjs
       - name: Test production identity bootstrap
-        run: node --test scripts/tests/test_production_identity_bootstrap.mjs
+        run: node --test scripts/tests/test_production_identity_bootstrap.mjs scripts/tests/test_mistral_alpha_preflight.mjs
       - name: Test ordered Railway release orchestration
         run: |
           bash scripts/tests/test-railway-stack-release.sh
