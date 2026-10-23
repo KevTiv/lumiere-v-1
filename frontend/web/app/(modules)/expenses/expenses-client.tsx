@@ -7,6 +7,7 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleInsights } from "../../../components/module-insights"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { Textarea } from "@lumiere/ui/components/textarea"
 import {
   inlineNumberAbove,
   isDraftExpense,
@@ -1327,9 +1328,9 @@ function ExpensesClientLoaded({
               <label className="text-sm font-medium" htmlFor="refuse-reason">
                 {t("expenses.workflow.refuseReason")}
               </label>
-              <textarea
+              <Textarea variant="plain"
                 id="refuse-reason"
-                className="w-full min-h-[80px] rounded-md border bg-background px-3 py-2 text-sm"
+                className="min-h-[80px]"
                 value={refuseReason}
                 onChange={(e) => setRefuseReason(e.target.value)}
                 placeholder={t("expenses.workflow.refuseReasonPlaceholder")}

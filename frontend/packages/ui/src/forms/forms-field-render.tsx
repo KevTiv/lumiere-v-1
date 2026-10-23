@@ -310,7 +310,7 @@ export function FormFieldRenderer({
                   disabled={field.disabled || option.disabled}
                   onClick={() => onChange(option.value)}
                   className={cn(
-                    "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150",
+                    "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150 pointer-coarse:min-h-11",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20",
                     selected
                       ? "border-primary bg-primary text-primary-foreground"

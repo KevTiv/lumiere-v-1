@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import type { TFunction } from "i18next"
 import { useTranslation } from "@lumiere/i18n"
 import { Button, Input, Label, type EntityRow } from "@lumiere/ui"
+import { Textarea } from "@lumiere/ui/components/textarea"
 import { stbTimestampFromDate } from "@lumiere/erp-shared/stb-timestamp"
 import {
   buildPurchasingConfigurationSubmission,
@@ -356,7 +357,7 @@ export function PurchasingConfigurationWorkspace({
             </div>
             <SelectField id="purchasing-intent-order" label={t("purchasing.configuration.fields.purchaseOrder", { defaultValue: "Purchase order" })} value={String(values.purchaseOrderId ?? "")} rows={purchaseOrders} fallback={t("purchasing.configuration.fields.purchaseOrder", { defaultValue: "Purchase order" })} optional onChange={(value) => setValue("purchaseOrderId", value)} t={t} />
             <div className="space-y-1.5"><Label htmlFor="purchasing-intent-key">{t("purchasing.configuration.fields.idempotencyKey", { defaultValue: "Idempotency key" })}</Label><Input id="purchasing-intent-key" value={String(values.idempotencyKey ?? "")} onChange={(event) => setValue("idempotencyKey", event.target.value)} required /></div>
-            <div className="space-y-1.5"><Label htmlFor="purchasing-intent-payload">{t("purchasing.configuration.fields.requestPayload", { defaultValue: "Request payload" })}</Label><textarea id="purchasing-intent-payload" className="border-input bg-background min-h-24 w-full rounded-md border px-3 py-2 text-sm" value={String(values.requestPayload ?? "")} onChange={(event) => setValue("requestPayload", event.target.value)} /></div>
+            <div className="space-y-1.5"><Label htmlFor="purchasing-intent-payload">{t("purchasing.configuration.fields.requestPayload", { defaultValue: "Request payload" })}</Label><Textarea variant="plain" id="purchasing-intent-payload" className="min-h-24" value={String(values.requestPayload ?? "")} onChange={(event) => setValue("requestPayload", event.target.value)} /></div>
           </>
         ) : null}
 
