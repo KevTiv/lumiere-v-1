@@ -15,7 +15,9 @@
 //! - no budget, price snapshot or visible reservation: the provider is not called;
 //! - an existing reservation or attempt for the key: the provider is not called,
 //!   because recovering either row does not authorize redispatch;
-//! - provider error or timeout: the attempt becomes `outcome_unknown` and the
+//! - explicit provider request/auth/rate rejection: the attempt becomes `failed`
+//!   and zero usage is settled before the rejection can permit a routed retry;
+//! - other provider errors or timeout: the attempt becomes `outcome_unknown` and the
 //!   reservation stays reserved; neither is retried or settled here. The
 //!   transport cannot tell a lost response from a provider that never ran, so
 //!   no dispatch error is recorded as a definite `failed`;
@@ -41,7 +43,7 @@ use crate::ai_spend::{
     STATUS_RELEASED, STATUS_RESERVED, STATUS_SETTLED,
 };
 use crate::providers::llm::{
-    CompletionTermination, LlmCompletion, LlmMessage, LlmRequest, LlmResponse,
+    CompletionTermination, LlmCompletion, LlmMessage, LlmRequest, LlmResponse, ProviderRejection,
 };
 
 /// Persistence operations needed for admission; implemented over SpacetimeDB
@@ -844,6 +846,20 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
         let response = match self.inner.complete(req).await {
             Ok(response) => response,
             Err(error) => {
+                if error.downcast_ref::<ProviderRejection>().is_some() {
+                    self.ledger
+                        .record_attempt_result(
+                            organization_id,
+                            &AttemptResult::failed(attempt.id, 0, 0, &error.to_string()),
+                        )
+                        .await
+                        .context("could not record definite provider rejection; retry denied")?;
+                    self.ledger
+                        .settle(organization_id, reservation.id, 0, 0)
+                        .await
+                        .context("could not settle definite provider rejection; retry denied")?;
+                    return Err(error.context("provider rejection recorded and zero usage settled"));
+                }
                 // The provider may have run, so the outcome is unknown rather
                 // than failed, and the reservation stays reserved.
                 self.ledger
@@ -1098,6 +1114,7 @@ mod tests {
         settled: Mutex<Vec<(u64, u32, u32)>>,
         reconciliations: Mutex<Vec<(u64, String, String, String)>>,
         settle_failures: AtomicU32,
+        result_failures: AtomicU32,
         settle_response_losses: AtomicU32,
         /// Ledger writes in call order, so tests can assert the sequence.
         writes: Mutex<Vec<String>>,
@@ -1312,6 +1329,15 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push(format!("result:{}", result.status));
+            if self
+                .result_failures
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_ok()
+            {
+                bail!("scripted result recording failure");
+            }
             let reservations = self.reservations.lock().unwrap();
             let mut rows = self.attempts.lock().unwrap();
             let row = rows
@@ -1446,6 +1472,201 @@ mod tests {
     }
 
     const KEY: &str = "h5:spend:run:42:step:1:attempt:0";
+
+    #[tokio::test]
+    async fn explicit_rejection_settles_zero_before_allowing_retry() {
+        let rejection =
+            crate::providers::llm::check_mistral_status(reqwest::StatusCode::TOO_MANY_REQUESTS)
+                .unwrap_err();
+        let provider = Provider::new(Err(rejection));
+        let ledger = FakeLedger::configured();
+        let error = admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        assert!(error
+            .downcast_ref::<ProviderRejection>()
+            .unwrap()
+            .retryable());
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_FAILED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_SETTLED
+        );
+        assert_eq!(*ledger.settled.lock().unwrap(), vec![(100, 0, 0)]);
+        assert_eq!(
+            ledger.writes(),
+            vec!["reserve", "accept", "dispatch", "result:failed", "settle"]
+        );
+    }
+
+    #[tokio::test]
+    async fn rejection_with_failed_settlement_does_not_authorize_retry() {
+        let rejection =
+            crate::providers::llm::check_mistral_status(reqwest::StatusCode::TOO_MANY_REQUESTS)
+                .unwrap_err();
+        let provider = Provider::new(Err(rejection));
+        let ledger = FakeLedger::configured();
+        ledger.settle_failures.store(1, Ordering::SeqCst);
+        let error = admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        assert!(error.downcast_ref::<ProviderRejection>().is_none());
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_FAILED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
+        assert_eq!(provider.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn rejection_with_failed_result_recording_does_not_authorize_retry() {
+        let rejection =
+            crate::providers::llm::check_mistral_status(reqwest::StatusCode::TOO_MANY_REQUESTS)
+                .unwrap_err();
+        let provider = Provider::new(Err(rejection));
+        let ledger = FakeLedger::configured();
+        ledger.result_failures.store(1, Ordering::SeqCst);
+        let error = admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        assert!(error.downcast_ref::<ProviderRejection>().is_none());
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_DISPATCHED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
+        assert!(ledger.settled.lock().unwrap().is_empty());
+        assert_eq!(provider.calls(), 1);
+    }
+
+    struct PendingProvider {
+        started: tokio::sync::Notify,
+        calls: AtomicU32,
+    }
+
+    #[tokio::test]
+    async fn concurrency_queue_timeout_has_no_spend_or_provider_effect() {
+        let provider = Provider::new(Ok(response(1, 1)));
+        let ledger = FakeLedger::configured();
+        let mut profile =
+            super::super::model_configuration::ModelProfile::legacy(&sample_agent(32_000));
+        profile.reference.key = "spend-queue".into();
+        profile.timeout_ms = 10;
+        let first = super::super::intelligence_router::ProfiledLlm::acquire(&provider, 9, &profile)
+            .await
+            .unwrap();
+        assert!(
+            super::super::intelligence_router::ProfiledLlm::acquire(&provider, 9, &profile)
+                .await
+                .is_err()
+        );
+        assert!(ledger.writes().is_empty());
+        assert!(ledger.reservations.lock().unwrap().is_empty());
+        assert_eq!(provider.calls(), 0);
+        drop(first);
+    }
+
+    #[async_trait]
+    impl LlmCompletion for PendingProvider {
+        async fn complete(&self, _: LlmRequest) -> Result<LlmResponse> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.started.notify_one();
+            std::future::pending().await
+        }
+    }
+
+    #[tokio::test]
+    async fn provider_deadline_records_unknown_without_settling_or_leaking_permit() {
+        let provider = PendingProvider {
+            started: tokio::sync::Notify::new(),
+            calls: AtomicU32::new(0),
+        };
+        let ledger = FakeLedger::configured();
+        let mut profile =
+            super::super::model_configuration::ModelProfile::legacy(&sample_agent(32_000));
+        profile.reference.key = "spend-deadline".into();
+        profile.timeout_ms = 10;
+        let transport =
+            super::super::intelligence_router::ProfiledLlm::acquire(&provider, 9, &profile)
+                .await
+                .unwrap();
+        let admitted =
+            SpendAdmittedLlm::with_clock(&transport, &ledger, binding(), fixed_clock).unwrap();
+        let error = admitted.complete(request()).await.unwrap_err();
+        assert!(format!("{error:#}").contains("deadline exceeded"));
+        assert!(error.downcast_ref::<ProviderRejection>().is_none());
+        let mut failures = Vec::new();
+        assert!(super::super::intelligence_router::record_retryable_failure(
+            &profile,
+            0,
+            error,
+            &mut failures
+        )
+        .await
+        .is_err());
+        assert!(failures.is_empty());
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_OUTCOME_UNKNOWN);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
+        assert!(ledger.settled.lock().unwrap().is_empty());
+        drop(admitted);
+        drop(transport);
+        let next = super::super::intelligence_router::ProfiledLlm::acquire(&provider, 9, &profile)
+            .await
+            .unwrap();
+        drop(next);
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn cancellation_preserves_dispatched_intent_and_blocks_recovery_redispatch() {
+        let provider = PendingProvider {
+            started: tokio::sync::Notify::new(),
+            calls: AtomicU32::new(0),
+        };
+        let ledger = FakeLedger::configured();
+        let mut profile =
+            super::super::model_configuration::ModelProfile::legacy(&sample_agent(32_000));
+        profile.reference.key = "spend-cancellation".into();
+        let transport =
+            super::super::intelligence_router::ProfiledLlm::acquire(&provider, 9, &profile)
+                .await
+                .unwrap();
+        let admitted =
+            SpendAdmittedLlm::with_clock(&transport, &ledger, binding(), fixed_clock).unwrap();
+        let mut call = Box::pin(admitted.complete(request()));
+        tokio::select! {
+            _ = provider.started.notified() => {},
+            _ = &mut call => panic!("pending provider completed before cancellation"),
+        }
+        drop(call);
+        drop(admitted);
+        drop(transport);
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_DISPATCHED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
+        let recovered =
+            SpendAdmittedLlm::with_clock(&provider, &ledger, binding(), fixed_clock).unwrap();
+        assert!(recovered
+            .complete(request())
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("not redispatching"));
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+        let next = super::super::intelligence_router::ProfiledLlm::acquire(&provider, 9, &profile)
+            .await
+            .unwrap();
+        drop(next);
+    }
 
     fn reconciliation(outcome: ReconciledOutcome) -> ProviderAttemptReconciliation {
         ProviderAttemptReconciliation {

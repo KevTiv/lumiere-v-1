@@ -4,12 +4,20 @@
 //! Its response is captured for evaluation only and can never alter the
 //! production return value or invoke a capability.
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc, Mutex, OnceLock, Weak,
+    },
+    time::Duration,
+};
 
 use anyhow::{bail, Context, Result};
 use futures::future::join_all;
 use serde_json::json;
 use stdb_client::{ReducerCall, StdbClient};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use super::{
     answer_gate::{DecisionClaimCoverageChecker, SourcePassage},
@@ -31,9 +39,124 @@ use super::{
     text_answer_gate::{gate_text_answer_with_passages_and_reviews, GatedTextAnswer, TextEvidence},
 };
 use crate::{
-    ai_agent::ResolvedAgentConfig, orchestrator::skill_loader::GovernedRunRef,
-    providers::llm::LlmCompletion,
+    ai_agent::ResolvedAgentConfig,
+    orchestrator::skill_loader::GovernedRunRef,
+    providers::llm::{LlmCompletion, LlmRequest, LlmResponse, ProviderRejection},
 };
+
+type ProfileLimitKey = (u64, String, u32, String, String);
+type ProfileLimitPool = HashMap<ProfileLimitKey, (u32, Weak<Semaphore>)>;
+static PROFILE_LIMITS: OnceLock<Mutex<ProfileLimitPool>> = OnceLock::new();
+const MAX_SAFE_RETRIES: u32 = 2;
+
+/// The permit is acquired before spend admission. The deadline wraps provider
+/// I/O only, so its error returns through the normal durable outcome recorder.
+pub(super) struct ProfiledLlm<'a> {
+    inner: &'a dyn LlmCompletion,
+    timeout: Duration,
+    _permit: OwnedSemaphorePermit,
+}
+
+impl<'a> ProfiledLlm<'a> {
+    pub(super) async fn acquire(
+        inner: &'a dyn LlmCompletion,
+        organization_id: u64,
+        profile: &ModelProfile,
+    ) -> Result<Self> {
+        if organization_id == 0
+            || profile.timeout_ms == 0
+            || profile.max_concurrency == 0
+            || profile.max_concurrency as usize > Semaphore::MAX_PERMITS
+        {
+            bail!("model profile requires organization, positive timeout and concurrency limits");
+        }
+        let limit = if profile.supports_parallel_requests {
+            profile.max_concurrency
+        } else {
+            1
+        };
+        let key = (
+            organization_id,
+            profile.reference.key.clone(),
+            profile.reference.version,
+            profile.provider.clone(),
+            profile.model.clone(),
+        );
+        let semaphore = {
+            let mut pool = PROFILE_LIMITS
+                .get_or_init(|| Mutex::new(HashMap::new()))
+                .lock()
+                .map_err(|_| anyhow::anyhow!("model profile concurrency registry unavailable"))?;
+            pool.retain(|_, (_, semaphore)| semaphore.strong_count() != 0);
+            match pool
+                .get(&key)
+                .and_then(|(prior, weak)| weak.upgrade().map(|value| (*prior, value)))
+            {
+                Some((prior, semaphore)) => {
+                    anyhow::ensure!(
+                        prior == limit,
+                        "immutable model profile concurrency limit changed"
+                    );
+                    semaphore
+                }
+                None => {
+                    let semaphore = Arc::new(Semaphore::new(limit as usize));
+                    pool.insert(key, (limit, Arc::downgrade(&semaphore)));
+                    semaphore
+                }
+            }
+        };
+        let timeout = Duration::from_millis(u64::from(profile.timeout_ms));
+        let permit = tokio::time::timeout(timeout, semaphore.acquire_owned())
+            .await
+            .context("model profile concurrency wait timed out before spend admission")?
+            .context("model profile concurrency limiter is closed")?;
+        Ok(Self {
+            inner,
+            timeout,
+            _permit: permit,
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl LlmCompletion for ProfiledLlm<'_> {
+    fn validate_request(&self, request: &LlmRequest) -> Result<()> {
+        self.inner.validate_request(request)
+    }
+
+    async fn complete(&self, request: LlmRequest) -> Result<LlmResponse> {
+        tokio::time::timeout(self.timeout, self.inner.complete(request))
+            .await
+            .context("provider deadline exceeded; dispatched outcome is unknown")?
+    }
+}
+
+pub(super) async fn record_retryable_failure(
+    profile: &ModelProfile,
+    attempt_no: u32,
+    error: anyhow::Error,
+    failures: &mut Vec<String>,
+) -> Result<()> {
+    // Only an explicit rate rejection survives spend result+settlement as this
+    // typed cause. Unknown transport/cancellation/ledger errors stop all routes.
+    if !error
+        .downcast_ref::<ProviderRejection>()
+        .is_some_and(ProviderRejection::retryable)
+    {
+        return Err(error.context("automatic provider retry and fallback stopped"));
+    }
+    failures.push(format!(
+        "{} attempt {}: {}",
+        profile.reference.stable_ref(),
+        attempt_no + 1,
+        error
+    ));
+    if attempt_no < profile.max_retries.min(MAX_SAFE_RETRIES) {
+        tokio::time::sleep(Duration::from_millis(100_u64 << attempt_no)).await;
+    }
+    Ok(())
+}
 
 /// Durable sink for GP-15 zero-authority shadow decision attempts. A shadow
 /// result is recorded regardless of success/failure but never fed back into
@@ -445,8 +568,8 @@ impl<'a> RoutedDecisionProvider<'a> {
             self.company_id,
             self.run_id,
         )?;
-        let admitted =
-            SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, call_scope)?;
+        let transport = ProfiledLlm::acquire(self.transport, self.organization_id, profile).await?;
+        let admitted = SpendAdmittedLlm::new_scoped(&transport, self.ledger, binding, call_scope)?;
         LlmDecisionAdapter::from_profile(&admitted, profile)
             .decide(request)
             .await
@@ -467,19 +590,16 @@ impl DecisionProvider for RoutedDecisionProvider<'_> {
 
         let mut failures = Vec::new();
         for profile in profiles {
-            for attempt_no in 0..=profile.max_retries {
+            for attempt_no in 0..=profile.max_retries.min(MAX_SAFE_RETRIES) {
                 let scope = next_call_scope(self.role, &self.next_scope)?;
                 match self.attempt(&profile, request.clone(), scope).await {
                     Ok(response) => {
                         self.run_shadows(&shadows, &request).await;
                         return Ok(response);
                     }
-                    Err(error) => failures.push(format!(
-                        "{} attempt {}: {}",
-                        profile.reference.stable_ref(),
-                        attempt_no + 1,
-                        error
-                    )),
+                    Err(error) => {
+                        record_retryable_failure(&profile, attempt_no, error, &mut failures).await?
+                    }
                 }
             }
         }
@@ -534,7 +654,7 @@ impl ReasoningProvider for RoutedReasoningProvider<'_> {
         profiles.extend(route.fallbacks);
         let mut failures = Vec::new();
         for profile in profiles {
-            for attempt_no in 0..=profile.max_retries {
+            for attempt_no in 0..=profile.max_retries.min(MAX_SAFE_RETRIES) {
                 let binding = spend_binding_for_profile(
                     self.agent,
                     &profile,
@@ -548,19 +668,18 @@ impl ReasoningProvider for RoutedReasoningProvider<'_> {
                 // before any spend reservation or provider dispatch.
                 let mut effective_profile = profile.clone();
                 effective_profile.max_tokens = binding.agent_max_tokens;
+                let transport =
+                    ProfiledLlm::acquire(self.transport, self.organization_id, &profile).await?;
                 let admitted =
-                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
+                    SpendAdmittedLlm::new_scoped(&transport, self.ledger, binding, scope)?;
                 match AgentLoopReasoner::from_profile(&admitted, &effective_profile)
                     .reason(request.clone())
                     .await
                 {
                     Ok(response) => return Ok(response),
-                    Err(error) => failures.push(format!(
-                        "{} attempt {}: {}",
-                        profile.reference.stable_ref(),
-                        attempt_no + 1,
-                        error
-                    )),
+                    Err(error) => {
+                        record_retryable_failure(&profile, attempt_no, error, &mut failures).await?
+                    }
                 }
             }
         }
@@ -617,7 +736,7 @@ impl GenerationProvider for RoutedGenerationProvider<'_> {
         profiles.extend(route.fallbacks);
         let mut failures = Vec::new();
         for profile in profiles {
-            for attempt_no in 0..=profile.max_retries {
+            for attempt_no in 0..=profile.max_retries.min(MAX_SAFE_RETRIES) {
                 let binding = spend_binding_for_profile(
                     self.agent,
                     &profile,
@@ -626,19 +745,18 @@ impl GenerationProvider for RoutedGenerationProvider<'_> {
                     self.run_id,
                 )?;
                 let scope = next_call_scope(IntelligenceRole::Generation, &self.next_scope)?;
+                let transport =
+                    ProfiledLlm::acquire(self.transport, self.organization_id, &profile).await?;
                 let admitted =
-                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
+                    SpendAdmittedLlm::new_scoped(&transport, self.ledger, binding, scope)?;
                 match LlmGenerationAdapter::from_profile(&admitted, &profile)
                     .generate(request.clone())
                     .await
                 {
                     Ok(response) => return Ok(response),
-                    Err(error) => failures.push(format!(
-                        "{} attempt {}: {}",
-                        profile.reference.stable_ref(),
-                        attempt_no + 1,
-                        error
-                    )),
+                    Err(error) => {
+                        record_retryable_failure(&profile, attempt_no, error, &mut failures).await?
+                    }
                 }
             }
         }
@@ -723,10 +841,113 @@ impl<'a> IntelligenceRouter<'a> {
 #[cfg(test)]
 mod tests {
     use super::super::intelligence::{DecisionKind, DecisionTypeRef};
+    use super::super::model_configuration::ModelProfileRef;
     use super::*;
     use anyhow::{bail, Result};
     use async_trait::async_trait;
     use serde_json::json;
+
+    fn limit_profile(key: &str) -> ModelProfile {
+        ModelProfile {
+            reference: ModelProfileRef {
+                key: key.into(),
+                version: 1,
+            },
+            provider: "mistral".into(),
+            model: "mistral-small".into(),
+            allowed_roles: vec![IntelligenceRole::Generation],
+            temperature: None,
+            top_p: None,
+            max_tokens: 256,
+            context_window: 32_000,
+            timeout_ms: 20,
+            max_retries: 1,
+            max_concurrency: 1,
+            supports_tool_calling: true,
+            supports_structured_output: true,
+            supports_parallel_requests: true,
+            input_cost_per_1k_microunits: None,
+            output_cost_per_1k_microunits: None,
+            per_request_cost_ceiling_microunits: None,
+        }
+    }
+
+    struct PendingTransport;
+
+    #[async_trait]
+    impl LlmCompletion for PendingTransport {
+        async fn complete(&self, _: LlmRequest) -> Result<LlmResponse> {
+            std::future::pending().await
+        }
+    }
+
+    #[tokio::test]
+    async fn profile_limits_are_shared_across_routes_and_release_on_drop() {
+        let profile = limit_profile("shared-routes");
+        let first = ProfiledLlm::acquire(&PendingTransport, 10, &profile)
+            .await
+            .unwrap();
+        // A second independently constructed route shares this profile's permit.
+        let second = ProfiledLlm::acquire(&PendingTransport, 10, &profile).await;
+        assert!(second
+            .err()
+            .unwrap()
+            .to_string()
+            .contains("before spend admission"));
+        // Another organization does not consume this organization's permits.
+        let other = ProfiledLlm::acquire(&PendingTransport, 11, &profile)
+            .await
+            .unwrap();
+        drop(first);
+        let resumed = ProfiledLlm::acquire(&PendingTransport, 10, &profile)
+            .await
+            .unwrap();
+        drop((other, resumed));
+    }
+
+    #[tokio::test]
+    async fn zero_timeout_and_changed_concurrency_fail_closed() {
+        let mut profile = limit_profile("immutable-limit");
+        profile.timeout_ms = 0;
+        assert!(ProfiledLlm::acquire(&PendingTransport, 12, &profile)
+            .await
+            .is_err());
+        profile.timeout_ms = 20;
+        let first = ProfiledLlm::acquire(&PendingTransport, 12, &profile)
+            .await
+            .unwrap();
+        profile.max_concurrency = 2;
+        assert!(ProfiledLlm::acquire(&PendingTransport, 12, &profile)
+            .await
+            .is_err());
+        drop(first);
+    }
+
+    #[tokio::test]
+    async fn only_explicit_rate_rejections_allow_bounded_retry_and_backoff() {
+        let profile = limit_profile("retry-rate");
+        let mut failures = Vec::new();
+        let start = std::time::Instant::now();
+        let rate =
+            crate::providers::llm::check_mistral_status(reqwest::StatusCode::TOO_MANY_REQUESTS)
+                .unwrap_err();
+        record_retryable_failure(&profile, 0, rate, &mut failures)
+            .await
+            .unwrap();
+        assert!(start.elapsed() >= Duration::from_millis(100));
+        assert_eq!(failures.len(), 1);
+        for error in [
+            anyhow::anyhow!("provider deadline exceeded"),
+            anyhow::anyhow!("settlement failed"),
+            crate::providers::llm::check_mistral_status(reqwest::StatusCode::SERVICE_UNAVAILABLE)
+                .unwrap_err(),
+        ] {
+            assert!(record_retryable_failure(&profile, 0, error, &mut failures)
+                .await
+                .is_err());
+        }
+        assert_eq!(failures.len(), 1);
+    }
 
     struct Fixed(&'static str);
     struct Broken;
