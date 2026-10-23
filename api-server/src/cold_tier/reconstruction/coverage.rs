@@ -484,6 +484,7 @@ fn require_disposable_source() -> Result<()> {
 
 fn is_disposable_source_module(module: &str) -> bool {
     module.starts_with("lumiere-c7-source-")
+        || module == "lumiere-c7-ai-source"
         || module == "lumiere-c7-presentation-source"
         || module.ends_with("-local-e2e")
 }
@@ -520,6 +521,7 @@ mod tests {
     #[test]
     fn source_module_scope_accepts_only_explicit_local_test_names() {
         assert!(is_disposable_source_module("lumiere-c7-source-final"));
+        assert!(is_disposable_source_module("lumiere-c7-ai-source"));
         assert!(is_disposable_source_module(
             "lumiere-c7-presentation-source"
         ));

@@ -944,6 +944,14 @@ mod tests {
                     }],
                     ..Default::default()
                 })),
+                // An unsolicited provider continuation after the admitted
+                // terminal response must remain unread and unexecuted.
+                Ok(ReasoningOutcome::CapabilityProposal(CapabilityProposal {
+                    capability: "create_task".into(),
+                    arguments: json!({"name": "post-terminal mutation"}),
+                    rationale: None,
+                    poll: false,
+                })),
             ]),
         };
 
@@ -973,6 +981,7 @@ mod tests {
         let evidence = outcome.state.get("evidence").unwrap().as_array().unwrap();
         assert_eq!(evidence.len(), 1);
         assert_eq!(evidence[0]["capability"], "erp.search");
+        assert_eq!(reasoner.outcomes.lock().unwrap().len(), 1);
     }
 
     #[tokio::test]

@@ -1,0 +1,272 @@
+{
+  "recorded_on": "2026-10-23",
+  "scope": "Disposable loopback-only synthetic-data validation with an instrumented test provider; no live Mistral or other external provider requests",
+  "admission_review": "pending; this is runtime evidence, not full Phase 4 admission",
+  "contracts": {
+    "version": "0.3.139",
+    "schema_tables": 515,
+    "restore_tables": 509,
+    "recreated_tables": 6,
+    "full_fresh_generation_drift": "passed"
+  },
+  "source_component_sha256": {
+    "ai-gateway/src/orchestrator/phase4_restart_probe.rs": "71566728359d59345a6c7e7cd97c6c7566073aab7cff4180d71b43cae00b249b",
+    "api-server/src/cold_tier/pg_codec.rs": "ba78e4380970b4f7e5d782461647515de6b1b645d47a9ab83b05870d41562a5d",
+    "api-server/src/cold_tier/reconstruction/stdb_sink.rs": "0c983eb0c05a6a3078ac1fbcab7da120b52d0d25c7e56e9b47e867ce9ee1114b",
+    "scripts/verify-ai-harness-reconstruction.py": "bb29e15cb3f5a65ce83173cdcfecc40cc93335184a6a34122464ab0fefd99ba5"
+  },
+  "spacetimedb_source_tree": "700165b0dbe54f45922c1e511f30b0d9a85b8a74",
+  "runtime": {
+    "host": "http://127.0.0.1:3999",
+    "source_module": "lumiere-c7-ai-source",
+    "target_module": "lumiere-c7-ai-target",
+    "spacetimedb_version": "2.8.2",
+    "target_build_profile": "ci-contracts (default optimization level 1)",
+    "distinct_reconstructor_and_verifier_identities": true,
+    "distinct_gateway_writer_and_spend_reader_identities": true
+  },
+  "tests": {
+    "gateway": {
+      "passed": 700,
+      "existing_ignored": 8,
+      "phase4_acceptance_feature": true
+    },
+    "reconstruction": {
+      "passed": 35,
+      "existing_ignored": 1
+    },
+    "postgres_codec": {
+      "passed": 15
+    },
+    "postgres_projection_manifest_matrix": {
+      "passed": 1,
+      "isolated_database": true
+    },
+    "python_verifier": {
+      "passed": 10
+    }
+  },
+  "live_database_ai_reducer_suite": "passed",
+  "live_races": {
+    "verified": true,
+    "module": "lumiere-c7-ai-source",
+    "organization_id": 1,
+    "company_id": 1,
+    "run_id": 23,
+    "ag06": {
+      "concurrent_clients": 2,
+      "winners": 1,
+      "outstanding_units_before": 0,
+      "outstanding_units_after": 60,
+      "limit_units": 100
+    },
+    "ag08": {
+      "concurrent_clients": 2,
+      "claim_rows": 1,
+      "terminal_status": "succeeded",
+      "reconnect_rejected": true
+    }
+  },
+  "timeout_process": {
+    "attempt_status": "outcome_unknown",
+    "mode": "timeout",
+    "module": "lumiere-c7-ai-source",
+    "organization_id": 1,
+    "provider_dispatch_after": 1,
+    "provider_dispatch_before": 0,
+    "request_key": "h5:spend:run:23:step:1:attempt:0",
+    "run_id": 23,
+    "verified": true
+  },
+  "restarted_process": {
+    "attempt_status": "outcome_unknown",
+    "mode": "recover",
+    "module": "lumiere-c7-ai-source",
+    "organization_id": 1,
+    "provider_dispatch_after": 1,
+    "provider_dispatch_before": 1,
+    "request_key": "h5:spend:run:23:step:1:attempt:0",
+    "run_id": 23,
+    "verified": true
+  },
+  "restored_target_recovery": {
+    "attempt_status": "outcome_unknown",
+    "mode": "recover",
+    "module": "lumiere-c7-ai-target",
+    "organization_id": 1,
+    "provider_dispatch_after": 1,
+    "provider_dispatch_before": 1,
+    "request_key": "h5:spend:run:23:step:1:attempt:0",
+    "run_id": 23,
+    "verified": true
+  },
+  "coverage": {
+    "organization_id": 1,
+    "watermark": {
+      "sequence": 2,
+      "commit_checksum": "cfe0eae2d3e3411a178c6ec4cb7d73689ef2933ccb1b06a5da55bf9e5b3b2bdc"
+    },
+    "modules": [
+      "accounting",
+      "ai",
+      "analytics",
+      "core",
+      "crm",
+      "data_ops",
+      "documents",
+      "expenses",
+      "fleet",
+      "forms",
+      "helpdesk",
+      "hr",
+      "integrations",
+      "inventory",
+      "iot",
+      "manufacturing",
+      "presentation",
+      "projects",
+      "proposals",
+      "purchasing",
+      "sales",
+      "subscriptions",
+      "workflow"
+    ],
+    "module_row_counts": {
+      "accounting": 114,
+      "ai": 55,
+      "analytics": 11,
+      "core": 737,
+      "crm": 24,
+      "data_ops": 1,
+      "documents": 6,
+      "expenses": 1,
+      "fleet": 1,
+      "forms": 3,
+      "helpdesk": 8,
+      "hr": 37,
+      "integrations": 2,
+      "inventory": 36,
+      "iot": 4,
+      "manufacturing": 15,
+      "presentation": 2,
+      "projects": 14,
+      "proposals": 6,
+      "purchasing": 5,
+      "sales": 13,
+      "subscriptions": 3,
+      "workflow": 667
+    },
+    "source_tables_with_rows": 216,
+    "source_rows": 1765,
+    "projection_commits": 2,
+    "projected_row_changes": 1768,
+    "deleted_table": "activity",
+    "deleted_identity": {
+      "id": 1
+    },
+    "relationship_values": 3742,
+    "total_values": 283,
+    "audit_rows": 679,
+    "durable_idempotency_records": 1770
+  },
+  "resume": {
+    "run_id": "harness-aih-20261023",
+    "organization_id": 1,
+    "placement_generation": 1,
+    "watermark": {
+      "sequence": 2,
+      "commit_checksum": "cfe0eae2d3e3411a178c6ec4cb7d73689ef2933ccb1b06a5da55bf9e5b3b2bdc"
+    },
+    "restored_tables": 509,
+    "restored_rows": 3535,
+    "recreated_tables": 6,
+    "excluded_tables": 0,
+    "verified": true,
+    "elapsed_millis": 214660
+  },
+  "repeat": {
+    "run_id": "harness-aih-20261023-repeat",
+    "organization_id": 1,
+    "placement_generation": 1,
+    "watermark": {
+      "sequence": 2,
+      "commit_checksum": "cfe0eae2d3e3411a178c6ec4cb7d73689ef2933ccb1b06a5da55bf9e5b3b2bdc"
+    },
+    "restored_tables": 509,
+    "restored_rows": 3535,
+    "recreated_tables": 6,
+    "excluded_tables": 0,
+    "verified": true,
+    "elapsed_millis": 220784
+  },
+  "observed_provider_dispatch": {
+    "organization_id": 1,
+    "source_module": "lumiere-c7-ai-source",
+    "target_module": "lumiere-c7-ai-target",
+    "watermark": {
+      "sequence": 2,
+      "commit_checksum": "cfe0eae2d3e3411a178c6ec4cb7d73689ef2933ccb1b06a5da55bf9e5b3b2bdc"
+    },
+    "observation_complete": true,
+    "before": 1,
+    "after": 1
+  },
+  "ai_harness_verification": {
+    "verified": true,
+    "organization_id": 1,
+    "watermark": {
+      "sequence": 2,
+      "commit_checksum": "cfe0eae2d3e3411a178c6ec4cb7d73689ef2933ccb1b06a5da55bf9e5b3b2bdc"
+    },
+    "provider_dispatch_delta": 0,
+    "tables": {
+      "ai_agent_run": {
+        "rows": 1,
+        "complete_rows_sha256": "d557f03baa28b9979cf73bdcf0feb67913b3a77446467ac066e075af58394091"
+      },
+      "ai_agent_run_step": {
+        "rows": 1,
+        "complete_rows_sha256": "da63a8df96ac740933df877cd6afb130eba11398ae12aae682893c026e0f4472"
+      },
+      "ai_price_snapshot": {
+        "rows": 2,
+        "complete_rows_sha256": "4c71d7289399a42c4f3df99299cfbd4e63bb6c928b3f4b8acbba30ed9eb145e8"
+      },
+      "ai_spend_budget": {
+        "rows": 1,
+        "complete_rows_sha256": "b11bc0a3f616bed5fb142fda3f9eda1d89242cb1641d59a892f486f33d6f1a2b"
+      },
+      "ai_spend_reservation": {
+        "rows": 2,
+        "complete_rows_sha256": "b91d57929fd8c20d210feee06981459655fe246595bf58e104d1703a4bf0b161"
+      },
+      "ai_provider_attempt": {
+        "rows": 1,
+        "complete_rows_sha256": "69a984a8a50afcdf438212001eec4cfb2f25c01cebba598855bc3bd25e2ed9c9"
+      },
+      "ai_action_draft": {
+        "rows": 1,
+        "complete_rows_sha256": "9d9122ca7a787fa052125cc8f8746aca7f9858c41438e90738c2ce864d16a739"
+      },
+      "ai_action_draft_request": {
+        "rows": 1,
+        "complete_rows_sha256": "577ea91ec78203bacd52069ec1b20746d52c00ef02a028f19b689b53e13b5dd9"
+      },
+      "ai_capability_execution": {
+        "rows": 2,
+        "complete_rows_sha256": "adb9220aedb33fe08381ee15c0a272e339c3f2e7d62a367bc86d239f5273370d"
+      }
+    },
+    "foreign_source_rows_excluded": 37
+  },
+  "remaining_acceptance": [
+    "Real-provider provisioning and connectivity",
+    "Normal gateway/browser consequential action, draft and reconnect acceptance",
+    "Final hosted CI on the published fixes",
+    "Admission review"
+  ],
+  "limits": [
+    "Fresh disposable database only; existing deployed PostgreSQL migration is not certified",
+    "Instrumented provider counts do not establish live Mistral account access"
+  ]
+}

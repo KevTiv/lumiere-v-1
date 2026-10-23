@@ -20,6 +20,15 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use stdb_client::{ReducerCall, StdbClient};
 
+const EXPECTED_RECREATED: [&str; 6] = [
+    "cold_tier_service_identity",
+    "organization_reconstruction_batch_receipt",
+    "organization_reconstruction_fence",
+    "policy_snapshot",
+    "project_margin_snapshot",
+    "workflow_subject_snapshot",
+];
+
 /// Trusted STDB reconstruction adapter. It owns the server identity and the
 /// run identity used by every reducer call.
 pub struct StdbReconstructionSink<'a> {
@@ -295,18 +304,25 @@ impl ReconstructionSink for StdbReconstructionSink<'_> {
 
     async fn prepare_recreated_state(
         &self,
-        _fence: &ReconstructionFence,
+        fence: &ReconstructionFence,
         tables: &[String],
     ) -> Result<()> {
-        const EXPECTED_RECREATED: [&str; 5] = [
-            "cold_tier_service_identity",
-            "organization_reconstruction_batch_receipt",
-            "organization_reconstruction_fence",
-            "policy_snapshot",
-            "project_margin_snapshot",
-        ];
         if tables.iter().map(String::as_str).collect::<Vec<_>>() != EXPECTED_RECREATED {
             bail!("generated recreated-state contract does not match the trusted rebuild set");
+        }
+        // This requester-scoped cache must be repopulated through the normal
+        // authorized refresh after recovery, never copied from the source or
+        // synthesized with the reconstructor's identity.
+        let subject_snapshots = self
+            .read_stdb
+            .query_sql(&format!(
+                "SELECT id FROM workflow_subject_snapshot WHERE organization_id = {} LIMIT 1",
+                fence.organization_id
+            ))
+            .await
+            .context("verify requester-scoped workflow snapshot cache is empty")?;
+        if !subject_snapshots.is_empty() {
+            bail!("workflow subject snapshots must be empty before reconstruction completes");
         }
         Ok(())
     }
@@ -485,6 +501,10 @@ pub(crate) fn canonical_stdb_row_json(
 pub(crate) fn stdb_sql_field_name(column_name: &str) -> &str {
     match column_name {
         "cost_per_1_k_tokens" => "cost_per_1k_tokens",
+        "input_units_per_1_k" => "input_units_per_1k",
+        "output_units_per_1_k" => "output_units_per_1k",
+        "input_cost_per_1_k_microunits" => "input_cost_per_1k_microunits",
+        "output_cost_per_1_k_microunits" => "output_cost_per_1k_microunits",
         "iso_3" => "iso3",
         "kpi_1_month_mrr" => "kpi_1month_mrr",
         "kpi_3_months_mrr" => "kpi_3months_mrr",
@@ -666,6 +686,19 @@ mod tests {
     }
 
     #[test]
+    fn trusted_recreated_state_matches_the_pinned_contract() {
+        let catalog = crate::cold_tier::reconstruction::RestoreCatalog::generated().unwrap();
+        assert_eq!(
+            catalog
+                .recreate_order()
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            super::EXPECTED_RECREATED
+        );
+    }
+
+    #[test]
     fn reconstruction_rows_use_stdb_rust_field_names() {
         let columns = pg_codec::load_columns(
             lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST,
@@ -678,6 +711,68 @@ mod tests {
         )
         .unwrap();
         assert_eq!(encoded, r#"{"next_sequence":"2","organization_id":"42"}"#);
+    }
+
+    #[test]
+    fn price_snapshot_restores_per_thousand_rates_and_preserves_its_digest() {
+        let columns = pg_codec::load_columns(
+            lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST,
+            "ai_price_snapshot",
+        )
+        .unwrap();
+        let durable = json!({
+            "id": "9007199254740993",
+            "organizationId": "42",
+            "agentId": "3",
+            "provider": "mistral",
+            "model": "restore-fixture",
+            "currency": "USD",
+            "inputUnitsPer1K": "17",
+            "outputUnitsPer1K": "29",
+            "version": "2",
+            "createdBy": "ab".repeat(32),
+            "createdAt": {"microsSinceUnixEpoch": 42},
+        });
+        let restored: Value =
+            serde_json::from_str(&canonical_stdb_row_json(&columns, &durable).unwrap()).unwrap();
+        assert_eq!(restored["input_units_per_1k"], "17");
+        assert_eq!(restored["output_units_per_1k"], "29");
+        assert!(restored.get("input_units_per_1_k").is_none());
+        assert!(restored.get("output_units_per_1_k").is_none());
+        assert_eq!(
+            normalize_stdb_digest_row(&columns, restored).unwrap(),
+            durable
+        );
+    }
+
+    #[test]
+    fn model_profile_per_thousand_prices_preserve_nullability_and_precision() {
+        let mut columns = pg_codec::load_columns(
+            lumiere_contracts::manifests::PROJECTION_CODEC_MANIFEST,
+            "ai_model_profile",
+        )
+        .unwrap();
+        columns.retain(|column| {
+            matches!(
+                column.name.as_str(),
+                "input_cost_per_1_k_microunits" | "output_cost_per_1_k_microunits"
+            )
+        });
+        assert_eq!(columns.len(), 2);
+        for durable in [
+            json!({"inputCostPer1KMicrounits": null, "outputCostPer1KMicrounits": "9007199254740993"}),
+            json!({"inputCostPer1KMicrounits": "17", "outputCostPer1KMicrounits": null}),
+        ] {
+            let restored: Value =
+                serde_json::from_str(&canonical_stdb_row_json(&columns, &durable).unwrap())
+                    .unwrap();
+            assert!(restored.get("input_cost_per_1k_microunits").is_some());
+            assert!(restored.get("output_cost_per_1k_microunits").is_some());
+            assert_eq!(
+                normalize_stdb_digest_row(&columns, restored).unwrap(),
+                durable
+            );
+        }
     }
 
     #[test]

@@ -86,6 +86,11 @@ async fn require_gateway_secret(
 async fn main() -> anyhow::Result<()> {
     let _ = dotenvy::dotenv();
 
+    #[cfg(feature = "phase4-acceptance")]
+    if std::env::args().nth(1).as_deref() == Some("phase4-restart-probe") {
+        return orchestrator::phase4_restart_probe::run_from_env().await;
+    }
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
