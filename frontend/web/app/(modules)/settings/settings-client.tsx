@@ -1160,6 +1160,8 @@ function SettingsLoaded({
             }
           }}
           config={withLinkedPickers(settingsActionForms[activeAction], linkedOptions)}
+          // Connector forms carry account ids and credential references; keep them out of browser storage.
+          draft={false}
           isPending={isPending}
           closeOnSubmit={false}
           submitError={submitError}

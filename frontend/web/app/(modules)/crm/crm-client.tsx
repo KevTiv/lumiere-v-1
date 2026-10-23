@@ -2469,6 +2469,16 @@ function CrmClientLoaded({
     return workflowModal.form
   }, [workflowModal, buildConvertLeadForm, buildConvertOppForm])
 
+  // Drafts of record edits are kept per record so one lead's notes never reopen on another.
+  const workflowDraftKey =
+    workflowModal == null
+      ? undefined
+      : "leadId" in workflowModal
+        ? `lead-${workflowModal.leadId.toString()}`
+        : "opportunityId" in workflowModal
+          ? `opportunity-${workflowModal.opportunityId.toString()}`
+          : `contact-${workflowModal.contactId.toString()}`
+
   const workflowModalKey =
     workflowModal == null
       ? "closed"
@@ -2566,6 +2576,7 @@ function CrmClientLoaded({
         preferStdbVisibility
         isPending={isFormMutationPending}
         submitError={workflowSubmitError}
+        draftKey={workflowDraftKey}
         onSubmit={(formData) => {
           return handleWorkflowSubmit(formData)
         }}

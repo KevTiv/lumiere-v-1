@@ -12,6 +12,7 @@ import { storedNumericValue } from "../lib/numeric-format"
 import { serializeAiFormSchema } from "../lib/ai-form-schema"
 import { FormFieldRenderer } from "./forms-field-render"
 import { formValuesDiffer } from "./use-unsaved-changes-guard"
+import { useFormDraft } from "./form-draft"
 import { Button } from "../components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Separator } from "../components/separator"
@@ -75,6 +76,13 @@ interface ModularFormProps {
   renderPreview?: FormPreviewRenderer
   /** Keep actions outside the scrolling body when embedded in a constrained dialog. */
   scrollable?: boolean
+  /**
+   * Autosave unsaved values to this browser and restore them when the form
+   * reopens. Set `false` for credential or otherwise sensitive forms.
+   */
+  draft?: boolean
+  /** Distinguishes drafts of one config, e.g. the id of the record being edited. */
+  draftKey?: string | number | null
 }
 
 export function ModularForm({
@@ -90,6 +98,8 @@ export function ModularForm({
   onDirtyChange,
   renderPreview,
   scrollable = false,
+  draft = true,
+  draftKey,
 }: ModularFormProps) {
   const { t } = useTranslation()
   const aiSuggest = useAiFormSuggest()
@@ -165,6 +175,27 @@ export function ModularForm({
   }, [dirty])
 
   useEffect(() => () => onDirtyChangeRef.current?.(false), [])
+  const formDraft = useFormDraft({
+    enabled: draft,
+    config,
+    draftKey,
+    values,
+    initialValues: baselineRef.current,
+    dirty,
+    onRestore: (restored) => {
+      setValues((prev) => {
+        const next = { ...prev, ...restored }
+        onValuesChange?.(next)
+        return next
+      })
+    },
+    onRevert: () => {
+      const baseline = baselineRef.current
+      setValues(baseline)
+      onValuesChange?.(baseline)
+      setErrors({})
+    },
+  })
   const aiSchema = useMemo(() => serializeAiFormSchema(config), [config])
   const aiEnabled = aiAssist?.enabled !== false && !!aiAssist?.companyId && !!aiAssist?.entityType
 
@@ -376,6 +407,7 @@ export function ModularForm({
         await submitHandler(values)
         // Saved: what is on screen is now the baseline, not unsaved work.
         baselineRef.current = values
+        formDraft.clear()
       } else {
         toast.warning(t("common.formSubmit.noHandler"))
       }
@@ -400,6 +432,7 @@ export function ModularForm({
   }
 
   const handleReset = () => {
+    formDraft.clear()
     const initial = getInitialValues()
     setValues(initial)
     onValuesChange?.(initial)
@@ -415,6 +448,7 @@ export function ModularForm({
 
   const fieldsContent = (
     <>
+      {formDraft.banner}
       {aiEnabled ? (
         <div data-form-ai-panel className={cn(workspaceStyles.surface, "space-y-3 bg-muted/30 p-4")}>
           <div className="flex items-center justify-between gap-3">

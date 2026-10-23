@@ -28,6 +28,7 @@ import type { AiFormAssistConfig, FormConfig, FormPreviewRenderer } from "../lib
 import { showSemanticOperationOutcome } from "../lib/semantic-operation-outcome"
 import { cn } from "../lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
+import { clearFormDraft, useFormDraftStorageKey } from "./form-draft"
 import { ModularForm } from "./modular-form"
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard"
 
@@ -70,6 +71,10 @@ export interface FormModalProps {
   onValuesChange?: (values: Record<string, unknown>) => void
   /** Local authoring preview. Receives the same values that validation and submit use. */
   renderPreview?: FormPreviewRenderer
+  /** Forwarded to {@link ModularForm}; `false` keeps values out of browser storage. */
+  draft?: boolean
+  /** Forwarded to {@link ModularForm}; pass the edited record's id. */
+  draftKey?: string | number | null
 }
 
 export function FormModal({
@@ -88,11 +93,14 @@ export function FormModal({
   aiAssist,
   onValuesChange,
   renderPreview,
+  draft,
+  draftKey,
 }: FormModalProps) {
   const { t } = useTranslation()
   const [dirty, setDirty] = React.useState(false)
   const [confirmingDiscard, setConfirmingDiscard] = React.useState(false)
   const submittingRef = React.useRef(false)
+  const draftStorageKey = useFormDraftStorageKey(config.id, draftKey)
   const [submitting, setSubmitting] = React.useState(false)
 
   // Nothing survives a closed dialog, so nothing is left to protect.
@@ -224,6 +232,8 @@ export function FormModal({
             onValuesChange={onValuesChange}
             renderPreview={renderPreview}
             onDirtyChange={setDirty}
+            draft={draft}
+            draftKey={draftKey}
           />
         </div>
         <AlertDialog open={confirmingDiscard} onOpenChange={setConfirmingDiscard}>
@@ -245,6 +255,8 @@ export function FormModal({
                 onClick={() => {
                   setConfirmingDiscard(false)
                   setDirty(false)
+                  // An explicit discard must not come back as a restored draft.
+                  if (draft !== false) clearFormDraft(draftStorageKey)
                   onOpenChange(false)
                 }}
               >

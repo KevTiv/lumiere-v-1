@@ -396,6 +396,10 @@
       "keep": "Keep editing",
       "title": "Discard changes?"
     },
+    "formDraft": {
+      "restored": "Restored unsaved changes from {{time}}",
+      "discard": "Discard draft"
+    },
     "loadFailed": "Could not load this list",
     "loadFailedHint": "Try again in a moment.",
     "csvImportDialog": {
