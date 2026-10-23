@@ -69,8 +69,13 @@ pub(super) async fn send_once(
     let first = guard.refresh(message).await?;
     validate(message, &first, now_seconds()?)?;
     let mut body = payload(message)?;
-    let intent = fingerprint(&json!([message.organization_id, message.company_id,
-        message.account_id, message.operational_message_id, message.review_digest]));
+    let intent = fingerprint(&json!([
+        message.organization_id,
+        message.company_id,
+        message.account_id,
+        message.operational_message_id,
+        message.review_digest
+    ]));
     body["biz_opaque_callback_data"] = json!(intent);
     let digest = fingerprint(&json!([message.phone_number_id, body]));
     store::verify(pool).await?;
@@ -153,7 +158,10 @@ fn classify_response(status: u16, value: &Value) -> SendOutcome {
         }
     } else if (400..500).contains(&status)
         && status != 408
-        && value.pointer("/error/code").and_then(Value::as_u64).is_some()
+        && value
+            .pointer("/error/code")
+            .and_then(Value::as_u64)
+            .is_some()
         && value.get("messages").is_none()
     {
         return SendOutcome::Rejected;
@@ -166,7 +174,9 @@ async fn response_outcome(mut response: reqwest::Response) -> SendOutcome {
     let mut bytes = Vec::new();
     loop {
         match response.chunk().await {
-            Ok(Some(chunk)) if bytes.len() + chunk.len() <= 65536 => bytes.extend_from_slice(&chunk),
+            Ok(Some(chunk)) if bytes.len() + chunk.len() <= 65536 => {
+                bytes.extend_from_slice(&chunk)
+            }
             Ok(None) => break,
             _ => return SendOutcome::Unknown,
         }

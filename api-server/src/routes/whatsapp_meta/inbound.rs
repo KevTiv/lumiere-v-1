@@ -43,7 +43,11 @@ fn account_from_row(row: &Value) -> Result<Account, ApiError> {
     })
 }
 
-pub(super) async fn account(state: &AppState, waba: &str, phone: &str) -> Result<Account, ApiError> {
+pub(super) async fn account(
+    state: &AppState,
+    waba: &str,
+    phone: &str,
+) -> Result<Account, ApiError> {
     if !valid_asset_id(waba) || !valid_asset_id(phone) {
         return Err(ApiError::BadRequest("invalid meta asset identifier".into()));
     }
@@ -51,9 +55,15 @@ pub(super) async fn account(state: &AppState, waba: &str, phone: &str) -> Result
         "SELECT * FROM whatsapp_business_account WHERE business_account_id = '{waba}' \
          AND phone_number_id = '{phone}' LIMIT 3"
     );
-    let rows = state.stdb.query_sql(&sql).await.map_err(ApiError::unavailable)?;
+    let rows = state
+        .stdb
+        .query_sql(&sql)
+        .await
+        .map_err(ApiError::unavailable)?;
     if rows.len() != 1 {
-        return Err(ApiError::Unavailable("ambiguous or missing meta account binding".into()));
+        return Err(ApiError::Unavailable(
+            "ambiguous or missing meta account binding".into(),
+        ));
     }
     let account = account_from_row(&rows[0])?;
     if account.business_account_id != waba || account.phone_number_id != phone {
@@ -67,14 +77,18 @@ fn sender_e164(value: &str) -> Result<String, ApiError> {
         || value.starts_with('0')
         || !value.bytes().all(|byte| byte.is_ascii_digit())
     {
-        return Err(ApiError::Unprocessable("sender requires identity triage".into()));
+        return Err(ApiError::Unprocessable(
+            "sender requires identity triage".into(),
+        ));
     }
     Ok(format!("+{value}"))
 }
 
 fn select_identity(rows: &[Value], account: &Account) -> Result<(u64, u64), ApiError> {
     if rows.len() >= 32 {
-        return Err(ApiError::Unprocessable("identity lookup is truncated".into()));
+        return Err(ApiError::Unprocessable(
+            "identity lookup is truncated".into(),
+        ));
     }
     let mut contacts = BTreeSet::new();
     let mut candidates = Vec::new();
@@ -97,14 +111,17 @@ fn select_identity(rows: &[Value], account: &Account) -> Result<(u64, u64), ApiE
             None | Some("OptedOut" | "opted_out") => continue,
             _ => {}
         }
-        let (Some(contact), Some(identity)) = (row_u64(row, "contact_id"), row_u64(row, "id")) else {
+        let (Some(contact), Some(identity)) = (row_u64(row, "contact_id"), row_u64(row, "id"))
+        else {
             continue;
         };
         contacts.insert((contact, company));
         candidates.push((rank, identity, contact));
     }
     if contacts.len() != 1 || candidates.is_empty() {
-        return Err(ApiError::Unprocessable("sender requires contact triage".into()));
+        return Err(ApiError::Unprocessable(
+            "sender requires contact triage".into(),
+        ));
     }
     candidates.sort_unstable();
     let (_, identity, contact) = candidates[0];
@@ -117,12 +134,16 @@ pub(super) async fn process(state: &AppState, event: &Incoming) -> Result<(), Ap
         || current.account_id != event.account_id
         || current.company_id != event.company_id
     {
-        return Err(ApiError::Forbidden("provider binding changed after receipt".into()));
+        return Err(ApiError::Forbidden(
+            "provider binding changed after receipt".into(),
+        ));
     }
     match event.kind.as_str() {
         "message" => message(state, &current, event).await,
         "status" => delivery(state, &current, event).await,
-        _ => Err(ApiError::Unprocessable("provider event requires triage".into())),
+        _ => Err(ApiError::Unprocessable(
+            "provider event requires triage".into(),
+        )),
     }
 }
 
@@ -131,9 +152,13 @@ async fn message(state: &AppState, account: &Account, event: &Incoming) -> Resul
     let id = text(raw, "id")?;
     let sender = text(raw, "from")?;
     if raw.get("type").and_then(Value::as_str) != Some("text") {
-        return Err(ApiError::Unprocessable("attachment requires document intake".into()));
+        return Err(ApiError::Unprocessable(
+            "attachment requires document intake".into(),
+        ));
     }
-    let body = raw.pointer("/text/body").and_then(Value::as_str)
+    let body = raw
+        .pointer("/text/body")
+        .and_then(Value::as_str)
         .filter(|body| !body.trim().is_empty() && body.len() <= 4000)
         .ok_or_else(|| ApiError::Unprocessable("unsupported message body".into()))?;
     let e164 = sender_e164(sender)?;
@@ -142,7 +167,11 @@ async fn message(state: &AppState, account: &Account, event: &Incoming) -> Resul
          AND normalized_e164 = '{e164}' LIMIT 32",
         account.organization_id
     );
-    let rows = state.stdb.query_sql(&sql).await.map_err(ApiError::unavailable)?;
+    let rows = state
+        .stdb
+        .query_sql(&sql)
+        .await
+        .map_err(ApiError::unavailable)?;
     let (contact, identity) = select_identity(&rows, account)?;
     dispatch_internal_reducer(
         state,
@@ -159,7 +188,8 @@ async fn message(state: &AppState, account: &Account, event: &Incoming) -> Resul
             "provider_message_id": id,
             "body": body,
         }]),
-    ).await?;
+    )
+    .await?;
     Ok(())
 }
 
@@ -170,7 +200,11 @@ async fn delivery(state: &AppState, account: &Account, event: &Incoming) -> Resu
         "read" | "delivered" => "delivered",
         "sent" => "sent",
         "failed" => "failed",
-        _ => return Err(ApiError::Unprocessable("unsupported delivery status".into())),
+        _ => {
+            return Err(ApiError::Unprocessable(
+                "unsupported delivery status".into(),
+            ))
+        }
     };
     let escaped = id.replace('\'', "''");
     let sql = format!(
@@ -178,20 +212,34 @@ async fn delivery(state: &AppState, account: &Account, event: &Incoming) -> Resu
          AND direction = 'outbound' AND provider_message_id = '{escaped}' LIMIT 2",
         account.organization_id
     );
-    let rows = state.stdb.query_sql(&sql).await.map_err(ApiError::unavailable)?;
+    let rows = state
+        .stdb
+        .query_sql(&sql)
+        .await
+        .map_err(ApiError::unavailable)?;
     if rows.len() != 1 {
-        return Err(ApiError::Unavailable("provider message correlation is pending".into()));
+        return Err(ApiError::Unavailable(
+            "provider message correlation is pending".into(),
+        ));
     }
     let row = &rows[0];
     if row_u64(row, "organization_id") != Some(account.organization_id)
-        || account.company_id.is_some_and(|id| row_u64(row, "company_id") != Some(id))
+        || account
+            .company_id
+            .is_some_and(|id| row_u64(row, "company_id") != Some(id))
     {
-        return Err(ApiError::Forbidden("provider delivery company mismatch".into()));
+        return Err(ApiError::Forbidden(
+            "provider delivery company mismatch".into(),
+        ));
     }
     let (Some(conversation), Some(message), Some(operational)) = (
-        row_u64(row, "conversation_id"), row_u64(row, "id"), row_u64(row, "operational_message_id"),
+        row_u64(row, "conversation_id"),
+        row_u64(row, "id"),
+        row_u64(row, "operational_message_id"),
     ) else {
-        return Err(ApiError::Unprocessable("delivery lacks canonical linkage".into()));
+        return Err(ApiError::Unprocessable(
+            "delivery lacks canonical linkage".into(),
+        ));
     };
     let failure = if status == "failed" {
         json!({"some": "meta delivery failed"})
@@ -214,7 +262,8 @@ async fn delivery(state: &AppState, account: &Account, event: &Incoming) -> Resu
             "status": status,
             "failure_reason": failure,
         }]),
-    ).await?;
+    )
+    .await?;
     Ok(())
 }
 
@@ -223,8 +272,13 @@ mod tests {
     use super::*;
 
     fn fixture() -> Account {
-        Account { organization_id: 1, account_id: 2, company_id: Some(3),
-            business_account_id: "123".into(), phone_number_id: "456".into() }
+        Account {
+            organization_id: 1,
+            account_id: 2,
+            company_id: Some(3),
+            business_account_id: "123".into(),
+            phone_number_id: "456".into(),
+        }
     }
 
     #[test]
@@ -244,7 +298,10 @@ mod tests {
         let mut whatsapp = wallet.clone();
         whatsapp["id"] = json!(2);
         whatsapp["kind"] = json!({"tag":"WhatsApp"});
-        assert_eq!(select_identity(&[wallet, whatsapp.clone()], &fixture()).unwrap(), (9,2));
+        assert_eq!(
+            select_identity(&[wallet, whatsapp.clone()], &fixture()).unwrap(),
+            (9, 2)
+        );
         whatsapp["companyId"] = json!(4);
         assert!(select_identity(&[whatsapp], &fixture()).is_err());
     }

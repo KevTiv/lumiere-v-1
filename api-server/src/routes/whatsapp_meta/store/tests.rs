@@ -30,39 +30,64 @@ async fn postgres_replay_conflict_concurrency_and_lease_recovery() -> Result<()>
     persist(&pool, &[event.clone()]).await?;
     persist(&pool, &[event.clone()]).await?;
     let client = pool.get().await?;
-    let count: i64 = client.query_one(
-        "SELECT count(*) FROM lumiere_whatsapp.inbox WHERE organization_id=$1",
-        &[&org.to_string()],
-    ).await?.get(0);
+    let count: i64 = client
+        .query_one(
+            "SELECT count(*) FROM lumiere_whatsapp.inbox WHERE organization_id=$1",
+            &[&org.to_string()],
+        )
+        .await?
+        .get(0);
     assert_eq!(count, 1, "duplicate webhook must be idempotent");
+    drop(client);
+
     let mut changed = event.clone();
     changed.payload["image"]["id"] = json!("different-media");
     changed.fingerprint = super::super::protocol::fingerprint(&changed.payload);
     persist(&pool, &[changed]).await?;
-    let conflict: String = client.query_one(
-        "SELECT state FROM lumiere_whatsapp.inbox \
-         WHERE organization_id=$1 AND fingerprint<>$2",
-        &[&org.to_string(), &event.fingerprint],
-    ).await?.get(0);
+    let client = pool.get().await?;
+    let conflict: String = client
+        .query_one(
+            "SELECT state FROM lumiere_whatsapp.inbox \
+             WHERE organization_id=$1 AND fingerprint<>$2",
+            &[&org.to_string(), &event.fingerprint],
+        )
+        .await?
+        .get(0);
     assert_eq!(conflict, "quarantined");
     drop(client);
+
     let (first, second) = tokio::join!(claim(&pool), claim(&pool));
     let mut leases: Vec<_> = [first?, second?].into_iter().flatten().collect();
     assert_eq!(leases.len(), 1, "only one worker may claim the event");
     let lease = leases.remove(0);
     assert!(lease.event_json.contains("retained-media"));
     let client = pool.get().await?;
-    client.execute(
-        "UPDATE lumiere_whatsapp.inbox SET lease_until=now()-interval '1 second' WHERE id=$1",
-        &[&lease.id],
-    ).await?;
+    client
+        .execute(
+            "UPDATE lumiere_whatsapp.inbox SET lease_until=now()-interval '1 second' WHERE id=$1",
+            &[&lease.id],
+        )
+        .await?;
     drop(client);
-    let replacement = claim(&pool).await?.expect("expired lease must recover after restart");
+
+    let replacement = claim(&pool)
+        .await?
+        .expect("expired lease must recover after restart");
     assert_eq!(replacement.id, lease.id);
     assert_ne!(replacement.token, lease.token);
-    assert!(finish(&pool, &lease, Outcome::Processed, "stale_worker").await.is_err());
-    finish(&pool, &replacement, Outcome::Quarantined, "identity_or_content_triage").await?;
-    assert!(requeue(&pool, org + 1, 2, replacement.id).await.is_err());
+    assert!(finish(&pool, &lease, Outcome::Processed, "stale_worker")
+        .await
+        .is_err());
+    finish(
+        &pool,
+        &replacement,
+        Outcome::Quarantined,
+        "identity_or_content_triage",
+    )
+    .await?;
+    assert!(requeue(&pool, org.wrapping_add(1), 2, replacement.id)
+        .await
+        .is_err());
     requeue(&pool, org, 2, replacement.id).await?;
     let final_lease = claim(&pool).await?.expect("scoped retry must be claimable");
     finish(&pool, &final_lease, Outcome::Processed, "test_processed").await?;

@@ -93,7 +93,7 @@ pub(super) fn field<'a>(row: &'a Value, name: &str) -> Option<&'a Value> {
 pub(super) fn scalar_u64(value: &Value) -> Option<u64> {
     value
         .as_u64()
-        .or_else(|| value.as_str().and_then(|text| text.parse().ok()))
+        .or_else(|| value.as_str().and_then(|value| value.parse().ok()))
         .or_else(|| value.get("some").and_then(scalar_u64))
         .or_else(|| value.get("Some").and_then(scalar_u64))
 }
@@ -124,7 +124,11 @@ pub(super) fn enum_tag(value: &Value) -> Option<&str> {
         .or_else(|| value.get("tag").and_then(Value::as_str))
         .or_else(|| {
             let object = value.as_object()?;
-            (object.len() == 1).then(|| object.keys().next()).flatten().map(String::as_str)
+            if object.len() == 1 {
+                object.keys().next().map(String::as_str)
+            } else {
+                None
+            }
         })
 }
 
@@ -147,7 +151,10 @@ mod tests {
         assert_eq!(field(&row, "is_active"), Some(&Value::Bool(true)));
         assert!(optional_id(&json!({}), "company_id").is_err());
         assert!(optional_id(&json!({"companyId": "bad"}), "company_id").is_err());
-        assert_eq!(optional_id(&json!({"companyId": null}), "company_id").unwrap(), None);
+        assert_eq!(
+            optional_id(&json!({"companyId": null}), "company_id").unwrap(),
+            None
+        );
     }
 
     #[test]

@@ -116,7 +116,9 @@ async fn prepare_batch(state: &AppState, envelope: Envelope) -> Result<Vec<Incom
             }
             for (kind, payload) in items {
                 if events.len() >= MAX_EVENTS {
-                    return Err(ApiError::BadRequest("meta batch exceeds event limit".into()));
+                    return Err(ApiError::BadRequest(
+                        "meta batch exceeds event limit".into(),
+                    ));
                 }
                 events.push(Incoming {
                     organization_id: account.organization_id,
@@ -189,7 +191,9 @@ pub(crate) async fn run_worker() -> anyhow::Result<()> {
             return store::requeue(pool, org.parse()?, account.parse()?, id.parse()?).await;
         }
         [] => {}
-        _ => anyhow::bail!("usage: whatsapp-inbox-worker [--migrate | --requeue ORG ACCOUNT EVENT]"),
+        _ => {
+            anyhow::bail!("usage: whatsapp-inbox-worker [--migrate | --requeue ORG ACCOUNT EVENT]")
+        }
     }
     if !enabled() {
         anyhow::bail!("LUMIERE_WHATSAPP_META_ENABLED=1 is required for the inbox worker");
@@ -215,25 +219,27 @@ pub(crate) async fn run_worker() -> anyhow::Result<()> {
         };
         let outcome = match serde_json::from_str::<Incoming>(&lease.event_json) {
             Ok(event) => {
-                let processing = tokio::time::timeout(
-                    Duration::from_secs(45),
-                    inbound::process(&state, &event),
-                )
-                .await;
+                let processing =
+                    tokio::time::timeout(Duration::from_secs(45), inbound::process(&state, &event))
+                        .await;
                 match processing {
                     Ok(Ok(())) => (store::Outcome::Processed, "canonical_receipt_recorded"),
                     Ok(Err(ApiError::BadRequest(_) | ApiError::Unprocessable(_))) => {
                         (store::Outcome::Quarantined, "identity_or_content_triage")
                     }
-                    Ok(Err(ApiError::Forbidden(_) | ApiError::Unauthorized)) => {
-                        (store::Outcome::Quarantined, "provider_authority_or_scope_denied")
-                    }
+                    Ok(Err(ApiError::Forbidden(_) | ApiError::Unauthorized)) => (
+                        store::Outcome::Quarantined,
+                        "provider_authority_or_scope_denied",
+                    ),
                     _ => (store::Outcome::Retry, "canonical_processing_unconfirmed"),
                 }
             }
             Err(_) => (store::Outcome::Quarantined, "invalid_stored_envelope"),
         };
-        if store::finish(pool, &lease, outcome.0, outcome.1).await.is_err() {
+        if store::finish(pool, &lease, outcome.0, outcome.1)
+            .await
+            .is_err()
+        {
             // Lost completion is replayed through the canonical event ledger.
             tracing::warn!(inbox_id = lease.id, "whatsapp completion is unconfirmed");
         }
@@ -254,7 +260,10 @@ mod tests {
 
     #[test]
     fn challenge_checks_mode_token_and_preserves_exact_response() {
-        assert_eq!(challenge("secret", query("subscribe", "secret")).unwrap(), "12345");
+        assert_eq!(
+            challenge("secret", query("subscribe", "secret")).unwrap(),
+            "12345"
+        );
         assert!(challenge("secret", query("subscribe", "wrong")).is_err());
         assert!(challenge("secret", query("other", "secret")).is_err());
         assert!(challenge("", query("subscribe", "")).is_err());

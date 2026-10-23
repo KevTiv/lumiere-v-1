@@ -61,7 +61,11 @@ pub(super) fn payload(message: &ReviewedMessage) -> Result<Value> {
             result["type"] = json!("text");
             result["text"] = json!({"body":body,"preview_url":false});
         }
-        Content::Template { name, language, parameters } => {
+        Content::Template {
+            name,
+            language,
+            parameters,
+        } => {
             let components = if parameters.is_empty() {
                 vec![]
             } else {
@@ -80,18 +84,34 @@ pub(super) fn payload(message: &ReviewedMessage) -> Result<Value> {
 }
 
 pub(crate) fn reviewed_payload_digest(message: &ReviewedMessage) -> Result<String> {
-    Ok(fingerprint(&json!([message.phone_number_id, payload(message)?])))
+    Ok(fingerprint(&json!([
+        message.phone_number_id,
+        payload(message)?
+    ])))
 }
 
 pub(super) fn validate(message: &ReviewedMessage, current: &Eligibility, now: u64) -> Result<()> {
-    let requested = (message.organization_id, message.company_id, message.account_id);
-    let authorized = (current.organization_id, current.company_id, current.account_id);
-    if requested.0 == 0 || requested.1 == 0 || requested.2 == 0
+    let requested = (
+        message.organization_id,
+        message.company_id,
+        message.account_id,
+    );
+    let authorized = (
+        current.organization_id,
+        current.company_id,
+        current.account_id,
+    );
+    if requested.0 == 0
+        || requested.1 == 0
+        || requested.2 == 0
         || message.operational_message_id == 0
         || requested != authorized
         || message.review_digest != current.review_digest
         || message.review_digest.len() != 64
-        || !message.review_digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || !message
+            .review_digest
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
         || reviewed_payload_digest(message)? != current.approved_payload_digest
         || !current.actor_can_send
         || !current.sender_active
@@ -103,18 +123,26 @@ pub(super) fn validate(message: &ReviewedMessage, current: &Eligibility, now: u6
     }
     match &message.content {
         Content::Reply(body) => {
-            let last = current.last_customer_message_seconds
+            let last = current
+                .last_customer_message_seconds
                 .filter(|last| *last <= now)
                 .ok_or_else(|| anyhow::anyhow!("no verified customer service window"))?;
             if now - last >= 86400 || body.trim().is_empty() || body.len() > 4000 {
                 bail!("whatsapp reply is outside its service window or body limit");
             }
         }
-        Content::Template { name, language, parameters } => {
-            let fresh = current.meta_approval_checked_at_seconds
+        Content::Template {
+            name,
+            language,
+            parameters,
+        } => {
+            let fresh = current
+                .meta_approval_checked_at_seconds
                 .is_some_and(|checked| checked <= now && now - checked <= 60);
-            if !current.exact_meta_template_approved || !fresh
-                || name.is_empty() || language.is_empty()
+            if !current.exact_meta_template_approved
+                || !fresh
+                || name.is_empty()
+                || language.is_empty()
                 || parameters.iter().any(|value| value.len() > 4000)
             {
                 bail!("exact current Meta template approval is required");

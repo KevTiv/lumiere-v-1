@@ -26,7 +26,10 @@ pub(super) async fn migrate(pool: &Pool) -> Result<()> {
     )
     .await?;
     let rows = tx
-        .query("SELECT version, checksum FROM lumiere_whatsapp.schema_version", &[])
+        .query(
+            "SELECT version, checksum FROM lumiere_whatsapp.schema_version",
+            &[],
+        )
         .await?;
     if rows.is_empty() {
         tx.batch_execute(SQL).await?;
@@ -48,12 +51,13 @@ pub(super) async fn migrate(pool: &Pool) -> Result<()> {
 pub(super) async fn verify(pool: &Pool) -> Result<()> {
     let client = pool.get().await?;
     let rows = client
-        .query("SELECT version, checksum FROM lumiere_whatsapp.schema_version", &[])
+        .query(
+            "SELECT version, checksum FROM lumiere_whatsapp.schema_version",
+            &[],
+        )
         .await
         .context("whatsapp transport schema is not installed")?;
-    if rows.len() != 1
-        || rows[0].get::<_, i32>(0) != 1
-        || rows[0].get::<_, String>(1) != checksum()
+    if rows.len() != 1 || rows[0].get::<_, i32>(0) != 1 || rows[0].get::<_, String>(1) != checksum()
     {
         bail!("whatsapp transport migration lineage mismatch");
     }
@@ -71,16 +75,22 @@ pub(super) async fn persist(pool: &Pool, events: &[Incoming]) -> Result<()> {
     let tx = client.transaction().await?;
     let mut ordered: Vec<_> = events.iter().collect();
     ordered.sort_by(|left, right| {
-        (left.organization_id, left.account_id, &left.event_key)
-            .cmp(&(right.organization_id, right.account_id, &right.event_key))
+        (left.organization_id, left.account_id, &left.event_key).cmp(&(
+            right.organization_id,
+            right.account_id,
+            &right.event_key,
+        ))
     });
     for event in ordered {
         let org = event.organization_id.to_string();
         let account = event.account_id.to_string();
         let company = event.company_id.map(|id| id.to_string());
         let lock_key = format!("meta-inbox:{org}:{account}");
-        tx.query_one("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", &[&lock_key])
-            .await?;
+        tx.query_one(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            &[&lock_key],
+        )
+        .await?;
         let duplicate = tx
             .query_opt(
                 "SELECT 1 FROM lumiere_whatsapp.inbox WHERE organization_id=$1 \
@@ -179,7 +189,12 @@ pub(super) enum Outcome {
     Quarantined,
 }
 
-pub(super) async fn finish(pool: &Pool, lease: &Lease, outcome: Outcome, reason: &str) -> Result<()> {
+pub(super) async fn finish(
+    pool: &Pool,
+    lease: &Lease,
+    outcome: Outcome,
+    reason: &str,
+) -> Result<()> {
     let state = match outcome {
         Outcome::Processed => "processed",
         Outcome::Retry if lease.attempts < 10 => "retry",
