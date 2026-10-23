@@ -23,6 +23,7 @@ import { Eye } from "lucide-react"
 import type { AccountAccount, AccountMove } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
 import { TablePager, usePagedRows } from "../components/table-pager"
+import { DatePicker } from "@/components/ui/date-picker"
 
 function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
   if (!ts) return "—"
@@ -129,20 +130,18 @@ export function AccountGlDrilldownPanel({
           <div className="grid gap-4 sm:grid-cols-2 py-2">
             <div className="space-y-2">
               <Label htmlFor="gl-drill-from">{t("accounting.glDrilldown.dateFrom")}</Label>
-              <Input
+              <DatePicker
                 id="gl-drill-from"
-                type="date"
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
+                onChange={(value) => setDateFrom(value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="gl-drill-to">{t("accounting.glDrilldown.dateTo")}</Label>
-              <Input
+              <DatePicker
                 id="gl-drill-to"
-                type="date"
                 value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
+                onChange={(value) => setDateTo(value)}
               />
             </div>
           </div>

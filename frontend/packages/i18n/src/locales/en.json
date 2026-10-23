@@ -15460,6 +15460,17 @@
     "title": "AI Skills"
   },
   "ui": {
+    "datePicker": {
+      "clear": "Clear",
+      "endOfMonth": "End of month",
+      "openCalendar": "Open calendar",
+      "outOfRange": "Date is outside the allowed range",
+      "plus30Days": "+30 days",
+      "plus7Days": "+7 days",
+      "time": "Time",
+      "today": "Today",
+      "tomorrow": "Tomorrow"
+    },
     "journal": {
       "actions": {
         "archive": "Archive",

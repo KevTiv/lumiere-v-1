@@ -163,6 +163,10 @@ export interface RadioField extends BaseField {
 export interface DateField extends BaseField {
   type: "date" | "time" | "datetime"
   defaultValue?: string
+  /** Earliest allowed value in the field's string format (`YYYY-MM-DD` for dates). */
+  minDate?: string
+  /** Latest allowed value in the field's string format (`YYYY-MM-DD` for dates). */
+  maxDate?: string
 }
 
 export interface FileField extends BaseField {

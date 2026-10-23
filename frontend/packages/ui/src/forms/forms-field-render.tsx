@@ -19,6 +19,7 @@ import {
 } from "../components/select"
 import { RecordPicker } from "../components/record-picker"
 import { MultiRecordPicker } from "../components/multi-record-picker"
+import { DatePicker, DateTimePicker } from "../components/date-picker"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -325,16 +326,37 @@ export function FormFieldRenderer({
         )
 
       case "date":
+      case "datetime": {
+        const Picker = field.type === "datetime" ? DateTimePicker : DatePicker
+        return (
+          <Picker
+            id={field.id}
+            name={field.name}
+            data-testid={`form-field-${field.name}`}
+            value={(value as string) || ""}
+            onChange={(next) => onChange(next)}
+            min={field.minDate}
+            max={field.maxDate}
+            disabled={field.disabled}
+            required={field.required}
+            aria-invalid={!!error}
+            aria-describedby={describedBy}
+            className={cn(inputBase, error && "border-destructive focus-visible:ring-destructive/20")}
+          />
+        )
+      }
+
       case "time":
-      case "datetime":
         return (
           <Input
             id={field.id}
             name={field.name}
             data-testid={`form-field-${field.name}`}
-            type={field.type === "datetime" ? "datetime-local" : field.type}
+            type="time"
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
+            min={field.minDate}
+            max={field.maxDate}
             disabled={field.disabled}
             required={field.required}
             aria-invalid={!!error}

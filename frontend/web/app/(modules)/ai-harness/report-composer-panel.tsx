@@ -31,10 +31,10 @@ import { Badge } from "@lumiere/ui/components/badge"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Separator } from "@lumiere/ui/components/separator"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
+import { DatePicker } from "@lumiere/ui/components/date-picker"
 import {
   AlertCircle,
   Building2,
-  CalendarDays,
   Clock,
   FileText,
   PlayCircle,
@@ -200,16 +200,7 @@ export function ReportComposerPanel({
 
             <Field>
               <FieldLabel>{t("aiHarness.reportComposer.dateLabel")}</FieldLabel>
-              <InputGroup>
-                <InputGroupAddon align="inline-start">
-                  <CalendarDays />
-                </InputGroupAddon>
-                <InputGroupInput
-                  type="date"
-                  value={date}
-                  onChange={(event) => setDate(event.target.value)}
-                />
-              </InputGroup>
+              <DatePicker value={date} onChange={setDate} />
             </Field>
 
             <Field>

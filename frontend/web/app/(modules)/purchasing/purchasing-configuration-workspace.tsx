@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { DatePicker } from "@lumiere/ui/components/date-picker"
 
 type Row = EntityRow
 
@@ -299,8 +300,8 @@ export function PurchasingConfigurationWorkspace({
 
         {kind === "contract" ? (
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5"><Label htmlFor="purchasing-contract-start">{t("purchasing.configuration.fields.startDate", { defaultValue: "Start date" })}</Label><Input id="purchasing-contract-start" type="date" value={String(values.dateStart ?? "")} onChange={(event) => setValue("dateStart", event.target.value)} /></div>
-            <div className="space-y-1.5"><Label htmlFor="purchasing-contract-end">{t("purchasing.configuration.fields.endDate", { defaultValue: "End date" })}</Label><Input id="purchasing-contract-end" type="date" value={String(values.dateEnd ?? "")} onChange={(event) => setValue("dateEnd", event.target.value)} /></div>
+            <div className="space-y-1.5"><Label htmlFor="purchasing-contract-start">{t("purchasing.configuration.fields.startDate", { defaultValue: "Start date" })}</Label><DatePicker id="purchasing-contract-start" value={String(values.dateStart ?? "")} onChange={(value) => setValue("dateStart", value)} /></div>
+            <div className="space-y-1.5"><Label htmlFor="purchasing-contract-end">{t("purchasing.configuration.fields.endDate", { defaultValue: "End date" })}</Label><DatePicker id="purchasing-contract-end" value={String(values.dateEnd ?? "")} onChange={(value) => setValue("dateEnd", value)} /></div>
           </div>
         ) : null}
 
@@ -336,7 +337,7 @@ export function PurchasingConfigurationWorkspace({
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-1.5"><Label htmlFor="purchasing-commodity-code">{t("purchasing.configuration.fields.commodityCode", { defaultValue: "Commodity code" })}</Label><Input id="purchasing-commodity-code" value={String(values.code ?? "")} onChange={(event) => setValue("code", event.target.value)} required /></div>
             <div className="space-y-1.5"><Label htmlFor="purchasing-commodity-rate">{t("purchasing.configuration.fields.rate", { defaultValue: "Rate" })}</Label><Input id="purchasing-commodity-rate" type="number" step="any" value={String(values.rate ?? "")} onChange={(event) => setValue("rate", event.target.value)} required /></div>
-            <div className="space-y-1.5"><Label htmlFor="purchasing-commodity-date">{t("purchasing.configuration.fields.asOfDate", { defaultValue: "As-of date" })}</Label><Input id="purchasing-commodity-date" type="date" value={String(values.asOf ?? "")} onChange={(event) => setValue("asOf", event.target.value)} required /></div>
+            <div className="space-y-1.5"><Label htmlFor="purchasing-commodity-date">{t("purchasing.configuration.fields.asOfDate", { defaultValue: "As-of date" })}</Label><DatePicker id="purchasing-commodity-date" value={String(values.asOf ?? "")} onChange={(value) => setValue("asOf", value)} required /></div>
           </div>
         ) : null}
 
