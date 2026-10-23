@@ -1,5 +1,6 @@
 //! Native Meta webhook -> durable transport inbox -> canonical CRM reducer.
 //! A 200 acknowledges durable storage, not delivery or financial settlement.
+mod connection;
 mod inbound;
 mod operator;
 mod outbound;

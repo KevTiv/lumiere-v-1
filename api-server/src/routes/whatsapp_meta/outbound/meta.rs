@@ -6,17 +6,6 @@ use serde_json::Value;
 use super::MetaTransport;
 use crate::routes::whatsapp_meta::protocol::{fingerprint, valid_asset_id};
 
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Credential {
-    organization_id: String,
-    account_id: String,
-    business_account_id: String,
-    phone_number_id: String,
-    credentials_reference: String,
-    access_token: String,
-}
-
 pub(crate) fn credential(
     organization: u64,
     account: u64,
@@ -24,27 +13,7 @@ pub(crate) fn credential(
     phone: &str,
     reference: &str,
 ) -> Result<String> {
-    let encoded = std::env::var("LUMIERE_WHATSAPP_ACCOUNT_TOKENS")
-        .map_err(|_| anyhow::anyhow!("WhatsApp account credentials are not provisioned"))?;
-    if encoded.len() > 524288 {
-        bail!("invalid WhatsApp credential configuration");
-    }
-    let entries: Vec<Credential> = serde_json::from_str(&encoded)
-        .map_err(|_| anyhow::anyhow!("invalid WhatsApp credential configuration"))?;
-    let mut matching = entries.into_iter().filter(|entry| {
-        entry.organization_id == organization.to_string()
-            && entry.account_id == account.to_string()
-            && entry.business_account_id == waba
-            && entry.phone_number_id == phone
-            && entry.credentials_reference == reference
-    });
-    let entry = matching
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("no deployment credential matches this WhatsApp sender"))?;
-    if matching.next().is_some() || entry.access_token.trim().is_empty() {
-        bail!("ambiguous or empty WhatsApp sender credential");
-    }
-    Ok(entry.access_token)
+    super::super::connection::credential(organization, account, waba, phone, reference)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

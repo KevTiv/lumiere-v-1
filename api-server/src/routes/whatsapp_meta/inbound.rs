@@ -52,9 +52,11 @@ pub(super) async fn account(
     if !valid_asset_id(waba) || !valid_asset_id(phone) {
         return Err(ApiError::BadRequest("invalid meta asset identifier".into()));
     }
+    let binding = super::connection::binding(waba, phone)
+        .map_err(|_| ApiError::Unavailable("sender has no approved deployment binding".into()))?;
     let sql = format!(
-        "SELECT * FROM whatsapp_business_account WHERE business_account_id = '{waba}' \
-         AND phone_number_id = '{phone}' LIMIT 3"
+        "SELECT * FROM whatsapp_business_account WHERE organization_id = {} AND id = {} LIMIT 2",
+        binding.organization_id, binding.account_id
     );
     let rows = state
         .stdb
@@ -67,7 +69,12 @@ pub(super) async fn account(
         ));
     }
     let account = account_from_row(&rows[0])?;
-    if account.business_account_id != waba || account.phone_number_id != phone {
+    if account.organization_id != binding.organization_id
+        || account.account_id != binding.account_id
+        || account.business_account_id != waba
+        || account.phone_number_id != phone
+        || text(&rows[0], "credentials_reference")? != binding.credentials_reference.as_str()
+    {
         return Err(ApiError::Forbidden("meta account binding mismatch".into()));
     }
     Ok(account)

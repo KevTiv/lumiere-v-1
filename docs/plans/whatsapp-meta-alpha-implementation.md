@@ -76,3 +76,9 @@ Focused node tests: `node --import tsx --test lib/whatsapp-dispatch.test.ts` fro
 ## Deliberate remaining limits
 
 This is text/utility-template alpha, not all WhatsApp features. Media references are retained but media bytes, malware scanning, document ingestion and invoice PDF attachments are not implemented. Business-scoped IDs without a verified phone/contact mapping require triage. Bulk campaigns, marketing automation, embedded merchant signup, arbitrary template components, automatic re-consent and provider-certified production acceptance remain outside this slice. Copy-first messaging remains a fallback and never claims provider delivery.
+
+## Server-approved sender ownership
+
+Both incoming routing and outgoing credentials use the same deployment-owned enrollment array. A tenant-editable WhatsApp account row does not establish ownership of a WABA or receiving phone number. Signed provider assets must first match a unique provisioned organization/account/reference; only then is that exact account read and checked. Duplicate asset or account enrollments fail closed. Another tenant copying provider IDs into its settings cannot capture or reroute callbacks.
+
+Provision the same enrollment mapping on the API and incoming worker. Missing enrollment produces a retryable failure rather than falling back to an unverified account-table scan. Credential rotation preserves exact ownership; changing the ownership binding quarantines already-received events instead of silently moving them to another organization.

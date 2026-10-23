@@ -55,7 +55,10 @@ fn parse(encoded: &str) -> Result<Vec<Connection>> {
             || entry.credentials_reference.len() > 255
             || entry.access_token.is_empty()
             || entry.access_token.len() > 16384
-            || !entry.access_token.bytes().all(|byte| byte.is_ascii_graphic())
+            || !entry
+                .access_token
+                .bytes()
+                .all(|byte| byte.is_ascii_graphic())
             || !assets.insert((&entry.business_account_id, &entry.phone_number_id))
             || !accounts.insert((org, account))
         {
@@ -158,9 +161,36 @@ mod tests {
     #[test]
     fn credential_scope_and_reference_cannot_be_substituted() {
         let config = json!([fixture()]).to_string();
-        assert!(find_credential(parse(&config).unwrap(), 1, 3, "123", "456", "fixture/connection").is_err());
-        assert!(find_credential(parse(&config).unwrap(), 1, 2, "123", "456", "another/reference").is_err());
-        assert_eq!(find_credential(parse(&config).unwrap(), 1, 2, "123", "456", "fixture/connection").unwrap(), "not-a-real-token");
+        assert!(find_credential(
+            parse(&config).unwrap(),
+            1,
+            3,
+            "123",
+            "456",
+            "fixture/connection"
+        )
+        .is_err());
+        assert!(find_credential(
+            parse(&config).unwrap(),
+            1,
+            2,
+            "123",
+            "456",
+            "another/reference"
+        )
+        .is_err());
+        assert_eq!(
+            find_credential(
+                parse(&config).unwrap(),
+                1,
+                2,
+                "123",
+                "456",
+                "fixture/connection"
+            )
+            .unwrap(),
+            "not-a-real-token"
+        );
     }
 
     #[test]
@@ -170,7 +200,10 @@ mod tests {
         assert!(parse(&json!([value]).to_string()).is_err());
         let mut value = fixture();
         value["accessToken"] = json!("private-value\nmalformed");
-        let error = parse(&json!([value]).to_string()).err().unwrap().to_string();
+        let error = parse(&json!([value]).to_string())
+            .err()
+            .unwrap()
+            .to_string();
         assert!(!error.contains("private-value"));
     }
 }
