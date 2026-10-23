@@ -150,6 +150,20 @@ jobs:
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::documents::tests
           python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::company_scope::tests
 
+      - name: WhatsApp transport, policy, and PostgreSQL recovery
+        env:
+          WHATSAPP_TEST_PG: "1"
+          PG_HOST: 127.0.0.1
+          PG_PORT: "5432"
+          PG_DATABASE: lumiere_whatsapp_test
+          PG_USER: lumiere
+          PG_PASSWORD: lumiere
+          PGPASSWORD: lumiere
+          PG_TLS_MODE: disable
+        run: |
+          psql -h 127.0.0.1 -p 5432 -U lumiere -d lumiere -v ON_ERROR_STOP=1 -c 'CREATE DATABASE lumiere_whatsapp_test'
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::whatsapp_meta -- --include-ignored --test-threads=1
+
       - name: C3 PostgreSQL projection matrix
         env:
           C3_TEST_PG: "1"

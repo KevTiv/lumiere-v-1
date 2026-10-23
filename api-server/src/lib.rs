@@ -118,3 +118,10 @@ pub async fn run_workflow_worker() -> anyhow::Result<()> {
     http_app::init_tracing();
     workflow_worker::serve().await
 }
+
+/// Run the durable Meta inbox worker or its explicitly selected maintenance command.
+pub async fn run_whatsapp_inbox_worker() -> anyhow::Result<()> {
+    install_rustls_crypto_provider();
+    http_app::init_tracing();
+    routes::whatsapp_meta::run_worker().await
+}
