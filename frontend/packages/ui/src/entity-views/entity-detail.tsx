@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { cn } from "../lib/utils"
-import type { EntityDetailConfig } from "../lib/entity-view-types"
+import type { EntityDetailConfig, EntityDetailField, EntityRow } from "../lib/entity-view-types"
 import { filterEntitySurface } from "../lib/entity-view-types"
 import { useRBAC } from "../lib/rbac-context"
 import { formatEntityFieldValue } from "../lib/entity-row-utils"
@@ -10,6 +10,7 @@ import { unwrapEntityValue } from "../lib/entity-row-values"
 import { Separator } from "../components/separator"
 import { MarkdownView } from "../components/markdown-view"
 import { TooltipProvider } from "../components/tooltip"
+import { InlineEditField } from "./inline-edit-field"
 
 interface EntityDetailProps {
   config: EntityDetailConfig
@@ -29,6 +30,17 @@ function formatDetailValue(
   }
   if (type === "markdown") return <MarkdownView value={String(unwrapEntityValue(value))} />
   return formatEntityFieldValue(value, type, badgeVariants, badgeLabels)
+}
+
+function renderFieldValue(
+  field: EntityDetailField,
+  value: unknown,
+  data: EntityRow,
+): React.ReactNode {
+  if (field.render) return field.render(value, data)
+  // A markdown-edited field reads formatted even when its column type was not set to markdown.
+  const type = field.inlineEdit?.kind === "markdown" ? "markdown" : field.type
+  return formatDetailValue(value, type, field.badgeVariants, field.badgeLabels)
 }
 
 const widthClasses: Record<string, string> = {
@@ -82,6 +94,8 @@ export function EntityDetail({ config, data, className }: EntityDetailProps) {
             {section.fields.map((field) => {
               const width = field.width ?? "1/2"
               const value = data[field.key]
+              // Editors work on the plain value; an Option-wrapped cell still renders as stored.
+              const plain = unwrapEntityValue(value)
               return (
                 <div
                   key={field.key}
@@ -91,9 +105,18 @@ export function EntityDetail({ config, data, className }: EntityDetailProps) {
                     {field.label}
                   </dt>
                   <dd className="text-sm text-foreground">
-                    {field.render
-                      ? field.render(value, data)
-                      : formatDetailValue(value, field.type, field.badgeVariants, field.badgeLabels)}
+                    {field.inlineEdit ? (
+                      <InlineEditField
+                        edit={field.inlineEdit}
+                        record={data}
+                        fieldKey={field.key}
+                        label={field.label}
+                        value={plain}
+                        renderValue={(shown) => renderFieldValue(field, shown === plain ? value : shown, data)}
+                      />
+                    ) : (
+                      renderFieldValue(field, value, data)
+                    )}
                   </dd>
                 </div>
               )

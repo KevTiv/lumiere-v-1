@@ -352,6 +352,14 @@
     "overview": "Overview",
     "remove": "Remove",
     "entityView": {
+      "inlineEdit": {
+        "edit": "Edit {{label}}",
+        "saved": "{{label}} updated",
+        "undo": "Undo",
+        "undone": "{{label}} change undone",
+        "notSaved": "{{label}} was not saved",
+        "saveHint": "Press {{shortcut}} to save, Esc to cancel"
+      },
       "board": "Board",
       "emptyColumn": "No records",
       "table": "Table",
@@ -4481,8 +4489,11 @@
     },
     "inlineEdit": {
       "emailInvalid": "Enter a valid email address",
+      "leadNameRequired": "A lead needs a contact name",
       "nameRequired": "A contact needs a name",
-      "phoneRequired": "Enter a phone number"
+      "opportunityNameRequired": "An opportunity needs a name",
+      "phoneRequired": "Enter a phone number",
+      "revenueInvalid": "Enter a revenue of 0 or more"
     },
     "myActivities": {
       "empty": "You have no open activities.",

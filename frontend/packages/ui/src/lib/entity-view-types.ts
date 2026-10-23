@@ -89,7 +89,11 @@ export interface EntityColumn extends EntityPermissioned {
 }
 
 export interface EntityInlineEdit {
-  kind: "text" | "number" | "select"
+  /**
+   * `textarea` is multi-line plain text and `markdown` edits with the rich text editor; for both,
+   * Enter inserts a newline and Cmd/Ctrl+Enter saves.
+   */
+  kind: "text" | "number" | "select" | "textarea" | "markdown"
   /** Choices for `kind: "select"`. */
   options?: Array<{ value: string; label: string }>
   /** Rows the cell may be edited on (e.g. only drafts). Defaults to every row. */
@@ -222,6 +226,11 @@ export interface EntityDetailField extends EntityPermissioned {
   badgeVariants?: Record<string, string>
   badgeLabels?: Record<string, string>
   render?: (value: unknown, record: EntityRow) => ReactNode
+  /**
+   * Makes the field editable where it is read (click, or Enter/Space when focused). The caller
+   * owns the write; a successful save offers Undo.
+   */
+  inlineEdit?: EntityInlineEdit
 }
 
 export interface EntityDetailSection {
