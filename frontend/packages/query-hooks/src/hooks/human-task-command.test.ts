@@ -6,7 +6,9 @@ import {
   humanTaskCommandReadbackPath,
   humanTaskDecisionExpectation,
   humanTaskInputHash,
+  humanTaskResubmissionExpectation,
   normalizeHumanTaskComment,
+  normalizeHumanTaskResubmissionReason,
   resolveHumanTaskCommandEffect,
   type HumanTaskCommandExpectation,
 } from "./human-task-command"
@@ -162,4 +164,62 @@ test("post-commit read revocation remains unknown without changing the original 
   assert.deepEqual(await humanTaskDecisionExpectation(scope, input), expected)
   assert.notEqual((await humanTaskDecisionExpectation(scope, { ...input, expectedInstanceRevision: 10 })).inputHash, expected.inputHash)
   assert.notEqual((await humanTaskDecisionExpectation(scope, { ...input, comment: "different" })).inputHash, expected.inputHash)
+})
+
+const resubmission = {
+  companyId: 11, taskId: 41, expectedTaskRevision: 3, expectedInstanceRevision: 9,
+  expectedSubjectRevisionHash: `sha256:${"1".repeat(64)}`, reason: " \u0085Reassign review é\u0085 ", attempt,
+}
+
+test("resubmission hashes the reviewed source and reason with the native byte layout", async () => {
+  const expected = await humanTaskResubmissionExpectation(scope, resubmission)
+  assert.equal(expected.commandKind, "resubmit")
+  assert.equal(expected.actingForIdentityHex, null)
+  assert.equal(expected.decision, null)
+  assert.equal(expected.inputHash, await humanTaskInputHash([
+    "7", "11", "41", "3", "9", resubmission.expectedSubjectRevisionHash, "Reassign review é",
+  ]))
+  const url = new URL(humanTaskCommandReadbackPath(scope, expected), "https://example.test")
+  assert.equal(url.searchParams.get("commandKind"), "resubmit")
+  assert.equal(url.searchParams.has("actingFor"), false)
+  assert.equal(url.searchParams.has("reason"), false)
+  assert.equal(JSON.stringify(expected).includes("Reassign review"), false)
+  assert.throws(() => normalizeHumanTaskResubmissionReason(" \u0085\n"), /reason is required/)
+  assert.throws(() => normalizeHumanTaskResubmissionReason("é".repeat(4097)), /8192 bytes/)
+  await assert.rejects(humanTaskResubmissionExpectation(scope, { ...resubmission, expectedSubjectRevisionHash: "invalid" }), /source revision/)
+  assert.notEqual((await humanTaskResubmissionExpectation(scope, { ...resubmission, reason: "Another reason" })).inputHash, expected.inputHash)
+})
+
+test("resubmission is proved only by the matching cancelled event and distinct linked successor", async () => {
+  const expected = await humanTaskResubmissionExpectation(scope, resubmission)
+  const evidence = {
+    resultStatus: "Cancelled", successorTaskId: "52", successorInstanceId: "80",
+    successorTaskRevision: "1", successorInstanceRevision: "2",
+  }
+  const page = evidencePage(expected, evidence)
+  page.data[0]!.status = "Cancelled"
+  const successor = { resource: "workflow-human-tasks", id: "52" }
+  assert.deepEqual(resolveHumanTaskCommandEffect(page, scope, expected), successor)
+  for (const override of [
+    { actorIdentityHex: principal }, { actingForIdentityHex: principal },
+    { idempotencyKey: "competing-resubmission" }, { priorInstanceRevision: "10" },
+    { subjectRevisionHash: `sha256:${"2".repeat(64)}` }, { successorTaskId: "41" },
+    { successorTaskId: "0" }, { successorTaskId: "052" }, { successorInstanceId: "70" },
+    { successorTaskRevision: undefined }, { successorInstanceRevision: "18446744073709551616" },
+    { resultStatus: "Open" }, { resultRevision: "5" }, { decision: "approve" },
+  ]) {
+    assert.equal(resolveHumanTaskCommandEffect({ ...page, commandEvidence: { ...page.commandEvidence, ...override } }, scope, expected), null, JSON.stringify(override))
+  }
+  page.data[0]!.status = "Open"
+  assert.equal(resolveHumanTaskCommandEffect(page, scope, expected), null)
+  page.data[0]!.status = "Cancelled"
+  let dispatches = 0
+  const result = await executeOperationWithCanonicalReadback({
+    resolveBeforeDispatch: false,
+    dispatch: async () => { dispatches++; throw new TypeError("Lost resubmission response") },
+    resolveEffect: async () => resolveHumanTaskCommandEffect(page, scope, expected),
+    readbackDelayMs: 0,
+  })
+  assert.equal(result.kind, "converged")
+  assert.equal(dispatches, 1)
 })

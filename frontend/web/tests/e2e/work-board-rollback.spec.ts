@@ -116,7 +116,7 @@ async function committedEvidence(page: Page, scope: EvidenceScope) {
   }
 }
 
-async function signalRejected(owner: Page, input: SignalWorkflowInput, expectedSnapshotHash: string) {
+async function signalRejected(owner: Page, input: SignalWorkflowInput, conditionRevisionHash: string) {
   const normalized = buildWorkflowSubjectSnapshotRequest(input)
   const request = await postWorkCommand(owner, stdbBffCommandPost("request_workflow_subject_snapshot", {
     companyId: normalized.companyId,
@@ -124,7 +124,7 @@ async function signalRejected(owner: Page, input: SignalWorkflowInput, expectedS
   }))
   expect(request.ok(), await request.text()).toBe(true)
   const snapshot = selectWorkflowSubjectSnapshot(await queryRows(owner, "workflow-subject-snapshots"), input)
-  expect(snapshot.subject_revision_hash).toBe(expectedSnapshotHash)
+  expect(snapshot.subject_revision_hash, "Setup must retain the workflow's canonical condition snapshot").toBe(conditionRevisionHash)
   const response = await postWorkCommand(owner, stdbBffCommandPost("signal_workflow", {
     params: buildSignalWorkflowWireParams(input, snapshot),
   }))
@@ -163,6 +163,10 @@ test.describe("Finance work board native transaction rollback", { tag: ["@dev-fi
       const taskRows = await persistedRows(`SELECT * FROM workflow_human_task WHERE organization_id = ${workflow.organizationId} AND company_id = ${workflow.companyId} AND id = ${positiveId(taskId, "task")}`)
       expect(taskRows).toHaveLength(1)
       const task = taskRows[0]!
+      const conditionRevisionHash = task.condition_revision_hash
+      if (typeof conditionRevisionHash !== "string" || !conditionRevisionHash) {
+        throw new Error("Rollback task has no canonical condition revision hash")
+      }
       const instanceId = positiveId(task.workflow_instance_id, "instance")
       const guarded = canonicalOptionValue(task.guarded_action)
       const guardedKey = Array.isArray(guarded) ? guarded[0] : (guarded as { key?: unknown } | null)?.key
@@ -170,11 +174,6 @@ test.describe("Finance work board native transaction rollback", { tag: ["@dev-fi
       const orderRows = await persistedRows(`SELECT * FROM purchase_order WHERE organization_id = ${workflow.organizationId} AND company_id = ${workflow.companyId} AND id = ${positiveId(orderId, "purchase order")}`)
       expect(orderRows).toHaveLength(1)
       const evidenceScope: EvidenceScope = { ...workflow, taskId, instanceId, orderId, vendorId: positiveId(orderRows[0]!.partner_id, "vendor") }
-
-      const instances = await persistedRows(`SELECT subject_revision_hash FROM workflow_instance WHERE organization_id = ${workflow.organizationId} AND company_id = ${workflow.companyId} AND id = ${instanceId}`)
-      expect(instances).toHaveLength(1)
-      const frozenSnapshotHash = instances[0]!.subject_revision_hash
-      expect(typeof frozenSnapshotHash).toBe("string")
 
       // Existing public signal_workflow consumes the approval token along its
       // rejected edge without deciding the human task. This is fixture setup,
@@ -184,7 +183,7 @@ test.describe("Finance work board native transaction rollback", { tag: ["@dev-fi
         subjectModel: "purchase_order", subjectId: orderId,
         expectedRevision: reviewed.expectedInstanceRevision, signalKey: "rejected",
         idempotencyKey: smokeName("work-rollback-signal"), correlationId: smokeName("work-rollback-signal-correlation"),
-      }, String(frozenSnapshotHash))
+      }, conditionRevisionHash)
       const before = await committedEvidence(page, evidenceScope)
       expect(before.tasks).toHaveLength(1)
       expect(before.instances).toHaveLength(1)

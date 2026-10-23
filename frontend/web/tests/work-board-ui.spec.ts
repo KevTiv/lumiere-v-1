@@ -11,6 +11,7 @@ import type { WorkActivityRow } from "../../packages/query-hooks/src/hooks/work-
 import {
   humanTaskClaimExpectation,
   humanTaskDecisionExpectation,
+  humanTaskResubmissionExpectation,
   type HumanTaskCommandExpectation,
 } from "../../packages/query-hooks/src/hooks/human-task-command"
 import { taskIdentityHex } from "../../packages/query-hooks/src/hooks/task-assignment"
@@ -20,6 +21,7 @@ const delegate = "ef".repeat(32)
 const secondDelegate = "12".repeat(32)
 const claimPath = stdbBffCallUrl("claim_workflow_human_task")
 const decidePath = stdbBffCallUrl("decide_workflow_human_task")
+const resubmitPath = stdbBffCallUrl("resubmit_workflow_human_task")
 const completeActivityPath = stdbBffCallUrl("complete_activity")
 
 type FixtureTask = WorkTaskRow & { decidedBy?: string }
@@ -30,6 +32,10 @@ type FixtureCommandEvidence = HumanTaskCommandExpectation & {
   eventId: string
   resultRevision: string
   resultStatus: string
+  successorTaskId?: string
+  successorInstanceId?: string
+  successorTaskRevision?: string
+  successorInstanceRevision?: string
 }
 type FixtureState = {
   rows: FixtureTask[]
@@ -79,6 +85,20 @@ function task(id: number, overrides: Partial<FixtureTask> = {}): FixtureTask {
     requireCommentOnReject: true,
     ...overrides,
   }
+}
+
+function cancelledTask(): FixtureTask {
+  return task(45, {
+    status: "Cancelled",
+    revision: 7,
+    instanceRevision: 12,
+    workflowInstanceId: 75,
+    requestedBy: delegate,
+    claimedBy: secondDelegate,
+    subjectRevisionHash: `sha256:${"a".repeat(64)}`,
+    workSourceTitle: "Cancelled review 45",
+    workActions: ["resubmit"],
+  })
 }
 
 const tag = (value: unknown): string => {
@@ -337,7 +357,7 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
     }
     if (
       request.method() === "POST" &&
-      [claimPath, decidePath].includes(url.pathname)
+      [claimPath, decidePath, resubmitPath].includes(url.pathname)
     ) {
       const body = request.postDataJSON() as { params: Record<string, unknown> }
       const params = body.params
@@ -356,6 +376,28 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
         return respond(
           route,
           { error: "Synthetic stale or unauthorized assignment action" },
+          409,
+        )
+      const isResubmission = url.pathname === resubmitPath
+      const expectedInstanceRevision = Number(
+        params.expectedInstanceRevision ?? params.expected_instance_revision,
+      )
+      const expectedSubjectRevisionHash = String(
+        params.expectedSubjectRevisionHash ??
+          params.expected_subject_revision_hash,
+      )
+      if (
+        isResubmission &&
+        (tag(row.status) !== "Cancelled" ||
+          !row.workActions.includes("resubmit") ||
+          expectedInstanceRevision !== row.instanceRevision ||
+          expectedSubjectRevisionHash !== row.subjectRevisionHash ||
+          typeof params.reason !== "string" ||
+          !params.reason.trim())
+      )
+        return respond(
+          route,
+          { error: "Synthetic stale or unauthorized resubmission" },
           409,
         )
       // Compute evidence from the saved command, never from a requested readback hash.
@@ -386,19 +428,50 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
               ...commonInput,
               expectedRevision: expected,
             })
-          : await humanTaskDecisionExpectation(scope, {
-              ...commonInput,
-              expectedTaskRevision: expected,
-              expectedInstanceRevision: Number(
-                params.expectedInstanceRevision ??
-                  params.expected_instance_revision,
-              ),
-              decision: {
-                tag: decisionTag(params.decision),
-              },
-              comment: optionalValue(params.comment) as string | null,
-            })
-      if (url.pathname === claimPath) {
+          : isResubmission
+            ? await humanTaskResubmissionExpectation(scope, {
+                companyId: commonInput.companyId,
+                taskId,
+                expectedTaskRevision: expected,
+                expectedInstanceRevision,
+                expectedSubjectRevisionHash,
+                reason: String(params.reason),
+                attempt: commonInput.attempt,
+              })
+            : await humanTaskDecisionExpectation(scope, {
+                ...commonInput,
+                expectedTaskRevision: expected,
+                expectedInstanceRevision,
+                decision: {
+                  tag: decisionTag(params.decision),
+                },
+                comment: optionalValue(params.comment) as string | null,
+              })
+      let successor: FixtureTask | undefined
+      if (isResubmission) {
+        successor = task(
+          Math.max(...state.rows.map((candidate) => Number(candidate.id))) + 1,
+          {
+            companyId: row.companyId,
+            workflowInstanceId:
+              Math.max(
+                ...state.rows.map((candidate) =>
+                  Number(candidate.workflowInstanceId),
+                ),
+              ) + 1,
+            revision: 1,
+            instanceRevision: 2,
+            subjectModel: row.subjectModel,
+            subjectId: row.subjectId,
+            subjectRevisionHash: row.subjectRevisionHash,
+            requestedBy: row.requestedBy,
+            workModule: row.workModule,
+            workSourceTitle: "Resubmitted review 45",
+          },
+        )
+        state.rows.push(successor)
+        Object.assign(row, { revision: expected + 1, workActions: [] })
+      } else if (url.pathname === claimPath) {
         Object.assign(row, {
           status: "Claimed",
           claimedBy: actor,
@@ -428,6 +501,12 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
         eventId: String(1000 + state.commandEvidence.length),
         resultRevision: String(row.revision),
         resultStatus: tag(row.status),
+        ...(successor && {
+          successorTaskId: String(successor.id),
+          successorInstanceId: String(successor.workflowInstanceId),
+          successorTaskRevision: String(successor.revision),
+          successorInstanceRevision: String(successor.instanceRevision),
+        }),
       })
       if (state.loseNextWriteReply) {
         state.loseNextWriteReply = false
@@ -560,6 +639,155 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     await expect(page).toHaveURL(/workTeam=workflow-group%3A5/)
     expect(state.writes).toHaveLength(0)
   })
+
+  test("resubmission requires a reason and creates a distinct approval while retaining the cancelled attempt", async ({ page }) => {
+    const predecessor = cancelledTask()
+    const reviewed = structuredClone(predecessor)
+    state.rows.push(predecessor)
+    await openFixture(page)
+    const oldCard = page.getByTestId("kanban-card-45")
+    await expect(oldCard).toHaveAttribute("data-draggable", "false")
+    await oldCard.click()
+    const review = page.getByRole("dialog", { name: "Cancelled review 45" })
+    const submit = review.getByRole("button", { name: "Resubmit approval", exact: true })
+    const reason = review.getByRole("textbox", { name: "Reason for resubmission", exact: true })
+    await expect(review).toContainText("This cancelled attempt and its previous votes remain in the history.")
+    await expect(review.getByRole("combobox", { name: "Acting as", exact: true })).toHaveCount(0)
+    await expect(submit).toBeDisabled()
+    await reason.fill("   ")
+    await expect(submit).toBeDisabled()
+    expect(state.writes).toHaveLength(0)
+    await reason.fill("  Reassign after the reviewer left the team  ")
+    await expect(submit).toBeEnabled()
+    state.holdNextWrite = true
+    await submit.click()
+    await expect.poll(() => state.writes.length).toBe(1)
+    await expect(review.getByRole("button", { name: /Saving/ })).toBeDisabled()
+    expect(state.writes[0]?.path).toBe(resubmitPath)
+    expect(state.writes[0]?.params).toMatchObject({
+      company_id: 11,
+      task_id: 45,
+      expected_task_revision: 7,
+      expected_instance_revision: 12,
+      expected_subject_revision_hash: reviewed.subjectRevisionHash,
+      reason: "Reassign after the reviewer left the team",
+    })
+    expect(state.writes[0]?.params).not.toHaveProperty("actingFor")
+    expect(state.writes[0]?.params).not.toHaveProperty("acting_for")
+    await state.pendingWrite!.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true }),
+    })
+    await expect(review).toHaveCount(0)
+    const proof = state.commandEvidence[0]!
+    expect(proof.commandKind).toBe("resubmit")
+    expect(proof.resultStatus).toBe("Cancelled")
+    expect(proof.successorTaskId).not.toBe(String(reviewed.id))
+    expect(predecessor).toEqual({ ...reviewed, revision: 8, workActions: [] })
+    expect(state.rows.find((row) => String(row.id) === proof.successorTaskId)).toMatchObject({
+      status: "Open",
+      revision: 1,
+      requestedBy: reviewed.requestedBy,
+      subjectRevisionHash: reviewed.subjectRevisionHash,
+    })
+    await expect(page.getByTestId("kanban-column-Cancelled").getByTestId("kanban-card-45")).toBeVisible()
+    await expect(page.getByTestId("kanban-column-Open").getByTestId(`kanban-card-${proof.successorTaskId}`)).toBeVisible()
+    await page.reload()
+    await expect(page.getByTestId("kanban-column-Cancelled").getByTestId("kanban-card-45")).toBeVisible()
+    await expect(page.getByTestId(`kanban-card-${proof.successorTaskId}`)).toBeVisible()
+    expect(state.writes).toHaveLength(1)
+  })
+
+  test("a lost resubmission reply checks the exact immutable successor evidence without another write", async ({ page }) => {
+    state.rows.push(cancelledTask())
+    await openFixture(page)
+    await page.getByTestId("kanban-card-45").click()
+    const review = page.getByRole("dialog", { name: "Cancelled review 45" })
+    await review.getByRole("textbox", { name: "Reason for resubmission", exact: true }).fill("One reviewed recovery attempt")
+    state.hideCommandEvidence = true
+    state.loseNextWriteReply = true
+    await review.getByRole("button", { name: "Resubmit approval", exact: true }).click()
+    const check = page.getByRole("button", { name: "Check outcome", exact: true })
+    await expect(check).toBeEnabled()
+    await expect(review).toHaveCount(0)
+    await expect(page.getByText("One reviewed recovery attempt", { exact: true })).toHaveCount(0)
+    expect(state.writes).toHaveLength(1)
+    const proof = state.commandEvidence[0]!
+    if (proof.commandKind !== "resubmit") throw new Error("Expected resubmission evidence")
+    state.hideCommandEvidence = false
+    state.commandEvidence[0] = { ...proof, priorInstanceRevision: "13" }
+    const before = state.commandReads.length
+    await check.click()
+    await expect.poll(() => state.commandReads.length).toBeGreaterThan(before)
+    await expect(check).toBeEnabled()
+    await expect(page.getByText("Outcome not confirmed. Check again before starting another action.", { exact: true })).toBeVisible()
+    expect(state.writes).toHaveLength(1)
+    state.commandEvidence[0] = proof
+    await check.click()
+    await expect(check).toHaveCount(0)
+    await expect(page.getByText("Assignment updated and confirmed.", { exact: true })).toBeVisible()
+    await expect(page.getByTestId("kanban-column-Cancelled").getByTestId("kanban-card-45")).toBeVisible()
+    await expect(page.getByTestId("kanban-column-Open").getByTestId(`kanban-card-${proof.successorTaskId}`)).toBeVisible()
+    expect(state.writes).toHaveLength(1)
+    for (const search of state.commandReads) {
+      const params = new URLSearchParams(search)
+      expect(params.get("taskId")).toBe("45")
+      expect(params.get("commandKind")).toBe("resubmit")
+      expect(params.get("idempotencyKey")).toBe(proof.idempotencyKey)
+      expect(params.get("inputHash")).toBe(proof.inputHash)
+      expect(params.get("workView")).toBe("eligible")
+      expect(params.has("actingFor")).toBe(false)
+      expect(params.has("reason")).toBe(false)
+    }
+  })
+
+  test("loss of resubmission authority clears the reviewed reason while the cancelled card remains readable", async ({ page }) => {
+    const row = cancelledTask()
+    state.rows.push(row)
+    await openFixture(page)
+    await page.getByTestId("kanban-card-45").click()
+    const review = page.getByRole("dialog", { name: "Cancelled review 45" })
+    await review.getByRole("textbox", { name: "Reason for resubmission", exact: true }).fill("Discard this revoked recovery review")
+    row.workActions = []
+    await control(page, "realtime-source")
+    await expect(review).toHaveCount(0)
+    await expect(page.getByTestId("kanban-card-45")).toBeVisible()
+    await page.getByTestId("kanban-card-45").click()
+    await expect(review.getByRole("button", { name: "Resubmit approval", exact: true })).toHaveCount(0)
+    await expect(review.getByRole("textbox")).toHaveCount(0)
+    await review.getByRole("button", { name: "Close", exact: true }).click()
+    row.workActions = ["resubmit"]
+    await control(page, "realtime-source")
+    await expect(review).toHaveCount(0)
+    await page.getByTestId("kanban-card-45").click()
+    await expect(review.getByRole("textbox", { name: "Reason for resubmission", exact: true })).toHaveValue("")
+    await expect(review.getByRole("button", { name: "Resubmit approval", exact: true })).toBeDisabled()
+    expect(state.writes).toHaveLength(0)
+  })
+
+  for (const change of ["changed", "unavailable"] as const) {
+    test(`a source revision that is ${change} blocks the reviewed resubmission`, async ({ page }) => {
+      const row = cancelledTask()
+      state.rows.push(row)
+      await openFixture(page)
+      await page.getByTestId("kanban-card-45").click()
+      const review = page.getByRole("dialog", { name: "Cancelled review 45" })
+      await review.getByRole("textbox", { name: "Reason for resubmission", exact: true }).fill("Do not carry this stale reason forward")
+      if (change === "changed") row.subjectRevisionHash = `sha256:${"b".repeat(64)}`
+      else delete row.subjectRevisionHash
+      await control(page, "realtime-source")
+      await expect(review.getByRole("alert")).toContainText("This assignment changed or is no longer available.")
+      await expect(review.getByRole("button", { name: "Resubmit approval", exact: true })).toHaveCount(0)
+      await expect(review.getByRole("textbox")).toHaveCount(0)
+      expect(state.writes).toHaveLength(0)
+      if (change === "unavailable") return
+      await review.getByRole("button", { name: "Review latest state", exact: true }).click()
+      await expect(review.getByRole("textbox", { name: "Reason for resubmission", exact: true })).toHaveValue("")
+      await expect(review.getByRole("button", { name: "Resubmit approval", exact: true })).toBeDisabled()
+      expect(state.writes).toHaveLength(0)
+    })
+  }
 
   test("selected delegates keep separate action sets and read-only records stay keyboard accessible", async ({
     page,

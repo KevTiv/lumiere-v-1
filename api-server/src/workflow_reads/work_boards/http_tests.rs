@@ -11,6 +11,7 @@ struct Fixture {
     source_exists: bool,
     receipts: Mutex<Vec<Value>>,
     events: Mutex<Vec<Value>>,
+    resubmissions: Mutex<Vec<Value>>,
     groups: Mutex<Vec<Value>>,
     delegations: Mutex<Vec<Value>>,
     candidates: Mutex<Vec<Value>>,
@@ -266,6 +267,19 @@ async fn mock_server_rows(tasks: Vec<Value>, source_exists: bool) -> MockServer 
                     fixture.events.lock().unwrap().clone()
                 }
             }
+            "workflow_human_task_resubmission" => {
+                assert_eq!(token, "Bearer owner-token");
+                assert!(sql
+                    .contains("organization_id = 42 AND company_id = 7 AND previous_task_id = 1"));
+                assert!(!sql.contains("reason"));
+                assert!(!sql.contains("correlation_id"));
+                if sql.ends_with("LIMIT 2") {
+                    assert!(sql.contains("scope_key = '42:7:9:attempt-1'"));
+                    assert!(sql.contains(&format!("created_by = 0x{}", "cd".repeat(32))));
+                    assert!(sql.contains("input_hash = 'sha256:"));
+                }
+                fixture.resubmissions.lock().unwrap().clone()
+            }
             "purchase_order" => {
                 assert_eq!(token, "Bearer actor-token");
                 assert!(sql.contains("WHERE organization_id = 42 AND company_id = 7 AND id = "));
@@ -290,7 +304,13 @@ async fn mock_server_rows(tasks: Vec<Value>, source_exists: bool) -> MockServer 
                     .unwrap()
                     .parse::<u64>()
                     .unwrap();
-                vec![json!({"id":id,"revision":3})]
+                let cancelled = fixture
+                    .tasks
+                    .iter()
+                    .any(|row| row["workflow_instance_id"] == id && row["status"] == "Cancelled");
+                vec![
+                    json!({"id":id,"revision":3,"state":if cancelled {"Cancelled"} else {"Active"}}),
+                ]
             }
             other => panic!("unexpected fixture table {other}: {sql}"),
         };
@@ -301,6 +321,7 @@ async fn mock_server_rows(tasks: Vec<Value>, source_exists: bool) -> MockServer 
         source_exists,
         receipts: Mutex::new(Vec::new()),
         events: Mutex::new(Vec::new()),
+        resubmissions: Mutex::new(Vec::new()),
         groups: Mutex::new(Vec::new()),
         delegations: Mutex::new(Vec::new()),
         candidates: Mutex::new(Vec::new()),
@@ -593,8 +614,11 @@ fn install_command(
     decision: Option<&str>,
     principal: Option<&str>,
 ) {
-    let status = if kind == "claim" { "Claimed" } else { "Open" };
-    let tag = if kind == "claim" { "Claim" } else { "Decision" };
+    let (status, tag, prior_status) = match kind {
+        "claim" => ("Claimed", "Claim", "Open"),
+        "resubmit" => ("Cancelled", "Resubmit", "Cancelled"),
+        _ => ("Open", "Decision", "Open"),
+    };
     *server.fixture.receipts.lock().unwrap() = vec![json!({
         "scope_key":format!("42:1:{kind}:attempt-1"), "organization_id":42, "company_id":7,
         "task_id":1, "command_kind":tag, "idempotency_key":"attempt-1",
@@ -604,9 +628,150 @@ fn install_command(
     *server.fixture.events.lock().unwrap() = vec![json!({
         "id":10, "organization_id":42, "company_id":7, "task_id":1, "workflow_instance_id":101,
         "command_kind":tag, "idempotency_key":"attempt-1", "input_hash":format!("sha256:{}", "12".repeat(32)),
-        "prior_status":"Open", "next_status":status, "prior_revision":1, "next_revision":2,
+        "prior_status":prior_status, "next_status":status, "prior_revision":1, "next_revision":2,
         "decision":decision, "actor":"cd".repeat(32), "acting_for":principal, "comment":"PRIVATE COMMENT"
     })];
+}
+
+#[tokio::test]
+async fn recovery_hint_and_exact_link_preserve_current_authority_and_hide_private_data() {
+    let mut cancelled = task(1);
+    cancelled["status"] = json!("Cancelled");
+    cancelled["revision"] = json!(2);
+    cancelled["subject_revision_hash"] = json!("material-hash");
+    cancelled["guarded_action"] = json!([[0, []], 1]);
+    let server = mock_server_rows(vec![cancelled.clone()], true).await;
+    let grants = [
+        "workflow:read",
+        "workflow_instance:create",
+        "workflow_task:write",
+        "purchase_order:read",
+        "purchase_order:write",
+    ];
+    let actor = context(&server, access(&grants));
+    let page = read_work_board(&server.owner, &actor, request(None, 50))
+        .await
+        .unwrap();
+    assert_eq!(page.rows[0]["workActions"], json!(["resubmit"]));
+    assert!(page.rows[0].get("guarded_action").is_none());
+    assert!(page.rows[0].get("guardedAction").is_none());
+    for missing in [
+        "workflow_instance:create",
+        "workflow_task:write",
+        "purchase_order:write",
+    ] {
+        let restricted: Vec<_> = grants
+            .iter()
+            .copied()
+            .filter(|grant| *grant != missing)
+            .collect();
+        let page = read_work_board(
+            &server.owner,
+            &context(&server, access(&restricted)),
+            request(None, 50),
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.rows[0]["workActions"], json!([]), "{missing}");
+    }
+
+    install_command(&server, "resubmit", None, None);
+    let link = json!({
+        "previous_task_id":1, "scope_key":"42:7:9:attempt-1", "organization_id":42, "company_id":7,
+        "expected_task_revision":1, "expected_instance_revision":3, "expected_subject_revision_hash":"material-hash",
+        "result_task_revision":2, "event_id":10, "successor_task_id":2, "successor_instance_id":102,
+        "successor_task_revision":1, "successor_instance_revision":2, "idempotency_key":"attempt-1",
+        "input_hash":format!("sha256:{}", "12".repeat(32)), "created_by":"cd".repeat(32),
+        "reason":"PRIVATE REASON", "correlation_id":"PRIVATE CORRELATION",
+    });
+    *server.fixture.resubmissions.lock().unwrap() = vec![link.clone()];
+    let page = read_work_board(
+        &server.owner,
+        &actor,
+        exact_request("available", "resubmit", None),
+    )
+    .await
+    .unwrap();
+    assert_eq!(page.rows[0]["workActions"], json!([]));
+    let evidence = page.command_evidence.unwrap();
+    assert_eq!(evidence["commandKind"], "resubmit");
+    assert_eq!(evidence["eventId"], "10");
+    assert_eq!(evidence["resultStatus"], "Cancelled");
+    assert_eq!(evidence["successorTaskId"], "2");
+    assert_eq!(evidence["successorInstanceId"], "102");
+    assert!(!evidence.to_string().contains("PRIVATE"));
+    for (field, value) in [
+        ("created_by", json!("ef".repeat(32))),
+        ("event_id", json!(11)),
+        ("result_task_revision", json!(3)),
+        ("successor_task_id", json!(1)),
+    ] {
+        let mut changed = link.clone();
+        changed[field] = value;
+        *server.fixture.resubmissions.lock().unwrap() = vec![changed];
+        assert!(
+            read_work_board(
+                &server.owner,
+                &actor,
+                exact_request("eligible", "resubmit", None)
+            )
+            .await
+            .unwrap()
+            .command_evidence
+            .is_none(),
+            "{field}"
+        );
+    }
+    *server.fixture.resubmissions.lock().unwrap() = vec![link];
+    let restricted = context(
+        &server,
+        access(&[
+            "workflow:read",
+            "workflow_task:write",
+            "purchase_order:read",
+            "purchase_order:write",
+        ]),
+    );
+    assert!(read_work_board(
+        &server.owner,
+        &restricted,
+        exact_request("eligible", "resubmit", None)
+    )
+    .await
+    .unwrap()
+    .command_evidence
+    .is_none());
+    let unreadable = context(
+        &server,
+        access(&[
+            "workflow:read",
+            "workflow_task:write",
+            "workflow_instance:create",
+            "purchase_order:write",
+        ]),
+    );
+    let page = read_work_board(
+        &server.owner,
+        &unreadable,
+        exact_request("eligible", "resubmit", None),
+    )
+    .await
+    .unwrap();
+    assert!(page.rows.is_empty());
+    assert!(page.command_evidence.is_none());
+
+    cancelled["candidate_role_ids"] = json!([99]);
+    cancelled["candidate_unit_ids"] = json!([]);
+    let hidden = mock_server_rows(vec![cancelled], true).await;
+    let page = read_work_board(
+        &hidden.owner,
+        &context(&hidden, access(&grants)),
+        exact_request("eligible", "resubmit", None),
+    )
+    .await
+    .unwrap();
+    assert!(page.rows.is_empty());
+    assert!(page.command_evidence.is_none());
 }
 
 #[tokio::test]

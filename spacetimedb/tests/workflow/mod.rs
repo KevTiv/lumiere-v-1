@@ -4,13 +4,16 @@ mod action_registry_test;
 mod authorization_test;
 mod branches_test;
 mod calendar_test;
+mod cancellation_repair_test;
 mod definitions_test;
 mod delivery_test;
 mod evaluator_simulation_test;
 mod human_tasks_test;
 mod migration_test;
+mod recovery_test;
 mod runtime_test;
 mod subject_snapshot_test;
+mod task_mutation_authorization_test;
 
 use spacetimedb::ReducerContext;
 
@@ -53,12 +56,18 @@ pub fn run_workflow_action_registry_tests(ctx: &ReducerContext) -> Result<(), St
 
 #[spacetimedb::reducer]
 pub fn run_workflow_human_task_tests(ctx: &ReducerContext) -> Result<(), String> {
-    human_tasks_test::test_workflow_human_tasks(ctx)
+    human_tasks_test::test_workflow_human_tasks(ctx)?;
+    cancellation_repair_test::test_cancelled_workflow_task_repair(ctx)?;
+    task_mutation_authorization_test::test_task_mutation_authorization(ctx)?;
+    recovery_test::test_workflow_recovery(ctx)
 }
 
 #[spacetimedb::reducer]
 pub fn run_all_workflow_human_effect_tests(ctx: &ReducerContext) -> Result<(), String> {
     human_tasks_test::test_workflow_human_tasks(ctx)?;
+    cancellation_repair_test::test_cancelled_workflow_task_repair(ctx)?;
+    task_mutation_authorization_test::test_task_mutation_authorization(ctx)?;
+    recovery_test::test_workflow_recovery(ctx)?;
     action_registry_test::test_guarded_action_registry(ctx)?;
     delivery_test::test_workflow_delivery(ctx)?;
     log::info!("workflow human and durable effect tests complete");

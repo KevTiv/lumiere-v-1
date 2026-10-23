@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { approvalActorOptions, approvalSelection, approvalTaskStatus, requireUnchangedApproval, resolveApprovalActor } from "./approval-controls"
+import { approvalActorOptions, approvalResubmissionSelection, approvalSelection, approvalTaskStatus, requireUnchangedApproval, requireUnchangedApprovalResubmission, resolveApprovalActor } from "./approval-controls"
 
 const principal = "ab".repeat(32)
 const row = { id: 41, companyId: 7, revision: 3, instanceRevision: 9, status: "Open", directlyEligible: true, actingForOptions: [{ identityHex: principal, label: "Approver" }] }
@@ -51,4 +51,22 @@ test("stale task, workflow, company and delegation selections fail before dispat
   requireUnchangedApproval(selected, row)
   for (const changed of [{ ...row, revision: 4 }, { ...row, instanceRevision: 10 }, { ...row, companyId: 8 },
     { ...row, id: 42 }, { ...row, actingForOptions: [] }]) assert.throws(() => requireUnchangedApproval(selected, changed))
+})
+
+test("cancelled recovery freezes the reviewed source and revisions without borrowing a principal", () => {
+  const cancelled = { ...row, status: "Cancelled", directlyEligible: false, subjectRevisionHash: `sha256:${"1".repeat(64)}` }
+  const selected = approvalResubmissionSelection(cancelled, 7)
+  assert.deepEqual(selected, {
+    requestId: 41, companyId: 7, expectedTaskRevision: 3, expectedInstanceRevision: 9,
+    expectedSubjectRevisionHash: cancelled.subjectRevisionHash,
+  })
+  requireUnchangedApprovalResubmission(selected, cancelled)
+  for (const changed of [
+    { ...cancelled, status: "Open" }, { ...cancelled, revision: 4 },
+    { ...cancelled, instanceRevision: 10 }, { ...cancelled, companyId: 8 },
+    { ...cancelled, id: 42 }, { ...cancelled, subjectRevisionHash: `sha256:${"2".repeat(64)}` },
+    { ...cancelled, subjectRevisionHash: "invalid" },
+  ]) assert.throws(() => requireUnchangedApprovalResubmission(selected, changed))
+  assert.throws(() => approvalResubmissionSelection(cancelled, 8), /another company/)
+  assert.throws(() => approvalResubmissionSelection({ ...cancelled, revision: Number.MAX_SAFE_INTEGER + 1 }, 7))
 })

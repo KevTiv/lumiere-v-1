@@ -15830,6 +15830,8 @@
     "updateFailed": "The update could not be confirmed. Refresh and review the current state before trying again.",
     "actionDenied": "This action is no longer permitted. Refresh and review the assignment.",
     "commentRequired": "A comment is required to reject this assignment.",
+    "resubmissionReason": "Reason for resubmission",
+    "resubmissionDescription": "Create a new approval using the current reviewer policy. This cancelled attempt and its previous votes remain in the history.",
     "refreshing": "Refreshing assignments or confirming an update…",
     "reviewActions": "Open the assignment to review its status and available actions.",
     "projectTasks": "Project tasks",
@@ -15853,7 +15855,8 @@
       "claim": "Claim",
       "approve": "Approve",
       "reject": "Reject",
-      "complete": "Complete"
+      "complete": "Complete",
+      "resubmit": "Resubmit approval"
     },
     "teamKind": {
       "workflow-group": "Workflow group #{{id}}",

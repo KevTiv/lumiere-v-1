@@ -30,7 +30,9 @@ import {
 import {
   approvalActorOptions,
   approvalSelection,
+  approvalResubmissionSelection,
   requireUnchangedApproval,
+  requireUnchangedApprovalResubmission,
   resolveApprovalActor,
 } from "@lumiere/query-hooks/hooks/approval-controls"
 import {
@@ -39,12 +41,16 @@ import {
   recheckHumanTaskCommandEffect,
   useClaimHumanTask,
   useDecideHumanTask,
+  useResubmitHumanTask,
   type ClaimHumanTaskInput,
   type DecideHumanTaskInput,
+  type ResubmitHumanTaskInput,
 } from "@lumiere/query-hooks/hooks/approvals"
 import {
   humanTaskClaimExpectation,
   humanTaskDecisionExpectation,
+  humanTaskResubmissionExpectation,
+  normalizeHumanTaskResubmissionReason,
   type HumanTaskCommandExpectation,
 } from "@lumiere/query-hooks/hooks/human-task-command"
 import {
@@ -58,6 +64,7 @@ const selectClass =
 type FrozenCommand =
   | { kind: "claim"; input: ClaimHumanTaskInput }
   | { kind: "decision"; input: DecideHumanTaskInput }
+  | { kind: "resubmit"; input: ResubmitHumanTaskInput }
 
 function taskTitle(row: WorkTaskRow): string {
   return (
@@ -85,6 +92,7 @@ export function WorkflowWorkContent({
   const query = useWorkBoard(scope, online)
   const claim = useClaimHumanTask(scope.organizationId, scope)
   const decide = useDecideHumanTask(scope.organizationId, scope)
+  const resubmit = useResubmitHumanTask(scope.organizationId, scope)
   const [review, setReview] = useState<{
     row: WorkTaskRow
     action?: WorkAction
@@ -135,7 +143,11 @@ export function WorkflowWorkContent({
     [rows],
   )
   const busy =
-    preparingCommand || claim.isPending || decide.isPending || checkingOutcome
+    preparingCommand ||
+    claim.isPending ||
+    decide.isPending ||
+    resubmit.isPending ||
+    checkingOutcome
   const disabled =
     navigationPending ||
     authorityRefreshing ||
@@ -155,7 +167,10 @@ export function WorkflowWorkContent({
     review != null &&
     current != null &&
     actor != null &&
-    resolveApprovalActor(current, actor) == null
+    (workStatus(review.row) === "Cancelled"
+      ? workActionsForActor(review.row, actor).includes("resubmit") &&
+        !workActionsForActor(current, actor).includes("resubmit")
+      : resolveApprovalActor(current, actor) == null)
   const unresolvedCurrent = unresolved
     ? rows.find((row) => String(row.id) === unresolved.taskId)
     : undefined
@@ -228,6 +243,21 @@ export function WorkflowWorkContent({
   if (
     review &&
     current &&
+    workStatus(review.row) === "Cancelled" &&
+    review.row.workActions.includes("resubmit")
+  ) {
+    try {
+      requireUnchangedApprovalResubmission(
+        approvalResubmissionSelection(review.row, scope.companyId),
+        current,
+      )
+    } catch {
+      stale = true
+    }
+  }
+  if (
+    review &&
+    current &&
     actor != null &&
     (workStatus(review.row) === "Open" || workStatus(review.row) === "Claimed")
   ) {
@@ -244,7 +274,7 @@ export function WorkflowWorkContent({
   const openReview = (row: WorkTaskRow, action?: WorkAction) => {
     if (unresolved && unresolved.taskId !== String(row.id)) return
     setReview({ row, action })
-    setActor(resolveApprovalActor(row))
+    setActor(workStatus(row) === "Cancelled" ? "" : resolveApprovalActor(row))
     setComment("")
     setError(null)
     setNotice(null)
@@ -259,8 +289,6 @@ export function WorkflowWorkContent({
     const preparation = Symbol("workflow-command")
     attempt.current = preparation
     try {
-      const selection = approvalSelection(review.row, scope.companyId, actor)
-      requireUnchangedApproval(selection, current)
       if (!workActionsForActor(current, actor).includes(action))
         throw new Error(t("workBoard.actionDenied"))
       if (
@@ -269,47 +297,73 @@ export function WorkflowWorkContent({
         !comment.trim()
       )
         throw new Error(t("workBoard.commentRequired"))
-      if (action === "claim") {
+      if (action === "resubmit") {
+        const selection = approvalResubmissionSelection(
+          review.row,
+          scope.companyId,
+        )
+        requireUnchangedApprovalResubmission(selection, current)
         command = {
-          kind: "claim",
-          input: Object.freeze({
-            companyId: selection.companyId,
-            taskId: selection.requestId,
-            expectedRevision: selection.expectedTaskRevision,
-            actingFor: selection.actingFor,
-            attempt: newHumanTaskAttempt("claim"),
-          }),
-        }
-      } else {
-        command = {
-          kind: "decision",
+          kind: "resubmit",
           input: Object.freeze({
             companyId: selection.companyId,
             taskId: selection.requestId,
             expectedTaskRevision: selection.expectedTaskRevision,
             expectedInstanceRevision: selection.expectedInstanceRevision,
-            actingFor: selection.actingFor,
-            decision: Object.freeze({
-              tag:
-                action === "approve"
-                  ? "Approve"
-                  : action === "reject"
-                    ? "Reject"
-                    : "Complete",
-            }),
-            comment: comment.trim() || null,
-            attempt: newHumanTaskAttempt("decision"),
+            expectedSubjectRevisionHash: selection.expectedSubjectRevisionHash,
+            reason: normalizeHumanTaskResubmissionReason(comment),
+            attempt: newHumanTaskAttempt("resubmit"),
           }),
+        }
+      } else {
+        const selection = approvalSelection(review.row, scope.companyId, actor)
+        requireUnchangedApproval(selection, current)
+        if (action === "claim") {
+          command = {
+            kind: "claim",
+            input: Object.freeze({
+              companyId: selection.companyId,
+              taskId: selection.requestId,
+              expectedRevision: selection.expectedTaskRevision,
+              actingFor: selection.actingFor,
+              attempt: newHumanTaskAttempt("claim"),
+            }),
+          }
+        } else {
+          command = {
+            kind: "decision",
+            input: Object.freeze({
+              companyId: selection.companyId,
+              taskId: selection.requestId,
+              expectedTaskRevision: selection.expectedTaskRevision,
+              expectedInstanceRevision: selection.expectedInstanceRevision,
+              actingFor: selection.actingFor,
+              decision: Object.freeze({
+                tag:
+                  action === "approve"
+                    ? "Approve"
+                    : action === "reject"
+                      ? "Reject"
+                      : "Complete",
+              }),
+              comment: comment.trim() || null,
+              attempt: newHumanTaskAttempt("decision"),
+            }),
+          }
         }
       }
       expected =
         command.kind === "claim"
           ? await humanTaskClaimExpectation(scope, command.input)
-          : await humanTaskDecisionExpectation(scope, command.input)
+          : command.kind === "resubmit"
+            ? await humanTaskResubmissionExpectation(scope, command.input)
+            : await humanTaskDecisionExpectation(scope, command.input)
       if (!mounted.current || attempt.current !== preparation) return
       attempt.current = expected
       setPreparingCommand(false)
       if (command.kind === "claim") await claim.mutateAsync(command.input)
+      else if (command.kind === "resubmit")
+        await resubmit.mutateAsync(command.input)
       else await decide.mutateAsync(command.input)
       if (!mounted.current || attempt.current !== expected) return
       attempt.current = null
@@ -493,7 +547,8 @@ export function WorkflowWorkContent({
               getItemId={(row) => String(row.id)}
               getColumnId={(row) => workStatus(row) ?? ""}
               isItemDraggable={(row) =>
-                !disabled && workActionsForActor(row).length > 0
+                !disabled &&
+                workActionsForActor(row).some((action) => action !== "resubmit")
               }
               canMove={(row, column) =>
                 !disabled && canMoveWorkTask(row, column)
@@ -631,39 +686,40 @@ export function WorkflowWorkContent({
                   </Link>
                 </p>
               )}
-              {approvalActorOptions(current).length > 0 && (
-                <label className="grid gap-1 text-sm">
-                  {t("workBoard.actingAs")}
-                  <select
-                    className={selectClass}
-                    value={actor ?? "select"}
-                    disabled={busy || unresolved != null}
-                    onChange={(event) => {
-                      setActor(
-                        event.target.value === "select"
-                          ? null
-                          : event.target.value,
-                      )
-                      setError(null)
-                    }}
-                  >
-                    <option value="select" disabled>
-                      {t("workBoard.selectActor")}
-                    </option>
-                    {current.directlyEligible && (
-                      <option value="">{t("workBoard.myself")}</option>
-                    )}
-                    {approvalActorOptions(current).map((option) => (
-                      <option
-                        key={option.identityHex}
-                        value={option.identityHex}
-                      >
-                        {option.label}
+              {workStatus(current) !== "Cancelled" &&
+                approvalActorOptions(current).length > 0 && (
+                  <label className="grid gap-1 text-sm">
+                    {t("workBoard.actingAs")}
+                    <select
+                      className={selectClass}
+                      value={actor ?? "select"}
+                      disabled={busy || unresolved != null}
+                      onChange={(event) => {
+                        setActor(
+                          event.target.value === "select"
+                            ? null
+                            : event.target.value,
+                        )
+                        setError(null)
+                      }}
+                    >
+                      <option value="select" disabled>
+                        {t("workBoard.selectActor")}
                       </option>
-                    ))}
-                  </select>
-                </label>
-              )}
+                      {current.directlyEligible && (
+                        <option value="">{t("workBoard.myself")}</option>
+                      )}
+                      {approvalActorOptions(current).map((option) => (
+                        <option
+                          key={option.identityHex}
+                          value={option.identityHex}
+                        >
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               {unresolved ? (
                 outcomeControls
               ) : stale || !current ? (
@@ -684,9 +740,18 @@ export function WorkflowWorkContent({
                 </p>
               ) : (
                 <>
+                  {actions.includes("resubmit") && (
+                    <p className="text-sm text-muted-foreground">
+                      {t("workBoard.resubmissionDescription")}
+                    </p>
+                  )}
                   {actions.some((action) => action !== "claim") && (
                     <label className="grid gap-2 text-sm">
-                      {t("workBoard.comment")}
+                      {t(
+                        actions.includes("resubmit")
+                          ? "workBoard.resubmissionReason"
+                          : "workBoard.comment",
+                      )}
                       <Textarea
                         value={comment}
                         onChange={(event) => setComment(event.target.value)}
@@ -709,6 +774,7 @@ export function WorkflowWorkContent({
                         variant={action === "reject" ? "outline" : "default"}
                         disabled={
                           disabled ||
+                          (action === "resubmit" && !comment.trim()) ||
                           (action === "reject" &&
                             !!(
                               current.requireCommentOnReject ??

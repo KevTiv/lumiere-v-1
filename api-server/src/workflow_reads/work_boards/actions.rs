@@ -13,6 +13,7 @@ pub(super) enum WorkAction {
     Approve,
     Reject,
     Complete,
+    Resubmit,
 }
 
 fn role_grants(permissions: &[String], required: &str) -> bool {
@@ -90,6 +91,9 @@ pub(super) fn may_read_command_evidence(
         WorkAction::Approve => "approve",
         WorkAction::Reject => "reject",
         WorkAction::Complete => "complete",
+        // Recovery is a management operation under the actual actor's own
+        // grants, with separate source/domain authorization in recovery.rs.
+        WorkAction::Resubmit => return false,
     };
     has_current_actor_authority(row, context)
         && context

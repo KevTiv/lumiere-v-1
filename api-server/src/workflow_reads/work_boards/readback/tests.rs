@@ -417,3 +417,45 @@ fn evidence_authority_is_live_without_requiring_an_unvoted_or_open_task() {
         WorkAction::Approve
     ));
 }
+
+#[test]
+fn resubmission_requires_an_exact_cancelled_to_cancelled_event_without_a_principal() {
+    let request = readback("resubmit", None);
+    let (mut task, mut receipt, mut event) = records("claim");
+    task["status"] = json!("Cancelled");
+    receipt["command_kind"] = json!("Resubmit");
+    receipt["scope_key"] = json!("42:1:resubmit:attempt-1");
+    receipt["result_status"] = json!("Cancelled");
+    event["command_kind"] = json!("Resubmit");
+    event["prior_status"] = json!("Cancelled");
+    event["next_status"] = json!("Cancelled");
+    let output = evidence(&task, &receipt, &event, &request).unwrap();
+    assert_eq!(output["commandKind"], "resubmit");
+    assert_eq!(output["decision"], Value::Null);
+    assert_eq!(output["resultStatus"], "Cancelled");
+    for (field, value) in [
+        ("prior_status", json!("Open")),
+        ("next_status", json!("Open")),
+        ("decision", json!("Approve")),
+        ("acting_for", json!("ef".repeat(32))),
+    ] {
+        let mut changed = event.clone();
+        changed[field] = value;
+        assert!(
+            evidence(&task, &receipt, &changed, &request).is_none(),
+            "{field}"
+        );
+    }
+    task["status"] = json!("Open");
+    assert!(evidence(&task, &receipt, &event, &request).is_none());
+    assert!(WorkTaskReadbackRequest::parse(
+        "workflow-human-tasks",
+        Some("finance"),
+        Some(1),
+        Some("resubmit"),
+        Some("attempt-1"),
+        Some(&format!("sha256:{}", "12".repeat(32))),
+        Some(&"ef".repeat(32)),
+    )
+    .is_err());
+}

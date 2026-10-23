@@ -14,6 +14,7 @@ import {
   workScopeFor,
   createPendingWorkReview,
   openWorkReview,
+  readWorkTask,
 } from "./work-board-acceptance-support"
 
 const decisionPath = stdbBffCallUrl("decide_workflow_human_task")
@@ -34,7 +35,9 @@ test.describe(
   "Finance work board live revocation",
   { tag: ["@dev-fixture", "@work-board"] },
   () => {
-    test.describe.configure({ mode: "serial" })
+    // Each case provisions independent actors and retires its workflow. Keep
+    // setup sequential without skipping membership coverage after a failure.
+    test.describe.configure({ mode: "default" })
 
     for (const revoke of ["source read", "organization membership"] as const) {
       test(`${revoke} revocation clears an open review and denies its queued command and same-cookie replay`, async ({
@@ -47,16 +50,23 @@ test.describe(
           `work-revoke-${revoke.replace(/ /g, "-")}`,
           WORK_REVIEWER_PERMISSIONS,
         )
-        const observer = await provisionActor(page, "work-revocation-observer", WORK_REVIEWER_PERMISSIONS)
+        const observer = await provisionActor(page, "work-revoke-observer", [
+          "company:read", "workflow:read", "purchase_order:read",
+        ])
         const workflow = await seedWorkReviewWorkflow(page, [actor.roleId, observer.roleId])
         const sessions = await openActorPages(browser, [actor, observer])
         let pendingRoute: Route | undefined
         try {
           const [reviewer, observerPage] = sessions.pages
-          if (!reviewer || !observerPage) throw new Error("Missing independent reviewer sessions")
+          if (!reviewer || !observerPage) throw new Error("Missing ordinary reviewer or observer session")
           const scope = workScopeFor(workflow, actor)
+          const observerScope = workScopeFor(workflow, observer)
           const pending = await createPendingWorkReview(page, reviewer)
           const before = await openWorkReview(reviewer, scope, pending.taskId)
+          const observerBefore = await readWorkTask(observerPage, observerScope, pending.taskId)
+          expect(observerBefore).toBeDefined()
+          expect(observerBefore?.workActions).toEqual([])
+          expect(Number(observerBefore?.revision)).toBe(Number(before.revision))
           const title =
             before.workSourceTitle ||
             `${before.subjectModel ?? before.subject_model ?? ""} #${before.subjectId ?? before.subject_id ?? before.id}`
@@ -130,20 +140,13 @@ test.describe(
           })
           await expectAccessDenied(replay)
 
-          // A separate eligible reviewer observes the unchanged task; the setup
-          // owner independently checks the domain effect below. Neither gains
-          // candidate visibility by holding an administrative role.
-          const observerRead = await observerPage.request.get(exactPath)
-          expect(observerRead.ok(), await observerRead.text()).toBe(true)
-          const observerRows = (await observerRead.json()).data as Array<{
-            id: number | string
-            revision: number | string
-            status: unknown
-          }>
-          expect(observerRows).toHaveLength(1)
-          expect(String(observerRows[0]!.id)).toBe(String(pending.taskId))
-          expect(Number(observerRows[0]!.revision)).toBe(Number(before.revision))
-          expect(approvalTaskStatus({ status: observerRows[0]!.status })).toBe(
+          // Private task reads require candidate scope even for the fixture
+          // owner. This separate candidate can observe but has no decision grant.
+          const observed = await readWorkTask(observerPage, observerScope, pending.taskId)
+          expect(observed).toBeDefined()
+          expect(String(observed?.id)).toBe(String(pending.taskId))
+          expect(Number(observed?.revision)).toBe(Number(before.revision))
+          expect(approvalTaskStatus({ status: observed?.status })).toBe(
             approvalTaskStatus(before),
           )
           expect(

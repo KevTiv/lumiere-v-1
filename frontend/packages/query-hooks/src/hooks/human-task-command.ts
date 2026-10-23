@@ -1,5 +1,5 @@
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
-import type { ClaimHumanTaskInput, DecideHumanTaskInput } from "./approvals"
+import type { ClaimHumanTaskInput, DecideHumanTaskInput, ResubmitHumanTaskInput } from "./approvals"
 import { approvalTaskStatus } from "./approval-controls"
 import { AmbiguousOperationEffectError, type CanonicalRecordRef } from "./operation-effect"
 import { parseWorkBoardPage, workBoardQueryPath, type WorkBoardScope } from "./work-board-model"
@@ -10,25 +10,36 @@ export interface HumanTaskCommandAttempt {
   readonly correlationId: string
 }
 
-export function newHumanTaskAttempt(kind: "claim" | "decision"): HumanTaskCommandAttempt {
+export function newHumanTaskAttempt(kind: "claim" | "decision" | "resubmit"): HumanTaskCommandAttempt {
   return Object.freeze({
     idempotencyKey: `${kind}-${crypto.randomUUID()}`,
     correlationId: `corr-${crypto.randomUUID()}`,
   })
 }
 
-export interface HumanTaskCommandExpectation {
+interface HumanTaskCommandScope {
   readonly organizationId: string
   readonly companyId: string
   readonly taskId: string
   readonly actorIdentityHex: string
   readonly actingForIdentityHex: string | null
-  readonly commandKind: "claim" | "decision"
   readonly idempotencyKey: string
   readonly inputHash: string
   readonly priorRevision: string
-  readonly decision: "approve" | "reject" | "complete" | null
 }
+
+export type HumanTaskCommandExpectation = HumanTaskCommandScope & (
+  | {
+    readonly commandKind: "claim" | "decision"
+    readonly decision: "approve" | "reject" | "complete" | null
+  }
+  | {
+    readonly commandKind: "resubmit"
+    readonly decision: null
+    readonly priorInstanceRevision: string
+    readonly subjectRevisionHash: string
+  }
+)
 
 const identity = (value: unknown): string => {
   if (typeof value !== "string") throw new Error("Workflow actor identity is unavailable")
@@ -56,6 +67,12 @@ export function normalizeHumanTaskComment(comment?: string | null): string {
   return normalized
 }
 
+export function normalizeHumanTaskResubmissionReason(reason: string): string {
+  const normalized = normalizeHumanTaskComment(reason)
+  if (!normalized) throw new Error("A reason is required to resubmit this approval")
+  return normalized
+}
+
 /** Matches native hash_fields: UTF-8 fields, each prefixed by an eight-byte BE length. */
 export async function humanTaskInputHash(fields: readonly string[]): Promise<string> {
   const encoded = fields.map((field) => new TextEncoder().encode(field))
@@ -73,7 +90,7 @@ export async function humanTaskInputHash(fields: readonly string[]): Promise<str
 
 function baseExpectation(
   scope: WorkBoardScope,
-  input: ClaimHumanTaskInput | DecideHumanTaskInput,
+  input: Pick<ClaimHumanTaskInput, "companyId" | "taskId" | "attempt" | "actingFor">,
 ) {
   // Validate the full scope before using it for a command or exact readback.
   workBoardQueryPath(scope)
@@ -125,6 +142,25 @@ export async function humanTaskDecisionExpectation(
   })
 }
 
+export async function humanTaskResubmissionExpectation(
+  scope: WorkBoardScope,
+  input: ResubmitHumanTaskInput,
+): Promise<HumanTaskCommandExpectation> {
+  const base = baseExpectation(scope, input)
+  const priorRevision = positive(input.expectedTaskRevision, "task revision")
+  const priorInstanceRevision = positive(input.expectedInstanceRevision, "workflow revision")
+  const subjectRevisionHash = input.expectedSubjectRevisionHash
+  if (!/^sha256:[0-9a-f]{64}$/.test(subjectRevisionHash)) throw new Error("Invalid approval source revision")
+  return Object.freeze({
+    ...base, actingForIdentityHex: null, commandKind: "resubmit", decision: null,
+    priorRevision, priorInstanceRevision, subjectRevisionHash,
+    inputHash: await humanTaskInputHash([
+      base.organizationId, base.companyId, base.taskId, priorRevision,
+      priorInstanceRevision, subjectRevisionHash, normalizeHumanTaskResubmissionReason(input.reason),
+    ]),
+  })
+}
+
 export function humanTaskCommandReadbackPath(
   scope: WorkBoardScope,
   expected: HumanTaskCommandExpectation,
@@ -163,6 +199,12 @@ interface HumanTaskCommandEvidenceWire {
   priorRevision?: unknown
   resultRevision?: unknown
   resultStatus?: unknown
+  priorInstanceRevision?: unknown
+  subjectRevisionHash?: unknown
+  successorTaskId?: unknown
+  successorInstanceId?: unknown
+  successorTaskRevision?: unknown
+  successorInstanceRevision?: unknown
 }
 
 const evidenceObject = (value: unknown): value is HumanTaskCommandEvidenceWire => object(value)
@@ -197,6 +239,15 @@ export function resolveHumanTaskCommandEffect(
   if (resultRevision !== BigInt(expected.priorRevision) + 1n || currentRevision == null ||
       currentRevision < resultRevision ||
       parseStrictU64(row.workflowInstanceId ?? row.workflow_instance_id) !== BigInt(raw.workflowInstanceId as string)) return null
+  if (expected.commandKind === "resubmit") {
+    const successorFields = ["successorTaskId", "successorInstanceId", "successorTaskRevision", "successorInstanceRevision"] as const
+    if (raw.resultStatus !== "Cancelled" || approvalTaskStatus(row) !== "Cancelled" ||
+      raw.priorInstanceRevision !== expected.priorInstanceRevision ||
+      raw.subjectRevisionHash !== expected.subjectRevisionHash ||
+      successorFields.some((field) => typeof raw[field] !== "string" || !/^[1-9][0-9]*$/.test(raw[field] as string) || parseStrictU64(raw[field]) == null) ||
+      raw.successorTaskId === expected.taskId || raw.successorInstanceId === raw.workflowInstanceId) return null
+    return { resource: "workflow-human-tasks", id: raw.successorTaskId as string }
+  }
   const terminalStatus = { approve: "Approved", reject: "Rejected", complete: "Completed" } as const
   const partial = expected.decision !== "reject" &&
     approvalTaskStatus({ status: row.assignment }) === "AllCandidates" &&

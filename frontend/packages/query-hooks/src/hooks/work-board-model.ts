@@ -11,7 +11,7 @@ export const WORK_MODULES = [
 export type WorkModule = (typeof WORK_MODULES)[number]
 export type WorkScope = WorkModule | "finance"
 export type WorkView = "eligible" | "mine" | "available"
-export type WorkAction = "claim" | "approve" | "reject" | "complete"
+export type WorkAction = "claim" | "approve" | "reject" | "complete" | "resubmit"
 export type WorkTeamRef = {
   kind: "workflow-group" | "department"
   id: string
@@ -62,6 +62,7 @@ const WORK_ACTIONS: readonly WorkAction[] = [
   "approve",
   "reject",
   "complete",
+  "resubmit",
 ]
 const object = (value: unknown): value is object =>
   value != null && typeof value === "object" && !Array.isArray(value)
@@ -233,14 +234,21 @@ export function workActionsForActor(
   requested?: string | null,
 ): readonly WorkAction[] {
   const status = workStatus(row)
+  if (status === "Cancelled") {
+    // Recovery uses the current actor's management grants, never a delegate's
+    // principal. A historical claimant can be visible without direct eligibility.
+    return requested == null || requested === ""
+      ? row.workActions.filter((action) => action === "resubmit")
+      : []
+  }
   if (status !== "Open" && status !== "Claimed") return []
   const actor = resolveApprovalActor(row, requested)
   if (actor == null) return []
-  if (actor === "") return row.workActions
+  if (actor === "") return row.workActions.filter((action) => action !== "resubmit")
   return (
     row.actingForOptions?.find(
       (option) => option.identityHex.toLowerCase() === actor,
-    )?.workActions ?? []
+    )?.workActions.filter((action) => action !== "resubmit") ?? []
   )
 }
 

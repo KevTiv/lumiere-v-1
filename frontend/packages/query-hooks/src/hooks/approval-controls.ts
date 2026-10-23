@@ -19,6 +19,15 @@ export type ApprovalSelection = {
   actingFor?: string | null
 }
 
+export type ApprovalResubmissionSelection = Omit<ApprovalSelection, "actingFor"> & {
+  expectedSubjectRevisionHash: string
+}
+
+type ApprovalResubmissionRow = ApprovalControlRow & {
+  subjectRevisionHash?: string
+  subject_revision_hash?: string
+}
+
 function positiveInteger(value: unknown, label: string): number {
   const number = Number(value)
   if (!Number.isSafeInteger(number) || number <= 0) throw new Error(`${label} is unavailable`)
@@ -89,6 +98,39 @@ export function requireUnchangedApproval(selection: ApprovalSelection, current: 
   if (now.requestId !== selection.requestId || now.expectedTaskRevision !== selection.expectedTaskRevision ||
     now.expectedInstanceRevision !== selection.expectedInstanceRevision ||
     now.actingFor !== selection.actingFor) {
+    throw new Error("Approval changed since it was reviewed; refresh the task")
+  }
+}
+
+/** Recovery creates a new attempt from the cancelled revision the operator reviewed. */
+export function approvalResubmissionSelection(
+  row: ApprovalResubmissionRow,
+  operatingCompanyId: number,
+): ApprovalResubmissionSelection {
+  const companyId = positiveInteger(row.companyId ?? row.company_id, "Approval company")
+  if (companyId !== operatingCompanyId) throw new Error("Approval belongs to another company")
+  if (approvalTaskStatus(row) !== "Cancelled") throw new Error("Only cancelled approvals can be resubmitted")
+  const hash = row.subjectRevisionHash ?? row.subject_revision_hash
+  if (typeof hash !== "string" || !/^sha256:[0-9a-f]{64}$/.test(hash)) {
+    throw new Error("Approval source revision is unavailable")
+  }
+  return {
+    requestId: positiveInteger(row.id, "Approval task"),
+    companyId,
+    expectedTaskRevision: positiveInteger(row.revision, "Approval revision"),
+    expectedInstanceRevision: positiveInteger(row.instanceRevision ?? row.instance_revision, "Workflow revision"),
+    expectedSubjectRevisionHash: hash,
+  }
+}
+
+export function requireUnchangedApprovalResubmission(
+  selection: ApprovalResubmissionSelection,
+  current: ApprovalResubmissionRow,
+): void {
+  const now = approvalResubmissionSelection(current, selection.companyId)
+  if (now.requestId !== selection.requestId || now.expectedTaskRevision !== selection.expectedTaskRevision ||
+    now.expectedInstanceRevision !== selection.expectedInstanceRevision ||
+    now.expectedSubjectRevisionHash !== selection.expectedSubjectRevisionHash) {
     throw new Error("Approval changed since it was reviewed; refresh the task")
   }
 }

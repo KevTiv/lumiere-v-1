@@ -30,10 +30,13 @@ jobs:
         run: python3 scripts/ci-change-scope.py --github-output "$GITHUB_OUTPUT"
       - name: Test change classifier
         run: python3 -B -m unittest discover -s scripts/tests
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Test external readiness probe
         run: node scripts/tests/test-compose-readiness.mjs
-      - name: Test production identity bootstrap
-        run: node --test scripts/tests/test_production_identity_bootstrap.mjs
+      - name: Test operational Node scripts
+        run: node --test scripts/tests/test_production_identity_bootstrap.mjs scripts/tests/inventory-workflow-cancellations.test.mjs
       - name: Test ordered Railway release orchestration
         run: |
           bash scripts/tests/test-railway-stack-release.sh

@@ -7,9 +7,11 @@
 use sha2::{Digest, Sha256};
 use spacetimedb::{reducer, Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
-use crate::core::permissions::role;
-use crate::core::users::user_organization;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+use crate::core::permissions::{effective_roles, role};
+use crate::core::users::{find_user_profile_for_organization, user_organization};
+use crate::helpers::{
+    check_permission, roles_allow_permission, write_audit_log_v2, AuditLogParams,
+};
 
 use super::action_registry::{
     execute_guarded_action, snapshot_guarded_action, ExecuteGuardedActionParams,
@@ -17,7 +19,8 @@ use super::action_registry::{
 };
 use super::authorization::{
     authorize_workflow_decision, authorize_workflow_decision_for_actor,
-    require_workflow_subject_read, WorkflowAuthorizationDecision, WorkflowAuthorizationRequest,
+    require_workflow_company_access, require_workflow_subject_read, WorkflowAuthorizationDecision,
+    WorkflowAuthorizationRequest,
 };
 use super::definitions::{
     workflow_edge, workflow_node, WorkflowHumanTaskKind, WorkflowNodeKind, WorkflowTaskAssignment,
@@ -59,6 +62,7 @@ pub enum WorkflowHumanTaskCommandKind {
     Decision,
     Invalidate,
     Comment,
+    Resubmit,
 }
 
 /// Optional guarded effect executed by an approval decision.
@@ -438,6 +442,8 @@ pub(crate) fn create_workflow_human_task_internal(
                 });
         }
     }
+    // Resubmission preserves the original requester for SoD, while creation
+    // evidence must identify the operator who actually created this attempt.
     append_event(
         ctx,
         &task,
@@ -445,7 +451,7 @@ pub(crate) fn create_workflow_human_task_internal(
         None,
         WorkflowHumanTaskStatus::Open,
         None,
-        params.requested_by,
+        ctx.sender(),
         None,
         None,
         None,
@@ -466,32 +472,7 @@ pub fn claim_workflow_human_task(
     organization_id: u64,
     params: ClaimWorkflowHumanTaskParams,
 ) -> Result<(), String> {
-    let task = claim_workflow_human_task_for_actor(ctx, organization_id, ctx.sender(), params)?;
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: Some(task.company_id),
-            table_name: "workflow_human_task",
-            record_id: task.id,
-            action: "CLAIM",
-            old_values: Some(r#"{"status":"Open"}"#.to_string()),
-            new_values: Some(
-                serde_json::json!({
-                    "status": "Claimed",
-                    "revision": task.revision,
-                    "claimed_by": task.claimed_by.map(|id| id.to_hex().to_string()),
-                })
-                .to_string(),
-            ),
-            changed_fields: vec![
-                "status".to_string(),
-                "revision".to_string(),
-                "claimed_by".to_string(),
-            ],
-            metadata: None,
-        },
-    );
+    claim_workflow_human_task_for_actor(ctx, organization_id, ctx.sender(), params)?;
     Ok(())
 }
 
@@ -560,6 +541,31 @@ pub(crate) fn claim_workflow_human_task_for_actor(
         None,
         &params.correlation_id,
     );
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(updated.company_id),
+            table_name: "workflow_human_task",
+            record_id: updated.id,
+            action: "CLAIM",
+            old_values: Some(r#"{"status":"Open"}"#.to_string()),
+            new_values: Some(
+                serde_json::json!({
+                    "status": "Claimed",
+                    "revision": updated.revision,
+                    "claimed_by": updated.claimed_by.map(|id| id.to_hex().to_string()),
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "status".to_string(),
+                "revision".to_string(),
+                "claimed_by".to_string(),
+            ],
+            metadata: None,
+        },
+    );
     insert_receipt(
         ctx,
         &updated,
@@ -568,7 +574,7 @@ pub(crate) fn claim_workflow_human_task_for_actor(
         input_hash,
         None,
         actor,
-    );
+    )?;
     crate::accounting::bank_settlement_lifecycle::record_bank_task_claim(ctx, &updated)?;
     Ok(updated)
 }
@@ -579,37 +585,7 @@ pub fn decide_workflow_human_task(
     organization_id: u64,
     params: DecideWorkflowHumanTaskParams,
 ) -> Result<(), String> {
-    let action = match params.decision {
-        WorkflowHumanTaskDecision::Approve => "APPROVE",
-        WorkflowHumanTaskDecision::Reject => "REJECT",
-        WorkflowHumanTaskDecision::Complete => "COMPLETE",
-    };
-    let task = decide_workflow_human_task_for_actor(ctx, organization_id, ctx.sender(), params)?;
-    write_audit_log_v2(
-        ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: Some(task.company_id),
-            table_name: "workflow_human_task",
-            record_id: task.id,
-            action,
-            old_values: None,
-            new_values: Some(
-                serde_json::json!({
-                    "status": format!("{:?}", task.status),
-                    "decision": format!("{:?}", task.decision),
-                    "revision": task.revision,
-                })
-                .to_string(),
-            ),
-            changed_fields: vec![
-                "status".to_string(),
-                "decision".to_string(),
-                "revision".to_string(),
-            ],
-            metadata: None,
-        },
-    );
+    decide_workflow_human_task_for_actor(ctx, organization_id, ctx.sender(), params)?;
     Ok(())
 }
 
@@ -778,7 +754,7 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         &task,
         &updated,
         WorkflowHumanTaskCommandKind::Decision,
-        Some(params.decision),
+        Some(params.decision.clone()),
         &authorization,
         &params.idempotency_key,
         &input_hash,
@@ -786,6 +762,7 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         domain_receipt.clone(),
         &params.correlation_id,
     );
+    audit_decision(ctx, &updated, &params.decision);
     insert_receipt(
         ctx,
         &updated,
@@ -794,7 +771,7 @@ pub(crate) fn decide_workflow_human_task_for_actor(
         input_hash,
         domain_receipt.clone(),
         actor,
-    );
+    )?;
     let expected_runtime_revision = params
         .expected_instance_revision
         .checked_add(if domain_receipt.is_some() { 2 } else { 1 })
@@ -901,7 +878,6 @@ pub fn invalidate_workflow_human_task(
     organization_id: u64,
     params: InvalidateWorkflowHumanTaskParams,
 ) -> Result<(), String> {
-    check_permission(ctx, organization_id, "workflow_task", "write")?;
     invalidate_workflow_human_task_internal(ctx, organization_id, ctx.sender(), params)?;
     Ok(())
 }
@@ -923,6 +899,9 @@ pub(crate) fn invalidate_workflow_human_task_internal(
         params.observed_subject_revision_hash.clone(),
         params.reason.trim().to_string(),
     ]);
+    let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
+    let company_membership_bypass = authorize_task_management_actor(ctx, actor, &task)
+        .map_err(|error| format!("Permission denied: {error}"))?;
     if let Some(receipt) = replay_receipt(
         ctx,
         organization_id,
@@ -931,9 +910,14 @@ pub(crate) fn invalidate_workflow_human_task_internal(
         &params.idempotency_key,
         &input_hash,
     )? {
-        return require_task(ctx, organization_id, params.company_id, receipt.task_id);
+        if receipt.created_by != actor {
+            return Err(
+                "Permission denied: workflow task invalidation receipt belongs to another actor"
+                    .to_string(),
+            );
+        }
+        return Ok(task);
     }
-    let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
     require_revision(&task, params.expected_revision)?;
     if !matches!(
         task.status,
@@ -959,7 +943,7 @@ pub(crate) fn invalidate_workflow_human_task_internal(
         ctx,
         &updated,
         WorkflowHumanTaskCommandKind::Invalidate,
-        Some(task.status),
+        Some(task.status.clone()),
         WorkflowHumanTaskStatus::Invalidated,
         None,
         actor,
@@ -974,6 +958,27 @@ pub(crate) fn invalidate_workflow_human_task_internal(
         None,
         &params.correlation_id,
     );
+    write_audit_log_v2(
+        ctx,
+        organization_id,
+        AuditLogParams {
+            company_id: Some(task.company_id),
+            table_name: "workflow_human_task",
+            record_id: task.id,
+            action: "INVALIDATE",
+            old_values: Some(serde_json::json!({"status": format!("{:?}", task.status), "revision": task.revision}).to_string()),
+            new_values: Some(serde_json::json!({"status": "Invalidated", "revision": updated.revision}).to_string()),
+            changed_fields: vec!["status".to_string(), "revision".to_string(), "invalidation_reason".to_string()],
+            metadata: Some(serde_json::json!({
+                "actor": actor.to_hex().to_string(),
+                "company_membership_bypass": company_membership_bypass,
+                "observed_subject_revision_hash": params.observed_subject_revision_hash,
+                "reason": params.reason.trim(),
+                "idempotency_key": params.idempotency_key,
+                "correlation_id": params.correlation_id,
+            }).to_string()),
+        },
+    );
     insert_receipt(
         ctx,
         &updated,
@@ -982,7 +987,7 @@ pub(crate) fn invalidate_workflow_human_task_internal(
         input_hash,
         None,
         actor,
-    );
+    )?;
     crate::accounting::bank_settlement_lifecycle::synchronize_bank_task(ctx, &updated)?;
     Ok(updated)
 }
@@ -1013,6 +1018,9 @@ pub(crate) fn add_workflow_human_task_comment_for_actor(
         params.expected_revision.to_string(),
         comment.clone(),
     ]);
+    let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
+    let authorization = authorize_task_actor(ctx, actor, &task, None, "workflow_task:write")
+        .map_err(|error| format!("Permission denied: {error}"))?;
     if let Some(receipt) = replay_receipt(
         ctx,
         organization_id,
@@ -1021,11 +1029,15 @@ pub(crate) fn add_workflow_human_task_comment_for_actor(
         &params.idempotency_key,
         &input_hash,
     )? {
-        return require_task(ctx, organization_id, params.company_id, receipt.task_id);
+        if receipt.created_by != actor {
+            return Err(
+                "Permission denied: workflow task comment receipt belongs to another actor"
+                    .to_string(),
+            );
+        }
+        return Ok(task);
     }
-    let task = require_task(ctx, organization_id, params.company_id, params.task_id)?;
     require_revision(&task, params.expected_revision)?;
-    let authorization = authorize_task_actor(ctx, actor, &task, None, "workflow_task:write")?;
     let next_revision = next_revision(task.revision)?;
     let updated = ctx.db.workflow_human_task().id().update(WorkflowHumanTask {
         revision: next_revision,
@@ -1054,7 +1066,7 @@ pub(crate) fn add_workflow_human_task_comment_for_actor(
         input_hash,
         None,
         actor,
-    );
+    )?;
     crate::accounting::bank_settlement_lifecycle::record_bank_task_comment(ctx, &updated)?;
     Ok(updated)
 }
@@ -1144,6 +1156,35 @@ fn execute_task_action(
         },
     )?;
     Ok(Some(result.receipt_id))
+}
+
+/// Invalidation is a management action, not a reviewer vote. It needs the
+/// actual actor's current company/source access and workflow write grant, but
+/// does not inherit a candidate's authority or impose approval-only SOD rules.
+fn authorize_task_management_actor(
+    ctx: &ReducerContext,
+    actor: Identity,
+    task: &WorkflowHumanTask,
+) -> Result<bool, String> {
+    let company_membership_bypass =
+        require_workflow_company_access(ctx, task.organization_id, task.company_id, actor)?;
+    let profile = find_user_profile_for_organization(ctx, actor, task.organization_id)
+        .ok_or("workflow actor profile not found")?;
+    let roles = effective_roles(ctx, task.organization_id, actor)?;
+    if !roles_allow_permission(
+        ctx,
+        task.organization_id,
+        actor,
+        &roles,
+        profile.is_superuser,
+        "workflow_task",
+        "write",
+    ) {
+        return Err("workflow permission denied: workflow_task:write".to_string());
+    }
+    require_workflow_subject_read(ctx, task.organization_id, actor, &task.subject_model)?;
+    crate::core::reconstruction::require_writes_unfenced(ctx, task.organization_id)?;
+    Ok(company_membership_bypass)
 }
 
 fn authorize_task_actor(
@@ -1589,6 +1630,7 @@ fn record_all_candidates_vote(
         None,
         &params.correlation_id,
     );
+    audit_decision(ctx, &updated, &params.decision);
     insert_receipt(
         ctx,
         &updated,
@@ -1597,7 +1639,7 @@ fn record_all_candidates_vote(
         input_hash.to_string(),
         None,
         actor,
-    );
+    )?;
     let _ = (organization_id, candidate);
     Ok(Some(updated))
 }
@@ -1683,7 +1725,7 @@ fn append_authorized_event(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn append_event(
+pub(super) fn append_event(
     ctx: &ReducerContext,
     task: &WorkflowHumanTask,
     command_kind: WorkflowHumanTaskCommandKind,
@@ -1701,7 +1743,7 @@ fn append_event(
     comment: Option<String>,
     domain_receipt: Option<String>,
     correlation_id: &str,
-) {
+) -> u64 {
     ctx.db
         .workflow_human_task_event()
         .insert(WorkflowHumanTaskEvent {
@@ -1728,10 +1770,48 @@ fn append_event(
             domain_receipt,
             correlation_id: correlation_id.to_string(),
             recorded_at: ctx.timestamp,
-        });
+        })
+        .id
 }
 
-fn insert_receipt(
+fn audit_decision(
+    ctx: &ReducerContext,
+    task: &WorkflowHumanTask,
+    decision: &WorkflowHumanTaskDecision,
+) {
+    let action = match decision {
+        WorkflowHumanTaskDecision::Approve => "APPROVE",
+        WorkflowHumanTaskDecision::Reject => "REJECT",
+        WorkflowHumanTaskDecision::Complete => "COMPLETE",
+    };
+    write_audit_log_v2(
+        ctx,
+        task.organization_id,
+        AuditLogParams {
+            company_id: Some(task.company_id),
+            table_name: "workflow_human_task",
+            record_id: task.id,
+            action,
+            old_values: None,
+            new_values: Some(
+                serde_json::json!({
+                    "status": format!("{:?}", task.status),
+                    "decision": format!("{:?}", task.decision),
+                    "revision": task.revision,
+                })
+                .to_string(),
+            ),
+            changed_fields: vec![
+                "status".to_string(),
+                "decision".to_string(),
+                "revision".to_string(),
+            ],
+            metadata: None,
+        },
+    );
+}
+
+pub(super) fn insert_receipt(
     ctx: &ReducerContext,
     task: &WorkflowHumanTask,
     command_kind: WorkflowHumanTaskCommandKind,
@@ -1739,7 +1819,7 @@ fn insert_receipt(
     input_hash: String,
     domain_receipt: Option<String>,
     actor: Identity,
-) {
+) -> Result<(), String> {
     ctx.db
         .workflow_human_task_receipt()
         .insert(WorkflowHumanTaskReceipt {
@@ -1752,7 +1832,7 @@ fn insert_receipt(
             organization_id: task.organization_id,
             company_id: task.company_id,
             task_id: task.id,
-            command_kind,
+            command_kind: command_kind.clone(),
             idempotency_key,
             input_hash,
             result_status: task.status.clone(),
@@ -1761,6 +1841,7 @@ fn insert_receipt(
             created_by: actor,
             created_at: ctx.timestamp,
         });
+    super::finance_persistence::record_task_receipt(ctx, task, &command_kind)
 }
 
 fn replay_receipt(
@@ -1807,7 +1888,7 @@ fn decision_input_hash(
     ])
 }
 
-fn hash_fields(fields: &[String]) -> String {
+pub(super) fn hash_fields(fields: &[String]) -> String {
     let mut hasher = Sha256::new();
     for field in fields {
         hasher.update((field.len() as u64).to_be_bytes());
@@ -1823,6 +1904,7 @@ fn command_tag(kind: &WorkflowHumanTaskCommandKind) -> &'static str {
         WorkflowHumanTaskCommandKind::Decision => "decision",
         WorkflowHumanTaskCommandKind::Invalidate => "invalidate",
         WorkflowHumanTaskCommandKind::Comment => "comment",
+        WorkflowHumanTaskCommandKind::Resubmit => "resubmit",
     }
 }
 

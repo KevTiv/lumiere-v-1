@@ -25,19 +25,9 @@ pub(super) fn may_execute_approval(
     if guarded.is_null() {
         return true;
     }
-    // query_sql unwraps Option but retains this SATS product/enum. Decode the
-    // pinned generated type rather than copying its numeric variant mapping.
-    if !strict_product_shape(guarded) {
-        return false;
-    }
-    let Ok(SerdeWrapper(action)) =
-        serde_json::from_value::<SerdeWrapper<WorkflowTaskGuardedAction>>(guarded.clone())
-    else {
+    let Some(action) = guarded_action(row) else {
         return false;
     };
-    if action.schema_version != 1 {
-        return false;
-    }
     let Some(model) = cell(row, "subjectModel", "subject_model").and_then(Value::as_str) else {
         return false;
     };
@@ -63,6 +53,18 @@ pub(super) fn may_execute_approval(
     permissions
         .iter()
         .all(|(resource, action)| permission_allowed(actor, resource, action))
+}
+
+pub(super) fn guarded_action(row: &Value) -> Option<WorkflowTaskGuardedAction> {
+    let guarded = cell(row, "guardedAction", "guarded_action")?;
+    // query_sql unwraps Option but retains this SATS product/enum. Decode the
+    // pinned generated type rather than copying its numeric variant mapping.
+    if !strict_product_shape(guarded) {
+        return None;
+    }
+    let SerdeWrapper(action) =
+        serde_json::from_value::<SerdeWrapper<WorkflowTaskGuardedAction>>(guarded.clone()).ok()?;
+    (action.schema_version == 1).then_some(action)
 }
 
 fn strict_product_shape(value: &Value) -> bool {

@@ -9,6 +9,7 @@ mod guarded_actions;
 #[cfg(test)]
 mod http_tests;
 mod readback;
+mod recovery;
 
 pub(crate) use readback::WorkTaskReadbackRequest;
 
@@ -423,6 +424,7 @@ pub(crate) async fn read_work_board(
         sod_rules: &sod_rules,
     };
     let mut delegated_access = HashMap::<String, Option<FieldAccessContext>>::new();
+    let mut recovery_cache = recovery::RecoveryCache::default();
     if let Some(readback) = &request.readback {
         return readback::read_exact_task(
             context,
@@ -431,6 +433,7 @@ pub(crate) async fn read_work_board(
             &predicate,
             &projection,
             &mut delegated_access,
+            &mut recovery_cache,
         )
         .await;
     }
@@ -466,9 +469,15 @@ pub(crate) async fn read_work_board(
             if let Some((source, source_row)) =
                 read_board_source(context, &row, request.scope, company).await?
             {
-                let mut projected =
-                    project_board_row(row, &source_row, source, &projection, &mut delegated_access)
-                        .await?;
+                let mut projected = project_board_row(
+                    row,
+                    &source_row,
+                    source,
+                    &projection,
+                    &mut delegated_access,
+                    &mut recovery_cache,
+                )
+                .await?;
                 // Team membership/visibility were checked before any projection.
                 let teams = team_refs(&projected, &scope, company);
                 if let Some(object) = projected.as_object_mut() {
@@ -559,6 +568,7 @@ async fn project_board_row(
     source: WorkSource,
     projection: &ProjectionContext<'_>,
     delegated_access: &mut HashMap<String, Option<FieldAccessContext>>,
+    recovery_cache: &mut recovery::RecoveryCache,
 ) -> Result<Value, ApiError> {
     let ProjectionContext {
         owner,
@@ -575,7 +585,9 @@ async fn project_board_row(
     let instance_id = number(&row, "workflowInstanceId", "workflow_instance_id")
         .filter(|id| *id > 0)
         .ok_or_else(|| ApiError::Internal("work task is missing its instance".into()))?;
-    let instances = owner.query_sql(&format!("SELECT id, revision FROM workflow_instance WHERE organization_id = {org} AND company_id = {company} AND id = {instance_id} LIMIT 1")).await.map_err(ApiError::internal)?;
+    let instances = owner.query_sql(&format!("SELECT id, revision, state FROM workflow_instance WHERE organization_id = {org} AND company_id = {company} AND id = {instance_id} LIMIT 1")).await.map_err(ApiError::internal)?;
+    let may_resubmit =
+        recovery::available(&row, source_row, &instances, projection, recovery_cache).await?;
     let revisions = instances
         .iter()
         .filter_map(|instance| {
@@ -625,6 +637,9 @@ async fn project_board_row(
     );
     direct_actions
         .retain(|action| *action != actions::WorkAction::Approve || guarded_approve_allowed);
+    if may_resubmit {
+        direct_actions.push(actions::WorkAction::Resubmit);
+    }
     for option in &mut options {
         let Some(principal) = option
             .get("identityHex")

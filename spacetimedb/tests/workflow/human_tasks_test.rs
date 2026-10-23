@@ -11,6 +11,9 @@ use crate::core::permissions::{
     org_permission, role, sod_conflict_rule, user_role_assignment, OrgPermission, PermissionAction,
     PermissionEffect, PermissionSubject, Role, SodConflictRule, UserRoleAssignment,
 };
+use crate::core::persistence::{
+    organization_commit, organization_row_change, OrganizationRowChange,
+};
 use crate::core::users::{
     find_user_profile_for_organization, user_organization, user_profile, UserOrganization,
     UserProfile,
@@ -41,9 +44,10 @@ use crate::workflow::authorization::{
 use crate::workflow::definitions::{
     create_workflow, publish_workflow_version, upsert_workflow_edge, upsert_workflow_node,
     workflow, workflow_edge, workflow_node, workflow_version, CreateWorkflowParams,
-    UpsertWorkflowEdgeParams, UpsertWorkflowNodeParams, WorkflowActionReference,
+    UpsertWorkflowEdgeParams, UpsertWorkflowNodeParams, Workflow, WorkflowActionReference,
     WorkflowBranchKind, WorkflowEdge, WorkflowHumanTaskKind, WorkflowNode, WorkflowNodeKind,
-    WorkflowTaskAssignment, WorkflowTaskPolicy, WorkflowTrigger,
+    WorkflowTaskAssignment, WorkflowTaskPolicy, WorkflowTrigger, WorkflowVersion,
+    WorkflowVersionStatus,
 };
 use crate::workflow::runtime::{
     cancel_workflow, workflow_command_receipt, workflow_decision_event, workflow_instance,
@@ -940,7 +944,11 @@ fn cancellation_closes_outstanding_tasks_without_rewriting_history(
         let role_id = seed_role(
             ctx,
             fixture.organization_id,
-            vec!["workflow_task:write", "workflow_task:approve"],
+            vec![
+                "workflow_task:write",
+                "workflow_task:approve",
+                "purchase_order:read",
+            ],
         );
         let actor = seed_member(ctx, &fixture, role_id, None);
         let other_candidate = seed_member(ctx, &fixture, role_id, None);
@@ -955,6 +963,31 @@ fn cancellation_closes_outstanding_tasks_without_rewriting_history(
                 WorkflowTaskAssignment::AnyCandidate
             },
         )?;
+        let order = insert_draft_purchase_order(ctx, &fixture, seeded.nonce)?;
+        let source_instance = ctx
+            .db
+            .workflow_instance()
+            .id()
+            .find(&history.workflow_instance_id)
+            .ok_or("cancellation source instance missing")?;
+        ctx.db.workflow_instance().id().update(WorkflowInstance {
+            subject_model: "purchase_order".to_string(),
+            subject_id: order.id,
+            ..source_instance
+        });
+        let source_tasks: Vec<_> = ctx
+            .db
+            .workflow_human_task()
+            .human_task_by_instance()
+            .filter(&history.workflow_instance_id)
+            .collect();
+        for task in source_tasks {
+            ctx.db.workflow_human_task().id().update(WorkflowHumanTask {
+                subject_model: "purchase_order".to_string(),
+                subject_id: order.id,
+                ..task
+            });
+        }
         let current = if all_candidates {
             decide_workflow_human_task_for_actor(
                 ctx,
@@ -992,6 +1025,14 @@ fn cancellation_closes_outstanding_tasks_without_rewriting_history(
             correlation_id: seeded.key("cancel-correlation"),
             causation_id: None,
         };
+        let commit_count = || {
+            ctx.db
+                .organization_commit()
+                .organization_commit_by_org()
+                .filter(&fixture.organization_id)
+                .count()
+        };
+        let previous_commit_count = commit_count();
         cancel_workflow(ctx, fixture.organization_id, cancel.clone())?;
         let cancelled = ctx
             .db
@@ -1020,6 +1061,10 @@ fn cancellation_closes_outstanding_tasks_without_rewriting_history(
                     .to_string(),
             );
         }
+        if commit_count() != previous_commit_count + 1 {
+            return Err("ordinary cancellation must record one durable commit".to_string());
+        }
+        assert_cancellation_commit(ctx, &cancelled, &preserved, &order, &cancel.correlation_id)?;
         let audit_count = || {
             ctx.db
                 .audit_log()
@@ -1038,6 +1083,7 @@ fn cancellation_closes_outstanding_tasks_without_rewriting_history(
         let runtime_counts = cancellation_evidence_counts(ctx, current.workflow_instance_id);
         cancel_workflow(ctx, fixture.organization_id, cancel.clone())?;
         if audit_count() != 1
+            || commit_count() != previous_commit_count + 1
             || cancellation_evidence_counts(ctx, current.workflow_instance_id) != runtime_counts
             || ctx
                 .db
@@ -1120,6 +1166,7 @@ fn cancellation_closes_outstanding_tasks_without_rewriting_history(
         .ok_or("old reviewer decided a cancelled human task")?;
         assert_contains(&denied, "not open")?;
         if audit_count() != 1
+            || commit_count() != previous_commit_count + 1
             || cancellation_evidence_counts(ctx, current.workflow_instance_id) != runtime_counts
             || candidate_decisions(ctx, current.id) != votes
             || task_evidence_counts(ctx, current.id) != task_evidence
@@ -1130,12 +1177,154 @@ fn cancellation_closes_outstanding_tasks_without_rewriting_history(
     Ok(())
 }
 
+fn assert_cancellation_commit(
+    ctx: &ReducerContext,
+    cancelled: &WorkflowHumanTask,
+    preserved: &WorkflowHumanTask,
+    source: &PurchaseOrder,
+    correlation_id: &str,
+) -> Result<(), String> {
+    let commits: Vec<_> = ctx
+        .db
+        .organization_commit()
+        .organization_commit_by_org()
+        .filter(&cancelled.organization_id)
+        .filter(|row| {
+            row.operation_id == "erp.cancel_workflow" && row.correlation_id == correlation_id
+        })
+        .collect();
+    if commits.len() != 1 || commits[0].actor_identity != ctx.sender() {
+        return Err(
+            "cancellation durable envelope is missing, duplicated or misattributed".to_string(),
+        );
+    }
+    let commit = &commits[0];
+    let changes: Vec<_> = ctx
+        .db
+        .organization_row_change()
+        .organization_row_change_by_commit()
+        .filter(&cancelled.organization_id)
+        .filter(|change| change.commit_sequence == commit.sequence)
+        .collect();
+    if changes.len() != commit.row_change_count as usize
+        || changes.iter().any(|change| change.change_kind != "upsert")
+    {
+        return Err("cancellation durable commit is incomplete or destructive".to_string());
+    }
+    assert_committed_row(&changes, "workflow_human_task", cancelled)?;
+    assert_committed_row(&changes, "workflow_human_task", preserved)?;
+    assert_committed_row(&changes, "purchase_order", source)?;
+    let instance = ctx
+        .db
+        .workflow_instance()
+        .id()
+        .find(&cancelled.workflow_instance_id)
+        .ok_or("cancelled instance missing")?;
+    assert_committed_row(&changes, "workflow_instance", &instance)?;
+    for token in ctx
+        .db
+        .workflow_token()
+        .workflow_token_by_instance()
+        .filter(&instance.id)
+    {
+        if token.state == WorkflowTokenState::Active {
+            return Err("cancellation retained an active runtime token".to_string());
+        }
+        assert_committed_row(&changes, "workflow_token", &token)?;
+    }
+    for event in ctx
+        .db
+        .workflow_decision_event()
+        .workflow_event_by_instance()
+        .filter(&instance.id)
+    {
+        assert_committed_row(&changes, "workflow_decision_event", &event)?;
+    }
+    for receipt in ctx
+        .db
+        .workflow_command_receipt()
+        .workflow_receipt_by_instance()
+        .filter(&instance.id)
+    {
+        assert_committed_row(&changes, "workflow_command_receipt", &receipt)?;
+    }
+    for task_id in [cancelled.id, preserved.id] {
+        for candidate in ctx
+            .db
+            .workflow_human_task_candidate()
+            .human_task_candidate_by_task()
+            .filter(&task_id)
+        {
+            assert_committed_row(&changes, "workflow_human_task_candidate", &candidate)?;
+        }
+        for event in ctx
+            .db
+            .workflow_human_task_event()
+            .human_task_event_by_task()
+            .filter(&task_id)
+        {
+            assert_committed_row(&changes, "workflow_human_task_event", &event)?;
+        }
+        for receipt in ctx
+            .db
+            .workflow_human_task_receipt()
+            .human_task_receipt_by_task()
+            .filter(&task_id)
+        {
+            assert_committed_row(&changes, "workflow_human_task_receipt", &receipt)?;
+        }
+    }
+    let audit = ctx
+        .db
+        .audit_log()
+        .audit_by_org()
+        .filter(&cancelled.organization_id)
+        .find(|row| {
+            row.table_name == "workflow_human_task"
+                && row.record_id == cancelled.id
+                && row.action == "CANCEL"
+        })
+        .ok_or("cancellation audit missing")?;
+    assert_committed_row(&changes, "audit_log", &audit)?;
+    Ok(())
+}
+
+fn assert_committed_row<T: spacetimedb_sats::Serialize>(
+    changes: &[OrganizationRowChange],
+    table: &str,
+    expected: &T,
+) -> Result<(), String> {
+    let expected = serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(expected))
+        .map_err(|error| error.to_string())?;
+    let mut matches = 0;
+    for change in changes.iter().filter(|row| row.table_name == table) {
+        let row = serde_json::from_str::<serde_json::Value>(
+            change
+                .row_json
+                .as_deref()
+                .ok_or("durable upsert row is missing")?,
+        )
+        .map_err(|error| error.to_string())?;
+        matches += usize::from(row == expected);
+    }
+    if matches != 1 {
+        return Err(format!(
+            "durable cancellation omitted or duplicated an exact {table} row"
+        ));
+    }
+    Ok(())
+}
+
 fn reject_requires_comment_and_invalidation_wins(ctx: &ReducerContext) -> Result<(), String> {
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let role_id = seed_role(
         ctx,
         fixture.organization_id,
-        vec!["workflow_task:reject", "workflow_task:approve"],
+        vec![
+            "workflow_task:reject",
+            "workflow_task:approve",
+            "workflow_task:write",
+        ],
     );
     let actor = seed_member(ctx, &fixture, role_id, None);
     let seeded = seed_task_runtime(
@@ -1348,7 +1537,7 @@ fn guarded_action_failure_does_not_consume_task(ctx: &ReducerContext) -> Result<
     Ok(())
 }
 
-fn definition_node(
+pub(super) fn definition_node(
     key: &str,
     kind: WorkflowNodeKind,
     sequence: u32,
@@ -1371,7 +1560,7 @@ fn definition_node(
     }
 }
 
-fn definition_edge(
+pub(super) fn definition_edge(
     key: &str,
     from: &str,
     to: &str,
@@ -1389,7 +1578,7 @@ fn definition_edge(
     }
 }
 
-fn insert_draft_purchase_order(
+pub(super) fn insert_draft_purchase_order(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     nonce: u64,
@@ -1459,19 +1648,19 @@ fn insert_draft_purchase_order(
     }))
 }
 
-struct SeededTask {
-    task_id: u64,
-    nonce: u64,
+pub(super) struct SeededTask {
+    pub(super) task_id: u64,
+    pub(super) nonce: u64,
 }
 
 impl SeededTask {
-    fn key(&self, suffix: &str) -> String {
+    pub(super) fn key(&self, suffix: &str) -> String {
         format!("human-task-{}-{suffix}", self.nonce)
     }
 }
 
 #[allow(clippy::too_many_arguments)]
-fn seed_task_runtime(
+pub(super) fn seed_task_runtime(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     role_id: u64,
@@ -1496,7 +1685,7 @@ fn seed_task_runtime(
     )
 }
 
-fn seed_task_after_approved_history(
+pub(super) fn seed_task_after_approved_history(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     role_id: u64,
@@ -1610,8 +1799,47 @@ fn seed_task_runtime_with_policy(
     guarded_action: Option<WorkflowTaskGuardedAction>,
 ) -> Result<SeededTask, String> {
     let nonce = ctx.rng().gen::<u64>();
-    let workflow_id = nonce;
-    let version_id = nonce.wrapping_add(1);
+    // These tests enter a runtime at its human task. Retain real pinned parent
+    // rows so its complete durable history is reconstructable as well.
+    let workflow_id = ctx
+        .db
+        .workflow()
+        .insert(Workflow {
+            id: 0,
+            organization_id: fixture.organization_id,
+            company_id: Some(fixture.company_id),
+            workflow_key: format!("human-task-{nonce}"),
+            model: "test_subject".to_string(),
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+        })
+        .id;
+    let version_id = ctx
+        .db
+        .workflow_version()
+        .insert(WorkflowVersion {
+            id: 0,
+            organization_id: fixture.organization_id,
+            company_id: Some(fixture.company_id),
+            workflow_id,
+            version: 1,
+            status: WorkflowVersionStatus::Published,
+            schema_version: 1,
+            draft_revision: 1,
+            name: format!("Human task fixture {nonce}"),
+            description: None,
+            trigger: WorkflowTrigger::Manual,
+            snapshot_fields: Vec::new(),
+            content_hash: Some(REVISION_A.to_string()),
+            create_uid: ctx.sender(),
+            create_date: ctx.timestamp,
+            published_uid: Some(ctx.sender()),
+            published_date: Some(ctx.timestamp),
+            retired_uid: None,
+            retired_date: None,
+            metadata: Some(r#"{"test":"human-task"}"#.to_string()),
+        })
+        .id;
     let task_key = format!("task-{nonce}");
     let approved_key = format!("approved-{nonce}");
     let rejected_key = format!("rejected-{nonce}");
@@ -1855,7 +2083,7 @@ fn decision(
     }
 }
 
-fn seed_role(ctx: &ReducerContext, organization_id: u64, permissions: Vec<&str>) -> u64 {
+pub(super) fn seed_role(ctx: &ReducerContext, organization_id: u64, permissions: Vec<&str>) -> u64 {
     ctx.db
         .role()
         .insert(Role {
@@ -1874,7 +2102,7 @@ fn seed_role(ctx: &ReducerContext, organization_id: u64, permissions: Vec<&str>)
         .id
 }
 
-fn seed_member(
+pub(super) fn seed_member(
     ctx: &ReducerContext,
     fixture: &OrgFixture,
     role_id: u64,
@@ -1923,7 +2151,7 @@ fn seed_member(
     identity
 }
 
-fn new_identity(ctx: &ReducerContext) -> Identity {
+pub(super) fn new_identity(ctx: &ReducerContext) -> Identity {
     Identity::from_byte_array(ctx.rng().gen::<[u8; 32]>())
 }
 
@@ -1949,7 +2177,7 @@ fn seed_candidate_group_member(
         })
 }
 
-fn task_evidence_counts(ctx: &ReducerContext, task_id: u64) -> (usize, usize) {
+pub(super) fn task_evidence_counts(ctx: &ReducerContext, task_id: u64) -> (usize, usize) {
     (
         ctx.db
             .workflow_human_task_event()
@@ -1965,14 +2193,17 @@ fn task_evidence_counts(ctx: &ReducerContext, task_id: u64) -> (usize, usize) {
 }
 
 #[derive(PartialEq, Eq)]
-struct CandidateDecisionSnapshot {
+pub(super) struct CandidateDecisionSnapshot {
     identity: Identity,
     decision: Option<WorkflowHumanTaskDecision>,
     actor: Option<Identity>,
     decided_at: Option<spacetimedb::Timestamp>,
 }
 
-fn candidate_decisions(ctx: &ReducerContext, task_id: u64) -> Vec<CandidateDecisionSnapshot> {
+pub(super) fn candidate_decisions(
+    ctx: &ReducerContext,
+    task_id: u64,
+) -> Vec<CandidateDecisionSnapshot> {
     let mut decisions: Vec<_> = ctx
         .db
         .workflow_human_task_candidate()
@@ -1989,7 +2220,10 @@ fn candidate_decisions(ctx: &ReducerContext, task_id: u64) -> Vec<CandidateDecis
     decisions
 }
 
-fn cancellation_evidence_counts(ctx: &ReducerContext, instance_id: u64) -> (usize, usize) {
+pub(super) fn cancellation_evidence_counts(
+    ctx: &ReducerContext,
+    instance_id: u64,
+) -> (usize, usize) {
     (
         ctx.db
             .workflow_decision_event()

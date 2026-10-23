@@ -68,7 +68,7 @@ async function assertOrdinaryActor(organizationId: number, actor: Actor) {
   expect(actorIdentity(profiles[0]!.identity)).toBe(actor.identityHex)
 }
 
-async function setDelegation(principalSession: Page, companyId: number, principal: Actor, delegate: Actor, active: boolean) {
+async function setDelegation(principalPage: Page, companyId: number, principal: Actor, delegate: Actor, active: boolean) {
   const now = Date.now()
   const metadata = active ? workflowDelegationMetadata(
     new Date(now - 60_000).toISOString(),
@@ -82,7 +82,7 @@ async function setDelegation(principalSession: Page, companyId: number, principa
     isActive: active,
     metadata,
   }, "SetPurchaseApprovalDelegateParams")
-  const response = await postWorkCommand(principalSession, stdbBffCommandPost("set_purchase_approval_delegate", { companyId, params }))
+  const response = await postWorkCommand(principalPage, stdbBffCommandPost("set_purchase_approval_delegate", { companyId, params }))
   expect(response.ok(), await response.text()).toBe(true)
 }
 
@@ -133,10 +133,10 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
     ])
     const workflow = await seedWorkReviewWorkflow(page, [principal.roleId])
     const sessions = await openActorPages(browser, [principal, delegate])
+    const [principalPage, delegatePage] = sessions.pages
     let pendingRoute: Route | undefined
     let delegationActive = false
     try {
-      const [principalPage, delegatePage] = sessions.pages
       if (!principalPage || !delegatePage) throw new Error("Missing independent principal/delegate sessions")
       await Promise.all([
         assertOrdinaryActor(workflow.organizationId, principal),
@@ -233,7 +233,7 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeEnabled()
     } finally {
       if (pendingRoute) await pendingRoute.abort().catch(() => {})
-      if (delegationActive) await setDelegation(sessions.pages[0]!, workflow.companyId, principal, delegate, false)
+      if (delegationActive && principalPage) await setDelegation(principalPage, workflow.companyId, principal, delegate, false)
       await sessions.close()
       await workflow.retire()
     }

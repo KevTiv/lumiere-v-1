@@ -15,6 +15,7 @@ next_revision, idempotency_key, input_hash";
 enum CommandKind {
     Claim,
     Decision,
+    Resubmit,
 }
 
 impl CommandKind {
@@ -22,6 +23,7 @@ impl CommandKind {
         match value {
             "claim" => Ok(Self::Claim),
             "decision" => Ok(Self::Decision),
+            "resubmit" => Ok(Self::Resubmit),
             _ => Err(ApiError::BadRequest("unsupported commandKind".into())),
         }
     }
@@ -30,6 +32,7 @@ impl CommandKind {
         match self {
             Self::Claim => "claim",
             Self::Decision => "decision",
+            Self::Resubmit => "resubmit",
         }
     }
 
@@ -37,6 +40,7 @@ impl CommandKind {
         match self {
             Self::Claim => "Claim",
             Self::Decision => "Decision",
+            Self::Resubmit => "Resubmit",
         }
     }
 
@@ -48,6 +52,7 @@ impl CommandKind {
                 WorkAction::Reject,
                 WorkAction::Complete,
             ],
+            Self::Resubmit => &[WorkAction::Resubmit],
         }
     }
 }
@@ -119,6 +124,11 @@ impl WorkTaskReadbackRequest {
                     "invalid command actingFor identity".into(),
                 ));
             }
+            if kind == CommandKind::Resubmit && acting_for.is_some() {
+                return Err(ApiError::BadRequest(
+                    "resubmission does not accept actingFor".into(),
+                ));
+            }
             Some(CommandAttempt {
                 kind,
                 idempotency_key: idempotency_key.into(),
@@ -139,7 +149,7 @@ fn canonical_hex(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn sql_text(value: &str) -> String {
+pub(super) fn sql_text(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }
 
@@ -150,6 +160,7 @@ pub(super) async fn read_exact_task(
     predicate: &str,
     projection: &ProjectionContext<'_>,
     delegated_access: &mut HashMap<String, Option<FieldAccessContext>>,
+    recovery_cache: &mut recovery::RecoveryCache,
 ) -> Result<WorkBoardPage, ApiError> {
     let candidates = projection
         .owner
@@ -183,7 +194,16 @@ pub(super) async fn read_exact_task(
     else {
         return Ok(WorkBoardPage::default());
     };
-    let mut row = project_board_row(row, &source_row, source, projection, delegated_access).await?;
+    let recovery_authorized = recovery::has_authority(&row, projection.access);
+    let mut row = project_board_row(
+        row,
+        &source_row,
+        source,
+        projection,
+        delegated_access,
+        recovery_cache,
+    )
+    .await?;
     let teams = team_refs(&row, projection.scope, projection.company);
     if let Some(object) = row.as_object_mut() {
         object.insert("workTeamRefs".into(), Value::Array(teams));
@@ -196,6 +216,7 @@ pub(super) async fn read_exact_task(
                 attempt,
                 projection,
                 delegated_access,
+                recovery_authorized,
             )
             .await?
         }
@@ -214,6 +235,7 @@ async fn read_command_evidence(
     attempt: &CommandAttempt,
     projection: &ProjectionContext<'_>,
     delegated_access: &HashMap<String, Option<FieldAccessContext>>,
+    recovery_authorized: bool,
 ) -> Result<Option<Value>, ApiError> {
     let principal = attempt.acting_for.as_deref().unwrap_or(projection.caller);
     let (access, eligible) = if attempt.acting_for.is_none() {
@@ -241,12 +263,16 @@ async fn read_command_evidence(
         // authorization even though it is no longer an available action.
         unvoted_candidates: &[],
     };
-    if !attempt
-        .kind
-        .actions()
-        .iter()
-        .any(|action| may_read_command_evidence(row, &authority, *action))
-    {
+    let authorized = if attempt.kind == CommandKind::Resubmit {
+        recovery_authorized
+    } else {
+        attempt
+            .kind
+            .actions()
+            .iter()
+            .any(|action| may_read_command_evidence(row, &authority, *action))
+    };
+    if !authorized {
         return Ok(None);
     }
     let org = projection.org;
@@ -279,6 +305,9 @@ async fn read_command_evidence(
     ) else {
         return Ok(None);
     };
+    if action == WorkAction::Resubmit {
+        return recovery::read_linked_evidence(row, evidence, projection).await;
+    }
     Ok(may_read_command_evidence(row, &authority, action).then_some(evidence))
 }
 
@@ -362,6 +391,14 @@ fn matching_evidence(
                 }
                 _ => return None,
             }
+        }
+        CommandKind::Resubmit
+            if status == "Cancelled"
+                && prior_status == "Cancelled"
+                && enum_tag(row, "status").as_deref() == Some("Cancelled")
+                && cell(event, "decision", "decision")?.is_null() =>
+        {
+            (None, WorkAction::Resubmit)
         }
         _ => return None,
     };

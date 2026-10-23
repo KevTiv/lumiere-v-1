@@ -34,16 +34,22 @@ export async function seedWorkReviewWorkflow(
   const key = smokeName("work-acceptance").toLowerCase().replace(/-/g, "_")
   const seed = await seedPublishableWorkflowDraft(owner, { workflowKey: key, model: "purchase_order", name: key })
   let revision = seed.draftRevision
-  // The guarded PO adapter captures these two condition fields. Declare the
-  // same schema so a public runtime signal can reproduce its canonical hash.
-  await callReducerOwner("update_workflow_draft", [seed.organizationId, seed.versionId, revision++, stdbParamsToJson({
-    name: key, description: none, trigger: { tag: "Manual" }, schemaVersion: 1,
-    snapshotFields: [
-      { fieldKey: "amount_total", valueType: { tag: "Money" }, nullable: false },
-      { fieldKey: "state", valueType: { tag: "Code" }, nullable: false },
-    ],
-    metadata: none,
-  }, "UpdateWorkflowDraftParams")])
+  // The runtime snapshot request must describe the same condition fields that
+  // the guarded PO adapter pins when it starts an approval instance.
+  const updated = await postWorkCommand(owner, stdbBffCommandPost("update_workflow_draft", {
+    workflowVersionId: seed.versionId,
+    expectedRevision: revision,
+    params: stdbParamsToJson({
+      name: key, description: null, trigger: { tag: "Manual" }, schemaVersion: 1,
+      snapshotFields: [
+        { fieldKey: "amount_total", valueType: { tag: "Money" }, nullable: false },
+        { fieldKey: "state", valueType: { tag: "Code" }, nullable: false },
+      ],
+      metadata: null,
+    }, "UpdateWorkflowDraftParams"),
+  }))
+  expect(updated.ok(), await updated.text()).toBe(true)
+  revision += 1
   for (const node of [
     {
       nodeKey: "approval", name: "Finance review", kind: { tag: "HumanTask" }, sequence: 2,

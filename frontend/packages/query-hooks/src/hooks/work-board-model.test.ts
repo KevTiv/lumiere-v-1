@@ -331,6 +331,26 @@ test("terminal or unknown tasks cannot be dragged even when stale capabilities r
   }
 })
 
+test("cancelled recovery uses only the actual actor's capability and never a column transition", () => {
+  const row = task({
+    status: "Cancelled",
+    directlyEligible: false,
+    workActions: ["resubmit", "approve"],
+    actingForOptions: [{ identityHex: firstDelegate, label: "Former approver", workActions: ["resubmit"] }],
+  })
+  assert.deepEqual(workActionsForActor(row), ["resubmit"])
+  assert.deepEqual(workActionsForActor(row, ""), ["resubmit"])
+  assert.deepEqual(workActionsForActor(row, firstDelegate), [])
+  assert.deepEqual(workActionsForActor({ ...row, workActions: [] }), [])
+  for (const status of ["Open", "Claimed", "Approved", "Rejected", "Invalidated"]) {
+    assert.equal(workActionsForActor({ ...row, status, directlyEligible: true }).includes("resubmit"), false)
+  }
+  assert.doesNotThrow(() => parseWorkBoardPage(page([row]), scope))
+  for (const target of ["Open", "Claimed", "Approved", "Cancelled"]) {
+    assert.equal(canMoveWorkTask(row, target), false)
+  }
+})
+
 test("cache keys separate actor, authorization, company, module, view and team", () => {
   const originalKey = workBoardQueryKey(scope)
   const variants: Partial<WorkBoardScope>[] = [

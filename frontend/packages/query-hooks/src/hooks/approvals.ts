@@ -24,6 +24,8 @@ import {
 import {
   humanTaskClaimExpectation,
   humanTaskDecisionExpectation,
+  humanTaskResubmissionExpectation,
+  normalizeHumanTaskResubmissionReason,
   humanTaskCommandReadbackPath,
   newHumanTaskAttempt,
   resolveHumanTaskCommandEffect,
@@ -200,7 +202,7 @@ export type ClaimHumanTaskInput = {
   attempt?: HumanTaskCommandAttempt
 }
 
-function commandAttempt(input: { attempt?: HumanTaskCommandAttempt; correlationId?: string }, kind: "claim" | "decision") {
+function commandAttempt(input: { attempt?: HumanTaskCommandAttempt; correlationId?: string }, kind: "claim" | "decision" | "resubmit") {
   if (input.attempt) return { ...input.attempt }
   const attempt = newHumanTaskAttempt(kind)
   return { ...attempt, correlationId: input.correlationId ?? attempt.correlationId }
@@ -348,6 +350,45 @@ export function useDecideHumanTask(organizationId: number, scope?: WorkBoardScop
       )
       if (!effect) throw new Error("Human task decision did not read back")
       return effect
+    },
+    onSettled: () => invalidateHumanTaskQueries(qc, organizationId),
+  })
+}
+
+export type ResubmitHumanTaskInput = {
+  companyId: number
+  taskId: number
+  expectedTaskRevision: number
+  expectedInstanceRevision: number
+  expectedSubjectRevisionHash: string
+  reason: string
+  attempt?: HumanTaskCommandAttempt
+}
+
+/** A new audited attempt; an uncertain response is reconciled without redispatch. */
+export function useResubmitHumanTask(organizationId: number, scope: WorkBoardScope) {
+  const qc = useQueryClient()
+  const requireContext = useHumanTaskContextGuard(organizationId, scope)
+  return useMutation<CanonicalRecordRef, Error, ResubmitHumanTaskInput>({
+    mutationFn: async (supplied) => {
+      const input = {
+        ...supplied,
+        reason: normalizeHumanTaskResubmissionReason(supplied.reason),
+        attempt: commandAttempt(supplied, "resubmit"),
+      }
+      const expected = await humanTaskResubmissionExpectation(scope, input)
+      requireContext()
+      const { attempt, ...reviewed } = input
+      const params = stdbParamsToJson({ ...reviewed, ...attempt }, "ResubmitWorkflowHumanTaskParams")
+      const { urlPath, init } = stdbBffCommandPost("resubmit_workflow_human_task", { params })
+      return requireResolvedOperationEffect(await executeOperationWithCanonicalReadback({
+        resolveBeforeDispatch: false,
+        dispatch: () => {
+          requireContext()
+          return apiFetch(urlPath, init).then(decodeOperationDispatch)
+        },
+        resolveEffect: () => { requireContext(); return readHumanTaskCommandEffect(scope, expected) },
+      })).ref
     },
     onSettled: () => invalidateHumanTaskQueries(qc, organizationId),
   })
