@@ -488,6 +488,26 @@ jobs:
         working-directory: frontend/web
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Start the quotation PDF renderer
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+        run: |
+          set -euo pipefail
+          pnpm --dir chromium-worker install --frozen-lockfile
+          browser_path="$(pnpm --dir frontend/web exec node -e 'process.stdout.write(require("@playwright/test").chromium.executablePath())')"
+          mkdir -p .tmp/e2e
+          PORT=8090 PUPPETEER_EXECUTABLE_PATH="$browser_path" node chromium-worker/src/server.ts >.tmp/e2e/pdf-renderer.log 2>&1 &
+          echo "$!" >.tmp/e2e/pdf-renderer.pid
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8090/health/ready >/dev/null; then
+              echo 'LUMIERE_REPORT_RENDERER_URL=http://127.0.0.1:8090' >>"$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat .tmp/e2e/pdf-renderer.log
+          exit 1
+
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.config.suite == 'pretenant'
 
@@ -577,6 +597,13 @@ jobs:
                 exit 1
               fi
             done
+          fi
+
+      - name: Stop the quotation PDF renderer
+        if: always()
+        run: |
+          if [ -f .tmp/e2e/pdf-renderer.pid ]; then
+            kill "$(cat .tmp/e2e/pdf-renderer.pid)" 2>/dev/null || true
           fi
 
       - name: Upload Playwright timings

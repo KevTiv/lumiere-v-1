@@ -30,6 +30,7 @@ import { webApi } from "@/lib/lumiere-web-http"
 import { PostHogPageView } from "@/lib/posthog-pageview"
 import { apiFetch } from "@/lib/api-fetch"
 import { EFFECTIVE_ACCESS_ROLE_ID } from "@lumiere/ui/lib/runtime-form-role"
+import { DocumentTemplateProvider } from "./document-template-provider"
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
 function RBACBridge({
@@ -232,7 +233,9 @@ export function Providers({
                     serverIdentity={serverIdentity}
                     organizationId={organizationId}
                   >
-                    <NavigationGuardProvider>{children}</NavigationGuardProvider>
+                    <DocumentTemplateProvider>
+                      <NavigationGuardProvider>{children}</NavigationGuardProvider>
+                    </DocumentTemplateProvider>
                   </RBACBridge>
                 </ErpSessionBridge>
               </StdbSubscriptionProvider>
