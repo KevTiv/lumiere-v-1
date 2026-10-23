@@ -1,10 +1,10 @@
 # Offline-first synchronization through generated Drizzle + SQLite
 
-**Status:** Proposed — architecture plan only  
+**Status:** Architecture target; first client projection slice implemented on a stacked branch, live synchronization not yet admitted
 **Tracks:** `offline-first`, `desktop`, `web`, `changesets`, `codegen`, `production-readiness`  
 **Related:** [sliding-window-cold-tier.md](./sliding-window-cold-tier.md) · [audit-log-cold-by-default.md](./audit-log-cold-by-default.md) · [backup-recovery-followup.md](./backup-recovery-followup.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
 
-> The Postgres cold tier, shared schema IR, generated Drizzle client projection, and Lumiere replication pipeline described here are architectural targets. This document extends PR #3's direction; it does not claim those components are implemented today.
+> The phase definitions below remain target requirements. The first offline client slice now provides an IR-generated product-category projection, Drizzle reads, a file-backed Node SQLite adapter and an atomic snapshot/pull consumer. See [implementation status](../plan/offline-category-projection-status.md). The authenticated server snapshot/changefeed, browser/Tauri adapters and application adoption are still pending; this is not Phase 1 acceptance.
 
 ---
 
