@@ -32,6 +32,11 @@ def digest(value):
 
 
 def option(value):
+    if isinstance(value, list) and len(value) == 2 and type(value[0]) is int:
+        if value[0] == 0:
+            return value[1]
+        if value[0] == 1 and value[1] == []:
+            return None
     if isinstance(value, dict) and set(value) == {"some"}:
         return value["some"]
     if isinstance(value, dict) and set(value) == {"none"}:

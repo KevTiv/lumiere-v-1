@@ -1,6 +1,6 @@
 # Phase 4 reconstruction contract alignment
 
-Status: integrated with current main and contracts v0.3.139; live AG-09 acceptance pending (2026-10-23).
+Status: integrated with current main and contracts v0.3.139; disposable C7 runtime drill verified, normal gateway/provider acceptance and admission review pending (2026-10-23).
 
 ## Scope
 
@@ -30,7 +30,7 @@ The old counts described schema tables, not restore tables: v0.3.60 has 503 sche
 4. Run `scripts/c7-all-module-reconstruction-drill.sh <organization-id>` with the documented dedicated source/reconstructor identities, loopback placement, PostgreSQL and `C7_EVIDENCE_DIR`. Preserve real verified `coverage.json`, `resume.json` and `repeat.json`.
 5. Capture external provider-dispatch counters across restoration and controlled recovery probes in `ai-provider-dispatch.json`; run `scripts/verify-ai-harness-reconstruction.py`. Compare every scoped row, budget and request binding, unknown outcomes, pending approvals and succeeded-output integrity. Require no provider redispatch.
 
-AG-09 remains partial until the actual reconstruction, repeat and provider-observation evidence passes. This is a fresh/disposable database drill; it does not certify migration of an already-deployed PostgreSQL database.
+The actual disposable reconstruction, repeat and provider-observation drill now passes; its [evidence bundle](../evidence/aih-phase4-disposable-2026-10-23.json) records the source-component hashes, immutable pin, scoped watermark, complete-row checksums and observed dispatch counters. All 509 restore tables and six recreated tables verified in both runs. The nine AI tables match completely, with 37 foreign-organization source rows excluded and the instrumented dispatch counter held at one through restored-target recovery. Broader normal gateway/browser acceptance and admission review remain pending. This fresh/disposable database drill does not certify migration of an already-deployed PostgreSQL database.
 
 ## Current operational prerequisites
 
@@ -39,3 +39,9 @@ The owner confirmed that the harness has no configured Mistral or other provider
 Disposable database races, reconstruction and the instrumented restart probe can run on an independent local stack without a live Mistral account. Their dispatch counters must observe the actual test execution. These checks do not establish real-provider connectivity or complete the normal gateway/browser acceptance gate.
 
 The optional `phase4-acceptance` restart probe accepts the exact disposable C7 source and target module names on loopback. Supply a distinct, registered `AI_SPEND_READ_STDB_TOKEN` alongside the writer's `STDB_TOKEN`; the probe refuses to reuse the writer token for spend reads. The fresh target module must be built with `LUMIERE_RECONSTRUCTION_BOOTSTRAP_IDENTITY` set to the dedicated reconstructor identity before publishing it.
+
+The live drill exposed a price-field codec mismatch: generated durable columns use `input_units_per_1_k` / `output_units_per_1_k`, while the module's canonical row JSON uses `input_units_per_1k` / `output_units_per_1k`. The shared projection/restore codec and target digest reader now translate both snapshot rates and the corresponding model-profile microunit cost fields. Regression coverage checks complete snapshot round trips, nullable profile prices and integers beyond JavaScript's exact-number range. This changes no schema or immutable contract pin.
+
+Use the repository's optimized `ci-contracts` profile for the disposable module. A temporary unoptimized build allocated a 1,708,560-byte restore-function stack frame against a 1,048,576-byte WASM stack; the normal optimized artifact reduced the largest observed initial frame to 57,024 bytes and passed the committed-batch failure/resume step.
+
+The trusted recreated-state set now matches all six entries in the pinned manifest. Requester-scoped `workflow_subject_snapshot` rows must be absent before completion; normal authorized requests recreate them after recovery. An unreadable or nonempty cache blocks completion. The evidence verifier also handles the numeric SATS Option variants returned by the live SQL endpoint, with malformed and nonempty pending-draft variants rejected by regression tests.
