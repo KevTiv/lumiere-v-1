@@ -253,6 +253,24 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
         "mail-messages".to_string(),
         ["metadata"].into_iter().map(String::from).collect(),
     );
+    // Generated documents retain their source snapshot on the document and
+    // its immutable initial version. These exceptions only preserve metadata
+    // selected by the normal field policy and owner/creator-scoped readers.
+    for resource in ["documents", "document-versions"] {
+        m.insert(
+            resource.to_string(),
+            ["metadata"].into_iter().map(String::from).collect(),
+        );
+    }
+    // Preserve the template library's existing readback fields while routing
+    // the former fixed SELECT through explicit field selections.
+    m.insert(
+        "document-templates".to_string(),
+        ["metadata", "create_date", "write_date"]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    );
     m.insert(
         "bank-statement-lines".to_string(),
         // Settlement readback needs its exact payment link and persisted
@@ -301,7 +319,9 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     );
     m.insert(
         "sale-orders".to_string(),
-        ["picking_ids", "invoice_ids"]
+        // A quotation snapshot records the source revision as well as its
+        // existing workflow links; explicit field masks still select each.
+        ["picking_ids", "invoice_ids", "write_date"]
             .into_iter()
             .map(String::from)
             .collect(),
@@ -1703,6 +1723,166 @@ mod tests {
                 cols.iter().any(|column| column == field),
                 "expected {field} in sale-orders projection, got: {cols:?}"
             );
+        }
+    }
+
+    #[test]
+    fn quotation_and_document_readback_defaults_are_schema_backed_for_normal_members() {
+        for (resource, row_type, required) in [
+            (
+                "sale-orders",
+                "SaleOrder",
+                &[
+                    "currency_id",
+                    "validity_date",
+                    "amount_untaxed",
+                    "amount_tax",
+                    "amount_total",
+                    "note",
+                    "terms_and_conditions",
+                    "write_date",
+                    "picking_ids",
+                    "invoice_ids",
+                ][..],
+            ),
+            (
+                "sale-order-lines",
+                "SaleOrderLine",
+                &["company_id", "sequence", "discount", "price_subtotal"][..],
+            ),
+            (
+                "contacts",
+                "Contact",
+                &[
+                    "description",
+                    "street",
+                    "street_2",
+                    "city",
+                    "zip",
+                    "country_code",
+                ][..],
+            ),
+            ("documents", "Document", &["metadata"][..]),
+            ("document-versions", "DocumentVersion", &["metadata"][..]),
+            (
+                "document-templates",
+                "DocumentTemplate",
+                &[
+                    "body_html",
+                    "header_html",
+                    "footer_html",
+                    "variable_bindings_json",
+                    "metadata",
+                    "create_date",
+                    "write_date",
+                ][..],
+            ),
+        ] {
+            let schema = sql_column_list_for_generated_type(row_type).expect("released row schema");
+            let member = field_access(&[&format!("{resource}:read")]);
+            let mut superuser = field_access(&[]);
+            superuser.is_superuser = true;
+            for context in [None, Some(&member), Some(&superuser)] {
+                let columns =
+                    resolve_http_sql_columns(resource, context).expect("readback columns");
+                for field in required {
+                    assert!(
+                        columns.iter().any(|column| column == field),
+                        "{resource}.{field}"
+                    );
+                }
+                assert!(
+                    columns.iter().all(|column| schema.contains(column)),
+                    "{resource} contains a column absent from {row_type}: {columns:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn quotation_and_document_readback_respects_explicit_field_masks() {
+        for (resource, selected, omitted) in [
+            (
+                "sale-orders",
+                "write_date",
+                &["amount_total", "note", "terms_and_conditions"][..],
+            ),
+            (
+                "sale-order-lines",
+                "price_subtotal",
+                &["discount", "sequence"][..],
+            ),
+            (
+                "contacts",
+                "description",
+                &["street", "street_2", "city", "zip", "country_code"][..],
+            ),
+            ("documents", "metadata", &["name", "url"][..]),
+            (
+                "document-versions",
+                "metadata",
+                &["version_number", "url"][..],
+            ),
+            (
+                "document-templates",
+                "name",
+                &[
+                    "body_html",
+                    "metadata",
+                    "header_html",
+                    "footer_html",
+                    "variable_bindings_json",
+                ][..],
+            ),
+        ] {
+            let mut access = field_access(&[&format!("{resource}:read")]);
+            select_fields(&mut access, resource, &["id"]);
+            let masked =
+                resolve_http_sql_columns(resource, Some(&access)).expect("masked readback");
+            assert!(
+                !masked.iter().any(|column| column == selected),
+                "{resource}.{selected}"
+            );
+            for field in omitted {
+                assert!(
+                    !masked.iter().any(|column| column == field),
+                    "{resource}.{field}"
+                );
+            }
+            if matches!(
+                resource,
+                "sale-orders"
+                    | "sale-order-lines"
+                    | "contacts"
+                    | "documents"
+                    | "document-templates"
+            ) {
+                assert!(masked.iter().any(|column| column == "company_id"));
+            }
+            access.field_permissions.clear();
+            select_fields(&mut access, resource, &[selected]);
+            let visible =
+                resolve_http_sql_columns(resource, Some(&access)).expect("selected readback");
+            assert!(
+                visible.iter().any(|column| column == selected),
+                "{resource}.{selected}"
+            );
+            for field in omitted {
+                assert!(
+                    !visible.iter().any(|column| column == field),
+                    "{resource}.{field}"
+                );
+            }
+        }
+        // The document provenance exception does not expose arbitrary metadata
+        // on the source customer or sales records.
+        for resource in ["contacts", "sale-orders", "sale-order-lines"] {
+            let mut access = field_access(&[&format!("{resource}:read")]);
+            select_fields(&mut access, resource, &["metadata"]);
+            assert!(!resolve_http_sql_columns(resource, Some(&access))
+                .expect("source columns")
+                .iter()
+                .any(|column| column == "metadata"));
         }
     }
 

@@ -9,6 +9,8 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@lumiere/i18n';
+import { useErpSession } from '@lumiere/erp-session';
+import { QuotationDocumentDialog } from './quotation-document-dialog';
 import {
   ModuleView,
   FormModal,
@@ -209,9 +211,6 @@ import { usePickingWorkflow } from '@lumiere/query-hooks/hooks/picking-workflow'
 import { useModuleFilters } from '@/hooks/use-module-filters';
 import { OrderHandoffLinks } from '../../../components/order-handoff-links';
 import { orderHandoffs } from '@lumiere/query-hooks/hooks/order-to-cash';
-import { downloadDocumentPdf } from '@lumiere/query-hooks/hooks/templates';
-import { useCreateDocument } from '@lumiere/query-hooks/hooks/documents';
-import { archiveRenderedPdfAsDocument } from '@/lib/archive-document-pdf';
 import { RecordDocumentAttachments } from '../../../components/record-document-attachments';
 import {
   SalesOpsPanel,
@@ -237,7 +236,6 @@ import {
 } from '@/lib/form-lookup';
 import { enumTag } from '@/lib/accounting-post-draft';
 import { saleOrderLineCanBeDeleted } from './sale-order-line-gates';
-import { runtimeFormRoleId } from '@lumiere/ui/lib/runtime-form-role';
 
 function saleOrderState(row: Record<string, unknown>): string {
   const v = row.state;
@@ -372,7 +370,18 @@ function SalesClientLoaded({
   useSalesModuleSubscription();
   const { t } = useTranslation();
   const router = useRouter();
-  const { currentUser } = useRBAC();
+  const { currentUser, permissionsReady, checkPermission } = useRBAC();
+  const documentSession = useErpSession();
+  const canPreviewQuotation = permissionsReady === true &&
+    currentUser?.id === documentSession.identity && documentSession.activeCompanyReady === true &&
+    documentSession.organizationId === organizationId && typeof documentSession.activeCompanyId === 'number' &&
+    documentSession.companyIds?.includes(documentSession.activeCompanyId) === true &&
+    checkPermission('document_template', 'read').allowed && checkPermission('sale_order', 'read').allowed;
+  const [quotationDocument, setQuotationDocument] = useState<{
+    orderId: string;
+    companyId: number;
+    identity: string;
+  } | null>(null);
   const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles);
   const { orgId } = orgBigInts(organizationId)
   const { askForm, cancelForm, formDialog } = useFormDialog();
@@ -1361,6 +1370,24 @@ function SalesClientLoaded({
             label: t('sales.csvImport.toolbarOrders'),
             onClick: () => setCsvKind('order'),
           },
+          ...(canPreviewQuotation ? [{
+            id: 'quotation-document',
+            label: t('sales.quotationDocument.action'),
+            requiresSelection: true,
+            selection: 'single' as const,
+            isApplicable: (rows: EntityRow[]) => rows.length === 1 &&
+              ['Draft', 'Sent', 'ToApprove'].includes(saleOrderState(rows[0]!)) &&
+              String(getRowField(rows[0]!, 'companyId')) === String(documentSession.activeCompanyId),
+            onClick: (rows: EntityRow[]) => {
+              const row = rows[0];
+              const companyId = documentSession.activeCompanyId;
+              const identity = documentSession.identity;
+              if (rows.length !== 1 || !row || !identity || typeof companyId !== 'number' ||
+                String(getRowField(row, 'companyId')) !== String(companyId) ||
+                !/^[1-9]\d*$/.test(String(row.id))) return;
+              setQuotationDocument({ orderId: String(row.id), companyId, identity });
+            },
+          }] : []),
           // Legacy id keeps the existing e2e selector while the action runs through the workflow seam.
           ...workflowActionsToEntityActions(saleOrderWorkflow.actions, {
             ids: {
@@ -1444,6 +1471,9 @@ function SalesClientLoaded({
     accrueSaleCommission,
     orderLines,
     setCsvKind,
+    canPreviewQuotation,
+    documentSession.activeCompanyId,
+    documentSession.identity,
     organizationId,
     t,
   ]);
@@ -2715,6 +2745,14 @@ function SalesClientLoaded({
         />
       ) : null}
       {opsUsable && formDialog}
+      {quotationDocument ? (
+        <QuotationDocumentDialog
+          key={`${organizationId}:${quotationDocument.companyId}:${quotationDocument.orderId}:${quotationDocument.identity}`}
+          organizationId={organizationId}
+          {...quotationDocument}
+          onClose={() => setQuotationDocument(null)}
+        />
+      ) : null}
       <FormModal
         open={openReturnForm && returnsUsable}
         onOpenChange={(open) => {

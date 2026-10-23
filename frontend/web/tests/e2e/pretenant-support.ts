@@ -411,12 +411,22 @@ export async function provisionActor(ownerPage: Page, label: string, permissions
 
 export async function withActor<T>(browser: Browser, actor: Actor, run: (page: Page) => Promise<T>): Promise<T> {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } })
+  let failed = false
   try {
     const page = await context.newPage()
     await signIn(page, actor.email, actor.password)
     return await run(page)
+  } catch (error) {
+    failed = true
+    throw error
   } finally {
-    await context.close()
+    try {
+      await context.close()
+    } catch (error) {
+      // Playwright may already have closed the context when a test times out.
+      // Preserve the original action failure instead of replacing its call log.
+      if (!failed) throw error
+    }
   }
 }
 

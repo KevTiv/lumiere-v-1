@@ -24,6 +24,54 @@ fn access(permissions: &[&str]) -> FieldAccessContext {
     }
 }
 
+#[test]
+fn template_company_scope_preserves_shared_defaults_and_authorized_companies_only() {
+    for row in [
+        json!({"organizationId": 7, "companyId": null}),
+        json!({"organization_id": "7", "company_id": null}),
+        json!({"organizationId": 7, "companyId": 12}),
+        json!({"organization_id": 7, "company_id": "12"}),
+        json!({"organizationId": 7, "companyId": 12, "company_id": "12"}),
+    ] {
+        assert!(template_row_in_company_scope(&row, 7, &[12]), "{row}");
+    }
+    let sibling = json!({"organizationId": 7, "companyId": 13});
+    assert!(!template_row_in_company_scope(&sibling, 7, &[12]));
+    assert!(template_row_in_company_scope(&sibling, 7, &[12, 13]));
+    assert!(template_row_in_company_scope(
+        &json!({"organizationId": 7, "companyId": null}),
+        7,
+        &[]
+    ));
+    assert!(!template_row_in_company_scope(&sibling, 7, &[]));
+}
+
+#[test]
+fn template_company_scope_rejects_missing_malformed_conflicting_and_foreign_fields() {
+    for row in [
+        json!({}),
+        json!({"organizationId": 7}),
+        json!({"companyId": null}),
+        json!({"organizationId": 8, "companyId": null}),
+        json!({"organizationId": 7, "organization_id": 8, "companyId": null}),
+        json!({"organizationId": 7, "companyId": null, "company_id": 12}),
+        json!({"organizationId": 7, "companyId": 12, "company_id": 13}),
+        json!({"organizationId": 7, "companyId": "none"}),
+        json!({"organizationId": 7, "companyId": {"some": 12}}),
+        json!({"organizationId": 7, "companyId": 0}),
+        json!({"organizationId": 7, "companyId": -1}),
+        json!({"organizationId": 7, "companyId": 12.5}),
+        json!({"organizationId": 7, "companyId": "18446744073709551616"}),
+    ] {
+        assert!(!template_row_in_company_scope(&row, 7, &[12]), "{row}");
+    }
+    assert!(!template_row_in_company_scope(
+        &json!({"organizationId": 0, "companyId": null}),
+        0,
+        &[12]
+    ));
+}
+
 fn parent(id: Value) -> Value {
     json!({"id": id, "organizationId": 7, "ownerId": ACTOR, "isDeleted": false})
 }
@@ -367,6 +415,75 @@ fn parent_response(rows: Vec<Value>) -> Value {
         {"name": {"some": "owner_id"}, "algebraic_type": {"String": []}},
         {"name": {"some": "is_deleted"}, "algebraic_type": {"Bool": []}}
     ]}, "rows": rows}])
+}
+
+#[tokio::test]
+async fn real_template_reader_keeps_decoded_global_and_authorized_company_rows() {
+    let response = json!([{"schema": {"elements": [
+        {"name": {"some": "id"}, "algebraic_type": {"U64": []}},
+        {"name": {"some": "organization_id"}, "algebraic_type": {"U64": []}},
+        {"name": {"some": "company_id"}, "algebraic_type": {"Sum": {"variants": [
+            {"name": {"some": "some"}, "algebraic_type": {"U64": []}},
+            {"name": {"some": "none"}, "algebraic_type": {"Product": {"elements": []}}}
+        ]}}}
+    ]}, "rows": [
+        [1, 7, [1, []]],
+        [2, 7, [0, 12]],
+        [3, 7, [0, 13]],
+        [4, 8, [1, []]],
+        [5, 8, [0, 12]]
+    ]}]);
+    let (client, queries, server) = sql_fixture(vec![response]).await;
+    let rows = read_document_templates(&client, 7, &[12], None)
+        .await
+        .unwrap();
+    server.abort();
+    assert_eq!(
+        rows,
+        vec![
+            json!({"id": 2, "organizationId": 7, "companyId": 12}),
+            json!({"id": 1, "organizationId": 7, "companyId": null}),
+        ]
+    );
+    let queries = queries.lock().unwrap();
+    assert_eq!(queries.len(), 1);
+    assert!(queries[0].ends_with("WHERE organization_id = 7"));
+}
+
+#[tokio::test]
+async fn template_reader_does_not_select_body_or_metadata_outside_field_mask() {
+    let (client, queries, server) = sql_fixture(vec![json!([{
+        "schema": {"elements": [
+            {"name": {"some": "id"}, "algebraic_type": {"U64": []}},
+            {"name": {"some": "organization_id"}, "algebraic_type": {"U64": []}},
+            {"name": {"some": "company_id"}, "algebraic_type": {"U64": []}},
+            {"name": {"some": "name"}, "algebraic_type": {"String": []}}
+        ]},
+        "rows": [[1, 7, 12, "Visible name"]]
+    }])])
+    .await;
+    let mut fa = access(&["document_template:read"]);
+    fa.field_permissions.push(FieldPermissionLike {
+        id: Some(1),
+        organization_id: Some(7),
+        role_id: Some(3),
+        resource: "document_template".into(),
+        action: "read".into(),
+        allowed_fields: vec!["name".into()],
+        subject_user_hex: None,
+        subject_role_id: Some(3),
+    });
+    let rows = read_document_templates(&client, 7, &[12], Some(&fa))
+        .await
+        .unwrap();
+    server.abort();
+    assert_eq!(
+        rows,
+        vec![json!({"id": 1, "organizationId": 7, "companyId": 12, "name": "Visible name"})]
+    );
+    let queries = queries.lock().unwrap();
+    assert_eq!(queries.len(), 1);
+    assert_eq!(queries[0], "SELECT id, organization_id, name, company_id FROM document_template WHERE organization_id = 7");
 }
 
 #[tokio::test]

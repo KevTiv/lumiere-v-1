@@ -450,11 +450,31 @@ export function useUpdateContactBusiness(organizationId: bigint) {
   })
 }
 
+export function contactDetailsUpdateRequest(contactId: ScalarId, params: Partial<UpdateContactDetailsParams>) {
+  const patch = finalizeUpdateContactDetailsParams(params)
+  const fields = [
+    "firstName", "lastName", "title", "emailSecondary", "fax", "website", "description", "color",
+  ] as const satisfies readonly (keyof UpdateContactDetailsParams)[]
+  // The released reducer uses Option<Option<String>>: outer none preserves
+  // an untouched field; some(none) clears it; some(some(text)) replaces it.
+  // HTTP structs require every outer Option, including untouched siblings.
+  const encoded = Object.fromEntries(fields.map((field) => {
+    const value = patch[field]
+    return [field, value === undefined
+      ? { none: [] }
+      : { some: value === null ? { none: [] } : { some: value } }]
+  }))
+  return stdbBffCommandPost("update_contact_details", {
+    contactId: toScalarU64(contactId),
+    params: stdbParamsToJson(encoded),
+  })
+}
+
 export function useUpdateContactDetails(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, ContactPatch<UpdateContactDetailsParams>>({
     mutationFn: async ({ contactId, params }) => {
-      const { urlPath, init } = stdbBffCommandPost("update_contact_details", { contactId: toScalarU64(contactId), params: stdbParamsToJson(finalizeUpdateContactDetailsParams(params)) })
+      const { urlPath, init } = contactDetailsUpdateRequest(contactId, params)
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error('Failed to update contact details')
     },
