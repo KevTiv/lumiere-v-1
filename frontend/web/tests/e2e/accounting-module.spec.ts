@@ -50,6 +50,7 @@ const ACCOUNTING_TAB_IDS = [
   "intercompany-transactions",
   "account-journals",
   "move-lines",
+  "work",
 ] as const
 
 type AccountingTabId = (typeof ACCOUNTING_TAB_IDS)[number]
@@ -157,6 +158,13 @@ async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {
     case "move-lines":
       await expect(activeTabEntityTable(page)).toBeVisible()
       break
+    case "work": {
+      const workspace = page.getByRole("region", { name: "My work", exact: true })
+      await expect(workspace).toBeVisible()
+      await expect(workspace.getByRole("combobox", { name: "Work type", exact: true })).toHaveValue("workflow")
+      await expect(workspace.getByRole("group", { name: "View layout", exact: true })).toBeVisible()
+      break
+    }
     default:
       tabId satisfies never
   }

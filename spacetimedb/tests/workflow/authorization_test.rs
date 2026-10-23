@@ -7,14 +7,16 @@ use spacetimedb::{Identity, ReducerContext, Table, Timestamp};
 
 use crate::core::organization::{company, create_company, CreateCompanyParams};
 use crate::core::permissions::{
-    role, sod_conflict_rule, user_role_assignment, Role, SodConflictRule, UserRoleAssignment,
+    org_permission, role, sod_conflict_rule, user_role_assignment, OrgPermission, PermissionAction,
+    PermissionEffect, PermissionSubject, Role, SodConflictRule, UserRoleAssignment,
 };
 use crate::core::users::{user_organization, user_profile, UserOrganization, UserProfile};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
 use crate::workflow::authorization::{
     authorize_workflow_decision_for_actor, insert_workflow_delegation,
-    require_workflow_company_access, workflow_delegation, CreateWorkflowDelegationParams,
-    WorkflowAuthorizationBypass, WorkflowAuthorizationRequest, WorkflowDelegation,
+    require_workflow_company_access, require_workflow_subject_read, workflow_delegation,
+    CreateWorkflowDelegationParams, WorkflowAuthorizationBypass, WorkflowAuthorizationRequest,
+    WorkflowDelegation,
 };
 
 pub fn test_workflow_authorization(ctx: &ReducerContext) -> Result<(), String> {
@@ -26,6 +28,7 @@ pub fn test_workflow_authorization(ctx: &ReducerContext) -> Result<(), String> {
     rejects_expired_delegation_at_decision_time(ctx)?;
     records_valid_delegation_identities(ctx)?;
     records_explicit_superuser_bypass(ctx)?;
+    finance_source_reads_use_current_actor_policy(ctx)?;
     Ok(())
 }
 
@@ -492,6 +495,131 @@ fn records_explicit_superuser_bypass(ctx: &ReducerContext) -> Result<(), String>
     {
         return Err("superuser bypass was not explicit in authorization evidence".to_string());
     }
+    Ok(())
+}
+
+fn finance_source_reads_use_current_actor_policy(ctx: &ReducerContext) -> Result<(), String> {
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let source_role = seed_role(
+        ctx,
+        fixture.organization_id,
+        "finance-source-reader",
+        vec![
+            "workflow_task:approve",
+            "module:purchasing:read",
+            "sale_order:read",
+            "account-moves:read",
+            "account_payment:read",
+            "expense_sheet:read",
+        ],
+    );
+    let principal = seed_member(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        source_role,
+        true,
+        false,
+    );
+    for model in [
+        "purchase_order",
+        "sale_order",
+        "account_move",
+        "account_payment",
+        "hr_expense_sheet",
+    ] {
+        require_workflow_subject_read(ctx, fixture.organization_id, principal, model)?;
+    }
+    for denied_resource in ["purchase-orders", "purchase_order", "module:purchasing"] {
+        let deny = ctx.db.org_permission().insert(OrgPermission {
+            id: 0,
+            organization_id: fixture.organization_id,
+            subject: PermissionSubject::User(principal),
+            role_id: None,
+            resource: denied_resource.to_string(),
+            action: PermissionAction::Read,
+            effect: PermissionEffect::Deny,
+            created_by: ctx.sender(),
+            created_at: ctx.timestamp,
+        });
+        let denied = require_workflow_subject_read(
+            ctx,
+            fixture.organization_id,
+            principal,
+            "purchase_order",
+        )
+        .err()
+        .ok_or("Finance source read bypassed a canonical resource or module deny")?;
+        assert_error_contains(&denied, "source read permission denied")?;
+        ctx.db.org_permission().id().delete(&deny.id);
+    }
+
+    let member_role = seed_role(ctx, fixture.organization_id, "finance-delegate", Vec::new());
+    let actor = seed_member(
+        ctx,
+        fixture.organization_id,
+        Some(fixture.company_id),
+        member_role,
+        true,
+        false,
+    );
+    insert_workflow_delegation(
+        ctx,
+        fixture.organization_id,
+        fixture.company_id,
+        delegation(principal, actor, Some(source_role), ctx.timestamp),
+        ctx.sender(),
+    )?;
+    authorize_workflow_decision_for_actor(
+        ctx,
+        actor,
+        &request(
+            &fixture,
+            new_identity(ctx),
+            Some(principal),
+            vec![source_role],
+            "workflow_task:approve",
+        ),
+    )?;
+    let denied =
+        require_workflow_subject_read(ctx, fixture.organization_id, actor, "purchase_order")
+            .err()
+            .ok_or("delegate inherited the principal's source-read authority")?;
+    assert_error_contains(&denied, "source read permission denied")?;
+
+    let read_only_role = seed_role(
+        ctx,
+        fixture.organization_id,
+        "delegate-source-reader",
+        vec!["purchase_order:read"],
+    );
+    let assignment = ctx.db.user_role_assignment().insert(UserRoleAssignment {
+        id: 0,
+        user_identity: actor,
+        role_id: read_only_role,
+        organization_id: fixture.organization_id,
+        assigned_by: ctx.sender(),
+        assigned_at: ctx.timestamp,
+        expires_at: None,
+        is_active: true,
+        metadata: None,
+    });
+    require_workflow_subject_read(ctx, fixture.organization_id, actor, "purchase_order")?;
+    ctx.db
+        .user_role_assignment()
+        .id()
+        .update(UserRoleAssignment {
+            is_active: false,
+            ..assignment
+        });
+    let revoked =
+        require_workflow_subject_read(ctx, fixture.organization_id, actor, "purchase_order")
+            .err()
+            .ok_or("revoked source-read role still authorized the delegate")?;
+    assert_error_contains(&revoked, "source read permission denied")?;
+
+    // Unrelated workflow subjects keep their existing authorization contract.
+    require_workflow_subject_read(ctx, fixture.organization_id, actor, "test_subject")?;
     Ok(())
 }
 

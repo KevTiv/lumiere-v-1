@@ -5,7 +5,8 @@ import { useProductivitySections } from "@/lib/use-productivity-sections"
 import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
-import { useMemo, useState, useCallback, useEffect } from "react"
+import { useMemo, useState, useCallback, useEffect, useRef } from "react"
+import { useErpSession } from "@lumiere/erp-session"
 import type { QueryResourceState } from "@lumiere/api-client"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -44,6 +45,7 @@ import {
 import { projectsModuleConfig } from "@/lib/module-dashboard-configs"
 import Link from "next/link"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { getProjectFieldValue, projectHref } from "./project-record"
 import { useProjectsModuleSubscription } from "@/lib/module-subscription-hooks"
 import {
@@ -77,6 +79,7 @@ import {
   useToggleProjectFavorite,
   useSetTaskParent,
   useAssignTaskUsers,
+  useTaskAssignees,
   useValidateTimesheets,
   useRejectTimesheets,
   useBillTimesheets,
@@ -105,7 +108,8 @@ import { useUoms } from "@lumiere/query-hooks/hooks/inventory"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { usePricelists, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
-import { useContacts, useUsers, type Contact } from "@lumiere/query-hooks/hooks/crm"
+import { useContacts, type Contact } from "@lumiere/query-hooks/hooks/crm"
+import { taskAssigneeIds } from "@lumiere/query-hooks/hooks/task-assignment"
 import { useAccountAccounts, useAccountJournals } from "@lumiere/query-hooks/hooks/accounting"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import {
@@ -114,7 +118,6 @@ import {
   projectRowsToSelectOptions,
   taskRowsToSelectOptions,
   taskStagePairOptionsFromTasks,
-  userRowsToSelectOptions,
   accountJournalRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
   employeeRowsToSelectOptions,
@@ -202,21 +205,18 @@ const assignUsersForm = (userOptions: Array<{ value: string; label: string }>): 
   id: "projects-assign-task-users",
   title: "Assign Task Users",
   submitLabel: "Assign users",
-  description:
-    userOptions.length > 0
-      ? `Available users: ${userOptions.map((o) => `${o.label} (${o.value})`).slice(0, 5).join(", ")}${userOptions.length > 5 ? "…" : ""}`
-      : undefined,
+  description: "Choose active members of this company. An empty selection clears the assignment on the selected tasks.",
   sections: [
     {
       id: "users",
       fields: [
         {
           id: "user-ids",
-          type: "textarea",
+          type: "multiselect",
           name: "userIds",
-          label: "User IDs, one per line",
-          required: true,
-          rows: 4,
+          label: "Assignees",
+          options: userOptions,
+          defaultValue: [],
           width: "full",
         },
       ],
@@ -274,13 +274,6 @@ function selectedIds(rows: Record<string, unknown>[]): Array<string | number | b
   return rows
     .map((row) => row.id as string | number | bigint | undefined)
     .filter((id): id is string | number | bigint => id != null && String(id).trim() !== "")
-}
-
-function idLines(value: unknown): Array<string | number | bigint> {
-  return String(value ?? "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
 }
 
 function timesheetStatus(row: Record<string, unknown>): string {
@@ -343,12 +336,33 @@ function ProjectsClientLoaded({
 }: ProjectsClientLoadedProps) {
   useProjectsModuleSubscription()
   const { t } = useTranslation()
+  const session = useErpSession()
+  const { currentUser, roles, policies, permissionsReady, checkPermission } = useRBAC()
+  const taskAuthorizationKey = JSON.stringify({ currentUser, roles, policies })
+  const canAssignTask = permissionsReady !== false && !!currentUser && !!session.identity && session.organizationId === organizationId && session.activeCompanyReady !== false && checkPermission("project_task", "write").allowed
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [modal, setModal] = useState<ModalState>({ type: null })
   const [lifecycleModal, setLifecycleModal] = useState<LifecycleModalState>({ type: null })
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
   const [csvKind, setCsvKind] = useState<ProjectsCsvImportKind | null>(null)
+  const assignmentScopeKey = `${organizationId}:${operatingCompanyId}:${session.identity}:${taskAuthorizationKey}`
+  const previousAssignmentScope = useRef(assignmentScopeKey)
+  const assigningTasks = useRef(false)
+  const [assignmentOnline, setAssignmentOnline] = useState(true)
+  useEffect(() => {
+    const update = () => setAssignmentOnline(navigator.onLine)
+    update()
+    window.addEventListener("online", update)
+    window.addEventListener("offline", update)
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update) }
+  }, [])
+  useEffect(() => {
+    if (previousAssignmentScope.current !== assignmentScopeKey) {
+      previousAssignmentScope.current = assignmentScopeKey
+      setLifecycleModal((current) => current.type === "assignUsers" ? { type: null } : current)
+    }
+  }, [assignmentScopeKey])
 
   const projectsRead = moduleCollection(useProjects(orgId, initialProjects))
   const projects = projectsRead.rows
@@ -401,7 +415,7 @@ function ProjectsClientLoaded({
       : contactsQuery.status === "error" || initialContactsState?.status === "unavailable"
         ? "Unavailable"
         : "Loading"
-  const { data: users = [] } = useUsers(orgId)
+  const taskAssignees = useTaskAssignees(orgId, operatingCompanyId, undefined, canAssignTask && lifecycleModal.type === "assignUsers", { actorIdentity: session.identity ?? "", authorizationKey: taskAuthorizationKey })
   const { data: accountJournals = [] } = useAccountJournals(orgId)
   const { data: accountAccounts = [] } = useAccountAccounts(orgId)
   const { data: currencies = [] } = useCurrencies()
@@ -519,10 +533,9 @@ function ProjectsClientLoaded({
   }, [tasks, t])
 
   const userFieldOptions = useMemo(() => {
-    const fromApi = userRowsToSelectOptions(users as Record<string, unknown>[])
-    if (fromApi.length > 0) return fromApi
-    return [{ value: "", label: "No users available", disabled: true }]
-  }, [users, t])
+    if (!canAssignTask || taskAssignees.isError || !taskAssignees.isSuccess) return []
+    return taskAssignees.data.map((option) => ({ value: option.id, label: option.name }))
+  }, [taskAssignees.data, taskAssignees.isError, taskAssignees.isSuccess, canAssignTask])
 
   const assignUsersFormConfig = useMemo(
     () => assignUsersForm(userFieldOptions),
@@ -1186,6 +1199,7 @@ function ProjectsClientLoaded({
                 {
                   id: "assign-users",
                   label: "Assign users",
+                  permission: { resource: "project_task", action: "write" },
                   requiresSelection: true,
                   selection: "multiple",
                   onClick: (rows) => {
@@ -1517,8 +1531,9 @@ function ProjectsClientLoaded({
           }}
           // Billing references may finish after this modal opens; retain the
           // draft while resolving its options from the current query results.
-          config={lifecycleModal.type === "billTimesheets" ? billTimesheetsFormConfig : lifecycleModal.form}
+          config={lifecycleModal.type === "billTimesheets" ? billTimesheetsFormConfig : lifecycleModal.type === "assignUsers" ? assignUsersFormConfig : lifecycleModal.form}
           isPending={isFormMutationPending}
+          submissionDisabled={lifecycleModal.type === "assignUsers" && (!canAssignTask || !assignmentOnline || !taskAssignees.isSuccess || taskAssignees.isFetching || taskAssignees.isError)}
           closeOnSubmit={false}
           submitError={lifecycleError}
           onSubmit={async (formData) => {
@@ -1550,16 +1565,29 @@ function ProjectsClientLoaded({
                   ),
                 )
               } else if (lifecycleModal.type === "assignUsers") {
-                const userIds = idLines(formData.userIds)
-                if (userIds.length === 0) throw new Error("At least one user ID is required")
-                await Promise.all(
+                if (assigningTasks.current) return
+                if (!canAssignTask) throw new Error("Task assignment permission is required")
+                if (!navigator.onLine) throw new Error("Connect to the network to change assignments")
+                if (operatingCompanyId <= 0n) throw new Error("Select an active company")
+                if (!taskAssignees.isSuccess || taskAssignees.isError || taskAssignees.isFetching) throw new Error("Eligible people could not be loaded. Close and reopen the form to retry.")
+                if (lifecycleModal.rows.some((row) => String(row.companyId ?? row.company_id) !== operatingCompanyId.toString())) {
+                  throw new Error("Select tasks from the current company")
+                }
+                const userIds = taskAssigneeIds(Array.isArray(formData.userIds) ? formData.userIds : [])
+                const eligible = new Set(userFieldOptions.map((option) => option.value))
+                if (userIds.some((identity) => !eligible.has(identity))) {
+                  throw new Error("Select active members of this company")
+                }
+                assigningTasks.current = true
+                try { await Promise.all(
                   ids.map((taskId) =>
                     assignTaskUsers.mutateAsync({
                       taskId,
                       userIds,
+                      companyId: operatingCompanyId,
                     }),
                   ),
-                )
+                ) } finally { assigningTasks.current = false }
               } else if (lifecycleModal.type === "billTimesheets") {
                 if (ids.length === 0) throw new Error("Select at least one timesheet")
                 if (operatingCompanyId == null) throw new Error("Select an active company")

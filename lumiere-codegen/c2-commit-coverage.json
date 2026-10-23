@@ -2,6 +2,13 @@
   "schema_version": 1,
   "reducers": [
     {
+      "source": "spacetimedb/src/workflow/cancellation_repair.rs",
+      "function": "repair_cancelled_workflow_tasks",
+      "operation": "repair_cancelled_workflow_tasks",
+      "operation_id": "erp.repair_cancelled_workflow_tasks",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
       "source": "spacetimedb/src/documents/templates.rs",
       "function": "queue_mail_from_template",
       "operation": "queue_mail_from_template",
@@ -253,6 +260,13 @@
       "function": "start_workflow_internal",
       "operation": "start_workflow",
       "operation_id": "erp.start_workflow",
+      "change_constructors": ["upsert_stdb_row"]
+    },
+    {
+      "source": "spacetimedb/src/workflow/recovery.rs",
+      "function": "resubmit_workflow_human_task",
+      "operation": "resubmit_workflow_human_task",
+      "operation_id": "erp.resubmit_workflow_human_task",
       "change_constructors": ["upsert_stdb_row"]
     },
     {
@@ -527,6 +541,61 @@
           "argument": "\"erp.add_workflow_human_task_comment\"",
           "operations": {
             "add_workflow_human_task_comment": "erp.add_workflow_human_task_comment"
+          }
+        }
+      ]
+    },
+    {
+      "source": "spacetimedb/src/workflow/finance_persistence.rs",
+      "function": "record",
+      "operation_id_parameter": "operation",
+      "snapshot_type": "FinanceWorkflowCommitSnapshot",
+      "method": "record",
+      "change_constructors": [
+        "upsert_stdb_row"
+      ],
+      "change_helpers": [
+        "append_guarded_receipts"
+      ],
+      "callers": [
+        {
+          "source": "spacetimedb/src/workflow/finance_persistence.rs",
+          "function": "record_claim",
+          "argument": "\"erp.claim_workflow_human_task\"",
+          "operations": {
+            "claim_workflow_human_task": "erp.claim_workflow_human_task"
+          }
+        },
+        {
+          "source": "spacetimedb/src/workflow/finance_persistence.rs",
+          "function": "record_decision",
+          "argument": "\"erp.decide_workflow_human_task\"",
+          "operations": {
+            "decide_workflow_human_task": "erp.decide_workflow_human_task"
+          }
+        },
+        {
+          "source": "spacetimedb/src/workflow/finance_persistence.rs",
+          "function": "record_invalidation",
+          "argument": "\"erp.invalidate_workflow_human_task\"",
+          "operations": {
+            "invalidate_workflow_human_task": "erp.invalidate_workflow_human_task"
+          }
+        },
+        {
+          "source": "spacetimedb/src/workflow/finance_persistence.rs",
+          "function": "record_comment",
+          "argument": "\"erp.add_workflow_human_task_comment\"",
+          "operations": {
+            "add_workflow_human_task_comment": "erp.add_workflow_human_task_comment"
+          }
+        },
+        {
+          "source": "spacetimedb/src/workflow/finance_persistence.rs",
+          "function": "record_cancelled_workflow",
+          "argument": "\"erp.cancel_workflow\"",
+          "operations": {
+            "cancel_workflow": "erp.cancel_workflow"
           }
         }
       ]

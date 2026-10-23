@@ -46,3 +46,7 @@ Integrated main `68af4d68` and retargeted #243 to main after #242 merged. The co
 The 390px navigation scenario opens the real mobile drawer by keyboard before inspecting Finance links, verifies its close action, and reopens it after the palette and route navigation. Desktop coverage retains the collapsed-sidebar checks. Visibility, permission, exact receipt handoff and no-business-write assertions remain enforced.
 
 Local validation: all 928 shared UI tests across 142 files pass, including the title regression (which fails with the old placement). UI and web TypeScript and changed UI lint pass; Playwright discovers all five Finance navigation cases plus authentication setup. Full release E2E and fresh security checks are selected for the pushed head. The flagged Compose placeholder file is byte-for-byte identical to main; no scanner suppression or credential change was introduced.
+
+## Module work boards
+
+The supporting Tasks entry now opens My work. Purchasing, Sales, Accounting and Expenses include a scoped Work workspace, with a Finance aggregate over authorized assignments. Project-task and deadline links retain the existing project-task view through `source=projects`. Record follow-ups use the existing typed Activity targets where available. See [Module work boards for the Finance alpha](module-work-boards-alpha.md) for the source/action mapping, authorization boundaries and release checks.

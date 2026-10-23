@@ -288,7 +288,7 @@
   "web/app/(modules)/projects/[id]/project-page-client.tsx": 1,
   "web/app/(modules)/projects/advanced-psa-panel.tsx": 1,
   "web/app/(modules)/projects/project-record.ts": 2,
-  "web/app/(modules)/projects/projects-client.tsx": 54,
+  "web/app/(modules)/projects/projects-client.tsx": 53,
   "web/app/(modules)/projects/projects-panels.tsx": 13,
   "web/app/(modules)/proposals/[id]/proposal-workspace-wrapper.tsx": 1,
   "web/app/(modules)/proposals/proposals-client.tsx": 7,

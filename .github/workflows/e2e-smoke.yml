@@ -1,7 +1,7 @@
 name: E2E smoke
 
 # Full browser smoke requires local SpacetimeDB, api-server, and seeded fixtures.
-# Default CI (ci.yml) only validates Playwright tests compile via `playwright test --list`.
+# Default CI (ci.yml) validates live specs load and runs the synthetic work-board browser suite.
 on:
   push:
     branches: [main]

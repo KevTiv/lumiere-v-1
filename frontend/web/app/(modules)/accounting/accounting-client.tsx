@@ -1,4 +1,5 @@
 "use client"
+import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { AssetDepreciationSchedule } from "@lumiere/ui/accounting-components/asset-depreciation-schedule"
 import { useModuleTab } from "@/hooks/use-module-tab"
@@ -34,7 +35,6 @@ import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
-  ModuleView,
   DashboardWidgetRenderer,
   FormModal,
   CsvImportModal,
@@ -840,6 +840,7 @@ function AccountingClientReady({
       "account-journals",
       "move-lines",
       "period-close",
+      "work",
     ],
     [moduleConfigBase],
   )
@@ -6375,7 +6376,9 @@ function AccountingClientReady({
         onResolve={handleReadinessResolve}
         className="mb-4"
       /> : <p role="status" className="rounded-lg border p-4 text-sm">Select an active company to continue. Original pending operations have been retained.</p>}
-      {companyAvailable ? <ModuleView
+      {companyAvailable ? <ModuleWorkView
+        organizationId={organizationId}
+        workScope="accounting"
         config={config}
         data={data}
         dataLoading={dataLoading}

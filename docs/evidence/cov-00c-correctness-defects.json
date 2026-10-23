@@ -315,6 +315,8 @@
       "frontend/web/tests/e2e/sales-mutations.spec.ts",
       "frontend/web/tests/e2e/tasks-board-drag.spec.ts",
       "frontend/web/tests/e2e/vertical-distributor.spec.ts",
+      "frontend/web/tests/e2e/work-board-acceptance-support.ts",
+      "frontend/web/tests/e2e/work-board-revocation.spec.ts",
       "frontend/web/tests/e2e/workflows-gate-ui.spec.ts"
     ],
     "latest_function_sites": [

@@ -3486,6 +3486,10 @@
       "name": "reorder_proposal_line_items",
       "shape_fingerprint": "sha256:d91065a5c7ddc9380cef987450925cb17f4d3b2173205393b3559176f824fbaf"
     },
+    "erp.repair_cancelled_workflow_tasks": {
+      "name": "repair_cancelled_workflow_tasks",
+      "shape_fingerprint": "sha256:72916bdac0638c7ba185c9f78aed4827b049d18e91bef218e126ca2a3fd09ac9"
+    },
     "erp.replace_contact_categories": {
       "name": "replace_contact_categories",
       "shape_fingerprint": "sha256:a3413724fede12325724bcedb846b780e4c5df9dce912a72171fc06d5641c1d8"
@@ -3569,6 +3573,10 @@
     "erp.resubmit_bank_statement_settlement": {
       "name": "resubmit_bank_statement_settlement",
       "shape_fingerprint": "sha256:db3b7e46c443e56bb313a3a5c3fe96d7620365d15fae05bfcc9808554cc937ff"
+    },
+    "erp.resubmit_workflow_human_task": {
+      "name": "resubmit_workflow_human_task",
+      "shape_fingerprint": "sha256:9321e33215aa83023cc952163191ee6c6594d0d44f7257d7406e2dea320347f3"
     },
     "erp.resume_ai_run_checked": {
       "name": "resume_ai_run_checked",
@@ -6112,6 +6120,14 @@
       "current_operations_fingerprint": "sha256:380394220a565218bb424cb3779d6e78b567f57737f30ee22415081d3c391286",
       "operation_count": 1460,
       "reason": "release on top of v0.3.138: add none; change the shape of update_document_template"
+    },
+    {
+      "previous_release": "v0.3.139",
+      "previous_ir_sha256": "sha256:0d62256574145532018f11c69567802fa969dcc4e131d4c079ac138bb4552e99",
+      "previous_operations_fingerprint": "sha256:380394220a565218bb424cb3779d6e78b567f57737f30ee22415081d3c391286",
+      "current_operations_fingerprint": "sha256:5cca890c71074d8d79b710f550b94fe7fc7e10cc51bce7bde92f42648b061d04",
+      "operation_count": 1462,
+      "reason": "release on top of v0.3.139: add repair_cancelled_workflow_tasks, resubmit_workflow_human_task; change the shape of none"
     }
   ]
 }
