@@ -81,6 +81,8 @@ Resubmission requires current workflow creation/task-management permission, actu
 
 Recovery outcomes enter the existing organization commit stream with complete task/runtime histories, pinned workflow definitions, audit rows and private recovery evidence. The shared durable projector and reconstruction path consume those full row images. Snapshot collection is bounded to 16,384 rows and fails the native transaction if exceeded; it never drops historical votes or receipts to fit the bound. A successful receipt replay records no additional recovery commit.
 
+Migrating an active guarded approval requires the target HumanTask's single `approved` edge to lead directly to the original action key and schema version. Missing or ambiguous approval paths and changed actions fail both preflight and execution without changing task, token, instance or frozen-vote evidence. A valid migration preserves earlier votes and the historical workflow definitions needed to reconstruct them.
+
 An active or stranded claim must first be cancelled by an authorized workflow operator. Resubmission grants no review authority and executes no purchase or payment effect. An administrator should not alter a source record solely to manufacture a new approval.
 
 ### Legacy cancellation inventory and repair
@@ -105,7 +107,7 @@ The scanner uses 128-ID windows, at most four complete windows and a shared budg
 
 ## Validation and release gate
 
-The change includes shared Kanban interaction tests, typed board/assignment/command model tests, API authorization and pagination tests, and a Playwright fixture that mounts the actual Work components with synthetic HTTP/session boundaries. The fixture covers review before dispatch, exact receipt readback, unresolved-outcome reconciliation without another POST, refusal/staleness, delegated principals, omitted/redacted rows, context changes, reconnect authority sequencing and desktop/mobile containment.
+The change includes shared Kanban interaction tests, typed board/assignment/command model tests, API authorization and pagination tests, and a Playwright fixture that mounts the actual Work components with synthetic HTTP/session boundaries. The fixture covers review before dispatch, exact receipt readback, unresolved-outcome reconciliation without another POST, refusal/staleness, delegated principals, omitted/redacted rows, context changes, reconnect authority sequencing and desktop/mobile containment. The existing Frontend CI job runs it through `test:e2e:work-board` with one configured worker and retains failure screenshots and traces.
 
 The browser fixture is not a live SpacetimeDB authorization proof. Native workflow tests cover current role/group/department eligibility, frozen quorum, revoked/expired delegation, same-key receipt ownership and replay authorization, source-read policy and cancellation history. They run through the existing workflow domain reducers. Existing project assignment and CRM Activity regression reducers are also included in the standard E2E domain list.
 
@@ -115,7 +117,7 @@ Delegations are created/revoked by their authorized principal. Private task evid
 
 The six live cases cover competing claims and opposite decisions, a lost response after a partial quorum vote commits, source-read revocation, organization-membership revocation, delegation revocation without a direct decision grant, and rollback after a native failure that occurs after attempted vote/domain writes. Revocation cases hold the real browser command while the owner changes authority, then forward the original request and retry its captured body. Independent canonical reads verify that denied commands leave no task, vote, receipt or purchase-order effect.
 
-For local verification on an 8 GiB workspace, serialize Node, Rust and browser builds. Use `NODE_OPTIONS=--max-old-space-size=4096` for the web typecheck and `CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0` for native checks. Missing live services or an unexecuted test must remain explicitly unproven in the PR. The shared CI live suite and the deployed alpha acceptance gate remain distinct from pure/unit/synthetic tests.
+For local verification on an 8 GiB workspace, run native checks, web typechecking and browser tests sequentially. The full web typecheck exhausted a 4 GiB heap in this workspace; use `NODE_OPTIONS=--max-old-space-size=6144` with the isolated local SpacetimeDB stopped and no other build running. Use `CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0` for native checks. A single full module or generated-contract build can still approach the local memory limit; stop it before exhaustion and use the module artifact or contracts release after its shared CI build passes. Missing live services or an unexecuted test must remain explicitly unproven in the PR. The shared CI live suite and the deployed alpha acceptance gate remain distinct from pure/unit/synthetic tests.
 
 The PR records the checks actually executed for its head. The existing Rust CI job also runs the work-board, Activity, assignee-directory and authoritative-source suites. Deployment and live alpha acceptance continue through the existing release gates.
 

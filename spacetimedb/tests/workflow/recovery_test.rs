@@ -50,22 +50,26 @@ use crate::workflow::definitions::{
     retire_workflow_version, upsert_workflow_edge, upsert_workflow_node, workflow, workflow_edge,
     workflow_node, workflow_version, CreateWorkflowParams, WorkflowActionReference,
     WorkflowHumanTaskKind, WorkflowNodeKind, WorkflowTaskAssignment, WorkflowTaskPolicy,
-    WorkflowTrigger, WorkflowVersionStatus,
+    WorkflowTrigger, WorkflowVersion, WorkflowVersionStatus,
 };
 use crate::workflow::migration::{
-    create_workflow_migration_plan, migrate_workflow_instance, workflow_migration_plan,
-    CreateWorkflowMigrationPlanParams, MigrateWorkflowInstanceParams, WorkflowEdgeMigrationMapping,
+    create_workflow_migration_plan, migrate_workflow_instance, preflight_workflow_migration,
+    workflow_migration_instance_result, workflow_migration_plan, workflow_migration_preflight,
+    CreateWorkflowMigrationPlanParams, MigrateWorkflowInstanceParams,
+    PreflightWorkflowMigrationParams, WorkflowEdgeMigrationMapping, WorkflowMigrationPlan,
     WorkflowNodeMigrationMapping,
 };
 use crate::workflow::recovery::{
     resubmit_workflow_human_task, workflow_human_task_resubmission,
     ResubmitWorkflowHumanTaskParams, WorkflowHumanTaskResubmission,
 };
-use crate::workflow::runtime::{cancel_workflow, workflow_instance, CancelWorkflowParams};
+use crate::workflow::runtime::{
+    cancel_workflow, workflow_instance, workflow_token, CancelWorkflowParams,
+};
 
 use super::human_tasks_test::{
-    candidate_decisions, definition_edge, definition_node, insert_draft_purchase_order,
-    seed_member, seed_role, task_evidence_counts,
+    cancellation_evidence_counts, candidate_decisions, definition_edge, definition_node,
+    insert_draft_purchase_order, seed_member, seed_role, task_evidence_counts,
 };
 
 const PO_OPERATOR_GRANTS: [&str; 5] = [
@@ -78,10 +82,16 @@ const PO_OPERATOR_GRANTS: [&str; 5] = [
 
 pub(super) fn test_workflow_recovery(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
-    resubmission_preserves_history_and_uses_current_electorate(ctx)?;
-    confirmation_recovery_checks_current_authority_and_source(ctx)?;
-    ordinary_payment_recovery_excludes_bank_attempts(ctx)?;
-    finance_claim_comment_invalidation_are_durable(ctx)?;
+    resubmission_preserves_history_and_uses_current_electorate(ctx).map_err(|error| {
+        format!("resubmission_preserves_history_and_uses_current_electorate: {error}")
+    })?;
+    confirmation_recovery_checks_current_authority_and_source(ctx).map_err(|error| {
+        format!("confirmation_recovery_checks_current_authority_and_source: {error}")
+    })?;
+    ordinary_payment_recovery_excludes_bank_attempts(ctx)
+        .map_err(|error| format!("ordinary_payment_recovery_excludes_bank_attempts: {error}"))?;
+    finance_claim_comment_invalidation_are_durable(ctx)
+        .map_err(|error| format!("finance_claim_comment_invalidation_are_durable: {error}"))?;
     Ok(())
 }
 
@@ -121,7 +131,8 @@ fn resubmission_preserves_history_and_uses_current_electorate(
         decision(ctx, &task, "partial-vote")?,
     )?;
     // A real version migration leaves this task's original Create/vote events
-    // and consumed tokens pinned to v1 while the active projection moves to v2.
+    // and consumed tokens pinned to v1 while the active projection moves to a
+    // later published version.
     migrate_recovery_fixture(ctx, &fixture, &task)?;
     let removed_membership = membership(ctx, &fixture, removed)?;
     ctx.db.user_organization().id().update(UserOrganization {
@@ -895,58 +906,22 @@ fn migrate_recovery_fixture(
         .id()
         .find(&task.workflow_version_id)
         .ok_or("recovery migration source missing")?;
-    clone_workflow_version_to_draft(
-        ctx,
-        fixture.organization_id,
-        source.id,
-        source.draft_revision,
-    )?;
-    let draft = ctx
-        .db
-        .workflow_version()
-        .workflow_version_by_workflow()
-        .filter(&task.workflow_id)
-        .find(|version| version.status == WorkflowVersionStatus::Draft)
-        .ok_or("recovery migration draft missing")?;
+    guarded_migration_rejections(ctx, fixture, task, &source)?;
+    let draft = clone_recovery_version(ctx, fixture, &source)?;
     publish_workflow_version(ctx, fixture.organization_id, draft.id, draft.draft_revision)?;
-    create_workflow_migration_plan(
+    let plan = recovery_migration_plan(
         ctx,
-        fixture.organization_id,
-        CreateWorkflowMigrationPlanParams {
-            company_id: fixture.company_id,
-            workflow_id: task.workflow_id,
-            source_workflow_version_id: source.id,
-            target_workflow_version_id: draft.id,
-            node_mappings: ["start", "approve", "effect", "done", "rejected"]
-                .into_iter()
-                .map(|key| WorkflowNodeMigrationMapping {
-                    from_node_key: key.to_string(),
-                    to_node_key: key.to_string(),
-                })
-                .collect(),
-            fork_mappings: Vec::new(),
-            edge_mappings: [
-                "start-approve",
-                "approve-effect",
-                "approve-rejected",
-                "effect-done",
-            ]
-            .into_iter()
-            .map(|key| WorkflowEdgeMigrationMapping {
-                from_edge_key: key.to_string(),
-                to_edge_key: key.to_string(),
-            })
-            .collect(),
-            active: true,
-        },
+        fixture,
+        task,
+        draft.id,
+        &["start", "approve", "effect", "done", "rejected"],
+        &[
+            "start-approve",
+            "approve-effect",
+            "approve-rejected",
+            "effect-done",
+        ],
     )?;
-    let plan = ctx
-        .db
-        .workflow_migration_plan()
-        .migration_plan_by_workflow()
-        .filter(&task.workflow_id)
-        .find(|plan| plan.target_workflow_version_id == draft.id)
-        .ok_or("recovery migration plan missing")?;
     let instance = ctx
         .db
         .workflow_instance()
@@ -974,6 +949,274 @@ fn migrate_recovery_fixture(
         source.id,
         source.draft_revision,
     )
+}
+
+fn clone_recovery_version(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    source: &WorkflowVersion,
+) -> Result<WorkflowVersion, String> {
+    clone_workflow_version_to_draft(
+        ctx,
+        fixture.organization_id,
+        source.id,
+        source.draft_revision,
+    )?;
+    ctx.db
+        .workflow_version()
+        .workflow_version_by_workflow()
+        .filter(&source.workflow_id)
+        .find(|version| version.status == WorkflowVersionStatus::Draft)
+        .ok_or_else(|| "recovery migration draft missing".to_string())
+}
+
+fn recovery_migration_plan(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    task: &WorkflowHumanTask,
+    target_version_id: u64,
+    node_keys: &[&str],
+    edge_keys: &[&str],
+) -> Result<WorkflowMigrationPlan, String> {
+    create_workflow_migration_plan(
+        ctx,
+        fixture.organization_id,
+        CreateWorkflowMigrationPlanParams {
+            company_id: fixture.company_id,
+            workflow_id: task.workflow_id,
+            source_workflow_version_id: task.workflow_version_id,
+            target_workflow_version_id: target_version_id,
+            node_mappings: node_keys
+                .iter()
+                .map(|key| WorkflowNodeMigrationMapping {
+                    from_node_key: key.to_string(),
+                    to_node_key: key.to_string(),
+                })
+                .collect(),
+            fork_mappings: Vec::new(),
+            edge_mappings: edge_keys
+                .iter()
+                .map(|key| WorkflowEdgeMigrationMapping {
+                    from_edge_key: key.to_string(),
+                    to_edge_key: key.to_string(),
+                })
+                .collect(),
+            active: true,
+        },
+    )?;
+    ctx.db
+        .workflow_migration_plan()
+        .migration_plan_by_workflow()
+        .filter(&task.workflow_id)
+        .find(|plan| plan.target_workflow_version_id == target_version_id)
+        .ok_or_else(|| "recovery migration plan missing".to_string())
+}
+
+fn guarded_migration_rejections(
+    ctx: &ReducerContext,
+    fixture: &OrgFixture,
+    task: &WorkflowHumanTask,
+    source: &WorkflowVersion,
+) -> Result<(), String> {
+    let cases = [
+        (
+            "changed action",
+            Some(definition_node(
+                "effect",
+                WorkflowNodeKind::Action,
+                3,
+                None,
+                Some(WorkflowActionReference {
+                    action_key: GuardedActionKey::ConfirmPurchaseOrder.as_str().to_string(),
+                    input_schema_version: GUARDED_ACTION_SCHEMA_VERSION,
+                    input: Vec::new(),
+                }),
+            )),
+            Vec::new(),
+            "guarded action schema mismatch",
+        ),
+        (
+            "missing approved edge",
+            None,
+            vec![definition_edge(
+                "approve-effect",
+                "approve",
+                "effect",
+                2,
+                Some("completed"),
+            )],
+            "requires exactly one approved edge",
+        ),
+        (
+            "duplicate approved edge to the same action",
+            None,
+            vec![definition_edge(
+                "second-approve-effect",
+                "approve",
+                "effect",
+                5,
+                Some("approved"),
+            )],
+            "requires exactly one approved edge",
+        ),
+        (
+            "approved edge to a non-action",
+            None,
+            vec![
+                definition_edge("approve-effect", "approve", "done", 2, Some("approved")),
+                definition_edge(
+                    "unapproved-effect",
+                    "approve",
+                    "effect",
+                    5,
+                    Some("completed"),
+                ),
+            ],
+            "must lead directly to an action node",
+        ),
+    ];
+    for (name, node, edges, expected_error) in cases {
+        let result: Result<(), String> = (|| {
+            let draft = clone_recovery_version(ctx, fixture, source)?;
+            let mut revision = draft.draft_revision;
+            if let Some(node) = node {
+                upsert_workflow_node(ctx, fixture.organization_id, draft.id, revision, node)?;
+                revision += 1;
+            }
+            for edge in edges {
+                upsert_workflow_edge(ctx, fixture.organization_id, draft.id, revision, edge)?;
+                revision += 1;
+            }
+            // Each target is a valid published graph. Only the active HumanTask
+            // is mapped, so an unrelated Action-node mapping cannot mask a
+            // failure to preserve this task's own guarded approval destination.
+            publish_workflow_version(ctx, fixture.organization_id, draft.id, revision)?;
+            let plan = recovery_migration_plan(ctx, fixture, task, draft.id, &["approve"], &[])?;
+            let instance = ctx
+                .db
+                .workflow_instance()
+                .id()
+                .find(&task.workflow_instance_id)
+                .ok_or("recovery migration instance missing")?;
+            let before = migration_projection_snapshot(ctx, task.id)?;
+            let counts = (
+                lifecycle_evidence_counts(ctx, fixture, task.id),
+                cancellation_evidence_counts(ctx, instance.id),
+                ctx.db
+                    .workflow_migration_instance_result()
+                    .migration_result_by_instance()
+                    .filter(&instance.id)
+                    .count(),
+            );
+            preflight_workflow_migration(
+                ctx,
+                fixture.organization_id,
+                PreflightWorkflowMigrationParams {
+                    company_id: fixture.company_id,
+                    plan_id: plan.id,
+                    instance_id: instance.id,
+                },
+            )?;
+            let report = ctx
+                .db
+                .workflow_migration_preflight()
+                .migration_preflight_by_plan()
+                .filter(&plan.id)
+                .find(|row| row.instance_id == instance.id)
+                .ok_or("guarded migration preflight missing")?;
+            if report.compatible
+                || !report
+                    .errors
+                    .iter()
+                    .any(|error| error.contains(expected_error))
+            {
+                return Err(format!(
+                    "guarded migration preflight missed '{expected_error}': {:?}",
+                    report.errors
+                ));
+            }
+            let key = format!("invalid-recovery-migration:{}:{}", instance.id, draft.id);
+            expect_error(
+                migrate_workflow_instance(
+                    ctx,
+                    fixture.organization_id,
+                    MigrateWorkflowInstanceParams {
+                        company_id: fixture.company_id,
+                        plan_id: plan.id,
+                        instance_id: instance.id,
+                        expected_instance_revision: instance.revision,
+                        reason: "Verify incompatible guarded migration preserves reviewed history"
+                            .to_string(),
+                        idempotency_key: key.clone(),
+                        correlation_id: key,
+                        causation_id: None,
+                    },
+                ),
+                expected_error,
+            )?;
+            if migration_projection_snapshot(ctx, task.id)? != before
+                || (
+                    lifecycle_evidence_counts(ctx, fixture, task.id),
+                    cancellation_evidence_counts(ctx, instance.id),
+                    ctx.db
+                        .workflow_migration_instance_result()
+                        .migration_result_by_instance()
+                        .filter(&instance.id)
+                        .count(),
+                ) != counts
+            {
+                return Err("incompatible guarded migration changed task/instance/token/candidate rows or recorded mutation evidence".to_string());
+            }
+            retire_workflow_version(ctx, fixture.organization_id, draft.id, revision)
+        })();
+        result.map_err(|error| format!("guarded migration '{name}': {error}"))?;
+    }
+    Ok(())
+}
+
+fn migration_projection_snapshot(
+    ctx: &ReducerContext,
+    task_id: u64,
+) -> Result<Vec<serde_json::Value>, String> {
+    let task = task_by_id(ctx, task_id)?;
+    let instance = ctx
+        .db
+        .workflow_instance()
+        .id()
+        .find(&task.workflow_instance_id)
+        .ok_or("recovery migration instance missing")?;
+    let mut rows = vec![
+        migration_row_snapshot(&task)?,
+        migration_row_snapshot(&instance)?,
+    ];
+    let mut tokens: Vec<_> = ctx
+        .db
+        .workflow_token()
+        .workflow_token_by_instance()
+        .filter(&instance.id)
+        .collect();
+    tokens.sort_by_key(|row| row.id);
+    for token in tokens {
+        rows.push(migration_row_snapshot(&token)?);
+    }
+    let mut candidates: Vec<_> = ctx
+        .db
+        .workflow_human_task_candidate()
+        .human_task_candidate_by_task()
+        .filter(&task.id)
+        .collect();
+    candidates.sort_by_key(|row| row.id);
+    for candidate in candidates {
+        rows.push(migration_row_snapshot(&candidate)?);
+    }
+    Ok(rows)
+}
+
+fn migration_row_snapshot<T: spacetimedb_sats::Serialize>(
+    row: &T,
+) -> Result<serde_json::Value, String> {
+    serde_json::to_value(spacetimedb_sats::serde::SerdeWrapper::from_ref(row))
+        .map_err(|error| error.to_string())
 }
 
 fn request(

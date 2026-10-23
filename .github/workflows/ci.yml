@@ -362,6 +362,22 @@ jobs:
       - name: Unit tests (accounting and cross-module overview models)
         run: pnpm --dir web test:accounting-ui:models
 
+      - name: Install Playwright Chromium
+        working-directory: frontend/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Work-board browser regressions
+        run: pnpm --dir web test:e2e:work-board
+
+      - name: Upload work-board browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: work-board-browser-diagnostics
+          path: frontend/web/test-results/
+          retention-days: 7
+          if-no-files-found: warn
+
       - name: Verify vendored frontend contracts pin
         run: pnpm contracts:verify-vendored
 
