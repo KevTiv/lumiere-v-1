@@ -570,6 +570,10 @@ pub(crate) fn snake_to_camel(s: &str) -> String {
 pub(crate) fn rust_field_name(column_name: &str) -> &str {
     match column_name {
         "cost_per_1_k_tokens" => "cost_per_1k_tokens",
+        "input_units_per_1_k" => "input_units_per_1k",
+        "output_units_per_1_k" => "output_units_per_1k",
+        "input_cost_per_1_k_microunits" => "input_cost_per_1k_microunits",
+        "output_cost_per_1_k_microunits" => "output_cost_per_1k_microunits",
         "iso_3" => "iso3",
         "kpi_1_month_mrr" => "kpi_1month_mrr",
         "kpi_3_months_mrr" => "kpi_3months_mrr",

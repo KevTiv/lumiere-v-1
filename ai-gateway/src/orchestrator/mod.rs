@@ -18,6 +18,8 @@ pub(crate) use invocation_policy::resolve_effective_generated_capabilities;
 mod knowledge_context;
 pub(crate) mod model_configuration;
 pub(crate) mod output_gate;
+#[cfg(feature = "phase4-acceptance")]
+pub(crate) mod phase4_restart_probe;
 mod precedent;
 mod probabilistic;
 mod progress;

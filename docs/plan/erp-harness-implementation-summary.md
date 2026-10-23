@@ -2,6 +2,10 @@
 
 This file is a compact navigation layer over the coordinated implementation plan.
 
+For the current governed runtime integration and Mistral setup gates, see
+[Harness key readiness — 2026-10-23](./harness-key-readiness-status.md).
+The broader program below also includes later capabilities outside that pilot.
+
 Use:
 
 - [`erp-harness-implementation-coordination-plan.md`](./erp-harness-implementation-coordination-plan.md) for authority, sequencing rules, promotion gates, invariants and coordinator behavior;

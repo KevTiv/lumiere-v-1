@@ -61,6 +61,47 @@ pub async fn post_governed_bootstrap(
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct GatewayGovernedReadinessRequest {
+    pub org_id: u64,
+    pub company_id: u64,
+    pub agent_id: u64,
+    pub intelligence_policy_ref: String,
+}
+
+/// Internal-secret protected metadata inspection; no model calls or writes.
+pub async fn post_governed_readiness(
+    State(state): State<AppState>,
+    Json(req): Json<GatewayGovernedReadinessRequest>,
+) -> AppResult<Json<Value>> {
+    if state.config.kong_llm_url.is_some() {
+        return Err(AppError::Unavailable(
+            "Mistral pilot requires direct transport".into(),
+        ));
+    }
+    let reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or_else(|| AppError::Unavailable("gateway spend reader is not configured".into()))?;
+    let readiness = crate::orchestrator::governed_bootstrap::inspect_governed_readiness(
+        &state.stdb,
+        reader,
+        req.org_id,
+        req.company_id,
+        req.agent_id,
+        &req.intelligence_policy_ref,
+    )
+    .await
+    .map_err(|error| AppError::Unavailable(error.to_string()))?;
+    Ok(Json(serde_json::json!({
+        "configuration": readiness,
+        "database": state.config.stdb_module,
+        "providerKeyConfigured": state.config.mistral_api_key.as_ref().is_some_and(|key| !key.trim().is_empty()),
+        "billableCalls": 0,
+    })))
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GatewayImportMappingRequest {
     pub org_id: u64,

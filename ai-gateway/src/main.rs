@@ -86,6 +86,11 @@ async fn require_gateway_secret(
 async fn main() -> anyhow::Result<()> {
     let _ = dotenvy::dotenv();
 
+    #[cfg(feature = "phase4-acceptance")]
+    if std::env::args().nth(1).as_deref() == Some("phase4-restart-probe") {
+        return orchestrator::phase4_restart_probe::run_from_env().await;
+    }
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -199,6 +204,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/v1/evidence/inspect", post(routes::evidence::post_inspect))
         .route("/v1/evidence/run", post(routes::evidence::post_run_inspect))
         .route(
+            "/v1/evidence/runs/history",
+            post(routes::evidence::post_run_history),
+        )
+        .route(
             "/v1/evidence/run/export",
             post(routes::evidence::post_run_export),
         )
@@ -239,6 +248,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/v1/harness/governed/bootstrap",
             post(routes::harness_skills::post_governed_bootstrap),
+        )
+        .route(
+            "/v1/harness/governed/readiness",
+            post(routes::harness_skills::post_governed_readiness),
         )
         .route(
             "/v1/internal/harness/runs/lifecycle",

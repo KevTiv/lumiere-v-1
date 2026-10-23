@@ -41,6 +41,12 @@ actor, or as-of inputs cannot currently be reproduced at the durable watermark. 
 target-local. This prevents a successful drill from silently replacing point-in-time evidence with
 new values computed at recovery time.
 
+`workflow_subject_snapshot` is also recreated state. Its requester-scoped cache
+must be empty when reconstruction completes; it is repopulated by the normal
+authorized snapshot request after recovery, rather than under the reconstructor's
+identity. The verification identity must be able to read this private relation.
+A nonempty cache or an unreadable relation keeps completion blocked.
+
 `cold_tier_service_identity` is also target-local recreated state. The operator registers the
 destination reconstructor through the empty-target allowlist; privileged source-cell service
 identities are never copied into the destination.
