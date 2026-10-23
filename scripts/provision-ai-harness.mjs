@@ -70,8 +70,8 @@ export function profilesFor(config) {
       context_window: profile.contextWindow, timeout_ms: profile.timeoutMs,
       max_retries: 0, max_concurrency: profile.maxConcurrency,
       supports_tool_calling: true, supports_structured_output: true, supports_parallel_requests: false,
-      input_cost_per_1k_microunits: some(profile.inputUnitsPer1k),
-      output_cost_per_1k_microunits: some(profile.outputUnitsPer1k),
+      input_cost_per_1_k_microunits: some(profile.inputUnitsPer1k),
+      output_cost_per_1_k_microunits: some(profile.outputUnitsPer1k),
       per_request_cost_ceiling_microunits: none(),
     }
   })
@@ -98,6 +98,10 @@ function matches(row, expected, kind) {
 function exactlyOne(rows, kind) {
   requireValue(rows.length === 1, `${kind} must resolve exactly once`)
   return rows[0]
+}
+
+async function responseJson(response) {
+  return response.json().catch(() => { throw new Error('server returned invalid JSON') })
 }
 
 // Check all immutable and scope prerequisites before the first write. An apply
@@ -135,7 +139,7 @@ export async function provision(config, client, apply = false) {
     name: config.agentName, model: config.primary.model, provider: 'mistral',
     temperature: 0, max_tokens: Math.max(config.primary.maxTokens, config.review.maxTokens),
     context_window: Math.max(config.primary.contextWindow, config.review.contextWindow),
-    rate_limit_per_minute: 10, cost_per_1k_tokens: 0, top_p: 1,
+    rate_limit_per_minute: 10, cost_per_1_k_tokens: 0, top_p: 1,
     frequency_penalty: 0, presence_penalty: 0, is_active: true, is_default: false,
     allowed_models: models, allowed_actions: ['skill_run'], description: none(),
     api_key_reference: some('MISTRAL_API_KEY'), system_prompt: none(), monthly_budget: none(),
@@ -166,21 +170,27 @@ export async function provision(config, client, apply = false) {
     return rows[0]
   }
   let agentId = agents.length ? positive(Number(agents[0].id), 'agent id') : null
+  const previousAgent = settings.defaultAgentId ?? settings.default_agent_id
+  requireValue(previousAgent == null || previousAgent === agentId, 'skill is bound to another default agent')
+  if (previousAgent !== agentId || !agentId) missing.push('company skill agent binding')
   if (!agentId || !await budgetFor(agentId)) missing.push('current-period spend budget')
   async function priceFor(profile) {
     if (!agentId) return null
     const prices = await client.sql(`SELECT * FROM ai_spend_price_snapshot_read WHERE organization_id = ${org} AND agent_id = ${agentId} AND provider = 'mistral' AND model = '${profile.model}'`, 'spend')
     const latest = prices.reduce((a, b) => !a || Number(b.version) > Number(a.version) ? b : a, null)
     requireValue(!latest || (latest.currency === config.currency
-      && Number(latest.input_units_per_1k) === profile.inputUnitsPer1k
-      && Number(latest.output_units_per_1k) === profile.outputUnitsPer1k), 'existing price differs; review a separate pricing update')
+      && Number(latest.input_units_per_1_k) === profile.inputUnitsPer1k
+      && Number(latest.output_units_per_1_k) === profile.outputUnitsPer1k), 'existing price differs; review a separate pricing update')
     return latest
   }
   for (const role of ['primary', 'review']) if (!await priceFor(config[role])) missing.push(`price:${role}`)
   const calibration = await client.sql(`SELECT id FROM ai_calibration_profile WHERE organization_id = ${org} AND profile_name = 'report-attention' AND profile_version = 1`)
   if (calibration.length !== 1) missing.push('governed bootstrap')
   const plan = { organizationId: org, companyId: config.companyId, agentId, skillId: Number(skill.id), policyRef: ref, billingPeriod: period, provider: 'mistral', models, apiKeyRequired: true }
-  if (!apply) return { ...plan, applied: false, readyForKey: missing.length === 0, missing }
+  if (!apply) {
+    if (!missing.length) await client.runtime({ orgId: org, companyId: config.companyId, agentId, intelligencePolicyRef: ref }, models)
+    return { ...plan, applied: false, readyForKey: missing.length === 0, missing }
+  }
   if (!agentId) {
     await client.call('create_ai_agent', [org, some(config.companyId), agent])
     const created = exactlyOne(await client.sql(`SELECT * FROM ai_agent WHERE organization_id = ${org} AND name = '${config.agentName}'`), 'created pilot agent')
@@ -196,10 +206,11 @@ export async function provision(config, client, apply = false) {
     if (!await priceFor(profile) || !await budgetFor(agentId)) await client.call('configure_ai_spend', [org, agentId, {
       billing_period: period, currency: config.currency, limit_units: config.monthlyLimitUnits,
       provider: 'mistral', model: profile.model,
-      input_units_per_1k: profile.inputUnitsPer1k, output_units_per_1k: profile.outputUnitsPer1k,
+      input_units_per_1_k: profile.inputUnitsPer1k, output_units_per_1_k: profile.outputUnitsPer1k,
     }])
   }
   await client.bootstrap({ orgId: org, intelligencePolicyRef: ref })
+  settings.defaultAgentId = agentId
   await client.call('upsert_ai_skill_config', [org, {
     company_id: some(config.companyId), skill_id: Number(skill.id), is_enabled: true,
     config_json: JSON.stringify(settings), custom_instructions: previous?.custom_instructions ?? none(),
@@ -241,7 +252,7 @@ export function httpClient(env, fetcher = fetch) {
     async sql(statement, role) {
       const response = await request(`${base}/v1/database/${database}/sql`, role === 'spend' ? reader : owner, statement, 'text/plain')
       if (role === 'spend') lastReaderIdentity = response.headers.get('spacetime-identity')?.replace(/^0x/, '').toLowerCase()
-      const result = exactlyOne(await response.json(), 'SQL result')
+      const result = exactlyOne(await responseJson(response), 'SQL result')
       requireValue(Array.isArray(result.schema?.elements) && Array.isArray(result.rows), 'invalid SQL response')
       const names = result.schema.elements.map(element => element.name?.some)
       requireValue(names.every(name => typeof name === 'string'), 'invalid SQL column schema')
@@ -264,8 +275,17 @@ export function httpClient(env, fetcher = fetch) {
     },
     async bootstrap(body) {
       const response = await request(`${gateway}/v1/harness/governed/bootstrap`, null, JSON.stringify(body), 'application/json', { 'X-Lumiere-Gateway-Secret': secret })
-      const result = await response.json()
+      const result = await responseJson(response)
       requireValue(result.organizationId === body.orgId && result.intelligencePolicyRef === body.intelligencePolicyRef && result.decisionTypesRegistered === true, 'bootstrap read-back mismatch')
+    },
+    async runtime(body, models) {
+      const response = await request(`${gateway}/v1/harness/governed/readiness`, null, JSON.stringify(body), 'application/json', { 'X-Lumiere-Gateway-Secret': secret })
+      const result = await responseJson(response)
+      const resolved = result.configuration
+      requireValue(result.database === env.STDB_MODULE && result.billableCalls === 0
+        && resolved?.organizationId === body.orgId && resolved.companyId === body.companyId
+        && resolved.agentId === body.agentId && resolved.intelligencePolicyRef === body.intelligencePolicyRef
+        && Array.isArray(resolved.models) && equal([...resolved.models].sort(), [...models].sort()), 'gateway runtime read-back mismatch')
     },
   }
 }
@@ -278,7 +298,7 @@ export async function verifyMistralCatalog(config, key, fetcher = fetch) {
     headers: { Authorization: `Bearer ${key.trim()}` }, redirect: 'error', signal: AbortSignal.timeout(30_000),
   }).catch(() => { throw new Error('Mistral catalog transport failed') })
   requireValue(response.ok, `Mistral catalog access failed: HTTP ${response.status}`)
-  const catalog = await response.json()
+  const catalog = await responseJson(response)
   requireValue(Array.isArray(catalog.data), 'invalid Mistral catalog')
   for (const role of ['primary', 'review']) {
     const profile = config[role]
@@ -306,11 +326,12 @@ export async function smokePilot(config, client, env, fetcher = fetch) {
       inputs: { query: 'Summarize current inventory using only authorized ERP evidence. State any missing evidence.' } }),
   }).catch(() => { throw new Error('pilot transport failed; inspect run history and reconcile before retry') })
   requireValue(response.ok, `pilot BFF failed: HTTP ${response.status}; inspect run history before retry`)
-  const result = await response.json()
+  const result = await responseJson(response)
   const runId = positive(Number(result.run?.run_id), 'pilot run id')
   requireValue(result.run.status === 'completed', 'pilot did not fully settle; inspect run history')
   const run = exactlyOne(await client.sql(`SELECT * FROM ai_agent_run WHERE id = ${runId} AND organization_id = ${config.organizationId}`), 'durable pilot run')
-  requireValue(Number(run.company_id) === config.companyId && Number(run.agent_id) === readiness.agentId, 'durable run scope mismatch')
+  requireValue(Number(run.company_id) === config.companyId && Number(run.agent_id) === readiness.agentId
+    && run.status === 'completed', 'durable run scope or settlement mismatch')
   const steps = await client.sql(`SELECT step_no FROM ai_agent_run_step WHERE run_id = ${runId} AND organization_id = ${config.organizationId}`)
   requireValue(steps.length >= 2 && new Set(steps.map(step => Number(step.step_no))).size === steps.length, 'pilot lacks ordered durable trace')
   const attempts = await client.sql(`SELECT * FROM ai_provider_attempt_read WHERE run_id = ${runId} AND organization_id = ${config.organizationId}`, 'spend')
@@ -322,6 +343,8 @@ export async function smokePilot(config, client, env, fetcher = fetch) {
       && Number(attempt.company_id) === config.companyId, 'pilot attempt is unresolved or has the wrong binding')
     const reservation = reservations.find(row => Number(row.id) === Number(attempt.reservation_id))
     requireValue(reservation?.status === 'settled' && reservation.request_key === attempt.request_key
+      && Number(reservation.company_id) === config.companyId && Number(reservation.agent_id) === readiness.agentId
+      && reservation.provider === attempt.provider && reservation.model === attempt.model
       && Number(reservation.settled_input_tokens) === Number(attempt.input_tokens)
       && Number(reservation.settled_output_tokens) === Number(attempt.output_tokens), 'pilot spend settlement mismatch')
   }
@@ -334,7 +357,10 @@ async function main() {
   const [mode, filename, ...extra] = process.argv.slice(2)
   requireValue(['--plan', '--check', '--apply', '--verify-key', '--smoke'].includes(mode) && filename && !extra.length,
     'usage: node scripts/provision-ai-harness.mjs --plan|--check|--apply|--verify-key|--smoke manifest.json')
-  const config = validateManifest(JSON.parse(await readFile(filename, 'utf8')))
+  const raw = await readFile(filename, 'utf8')
+  let config
+  try { config = JSON.parse(raw) } catch { throw new Error('manifest contains invalid JSON') }
+  validateManifest(config)
   const result = mode === '--plan'
     ? { profiles: profilesFor(config), policy: policyFor(config), monthlyLimitUnits: config.monthlyLimitUnits,
       currency: config.currency, priceReviewedAt: config.priceReviewedAt, billableCalls: 0 }

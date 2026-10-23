@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { httpClient, policyFor, profilesFor, provision, smokePilot, unwrap, validateManifest, verifyMistralCatalog } from '../provision-ai-harness.mjs'
 
 const manifest = () => ({
@@ -18,6 +21,10 @@ function fixture() {
   const writes = []
   const client = {
     async verifyTarget(org) { assert.equal(org, 9) },
+    async runtime(body, models) {
+      assert.equal(body.agentId, 12)
+      assert.deepEqual(models, ['fixture-primary', 'fixture-review'])
+    },
     async sql(sql, role) {
       if (sql.includes('FROM company ')) return [{ id: 3, organization_id: 9 }]
       if (sql.includes('FROM ai_skill ')) return [{ id: 8, organization_id: 0, is_active: true }]
@@ -98,7 +105,7 @@ test('wrong company, immutable drift, disabled skill and unregistered reader fai
     if (kind === 'price' || kind === 'budget') {
       await provision(manifest(), client, true)
       writes.length = 0
-      if (kind === 'price') tables.prices[0].input_units_per_1k = 999
+      if (kind === 'price') tables.prices[0].input_units_per_1_k = 999
       else tables.budgets[0].limit_units = 999
     }
     await assert.rejects(provision(manifest(), client, true), undefined, kind)
@@ -171,11 +178,12 @@ test('BFF smoke requires durable matching settlement, never retries and redacts 
   const sql = client.sql
   let state = 'settled'
   client.sql = async (statement, role) => {
-    if (statement.includes('FROM ai_agent_run ')) return [{ id: 42, company_id: 3, agent_id: 12 }]
+    if (statement.includes('FROM ai_agent_run ')) return [{ id: 42, company_id: 3, agent_id: 12, status: 'completed' }]
     if (statement.includes('FROM ai_agent_run_step ')) return [{ step_no: 1 }, { step_no: 2 }]
     if (statement.includes('FROM ai_provider_attempt_read ')) return [{ reservation_id: 8, request_key: 'exact',
       company_id: 3, agent_id: 12, provider: 'mistral', model: 'fixture-primary', status: 'succeeded', input_tokens: 11, output_tokens: 12 }]
     if (statement.includes('FROM ai_spend_reservation_read ')) return [{ id: 8, request_key: 'exact', status: state,
+      company_id: 3, agent_id: 12, provider: 'mistral', model: 'fixture-primary',
       settled_input_tokens: 11, settled_output_tokens: 12 }]
     return sql(statement, role)
   }
@@ -198,4 +206,21 @@ test('BFF smoke requires durable matching settlement, never retries and redacts 
   const before = calls
   await assert.rejects(smokePilot(config, client, env, async () => { calls++; throw new Error('private failure') }), /inspect run history/)
   assert.equal(calls, before + 1)
+})
+
+test('provisioning payloads match the immutable released parameter contracts', async () => {
+  const root = fileURLToPath(new URL('../../', import.meta.url))
+  const version = JSON.parse(readFileSync(`${root}/release-compatibility-manifest.json`, 'utf8')).lumiere_contracts.version
+  const archive = `${root}/vendor/lumiere-contracts-rust-${version}.tar.gz`
+  const fields = filename => {
+    const source = execFileSync('tar', ['-xOf', archive, `lumiere-contracts/crates/lumiere-contracts/src/bindings/${filename}_params_type.rs`], { encoding: 'utf8' })
+    return [...source.matchAll(/^    pub (\w+):/gm)].map(match => match[1]).sort()
+  }
+  const { client } = fixture()
+  const call = client.call
+  client.call = async (name, args) => {
+    assert.deepEqual(Object.keys(args.at(-1)).sort(), fields(name), name)
+    return call(name, args)
+  }
+  await provision(manifest(), client, true)
 })

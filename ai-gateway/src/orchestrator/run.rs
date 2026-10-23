@@ -750,7 +750,7 @@ pub async fn run_skill_admitted(
     let agent = resolve_agent(
         &stdb,
         req.org_id,
-        req.agent_id,
+        super::skill_loader::skill_agent_id(&skill.config_json, req.agent_id, req.team_member_id)?,
         req.team_member_id,
         state.config.ollama_supports_tool_calling,
     )

@@ -1073,7 +1073,7 @@ fn prompt_bytes(req: &LlmRequest) -> Result<usize> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use anyhow::anyhow;
     use chrono::TimeZone;
@@ -1162,7 +1162,7 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct FakeLedger {
+    pub(crate) struct FakeLedger {
         has_budget: bool,
         has_snapshot: bool,
         /// Models a reader that sees an attempt recovered as already dispatched.
@@ -1178,7 +1178,7 @@ mod tests {
     }
 
     impl FakeLedger {
-        fn configured() -> Self {
+        pub(crate) fn configured() -> Self {
             Self {
                 has_budget: true,
                 has_snapshot: true,
@@ -1196,15 +1196,14 @@ mod tests {
                 .expect("attempt was not persisted")
         }
 
-        fn writes(&self) -> Vec<String> {
+        pub(crate) fn writes(&self) -> Vec<String> {
             self.writes.lock().unwrap().clone()
         }
     }
 
     #[async_trait]
     impl SpendLedger for FakeLedger {
-        async fn budget(&self, _: u64, _: u64, period: &str) -> Result<Option<SpendBudget>> {
-            assert_eq!(period, "2026-09");
+        async fn budget(&self, _: u64, _: u64, _: &str) -> Result<Option<SpendBudget>> {
             Ok(self.has_budget.then(|| SpendBudget {
                 id: 1,
                 currency: "EUR".into(),

@@ -12,6 +12,8 @@ PR #193. Their original branches remain intact. Main already includes spend
 recovery #190, trusted envelopes #191, legacy retirement #192, revocation #133,
 and spend safety #134.
 
+Review: [integration PR #255](https://github.com/KevTiv/lumiere-v-1/pull/255).
+
 Additional corrections in this branch:
 
 - Immutable profile deadlines apply to provider I/O inside the durable spend
@@ -27,15 +29,27 @@ Additional corrections in this branch:
   built-in calibration, and company-specific report-analysis policy binding.
   It preserves existing settings, counters, and reviewed overrides. No API key
   is needed for these operations, and no provider call is made.
+- The company skill also binds its default agent. Ordinary report-analysis
+  requests use that agent without replacing the organization's default or
+  overriding an explicit agent/persona selection.
 
 ## Acceptance evidence
 
-- The integrated gateway suite passes **713 tests**, with eight existing ignored
+- The integrated gateway suite passes **716 tests**, with eight existing ignored
   tests. Profile queue/deadline/isolation regression tests are included.
-- Provisioning has eight deterministic tests for idempotence, scope/conflict
+- Provisioning has nine deterministic tests for idempotence, scope/conflict
   rejection before writes, ambiguous-response handling, dedicated spend reads,
-  catalog validation, and durable smoke settlement. CI runs these tests.
+  catalog validation, durable smoke settlement, and payload compatibility with
+  the immutable generated contracts. CI runs these tests.
+- Read-only runtime readiness uses the canonical release, skill, model-policy,
+  calibration and spend readers. HTTP fixtures exercise the actual resolvers
+  for a configured pilot and eight configuration/authorization failure cases.
+- The router regression covers decision, review, reasoning and generation with
+  retries and a fallback configured: an ambiguous dispatch makes exactly one
+  provider attempt/reservation and stops.
 - The reconstruction verifier's ten tests pass.
+- Full web TypeScript, focused harness UI tests, all 140 script tests, changed
+  Rust formatting, and trusted-route boundary lint pass locally.
 - The pre-existing disposable Phase 4 evidence is in
   `docs/evidence/aih-phase4-disposable-2026-10-23.json`: two-client budget/claim
   races, ambiguous-timeout restart, and reconstruction without redispatch.
@@ -103,8 +117,12 @@ node scripts/provision-ai-harness.mjs --apply manifest.json
 node scripts/provision-ai-harness.mjs --check manifest.json
 ```
 
-`--check` is read-only and exits nonzero when setup is missing. `--apply` reads
-back all provisioned state; an uncertain mutation stops instead of retrying.
+`--check` is read-only and exits nonzero when setup is missing. Once the stored
+configuration matches, it also calls the internal-secret-protected
+`/v1/harness/governed/readiness` endpoint to verify the deployed gateway's own
+release/policy/profile/bootstrap/spend resolution and selected database.
+`--apply` reads back all provisioned state; an uncertain mutation stops instead
+of retrying.
 It does not reset spend or replace an existing incompatible policy. Re-run for
 each billing period to provision that month's budget without resetting history.
 
@@ -120,7 +138,8 @@ node scripts/provision-ai-harness.mjs --verify-key manifest.json
 node scripts/provision-ai-harness.mjs --smoke manifest.json
 ```
 
-Use the returned `agentId` explicitly for the pilot. The smoke requires a fully
+Ordinary report-analysis requests use the company-bound agent when no explicit
+agent/persona is selected. The smoke pins the returned `agentId` explicitly and requires a fully
 settled run, at least two durable trace steps, and matching provider-attempt and
 reservation usage. It prints IDs/counts only. Neither catalog access nor a green
 health endpoint establishes this acceptance. An uncertain request requires run

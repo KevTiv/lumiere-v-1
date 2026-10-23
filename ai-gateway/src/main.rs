@@ -250,6 +250,10 @@ async fn main() -> anyhow::Result<()> {
             post(routes::harness_skills::post_governed_bootstrap),
         )
         .route(
+            "/v1/harness/governed/readiness",
+            post(routes::harness_skills::post_governed_readiness),
+        )
+        .route(
             "/v1/internal/harness/runs/lifecycle",
             post(routes::run_lifecycle::post_run_lifecycle),
         )

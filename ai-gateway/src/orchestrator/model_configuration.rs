@@ -903,6 +903,127 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn all_routed_roles_stop_after_unknown_dispatch_even_with_retries_and_fallback() {
+        use crate::orchestrator::{
+            intelligence::{
+                DecisionKind, DecisionProvider, DecisionRequest, DecisionTypeRef,
+                GenerationProvider, GenerationRequest, ReasoningProvider, ReasoningRequest,
+            },
+            intelligence_router::{
+                ConfiguredIntelligenceRouter, NoopShadowDecisionRecorder, RoutedDecisionProvider,
+                RoutedGenerationProvider, RoutedReasoningProvider,
+            },
+            spend_admission::{tests::FakeLedger, UnresolvedProviderAttempt},
+        };
+        use crate::providers::llm::{LlmCompletion, LlmRequest, LlmResponse};
+        use serde_json::json;
+        use std::sync::atomic::{AtomicU32, Ordering};
+
+        struct LostResponse(AtomicU32);
+        #[async_trait]
+        impl LlmCompletion for LostResponse {
+            async fn complete(&self, _: LlmRequest) -> Result<LlmResponse> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                anyhow::bail!("provider response lost after dispatch")
+            }
+        }
+        for role in [
+            IntelligenceRole::Decision,
+            IntelligenceRole::Review,
+            IntelligenceRole::Reasoning,
+            IntelligenceRole::Generation,
+        ] {
+            let store = FakeStore::new();
+            let mut primary = profile("ambiguous-primary", role, "primary-model");
+            primary.max_retries = 3;
+            let fallback = profile("fallback", role, "fallback-model");
+            let mut configured = policy();
+            configured.defaults.insert(role, primary.reference.clone());
+            configured
+                .fallbacks
+                .insert(role, vec![fallback.reference.clone()]);
+            store.insert_profile(9, primary);
+            store.insert_profile(9, fallback);
+            store.insert_policy(9, configured);
+            let agent = agent();
+            let resolver =
+                IntelligenceRouteResolver::new_governed(&store, 9, &agent, None).unwrap();
+            let router = ConfiguredIntelligenceRouter::new(resolver);
+            let transport = LostResponse(AtomicU32::new(0));
+            let ledger = FakeLedger::configured();
+            let result = match role {
+                IntelligenceRole::Decision | IntelligenceRole::Review => {
+                    RoutedDecisionProvider::new(
+                        &router,
+                        &transport,
+                        &ledger,
+                        &agent,
+                        9,
+                        3,
+                        42,
+                        role,
+                        &NoopShadowDecisionRecorder,
+                    )
+                    .unwrap()
+                    .decide(DecisionRequest {
+                        decision_type: DecisionTypeRef {
+                            name: "PaymentDisposition".into(),
+                            version: 1,
+                        },
+                        kind: DecisionKind::Choice,
+                        question: "pick".into(),
+                        bounded_state: json!({}),
+                        candidates: vec!["a".into(), "b".into()],
+                        precedent: vec![],
+                        evidence: vec![],
+                    })
+                    .await
+                    .map(|_| ())
+                }
+                IntelligenceRole::Reasoning => {
+                    RoutedReasoningProvider::new(&router, &transport, &ledger, &agent, 9, 3, 42)
+                        .reason(ReasoningRequest {
+                            objective: "test".into(),
+                            bounded_state: json!({}),
+                            precedent: vec![],
+                            allowed_proposal_kinds: vec!["final_draft".into()],
+                            remaining_rounds: 1,
+                        })
+                        .await
+                        .map(|_| ())
+                }
+                IntelligenceRole::Generation => {
+                    RoutedGenerationProvider::new(&router, &transport, &ledger, &agent, 9, 3, 42)
+                        .generate(GenerationRequest {
+                            objective: "test".into(),
+                            context: json!({}),
+                            format: "text".into(),
+                            instructions: None,
+                            max_tokens: None,
+                        })
+                        .await
+                        .map(|_| ())
+                }
+                _ => unreachable!(),
+            };
+            let error = result.unwrap_err();
+            assert!(
+                error.is::<UnresolvedProviderAttempt>(),
+                "{role:?}: {error:#}"
+            );
+            assert_eq!(transport.0.load(Ordering::SeqCst), 1, "{role:?}");
+            assert_eq!(
+                ledger
+                    .writes()
+                    .iter()
+                    .filter(|write| *write == "reserve")
+                    .count(),
+                1
+            );
+        }
+    }
+
     #[test]
     fn selects_latest_policy_version_without_server_side_ordering() {
         let row = |version| {
