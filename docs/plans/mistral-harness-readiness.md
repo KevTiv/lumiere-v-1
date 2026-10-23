@@ -5,11 +5,20 @@ Assessed 2026-10-16 against application baseline `ff98a918` and the pinned
 assessment, not live-provider or deployment certification. Credentials are to
 be configured separately.
 
+The 2026-10-23 branch follow-up uses contracts `0.3.139`. It adds operational
+limit source changes, setup tooling and acceptance preparation. Rust execution
+and live deployment are still unverified; see the
+[coordination record](../plan/mistral-alpha-coordination-2026-10-23.md).
+
 The follow-up [Mistral/OpenCode compatibility check](../evidence/mistral-opencode-compatibility-2026-10-16.md)
 pins the upstream sources, records parser corrections found during comparison,
 and provides a source-derived Large 4 provider example.
 The subsequent [reasoning/replay implementation](../evidence/mistral-reasoning-replay-2026-10-16.md)
 adds explicit model-specific effort and ephemeral native assistant replay.
+
+The [Railway alpha setup procedure](./mistral-alpha-railway-setup.md) adds a
+reviewed pilot manifest, offline configuration checks, and optional read-only
+catalog/identity checks. It performs no provisioning writes or live completions.
 
 ## What is already implemented
 
@@ -76,7 +85,7 @@ tools must not bypass Lumiere capability authorization, drafts or verification.
 | --- | --- | --- |
 | P0 | **Provisioning:** keys alone do not create model profiles, policies, budgets, service grants, skill releases or calibration | One provisioned organization completes an authorized governed Mistral run with durable attempts, steps, evidence and settled spend |
 | P0 for cross-provider routing | **Spend/provider mismatch:** routing chooses a profile provider, but both `configure_ai_spend` and `reserve_ai_spend` require `provider_eq(agent.provider, params.provider)` | A reviewed source + generated-contract change admits policy-authorized alternate providers against the same agent budget; real Mistral→Gemini reservation/fallback and exhausted-budget denial both pass |
-| P1 | **Operational profile limits:** `timeout_ms` and `max_concurrency` are loaded but not enforced around routed calls; retries apply to every error without backoff/status classification | Bounded per-attempt deadlines, concurrency permits, typed provider errors and bounded 429/5xx handling; uncertain dispatched attempts remain reconcilable |
+| P1 | **Operational profile limits:** this branch adds process-shared profile permits and provider-I/O deadlines inside spend admission. Only recorded and zero-settled direct-Mistral 429 rejection permits bounded retry; uncertain outcomes stop retry/fallback. Source and deterministic regressions are present; runtime execution remains pending | Bounded per-attempt deadlines, concurrency permits, typed provider errors and bounded 429/5xx handling; uncertain dispatched attempts remain reconcilable |
 | P1 | **Provider capability truth:** process-global Mistral key and hardcoded endpoint; no account/region instance binding or live catalog validation | Instance-bound credentials/endpoint/catalog with downgrade tests; catalog metadata never grants ERP permissions |
 | P1 for versioned reasoning policy | **Per-profile effort:** direct Mistral now honors explicit opt-in effort and in-memory replay; persisted model profiles still have no effort field | Future generated-contract release for organization/profile effort ownership; current deployment settings and admitted profile/agent output budgets are documented in the implementation evidence |
 | P1 | **Live admission evidence:** deterministic fixtures do not prove account access, real tool-schema acceptance, model quality, restart behavior or UI settlement | Recorded synthetic-data provider smoke plus persisted authorized pilot, denial, cancellation/reconnect and settlement/reconciliation evidence |
@@ -115,8 +124,9 @@ across restarts.
    with `register_ai_model_profile`: `provider="mistral"`, exact `model`,
    appropriate `allowed_roles`, explicit token/context limits and
    `supports_tool_calling=true` for decision/reasoning/review. Start with
-   `max_retries=0`, no shadows, and a bounded pilot. Do not mistake stored
-   timeout/concurrency values for enforcement until the P1 work lands.
+   `max_retries=0`, no shadows, one gateway replica and a bounded pilot. The
+   branch adds process-local limit enforcement; compile/test and live evidence
+   are still required before treating those controls as admitted.
 5. Register `register_ai_intelligence_policy` defaults for decision, reasoning,
    generation and review. Use a distinct review profile and respect any stricter
    configured provider independence requirement. Keep all initial profiles on
