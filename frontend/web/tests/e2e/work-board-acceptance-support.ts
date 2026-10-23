@@ -80,6 +80,10 @@ export async function createPendingWorkReview(owner: Page, reviewer: Page) {
   const command = stdbBffCommandPost("confirm_purchase_order", { orderId })
   const response = await postWorkCommand(owner, command)
   expect(response.ok(), await response.text()).toBe(true)
+  // Surface authorization errors before polling for this exact task. Keep this
+  // diagnostic local so unrelated E2E specs do not become affected importers.
+  const inbox = await reviewer.request.get("/api/query/workflow-human-tasks-inbox")
+  expect(inbox.ok(), `Reviewer inbox HTTP ${inbox.status()}: ${await inbox.text()}`).toBe(true)
   const taskId = await waitForPendingApprovalRequest(reviewer, "purchase_order", orderId)
   return { orderId, taskId }
 }
