@@ -157,11 +157,16 @@ pub struct AiProviderAttempt {
     pub write_date: Timestamp,
     /// Attributable recovery command that moved a stranded dispatched attempt
     /// to outcome_unknown, or abandoned an accepted pre-dispatch attempt.
+    #[default(None::<String>)]
     pub recovery_actor: Option<String>,
+    #[default(None::<String>)]
     pub recovery_approval_id: Option<String>,
+    #[default(None::<Timestamp>)]
     pub recovery_at: Option<Timestamp>,
     /// Attributable approved command that resolved outcome_unknown.
+    #[default(None::<String>)]
     pub reconciliation_actor: Option<String>,
+    #[default(None::<String>)]
     pub reconciliation_approval_id: Option<String>,
 }
 

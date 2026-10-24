@@ -22,7 +22,7 @@ spacetime publish "${STDB_MODULE}" \
   --bin-path /app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm \
   --server "${STDB_HOST}" \
   --delete-data=never \
-  -y
+  --yes=remote,migrate,break-clients,skip-login
 
 spacetime describe "${STDB_MODULE}" \
   --server "${STDB_HOST}" \

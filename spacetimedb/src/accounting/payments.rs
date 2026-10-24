@@ -65,7 +65,9 @@ pub struct AccountPayment {
     pub state: PaymentState,              // NotPaid (Draft) | Paid (Posted) | Reversed (Cancelled)
     pub created_at: Timestamp,
     pub create_uid: Identity,
+    // Append new columns to preserve the deployed table layout.
     /// Exact posted reversal created by `cancel_payment`; at most one per payment.
+    #[default(None::<u64>)]
     pub reversal_move_id: Option<u64>,
 }
 
