@@ -60,7 +60,7 @@ export const newEmployeeForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "emp-work-email",
-          type: "text",
+          type: "email",
           name: "workEmail",
           label: t("hr.forms.newEmployee.fields.workEmail"),
           placeholder: t("hr.forms.newEmployee.fields.workEmailPlaceholder"),
@@ -68,7 +68,7 @@ export const newEmployeeForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "emp-work-phone",
-          type: "text",
+          type: "tel",
           name: "workPhone",
           label: t("hr.forms.newEmployee.fields.workPhone"),
           placeholder: t("hr.forms.newEmployee.fields.workPhonePlaceholder"),
@@ -637,14 +637,14 @@ export const editEmployeeForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "emp-edit-work-email",
-          type: "text",
+          type: "email",
           name: "workEmail",
           label: t("hr.forms.newEmployee.fields.workEmail"),
           width: "1/2",
         },
         {
           id: "emp-edit-work-phone",
-          type: "text",
+          type: "tel",
           name: "workPhone",
           label: t("hr.forms.newEmployee.fields.workPhone"),
           width: "1/2",

@@ -981,7 +981,7 @@ export const adjustmentReasonsTableConfig = (t: TFunction): EntityViewConfig => 
     searchKeys: ["code", "description"],
     columns: [
       { key: "code", label: t("inventory.adjustmentReasons.columns.code"), width: "min-w-28" },
-      { key: "description", label: t("inventory.adjustmentReasons.columns.description"), width: "min-w-48" },
+      { key: "description", type: "markdown", label: t("inventory.adjustmentReasons.columns.description"), width: "min-w-48" },
       { key: "isActive", label: t("inventory.adjustmentReasons.columns.isActive"), type: "boolean" },
       { key: "isSystem", label: t("inventory.adjustmentReasons.columns.isSystem"), type: "boolean" },
     ],

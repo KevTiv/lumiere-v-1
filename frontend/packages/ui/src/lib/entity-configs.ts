@@ -143,7 +143,7 @@ export const accountDetailConfig: EntityViewConfig = {
           { key: "isOffBalance", label: "Off-Balance", type: "boolean", width: "1/4" },
           { key: "nonTrade", label: "Non-Trade", type: "boolean", width: "1/4" },
           { key: "active", label: "Active", type: "badge", ...activeBadges, width: "1/4" },
-          { key: "note", label: "Notes", width: "full" },
+          { key: "note", type: "markdown", label: "Notes", width: "full" },
         ],
       },
     ],

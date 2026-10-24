@@ -8,6 +8,7 @@ import { useRBAC } from "../lib/rbac-context"
 import { formatEntityFieldValue } from "../lib/entity-row-utils"
 import { unwrapEntityValue } from "../lib/entity-row-values"
 import { Separator } from "../components/separator"
+import { MarkdownView } from "../components/markdown-view"
 import { TooltipProvider } from "../components/tooltip"
 
 interface EntityDetailProps {
@@ -26,6 +27,7 @@ function formatDetailValue(
   if (unwrapEntityValue(value) == null || unwrapEntityValue(value) === "") {
     return <span className="text-muted-foreground italic">—</span>
   }
+  if (type === "markdown") return <MarkdownView value={String(unwrapEntityValue(value))} />
   return formatEntityFieldValue(value, type, badgeVariants, badgeLabels)
 }
 

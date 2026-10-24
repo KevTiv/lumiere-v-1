@@ -40,7 +40,7 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
         {
           id: "phone",
           name: "phone",
-          type: "text",
+          type: "tel",
           label: t("crm.forms.newLead.fields.phone"),
           placeholder: t("crm.forms.newLead.fields.phonePlaceholder"),
           // width: "1/2",
@@ -358,7 +358,7 @@ export const newContactForm = (t: TFunction): FormConfig => ({
         {
           id: "email",
           name: "email",
-          type: "text",
+          type: "email",
           label: t("crm.forms.newContact.fields.email"),
           placeholder: t("crm.forms.newContact.fields.emailPlaceholder"),
           // width: "1/2",
@@ -366,7 +366,7 @@ export const newContactForm = (t: TFunction): FormConfig => ({
         {
           id: "phone",
           name: "phone",
-          type: "text",
+          type: "tel",
           label: t("crm.forms.newContact.fields.phone"),
           placeholder: t("crm.forms.newContact.fields.phonePlaceholder"),
           // width: "1/2",
@@ -825,9 +825,9 @@ export const editContactForm = (t: TFunction): FormConfig => ({
       title: t("crm.forms.editContact.sections.core"),
       fields: [
         { id: "name", name: "name", type: "text", label: t("crm.forms.editContact.fields.name"), width: "full" },
-        { id: "email", name: "email", type: "text", label: t("crm.forms.editContact.fields.email"), width: "1/2" },
-        { id: "phone", name: "phone", type: "text", label: t("crm.forms.editContact.fields.phone"), width: "1/2" },
-        { id: "mobile", name: "mobile", type: "text", label: t("crm.forms.editContact.fields.mobile"), width: "1/2" },
+        { id: "email", name: "email", type: "email", label: t("crm.forms.editContact.fields.email"), width: "1/2" },
+        { id: "phone", name: "phone", type: "tel", label: t("crm.forms.editContact.fields.phone"), width: "1/2" },
+        { id: "mobile", name: "mobile", type: "tel", label: t("crm.forms.editContact.fields.mobile"), width: "1/2" },
         {
           id: "isCustomer",
           name: "isCustomer",
@@ -905,9 +905,9 @@ export const editContactDetailsForm = (t: TFunction): FormConfig => ({
         { id: "firstName", name: "firstName", type: "text", label: t("crm.forms.editContactDetails.fields.firstName"), width: "1/2" },
         { id: "lastName", name: "lastName", type: "text", label: t("crm.forms.editContactDetails.fields.lastName"), width: "1/2" },
         { id: "title", name: "title", type: "text", label: t("crm.forms.editContactDetails.fields.title"), width: "1/2" },
-        { id: "website", name: "website", type: "text", label: t("crm.forms.editContactDetails.fields.website"), width: "1/2" },
+        { id: "website", name: "website", type: "url", label: t("crm.forms.editContactDetails.fields.website"), width: "1/2" },
         { id: "emailSecondary", name: "emailSecondary", type: "text", label: t("crm.forms.editContactDetails.fields.emailSecondary"), width: "1/2" },
-        { id: "fax", name: "fax", type: "text", label: t("crm.forms.editContactDetails.fields.fax"), width: "1/2" },
+        { id: "fax", name: "fax", type: "tel", label: t("crm.forms.editContactDetails.fields.fax"), width: "1/2" },
         { id: "color", name: "color", type: "text", label: t("crm.forms.editContactDetails.fields.color"), width: "1/2" },
         { id: "description", name: "description", type: "textarea", label: t("crm.forms.editContactDetails.fields.description"), width: "full", rows: 3 },
       ],
@@ -926,7 +926,7 @@ export const editLeadDetailsForm = (t: TFunction): FormConfig => ({
       fields: [
         { id: "contactName", name: "contactName", type: "text", label: t("crm.forms.editLeadDetails.fields.contactName"), width: "full" },
         { id: "title", name: "title", type: "text", label: t("crm.forms.editLeadDetails.fields.title"), width: "1/2" },
-        { id: "website", name: "website", type: "text", label: t("crm.forms.editLeadDetails.fields.website"), width: "1/2" },
+        { id: "website", name: "website", type: "url", label: t("crm.forms.editLeadDetails.fields.website"), width: "1/2" },
         { id: "industry", name: "industry", type: "text", label: t("crm.forms.editLeadDetails.fields.industry"), width: "1/2" },
         { id: "referredBy", name: "referredBy", type: "text", label: t("crm.forms.editLeadDetails.fields.referredBy"), width: "1/2" },
         { id: "description", name: "description", type: "textarea", label: t("crm.forms.editLeadDetails.fields.description"), width: "full", rows: 3 },

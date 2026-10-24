@@ -72,7 +72,7 @@ export interface TextareaField extends BaseField {
 }
 
 /** Field names whose values are machine-read (IDs, CSV, JSON, HTML, templates). */
-const RAW_TEXT_FIELD_NAME = /(Ids|Json|Csv|Data|Domain|Html|Values|Prompt|Template|Expression|Sql)$/
+const RAW_TEXT_FIELD_NAME = /(Ids|Json|Csv|Data|Domain|Html|Values|Prompt|Template|Expression|Sql)$|^metadata$/
 
 /** Whether a textarea field should use the bare textarea instead of the rich text editor. */
 export function isPlainTextareaField(field: Pick<TextareaField, "name" | "format">): boolean {

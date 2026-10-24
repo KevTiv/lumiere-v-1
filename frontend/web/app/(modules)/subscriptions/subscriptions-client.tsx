@@ -820,7 +820,7 @@ function SubscriptionsClientLoaded({
                 openHref: (record) => (record.id == null ? undefined : `/subscriptions/${String(record.id)}`),
                 detailConfig: { mode: "detail", sections: [{ id: "subscription", fields: [
                   { key: "code", label: t("subscriptions.subscriptions.columns.code") },
-                  { key: "description", label: t("subscriptions.subscriptions.columns.description") },
+                  { key: "description", type: "markdown", label: t("subscriptions.subscriptions.columns.description") },
                 ] }] },
                 customTabs: [{
                   id: "handoffs",

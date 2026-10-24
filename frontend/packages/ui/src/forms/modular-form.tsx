@@ -25,6 +25,17 @@ function isFieldVisible(field: FormField, values: Record<string, unknown>): bool
   return "oneOf" in rule ? rule.oneOf.includes(value) : value === rule.equals
 }
 
+// Deliberately loose: catches typos (missing @ or domain) without rejecting unusual valid values.
+const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const URL_FORMAT = /^(https?:\/\/)?[^\s/.]+\.[^\s]+$/i
+
+function formatError(field: FormField, value: unknown): "email" | "url" | null {
+  if (typeof value !== "string" || value.trim() === "") return null
+  if (field.type === "email" && !EMAIL_FORMAT.test(value.trim())) return "email"
+  if (field.type === "url" && !URL_FORMAT.test(value.trim())) return "url"
+  return null
+}
+
 function visibleSectionFields(
   fields: FormField[],
   values: Record<string, unknown>,
@@ -271,6 +282,15 @@ export function ModularForm({
       }
     }
 
+    // Only values the user typed are checked, so an old stored value never blocks an unrelated edit.
+    const format = value !== baselineRef.current[field.name] ? formatError(field, value) : null
+    if (format === "email") {
+      return t("common.validation.invalidEmail")
+    }
+    if (format === "url") {
+      return t("common.validation.invalidUrl")
+    }
+
     if (field.validation) {
       const v = field.validation
 
@@ -355,6 +375,14 @@ export function ModularForm({
     }
   }
 
+  // Cmd/Ctrl+Enter submits from any field, so long forms do not need a trip to the footer.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey) || e.nativeEvent.isComposing) return
+    if ((e.target as HTMLElement).closest("[data-form-ai-panel]")) return
+    e.preventDefault()
+    e.currentTarget.requestSubmit()
+  }
+
   const handleReset = () => {
     const initial = getInitialValues()
     setValues(initial)
@@ -372,7 +400,7 @@ export function ModularForm({
   const fieldsContent = (
     <>
       {aiEnabled ? (
-        <div className={cn(workspaceStyles.surface, "space-y-3 bg-muted/30 p-4")}>
+        <div data-form-ai-panel className={cn(workspaceStyles.surface, "space-y-3 bg-muted/30 p-4")}>
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className={workspaceStyles.sectionTitle}>Fill with AI</p>
@@ -490,7 +518,7 @@ export function ModularForm({
   const hasPreview = preview != null && preview !== false
 
   const formContent = (
-    <form noValidate onSubmit={handleSubmit} className={cn("flex flex-col", scrollable ? "min-h-0 flex-1 overflow-hidden" : "gap-6")}>
+    <form noValidate onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={cn("flex flex-col", scrollable ? "min-h-0 flex-1 overflow-hidden" : "gap-6")}>
       <div
         data-form-body={scrollable ? "" : undefined}
         className={cn(

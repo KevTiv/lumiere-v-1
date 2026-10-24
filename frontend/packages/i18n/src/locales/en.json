@@ -239,7 +239,8 @@
       "min": "Minimum value is {{min}}",
       "max": "Maximum value is {{max}}",
       "invalidFormat": "Invalid format",
-      "invalidEmail": "Invalid email address"
+      "invalidEmail": "Invalid email address",
+      "invalidUrl": "Invalid web address"
     },
     "form": {
       "unavailableSelection": "Unavailable selection: {{value}}"

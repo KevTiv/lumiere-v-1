@@ -198,7 +198,7 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
       {
         id: "email",
         fields: [
-          { id: "email", type: "text", name: "email", label: "Email", required: true, width: "1/2" },
+          { id: "email", type: "email", name: "email", label: "Email", required: true, width: "1/2" },
           { id: "verified", type: "switch", name: "emailVerified", label: "Email verified", width: "1/2" },
         ],
       },
@@ -259,7 +259,7 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
         id: "connection",
         fields: [
           { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
-          { id: "account-email", type: "text", name: "accountEmail", label: "Account email", required: true, width: "1/2" },
+          { id: "account-email", type: "email", name: "accountEmail", label: "Account email", required: true, width: "1/2" },
           { id: "account-id", type: "text", name: "accountId", label: "Account ID", required: true, width: "1/2" },
           { id: "credentials-ref", type: "text", name: "credentialsReference", label: "Credentials reference", required: true, width: "1/2" },
           { id: "root-folder", type: "text", name: "rootFolderId", label: "Root folder ID", width: "1/2" },
@@ -267,7 +267,7 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
           { id: "sync-enabled", type: "switch", name: "syncEnabled", label: "Sync enabled", defaultValue: true, width: "1/3" },
           { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/3" },
           { id: "sync-direction", type: "select", name: "syncDirection", label: "Sync direction", defaultValue: "Bidirectional", options: syncDirectionOptions, width: "1/3" },
-          { id: "webhook-url", type: "text", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
+          { id: "webhook-url", type: "url", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
           { id: "webhook-secret", type: "text", name: "webhookSecretReference", label: "Webhook secret reference", width: "1/2" },
           { id: "sync-frequency", type: "number", name: "syncFrequencyMinutes", label: "Sync frequency minutes", defaultValue: 60, width: "1/2" },
           { id: "max-file-size", type: "number", name: "maxFileSizeMb", label: "Max file size MB", defaultValue: 50, width: "1/2" },
@@ -291,7 +291,7 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
           { id: "sync-enabled", type: "switch", name: "syncEnabled", label: "Sync enabled", width: "1/3" },
           { id: "auto-sync", type: "switch", name: "autoSyncFiles", label: "Auto sync files", width: "1/3" },
           { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/3" },
-          { id: "webhook-url", type: "text", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
+          { id: "webhook-url", type: "url", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
           { id: "sync-direction", type: "select", name: "syncDirection", label: "Sync direction", defaultValue: "Bidirectional", options: syncDirectionOptions, width: "1/2" },
           { id: "sync-frequency", type: "number", name: "syncFrequencyMinutes", label: "Sync frequency minutes", width: "1/2" },
           { id: "max-file-size", type: "number", name: "maxFileSizeMb", label: "Max file size MB", width: "1/2" },
@@ -332,7 +332,7 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
           { id: "primary", type: "switch", name: "isPrimary", label: "Primary account", width: "1/3" },
           { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/3" },
           { id: "daily-limit", type: "number", name: "dailyMessageLimit", label: "Daily message limit", defaultValue: 1000, width: "1/3" },
-          { id: "webhook-url", type: "text", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
+          { id: "webhook-url", type: "url", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
           { id: "events", type: "text", name: "subscribedWebhookEvents", label: "Subscribed events (CSV)", defaultValue: "messages,message_status,account_alerts", width: "1/2" },
           { id: "namespace", type: "text", name: "templateNamespace", label: "Template namespace", width: "1/2" },
           { id: "media", type: "text", name: "mediaProvider", label: "Media provider", width: "1/2" },
@@ -356,7 +356,7 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
       { id: "interactive", type: "switch", name: "interactiveMessagingEnabled", label: "Interactive", width: "1/4" },
       { id: "webhook-enabled", type: "switch", name: "webhookEnabled", label: "Webhook enabled", width: "1/2" },
       { id: "daily-limit", type: "number", name: "dailyMessageLimit", label: "Daily message limit", width: "1/2" },
-      { id: "webhook-url", type: "text", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
+      { id: "webhook-url", type: "url", name: "webhookUrl", label: "Webhook URL", width: "1/2" },
       { id: "events", type: "text", name: "subscribedWebhookEvents", label: "Subscribed events (CSV)", width: "1/2" },
       { id: "namespace", type: "text", name: "templateNamespace", label: "Template namespace", width: "1/2" },
       { id: "media", type: "text", name: "mediaProvider", label: "Media provider", width: "1/2" },
@@ -543,7 +543,7 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
       {
         id: "invite",
         fields: [
-          { id: "email", type: "text", name: "email", label: "Email", required: true, width: "1/2" },
+          { id: "email", type: "email", name: "email", label: "Email", required: true, width: "1/2" },
           { id: "role-id", type: "number", name: "roleId", label: "Role ID", required: true, width: "1/2" },
           { id: "hash", type: "textarea", name: "tokenHash", label: "Token hash", required: true, rows: 2, width: "full" },
           { id: "invited-by", type: "text", name: "invitedBy", label: "Invited by identity", required: true, width: "1/2" },

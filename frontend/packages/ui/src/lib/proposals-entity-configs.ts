@@ -151,7 +151,7 @@ export const proposalTemplatesTableConfig = (t: TFunction): EntityViewConfig => 
       { key: "name", label: t("proposals.templates.columns.name"), width: "min-w-40" },
       { key: "category", label: t("proposals.templates.columns.category"), width: "min-w-28" },
       { key: "sectionCount", label: t("proposals.templates.columns.sectionCount"), type: "number", align: "right", width: "min-w-20" },
-      { key: "description", label: t("proposals.templates.columns.description"), width: "min-w-48" },
+      { key: "description", type: "markdown", label: t("proposals.templates.columns.description"), width: "min-w-48" },
       { key: "usageCount", label: t("proposals.templates.columns.usageCount"), type: "number", align: "right", width: "min-w-16" },
       { key: "createdAt", label: t("proposals.templates.columns.createdAt"), type: "date", width: "min-w-28" },
     ],

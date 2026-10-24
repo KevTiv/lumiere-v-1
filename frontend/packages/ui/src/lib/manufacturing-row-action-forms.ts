@@ -673,7 +673,7 @@ export function manufacturingWorkcenterRowActionForm(
             width: "full",
           },
           {
-            type: "text",
+            type: "url",
             id: "routingWorksheetUrl",
             name: "routingWorksheetUrl",
             label: t("manufacturing.rowActions.form.routingWorksheetUrl"),

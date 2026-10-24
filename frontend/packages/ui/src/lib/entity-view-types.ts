@@ -54,6 +54,8 @@ export type ColumnType =
   | "progress"
   | "boolean"
   | "percent"
+  /** Long-form text written in `RichTextarea`: one plain line in tables, formatted in detail views. */
+  | "markdown"
   | "custom"
 
 export type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info"
