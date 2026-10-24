@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useCurrencyFormat } from "../lib/currency-context"
 import type { TFunction } from "i18next"
 import { EntityView } from "@/components/entity-views/entity-view"
 import { budgetsTableConfig } from "@/lib/entity-configs"
@@ -184,6 +185,7 @@ export function BudgetsWorkspace({
   postPending,
 }: BudgetsWorkspaceProps) {
   const { t } = useTranslation()
+  const { money } = useCurrencyFormat()
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null)
 
   const [budgetModalOpen, setBudgetModalOpen] = useState(false)
@@ -507,10 +509,7 @@ export function BudgetsWorkspace({
                   <Badge variant="secondary">{selectedState}</Badge>
                   <span className="text-sm text-muted-foreground">
                     {t("accounting.budgets.planned")}:{" "}
-                    {Number(selected.totalPlanned ?? 0).toLocaleString(undefined, {
-                      style: "currency",
-                      currency: "USD",
-                    })}
+                    {money(Number(selected.totalPlanned ?? 0), selected.currencyId)}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">

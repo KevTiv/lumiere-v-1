@@ -182,6 +182,70 @@ export function journalItemsHref(accountId: string | null): string | null {
   return `/accounting?tab=move-lines&filter=${encodeURIComponent(`accountId:${accountId}`)}`
 }
 
-export function formatStatementAmount(value: number, locale?: string): string {
-  return value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+/**
+ * A statement figure in the viewer's locale: the currency's own decimals when a code is known
+ * (RWF none, KWD three), two otherwise, and negatives in brackets, "(1,200.00)".
+ */
+export function formatStatementAmount(value: number, locale?: string, currency?: string): string {
+  let digits = 2
+  if (currency) {
+    try {
+      digits = new Intl.NumberFormat(locale, { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2
+    } catch {
+      digits = 2
+    }
+  }
+  const text = Math.abs(value).toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits })
+  // A value that rounds to zero is not shown as a negative.
+  return value < 0 && Number(text.replace(/[^\d]/g, "")) !== 0 ? `(${text})` : text
+}
+
+export interface StatementVariance {
+  /** Amount minus the comparison figure. */
+  readonly amount: number
+  /** Change relative to the comparison's size; null when the comparison is zero. */
+  readonly percent: number | null
+}
+
+/** Variance of a row against its comparison column; null on section headers, which carry no figure. */
+export function statementVariance(row: Pick<StatementDisplayRow, "amount" | "comparisonAmount">): StatementVariance | null {
+  if (row.amount == null || row.comparisonAmount == null) return null
+  const amount = row.amount - row.comparisonAmount
+  const percent = row.comparisonAmount === 0 ? null : (amount / Math.abs(row.comparisonAmount)) * 100
+  return { amount, percent }
+}
+
+export function formatStatementPercent(percent: number | null, locale?: string): string {
+  if (percent == null) return "—"
+  const text = Math.abs(percent).toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+  return percent < 0 && Number(text.replace(/[^\d]/g, "")) !== 0 ? `(${text}%)` : `${text}%`
+}
+
+/** Keys of the section rows, i.e. the groups that can be collapsed. */
+export function collapsibleSectionKeys(rows: readonly StatementDisplayRow[]): string[] {
+  return rows.filter((row) => row.kind === "section").map((row) => row.key)
+}
+
+/**
+ * Rows to show when the given section keys are collapsed: a collapsed section keeps its header and
+ * its subtotal row and hides everything between them (nested sections included).
+ */
+export function visibleStatementRows(
+  rows: readonly StatementDisplayRow[],
+  collapsed: ReadonlySet<string>,
+): StatementDisplayRow[] {
+  const visible: StatementDisplayRow[] = []
+  let skipUntil: string | null = null
+  for (const row of rows) {
+    if (skipUntil != null) {
+      if (row.key === skipUntil) {
+        skipUntil = null
+        visible.push(row)
+      }
+      continue
+    }
+    visible.push(row)
+    if (row.kind === "section" && collapsed.has(row.key)) skipUntil = `t-${row.lineId}`
+  }
+  return visible
 }

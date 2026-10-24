@@ -100,18 +100,28 @@ function numberFormat(locale: string | undefined, options?: Intl.NumberFormatOpt
   }
 }
 
+let warnedMissingCurrency = false
+
 /**
  * An amount in a currency, grouped and placed the way `locale` writes it, with the currency's own
- * number of decimals (e.g. none for RWF). `currencyCode` falls back to USD when it is not an ISO code.
+ * number of decimals (e.g. none for RWF) and the accountant convention for negatives, "(1,200.00)".
+ * `currencyCode` falls back to USD when it is not an ISO code.
  */
 export function formatCurrencyAmount(
   value: number,
   currencyCode?: string,
   options?: { locale?: string },
 ): string {
+  const resolved = resolveCurrencyCode(currencyCode)
+  if (!resolved && !warnedMissingCurrency && process.env.NODE_ENV === "development") {
+    // A silent USD fallback hides figures that never told us their currency; say so once in dev.
+    warnedMissingCurrency = true
+    console.warn("formatCurrencyAmount: no valid currency code, showing USD. Pass the row or company currency.")
+  }
   return numberFormat(options?.locale, {
     style: "currency",
-    currency: resolveCurrencyCode(currencyCode) ?? "USD",
+    currency: resolved ?? "USD",
+    currencySign: "accounting",
   }).format(value)
 }
 

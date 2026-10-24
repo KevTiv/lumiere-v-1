@@ -6,7 +6,7 @@ import { EntityView } from "@/components/entity-views/entity-view"
 import { FormModal } from "@/components/forms/form-modal"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { partnerCreditControlsTableConfig } from "@/lib/accounting-entity-configs"
+import { labelMapFromOptions, partnerCreditControlsTableConfig } from "@/lib/accounting-entity-configs"
 import {
   createBadDebtWriteOffForm,
   upsertPartnerCreditControlForm,
@@ -41,7 +41,10 @@ export function PartnerCreditControlPanel({
   const [showWriteOff, setShowWriteOff] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const controlsTableConfig = useMemo(() => partnerCreditControlsTableConfig(t), [t])
+  const controlsTableConfig = useMemo(
+    () => partnerCreditControlsTableConfig(t, { partnerLabelMap: labelMapFromOptions(partnerSelectOptions) }),
+    [t, partnerSelectOptions],
+  )
 
   const upsertFormConfig = useMemo(
     () =>

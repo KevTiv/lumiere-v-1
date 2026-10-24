@@ -11,6 +11,9 @@ export interface InsightPanel<T> { state: ModuleDataState; value: T | null }
 export interface InsightComparison { current: number; previous: number; percent: number | null }
 export interface InsightTrend { startMs: number; invoices: number; bills: number }
 export interface InsightAging { bucket: "current" | "1-30" | "31-60" | "61-90" | "90+" | "undated"; invoices: number; bills: number }
+export interface InsightTurnover { dso: number | null; dpo: number | null }
+export interface InsightCashPoint { startMs: number; balance: number | null }
+export interface InsightCash { position: number; asOfMs: number; accounts: number; months: InsightCashPoint[] }
 export interface InsightBudget { id: string; name: string; planned: number; actual: number; variance: number }
 
 function key(value: unknown): string {
@@ -138,6 +141,64 @@ export function buildAccountantInsights(data: AccountantOverviewData, days: Insi
     }
     return points.map((point): InsightAging => ({ bucket: point.bucket, invoices: major(point.invoices, required(decimals)), bills: major(point.bills, required(decimals)) }))
   })
+  // Days sales / payables outstanding: open balance relative to what was posted in the period,
+  // scaled to the period's length. No posted total in the period means no meaningful figure.
+  const turnover = panel(documentState, () => {
+    const places = required(decimals)
+    let openInvoices = 0n, openBills = 0n, postedInvoices = 0n, postedBills = 0n
+    for (const row of selected) {
+      const residual = required(minor(row.amountResidual ?? row.amount_residual, places))
+      if (residual < 0n) throw new Error("negative open invoice balance")
+      const date = required(kpiDate(row.invoiceDate ?? row.invoice_date ?? row.date)).getTime()
+      const total = required(minor(row.amountTotal ?? row.amount_total, places))
+      if (isInvoice(row)) { openInvoices += residual; if (date >= startMs && date <= now.getTime()) postedInvoices += total }
+      else { openBills += residual; if (date >= startMs && date <= now.getTime()) postedBills += total }
+    }
+    const daysOf = (open: bigint, posted: bigint): number | null => posted <= 0n ? null : major(open, places) / major(posted, places) * days
+    return { dso: daysOf(openInvoices, postedInvoices), dpo: daysOf(openBills, postedBills) }
+  })
+  // Cash position: the closing balance of the latest bank statement of each bank journal, and the
+  // same figure at each month end so the trend never mixes a journal's old and new balances.
+  const statements = scoped(data.bankStatements, data)
+  const cashState = mergeModuleStates([statements.state, currencyState])
+  const cash = panel(cashState, () => {
+    const places = required(decimals)
+    const byJournal = new Map<string, Array<{ at: number; id: number; closing: bigint }>>()
+    for (const row of statements.rows) {
+      if (overviewTag(row.state) === "cancel" || overviewTag(row.state) === "cancelled") continue
+      const rowCurrency = key(row.currencyId ?? row.currency_id)
+      if (!rowCurrency) throw new Error("bank statement currency unavailable")
+      if (rowCurrency !== selectedId) continue
+      const journal = key(row.journalId ?? row.journal_id)
+      if (!journal) throw new Error("bank statement journal unavailable")
+      const at = required(kpiDate(row.date)).getTime()
+      if (at > now.getTime()) continue
+      const closing = required(minor(row.balanceEndReal ?? row.balance_end_real ?? row.balanceEnd ?? row.balance_end, places))
+      const list = byJournal.get(journal) ?? []
+      list.push({ at, id: Number(key(row.id)), closing })
+      byJournal.set(journal, list)
+    }
+    for (const list of byJournal.values()) list.sort((a, b) => a.at - b.at || a.id - b.id)
+    const latestBy = (limitMs: number): { total: bigint; accounts: number; at: number } => {
+      let total = 0n, accounts = 0, at = 0
+      for (const list of byJournal.values()) {
+        const last = [...list].reverse().find((item) => item.at <= limitMs)
+        if (!last) continue
+        total += last.closing; accounts += 1; at = Math.max(at, last.at)
+      }
+      return { total, accounts, at }
+    }
+    const now_ = latestBy(now.getTime())
+    const months: InsightCashPoint[] = []
+    for (let month = Date.UTC(new Date(startMs).getUTCFullYear(), new Date(startMs).getUTCMonth(), 1); month < endMs;) {
+      const date = new Date(month)
+      const next = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)
+      const point = latestBy(Math.min(next - 1, now.getTime()))
+      months.push({ startMs: month, balance: point.accounts === 0 ? null : major(point.total, places) })
+      month = next
+    }
+    return { position: major(now_.total, places), asOfMs: now_.at, accounts: now_.accounts, months }
+  })
   const budgetSource = scoped(data.budgets, data)
   const budgetState = mergeModuleStates([budgetSource.state, companies?.state ?? unavailable, currencyState])
   const budgets = panel(budgetState, () => {
@@ -158,5 +219,5 @@ export function buildAccountantInsights(data: AccountantOverviewData, days: Insi
     }
     return rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
   })
-  return { currencies, currency, selectedId, companyCurrencyId, days, startMs, endMs, previousStartMs, asOfMs: now.getTime(), balances, period, aging, budgets }
+  return { currencies, currency, selectedId, companyCurrencyId, days, startMs, endMs, previousStartMs, asOfMs: now.getTime(), balances, period, aging, budgets, turnover, cash }
 }

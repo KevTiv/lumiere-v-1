@@ -75,9 +75,9 @@ export interface EntityColumn extends EntityPermissioned {
   /** Map raw value → display label for type="badge" */
   badgeLabels?: Record<string, string>
   /**
-   * For `type: "currency"`: the row field holding the row's ISO 4217 code (e.g. "EUR"). The cell
-   * formats with that currency when the field is such a code and falls back to USD otherwise
-   * (numeric currency ids are not resolved here).
+   * For `type: "currency"`: the row field holding the row's currency, an ISO 4217 code (e.g. "EUR")
+   * or a currency id that the surrounding `CurrencyFormatProvider` can look up. Falls back to the
+   * provider's default currency, then USD.
    */
   currencyKey?: string
   /** Secret or masked values (e.g. statutory IDs): never written by the table's CSV export. */

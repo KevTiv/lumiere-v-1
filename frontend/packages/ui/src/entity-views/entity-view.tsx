@@ -22,6 +22,7 @@ import { EntityPivotView } from "./entity-pivot"
 import { ALL_FILTER_VALUE, matchesSearch, rowFilterValue } from "../lib/entity-table-engine"
 import { formatEntityFieldValue, getRowField } from "../lib/entity-row-utils"
 import { useCurrencyFormat } from "../lib/currency-context"
+import { unwrapEntityValue } from "../lib/entity-row-values"
 import { Input } from "../components/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Button } from "../components/button"
@@ -73,24 +74,32 @@ export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTab
     () => ({
       ...config,
       // Currency columns format in their row's currency (named by `currencyKey`, as an ISO code or a
-      // currency record id), else the company's, in the user's locale.
-      columns: columns.map((column) =>
-        column.type === "currency" && !column.render && (column.currencyKey || currency.defaultCode || currency.locale)
-          ? {
-              ...column,
-              render: (value: unknown, row: Record<string, unknown>) =>
-                formatEntityFieldValue(
-                  value,
-                  "currency",
-                  undefined,
-                  undefined,
-                  (column.currencyKey ? currency.codeFor(getRowField(row, column.currencyKey)) : undefined) ??
-                    currency.defaultCode,
-                  currency.locale,
-                ),
-            }
-          : column,
-      ),
+      // currency record id), else the company's, in the user's locale. They are right-aligned, and
+      // negatives are tinted so they stand out in a column of figures.
+      columns: columns.map((column) => {
+        if (column.type !== "currency" || column.render) return column
+        return {
+          ...column,
+          align: column.align ?? "right",
+          render: (value: unknown, row: Record<string, unknown>) => {
+            const content = formatEntityFieldValue(
+              value,
+              "currency",
+              undefined,
+              undefined,
+              (column.currencyKey ? currency.codeFor(getRowField(row, column.currencyKey)) : undefined) ??
+                currency.defaultCode,
+              currency.locale,
+            )
+            const amount = unwrapEntityValue(value)
+            return typeof amount === "number" && amount < 0 ? (
+              <span className="text-destructive">{content}</span>
+            ) : (
+              content
+            )
+          },
+        }
+      }),
       actions: actions.length > 0 ? actions : undefined,
     }),
     [config, columns, actions, currency],
