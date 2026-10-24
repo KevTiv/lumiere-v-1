@@ -8,5 +8,5 @@ CREATE TABLE IF NOT EXISTS lumiere_platform.ai_legacy_index_payload (
     payload JSONB NOT NULL,
     PRIMARY KEY (organization_id, source_table, source_id)
 );
-ALTER TABLE search_embedding ADD COLUMN expected_fingerprint TEXT NOT NULL DEFAULT '';
-ALTER TABLE search_embedding ADD COLUMN index_generation TEXT NOT NULL DEFAULT 'legacy-unverified';
+ALTER TABLE search_embedding ADD COLUMN IF NOT EXISTS expected_fingerprint TEXT NOT NULL DEFAULT '';
+ALTER TABLE search_embedding ADD COLUMN IF NOT EXISTS index_generation TEXT NOT NULL DEFAULT 'legacy-unverified';

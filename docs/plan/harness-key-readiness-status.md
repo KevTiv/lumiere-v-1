@@ -32,10 +32,44 @@ upgrade uses phases 23–26. This local integration does not merge those PRs.
   environment variables. The provisioning job needs the owner token; the
   gateway must not receive it.
 
-The embedding request contract changes, so a new immutable contracts candidate
-must be prepared and pinned before the combined consumer can pass release/drift
-checks. The v0.3.140 baseline and its migration must not be replaced by an AI
-release generated from the older v0.3.139 source alone.
+The embedding request contract changes. The local immutable candidate is
+v0.3.141 at `fcfe7dff63a6f42b54e4dac2bf306f16e07eed9a`, generated from
+application source `6d6e8eeb75b5cd2e5daa10c241c181accfa3b3bb`. It preserves the
+published v0.3.140 baseline. The consumer pin, Rust archive, frontend package,
+lockfiles and release assertions agree. Live local generation passes the full
+contracts drift comparison and release-manifest verification. The candidate
+has not been tagged or pushed.
+
+## Executed local acceptance after convergence
+
+- Gateway: **729 passed**, eight existing ignored tests. API and gateway binaries
+  build against the v0.3.141 candidate. Codegen: **136 passed**, one existing
+  ignored test.
+- PostgreSQL migration suite: **30 passed**, with `C4_TEST_PG=1` and disposable
+  local databases. The authored AI upgrade also passes exact archive/scope,
+  quarantine, forced-mismatch rollback, current-projector adoption and partial
+  legacy-shape rejection checks. Released migration 22 remains unchanged.
+- Native module: embedding organization isolation, evidence provenance and
+  document Wave D/OCR suites passed against the combined source.
+- Frontend: **523 unit tests passed** and full TypeScript validation passed.
+  Authenticated Chromium chat tests passed at 320/390/768/1440 pixels, plus
+  authentication setup (**5 passed**), using a real local API, PostgreSQL and
+  seeded SpacetimeDB module. This was a development server and made no provider
+  requests. The shared helper now opens mobile navigation before the assistant.
+- Provisioning: the exact script applied twice against the real disposable
+  module and gateway, then read back `readyForKey: true`, with **zero billable
+  calls**. This exposed and fixed the live SQL one-field Identity tuple encoding.
+  Synthetic model IDs/prices and local credentials prove request/read-back
+  compatibility only; they do not establish account access or reviewed prices.
+- Operational Node CI suite: **40 passed**, including twelve provisioning tests.
+  Reconstruction verifier: **10 passed**. Railway preflight shell suite passed.
+- The full Python script suite was attempted on macOS. Its native-Linux ELF
+  cache cases fail on this host, and the Kong YAML test cannot import PyYAML.
+  This is not recorded as a passing full script suite.
+
+The combined head still needs its own hosted CI/full P0 lane. GOV00 and the
+billable smoke must run after real deployment configuration and tenant
+provisioning. No completed local check replaces those gates.
 
 ## Integrated implementation
 

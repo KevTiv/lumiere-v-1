@@ -251,3 +251,24 @@ test('placeholder models and rolling aliases cannot be provisioned', () => {
     assert.throws(() => validateManifest(config), /exact reviewed model id/)
   }
 })
+
+
+test('live SQL identity product is checked against the authenticated reader', async () => {
+  const identity = 'ab'.repeat(32)
+  const env = { STDB_HOST: 'http://127.0.0.1:3014', STDB_MODULE: 'local-test',
+    AI_GATEWAY_URL: 'http://127.0.0.1:8185', STDB_SERVER_TOKEN: 'owner',
+    AI_SPEND_READ_STDB_TOKEN: 'reader', LUMIERE_AI_GATEWAY_INTERNAL_SECRET: 'internal' }
+  for (const binding of [[`0x${identity}`], { __identity__: `0x${identity}` }, `0x${identity}`]) {
+    let matches = true
+    const client = httpClient(env, async (_url, options) => {
+      const service = options.body.includes('cold_tier_service_identity')
+      return Response.json([{
+        schema: { elements: [{ name: { some: service ? 'identity' : 'id' } }] },
+        rows: [[service ? (matches ? binding : ['0x' + 'cd'.repeat(32)]) : 9]],
+      }], { headers: { 'spacetime-identity': identity } })
+    })
+    await client.verifyTarget(9)
+    matches = false
+    await assert.rejects(client.verifyTarget(9), /not registered/)
+  }
+})

@@ -53,3 +53,26 @@ DO $$ BEGIN
 END $$;
 SQL
 echo 'AI index migration: archive, tenant scope, quarantine, verification and rollback passed'
+# The current projector can create the new shape before adopting history.
+psql -X -q -v ON_ERROR_STOP=1 <<'SQL'
+DROP TABLE document, search_embedding, lumiere_platform.ai_legacy_index_payload;
+CREATE TABLE document (id NUMERIC(20,0), organization_id NUMERIC(20,0), company_id NUMERIC(20,0));
+CREATE TABLE search_embedding (id NUMERIC(20,0), organization_id NUMERIC(20,0), company_id NUMERIC(20,0), expected_fingerprint TEXT NOT NULL, index_generation TEXT NOT NULL, sync_status TEXT, sync_error TEXT);
+INSERT INTO search_embedding VALUES (3,9,3,'canonical-fingerprint','canonical-generation','synced',NULL);
+SQL
+{ printf 'BEGIN;\n'; cat "$MIGRATIONS/ai_index_expand.sql" "$MIGRATIONS/ai_index_backfill.sql" "$MIGRATIONS/ai_index_verify.sql" "$MIGRATIONS/ai_index_contract.sql"; printf 'COMMIT;\n';
+} | psql -X -q -v ON_ERROR_STOP=1
+psql -X -q -v ON_ERROR_STOP=1 <<'SQL'
+DO $$ BEGIN
+ IF EXISTS (SELECT 1 FROM lumiere_platform.ai_legacy_index_payload) OR
+    NOT EXISTS (SELECT 1 FROM search_embedding WHERE id=3 AND expected_fingerprint='canonical-fingerprint' AND index_generation='canonical-generation' AND sync_status='synced') THEN
+   RAISE EXCEPTION 'current projection adoption changed canonical data';
+ END IF;
+END $$;
+ALTER TABLE search_embedding ADD COLUMN text TEXT;
+SQL
+if { printf 'BEGIN;\n'; cat "$MIGRATIONS/ai_index_backfill.sql" "$MIGRATIONS/ai_index_verify.sql" "$MIGRATIONS/ai_index_contract.sql"; printf 'COMMIT;\n';
+} | psql -X -q -v ON_ERROR_STOP=1 >/dev/null 2>&1; then
+  echo 'partial legacy shape was accepted' >&2; exit 1
+fi
+echo 'AI index migration: current projection adoption and partial-shape rejection passed'

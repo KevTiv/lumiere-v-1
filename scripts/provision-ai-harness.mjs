@@ -270,7 +270,9 @@ export function httpClient(env, fetcher = fetch) {
       requireValue(/^[a-f0-9]{64}$/.test(lastReaderIdentity ?? ''), 'spend reader identity not verified by server')
       const bindings = await this.sql(`SELECT identity FROM cold_tier_service_identity WHERE organization_id = ${organizationId} AND service_name = 'ai_spend_reader' AND is_active = true`)
       const binding = exactlyOne(bindings, 'active spend reader service binding')
-      const identity = unwrap(binding.identity)
+      // SpacetimeDB SQL encodes the Identity product as a one-field tuple.
+      const rawIdentity = binding.identity
+      const identity = Array.isArray(rawIdentity) && rawIdentity.length === 1 ? rawIdentity[0] : unwrap(rawIdentity)
       const normalized = (typeof identity === 'string' ? identity : identity?.__identity__)?.replace(/^0x/, '').toLowerCase()
       requireValue(normalized === lastReaderIdentity, 'spend reader is not registered for this organization')
     },

@@ -249,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    fn accepts_main_catalog_as_exact_prefix_with_only_additive_finance_pending() {
+    fn accepts_released_catalog_prefix_and_reports_all_pending_migrations() {
         let report = inspect_history(true, false, &history(18), MIGRATIONS);
         assert_eq!(report.status, MigrationAuditStatus::Pending);
         assert_eq!(report.matching_versions, (1..=18).collect::<Vec<_>>());
@@ -258,7 +258,7 @@ mod tests {
             report.observed[17].name,
             "durable_invite_acceptance_receipts"
         );
-        assert_eq!(report.pending.len(), 1);
+        assert_eq!(report.pending.len(), MIGRATIONS.len() - 18);
         assert_eq!(report.pending[0].version, 19);
         assert_eq!(report.pending[0].name, "financial_alpha_operations");
         assert!(report.require_compatible().is_ok());
