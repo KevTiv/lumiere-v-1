@@ -145,8 +145,15 @@ export function pricelistRowsToSelectOptions(
     }))
 }
 
+type WarehouseLookupRow = {
+  id?: unknown
+  code?: unknown
+  name?: unknown
+  active?: unknown
+}
+
 export function warehouseRowsToSelectOptions(
-  rows: Record<string, unknown>[],
+  rows: readonly WarehouseLookupRow[],
 ): Array<{ value: string; label: string }> {
   return rows
     .filter((r) => r.active !== false && r.active !== 0)
@@ -810,8 +817,14 @@ export function orgMemberRowsToSelectOptions(
   }))
 }
 
+type StockLocationLookupRow = {
+  id?: unknown
+  name?: unknown
+  completeName?: unknown
+}
+
 export function stockLocationRowsToSelectOptions(
-  rows: Record<string, unknown>[],
+  rows: readonly StockLocationLookupRow[],
 ): Array<{ value: string; label: string }> {
   return rows.map((row) => ({
     value: String(row.id ?? ''),

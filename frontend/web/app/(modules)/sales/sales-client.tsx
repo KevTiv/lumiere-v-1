@@ -926,8 +926,8 @@ function SalesClientLoaded({
         productId: productFieldOptions,
         currencyId: currencyFieldOptions,
         priceRuleIds: linkedRecordOptions(
-          deliveryPriceRules as unknown as Parameters<typeof linkedRecordOptions>[0],
-          (rule) => rule.name,
+          deliveryPriceRules,
+          (rule) => `${rule.variable} ${rule.operator} ${rule.maxValue} → ${rule.listPrice}`,
         ),
       }),
     [t, productFieldOptions, currencyFieldOptions, deliveryPriceRules],
@@ -1179,10 +1179,7 @@ function SalesClientLoaded({
   const pickingBatchFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(newPickingBatchForm(t), {
-        pickingIds: linkedRecordOptions(
-          stockPickings as unknown as Parameters<typeof linkedRecordOptions>[0],
-          (picking) => picking.name,
-        ),
+        pickingIds: linkedRecordOptions(stockPickings, (picking) => picking.name),
       }),
     [t, stockPickings],
   );

@@ -823,12 +823,9 @@ function InventoryClientLoaded({
         productIds: productSelectOptions,
         lotIds: lotSelectOptions,
         serialIds: serialSelectOptions,
-        locationIds: stockLocationRowsToSelectOptions(locations as Record<string, unknown>[]),
-        warehouseIds: warehouseRowsToSelectOptions(warehouses as Record<string, unknown>[]),
-        partnerIds: linkedRecordOptions(
-          contacts as unknown as Parameters<typeof linkedRecordOptions>[0],
-          (contact) => contact.displayName ?? contact.name,
-        ),
+        locationIds: stockLocationRowsToSelectOptions(locations),
+        warehouseIds: warehouseRowsToSelectOptions(warehouses),
+        partnerIds: linkedRecordOptions(contacts, (contact) => contact.displayName ?? contact.name),
         pickingTypeIds: transferFieldOptions.picking,
       }),
     [
