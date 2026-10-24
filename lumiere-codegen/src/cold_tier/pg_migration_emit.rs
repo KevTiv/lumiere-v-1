@@ -529,7 +529,7 @@ fn is_authored_column_addition(table: &str, line: &str) -> bool {
     )
 }
 
-/// Exact retired definitions archived and verified by API migrations 22–25. Other removals
+/// Exact retired definitions archived and verified by API migrations 23–26. Other removals
 /// and type/nullability changes still fail the source compatibility check.
 fn is_authored_column_removal(table: &str, line: &str) -> bool {
     matches!(
@@ -1440,7 +1440,7 @@ mod tests {
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("pg-migration-ledger"),
         )
         .unwrap();
-        assert_eq!(ledger.released.len(), 10);
+        assert_eq!(ledger.released.len(), 11);
         // The v0.3.80 migration 1 that existing databases recorded.
         assert_eq!(
             checksum(&ledger.released[0].sql),
@@ -1455,6 +1455,7 @@ mod tests {
         assert_eq!(ledger.released[7].version, 19);
         assert_eq!(ledger.released[8].version, 20);
         assert_eq!(ledger.released[9].version, 21);
+        assert_eq!(ledger.released[10].version, 22);
         assert_eq!(
             checksum(&ledger.released[3].sql),
             "sha256:a06969f4217bd58dba68cc5291fab2699a1252e6c9269e3bc86e3eb2cd4f719e"
@@ -1484,8 +1485,12 @@ mod tests {
             "sha256:336c8a00ce2ad27063336344e95b6273f4c618e4d448fb738359dab9b91502aa"
         );
         assert_eq!(
+            checksum(&ledger.released[10].sql),
+            "sha256:79437df7d1133c0bf9e63499308df502b7824a3fa067074ea5b15262fabcc369"
+        );
+        assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (26, "0026_durable_projection_delta")
+            (27, "0027_durable_projection_delta")
         );
     }
     #[test]

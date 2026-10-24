@@ -21,7 +21,8 @@ pub(crate) fn authoritative_resource_scope(resource: &str) -> Option<Authoritati
     match resource {
         "products" => Some(AuthoritativeResourceScope::Organization),
         "contacts" => Some(AuthoritativeResourceScope::OrganizationOptionalCompany),
-        "sale-orders" | "purchase-orders" | "tasks" | "account-moves" | "mrp-productions" => {
+        "sale-orders" | "purchase-orders" | "tasks" | "account-moves" | "account-payments"
+        | "expense-sheets" | "mrp-productions" => {
             Some(AuthoritativeResourceScope::OrganizationAndCompany)
         }
         _ => None,
@@ -38,6 +39,11 @@ pub(crate) fn authoritative_record_sql(
     if record_id == 0 || organization_id == 0 || company_id == 0 {
         return Err(ApiError::Unprocessable(
             "organization, company, and record IDs must be positive".into(),
+        ));
+    }
+    if field_access.is_none_or(|access| access.organization_id != organization_id) {
+        return Err(ApiError::NotFound(
+            "Authoritative resource not found".into(),
         ));
     }
     if !has_resource_read_permission(field_access, resource) {
@@ -98,4 +104,51 @@ pub async fn execute_authorized_resource_record(
         filter_and_strip_soft_deleted(&mut rows);
     }
     Ok(rows.into_iter().next())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn finance_board_sources_use_company_and_field_authorization() {
+        for (resource, grant, table) in [
+            (
+                "account-payments",
+                "account_payment:read",
+                "account_payment",
+            ),
+            ("expense-sheets", "expense_sheet:read", "expense_sheet"),
+        ] {
+            let mut access = FieldAccessContext {
+                organization_id: 42,
+                role_id: 1,
+                role_permissions: vec![grant.into()],
+                ..FieldAccessContext::default()
+            };
+            let (sql, scope) = authoritative_record_sql(resource, 42, 7, 9, Some(&access)).unwrap();
+            assert_eq!(scope, AuthoritativeResourceScope::OrganizationAndCompany);
+            assert!(
+                sql.contains(&format!(
+                    "FROM {table} WHERE organization_id = 42 AND company_id = 7 AND id = 9"
+                )),
+                "{sql}"
+            );
+            access.field_permissions.push(
+                serde_json::from_value(json!({
+                    "organizationId": 42, "roleId": 1, "resource": resource,
+                    "action": "read", "allowedFields": ["state"]
+                }))
+                .unwrap(),
+            );
+            let (sql, _) = authoritative_record_sql(resource, 42, 7, 9, Some(&access)).unwrap();
+            assert!(!sql.contains("name"), "{sql}");
+            assert!(!sql.contains("amount"), "{sql}");
+            assert!(sql.contains("state"));
+            assert!(authoritative_record_sql(resource, 43, 7, 9, Some(&access)).is_err());
+            access.role_permissions.clear();
+            assert!(authoritative_record_sql(resource, 42, 7, 9, Some(&access)).is_err());
+        }
+    }
 }

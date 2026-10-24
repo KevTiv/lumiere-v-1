@@ -304,9 +304,18 @@ fn test_cancel_replay_and_terminal_behavior(ctx: &ReducerContext) -> Result<(), 
 
     cancel_workflow(ctx, fixture.organization_id, cancel.clone())?;
     let cancelled = require_instance(ctx, instance.id)?;
+    let cancellation_commits = || {
+        ctx.db
+            .organization_commit()
+            .organization_commit_by_org()
+            .filter(&fixture.organization_id)
+            .filter(|commit| commit.operation_id == "erp.cancel_workflow")
+            .count()
+    };
     if cancelled.state != WorkflowInstanceState::Cancelled
         || cancelled.revision != 2
         || cancelled.active_token_count != 0
+        || cancellation_commits() != 1
     {
         return Err("cancel command did not produce a terminal projection".to_string());
     }
@@ -314,6 +323,7 @@ fn test_cancel_replay_and_terminal_behavior(ctx: &ReducerContext) -> Result<(), 
     cancel_workflow(ctx, fixture.organization_id, cancel)?;
     if runtime_counts(ctx, instance.id) != counts
         || require_instance(ctx, instance.id)?.revision != 2
+        || cancellation_commits() != 1
     {
         return Err("identical cancel replay changed runtime state".to_string());
     }
@@ -330,7 +340,10 @@ fn test_cancel_replay_and_terminal_behavior(ctx: &ReducerContext) -> Result<(), 
     let error = cancel_workflow(ctx, fixture.organization_id, second)
         .err()
         .ok_or("terminal instance accepted a second cancellation")?;
-    if !error.contains("terminal") || runtime_counts(ctx, instance.id) != counts {
+    if !error.contains("terminal")
+        || runtime_counts(ctx, instance.id) != counts
+        || cancellation_commits() != 1
+    {
         return Err(format!("terminal cancellation was not atomic: {error}"));
     }
     Ok(())

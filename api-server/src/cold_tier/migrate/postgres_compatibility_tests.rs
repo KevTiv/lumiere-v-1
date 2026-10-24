@@ -179,6 +179,8 @@ async fn exercise_manufacturing_cost_projection_upgrade(pool: &Pool) -> Result<(
         "purchase_order_creation_operation",
         "purchase_receipt_operation",
         "user_invite_acceptance",
+        "workflow_cancellation_repair_receipt",
+        "workflow_human_task_resubmission",
     ];
     for table in expected_new_tables {
         ensure!(

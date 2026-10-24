@@ -88,6 +88,11 @@ pub(super) fn validate_resources(requested: &[String]) -> Result<(), ApiError> {
         crate::cold_tier::read_descriptor::subscription_resource_keys()
             .map_err(ApiError::internal)?,
     );
+    allowed.extend(
+        super::workflow_tables::WORKFLOW_INVALIDATION_TABLES
+            .iter()
+            .map(|(resource, _)| (*resource).to_string()),
+    );
     for r in requested {
         let t = r.trim();
         if t.is_empty() || !allowed.contains(t) {
@@ -130,6 +135,9 @@ pub(super) fn authorized_resources(
         .iter()
         .map(|resource| resource.trim())
         .filter(|resource| {
+            if super::workflow::resource_table(resource).is_some() {
+                return has_resource_read_permission(Some(field_access), "workflows");
+            }
             !stdb_auth::resource_read_denied(field_access, resource)
                 && (bootstrap_realtime_resource(resource)
                     || stdb_auth::session_read_resource(resource)

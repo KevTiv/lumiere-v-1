@@ -8,19 +8,19 @@ This artifact classifies operation ownership and current disposition only. It do
 
 | Dimension | Count |
 | --- | ---: |
-| Total contract operations | 1461 |
-| Client-facing operations | 946 |
+| Total contract operations | 1463 |
+| Client-facing operations | 948 |
 | Non-client operations | 515 |
 | Unowned client-facing operations | 0 |
 | Review-required rows | 0 |
-| Reconciled Rust reducer rows | 1226 |
+| Reconciled Rust reducer rows | 1228 |
 | Contract-only operations | 235 |
 
 ### Dispositions
 
 | Disposition | Count |
 | --- | ---: |
-| `future-disabled` | 79 |
+| `future-disabled` | 81 |
 | `horizontal` | 156 |
 | `internal-support` | 520 |
 | `primary-workflow` | 706 |
@@ -47,7 +47,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `COV-18` | 45 |
 | `COV-19` | 19 |
 | `COV-20` | 24 |
-| `COV-21` | 41 |
+| `COV-21` | 43 |
 | `COV-22` | 85 |
 | `COV-23` | 86 |
 | `GOV/CAP` | 137 |
@@ -936,6 +936,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `reopen_ticket` | yes | `COV-14` | `primary-workflow` | `reachable-ui` | `helpdesk/tickets.rs` |
 | `reopen_timesheets` | yes | `COV-10` | `primary-workflow` | `reachable-ui` | `projects/timesheets.rs` |
 | `reorder_proposal_line_items` | yes | `COV-17` | `primary-workflow` | `reachable-ui` | `proposals/proposals.rs` |
+| `repair_cancelled_workflow_tasks` | yes | `COV-21` | `future-disabled` | `command-only` | `workflow/cancellation_repair.rs` |
 | `replace_contact_categories` | yes | `COV-03` | `primary-workflow` | `reachable-ui` | `crm/contacts.rs` |
 | `reply_ai_run_question` | no | `GOV/CAP` | `internal-support` | `backend-only` | `ai/run_lifecycle.rs` |
 | `request_ai_skill_certification` | no | `GOV/CAP` | `internal-support` | `backend-only` | `ai/skill_registry.rs` |
@@ -957,6 +958,7 @@ This artifact classifies operation ownership and current disposition only. It do
 | `restore_product_category` | yes | `COV-06` | `primary-workflow` | `reachable-ui` | `inventory/product_category.rs` |
 | `restore_proposal_version` | yes | `COV-17` | `primary-workflow` | `reachable-ui` | `proposals/proposals.rs` |
 | `resubmit_bank_statement_settlement` | yes | `COV-08` | `future-disabled` | `backend-only` | `accounting/bank_settlement_lifecycle.rs` |
+| `resubmit_workflow_human_task` | yes | `COV-21` | `future-disabled` | `hook-only` | `workflow/recovery.rs` |
 | `resume_ai_run_checked` | no | `GOV/CAP` | `internal-support` | `backend-only` | `ai/run_lifecycle.rs` |
 | `resume_subscription` | yes | `COV-12` | `primary-workflow` | `reachable-ui` | `subscriptions/subscription_wave_c.rs` |
 | `retire_workflow_version` | yes | `COV-21` | `horizontal` | `reachable-ui` | `workflow/definitions.rs` |

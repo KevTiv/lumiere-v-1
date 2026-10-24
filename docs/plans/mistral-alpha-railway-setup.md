@@ -1,5 +1,10 @@
 # Mistral alpha setup on Railway
 
+For the current idempotent provisioning command and Railway environment
+manifest, use [Harness key readiness](../plan/harness-key-readiness-status.md).
+The older release/identity manifest below remains an optional read-only audit;
+it is a different format from the provisioning manifest.
+
 This procedure prepares one organization for the governed `report_analysis`
 pilot. It does not grant alpha admission or deploy a release. Use one gateway
 replica: the profile concurrency limit is process-local, not a distributed

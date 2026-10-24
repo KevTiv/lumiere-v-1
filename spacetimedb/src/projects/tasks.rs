@@ -9,6 +9,7 @@ use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::core::organization::company_id_from_scope;
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::projects::milestones::validate_milestone_fk;
 use crate::projects::projects::{project_project, ProjectProject};
@@ -442,6 +443,38 @@ fn task_update_old_values(task: &ProjectTask) -> Value {
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
 
+/// Assignees must remain active members of the task's organization and company.
+/// An organization-wide membership (`company_id: None`) covers every company.
+fn require_task_assignees(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    user_ids: &[Identity],
+) -> Result<(), String> {
+    let mut seen = std::collections::HashSet::with_capacity(user_ids.len());
+    for identity in user_ids {
+        if !seen.insert(*identity) {
+            return Err("task assignees contain duplicates".to_string());
+        }
+        let active_profile = find_user_profile_for_organization(ctx, *identity, organization_id)
+            .is_some_and(|profile| profile.is_active);
+        let active_member = ctx
+            .db
+            .user_organization()
+            .user_org_by_user()
+            .filter(identity)
+            .any(|membership| {
+                membership.organization_id == organization_id
+                    && membership.is_active
+                    && membership.company_id.is_none_or(|id| id == company_id)
+            });
+        if !active_profile || !active_member {
+            return Err("task assignee must be an active member of this company".to_string());
+        }
+    }
+    Ok(())
+}
+
 #[spacetimedb::reducer]
 pub fn create_task(
     ctx: &ReducerContext,
@@ -451,6 +484,13 @@ pub fn create_task(
     check_permission(ctx, organization_id, "project_task", "create")?;
 
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
+    let company_bypass = crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        company_id,
+        ctx.sender(),
+    )?;
+    require_task_assignees(ctx, organization_id, company_id, &params.user_ids)?;
 
     if params.name.trim().is_empty() {
         return Err("Task name cannot be empty".to_string());
@@ -728,7 +768,9 @@ pub fn create_task(
                 "message_ids".to_string(),
                 "metadata".to_string(),
             ],
-            metadata: None,
+            metadata: company_bypass.then(|| {
+                serde_json::json!({"company_membership_superuser_bypass": true}).to_string()
+            }),
         },
     );
 
@@ -952,6 +994,15 @@ pub fn update_task(
     let company_id = company_id_from_scope(ctx, organization_id, params.company_id)?;
     if task.company_id != company_id {
         return Err("Task does not belong to this company".to_string());
+    }
+    let company_bypass = crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        company_id,
+        ctx.sender(),
+    )?;
+    if let Some(user_ids) = &params.user_ids {
+        require_task_assignees(ctx, organization_id, company_id, user_ids)?;
     }
 
     let old_values = task_update_old_values(&task);
@@ -1285,7 +1336,9 @@ pub fn update_task(
                 Value::Object(new_values).to_string()
             }),
             changed_fields,
-            metadata: None,
+            metadata: company_bypass.then(|| {
+                serde_json::json!({"company_membership_superuser_bypass": true}).to_string()
+            }),
         },
     );
 
@@ -1480,6 +1533,13 @@ pub fn assign_task_users(
     }
 
     let company_id = task.company_id;
+    let company_bypass = crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        company_id,
+        ctx.sender(),
+    )?;
+    require_task_assignees(ctx, organization_id, company_id, &user_ids)?;
 
     let mut old_values = Map::new();
     old_values.insert("user_ids".to_string(), identity_vec_to_json(&task.user_ids));
@@ -1519,7 +1579,9 @@ pub fn assign_task_users(
                 Value::Object(new_values).to_string()
             }),
             changed_fields: vec!["user_ids".to_string(), "date_assign".to_string()],
-            metadata: None,
+            metadata: company_bypass.then(|| {
+                serde_json::json!({"company_membership_superuser_bypass": true}).to_string()
+            }),
         },
     );
 

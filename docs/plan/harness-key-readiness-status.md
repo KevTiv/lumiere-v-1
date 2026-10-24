@@ -1,12 +1,45 @@
-# Harness key readiness — 2026-10-23
+# Harness key readiness — 2026-10-24
 
 This status supersedes the September execution board for the bounded Mistral
 pilot. It distinguishes code integration, disposable acceptance, deployment
 provisioning, and real-provider admission.
 
+## Local convergence on 2026-10-24
+
+The isolated `codex/harness-gap-closure` branch combines #135, #136, #193,
+#252–#254, #226 and #232. The published v0.3.140 source from #249 is a
+contracts dependency: migration 22 stays byte-identical, and the AI index
+upgrade uses phases 23–26. This local integration does not merge those PRs.
+
+- Routed limits have one owner, inside durable spend admission. Only an
+  explicitly rejected and zero-settled rate limit can permit bounded retry.
+  Ambiguous dispatch, result recording or settlement still blocks all routes.
+- Required GOV00 cannot skip missing or invalid agent provisioning. Successful
+  acceptance now requires `completed`, an ordered durable trace and authorized
+  Mistral economics with settled reservations. Reload reads the original run.
+- Chat workspace and scope-isolation changes are integrated. The authenticated
+  layout/keyboard suite covers 320/390/768/1440 pixels without provider calls.
+  Its browser execution is a separate check from component tests and discovery.
+- The embedding worker finalizes only its claimed job after confirmed vector
+  persistence. The upgrade archives legacy document text and vector payloads
+  privately, verifies exact tenant/company/payload matches, then retires the
+  duplicate columns. Existing index rows remain unverified until canonical
+  reconciliation; the archive cannot supply retrieval evidence.
+- The existing Railway preflight now requires one AI replica, distinct service
+  credentials, no owner token on the gateway, and direct Mistral transport.
+- `provision-ai-harness.mjs` accepts `--env` with `AI_HARNESS_MANIFEST_JSON`.
+  Placeholders and rolling model aliases are rejected. Credentials remain in
+  environment variables. The provisioning job needs the owner token; the
+  gateway must not receive it.
+
+The embedding request contract changes, so a new immutable contracts candidate
+must be prepared and pinned before the combined consumer can pass release/drift
+checks. The v0.3.140 baseline and its migration must not be replaced by an AI
+release generated from the older v0.3.139 source alone.
+
 ## Integrated implementation
 
-The `codex/harness-key-readiness` branch combines current main (`c4c83289`),
+The earlier `codex/harness-key-readiness` branch combines main (`c4c83289`),
 Phase 4 draft/protocol/recovery PR #135, reconstruction PR #136, and run-history
 PR #193. Their original branches remain intact. Main already includes spend
 recovery #190, trusted envelopes #191, legacy retirement #192, revocation #133,
@@ -33,7 +66,7 @@ Additional corrections in this branch:
   requests use that agent without replacing the organization's default or
   overriding an explicit agent/persona selection.
 
-## Acceptance evidence
+## Earlier acceptance evidence (before local convergence)
 
 - The integrated gateway suite passes **716 tests**, with eight existing ignored
   tests. Profile queue/deadline/isolation regression tests are included.
@@ -115,6 +148,11 @@ certificate, overrides explicit disablement, or switches the default agent.
 node scripts/provision-ai-harness.mjs --check manifest.json
 node scripts/provision-ai-harness.mjs --apply manifest.json
 node scripts/provision-ai-harness.mjs --check manifest.json
+
+# In an approved private setup job, supply the reviewed JSON as one variable:
+node scripts/provision-ai-harness.mjs --plan --env
+node scripts/provision-ai-harness.mjs --apply --env
+node scripts/provision-ai-harness.mjs --check --env
 ```
 
 `--check` is read-only and exits nonzero when setup is missing. Once the stored

@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "summary": {
-    "total_operations": 1461,
-    "client_facing_operations": 946,
+    "total_operations": 1463,
+    "client_facing_operations": 948,
     "non_client_operations": 515,
     "unowned_client_facing": 0,
     "review_required": 0,
-    "reconciled_reducer_rows": 1226,
+    "reconciled_reducer_rows": 1228,
     "contract_only_operations": 235,
     "by_owner": {
       "COV-03": 78,
@@ -27,14 +27,14 @@
       "COV-18": 45,
       "COV-19": 19,
       "COV-20": 24,
-      "COV-21": 41,
+      "COV-21": 43,
       "COV-22": 85,
       "COV-23": 86,
       "GOV/CAP": 137,
       "INTERNAL": 138
     },
     "by_disposition": {
-      "future-disabled": 79,
+      "future-disabled": 81,
       "horizontal": 156,
       "internal-support": 520,
       "primary-workflow": 706
@@ -10494,6 +10494,18 @@
       "basis": "canonical source domain proposals; detected UI caller"
     },
     {
+      "operation": "repair_cancelled_workflow_tasks",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-21",
+      "disposition": "future-disabled",
+      "coverage_status": "command-only",
+      "reducer": "repair_cancelled_workflow_tasks",
+      "source": "workflow/cancellation_repair.rs",
+      "basis": "canonical source domain workflow; no detected UI caller (command-only)"
+    },
+    {
       "operation": "replace_contact_categories",
       "contract_file": "finance-commercial.json",
       "semantic_kind": "command",
@@ -10744,6 +10756,18 @@
       "reducer": "resubmit_bank_statement_settlement",
       "source": "accounting/bank_settlement_lifecycle.rs",
       "basis": "canonical source domain accounting; no detected UI caller (backend-only)"
+    },
+    {
+      "operation": "resubmit_workflow_human_task",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-21",
+      "disposition": "future-disabled",
+      "coverage_status": "hook-only",
+      "reducer": "resubmit_workflow_human_task",
+      "source": "workflow/recovery.rs",
+      "basis": "canonical source domain workflow; no detected UI caller (hook-only)"
     },
     {
       "operation": "resume_ai_run_checked",
