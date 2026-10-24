@@ -4,8 +4,9 @@ import { NavigationGuardProvider } from "@lumiere/ui"
 
 import { QueryClient, QueryClientProvider, useQueryClient, useQuery } from "@tanstack/react-query"
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
-import { I18nProvider } from "@lumiere/i18n"
+import { I18nProvider, useTranslation } from "@lumiere/i18n"
 import {
+  CurrencyFormatProvider,
   RBACProvider,
   SonnerToaster,
   ThemeProvider,
@@ -31,6 +32,12 @@ import { PostHogPageView } from "@/lib/posthog-pageview"
 import { apiFetch } from "@/lib/api-fetch"
 import { EFFECTIVE_ACCESS_ROLE_ID } from "@lumiere/ui/lib/runtime-form-role"
 import { DocumentTemplateProvider } from "./document-template-provider"
+
+/** Amounts and numbers follow the language the user picked. */
+function CurrencyLocaleBridge({ children }: { children: React.ReactNode }) {
+  const { i18n } = useTranslation()
+  return <CurrencyFormatProvider locale={i18n.language}>{children}</CurrencyFormatProvider>
+}
 
 // ─── REST-based RBAC Bridge ───────────────────────────────────────────────────
 function RBACBridge({
@@ -199,6 +206,7 @@ export function Providers({
 
   return (
     <I18nProvider>
+      <CurrencyLocaleBridge>
       <ThemeProvider>
         <SonnerToaster />
         <Suspense fallback={null}>
@@ -243,6 +251,7 @@ export function Providers({
           </QueryClientProvider>
         </LumiereApiProvider>
       </ThemeProvider>
+      </CurrencyLocaleBridge>
     </I18nProvider>
   )
 }

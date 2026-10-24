@@ -5,6 +5,7 @@ import { cn } from "../lib/utils"
 import type { EntityDetailConfig, EntityDetailField, EntityRow } from "../lib/entity-view-types"
 import { filterEntitySurface } from "../lib/entity-view-types"
 import { useRBAC } from "../lib/rbac-context"
+import { useCurrencyFormat, type CurrencyFormat } from "../lib/currency-context"
 import { formatEntityFieldValue } from "../lib/entity-row-utils"
 import { unwrapEntityValue } from "../lib/entity-row-values"
 import { Separator } from "../components/separator"
@@ -23,24 +24,30 @@ function formatDetailValue(
   type: string | undefined,
   badgeVariants?: Record<string, string>,
   badgeLabels?: Record<string, string>,
+  currencyCode?: string,
+  locale?: string,
 ): React.ReactNode {
   // Same formatting as table cells, so a record reads identically in both.
   if (unwrapEntityValue(value) == null || unwrapEntityValue(value) === "") {
     return <span className="text-muted-foreground italic">—</span>
   }
   if (type === "markdown") return <MarkdownView value={String(unwrapEntityValue(value))} />
-  return formatEntityFieldValue(value, type, badgeVariants, badgeLabels)
+  return formatEntityFieldValue(value, type, badgeVariants, badgeLabels, currencyCode, locale)
 }
 
 function renderFieldValue(
   field: EntityDetailField,
   value: unknown,
   data: EntityRow,
+  currency: CurrencyFormat,
 ): React.ReactNode {
   if (field.render) return field.render(value, data)
   // A markdown-edited field reads formatted even when its column type was not set to markdown.
   const type = field.inlineEdit?.kind === "markdown" ? "markdown" : field.type
-  return formatDetailValue(value, type, field.badgeVariants, field.badgeLabels)
+  // Currency fields read in their record's currency (named by `currencyKey`), else the company's.
+  const currencyCode =
+    (field.currencyKey ? currency.codeFor(data[field.currencyKey]) : undefined) ?? currency.defaultCode
+  return formatDetailValue(value, type, field.badgeVariants, field.badgeLabels, currencyCode, currency.locale)
 }
 
 const widthClasses: Record<string, string> = {
@@ -53,6 +60,7 @@ const widthClasses: Record<string, string> = {
 
 export function EntityDetail({ config, data, className }: EntityDetailProps) {
   const { checkPermission } = useRBAC()
+  const currency = useCurrencyFormat()
 
   const sections = useMemo(
     () =>
@@ -112,10 +120,10 @@ export function EntityDetail({ config, data, className }: EntityDetailProps) {
                         fieldKey={field.key}
                         label={field.label}
                         value={plain}
-                        renderValue={(shown) => renderFieldValue(field, shown === plain ? value : shown, data)}
+                        renderValue={(shown) => renderFieldValue(field, shown === plain ? value : shown, data, currency)}
                       />
                     ) : (
-                      renderFieldValue(field, value, data)
+                      renderFieldValue(field, value, data, currency)
                     )}
                   </dd>
                 </div>

@@ -225,6 +225,8 @@ export interface EntityDetailField extends EntityPermissioned {
   width?: FieldWidth
   badgeVariants?: Record<string, string>
   badgeLabels?: Record<string, string>
+  /** For `type: "currency"`: the record field naming its currency (an ISO code or a currency id). */
+  currencyKey?: string
   render?: (value: unknown, record: EntityRow) => ReactNode
   /**
    * Makes the field editable where it is read (click, or Enter/Space when focused). The caller

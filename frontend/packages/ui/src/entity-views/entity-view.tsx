@@ -20,7 +20,8 @@ import { EntityDetail } from "./entity-detail"
 import { EntityBoardView } from "./entity-board"
 import { EntityPivotView } from "./entity-pivot"
 import { ALL_FILTER_VALUE, matchesSearch, rowFilterValue } from "../lib/entity-table-engine"
-import { formatEntityFieldValue, getRowField, resolveCurrencyCode } from "../lib/entity-row-utils"
+import { formatEntityFieldValue, getRowField } from "../lib/entity-row-utils"
+import { useCurrencyFormat } from "../lib/currency-context"
 import { Input } from "../components/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Button } from "../components/button"
@@ -67,12 +68,14 @@ export function useEntitySurfaceFilter<T extends EntityPermissioned>(
 export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTableConfig {
   const columns = useEntitySurfaceFilter(config.columns)
   const actions = useEntitySurfaceFilter(config.actions)
+  const currency = useCurrencyFormat()
   return useMemo(
     () => ({
       ...config,
-      // Currency columns that name a row currency field format with that row's currency.
+      // Currency columns format in their row's currency (named by `currencyKey`, as an ISO code or a
+      // currency record id), else the company's, in the user's locale.
       columns: columns.map((column) =>
-        column.type === "currency" && column.currencyKey && !column.render
+        column.type === "currency" && !column.render && (column.currencyKey || currency.defaultCode || currency.locale)
           ? {
               ...column,
               render: (value: unknown, row: Record<string, unknown>) =>
@@ -81,14 +84,16 @@ export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTab
                   "currency",
                   undefined,
                   undefined,
-                  resolveCurrencyCode(getRowField(row, column.currencyKey!)),
+                  (column.currencyKey ? currency.codeFor(getRowField(row, column.currencyKey)) : undefined) ??
+                    currency.defaultCode,
+                  currency.locale,
                 ),
             }
           : column,
       ),
       actions: actions.length > 0 ? actions : undefined,
     }),
-    [config, columns, actions],
+    [config, columns, actions, currency],
   )
 }
 

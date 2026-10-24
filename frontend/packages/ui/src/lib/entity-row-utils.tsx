@@ -88,8 +88,28 @@ export function resolveCurrencyCode(raw: unknown): string | undefined {
   }
 }
 
-export function formatCurrencyAmount(value: number, currencyCode?: string): string {
-  return new Intl.NumberFormat("en-US", {
+/** Locale used when none is supplied (see `CurrencyFormatProvider`). */
+export const DEFAULT_FORMAT_LOCALE = "en-US"
+
+/** An `Intl.NumberFormat` that falls back to the default locale when the tag is not valid. */
+function numberFormat(locale: string | undefined, options?: Intl.NumberFormatOptions): Intl.NumberFormat {
+  try {
+    return new Intl.NumberFormat(locale ?? DEFAULT_FORMAT_LOCALE, options)
+  } catch {
+    return new Intl.NumberFormat(DEFAULT_FORMAT_LOCALE, options)
+  }
+}
+
+/**
+ * An amount in a currency, grouped and placed the way `locale` writes it, with the currency's own
+ * number of decimals (e.g. none for RWF). `currencyCode` falls back to USD when it is not an ISO code.
+ */
+export function formatCurrencyAmount(
+  value: number,
+  currencyCode?: string,
+  options?: { locale?: string },
+): string {
+  return numberFormat(options?.locale, {
     style: "currency",
     currency: resolveCurrencyCode(currencyCode) ?? "USD",
   }).format(value)
@@ -102,6 +122,8 @@ export function formatEntityFieldValue(
   badgeLabels?: Record<string, string>,
   /** ISO code for `type: "currency"`; USD when absent or not a valid code. */
   currencyCode?: string,
+  /** BCP 47 tag for numbers and amounts (default en-US); dates keep following the browser. */
+  locale?: string,
 ): ReactNode {
   const value = unwrapEntityValue(rawValue)
   if (value === null || value === undefined || value === "") {
@@ -110,11 +132,11 @@ export function formatEntityFieldValue(
 
   switch (type) {
     case "currency":
-      return typeof value === "number" ? formatCurrencyAmount(value, currencyCode) : String(value)
+      return typeof value === "number" ? formatCurrencyAmount(value, currencyCode, { locale }) : String(value)
 
     case "number":
       return typeof value === "number"
-        ? new Intl.NumberFormat("en-US").format(value)
+        ? numberFormat(locale).format(value)
         : String(value)
 
     case "percent":

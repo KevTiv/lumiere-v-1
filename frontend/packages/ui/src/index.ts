@@ -25,6 +25,7 @@ export * from "./entity-views/entity-board";
 export * from "./entity-views/entity-board-card";
 export * from "./lib/entity-view-types"; // exports FieldWidth, ColumnType
 export * from "./lib/entity-row-utils";
+export * from "./lib/currency-context";
 export * from "./lib/kanban-board-types";
 export * from "./kanban/kanban-board";
 export * from "./kanban/kanban-column";
