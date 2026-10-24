@@ -32,13 +32,17 @@ upgrade uses phases 23–26. This local integration does not merge those PRs.
   environment variables. The provisioning job needs the owner token; the
   gateway must not receive it.
 
-The embedding request contract changes. The local immutable candidate is
+The embedding request contract changes. The published immutable release is
 v0.3.141 at `fcfe7dff63a6f42b54e4dac2bf306f16e07eed9a`, generated from
 application source `6d6e8eeb75b5cd2e5daa10c241c181accfa3b3bb`. It preserves the
 published v0.3.140 baseline. The consumer pin, Rust archive, frontend package,
 lockfiles and release assertions agree. Live local generation passes the full
-contracts drift comparison and release-manifest verification. The candidate
-has not been tagged or pushed.
+contracts drift comparison and release-manifest verification. Contracts `main`
+and annotated tag `v0.3.141` both resolve to the verified release commit.
+[Hosted Contracts CI](https://github.com/KevTiv/lumiere-contracts/actions/runs/40093161295)
+passed for that exact commit, including offline generation, emitter tests,
+Rust v2 contracts, TypeScript type-check/build and package validation. This
+publishes contract artifacts; it does not deploy the application.
 
 ## Executed local acceptance after convergence
 
