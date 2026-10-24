@@ -47,7 +47,7 @@ const config: FormConfig = {
       id: "main",
       fields: [
         { id: "title", name: "title", label: "Title", type: "text", defaultValue: "Initial" },
-        { id: "description", name: "description", label: "Description", type: "textarea" },
+        { id: "description", name: "description", label: "Description", type: "textarea", format: "plain" },
         { id: "password", name: "password", label: "Password", type: "password" },
         { id: "apiToken", name: "apiToken", label: "API token", type: "text" },
       ],
