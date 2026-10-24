@@ -15,11 +15,16 @@ export const FORM_DRAFT_DEBOUNCE_MS = 800
 
 const SECRET_NAME = /pass(word|wd|phrase|code)?$|password|secret|token|api[-_]?key|private[-_]?key|credential|cvv|cvc|card[-_]?number|iban|ssn|otp/i
 
+/** A value that survives a JSON round trip unchanged. */
+export type DraftValue = string | number | boolean | null | readonly DraftValue[] | { readonly [key: string]: DraftValue }
+/** Draftable field values by field name. */
+export type DraftValues = { readonly [field: string]: DraftValue }
+
 interface StoredDraft {
   savedAt: number
   /** Fingerprint of the values the form opened with; a draft only applies to the same starting point. */
   base: string
-  values: Record<string, unknown>
+  values: DraftValues
 }
 
 /**
@@ -61,17 +66,12 @@ function readDraft(key: string, now = Date.now()): StoredDraft | null {
   try {
     const raw = storage()?.getItem(key)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<StoredDraft>
-    if (typeof parsed?.savedAt !== "number" || typeof parsed.base !== "string"
-      || !parsed.values || typeof parsed.values !== "object") {
+    const parsed: unknown = JSON.parse(raw)
+    if (!isStoredDraft(parsed) || now - parsed.savedAt > FORM_DRAFT_TTL_MS) {
       clearFormDraft(key)
       return null
     }
-    if (now - parsed.savedAt > FORM_DRAFT_TTL_MS) {
-      clearFormDraft(key)
-      return null
-    }
-    return parsed as StoredDraft
+    return parsed
   } catch {
     return null
   }
@@ -91,33 +91,46 @@ export function isDraftableField(field: FormField): boolean {
   return !SECRET_NAME.test(field.name) && !SECRET_NAME.test(field.id)
 }
 
-function isJsonSafe(value: unknown): boolean {
-  if (value == null) return true
-  const kind = typeof value
-  if (kind === "string" || kind === "boolean") return true
-  if (kind === "number") return Number.isFinite(value)
-  if (Array.isArray(value)) return value.every(isJsonSafe)
-  if (kind === "object" && Object.getPrototypeOf(value) === Object.prototype) {
-    return Object.values(value as Record<string, unknown>).every(isJsonSafe)
-  }
-  return false
+function isPlainObject(value: unknown): value is object {
+  return typeof value === "object" && value !== null && Object.getPrototypeOf(value) === Object.prototype
 }
 
-function draftableValues(config: FormConfig, values: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
+function isDraftValue(value: unknown): value is DraftValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return true
+  if (typeof value === "number") return Number.isFinite(value)
+  if (Array.isArray(value)) return value.every(isDraftValue)
+  return isPlainObject(value) && Object.values(value).every(isDraftValue)
+}
+
+function isDraftValues(value: unknown): value is DraftValues {
+  return isPlainObject(value) && Object.values(value).every(isDraftValue)
+}
+
+function isStoredDraft(value: unknown): value is StoredDraft {
+  return isPlainObject(value)
+    && "savedAt" in value && typeof value.savedAt === "number"
+    && "base" in value && typeof value.base === "string"
+    && "values" in value && isDraftValues(value.values)
+}
+
+/**
+ * The draftable, JSON-safe subset of a form's values. `read` returns the
+ * current value of a field by name; anything else is left out.
+ */
+export function toDraftValues(config: FormConfig, read: (name: string) => unknown): DraftValues {
+  const out: { [field: string]: DraftValue } = {}
   for (const section of config.sections) {
     for (const field of section.fields) {
-      if (!isDraftableField(field) || !(field.name in values)) continue
-      const value = values[field.name]
-      if (isJsonSafe(value)) out[field.name] = value
+      if (!isDraftableField(field)) continue
+      const value = read(field.name)
+      if (isDraftValue(value)) out[field.name] = value
     }
   }
   return out
 }
 
-function fingerprint(config: FormConfig, values: Record<string, unknown>): string {
-  const draftable = draftableValues(config, values)
-  return JSON.stringify(Object.keys(draftable).sort().map((name) => [name, draftable[name]]))
+function fingerprint(values: DraftValues): string {
+  return JSON.stringify(Object.keys(values).sort().map((name) => [name, values[name]]))
 }
 
 function formatRelative(savedAt: number, language: string | undefined): string {
@@ -139,12 +152,13 @@ interface UseFormDraftOptions {
   enabled: boolean
   config: FormConfig
   draftKey?: string | number | null
-  values: Record<string, unknown>
-  /** Values the form opened with (read on first render only). */
-  initialValues: Record<string, unknown>
+  /** Current draftable values, from {@link toDraftValues}. */
+  values: DraftValues
+  /** Draftable values the form opened with (read on first render only). */
+  initialValues: DraftValues
   dirty: boolean
   /** Applies restored values on top of the current ones. */
-  onRestore: (draftValues: Record<string, unknown>) => void
+  onRestore: (draftValues: DraftValues) => void
   /** Puts the form back to the values it opened with. */
   onRevert: () => void
 }
@@ -166,7 +180,7 @@ export function useFormDraft({
   const { t, i18n } = useTranslation()
   const key = useFormDraftStorageKey(config.id, draftKey)
   const baseRef = useRef<string | null>(null)
-  if (baseRef.current === null) baseRef.current = fingerprint(config, initialValues)
+  if (baseRef.current === null) baseRef.current = fingerprint(initialValues)
   const [restoredAt, setRestoredAt] = useState<number | null>(null)
   const checkedKeyRef = useRef<string | null>(null)
   const pendingRef = useRef<(() => void) | null>(null)
@@ -188,8 +202,9 @@ export function useFormDraft({
       clearFormDraft(key)
       return
     }
-    const restorable = draftableValues(config, draft.values)
-    if (fingerprint(config, { ...latest.current.values, ...restorable }) === baseRef.current) {
+    // Only fields this form still has, and may store, come back.
+    const restorable = toDraftValues(config, (name) => draft.values[name])
+    if (fingerprint({ ...latest.current.values, ...restorable }) === baseRef.current) {
       clearFormDraft(key)
       return
     }
@@ -198,6 +213,8 @@ export function useFormDraft({
     setRestoredAt(draft.savedAt)
   }, [enabled, key, config])
 
+  // Effects key on the content, not the identity, of the snapshot built each render.
+  const snapshot = fingerprint(values)
   useEffect(() => {
     if (!enabled || checkedKeyRef.current !== key) return
     if (dirty) restoringRef.current = false
@@ -209,12 +226,12 @@ export function useFormDraft({
     }
     const save = () => {
       pendingRef.current = null
-      writeDraft(key, { savedAt: Date.now(), base: baseRef.current ?? "", values: draftableValues(config, values) })
+      writeDraft(key, { savedAt: Date.now(), base: baseRef.current ?? "", values: latest.current.values })
     }
     pendingRef.current = save
     const timer = setTimeout(save, FORM_DRAFT_DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [enabled, key, config, values, dirty])
+  }, [enabled, key, snapshot, dirty])
 
   // A reload or tab close inside the debounce window still keeps the last edit.
   useEffect(() => {

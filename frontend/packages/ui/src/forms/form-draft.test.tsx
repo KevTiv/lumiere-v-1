@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { FormConfig } from "../lib/form-types"
-import { FORM_DRAFT_DEBOUNCE_MS, FORM_DRAFT_TTL_MS, formDraftStorageKey } from "./form-draft"
+import { FORM_DRAFT_DEBOUNCE_MS, FORM_DRAFT_TTL_MS, formDraftStorageKey, type DraftValues } from "./form-draft"
 import { FormModal } from "./form-modal"
 import { ModularForm } from "./modular-form"
 
@@ -58,7 +58,7 @@ const config: FormConfig = {
 const key = (draftKey?: string) => formDraftStorageKey(config.id, draftKey, null, undefined)
 const stored = (draftKey?: string) => {
   const raw = localStorage.getItem(key(draftKey))
-  return raw ? (JSON.parse(raw) as { savedAt: number; values: Record<string, unknown> }) : null
+  return raw ? (JSON.parse(raw) as { savedAt: number; values: DraftValues }) : null
 }
 const field = (name: string) => screen.getByTestId(`form-field-${name}`) as HTMLInputElement
 const edit = (name: string, value: string) => fireEvent.change(field(name), { target: { value } })

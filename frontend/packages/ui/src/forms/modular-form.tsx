@@ -12,7 +12,7 @@ import { storedNumericValue } from "../lib/numeric-format"
 import { serializeAiFormSchema } from "../lib/ai-form-schema"
 import { FormFieldRenderer } from "./forms-field-render"
 import { formValuesDiffer } from "./use-unsaved-changes-guard"
-import { useFormDraft } from "./form-draft"
+import { toDraftValues, useFormDraft } from "./form-draft"
 import { Button } from "../components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Separator } from "../components/separator"
@@ -179,8 +179,8 @@ export function ModularForm({
     enabled: draft,
     config,
     draftKey,
-    values,
-    initialValues: baselineRef.current,
+    values: toDraftValues(config, (name) => values[name]),
+    initialValues: toDraftValues(config, (name) => baselineRef.current[name]),
     dirty,
     onRestore: (restored) => {
       setValues((prev) => {
