@@ -196,7 +196,7 @@ export const dashboardsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchKeys: ["name", "description"],
     columns: [
       { key: "name", label: t("reports.dashboards.columns.name"), width: "min-w-48" },
-      { key: "description", label: t("reports.dashboards.columns.description"), width: "min-w-48" },
+      { key: "description", type: "markdown", label: t("reports.dashboards.columns.description"), width: "min-w-48" },
       { key: "isDefault", label: t("reports.dashboards.columns.isDefault"), type: "boolean" },
       { key: "isShared", label: t("reports.dashboards.columns.isShared"), type: "boolean" },
       { key: "createDate", label: t("reports.dashboards.columns.createDate"), type: "date" },

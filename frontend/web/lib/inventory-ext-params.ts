@@ -13,6 +13,7 @@ import type { Timestamp } from "spacetimedb"
 import { nullableBigIntU64, optionalBigIntU64, optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
+import { idListTokens } from "@/lib/id-list"
 
 export type InventoryCreateProductPayload = Record<string, unknown> & {
   name: string
@@ -96,15 +97,10 @@ function timestampFromFormDate(v: unknown, fallback = new Date()): Timestamp {
   return stbTimestampFromDate(fallback)
 }
 
-/** Comma / whitespace separated unsigned integers → bigint array (invalid tokens skipped). */
+/** Picked ids (`string[]`) or comma / whitespace separated text → bigint array (invalid tokens skipped). */
 export function parseBigIntIdList(raw: unknown): bigint[] {
-  const s = String(raw ?? "").trim()
-  if (!s) return []
   const out: bigint[] = []
-  for (const p of s
-    .split(/[\s,;]+/)
-    .map((x) => x.trim())
-    .filter(Boolean)) {
+  for (const p of idListTokens(raw)) {
     try {
       out.push(BigInt(p))
     } catch {

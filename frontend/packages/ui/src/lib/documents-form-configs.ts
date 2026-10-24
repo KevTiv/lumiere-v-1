@@ -84,6 +84,7 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
           type: "text",
           label: t("documents.forms.newDocument.fields.tagIds"),
           placeholder: t("documents.forms.newDocument.fields.tagIdsHint"),
+          description: t("documents.forms.newDocument.fields.tagIdsDescription"),
           width: "full",
         },
         {
@@ -466,7 +467,7 @@ export const completeDocumentProcessingJobForm = (t: TFunction): FormConfig => (
         {
           id: "cost",
           name: "cost",
-          type: "number",
+          type: "money",
           label: t("documents.forms.completeProcessingJob.fields.cost"),
           width: "1/2",
         },

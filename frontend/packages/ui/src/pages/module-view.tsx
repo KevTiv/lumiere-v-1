@@ -26,7 +26,7 @@ import { FormModal } from "../forms/form-modal"
 import { RuntimeFormModal } from "../forms/runtime-form-modal"
 import { buildModuleNavigationAreas, type ModuleConfig, type ModuleTab } from "../lib/module-types"
 import type { EntityBoardRuntimeContext } from "../lib/module-types"
-import type { EntitySurfacePermission } from "../lib/entity-view-types"
+import type { EntityRow, EntitySurfacePermission } from "../lib/entity-view-types"
 import type { FormConfig, FormValues } from "../lib/form-types"
 import { getEntityRowKey } from "../lib/entity-row-utils"
 import { decideCreateGate, withTabCreateCta } from "../lib/list-empty-state"
@@ -95,6 +95,20 @@ interface ModuleViewProps {
    * module already holds; selecting a tile narrows the list to the rows behind it.
    */
   kpiStrips?: Record<string, { tiles: KpiTileDef[]; loading?: boolean }>
+}
+
+/**
+ * The open record sheet shows the row as the list has it now, so edits made from the sheet (and
+ * refetches) show up without reopening it. Falls back to the clicked row.
+ */
+function liveSheetRecord(
+  rows: EntityRow[] | undefined,
+  selected: EntityRow | null,
+  rowKey: string | undefined,
+): EntityRow | null {
+  if (!selected || !rows || !rowKey || selected[rowKey] == null) return selected
+  const key = String(selected[rowKey])
+  return rows.find((row) => row[rowKey] != null && String(row[rowKey]) === key) ?? selected
 }
 
 export function ModuleView({
@@ -448,7 +462,7 @@ export function ModuleView({
                     open={selectedRecord != null}
                     onOpenChange={(open) => !open && setSelectedRecord(null)}
                     config={tab.recordSheet}
-                    record={selectedRecord}
+                    record={liveSheetRecord(data[tab.id], selectedRecord, getEntityRowKey(tab.entityConfig!))}
                   />
                 )}
 

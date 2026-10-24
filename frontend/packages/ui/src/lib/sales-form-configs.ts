@@ -81,7 +81,7 @@ export const newSaleOrderForm = (t: TFunction): FormConfig => ({
         {
           id: "commissionRatePercent",
           name: "commissionRatePercent",
-          type: "number",
+          type: "percent",
           label: t("sales.forms.newSaleOrder.fields.commissionRatePercent", {
             defaultValue: "Commission rate %",
           }),
@@ -245,7 +245,7 @@ export const newPricelistItemForm = (t: TFunction): FormConfig => ({
         {
           id: "minQuantity",
           name: "minQuantity",
-          type: "number",
+          type: "quantity",
           label: t("sales.forms.newPricelistItem.fields.minQuantity"),
           width: "1/3",
           defaultValue: 1,
@@ -259,7 +259,7 @@ export const newPricelistItemForm = (t: TFunction): FormConfig => ({
         {
           id: "fixedPrice",
           name: "fixedPrice",
-          type: "number",
+          type: "money",
           label: t("sales.forms.newPricelistItem.fields.fixedPrice"),
           width: "1/2",
           defaultValue: 0,
@@ -314,12 +314,12 @@ export const newPickingBatchForm = (t: TFunction): FormConfig => ({
         {
           id: "pickingIds",
           name: "pickingIds",
-          type: "textarea",
+          type: "multiselect",
           label: t("sales.forms.newPickingBatch.fields.pickingIds"),
           placeholder: t("sales.forms.newPickingBatch.fields.pickingIdsPlaceholder"),
           description: t("sales.forms.newPickingBatch.fields.pickingIdsHint"),
           width: "full",
-          rows: 3,
+          options: [],
         },
         {
           id: "isWave",
@@ -376,21 +376,21 @@ export const newDeliveryPriceRuleForm = (t: TFunction): FormConfig => ({
         {
           id: "listBasePrice",
           name: "listBasePrice",
-          type: "number",
+          type: "money",
           label: t("sales.forms.newDeliveryPriceRule.fields.listBasePrice"),
           width: "1/2",
         },
         {
           id: "listPrice",
           name: "listPrice",
-          type: "number",
+          type: "money",
           label: t("sales.forms.newDeliveryPriceRule.fields.listPrice"),
           width: "1/2",
         },
         {
           id: "standardPrice",
           name: "standardPrice",
-          type: "number",
+          type: "money",
           label: t("sales.forms.newDeliveryPriceRule.fields.standardPrice"),
           width: "1/2",
         },
@@ -458,11 +458,11 @@ export const newDeliveryCarrierForm = (t: TFunction): FormConfig => ({
         {
           id: "priceRuleIds",
           name: "priceRuleIds",
-          type: "textarea",
+          type: "multiselect",
           label: t("sales.forms.newDeliveryCarrier.fields.priceRuleIds"),
           description: t("sales.forms.newDeliveryCarrier.fields.priceRuleIdsHint"),
           width: "full",
-          rows: 2,
+          options: [],
         },
         {
           id: "margin",
@@ -474,14 +474,14 @@ export const newDeliveryCarrierForm = (t: TFunction): FormConfig => ({
         {
           id: "amount",
           name: "amount",
-          type: "number",
+          type: "money",
           label: t("sales.forms.newDeliveryCarrier.fields.amount"),
           width: "1/3",
         },
         {
           id: "fixedCharge",
           name: "fixedCharge",
-          type: "number",
+          type: "money",
           label: t("sales.forms.newDeliveryCarrier.fields.fixedCharge"),
           width: "1/3",
         },
@@ -495,7 +495,7 @@ export const newDeliveryCarrierForm = (t: TFunction): FormConfig => ({
         {
           id: "shippingInsurance",
           name: "shippingInsurance",
-          type: "number",
+          type: "money",
           label: t("sales.forms.newDeliveryCarrier.fields.shippingInsurance"),
           width: "1/3",
         },
@@ -546,6 +546,7 @@ export const newDeliveryCarrierForm = (t: TFunction): FormConfig => ({
           name: "countryIds",
           type: "textarea",
           label: t("sales.forms.newDeliveryCarrier.fields.countryIds"),
+          description: t("sales.forms.newDeliveryCarrier.fields.countryIdsHint"),
           width: "full",
           rows: 2,
         },
@@ -554,6 +555,7 @@ export const newDeliveryCarrierForm = (t: TFunction): FormConfig => ({
           name: "stateIds",
           type: "textarea",
           label: t("sales.forms.newDeliveryCarrier.fields.stateIds"),
+          description: t("sales.forms.newDeliveryCarrier.fields.stateIdsHint"),
           width: "full",
           rows: 2,
         },
@@ -627,7 +629,7 @@ export const newShippingMethodForm = (t: TFunction): FormConfig => ({
         {
           id: "fixedPrice",
           name: "fixedPrice",
-          type: "number",
+          type: "money",
           label: t("sales.forms.newShippingMethod.fields.fixedPrice"),
           width: "1/3",
         },
@@ -641,7 +643,7 @@ export const newShippingMethodForm = (t: TFunction): FormConfig => ({
         {
           id: "amount",
           name: "amount",
-          type: "number",
+          type: "money",
           label: t("sales.forms.newShippingMethod.fields.amount"),
           width: "1/3",
         },
@@ -843,11 +845,11 @@ export const newLoyaltyProgramForm = (t: TFunction): FormConfig => ({
         {
           id: "triggerProductIds",
           name: "triggerProductIds",
-          type: "textarea",
+          type: "multiselect",
           label: t("sales.forms.newLoyaltyProgram.fields.triggerProductIds"),
           description: t("sales.forms.newLoyaltyProgram.fields.triggerProductIdsHint"),
           width: "full",
-          rows: 2,
+          options: [],
         },
       ],
     },
@@ -950,7 +952,7 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "quantity",
           name: "quantity",
-          type: "number",
+          type: "quantity",
           label: t("sales.forms.addSaleOrderLine.fields.quantity"),
           required: true,
           width: "1/2",
@@ -958,7 +960,7 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "priceUnit",
           name: "priceUnit",
-          type: "number",
+          type: "money",
           label: t("sales.forms.addSaleOrderLine.fields.priceUnit"),
           required: true,
           width: "1/2",
@@ -972,7 +974,7 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "discount",
           name: "discount",
-          type: "number",
+          type: "percent",
           label: t("sales.forms.addSaleOrderLine.fields.discount"),
           width: "1/3",
           defaultValue: 0,
@@ -996,12 +998,12 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "taxIds",
           name: "taxIds",
-          type: "textarea",
+          type: "multiselect",
           label: t("sales.forms.addSaleOrderLine.fields.taxIds"),
           placeholder: t("sales.forms.addSaleOrderLine.fields.taxIdsPlaceholder"),
           description: t("sales.forms.addSaleOrderLine.fields.taxIdsHint"),
           width: "full",
-          rows: 2,
+          options: [],
         },
       ],
     },
@@ -1041,7 +1043,7 @@ export const editSaleOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "quantity",
           name: "quantity",
-          type: "number",
+          type: "quantity",
           label: t("sales.forms.addSaleOrderLine.fields.quantity"),
           required: true,
           width: "1/2",
@@ -1049,14 +1051,14 @@ export const editSaleOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "priceUnit",
           name: "priceUnit",
-          type: "number",
+          type: "money",
           label: t("sales.forms.addSaleOrderLine.fields.priceUnit"),
           width: "1/2",
         },
         {
           id: "discount",
           name: "discount",
-          type: "number",
+          type: "percent",
           label: t("sales.forms.addSaleOrderLine.fields.discount"),
           width: "1/2",
         },
@@ -1182,7 +1184,7 @@ export const addReturnOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "productUomQty",
           name: "productUomQty",
-          type: "number",
+          type: "quantity",
           label: t("sales.forms.addReturnOrderLine.fields.quantity"),
           required: true,
           width: "1/3",
@@ -1191,7 +1193,7 @@ export const addReturnOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "priceUnit",
           name: "priceUnit",
-          type: "number",
+          type: "money",
           label: t("sales.forms.addReturnOrderLine.fields.priceUnit"),
           required: true,
           width: "1/3",
@@ -1383,7 +1385,7 @@ export const editSaleOrderForm = (t: TFunction): FormConfig => ({
         {
           id: "commissionRatePercent",
           name: "commissionRatePercent",
-          type: "number",
+          type: "percent",
           label: t("sales.forms.editSaleOrder.fields.commissionRatePercent", {
             defaultValue: "Commission rate %",
           }),

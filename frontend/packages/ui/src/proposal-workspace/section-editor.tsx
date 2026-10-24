@@ -5,6 +5,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
+import { Textarea } from "@/components/ui/textarea"
 import type { SectionStatus } from "@/lib/proposal-workspace-types"
 import type { ProposalLineItem, ProposalComment } from "@lumiere/stdb/proposal-row-types"
 import { ProductLineItems } from "./product-line-items"
@@ -245,13 +246,12 @@ export function SectionEditor({
 
       {/* Content editor with @-mention */}
       <div className="relative flex-1">
-        <textarea
+        <Textarea variant="plain"
           ref={textareaRef}
           value={content}
           onChange={handleContentChange}
           placeholder={t("proposalWorkspace.sectionEditor.contentPlaceholder", { sectionName: title || t("proposalWorkspace.sectionEditor.sectionDefaultName") })}
-          className="w-full min-h-[300px] resize-none bg-transparent border-none outline-none focus:outline-none text-sm text-foreground placeholder:text-muted-foreground/40 leading-relaxed"
-          style={{ fieldSizing: "content" } as React.CSSProperties}
+          className="min-h-[300px] resize-none rounded-none border-none bg-transparent p-0 text-sm text-foreground shadow-none leading-relaxed placeholder:text-muted-foreground/40 focus-visible:ring-0 md:text-sm dark:bg-transparent"
         />
 
         {/* @-mention popover */}

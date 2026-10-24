@@ -201,7 +201,7 @@ const taskStateForm: FormConfig = {
   ],
 }
 
-const assignUsersForm = (userOptions: Array<{ value: string; label: string }>): FormConfig => ({
+const assignUsersForm = (userOptions: Array<{ value: string; label: string; disabled?: boolean }>): FormConfig => ({
   id: "projects-assign-task-users",
   title: "Assign Task Users",
   submitLabel: "Assign users",
@@ -215,9 +215,9 @@ const assignUsersForm = (userOptions: Array<{ value: string; label: string }>): 
           type: "multiselect",
           name: "userIds",
           label: "Assignees",
-          options: userOptions,
           defaultValue: [],
           width: "full",
+          options: userOptions,
         },
       ],
     },

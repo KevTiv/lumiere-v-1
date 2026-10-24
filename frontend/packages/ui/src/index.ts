@@ -322,6 +322,7 @@ export * from "./entity-views/status-bar";
 export * from "./entity-views/smart-buttons";
 export * from "./entity-views/use-entity-table";
 export * from "./components/record-picker";
+export * from "./components/date-picker";
 export * from "./components/editable-number";
 export * from "./lib/sale-order-line-totals";
 export * from "./entity-views/sale-order-line-grid";

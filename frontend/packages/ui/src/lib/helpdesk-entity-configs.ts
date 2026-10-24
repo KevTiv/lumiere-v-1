@@ -98,7 +98,7 @@ export const helpdeskTeamsTableConfig = (t: TFunction): EntityViewConfig => ({
     searchKeys: ["name", "description"],
     columns: [
       { key: "name", label: t("helpdesk.teams.columns.name"), width: "min-w-40" },
-      { key: "description", label: t("helpdesk.teams.columns.description"), width: "min-w-48" },
+      { key: "description", type: "markdown", label: t("helpdesk.teams.columns.description"), width: "min-w-48" },
       { key: "isActive", label: t("helpdesk.teams.columns.isActive"), type: "boolean" },
       { key: "createdAt", label: t("helpdesk.teams.columns.createdAt"), type: "date" },
     ],

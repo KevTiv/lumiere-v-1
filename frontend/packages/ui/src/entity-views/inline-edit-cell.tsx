@@ -1,13 +1,13 @@
 "use client"
 
-import { useRef, useState, type ReactNode } from "react"
+import { useRef, type ReactNode } from "react"
 import { Loader2 } from "lucide-react"
 
 import type { EntityInlineEdit, EntityRow } from "../lib/entity-view-types"
-import { isUnchangedInline, parseInlineValue } from "../lib/inline-edit"
-import { showWorkflowToast } from "../lib/workflow-toast"
+import { isMultilineInlineKind } from "../lib/inline-edit"
 import { Input } from "../components/input"
-import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
+import { Textarea } from "../components/textarea"
+import { useInlineEdit } from "./use-inline-edit"
 import {
   Select,
   SelectContent,
@@ -26,57 +26,17 @@ interface InlineEditCellProps {
 }
 
 /**
- * A table cell that turns into an input on double-click. Enter or leaving the field saves, Escape
- * cancels; an invalid or rejected value is reported and the old value stays.
+ * A table cell that turns into an input on double-click. Enter (Cmd/Ctrl+Enter for multi-line
+ * kinds) or leaving the field saves, Escape cancels; an invalid or rejected value is reported and
+ * the old value stays. Edit state and saving live in `useInlineEdit`.
  */
 export function InlineEditCell({ edit, row, columnKey, label, value, children }: InlineEditCellProps) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState("")
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { canEdit, editing, draft, setDraft, pending, error, start, commit, handleKeyDown, navigationDialog } =
+    useInlineEdit({ edit, row, label, value })
   // The select popup takes focus while open; that must not count as leaving the field.
   const selectOpenRef = useRef(false)
-  const navigationDialog = useUnsavedChangesGuard(editing && draft !== String(value ?? ""), pending)
 
-  if (edit.canEdit && !edit.canEdit(row)) return <>{children}</>
-
-  const start = () => {
-    setDraft(value == null ? "" : String(value))
-    setError(null)
-    setEditing(true)
-  }
-
-  const cancel = () => {
-    setEditing(false)
-    setError(null)
-  }
-
-  const commit = async (next: string = draft) => {
-    if (pending) return
-    const parsed = parseInlineValue(edit.kind, next)
-    if (!parsed.ok) {
-      setError(parsed.error)
-      return
-    }
-    if (isUnchangedInline(value, parsed.value)) {
-      cancel()
-      return
-    }
-    setPending(true)
-    try {
-      await edit.save(row, parsed.value)
-      setEditing(false)
-    } catch (caught) {
-      setEditing(false)
-      showWorkflowToast({
-        kind: "error",
-        title: `${label} was not saved`,
-        description: caught instanceof Error ? caught.message : String(caught),
-      })
-    } finally {
-      setPending(false)
-    }
-  }
+  if (!canEdit) return <>{children}</>
 
   if (!editing) {
     return (
@@ -101,16 +61,7 @@ export function InlineEditCell({ edit, row, columnKey, label, value, children }:
     autoFocus: true,
     onClick: (event: { stopPropagation: () => void }) => event.stopPropagation(),
     onBlur: () => void commit(),
-    onKeyDown: (event: { key: string; preventDefault: () => void; stopPropagation: () => void }) => {
-      event.stopPropagation()
-      if (event.key === "Enter") {
-        event.preventDefault()
-        void commit()
-      } else if (event.key === "Escape") {
-        event.preventDefault()
-        cancel()
-      }
-    },
+    onKeyDown: handleKeyDown,
   }
 
   return (
@@ -145,6 +96,15 @@ export function InlineEditCell({ edit, row, columnKey, label, value, children }:
               ))}
             </SelectContent>
           </Select>
+        ) : isMultilineInlineKind(edit.kind) ? (
+          // A cell has no room for the rich editor; both multi-line kinds edit as plain text here.
+          <Textarea
+            {...common}
+            variant="plain"
+            className="min-h-16 py-1.5"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+          />
         ) : (
           <Input
             {...common}

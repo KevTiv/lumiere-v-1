@@ -3,11 +3,11 @@ import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleInsights, type InsightPeriodRange } from "../../../components/module-insights"
-import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { withDetailInlineEdits, withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
 import { opportunityKpis } from "./opportunity-kpis"
-import { requiredInlineEmail, requiredInlineText } from "@/lib/inline-edit-params"
+import { inlineNumberAtLeast, requiredInlineEmail, requiredInlineText } from "@/lib/inline-edit-params"
 
 import { CrmDuplicateContacts } from "@/lib/crm-duplicate-contacts-panel"
 import { ContactIdentitiesPanel } from "./contact-identities-panel"
@@ -47,6 +47,7 @@ import {
   contactTagRowsToSelectOptions,
   contactCategoryRowsToSelectOptions,
   contactSegmentRowsToSelectOptions,
+  taxRowsToSelectOptions,
 } from "@/lib/form-lookup"
 import {
   timestampToDateInputValue,
@@ -122,6 +123,7 @@ import {
 } from "@lumiere/query-hooks/hooks/crm"
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
+import { useAccountTaxes } from "@lumiere/query-hooks/hooks/accounting"
 import type { EntityRecordSheetConfig, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { entityTableConfigFromView } from "@lumiere/ui/lib/entity-view-types"
 import {
@@ -457,6 +459,7 @@ function CrmClientLoaded({
   const { data: warehouses = [] } = useWarehouses(orgId)
   const { data: products = [] } = useProducts(orgId)
   const { data: uoms = [] } = useUoms(orgId)
+  const { data: accountTaxes = [] } = useAccountTaxes(orgId)
 
   const opportunityStageOptions = useMemo(
     () =>
@@ -633,8 +636,9 @@ function CrmClientLoaded({
         opportunityId: openOpportunityOptions,
         productId: productFieldOptions,
         uomId: uomFieldOptions,
+        taxIds: taxRowsToSelectOptions(accountTaxes, "Sale"),
       }),
-    [t, openOpportunityOptions, productFieldOptions, uomFieldOptions],
+    [t, openOpportunityOptions, productFieldOptions, uomFieldOptions, accountTaxes],
   )
 
   const createLead = useCreateLead(orgId)
@@ -1055,6 +1059,89 @@ function CrmClientLoaded({
     [handleOpportunityStageMove, opportunityBoardColumns, operatingCompanyId],
   )
 
+  // Click-to-edit on the record sheets: the same update commands the edit forms send, one field at a time.
+  const updateLeadAsync = updateLead.mutateAsync
+  const updateOpportunityAsync = updateOpportunity.mutateAsync
+  const leadDetail = useMemo(
+    () =>
+      withDetailInlineEdits(leadDetailConfig(t), {
+        contactName: {
+          kind: "text",
+          save: async (row, value) => {
+            const contactName = requiredInlineText(
+              value,
+              t("crm.inlineEdit.leadNameRequired", { defaultValue: "A lead needs a contact name" }),
+            )
+            await updateLeadAsync({ leadId: rowIdBigInt(row), params: { contactName } })
+          },
+        },
+        expectedRevenue: {
+          kind: "number",
+          save: async (row, value) => {
+            const expectedRevenue = inlineNumberAtLeast(
+              value,
+              0,
+              t("crm.inlineEdit.revenueInvalid", { defaultValue: "Enter a revenue of 0 or more" }),
+            )
+            await updateLeadAsync({ leadId: rowIdBigInt(row), params: { expectedRevenue } })
+          },
+        },
+        description: {
+          kind: "markdown",
+          save: async (row, value) => {
+            const description = String(value).trim()
+            await updateLeadAsync({ leadId: rowIdBigInt(row), params: { description: description || null } })
+          },
+        },
+      }),
+    [t, updateLeadAsync],
+  )
+  const opportunityDetail = useMemo(
+    () =>
+      withDetailInlineEdits(opportunityDetailConfig(t), {
+        name: {
+          kind: "text",
+          save: async (row, value) => {
+            const name = requiredInlineText(
+              value,
+              t("crm.inlineEdit.opportunityNameRequired", { defaultValue: "An opportunity needs a name" }),
+            )
+            await updateOpportunityAsync({
+              opportunityId: rowIdBigInt(row),
+              companyId: rowCompanyId(row, operatingCompanyId),
+              params: { name },
+            })
+          },
+        },
+        expectedRevenue: {
+          kind: "number",
+          save: async (row, value) => {
+            const expectedRevenue = inlineNumberAtLeast(
+              value,
+              0,
+              t("crm.inlineEdit.revenueInvalid", { defaultValue: "Enter a revenue of 0 or more" }),
+            )
+            await updateOpportunityAsync({
+              opportunityId: rowIdBigInt(row),
+              companyId: rowCompanyId(row, operatingCompanyId),
+              params: { expectedRevenue },
+            })
+          },
+        },
+        description: {
+          kind: "markdown",
+          save: async (row, value) => {
+            await updateOpportunityAsync({
+              opportunityId: rowIdBigInt(row),
+              companyId: rowCompanyId(row, operatingCompanyId),
+              params: { description: String(value).trim() },
+            })
+          },
+        },
+      }),
+    [t, updateOpportunityAsync, operatingCompanyId],
+  )
+
   const leadRecordSheet = useMemo(
     (): EntityRecordSheetConfig => ({
       titleKey: "contactName",
@@ -1081,7 +1168,7 @@ function CrmClientLoaded({
         Won: t("crm.leads.states.Won"),
         Lost: t("crm.leads.states.Lost"),
       },
-      detailConfig: leadDetailConfig(t),
+      detailConfig: leadDetail,
       auditTableName: "lead",
       discussion: {},
       customTabs: [
@@ -1109,7 +1196,7 @@ function CrmClientLoaded({
         },
       ],
     }),
-    [t, organizationId],
+    [t, organizationId, leadDetail],
   )
 
   const opportunityRecordSheet = useMemo(
@@ -1122,7 +1209,7 @@ function CrmClientLoaded({
         Medium: t("crm.opportunities.states.Medium"),
         High: t("crm.opportunities.states.High"),
       },
-      detailConfig: opportunityDetailConfig(t),
+      detailConfig: opportunityDetail,
       auditTableName: "opportunity",
       discussion: {},
       customTabs: [
@@ -1147,7 +1234,7 @@ function CrmClientLoaded({
         },
       ],
     }),
-    [t, organizationId],
+    [t, organizationId, opportunityDetail],
   )
 
   const contactRecordSheet = useMemo(
@@ -2465,6 +2552,16 @@ function CrmClientLoaded({
     return workflowModal.form
   }, [workflowModal, buildConvertLeadForm, buildConvertOppForm])
 
+  // Drafts of record edits are kept per record so one lead's notes never reopen on another.
+  const workflowDraftKey =
+    workflowModal == null
+      ? undefined
+      : "leadId" in workflowModal
+        ? `lead-${workflowModal.leadId.toString()}`
+        : "opportunityId" in workflowModal
+          ? `opportunity-${workflowModal.opportunityId.toString()}`
+          : `contact-${workflowModal.contactId.toString()}`
+
   const workflowModalKey =
     workflowModal == null
       ? "closed"
@@ -2562,6 +2659,7 @@ function CrmClientLoaded({
         preferStdbVisibility
         isPending={isFormMutationPending}
         submitError={workflowSubmitError}
+        draftKey={workflowDraftKey}
         onSubmit={(formData) => {
           return handleWorkflowSubmit(formData)
         }}

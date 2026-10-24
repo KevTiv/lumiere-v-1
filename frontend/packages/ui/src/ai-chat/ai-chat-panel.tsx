@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -787,7 +788,8 @@ export function AIChatPanel({
           )}
         <div className="shrink-0 border-t border-border/70 bg-background/95 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 sm:px-5">
           <div className="mx-auto w-full max-w-[790px] rounded-2xl border border-border bg-card p-2 shadow-sm transition-colors focus-within:border-ring">
-            <textarea
+            <Textarea
+              variant="plain"
               ref={inputRef}
               data-testid="erp-ai-chat-input"
               value={input}
@@ -796,7 +798,7 @@ export function AIChatPanel({
               placeholder={config?.placeholder || t("aiChat.placeholder")}
               rows={2}
               aria-label="Message Lumière assistant"
-              className="block min-h-[58px] max-h-[180px] w-full resize-none bg-transparent px-3 pt-2 text-sm leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none"
+              className="block field-sizing-fixed min-h-[58px] max-h-[180px] w-full resize-none rounded-none border-0 bg-transparent px-3 pt-2 text-sm leading-6 text-foreground shadow-none placeholder:text-muted-foreground focus:outline-none focus-visible:ring-0 dark:bg-transparent"
             />
             <div className="flex min-h-10 flex-wrap items-center justify-between gap-2 pl-2">
               <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">

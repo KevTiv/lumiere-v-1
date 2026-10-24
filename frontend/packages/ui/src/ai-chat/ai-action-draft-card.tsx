@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Loader2, Pencil, ShieldAlert, X } from "lucide-react"
@@ -248,10 +249,10 @@ export function AiActionDraftCard({
         {expanded ? (
           editing ? (
             <div className="mt-1 space-y-1.5">
-              <textarea
+              <Textarea variant="plain"
                 value={editJson}
                 onChange={(event) => setEditJson(event.target.value)}
-                className="min-h-32 w-full rounded bg-background/80 p-2 font-mono text-[10px] leading-relaxed border border-border"
+                className="field-sizing-fixed min-h-32 rounded border-border bg-background/80 p-2 font-mono text-[10px] leading-relaxed shadow-none md:text-[10px]"
                 spellCheck={false}
               />
               {editError ? <p className="text-[10px] text-destructive">{editError}</p> : null}

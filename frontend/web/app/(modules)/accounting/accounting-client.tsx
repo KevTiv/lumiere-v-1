@@ -5618,6 +5618,7 @@ function AccountingClientReady({
                       budgets={budgets}
                       budgetLines={budgetLines}
                       budgetPosts={budgetPosts}
+                      accountOptions={glAccountSelectOptions}
                       onCreateBudget={(params) =>
                         createBudget.mutateAsync(toCreateCrossoveredBudgetParams(params, operatingCompanyId))
                       }

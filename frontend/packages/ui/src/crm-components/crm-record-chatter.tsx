@@ -48,6 +48,7 @@ import {
   mergeRecordTimeline,
   type TimelineEntry,
 } from "./crm-record-timeline"
+import { DatePicker } from "@/components/ui/date-picker"
 
 const FOLLOW_SUBTYPES = ["comment", "note"] as const
 
@@ -523,11 +524,10 @@ export function CrmRecordChatter({
           </div>
           <div className="space-y-1">
             <Label htmlFor="chatter-activity-deadline">{t("crm.chatter.activityDeadline")}</Label>
-            <Input
+            <DatePicker
               id="chatter-activity-deadline"
-              type="date"
               value={activityDeadline}
-              onChange={(e) => setActivityDeadline(e.target.value)}
+              onChange={(value) => setActivityDeadline(value)}
               data-testid="record-chatter-activity-deadline"
             />
           </div>

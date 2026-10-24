@@ -21,6 +21,7 @@ import { parseInvoiceContent, parseInvoiceNotes, type InvoiceDocumentSnapshot, t
 import type { ModuleDataState } from "../lib/module-data-state"
 import { ModuleDataNotice } from "../pages/module-data-notice"
 import { useConfirmDialog } from "../hooks/use-confirm-dialog"
+import { DatePicker } from "@/components/ui/date-picker"
 
 const emptyProfile: InvoicePersonalizationProfile = { logoUrl: "", accent: "teal", email: "", phone: "", website: "", notice: "", terms: "", paymentInstructions: "", footer: "" }
 const emptySeller: InvoiceDocumentSnapshot["seller"] = { name: "", address: [], taxId: "", registrationNumber: "", email: "", phone: "", website: "" }
@@ -349,8 +350,8 @@ function ReleasedCreateInvoiceModal({
           <FieldSelect label={t(`accounting.forms.${copyKey}.fields.journal`)} value={journalId} onChange={(value) => { setFormEdited(true); setJournalId(value) }} options={journalOptions} />
           <FieldSelect label={kind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={(value) => { setFormEdited(true); setCounterpartAccountId(value) }} options={counterpartOptions} />
           <div className="space-y-2"><Label>Currency</Label><Input aria-label="Currency" value={currencyOption?.label ?? (journal ? `Currency #${journal.currencyId}` : "Select a journal")} readOnly /></div>
-          <div className="space-y-2"><Label htmlFor="create-invoice-date">{kind === "bill" ? "Bill date" : "Invoice Date"}</Label><Input id="create-invoice-date" type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></div>
-          <div className="space-y-2"><Label htmlFor="create-invoice-due-date">{t(`accounting.forms.${copyKey}.fields.dueDate`)}</Label><Input id="create-invoice-due-date" type="date" min={invoiceDate} value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></div>
+          <div className="space-y-2"><Label htmlFor="create-invoice-date">{kind === "bill" ? "Bill date" : "Invoice Date"}</Label><DatePicker id="create-invoice-date" value={invoiceDate} onChange={(value) => setInvoiceDate(value)} /></div>
+          <div className="space-y-2"><Label htmlFor="create-invoice-due-date">{t(`accounting.forms.${copyKey}.fields.dueDate`)}</Label><DatePicker id="create-invoice-due-date" min={invoiceDate} value={dueDate} onChange={(value) => setDueDate(value)} /></div>
           <FieldSelect label="Payment term (optional)" value={paymentTermId || NONE} onChange={(value) => setPaymentTermId(value === NONE ? "" : value)} options={[{ value: NONE, label: "None" }, ...paymentTermOptions]} />
           <div className="space-y-2"><Label>Reference</Label><Input aria-label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} /></div>
           <div className="space-y-2"><Label>Payment reference</Label><Input aria-label="Payment reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div>
@@ -534,8 +535,8 @@ function LegacyCreateInvoiceModal({
         <FieldSelect label={documentKind === "bill" ? "Vendor" : "Customer"} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
         <FieldSelect label="Journal" value={journalId} onChange={setJournalId} options={journalOptions} />
         <FieldSelect label={documentKind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={setCounterpartAccountId} options={counterpartAccountOptions} />
-        <div className="space-y-2"><Label htmlFor="legacy-invoice-date">{documentKind === "bill" ? "Bill Date" : "Invoice Date"}</Label><Input id="legacy-invoice-date" type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></div>
-        <div className="space-y-2"><Label htmlFor="legacy-invoice-due-date">Due Date</Label><Input id="legacy-invoice-due-date" type="date" min={invoiceDate} value={dueDate} onChange={(event) => setDueDate(event.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="legacy-invoice-date">{documentKind === "bill" ? "Bill Date" : "Invoice Date"}</Label><DatePicker id="legacy-invoice-date" value={invoiceDate} onChange={(value) => setInvoiceDate(value)} /></div>
+        <div className="space-y-2"><Label htmlFor="legacy-invoice-due-date">Due Date</Label><DatePicker id="legacy-invoice-due-date" min={invoiceDate} value={dueDate} onChange={(value) => setDueDate(value)} /></div>
       </div>
       <div className="grid gap-3 rounded-md border p-3 md:grid-cols-5">
         <div className="space-y-2 md:col-span-2"><Label htmlFor="legacy-line-description">Description</Label><Input id="legacy-line-description" data-testid="create-invoice-line-description" value={line.description} onChange={(event) => setLine((value) => ({ ...value, description: event.target.value }))} /></div>
