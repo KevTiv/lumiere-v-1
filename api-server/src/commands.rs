@@ -653,13 +653,15 @@ pub(crate) async fn dispatch_ai_evidence_search_mutation(
             })?;
             (
                 "erp.request_embedding_job",
-                contract.params.len() == 5
+                contract.params.len() == 6
                     && contract.params[2].name == "content_type"
                     && contract.params[2].kind == ScalarKind::String
                     && contract.params[3].name == "content_id"
                     && contract.params[3].kind == ScalarKind::UnsignedInteger
-                    && contract.params[4].name == "text"
-                    && contract.params[4].kind == ScalarKind::String,
+                    && contract.params[4].name == "expected_fingerprint"
+                    && contract.params[4].kind == ScalarKind::String
+                    && contract.params[5].name == "index_generation"
+                    && contract.params[5].kind == ScalarKind::String,
             )
         }
         _ => {

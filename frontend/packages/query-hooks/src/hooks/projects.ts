@@ -21,6 +21,7 @@ import { decodeOperationDispatch } from '@lumiere/api-client'
 import { executeOperationWithCanonicalReadback, requireResolvedOperationEffect, type CanonicalRecordRef, type ResolvedOperationEffectOutcome } from './operation-effect'
 import { resolveTimesheetBillingEffect, resolveTimesheetStatusEffect } from './partial-slice-effects'
 import { buildTaskStateCommand } from './task-state-command'
+import { buildTaskAssignmentCommand, resolveTaskAssignmentEffect, taskAssigneeOptions } from './task-assignment'
 import type {
   HrResource,
   ProjectProject,
@@ -85,6 +86,32 @@ export function useTasks(
     queryFn: () => fetchQueryList('/api/query/tasks', 'Failed to fetch tasks'),
     staleTime: 30_000,
     initialData,
+  })
+}
+
+/** Minimal directory authorized for task assignment in the selected company. */
+export function useTaskAssignees(
+  organizationId: bigint,
+  companyId: bigint | null | undefined,
+  taskId?: string | number | bigint,
+  enabled = true,
+  authorization?: { actorIdentity: string; authorizationKey: string },
+) {
+  const company = companyId?.toString()
+  const task = taskId == null ? undefined : toScalarU64(taskId).toString()
+  return useQuery({
+    queryKey: ['task-assignees', rqBigIntKey(organizationId), company, task, authorization?.actorIdentity, authorization?.authorizationKey],
+    enabled: enabled && organizationId > 0n && companyId != null && companyId > 0n && !!authorization?.actorIdentity && !!authorization.authorizationKey,
+    queryFn: async () => {
+      const params = new URLSearchParams({ companyId: company ?? '' })
+      if (task) params.set('taskId', task)
+      return taskAssigneeOptions(await fetchQueryList(
+        `/api/query/task-assignees?${params.toString()}`,
+        'Failed to fetch eligible task assignees',
+      ))
+    },
+    staleTime: 0,
+    retry: false,
   })
 }
 
@@ -519,14 +546,28 @@ export function useAssignTaskUsers(organizationId: bigint) {
     mutationFn: async ({
       taskId,
       userIds,
+      companyId,
     }: {
       taskId: string | number | bigint
-      userIds: (string | number | bigint)[]
+      userIds: readonly string[]
+      companyId: string | number | bigint
     }) => {
-      const { urlPath, init } = stdbBffCommandPost("assign_task_users", { taskId: taskId, userIds: userIds.map((id) => id) })
-
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error('Failed to assign task users')
+      const id = toScalarU64(taskId)
+      const company = toScalarU64(companyId)
+      if (organizationId <= 0n || company === 0n) throw new Error('Select an active company')
+      const command = buildTaskAssignmentCommand(taskId, userIds)
+      return requireResolvedOperationEffect(await executeOperationWithCanonicalReadback({
+        resolveBeforeDispatch: false,
+        dispatch: async () => decodeOperationDispatch(await apiFetch(command.urlPath, command.init)),
+        resolveEffect: async () => resolveTaskAssignmentEffect(
+          await fetchQueryList('/api/query/tasks', 'Failed to read task assignment'),
+          organizationId,
+          company,
+          id,
+          userIds,
+        ),
+        afterDispatch: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
+      }))
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['tasks', rqBigIntKey(organizationId)] }),
   })

@@ -13,6 +13,8 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
+use futures::{stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -31,6 +33,10 @@ const INSPECT_CAPABILITY: &str = "ai.evidence.inspect";
 const KNOWLEDGE_RETRIEVE_CAPABILITY: &str = "ai.knowledge.retrieve";
 const MAX_RUN_TRANSCRIPT_STEPS: usize = 200;
 const MAX_RUN_CLAIMS: usize = 100;
+const DEFAULT_RUN_HISTORY_LIMIT: u16 = 20;
+const MAX_RUN_HISTORY_LIMIT: u16 = 50;
+const MAX_RUN_ECONOMICS_ROWS: usize = 200;
+const MAX_PROVIDER_MODELS: usize = 8;
 /// Exact authority to have persisted evidence passages placed in a RAG answer.
 /// Deliberately distinct from `ai.knowledge.retrieve` (reviewed knowledge
 /// reuse): holding one never implies the other, and neither is seeded by
@@ -41,6 +47,39 @@ pub(crate) const RAG_EVIDENCE_RETRIEVE_CAPABILITY: &str = "ai.evidence.retrieve"
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RunInspectionRequest {
     pub run_id: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RunHistoryRequest {
+    #[serde(default)]
+    pub cursor: Option<String>,
+    #[serde(default)]
+    pub limit: Option<u16>,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderModelSummary {
+    pub provider: String,
+    pub model: String,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RunEconomicsSummary {
+    pub provider_models: Vec<ProviderModelSummary>,
+    pub provider_models_truncated: bool,
+    pub attempt_count: Option<u64>,
+    pub attempt_statuses: Vec<String>,
+    pub reservation_statuses: Vec<String>,
+    pub outcome_unknown: bool,
+    pub input_tokens: Option<u64>,
+    pub output_tokens: Option<u64>,
+    pub currency: Option<String>,
+    pub reserved_units: Option<u64>,
+    pub settled_units: Option<u64>,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -72,6 +111,30 @@ pub struct RunEvidenceInspection {
     pub contribution_ids: Vec<u64>,
     pub claim_ids: Vec<u64>,
     pub claims: Vec<Inspection>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub economics: Option<RunEconomicsSummary>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunHistoryItem {
+    pub run_id: u64,
+    pub status: String,
+    pub skill_id: u64,
+    pub agent_id: u64,
+    pub step_count: u64,
+    pub tokens_used: u64,
+    pub started_at: String,
+    pub completed_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub economics: Option<RunEconomicsSummary>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunHistoryResponse {
+    pub runs: Vec<RunHistoryItem>,
+    pub next_cursor: Option<String>,
 }
 
 #[derive(Clone, Copy)]
@@ -107,6 +170,9 @@ fn enforce_run_byte_bound(
     let fits = |inspection: &RunEvidenceInspection| {
         serialized_run_size(inspection, shape).map(|size| size as u64 <= max_bytes)
     };
+    if !fits(inspection)? {
+        inspection.economics = None;
+    }
     while !inspection.claims.is_empty() && !fits(inspection)? {
         inspection.claims.pop();
         inspection.claim_ids.pop();
@@ -196,6 +262,12 @@ struct CapabilityGrantEnvelope {
     actor_identity: String,
     #[serde(rename = "knowledgeTeamRefs", default)]
     _knowledge_team_refs: Vec<String>,
+    #[serde(rename = "placementGeneration", default)]
+    _placement_generation: Option<u64>,
+    #[serde(rename = "policySnapshotHash", default)]
+    _policy_snapshot_hash: Option<String>,
+    #[serde(rename = "capabilityGrantsHash", default)]
+    _capability_grants_hash: Option<String>,
     grants: Vec<CapabilityGrant>,
 }
 
@@ -400,6 +472,208 @@ fn row_text(row: &Value, camel: &str, snake: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+fn bounded_row_text(row: &Value, camel: &str, snake: &str, max: usize) -> Option<String> {
+    row_text(row, camel, snake).map(|value| value.chars().take(max).collect())
+}
+
+fn bounded_row_display(row: &Value, camel: &str, snake: &str, max: usize) -> Option<String> {
+    let value = row.get(camel).or_else(|| row.get(snake))?;
+    if value.is_null() {
+        return None;
+    }
+    let value = value
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| value.to_string());
+    Some(value.chars().take(max).collect())
+}
+
+fn encode_run_cursor(run_id: u64) -> String {
+    URL_SAFE_NO_PAD.encode(run_id.to_be_bytes())
+}
+
+fn decode_run_cursor(cursor: Option<&str>) -> AppResult<Option<u64>> {
+    let Some(cursor) = cursor else {
+        return Ok(None);
+    };
+    if cursor.is_empty() || cursor.len() > 32 {
+        return Err(AppError::BadRequest("run history cursor is invalid".into()));
+    }
+    let bytes = URL_SAFE_NO_PAD
+        .decode(cursor)
+        .map_err(|_| AppError::BadRequest("run history cursor is invalid".into()))?;
+    let bytes: [u8; 8] = bytes
+        .try_into()
+        .map_err(|_| AppError::BadRequest("run history cursor is invalid".into()))?;
+    let run_id = u64::from_be_bytes(bytes);
+    if run_id == 0 {
+        return Err(AppError::BadRequest("run history cursor is invalid".into()));
+    }
+    Ok(Some(run_id))
+}
+
+fn allowed_attempt_status(value: &str) -> bool {
+    matches!(
+        value,
+        "accepted" | "dispatched" | "succeeded" | "failed" | "outcome_unknown" | "abandoned"
+    )
+}
+
+fn allowed_reservation_status(value: &str) -> bool {
+    matches!(value, "reserved" | "settled" | "released")
+}
+
+fn economics_from_rows(
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    attempt_rows: &[Value],
+    reservation_rows: &[Value],
+) -> Option<RunEconomicsSummary> {
+    use std::collections::BTreeSet;
+
+    let attempts = attempt_rows
+        .iter()
+        .filter(|row| {
+            row_u64(row, "organizationId", "organization_id") == Some(organization_id)
+                && row_u64(row, "companyId", "company_id") == Some(company_id)
+                && row_u64(row, "runId", "run_id") == Some(run_id)
+        })
+        .take(MAX_RUN_ECONOMICS_ROWS + 1)
+        .collect::<Vec<_>>();
+    let reservations = reservation_rows
+        .iter()
+        .filter(|row| {
+            row_u64(row, "organizationId", "organization_id") == Some(organization_id)
+                && row_u64(row, "companyId", "company_id") == Some(company_id)
+                && row_u64(row, "runId", "run_id") == Some(run_id)
+        })
+        .take(MAX_RUN_ECONOMICS_ROWS + 1)
+        .collect::<Vec<_>>();
+    if attempts.is_empty() && reservations.is_empty() {
+        return None;
+    }
+
+    let truncated =
+        attempts.len() > MAX_RUN_ECONOMICS_ROWS || reservations.len() > MAX_RUN_ECONOMICS_ROWS;
+    let attempts = attempts.into_iter().take(MAX_RUN_ECONOMICS_ROWS);
+    let reservations = reservations
+        .into_iter()
+        .take(MAX_RUN_ECONOMICS_ROWS)
+        .collect::<Vec<_>>();
+    let mut provider_models = BTreeSet::new();
+    let mut attempt_statuses = BTreeSet::new();
+    let mut input_tokens = 0_u64;
+    let mut output_tokens = 0_u64;
+    let mut attempt_count = 0_u64;
+    let mut outcome_unknown = false;
+    for row in attempts {
+        attempt_count = attempt_count.saturating_add(1);
+        input_tokens = input_tokens
+            .saturating_add(row_u64(row, "inputTokens", "input_tokens").unwrap_or_default());
+        output_tokens = output_tokens
+            .saturating_add(row_u64(row, "outputTokens", "output_tokens").unwrap_or_default());
+        if let Some(status) = bounded_row_text(row, "status", "status", 32)
+            .filter(|status| allowed_attempt_status(status))
+        {
+            outcome_unknown |= status == "outcome_unknown";
+            attempt_statuses.insert(status);
+        }
+        if let (Some(provider), Some(model)) = (
+            bounded_row_text(row, "provider", "provider", 128),
+            bounded_row_text(row, "model", "model", 128),
+        ) {
+            if !provider.is_empty() && !model.is_empty() {
+                provider_models.insert((provider, model));
+            }
+        }
+    }
+
+    let mut reservation_statuses = BTreeSet::new();
+    let mut currencies = BTreeSet::new();
+    let mut reserved_units = 0_u64;
+    let mut settled_units = 0_u64;
+    for row in reservations {
+        reserved_units = reserved_units
+            .saturating_add(row_u64(row, "reservedUnits", "reserved_units").unwrap_or_default());
+        settled_units = settled_units
+            .saturating_add(row_u64(row, "settledUnits", "settled_units").unwrap_or_default());
+        if let Some(status) = bounded_row_text(row, "status", "status", 32)
+            .filter(|status| allowed_reservation_status(status))
+        {
+            reservation_statuses.insert(status);
+        }
+        if let Some(currency) = bounded_row_text(row, "currency", "currency", 16)
+            .filter(|currency| !currency.is_empty())
+        {
+            currencies.insert(currency);
+        }
+        if let (Some(provider), Some(model)) = (
+            bounded_row_text(row, "provider", "provider", 128),
+            bounded_row_text(row, "model", "model", 128),
+        ) {
+            if !provider.is_empty() && !model.is_empty() {
+                provider_models.insert((provider, model));
+            }
+        }
+    }
+    let currency = (currencies.len() == 1)
+        .then(|| currencies.into_iter().next())
+        .flatten();
+    let provider_models_truncated = provider_models.len() > MAX_PROVIDER_MODELS;
+    Some(RunEconomicsSummary {
+        provider_models: provider_models
+            .into_iter()
+            .take(MAX_PROVIDER_MODELS)
+            .map(|(provider, model)| ProviderModelSummary { provider, model })
+            .collect(),
+        provider_models_truncated,
+        attempt_count: (!truncated).then_some(attempt_count),
+        attempt_statuses: attempt_statuses.into_iter().collect(),
+        reservation_statuses: reservation_statuses.into_iter().collect(),
+        outcome_unknown,
+        input_tokens: (!truncated).then_some(input_tokens),
+        output_tokens: (!truncated).then_some(output_tokens),
+        currency,
+        reserved_units: (!truncated).then_some(reserved_units),
+        settled_units: (!truncated).then_some(settled_units),
+        truncated,
+    })
+}
+
+async fn load_run_economics(
+    state: &AppState,
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+) -> Option<RunEconomicsSummary> {
+    let Some(reader) = state.spend_read_stdb.as_deref() else {
+        return None;
+    };
+    let row_limit = MAX_RUN_ECONOMICS_ROWS + 1;
+    let attempts = reader
+        .query_sql(&format!(
+            "SELECT id, organization_id, company_id, run_id, provider, model, status, input_tokens, output_tokens FROM ai_provider_attempt_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT {row_limit}"
+        ))
+        .await
+        .map_err(|error| tracing::warn!(%error, run_id, "run provider economics unavailable"))
+        .ok()?;
+    let reservations = reader
+        .query_sql(&format!(
+            "SELECT id, organization_id, company_id, run_id, provider, model, currency, reserved_units, settled_units, status FROM ai_spend_reservation_read WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT {row_limit}"
+        ))
+        .await
+        .map_err(|error| tracing::warn!(%error, run_id, "run reservation economics unavailable"))
+        .ok()?;
+    economics_from_rows(
+        organization_id,
+        company_id,
+        run_id,
+        &attempts,
+        &reservations,
+    )
+}
+
 fn redacted_step(row: &Value) -> Option<RunTranscriptStep> {
     let row_count = row_u64(row, "outputRowCount", "output_row_count");
     let error_message = row_text(row, "errorMessage", "error_message");
@@ -527,6 +801,7 @@ async fn inspect_run(
         contribution_ids,
         claim_ids,
         claims,
+        economics: load_run_economics(state, actor.organization_id, actor.company_id, run_id).await,
     };
     enforce_run_byte_bound(&mut inspection, grant.max_bytes, shape)?;
     Ok(inspection)
@@ -544,6 +819,121 @@ pub async fn post_run_inspect(
         .headers_mut()
         .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
     Ok(response)
+}
+
+fn history_item_from_row(row: &Value) -> AppResult<RunHistoryItem> {
+    let required_number = |camel: &str, snake: &str| {
+        row_u64(row, camel, snake)
+            .ok_or_else(|| AppError::Internal(format!("run history row is missing {camel}")))
+    };
+    let required_text = |camel: &str, snake: &str, max: usize| {
+        bounded_row_text(row, camel, snake, max)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppError::Internal(format!("run history row is missing {camel}")))
+    };
+    Ok(RunHistoryItem {
+        run_id: required_number("id", "id")?,
+        status: required_text("status", "status", 64)?,
+        skill_id: required_number("skillId", "skill_id")?,
+        agent_id: required_number("agentId", "agent_id")?,
+        step_count: required_number("stepCount", "step_count")?,
+        tokens_used: required_number("tokensUsed", "tokens_used")?,
+        started_at: bounded_row_display(row, "startedAt", "started_at", 128)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppError::Internal("run history row is missing startedAt".into()))?,
+        completed_at: bounded_row_display(row, "completedAt", "completed_at", 128)
+            .filter(|value| !value.is_empty()),
+        economics: None,
+    })
+}
+
+/// Tenant-bound, newest-first run history. The cursor contains only the last
+/// returned run id and grants no authority; actor, organization, company, row,
+/// and byte bounds are rechecked on every page.
+pub async fn post_run_history(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<RunHistoryRequest>,
+) -> AppResult<Response> {
+    let actor = ActorCredentials::from_headers(&headers)?;
+    let grant = require_actor_grant_bounds(&state, &actor, INSPECT_CAPABILITY).await?;
+    let before_run_id = decode_run_cursor(req.cursor.as_deref())?;
+    let requested_limit = req.limit.unwrap_or(DEFAULT_RUN_HISTORY_LIMIT);
+    if requested_limit == 0 || requested_limit > MAX_RUN_HISTORY_LIMIT {
+        return Err(AppError::BadRequest(format!(
+            "limit must be between 1 and {MAX_RUN_HISTORY_LIMIT}"
+        )));
+    }
+    let limit =
+        usize::from(requested_limit).min(usize::try_from(grant.max_rows).unwrap_or(usize::MAX));
+    if limit == 0 {
+        return Err(AppError::Forbidden("run history row grant is empty".into()));
+    }
+    let cursor_clause = before_run_id
+        .map(|id| format!(" AND id < {id}"))
+        .unwrap_or_default();
+    let query_limit = limit.saturating_add(1);
+    let mut rows = state
+        .stdb
+        .query_sql(&format!(
+            "SELECT id, status, skill_id, agent_id, step_count, tokens_used, started_at, completed_at FROM ai_agent_run WHERE organization_id = {} AND company_id = {}{} ORDER BY id DESC LIMIT {}",
+            actor.organization_id, actor.company_id, cursor_clause, query_limit
+        ))
+        .await
+        .map_err(|error| AppError::Internal(format!("read run history: {error}")))?;
+    let mut has_more = rows.len() > limit;
+    rows.truncate(limit);
+    let mut runs = Vec::with_capacity(rows.len());
+    for row in rows {
+        runs.push(history_item_from_row(&row)?);
+    }
+    let organization_id = actor.organization_id;
+    let company_id = actor.company_id;
+    let runs = stream::iter(runs.into_iter().map(|mut item| {
+        let state = &state;
+        async move {
+            item.economics =
+                load_run_economics(state, organization_id, company_id, item.run_id).await;
+            item
+        }
+    }))
+    .buffered(8)
+    .collect::<Vec<_>>()
+    .await;
+    let mut runs = runs;
+
+    let had_runs = !runs.is_empty();
+    loop {
+        let next_cursor = has_more
+            .then(|| runs.last().map(|run| encode_run_cursor(run.run_id)))
+            .flatten();
+        let response = RunHistoryResponse { runs, next_cursor };
+        let encoded =
+            serde_json::to_vec(&response).map_err(|error| AppError::Internal(error.to_string()))?;
+        if encoded.len() as u64 <= grant.max_bytes {
+            let mut response = Json(response).into_response();
+            response
+                .headers_mut()
+                .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            return Ok(response);
+        }
+        runs = response.runs;
+        if let Some(run) = runs.iter_mut().rev().find(|run| run.economics.is_some()) {
+            run.economics = None;
+            continue;
+        }
+        if runs.pop().is_none() {
+            return Err(AppError::Forbidden(
+                "run history response exceeds the acting user's byte grant".into(),
+            ));
+        }
+        has_more = true;
+        if had_runs && runs.is_empty() {
+            return Err(AppError::Forbidden(
+                "run history response exceeds the acting user's byte grant".into(),
+            ));
+        }
+    }
 }
 
 pub async fn post_run_export(
@@ -678,6 +1068,23 @@ mod route_tests {
             contribution_ids: vec![7, 8],
             claim_ids: vec![],
             claims: vec![],
+            economics: Some(RunEconomicsSummary {
+                provider_models: vec![ProviderModelSummary {
+                    provider: "provider".into(),
+                    model: "model".into(),
+                }],
+                provider_models_truncated: false,
+                attempt_count: Some(1),
+                attempt_statuses: vec!["succeeded".into()],
+                reservation_statuses: vec!["settled".into()],
+                outcome_unknown: false,
+                input_tokens: Some(10),
+                output_tokens: Some(10),
+                currency: Some("USD".into()),
+                reserved_units: Some(10),
+                settled_units: Some(10),
+                truncated: false,
+            }),
         };
         let minimal = RunEvidenceInspection {
             run_id: 11,
@@ -690,6 +1097,7 @@ mod route_tests {
             contribution_ids: vec![],
             claim_ids: vec![],
             claims: vec![],
+            economics: None,
         };
         let max_bytes = serialized_run_size(&minimal, RunResponseShape::Export)
             .expect("serialize minimal export") as u64;
@@ -698,6 +1106,7 @@ mod route_tests {
             .expect("trim export");
 
         assert!(inspection.answer.is_none());
+        assert!(inspection.economics.is_none());
         assert!(inspection.transcript.is_empty());
         assert!(inspection.contribution_ids.is_empty());
         assert!(
@@ -772,6 +1181,28 @@ mod route_tests {
             }
         }
         assert!(parse(json!({"organizationId": 7, "companyId": 9, "actorIdentity": "a".repeat(64), "grants": [], "actor": "forged"})).is_err());
+    }
+
+    #[test]
+    fn grant_envelope_accepts_trusted_snapshot_fields_but_rejects_unknown_fields() {
+        let envelope = json!({
+            "organizationId": 7,
+            "companyId": 9,
+            "actorIdentity": "a".repeat(64),
+            "knowledgeTeamRefs": ["department:42"],
+            "placementGeneration": 3,
+            "policySnapshotHash": "policy-v3",
+            "capabilityGrantsHash": "grants-v3",
+            "grants": [{
+                "capabilityKey": INSPECT_CAPABILITY,
+                "maxRows": 4,
+                "maxBytes": 2048
+            }]
+        });
+        assert!(serde_json::from_value::<CapabilityGrantEnvelope>(envelope.clone()).is_ok());
+        let mut unknown = envelope;
+        unknown["unexpectedAuthority"] = json!(true);
+        assert!(serde_json::from_value::<CapabilityGrantEnvelope>(unknown).is_err());
     }
 
     #[test]
@@ -1021,5 +1452,97 @@ mod route_tests {
             fetch_actor_grants(&http, "http://127.0.0.1:9", &actor, short).await,
             Err(AppError::Unavailable(_))
         ));
+    }
+
+    #[test]
+    fn run_history_cursor_round_trips_and_rejects_forgery_shapes() {
+        let cursor = encode_run_cursor(42);
+        assert_eq!(decode_run_cursor(Some(&cursor)).expect("cursor"), Some(42));
+        assert_eq!(decode_run_cursor(None).expect("empty cursor"), None);
+        let zero_cursor = URL_SAFE_NO_PAD.encode([0_u8; 8]);
+        for invalid in ["", "42", "not/base64", zero_cursor.as_str()] {
+            assert!(decode_run_cursor(Some(invalid)).is_err(), "{invalid}");
+        }
+    }
+
+    #[test]
+    fn economics_are_tenant_bound_bounded_and_never_expose_failure_text() {
+        let attempts = vec![
+            json!({"organizationId": 7, "companyId": 9, "runId": 42, "provider": "openai", "model": "gpt-test", "status": "succeeded", "inputTokens": 100, "outputTokens": 20, "failureReason": "secret"}),
+            json!({"organizationId": 7, "companyId": 9, "runId": 42, "provider": "openai", "model": "gpt-test", "status": "outcome_unknown", "inputTokens": 0, "outputTokens": 0, "failureReason": "private network detail"}),
+            json!({"organizationId": 7, "companyId": 10, "runId": 42, "provider": "foreign", "model": "foreign", "status": "failed", "inputTokens": 999, "outputTokens": 999}),
+        ];
+        let reservations = vec![
+            json!({"organizationId": 7, "companyId": 9, "runId": 42, "currency": "USD", "reservedUnits": 90, "settledUnits": 30, "status": "settled"}),
+            json!({"organizationId": 8, "companyId": 9, "runId": 42, "currency": "EUR", "reservedUnits": 999, "settledUnits": 999, "status": "settled"}),
+        ];
+        let summary = economics_from_rows(7, 9, 42, &attempts, &reservations).expect("economics");
+        assert_eq!(summary.attempt_count, Some(2));
+        assert_eq!(summary.input_tokens, Some(100));
+        assert_eq!(summary.output_tokens, Some(20));
+        assert_eq!(summary.currency.as_deref(), Some("USD"));
+        assert_eq!(summary.reserved_units, Some(90));
+        assert_eq!(summary.settled_units, Some(30));
+        assert!(summary.outcome_unknown);
+        assert_eq!(
+            summary.provider_models,
+            vec![ProviderModelSummary {
+                provider: "openai".into(),
+                model: "gpt-test".into(),
+            }]
+        );
+        let encoded = serde_json::to_string(&summary).expect("serialize");
+        assert!(!encoded.contains("secret"));
+        assert!(!encoded.contains("private network detail"));
+        assert!(!encoded.contains("foreign"));
+    }
+
+    #[test]
+    fn truncated_economics_never_claim_complete_totals() {
+        let attempts = (0..=MAX_RUN_ECONOMICS_ROWS)
+            .map(|id| json!({"id": id + 1, "organizationId": 7, "companyId": 9, "runId": 42, "provider": "p", "model": "m", "status": "succeeded", "inputTokens": 1, "outputTokens": 1}))
+            .collect::<Vec<_>>();
+        let summary = economics_from_rows(7, 9, 42, &attempts, &[]).expect("economics");
+        assert!(summary.truncated);
+        assert_eq!(summary.attempt_count, None);
+        assert_eq!(summary.input_tokens, None);
+        assert_eq!(summary.output_tokens, None);
+        assert_eq!(summary.reserved_units, None);
+        assert_eq!(summary.settled_units, None);
+    }
+
+    #[test]
+    fn economics_preserve_recovery_statuses_and_flag_provider_truncation() {
+        let attempts = (0..=MAX_PROVIDER_MODELS)
+            .map(|index| {
+                json!({
+                    "organizationId": 7,
+                    "companyId": 9,
+                    "runId": 42,
+                    "provider": format!("provider-{index}"),
+                    "model": "model",
+                    "status": "abandoned",
+                    "inputTokens": 0,
+                    "outputTokens": 0
+                })
+            })
+            .collect::<Vec<_>>();
+        let reservations = vec![json!({
+            "organizationId": 7,
+            "companyId": 9,
+            "runId": 42,
+            "provider": "provider-0",
+            "model": "model",
+            "currency": "USD",
+            "reservedUnits": 10,
+            "settledUnits": 0,
+            "status": "released"
+        })];
+        let summary = economics_from_rows(7, 9, 42, &attempts, &reservations).expect("economics");
+        assert_eq!(summary.attempt_statuses, vec!["abandoned"]);
+        assert_eq!(summary.reservation_statuses, vec!["released"]);
+        assert!(summary.provider_models_truncated);
+        assert!(!summary.truncated);
+        assert_eq!(summary.attempt_count, Some(9));
     }
 }

@@ -16192,6 +16192,37 @@
       "postgres_access_path": "organization_index"
     },
     {
+      "table": "workflow_cancellation_repair_receipt",
+      "module": "workflow",
+      "rationale": "Private, immutable organization/company-scoped recovery evidence; authoritative native replay and successor linkage must remain hot.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "scope_key",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
       "table": "workflow_candidate_group_member",
       "module": "workflow",
       "rationale": "Independent organization-owned aggregate root; related rows do not determine storage routing.",
@@ -16566,6 +16597,37 @@
       "primary_key": {
         "strategy": "natural",
         "column": "scope_key",
+        "version_strategy": "none"
+      },
+      "projection_mode": "upsert-current",
+      "hot_retention": "always",
+      "cooling_eligibility": "never",
+      "cooling_eligibility_source": "reviewed:c5/people-platform/always-hot/missing-semantic-safety-contract",
+      "dependency_behavior": "independent",
+      "hydration_policy": "not_applicable",
+      "delete_behavior": "tombstone",
+      "postgres_access_path": "organization_index"
+    },
+    {
+      "table": "workflow_human_task_resubmission",
+      "module": "workflow",
+      "rationale": "Private, immutable organization/company-scoped recovery evidence; authoritative native replay and successor linkage must remain hot.",
+      "authoritative_resources": [],
+      "durability_class": "durable_operational_state",
+      "organization_ownership": "direct",
+      "organization_column": "organization_id",
+      "company_ownership": "direct",
+      "company_column_path": [
+        "company_id"
+      ],
+      "company_column_nullable": false,
+      "aggregate": {
+        "kind": "root",
+        "parent": null
+      },
+      "primary_key": {
+        "strategy": "natural",
+        "column": "previous_task_id",
         "version_strategy": "none"
       },
       "projection_mode": "upsert-current",

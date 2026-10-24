@@ -251,8 +251,7 @@ use crate::analytics::reports::{
 // ── AI Agents ───────────────────────────────────────────────────────────────────
 use crate::ai::agents::{ai_agent, ai_team_member, AiAgent, AiTeamMember};
 use crate::ai::intelligence::{
-    ai_document_processing_job, ai_insight, search_embedding, AiDocumentProcessingJob, AiInsight,
-    SearchEmbedding,
+    ai_document_processing_job, ai_insight, AiDocumentProcessingJob, AiInsight,
 };
 use crate::ai::skill_registry::{
     ai_skill_certification_environment, ai_skill_fixture, ai_skill_release, ai_skill_version,
@@ -1384,6 +1383,21 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         create_date: ctx.timestamp,
         write_date: ctx.timestamp,
         metadata: Some(r#"{"seed":true,"risk":"low"}"#.to_string()),
+    });
+
+    // The dev fixture also opts into the elevated payment-reversal draft path
+    // so the ordinary-user, two-session certification can exercise it. The
+    // production default remains fail-closed for every organization.
+    ctx.db.ai_reducer_allowlist().insert(AiReducerAllowlist {
+        id: 0,
+        organization_id: org_id,
+        reducer_name: "reverse_payment_transaction".to_string(),
+        permission_resource: "payment_transaction".to_string(),
+        permission_action: "reverse".to_string(),
+        enabled: true,
+        create_date: ctx.timestamp,
+        write_date: ctx.timestamp,
+        metadata: Some(r#"{"seed":true,"risk":"elevated"}"#.to_string()),
     });
 
     // ── 1.8 UOM Categories & Units ────────────────────────────────────────────
@@ -7586,7 +7600,6 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         file_size: 2_450_000,
         mimetype: "application/pdf".to_string(),
         checksum: None,
-        index_content: Some("Acme Master Services Agreement".to_string()),
         index_language: Some("en".to_string()),
         access_token: None,
         url: Some("https://storage.lumiere.demo/docs/acme-msa.pdf".to_string()),
@@ -7638,7 +7651,6 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
         file_size: 8_120_000,
         mimetype: "application/pdf".to_string(),
         checksum: None,
-        index_content: Some("Q1 Product Deck".to_string()),
         index_language: Some("en".to_string()),
         access_token: None,
         url: Some("https://storage.lumiere.demo/docs/q1-deck.pdf".to_string()),
@@ -9444,28 +9456,6 @@ Prioritize high-severity findings and cite related records."#,
             write_date: ctx.timestamp,
             metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
         });
-    ctx.db.search_embedding().insert(SearchEmbedding {
-        id: 0,
-        organization_id: org_id,
-        content_type: "document".to_string(),
-        content_id: folder_contracts.id,
-        text: "Master services agreement and pricing schedule".to_string(),
-        embedding: vec![0.01, 0.02, 0.03, 0.04],
-        embedding_hash: Some("seed-embedding-hash".to_string()),
-        sync_status: "synced".to_string(),
-        vector_db_id: Some("seed-doc-1".to_string()),
-        embedding_model: Some("embeddinggemma:latest".to_string()),
-        embedding_dim: Some(4),
-        last_synced_at: Some(ctx.timestamp),
-        sync_error: None,
-        company_id: Some(company_id),
-        create_uid: seeder,
-        create_date: ctx.timestamp,
-        write_uid: seeder,
-        write_date: ctx.timestamp,
-        metadata: Some("{\"seed\":true,\"coverage\":true}".to_string()),
-    });
-
     // ── Coverage: operational POS, inventory, purchasing, and manufacturing ──
     let loc_vendor = ctx.db.stock_location().insert(StockLocation {
         id: 0,

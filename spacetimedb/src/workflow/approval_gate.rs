@@ -14,7 +14,7 @@ use super::action_registry::{
 };
 use super::approvals::{
     create_workflow_human_task_internal, workflow_human_task, CreateWorkflowHumanTaskParams,
-    WorkflowTaskGuardedAction,
+    WorkflowHumanTask, WorkflowTaskGuardedAction,
 };
 use super::definitions::{
     workflow, workflow_edge, workflow_node, workflow_version, WorkflowEdge, WorkflowNode,
@@ -62,6 +62,27 @@ pub fn request_guarded_action(
     organization_id: u64,
     params: RequestGuardedActionParams,
 ) -> Result<GuardedActionGateOutcome, String> {
+    request_guarded_action_internal(ctx, organization_id, params, None)
+}
+
+/// Start a fresh approval only after the recovery reducer has authorized and
+/// revision-checked the cancelled predecessor. Normal requests cannot opt into
+/// this distinct singleton trigger or change the original requester.
+pub(super) fn resubmit_guarded_action(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: RequestGuardedActionParams,
+    previous: &WorkflowHumanTask,
+) -> Result<GuardedActionGateOutcome, String> {
+    request_guarded_action_internal(ctx, organization_id, params, Some(previous))
+}
+
+fn request_guarded_action_internal(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    params: RequestGuardedActionParams,
+    previous: Option<&WorkflowHumanTask>,
+) -> Result<GuardedActionGateOutcome, String> {
     let snapshot = snapshot_guarded_action(
         ctx,
         organization_id,
@@ -70,12 +91,29 @@ pub fn request_guarded_action(
         params.action_version,
         params.input.clone(),
     )?;
+    if previous.is_none() {
+        if let Some(task) = super::recovery::resubmitted_guarded_task(ctx, &snapshot)? {
+            return Ok(GuardedActionGateOutcome::HumanTaskCreated {
+                workflow_instance_id: task.workflow_instance_id,
+                task_id: task.id,
+                subject_revision_hash: task.subject_revision_hash,
+            });
+        }
+    }
     let Some(plan) = discover_gate_plan(ctx, organization_id, params.company_id, &snapshot)? else {
+        if previous.is_some() {
+            return Err(
+                "resubmission requires a currently published approval workflow".to_string(),
+            );
+        }
         return Ok(GuardedActionGateOutcome::DirectExecutionAllowed {
             subject_revision_hash: snapshot.subject_revision_hash,
         });
     };
     let Some(task_node) = plan.task_node else {
+        if previous.is_some() {
+            return Err("resubmission must create a human approval task".to_string());
+        }
         return Ok(GuardedActionGateOutcome::DirectExecutionAllowed {
             subject_revision_hash: snapshot.subject_revision_hash,
         });
@@ -100,13 +138,14 @@ pub fn request_guarded_action(
             subject_revision_hash: snapshot.condition_snapshot.subject_revision_hash.clone(),
             singleton_trigger_key: version_requires_singleton(plan.version.metadata.as_deref())?
                 .then(|| {
-                    format!(
+                    let key = format!(
                         "guarded:{}:{}:{}:{}",
                         plan.version.id,
                         snapshot.subject_id,
                         params.action.as_str(),
                         snapshot.subject_revision_hash
-                    )
+                    );
+                    previous.map_or(key.clone(), |task| format!("{key}:resubmit:{}", task.id))
                 }),
             idempotency_key: start_key.clone(),
             correlation_id: params.correlation_id.clone(),
@@ -186,7 +225,7 @@ pub fn request_guarded_action(
                 key: params.action,
                 schema_version: params.action_version,
             }),
-            requested_by: ctx.sender(),
+            requested_by: previous.map_or(ctx.sender(), |task| task.requested_by),
             correlation_id: params.correlation_id,
             subject_revision_hash: Some(snapshot.subject_revision_hash.clone()),
         },
@@ -196,6 +235,35 @@ pub fn request_guarded_action(
         task_id: task.id,
         subject_revision_hash: snapshot.subject_revision_hash,
     })
+}
+
+/// Resolve the currently published guarded-action route without starting a
+/// workflow instance or creating a human task.
+///
+/// Draft executors use this to stop when the domain action has an additional
+/// approval requirement. The domain reducer still performs its ordinary gate
+/// check immediately before execution, so this is a side-effect-free preflight
+/// rather than an approval bypass.
+pub(crate) fn guarded_action_requires_human_approval(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: u64,
+    action: GuardedActionKey,
+    action_version: u32,
+    input: GuardedActionInput,
+) -> Result<bool, String> {
+    let snapshot = snapshot_guarded_action(
+        ctx,
+        organization_id,
+        company_id,
+        action,
+        action_version,
+        input,
+    )?;
+    Ok(
+        discover_gate_plan(ctx, organization_id, company_id, &snapshot)?
+            .is_some_and(|plan| plan.task_node.is_some()),
+    )
 }
 
 /// Validate workflow discovery and selected routing without creating an instance/task.

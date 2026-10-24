@@ -17,7 +17,7 @@ use crate::workflow::approvals::{
 };
 use crate::workflow::branches::{workflow_fork, workflow_join_arrival, WorkflowFork};
 use crate::workflow::definitions::{
-    workflow, workflow_edge, workflow_node, workflow_version, WorkflowBranchKind,
+    workflow, workflow_edge, workflow_node, workflow_version, WorkflowBranchKind, WorkflowEdge,
     WorkflowMigrationCompatibility, WorkflowNode, WorkflowNodeKind, WorkflowVersionStatus,
 };
 use crate::workflow::delivery::{
@@ -826,8 +826,12 @@ fn evaluate_migration_compatibility(
                             task.node_key, task.kind, policy.kind
                         ));
                     }
-                    if let Err(e) = guarded_action_compatible(task.guarded_action.as_ref(), to_node)
-                    {
+                    if let Err(e) = guarded_action_compatible(
+                        task.guarded_action.as_ref(),
+                        to_node,
+                        &target_nodes,
+                        &target_edges,
+                    ) {
                         errors.push(e);
                     }
                 }
@@ -988,26 +992,47 @@ fn nodes_compatible(from: &WorkflowNode, to: &WorkflowNode) -> Result<(), String
 fn guarded_action_compatible(
     task_action: Option<&WorkflowTaskGuardedAction>,
     to_node: &WorkflowNode,
+    target_nodes: &BTreeMap<String, WorkflowNode>,
+    target_edges: &BTreeMap<String, WorkflowEdge>,
 ) -> Result<(), String> {
-    match (task_action, to_node.action.as_ref()) {
-        (None, None) => Ok(()),
-        (Some(task), Some(def)) => {
-            if task.key.as_str() != def.action_key
-                || task.schema_version != def.input_schema_version
-            {
-                return Err(format!(
-                    "guarded action schema mismatch for '{}'",
-                    to_node.node_key
-                ));
-            }
-            Ok(())
-        }
-        (Some(_), None) => Err(format!(
-            "target human task '{}' lost guarded action",
+    let Some(task) = task_action else {
+        return Ok(());
+    };
+    // Published definitions put action metadata on the following Action node,
+    // never on a HumanTask. Preserve the same direct, unambiguous approved
+    // target that the guarded gate and the eventual decision validate.
+    let mut approved_edges = target_edges.values().filter(|edge| {
+        edge.from_node_key == to_node.node_key && edge.signal_key.as_deref() == Some("approved")
+    });
+    let edge = approved_edges.next().ok_or_else(|| {
+        format!(
+            "target guarded human task '{}' requires exactly one approved edge",
             to_node.node_key
-        )),
-        (None, Some(_)) => Ok(()),
+        )
+    })?;
+    if approved_edges.next().is_some() {
+        return Err(format!(
+            "target guarded human task '{}' requires exactly one approved edge",
+            to_node.node_key
+        ));
     }
+    let def = target_nodes
+        .get(&edge.to_node_key)
+        .filter(|node| node.kind == WorkflowNodeKind::Action)
+        .and_then(|node| node.action.as_ref())
+        .ok_or_else(|| {
+            format!(
+                "target guarded human task '{}' must lead directly to an action node",
+                to_node.node_key
+            )
+        })?;
+    if task.key.as_str() != def.action_key || task.schema_version != def.input_schema_version {
+        return Err(format!(
+            "guarded action schema mismatch for '{}'",
+            to_node.node_key
+        ));
+    }
+    Ok(())
 }
 
 // ============================================================================

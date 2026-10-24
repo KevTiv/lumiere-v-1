@@ -1,4 +1,5 @@
 "use client"
+import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { expensesTableConfig } from "@lumiere/ui/lib/expenses-entity-configs"
 import { ExpenseSourcePreview } from "../../../components/finance-source-preview"
@@ -17,7 +18,6 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
-  ModuleView,
   EntityDetail,
   FormModal,
   CsvImportModal,
@@ -1173,7 +1173,9 @@ function ExpensesClientLoaded({
           {toolbarError}
         </p>
       ) : null}
-      <ModuleView
+      <ModuleWorkView
+        organizationId={organizationId}
+        workScope="expenses"
         config={config}
         dashboardContent={<ModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}

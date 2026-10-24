@@ -8,6 +8,7 @@ import type { ReducerCommandContractMeta } from "./types";
 export const APPROVALS_BFF_REDUCERS = [
   "claim_workflow_human_task",
   "decide_workflow_human_task",
+  "resubmit_workflow_human_task",
   "add_workflow_human_task_comment",
   "invalidate_workflow_human_task",
   "create_workflow_delegation",
@@ -29,6 +30,7 @@ export const APPROVALS_COMMAND_SUBSCRIPTION_HINTS: Record<
 > = {
   claim_workflow_human_task: INBOX_RESOURCES,
   decide_workflow_human_task: INBOX_RESOURCES,
+  resubmit_workflow_human_task: [...INBOX_RESOURCES, "workflow-instances"],
   add_workflow_human_task_comment: INBOX_RESOURCES,
   invalidate_workflow_human_task: INBOX_RESOURCES,
   create_workflow_delegation: INBOX_RESOURCES,

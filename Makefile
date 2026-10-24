@@ -74,6 +74,8 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_proposals_convert_integrity_test \
 	run_crm_contact_update_delete_test \
 	run_crm_contact_identity_test \
+	run_crm_relational_fk_test \
+	run_projects_wave_f_test \
 	run_accounting_payment_management_test \
 	run_core_operational_messaging_test \
 	run_core_sod_test \

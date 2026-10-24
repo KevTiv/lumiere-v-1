@@ -2398,6 +2398,10 @@
       "name": "fail_workorder_quality_check",
       "shape_fingerprint": "sha256:7d3c3d3d3a00753a414866812dd5cd68e9866cff2beabfba51f80ec2f51fce0f"
     },
+    "erp.finalize_embedding_job": {
+      "name": "finalize_embedding_job",
+      "shape_fingerprint": "sha256:2f63a005787f2ff194e2863b095c0cba1ba2d01b4aae708aeff7bf3174e6ba76"
+    },
     "erp.finalize_import_assistant_job": {
       "name": "finalize_import_assistant_job",
       "shape_fingerprint": "sha256:da5bffb757ef21834ad44ea6fd7a767bf922abe8d396f13e29a98bc27d16f689"
@@ -3486,6 +3490,10 @@
       "name": "reorder_proposal_line_items",
       "shape_fingerprint": "sha256:d91065a5c7ddc9380cef987450925cb17f4d3b2173205393b3559176f824fbaf"
     },
+    "erp.repair_cancelled_workflow_tasks": {
+      "name": "repair_cancelled_workflow_tasks",
+      "shape_fingerprint": "sha256:72916bdac0638c7ba185c9f78aed4827b049d18e91bef218e126ca2a3fd09ac9"
+    },
     "erp.replace_contact_categories": {
       "name": "replace_contact_categories",
       "shape_fingerprint": "sha256:a3413724fede12325724bcedb846b780e4c5df9dce912a72171fc06d5641c1d8"
@@ -3500,7 +3508,7 @@
     },
     "erp.request_embedding_job": {
       "name": "request_embedding_job",
-      "shape_fingerprint": "sha256:286df1a723f67733ef9ee625d75de71d18126a9f48328c24744fd6885e1e2684"
+      "shape_fingerprint": "sha256:e876da5a61bd16ff74d484cc0561fb9be82c5b93d70812e220b873219fd88d7c"
     },
     "erp.request_expense_policy_exception": {
       "name": "request_expense_policy_exception",
@@ -3569,6 +3577,10 @@
     "erp.resubmit_bank_statement_settlement": {
       "name": "resubmit_bank_statement_settlement",
       "shape_fingerprint": "sha256:db3b7e46c443e56bb313a3a5c3fe96d7620365d15fae05bfcc9808554cc937ff"
+    },
+    "erp.resubmit_workflow_human_task": {
+      "name": "resubmit_workflow_human_task",
+      "shape_fingerprint": "sha256:9321e33215aa83023cc952163191ee6c6594d0d44f7257d7406e2dea320347f3"
     },
     "erp.resume_ai_run_checked": {
       "name": "resume_ai_run_checked",
@@ -6112,6 +6124,22 @@
       "current_operations_fingerprint": "sha256:380394220a565218bb424cb3779d6e78b567f57737f30ee22415081d3c391286",
       "operation_count": 1460,
       "reason": "release on top of v0.3.138: add none; change the shape of update_document_template"
+    },
+    {
+      "previous_release": "v0.3.139",
+      "previous_ir_sha256": "sha256:0d62256574145532018f11c69567802fa969dcc4e131d4c079ac138bb4552e99",
+      "previous_operations_fingerprint": "sha256:380394220a565218bb424cb3779d6e78b567f57737f30ee22415081d3c391286",
+      "current_operations_fingerprint": "sha256:5cca890c71074d8d79b710f550b94fe7fc7e10cc51bce7bde92f42648b061d04",
+      "operation_count": 1462,
+      "reason": "release on top of v0.3.139: add repair_cancelled_workflow_tasks, resubmit_workflow_human_task; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.140",
+      "previous_ir_sha256": "sha256:1aeba8c7e0e02f6d1b430dc3c8ea9ef4446266d6cb3d359c8339928d9ea1625d",
+      "previous_operations_fingerprint": "sha256:5cca890c71074d8d79b710f550b94fe7fc7e10cc51bce7bde92f42648b061d04",
+      "current_operations_fingerprint": "sha256:9f581a9b17c58845cb18d9487da60520a9927caa016ea8f5f5791de1929ec87b",
+      "operation_count": 1463,
+      "reason": "Add claimed embedding-job finalization and canonical passage-reference payloads on top of v0.3.140; preserve all other released operations."
     }
   ]
 }

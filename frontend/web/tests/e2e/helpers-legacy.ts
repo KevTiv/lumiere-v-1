@@ -2269,6 +2269,14 @@ export async function isAiGatewayAvailable(page: Page): Promise<boolean> {
 
 /** Open ERP assistant from sidebar and wait for panel. */
 export async function openErpAiChat(page: Page) {
+  if (await page.evaluate(() => window.matchMedia("(max-width: 767px)").matches)) {
+    const toggle = page.getByTestId("workspace-navigation-toggle")
+    await expect(toggle).toBeVisible()
+    if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+      await toggle.click()
+      await expect(toggle).toHaveAttribute("aria-expanded", "true")
+    }
+  }
   await page.getByTestId("sidebar-open-ai-chat").click()
   await expect(page.getByTestId("erp-ai-chat-panel")).toBeVisible({ timeout: 10_000 })
 }

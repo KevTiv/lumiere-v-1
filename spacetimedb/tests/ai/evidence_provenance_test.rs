@@ -2149,6 +2149,13 @@ pub fn test_deletion_and_revocation_preserve_honest_history(
     let (org, company) = (f.organization_id, f.company_id);
 
     let revoked = seed_evidence(ctx, org, company, "revoked-src", "company")?;
+    let revoked_fingerprint = ctx
+        .db
+        .ai_evidence_passage()
+        .id()
+        .find(&revoked.passage_id)
+        .ok_or("revoked passage missing")?
+        .content_hash;
 
     // Qdrant is derived state. Seed the authoritative semantic row exactly as
     // the ingestion path does; a source change must tombstone it and enqueue a
@@ -2160,9 +2167,8 @@ pub fn test_deletion_and_revocation_preserve_honest_history(
         UpsertSearchEmbeddingParams {
             content_type: "ai_evidence_passage".into(),
             content_id: revoked.passage_id,
-            text: "Passage p1 of revoked-src.".into(),
-            embedding: vec![],
-            embedding_hash: Some(hash('e')),
+            expected_fingerprint: revoked_fingerprint,
+            index_generation: "semantic-index-v1".into(),
             metadata: None,
         },
     )?;
@@ -2173,7 +2179,11 @@ pub fn test_deletion_and_revocation_preserve_honest_history(
         .filter(&"ai_evidence_passage".to_string())
         .find(|row| row.content_id == revoked.passage_id && row.company_id == Some(company))
         .ok_or("semantic row missing before revocation")?;
-    assert_eq_str(&semantic_before.sync_status, "pending", "semantic row before revocation")?;
+    assert_eq_str(
+        &semantic_before.sync_status,
+        "pending",
+        "semantic row before revocation",
+    )?;
 
     record_ai_evidence_source_change(
         ctx,
@@ -2203,10 +2213,9 @@ pub fn test_deletion_and_revocation_preserve_honest_history(
             job.organization_id == org
                 && job.company_id == Some(company)
                 && job.job_type == "delete_embedding"
-                && job.payload.contains(&format!(
-                    "\"content_id\":{}",
-                    revoked.passage_id
-                ))
+                && job
+                    .payload
+                    .contains(&format!("\"content_id\":{}", revoked.passage_id))
         })
         .ok_or("source change did not enqueue Qdrant deletion")?;
     if !delete_job.payload.contains("\"operation\":\"delete\"") {

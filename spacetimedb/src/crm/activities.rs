@@ -8,14 +8,99 @@
 use spacetimedb::{Identity, ReducerContext, SpacetimeType, Table, Timestamp};
 
 use crate::accounting::journal_entries::account_move;
+use crate::core::users::{find_user_profile_for_organization, user_organization};
 use crate::crm::contacts::contact;
 use crate::crm::leads::lead;
 use crate::crm::opportunities::opportunity;
+use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
 use crate::hr::employees::hr_employee;
 use crate::inventory::stock::stock_picking;
 use crate::purchasing::purchase_orders::purchase_order;
 use crate::sales::sales_core::sale_order;
-use crate::helpers::{check_permission, write_audit_log_v2, AuditLogParams};
+
+/// Finance follow-ups inherit scope and read authorization from their canonical record.
+/// The activity remains independent of the record's business lifecycle.
+fn finance_activity_scope(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    res_model: Option<&str>,
+    res_id: Option<u64>,
+) -> Result<Option<(u64, bool)>, String> {
+    let (company_id, permission) = match res_model {
+        Some("purchase_order") => {
+            let row = ctx
+                .db
+                .purchase_order()
+                .id()
+                .find(&res_id.ok_or("activity target ID missing")?)
+                .ok_or("activity target purchase order not found")?;
+            if row.organization_id != organization_id {
+                return Err("activity target belongs to another organization".into());
+            }
+            (row.company_id, "purchase_order")
+        }
+        Some("sale_order") => {
+            let row = ctx
+                .db
+                .sale_order()
+                .id()
+                .find(&res_id.ok_or("activity target ID missing")?)
+                .ok_or("activity target sale order not found")?;
+            if row.organization_id != organization_id {
+                return Err("activity target belongs to another organization".into());
+            }
+            (row.company_id, "sale_order")
+        }
+        Some("account_move") => {
+            let row = ctx
+                .db
+                .account_move()
+                .id()
+                .find(&res_id.ok_or("activity target ID missing")?)
+                .ok_or("activity target account move not found")?;
+            if row.organization_id != organization_id {
+                return Err("activity target belongs to another organization".into());
+            }
+            (row.company_id, "account_move")
+        }
+        _ => return Ok(None),
+    };
+    check_permission(ctx, organization_id, permission, "read")?;
+    let bypass = crate::workflow::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        company_id,
+        ctx.sender(),
+    )?;
+    Ok(Some((company_id, bypass)))
+}
+
+fn require_activity_recipient(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    company_id: Option<u64>,
+    assigned_to: Option<Identity>,
+) -> Result<(), String> {
+    let Some(identity) = assigned_to else {
+        return Ok(());
+    };
+    let active_profile = find_user_profile_for_organization(ctx, identity, organization_id)
+        .is_some_and(|profile| profile.is_active);
+    let active_member = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&identity)
+        .any(|member| {
+            member.organization_id == organization_id
+                && member.is_active
+                && company_id.is_none_or(|company| member.company_id.is_none_or(|id| id == company))
+        });
+    if !active_profile || !active_member {
+        return Err("activity assignee must be an active member of the record's company".into());
+    }
+    Ok(())
+}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TYPED ACTIVITY TARGET
@@ -143,7 +228,8 @@ fn resolve_activity_target(
                 .ok_or("activity target purchase order not found")?;
             if record.organization_id != organization_id {
                 return Err(
-                    "activity target purchase order does not belong to this organization".to_string(),
+                    "activity target purchase order does not belong to this organization"
+                        .to_string(),
                 );
             }
             Ok((Some("purchase_order".to_string()), Some(purchase_order_id)))
@@ -185,7 +271,8 @@ fn resolve_activity_target(
                 .ok_or("activity target stock picking not found")?;
             if record.organization_id != organization_id {
                 return Err(
-                    "activity target stock picking does not belong to this organization".to_string(),
+                    "activity target stock picking does not belong to this organization"
+                        .to_string(),
                 );
             }
             Ok((Some("stock_picking".to_string()), Some(stock_picking_id)))
@@ -386,7 +473,7 @@ pub fn create_activity(
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "activity", "create")?;
 
-    if params.summary.is_empty() {
+    if params.summary.trim().is_empty() {
         return Err("Activity summary cannot be empty".to_string());
     }
 
@@ -404,6 +491,29 @@ pub fn create_activity(
     }
 
     let (res_model, res_id) = resolve_activity_target(ctx, organization_id, &params.target)?;
+    let finance_scope = finance_activity_scope(ctx, organization_id, res_model.as_deref(), res_id)?;
+    require_activity_recipient(
+        ctx,
+        organization_id,
+        finance_scope.map(|(company, _)| company),
+        params.assigned_to,
+    )?;
+    // User-created finance follow-ups start open; completion has its own guarded command.
+    if finance_scope.is_some()
+        && (params.is_done || params.date_done.is_some() || params.state == "done")
+    {
+        return Err("create an open follow-up and complete it through the activity command".into());
+    }
+    if finance_scope.is_some()
+        && (params.auto
+            || params.is_system
+            || !matches!(
+                params.state.as_str(),
+                "planned" | "today" | "overdue" | "open"
+            ))
+    {
+        return Err("record follow-ups must use a supported manual activity state".into());
+    }
 
     let activity = ctx.db.activity().insert(Activity {
         id: 0,
@@ -438,7 +548,7 @@ pub fn create_activity(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: finance_scope.map(|(company, _)| company),
             table_name: "activity",
             record_id: activity.id,
             action: "CREATE",
@@ -452,7 +562,9 @@ pub fn create_activity(
                 .to_string(),
             ),
             changed_fields: vec!["summary".to_string(), "activity_type".to_string()],
-            metadata: None,
+            metadata: finance_scope.filter(|(_, bypass)| *bypass).map(|_| {
+                serde_json::json!({"company_membership_superuser_bypass": true}).to_string()
+            }),
         },
     );
 
@@ -476,6 +588,15 @@ pub fn complete_activity(
     if activity.organization_id != organization_id {
         return Err("Activity does not belong to this organization".to_string());
     }
+    if activity.deleted_at.is_some() {
+        return Err("Activity has been deleted".to_string());
+    }
+    let finance_scope = finance_activity_scope(
+        ctx,
+        organization_id,
+        activity.res_model.as_deref(),
+        activity.res_id,
+    )?;
     if activity.is_done || activity.state == "done" {
         return Err("Activity is already done".to_string());
     }
@@ -496,7 +617,7 @@ pub fn complete_activity(
         ctx,
         organization_id,
         AuditLogParams {
-            company_id: None,
+            company_id: finance_scope.map(|(company, _)| company),
             table_name: "activity",
             record_id: activity_id,
             action: "UPDATE",
@@ -520,7 +641,9 @@ pub fn complete_activity(
                 "state".to_string(),
                 "date_done".to_string(),
             ],
-            metadata: None,
+            metadata: finance_scope.filter(|(_, bypass)| *bypass).map(|_| {
+                serde_json::json!({"company_membership_superuser_bypass": true}).to_string()
+            }),
         },
     );
 

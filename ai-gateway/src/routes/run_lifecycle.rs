@@ -12,11 +12,13 @@ use stdb_client::StdbClient;
 use crate::{
     error::{AppError, AppResult},
     orchestrator::run_lifecycle::ContinuationToken,
-    routes::evidence::require_scoped_capability_grant,
+    routes::evidence::{require_scoped_capability_grant, CapabilityGrantBounds},
     state::AppState,
 };
 
 const LIFECYCLE_CAPABILITY: &str = "ai.run.lifecycle";
+const MAX_LIFECYCLE_ROWS: u64 = 500;
+const MAX_LIFECYCLE_BYTES: u64 = 2 * 1024 * 1024;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -83,6 +85,7 @@ pub struct RunLifecycleResponse {
     pub events: Vec<LifecycleEvent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comparison: Option<LifecycleComparison>,
+    pub truncated: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -116,6 +119,22 @@ pub struct LifecycleComparison {
     pub right_run_id: u64,
     pub left_continuation: ContinuationToken,
     pub right_continuation: ContinuationToken,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<LifecycleComparisonDetails>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifecycleComparisonDetails {
+    pub left_status: String,
+    pub right_status: String,
+    pub left_step_count: u64,
+    pub right_step_count: u64,
+    pub left_tokens_used: u64,
+    pub right_tokens_used: u64,
+    pub tools_only_left: Vec<String>,
+    pub tools_only_right: Vec<String>,
+    pub tool_diff_truncated: bool,
 }
 
 struct ActorContext {
@@ -136,7 +155,7 @@ pub async fn post_run_lifecycle(
         ));
     }
     let actor = actor_context(&headers, req.company_id)?;
-    require_scoped_capability_grant(
+    let granted = require_scoped_capability_grant(
         &state,
         &actor.identity,
         &actor.token,
@@ -145,16 +164,29 @@ pub async fn post_run_lifecycle(
         LIFECYCLE_CAPABILITY,
     )
     .await?;
+    let bounds = CapabilityGrantBounds {
+        max_rows: granted.max_rows.min(MAX_LIFECYCLE_ROWS),
+        max_bytes: granted.max_bytes.min(MAX_LIFECYCLE_BYTES),
+    };
 
     let comparison = apply_intent(state.stdb.as_ref(), &actor, req.run_id, req.intent).await?;
+    let comparison = load_comparison_details(
+        state.stdb.as_ref(),
+        actor.organization_id,
+        actor.company_id,
+        comparison,
+    )
+    .await?;
     let response = load_response(
         state.stdb.as_ref(),
         actor.organization_id,
         actor.company_id,
         req.run_id,
         comparison,
+        usize::try_from(bounds.max_rows).unwrap_or(usize::MAX),
     )
     .await?;
+    let response = enforce_lifecycle_bounds(response, bounds)?;
     Ok(Json(response))
 }
 
@@ -279,6 +311,7 @@ async fn apply_intent(
                 right_run_id,
                 left_continuation: continuation.clone(),
                 right_continuation: right.clone(),
+                details: None,
             };
             (
                 "compare_ai_runs_checked",
@@ -340,19 +373,189 @@ fn continuation_params(token: &ContinuationToken, expected_run_id: u64) -> AppRe
     )
 }
 
+fn bounded_tool_differences(
+    left: &std::collections::BTreeSet<String>,
+    right: &std::collections::BTreeSet<String>,
+    limit: usize,
+) -> (Vec<String>, Vec<String>, bool) {
+    let left_total = left.difference(right).count();
+    let right_total = right.difference(left).count();
+    (
+        left.difference(right).take(limit).cloned().collect(),
+        right.difference(left).take(limit).cloned().collect(),
+        left_total > limit || right_total > limit,
+    )
+}
+
+async fn load_comparison_details(
+    stdb: &StdbClient,
+    organization_id: u64,
+    company_id: u64,
+    comparison: Option<LifecycleComparison>,
+) -> AppResult<Option<LifecycleComparison>> {
+    use std::collections::BTreeSet;
+
+    const MAX_TOOLS: usize = 100;
+    const MAX_TOOL_DIFF: usize = 20;
+    let Some(mut comparison) = comparison else {
+        return Ok(None);
+    };
+    let load_run = |run_id: u64| async move {
+        stdb.query_sql(&format!(
+            "SELECT status, step_count, tokens_used FROM ai_agent_run WHERE organization_id = {organization_id} AND company_id = {company_id} AND id = {run_id} LIMIT 1"
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?
+        .into_iter()
+        .next()
+        .ok_or_else(|| AppError::NotFound("compared run not found".into()))
+    };
+    let left = load_run(comparison.left_run_id).await?;
+    let right = load_run(comparison.right_run_id).await?;
+    let load_tools = |run_id: u64| async move {
+        stdb.query_sql(&format!(
+            "SELECT tool_name FROM ai_agent_run_step WHERE organization_id = {organization_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {}",
+            MAX_TOOLS + 1
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))
+    };
+    let left_tool_rows = load_tools(comparison.left_run_id).await?;
+    let right_tool_rows = load_tools(comparison.right_run_id).await?;
+    let tool_diff_truncated = left_tool_rows.len() > MAX_TOOLS || right_tool_rows.len() > MAX_TOOLS;
+    let tools = |rows: Vec<Value>| {
+        rows.into_iter()
+            .take(MAX_TOOLS)
+            .filter_map(|row| text(&row, "toolName").ok())
+            .filter(|name| !name.is_empty() && name.len() <= 128)
+            .collect::<BTreeSet<_>>()
+    };
+    let left_tools = tools(left_tool_rows);
+    let right_tools = tools(right_tool_rows);
+    let (tools_only_left, tools_only_right, diff_limit_truncated) =
+        bounded_tool_differences(&left_tools, &right_tools, MAX_TOOL_DIFF);
+    comparison.details = Some(LifecycleComparisonDetails {
+        left_status: text(&left, "status")?,
+        right_status: text(&right, "status")?,
+        left_step_count: number(&left, "stepCount")?,
+        right_step_count: number(&right, "stepCount")?,
+        left_tokens_used: number(&left, "tokensUsed")?,
+        right_tokens_used: number(&right, "tokensUsed")?,
+        tools_only_left,
+        tools_only_right,
+        tool_diff_truncated: tool_diff_truncated || diff_limit_truncated,
+    });
+    Ok(Some(comparison))
+}
+
+fn lifecycle_response_size(response: &RunLifecycleResponse) -> AppResult<u64> {
+    serde_json::to_vec(response)
+        .map(|encoded| encoded.len() as u64)
+        .map_err(|error| AppError::Internal(error.to_string()))
+}
+
+fn enforce_lifecycle_bounds(
+    mut response: RunLifecycleResponse,
+    bounds: CapabilityGrantBounds,
+) -> AppResult<RunLifecycleResponse> {
+    if bounds.max_rows == 0 {
+        return Err(AppError::Forbidden(
+            "run lifecycle row grant is empty".into(),
+        ));
+    }
+    let mut remaining = usize::try_from(bounds.max_rows.saturating_sub(1)).unwrap_or(usize::MAX);
+    if response.questions.len() > remaining {
+        response.questions.truncate(remaining);
+        response.truncated = true;
+    }
+    remaining = remaining.saturating_sub(response.questions.len());
+    if response.events.len() > remaining {
+        response.events.truncate(remaining);
+        response.truncated = true;
+    }
+    remaining = remaining.saturating_sub(response.events.len());
+    if response
+        .comparison
+        .as_ref()
+        .is_some_and(|comparison| comparison.details.is_some())
+    {
+        if remaining == 0 {
+            if let Some(comparison) = response.comparison.as_mut() {
+                comparison.details = None;
+            }
+            response.truncated = true;
+        } else {
+            remaining -= 1;
+        }
+    }
+    if let Some(details) = response
+        .comparison
+        .as_mut()
+        .and_then(|comparison| comparison.details.as_mut())
+    {
+        if details.tools_only_left.len() > remaining {
+            details.tools_only_left.truncate(remaining);
+            details.tool_diff_truncated = true;
+            response.truncated = true;
+        }
+        remaining = remaining.saturating_sub(details.tools_only_left.len());
+        if details.tools_only_right.len() > remaining {
+            details.tools_only_right.truncate(remaining);
+            details.tool_diff_truncated = true;
+            response.truncated = true;
+        }
+    }
+
+    while lifecycle_response_size(&response)? > bounds.max_bytes {
+        let removed_tool = response
+            .comparison
+            .as_mut()
+            .and_then(|comparison| comparison.details.as_mut())
+            .is_some_and(|details| {
+                let removed = details.tools_only_right.pop().is_some()
+                    || details.tools_only_left.pop().is_some();
+                if removed {
+                    details.tool_diff_truncated = true;
+                }
+                removed
+            });
+        if removed_tool {
+            response.truncated = true;
+            continue;
+        }
+        if response.events.pop().is_some() || response.questions.pop().is_some() {
+            response.truncated = true;
+            continue;
+        }
+        if response
+            .comparison
+            .as_mut()
+            .is_some_and(|comparison| comparison.details.take().is_some())
+        {
+            response.truncated = true;
+            continue;
+        }
+        return Err(AppError::Forbidden(
+            "run lifecycle response exceeds the acting user's byte grant".into(),
+        ));
+    }
+    Ok(response)
+}
+
 async fn load_response(
     stdb: &StdbClient,
     organization_id: u64,
     company_id: u64,
     run_id: u64,
     comparison: Option<LifecycleComparison>,
+    row_limit: usize,
 ) -> AppResult<RunLifecycleResponse> {
     let state = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_state WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?.into_iter().next()
         .ok_or_else(|| AppError::NotFound("run lifecycle not found".into()))?;
-    let questions = stdb.query_sql(&format!("SELECT * FROM ai_run_question WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC"))
+    let questions = stdb.query_sql(&format!("SELECT * FROM ai_run_question WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
-    let events = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_event WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC"))
+    let events = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_event WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
     let checkpoint_hash = text(&state, "checkpointHash")?;
     Ok(RunLifecycleResponse {
@@ -373,6 +576,7 @@ async fn load_response(
             .map(event_from_row)
             .collect::<AppResult<_>>()?,
         comparison,
+        truncated: false,
     })
 }
 
@@ -477,5 +681,151 @@ mod tests {
         };
         assert!(continuation_params(&token, 8).is_ok());
         assert!(continuation_params(&token, 9).is_err());
+    }
+
+    #[test]
+    fn comparison_tool_differences_are_sorted_and_bounded() {
+        use std::collections::BTreeSet;
+
+        let left = ["shared", "z-left", "a-left"]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<BTreeSet<_>>();
+        let right = ["shared", "b-right", "y-right"]
+            .into_iter()
+            .map(str::to_string)
+            .collect::<BTreeSet<_>>();
+        let (left_only, right_only, truncated) = bounded_tool_differences(&left, &right, 1);
+        assert_eq!(left_only, vec!["a-left"]);
+        assert_eq!(right_only, vec!["b-right"]);
+        assert!(truncated);
+    }
+
+    fn lifecycle_response() -> RunLifecycleResponse {
+        RunLifecycleResponse {
+            run_id: 8,
+            state: "running".into(),
+            continuation: ContinuationToken {
+                run_id: 8,
+                checkpoint_hash: "a".repeat(64),
+                cursor: 1,
+                concurrency_version: 1,
+            },
+            questions: (1..=3)
+                .map(|id| LifecycleQuestion {
+                    id,
+                    key: format!("q{id}"),
+                    prompt: "prompt".repeat(50),
+                    status: "open".into(),
+                    required: true,
+                    revision: 1,
+                    answer: None,
+                })
+                .collect(),
+            events: (1..=3)
+                .map(|id| LifecycleEvent {
+                    id,
+                    kind: "advanced".into(),
+                    from_version: id,
+                    to_version: id + 1,
+                    cursor: id as u32,
+                    created_at: "now".into(),
+                })
+                .collect(),
+            comparison: None,
+            truncated: false,
+        }
+    }
+
+    #[test]
+    fn lifecycle_rows_are_intersected_with_the_grant() {
+        let bounded = enforce_lifecycle_bounds(
+            lifecycle_response(),
+            CapabilityGrantBounds {
+                max_rows: 3,
+                max_bytes: 1_000_000,
+            },
+        )
+        .expect("bounded lifecycle");
+        assert_eq!(bounded.questions.len(), 2);
+        assert!(bounded.events.is_empty());
+        assert!(bounded.truncated);
+    }
+
+    #[test]
+    fn lifecycle_rejects_an_empty_row_grant() {
+        let result = enforce_lifecycle_bounds(
+            lifecycle_response(),
+            CapabilityGrantBounds {
+                max_rows: 0,
+                max_bytes: 1_000_000,
+            },
+        );
+        assert!(matches!(result, Err(AppError::Forbidden(_))));
+    }
+
+    #[test]
+    fn lifecycle_drops_comparison_details_when_no_row_remains() {
+        let mut response = lifecycle_response();
+        response.questions.clear();
+        response.events.clear();
+        response.comparison = Some(LifecycleComparison {
+            left_run_id: 8,
+            right_run_id: 9,
+            left_continuation: response.continuation.clone(),
+            right_continuation: ContinuationToken {
+                run_id: 9,
+                checkpoint_hash: "b".repeat(64),
+                cursor: 2,
+                concurrency_version: 2,
+            },
+            details: Some(LifecycleComparisonDetails {
+                left_status: "completed".into(),
+                right_status: "failed".into(),
+                left_step_count: 2,
+                right_step_count: 3,
+                left_tokens_used: 20,
+                right_tokens_used: 30,
+                tools_only_left: vec!["left.tool".into()],
+                tools_only_right: vec!["right.tool".into()],
+                tool_diff_truncated: false,
+            }),
+        });
+        let bounded = enforce_lifecycle_bounds(
+            response,
+            CapabilityGrantBounds {
+                max_rows: 1,
+                max_bytes: 1_000_000,
+            },
+        )
+        .expect("bounded lifecycle");
+        assert!(bounded
+            .comparison
+            .as_ref()
+            .is_some_and(|comparison| comparison.details.is_none()));
+        assert!(bounded.truncated);
+    }
+
+    #[test]
+    fn lifecycle_optional_rows_are_removed_to_meet_byte_grant() {
+        let minimal = {
+            let mut response = lifecycle_response();
+            response.questions.clear();
+            response.events.clear();
+            response
+        };
+        let max_bytes = lifecycle_response_size(&minimal).expect("minimal size");
+        let bounded = enforce_lifecycle_bounds(
+            lifecycle_response(),
+            CapabilityGrantBounds {
+                max_rows: 100,
+                max_bytes,
+            },
+        )
+        .expect("bounded lifecycle");
+        assert!(bounded.questions.is_empty());
+        assert!(bounded.events.is_empty());
+        assert!(bounded.truncated);
+        assert!(lifecycle_response_size(&bounded).expect("bounded size") <= max_bytes);
     }
 }

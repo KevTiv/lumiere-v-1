@@ -53,7 +53,8 @@ const UNASSIGNED = "__unassigned__"
 export interface TaskBoardViewProps {
   items: TaskBoardItem[]
   columns: KanbanColumnDef[]
-  onMove: (taskId: string, toColumnId: string) => void | Promise<void>
+  /** Omitted makes the board read-only while preserving task review. */
+  onMove?: (taskId: string, toColumnId: string) => void | Promise<void>
   onTaskClick?: (taskId: string) => void
   /** Column "+" buttons; omitted hides them. */
   onCreateInColumn?: (columnId: string) => void
@@ -249,7 +250,7 @@ export function TaskBoardView({
           getColumnId={(item) => item.columnId}
           onItemClick={onTaskClick ? (item) => onTaskClick(item.id) : undefined}
           onAddItem={onCreateInColumn}
-          onMove={({ itemId, toColumnId }) => onMove(itemId, toColumnId)}
+          onMove={onMove ? ({ itemId, toColumnId }) => onMove(itemId, toColumnId) : undefined}
           labels={{
             emptyColumn: t("tasks.board.dropTasksHere"),
             wipLimitReached: (limit) => t("tasks.board.wipLimitReached", { limit }),

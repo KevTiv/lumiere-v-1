@@ -40,9 +40,11 @@ import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use
 import { Button, buttonVariants } from "@lumiere/ui/components/button"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
-import { Ban, CheckCheck, CircleCheck, ExternalLink, Pencil, Plus, RotateCcw } from "lucide-react"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { Ban, CheckCheck, CircleCheck, ExternalLink, Pencil, Plus, RotateCcw, Users } from "lucide-react"
 import { TASK_BOARD_STATES, taskBoardState, type TaskBoardState } from "../projects/project-record"
 import { taskAttachmentCounts, toTaskBoardItem } from "./task-board-items"
+import { TaskAssigneesDialog } from "./task-assignees-dialog"
 
 const TASK_COLUMN_COLORS = ["bg-info", "bg-warning", "bg-category-3", "bg-success", "bg-destructive"] as const
 
@@ -99,6 +101,10 @@ function TasksClientLoaded({
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const [modal, setModal] = useState<ModalState>({ type: null })
+  const [assignmentTaskId, setAssignmentTaskId] = useState<string | null>(null)
+  const { permissionsReady, checkPermission } = useRBAC()
+  const canAssign = permissionsReady !== false && checkPermission("project_task", "write").allowed
+  const canCreate = permissionsReady !== false && checkPermission("project_task", "create").allowed
 
   const { data: tasks = [] } = useTasks(orgId, initialTasks)
   const { data: projects = [] } = useProjects(orgId, initialProjects)
@@ -204,6 +210,7 @@ function TasksClientLoaded({
   }, [boardItems])
 
   const handleMoveTask = async (taskId: string, toColumnId: string) => {
+    if (!canAssign) return
     const state = TASK_BOARD_STATES.find((candidate) => candidate === toColumnId)
     if (!state) return
     setPendingMoves((prev) => new Map(prev).set(taskId, state))
@@ -224,6 +231,7 @@ function TasksClientLoaded({
   }
 
   const openEditTask = (taskId: string) => {
+    if (!canAssign) return
     const task = tasks.find((row) => String(row.id) === taskId)
     if (!task) return
     setModal({
@@ -238,7 +246,7 @@ function TasksClientLoaded({
     const base = tasksTableConfig(t)
     if (base.view.mode !== "table") return base
     const moveTo = (state: TaskBoardState) => (row: EntityRow) => handleMoveTask(String(row.id), state)
-    const notIn = (state: TaskBoardState) => (row: EntityRow) => taskBoardState(row) !== state
+    const notIn = (state: TaskBoardState) => (row: EntityRow) => canAssign && taskBoardState(row) !== state
     return {
       ...base,
       title: "",
@@ -252,7 +260,8 @@ function TasksClientLoaded({
             : column,
         ),
         rowActions: [
-          { id: "edit", label: t("common.edit"), icon: Pencil, onClick: (row) => openEditTask(String(row.id)) },
+          { id: "edit", label: t("common.edit"), icon: Pencil, isApplicable: () => canAssign, onClick: (row) => openEditTask(String(row.id)) },
+          { id: "assign", label: "Assign people", icon: Users, isApplicable: () => canAssign, onClick: (row) => setAssignmentTaskId(String(row.id)) },
           { id: "approve", label: t("tasks.board.columns.Approved"), icon: CheckCheck, isApplicable: notIn("Approved"), onClick: moveTo("Approved") },
           { id: "done", label: t("tasks.board.columns.Done"), icon: CircleCheck, isApplicable: notIn("Done"), onClick: moveTo("Done") },
           { id: "reopen", label: t("tasks.board.columns.InProgress"), icon: RotateCcw, isApplicable: notIn("InProgress"), onClick: moveTo("InProgress") },
@@ -261,7 +270,7 @@ function TasksClientLoaded({
       },
     }
     // handleMoveTask/openEditTask read the latest rows through state setters and lookups.
-  }, [t, projectNames, tasks]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [t, projectNames, tasks, canAssign]) // eslint-disable-line react-hooks/exhaustive-deps
   const projectOptions = useMemo(
     () => projectFieldOptions.filter((option) => option.value !== "" && !("disabled" in option && option.disabled)),
     [projectFieldOptions],
@@ -284,6 +293,7 @@ function TasksClientLoaded({
 
   const isPending =
     createTask.isPending || updateTask.isPending || updateTaskState.isPending
+  const assignmentTask = tasks.find((task) => String(task.id) === assignmentTaskId)
 
   return (
     <div className="flex min-h-[calc(100vh-12rem)] flex-col gap-4">
@@ -297,13 +307,13 @@ function TasksClientLoaded({
             <ExternalLink className="mr-2 h-4 w-4" />
             {t("tasks.board.viewProjects")}
           </Link>
-          <Button
+          {canCreate ? <Button
             size="sm"
             onClick={() => setModal({ type: "create", form: taskFormConfig, action: "createTask" })}
           >
             <Plus className="mr-2 h-4 w-4" />
             {t("tasks.board.createTask")}
-          </Button>
+          </Button> : null}
         </div>
       </div>
 
@@ -325,9 +335,9 @@ function TasksClientLoaded({
         className="min-h-0 flex-1"
         items={boardItems}
         columns={boardColumns}
-        onMove={handleMoveTask}
-        onTaskClick={openEditTask}
-        onCreateInColumn={() => setModal({ type: "create", form: taskFormConfig, action: "createTask" })}
+        onMove={canAssign ? handleMoveTask : undefined}
+        onTaskClick={canAssign ? openEditTask : undefined}
+        onCreateInColumn={canCreate ? () => setModal({ type: "create", form: taskFormConfig, action: "createTask" }) : undefined}
         priorityLabel={(priority) => t(`projects.tasks.priority.${priority}`, { defaultValue: priority })}
         projects={projectOptions}
         storageKey="lumiere:tasks-board-view"
@@ -336,22 +346,31 @@ function TasksClientLoaded({
             config={tableConfig}
             useCard={false}
             data={tasks.filter((task) => visibleIds.has(String(task.id)))}
-            onRowClick={(row) => openEditTask(String(row.id))}
+            onRowClick={canAssign ? (row) => openEditTask(String(row.id)) : undefined}
           />
         )}
       />
 
       <FormModal
-        open={modal.type !== null}
+        open={modal.type === "create" ? canCreate : modal.type === "edit" && canAssign}
         onOpenChange={(open) => !open && setModal({ type: null })}
         config={modal.type ? modal.form : taskFormConfig}
         isPending={isPending}
+        formLeadingActions={modal.type === "edit" && canAssign ? (
+          <Button type="button" variant="outline" disabled={isPending} onClick={() => setAssignmentTaskId(String(modal.entityId))}>
+            <Users className="mr-2 h-4 w-4" /> Assign people
+          </Button>
+        ) : undefined}
         onSubmit={async (formData) => {
           if (!modal.type) return
+          if (modal.type === "create" ? !canCreate : !canAssign) throw new Error("Task permission is required")
           await handleFormSubmit(modal.action, formData)
           setModal({ type: null })
         }}
       />
+      {assignmentTask && canAssign ? (
+        <TaskAssigneesDialog key={`${organizationId}:${assignmentTask.companyId}:${assignmentTask.id}`} organizationId={orgId} task={assignmentTask} onClose={() => setAssignmentTaskId(null)} />
+      ) : null}
     </div>
   )
 }

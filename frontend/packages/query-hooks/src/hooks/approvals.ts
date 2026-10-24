@@ -12,16 +12,37 @@ import {
 } from "@lumiere/erp-shared/record-links"
 import type { WorkflowHumanTaskDecision } from "@lumiere/stdb/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useEffect, useRef } from "react"
+import { decodeOperationDispatch, OperationRequestError } from "@lumiere/api-client"
 
 import { apiFetch } from "../http"
-import type { CanonicalRecordRef } from "./operation-effect"
+import {
+  executeOperationWithCanonicalReadback,
+  requireResolvedOperationEffect,
+  type CanonicalRecordRef,
+} from "./operation-effect"
+import {
+  humanTaskClaimExpectation,
+  humanTaskDecisionExpectation,
+  humanTaskResubmissionExpectation,
+  normalizeHumanTaskResubmissionReason,
+  humanTaskCommandReadbackPath,
+  newHumanTaskAttempt,
+  resolveHumanTaskCommandEffect,
+  type HumanTaskCommandAttempt,
+  type HumanTaskCommandExpectation,
+} from "./human-task-command"
+import { parseWorkBoardPage, workBoardQueryKey, type WorkBoardScope } from "./work-board-model"
+
+export { newHumanTaskAttempt } from "./human-task-command"
+export type { HumanTaskCommandAttempt } from "./human-task-command"
 import {
   resolveHumanTaskClaimEffect,
   resolveHumanTaskDecisionEffect,
   type HumanTaskEffectProjection,
 } from "./human-task-effect"
 
-import { approvalSelection, requireUnchangedApproval, type ApprovalSelection } from "./approval-controls"
+import { approvalTaskStatus, approvalSelection, requireUnchangedApproval, type ApprovalSelection } from "./approval-controls"
 import { workflowDelegationMetadata } from "@lumiere/erp-shared/workflow-delegation"
 
 import { responseErrorMessage as parseCallError } from "@lumiere/api-client/response-error"
@@ -91,14 +112,7 @@ export type HumanTaskRow = {
 }
 
 function taskStatusTag(row: HumanTaskRow): string {
-  const s = row.status
-  if (typeof s === "string") return s
-  if (s && typeof s === "object" && "tag" in s && typeof s.tag === "string") return s.tag
-  if (s && typeof s === "object") {
-    const keys = Object.keys(s)
-    if (keys.length === 1) return keys[0]!
-  }
-  return ""
+  return approvalTaskStatus(row) ?? ""
 }
 
 export function humanTaskInboxQueryKey(organizationId: number, companyId?: number | null) {
@@ -185,23 +199,86 @@ export type ClaimHumanTaskInput = {
   expectedRevision: number
   actingFor?: unknown
   correlationId?: string
+  attempt?: HumanTaskCommandAttempt
 }
 
-export function useClaimHumanTask(organizationId: number) {
+function commandAttempt(input: { attempt?: HumanTaskCommandAttempt; correlationId?: string }, kind: "claim" | "decision" | "resubmit") {
+  if (input.attempt) return { ...input.attempt }
+  const attempt = newHumanTaskAttempt(kind)
+  return { ...attempt, correlationId: input.correlationId ?? attempt.correlationId }
+}
+
+/** A context switch may happen while hashing an attempt; never dispatch it as a new actor. */
+function useHumanTaskContextGuard(organizationId: number, scope?: WorkBoardScope) {
+  const key = JSON.stringify(scope ? workBoardQueryKey(scope) : [organizationId])
+  const current = useRef({ key, active: true })
+  current.current.key = key
+  useEffect(() => {
+    current.current.active = true
+    return () => { current.current.active = false }
+  }, [])
+  return () => {
+    if (!current.current.active || current.current.key !== key || (scope && scope.organizationId !== organizationId)) {
+      throw new OperationRequestError({ code: "conflict", status: 409, retry: "never", message: "Workflow command context changed; reopen the task" })
+    }
+  }
+}
+
+/** Read-only receipt check using a frozen hash; no source title or decision comment is retained. */
+export async function recheckHumanTaskCommandEffect(scope: WorkBoardScope, expected: HumanTaskCommandExpectation) {
+  const response = await apiFetch(humanTaskCommandReadbackPath(scope, expected), { cache: "no-store" })
+  if (!response.ok) throw new Error(await parseCallError(response))
+  const payload: unknown = await response.json()
+  const effect = resolveHumanTaskCommandEffect(payload, scope, expected)
+  const visible = parseWorkBoardPage(payload, { ...scope, view: "eligible" }).data.some((row) => String(row.id) === expected.taskId)
+  return { effect, visible }
+}
+
+async function readHumanTaskCommandEffect(scope: WorkBoardScope, expected: HumanTaskCommandExpectation) {
+  return (await recheckHumanTaskCommandEffect(scope, expected)).effect
+}
+
+/** Read-only: checks the original frozen attempt and never sends a command. */
+export async function recheckHumanTaskClaimEffect(scope: WorkBoardScope, input: ClaimHumanTaskInput) {
+  return readHumanTaskCommandEffect(scope, await humanTaskClaimExpectation(scope, input))
+}
+
+/** Read-only: another reviewer's matching decision cannot confirm this attempt. */
+export async function recheckHumanTaskDecisionEffect(scope: WorkBoardScope, input: DecideHumanTaskInput) {
+  return readHumanTaskCommandEffect(scope, await humanTaskDecisionExpectation(scope, input))
+}
+
+export function useClaimHumanTask(organizationId: number, scope?: WorkBoardScope) {
   const qc = useQueryClient()
+  const requireContext = useHumanTaskContextGuard(organizationId, scope)
   return useMutation<CanonicalRecordRef, Error, ClaimHumanTaskInput>({
-    mutationFn: async (input) => {
+    mutationFn: async (supplied) => {
+      const input = { ...supplied, attempt: commandAttempt(supplied, "claim") }
+      const expected = scope ? await humanTaskClaimExpectation(scope, input) : null
+      requireContext()
       const params = {
         companyId: input.companyId,
         taskId: input.taskId,
         expectedRevision: input.expectedRevision,
         actingFor: typeof input.actingFor === "string" ? encodeIdentity(input.actingFor) : input.actingFor ?? null,
-        idempotencyKey: newIdempotencyKey("claim"),
-        correlationId: input.correlationId ?? newIdempotencyKey("corr"),
+        idempotencyKey: input.attempt.idempotencyKey,
+        correlationId: input.attempt.correlationId,
       }
       const { urlPath, init } = stdbBffCommandPost("claim_workflow_human_task", { params: stdbParamsToJson(params, "ClaimWorkflowHumanTaskParams") })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      const dispatch = async () => {
+        requireContext()
+        return decodeOperationDispatch(await apiFetch(urlPath, init))
+      }
+      if (scope && expected) {
+        return requireResolvedOperationEffect(await executeOperationWithCanonicalReadback({
+          resolveBeforeDispatch: false,
+          dispatch,
+          resolveEffect: () => { requireContext(); return readHumanTaskCommandEffect(scope, expected) },
+        })).ref
+      }
+      // Legacy inbox callers retain acknowledged-state readback. Never use
+      // that weaker projection to reconcile an ambiguous dispatch.
+      await dispatch()
       const effect = resolveHumanTaskClaimEffect(
         await fetchHumanTaskRows(),
         BigInt(organizationId),
@@ -211,7 +288,7 @@ export function useClaimHumanTask(organizationId: number) {
       if (!effect) throw new Error("Human task claim did not read back")
       return effect
     },
-    onSuccess: () => invalidateHumanTaskQueries(qc, organizationId),
+    onSettled: () => invalidateHumanTaskQueries(qc, organizationId),
   })
 }
 
@@ -224,12 +301,17 @@ export type DecideHumanTaskInput = {
   actingFor?: unknown
   comment?: string | null
   correlationId?: string
+  attempt?: HumanTaskCommandAttempt
 }
 
-export function useDecideHumanTask(organizationId: number) {
+export function useDecideHumanTask(organizationId: number, scope?: WorkBoardScope) {
   const qc = useQueryClient()
+  const requireContext = useHumanTaskContextGuard(organizationId, scope)
   return useMutation<CanonicalRecordRef, Error, DecideHumanTaskInput>({
-    mutationFn: async (input) => {
+    mutationFn: async (supplied) => {
+      const input = { ...supplied, decision: { ...supplied.decision }, attempt: commandAttempt(supplied, "decision") }
+      const expected = scope ? await humanTaskDecisionExpectation(scope, input) : null
+      requireContext()
       const decision =
         typeof input.decision === "object" && input.decision && "tag" in input.decision
           ? input.decision
@@ -242,13 +324,23 @@ export function useDecideHumanTask(organizationId: number) {
         decision,
         actingFor: typeof input.actingFor === "string" ? encodeIdentity(input.actingFor) : input.actingFor ?? null,
         comment: input.comment ?? null,
-        idempotencyKey: newIdempotencyKey("decide"),
-        correlationId: input.correlationId ?? newIdempotencyKey("corr"),
+        idempotencyKey: input.attempt.idempotencyKey,
+        correlationId: input.attempt.correlationId,
         causationId: null,
       }
       const { urlPath, init } = stdbBffCommandPost("decide_workflow_human_task", { params: stdbParamsToJson(params, "DecideWorkflowHumanTaskParams") })
-      const r = await apiFetch(urlPath, init)
-      if (!r.ok) throw new Error(await parseCallError(r))
+      const dispatch = async () => {
+        requireContext()
+        return decodeOperationDispatch(await apiFetch(urlPath, init))
+      }
+      if (scope && expected) {
+        return requireResolvedOperationEffect(await executeOperationWithCanonicalReadback({
+          resolveBeforeDispatch: false,
+          dispatch,
+          resolveEffect: () => { requireContext(); return readHumanTaskCommandEffect(scope, expected) },
+        })).ref
+      }
+      await dispatch()
       const effect = resolveHumanTaskDecisionEffect(
         await fetchHumanTaskRows(),
         BigInt(organizationId),
@@ -259,7 +351,46 @@ export function useDecideHumanTask(organizationId: number) {
       if (!effect) throw new Error("Human task decision did not read back")
       return effect
     },
-    onSuccess: () => invalidateHumanTaskQueries(qc, organizationId),
+    onSettled: () => invalidateHumanTaskQueries(qc, organizationId),
+  })
+}
+
+export type ResubmitHumanTaskInput = {
+  companyId: number
+  taskId: number
+  expectedTaskRevision: number
+  expectedInstanceRevision: number
+  expectedSubjectRevisionHash: string
+  reason: string
+  attempt?: HumanTaskCommandAttempt
+}
+
+/** A new audited attempt; an uncertain response is reconciled without redispatch. */
+export function useResubmitHumanTask(organizationId: number, scope: WorkBoardScope) {
+  const qc = useQueryClient()
+  const requireContext = useHumanTaskContextGuard(organizationId, scope)
+  return useMutation<CanonicalRecordRef, Error, ResubmitHumanTaskInput>({
+    mutationFn: async (supplied) => {
+      const input = {
+        ...supplied,
+        reason: normalizeHumanTaskResubmissionReason(supplied.reason),
+        attempt: commandAttempt(supplied, "resubmit"),
+      }
+      const expected = await humanTaskResubmissionExpectation(scope, input)
+      requireContext()
+      const { attempt, ...reviewed } = input
+      const params = stdbParamsToJson({ ...reviewed, ...attempt }, "ResubmitWorkflowHumanTaskParams")
+      const { urlPath, init } = stdbBffCommandPost("resubmit_workflow_human_task", { params })
+      return requireResolvedOperationEffect(await executeOperationWithCanonicalReadback({
+        resolveBeforeDispatch: false,
+        dispatch: () => {
+          requireContext()
+          return apiFetch(urlPath, init).then(decodeOperationDispatch)
+        },
+        resolveEffect: () => { requireContext(); return readHumanTaskCommandEffect(scope, expected) },
+      })).ref
+    },
+    onSettled: () => invalidateHumanTaskQueries(qc, organizationId),
   })
 }
 
