@@ -30,11 +30,11 @@ import {
 import { Badge } from "@lumiere/ui/components/badge"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Skeleton } from "@lumiere/ui/components/skeleton"
+import { DatePicker } from "@lumiere/ui/components/date-picker"
 import { DashboardGrid, RankedBarList } from "@lumiere/ui"
 import {
   AlertCircle,
   Building2,
-  CalendarDays,
   Clock,
   Eye,
   FileText,
@@ -323,16 +323,7 @@ export function OwnerReportsPanel({
 
             <Field>
               <FieldLabel>{t("reports.ownerReports.dateLabel")}</FieldLabel>
-              <InputGroup>
-                <InputGroupAddon align="inline-start">
-                  <CalendarDays />
-                </InputGroupAddon>
-                <InputGroupInput
-                  type="date"
-                  value={date}
-                  onChange={(event) => setDate(event.target.value)}
-                />
-              </InputGroup>
+              <DatePicker value={date} onChange={setDate} />
             </Field>
 
             <Field>

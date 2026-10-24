@@ -2,7 +2,7 @@
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/ui/lib/module-data-state"
-import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { withDetailInlineEdits, withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
@@ -46,7 +46,7 @@ import { allocationOptionalColumns, mapAllocationRows } from "@lumiere/query-hoo
 import { HrOffboardingPanel } from "./hr-offboarding-panel"
 import { HrStatutoryIdsPanel } from "./hr-statutory-ids-panel"
 import type { QueryResourceState } from "@lumiere/api-client"
-import type { EntityAction, EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
+import type { EntityAction, EntityInlineEdit, EntityRecordSheetConfig, EntityViewConfig, FormConfig, HrCsvImportKind, ModuleConfig } from "@lumiere/ui"
 import type { QueryRows } from "@lumiere/query-hooks/http"
 import { hrModuleConfig } from "@/lib/module-dashboard-configs"
 import { useHrModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -719,6 +719,30 @@ function HrClientLoaded({
     [leaveAllocations, employees, leaveTypes],
   )
 
+  // The employee list and the employee record sheet edit the same fields with the same command.
+  const updateEmployeeAsync = updateEmployee.mutateAsync
+  const employeeInlineEdits = useMemo(
+    (): Record<string, EntityInlineEdit> => ({
+      name: {
+        kind: "text",
+        save: async (row, value) => {
+          const name = String(value).trim()
+          if (!name) throw new Error(t("hr.inlineEdit.nameRequired", { defaultValue: "An employee needs a name" }))
+          await updateEmployeeAsync({ employeeId: Number(row.id), params: { name } })
+        },
+      },
+      jobTitle: {
+        kind: "text",
+        save: async (row, value) => {
+          const jobTitle = String(value).trim()
+          if (!jobTitle) throw new Error(t("hr.inlineEdit.jobTitleRequired", { defaultValue: "Enter a job title" }))
+          await updateEmployeeAsync({ employeeId: Number(row.id), params: { jobTitle } })
+        },
+      },
+    }),
+    [t, updateEmployeeAsync],
+  )
+
   const employeeRecordSheet = useMemo((): EntityRecordSheetConfig => {
     const status = employeeStatusBadges(t)
     return {
@@ -726,7 +750,7 @@ function HrClientLoaded({
       statusKey: "employmentType",
       statusBadgeVariants: status.badgeVariants,
       statusBadgeLabels: status.badgeLabels,
-      detailConfig: employeeDetailConfig(t),
+      detailConfig: withDetailInlineEdits(employeeDetailConfig(t), employeeInlineEdits),
       auditTableName: "hr_employee",
       discussion: {},
       customTabs: [
@@ -791,6 +815,7 @@ function HrClientLoaded({
     t,
     orgId,
     operatingCompanyId,
+    employeeInlineEdits,
     offboardingQuery.data,
     offboardingQuery.isLoading,
     offboardingQuery.isError,
@@ -1435,24 +1460,7 @@ function HrClientLoaded({
           if (tab.id === "employees" && tab.entityConfig) {
             return {
               ...tab,
-              entityConfig: withInlineEdits(tab.entityConfig, {
-                name: {
-                  kind: "text",
-                  save: async (row, value) => {
-                    const name = String(value).trim()
-                    if (!name) throw new Error(t("hr.inlineEdit.nameRequired", { defaultValue: "An employee needs a name" }))
-                    await updateEmployee.mutateAsync({ employeeId: Number(row.id), params: { name } })
-                  },
-                },
-                jobTitle: {
-                  kind: "text",
-                  save: async (row, value) => {
-                    const jobTitle = String(value).trim()
-                    if (!jobTitle) throw new Error(t("hr.inlineEdit.jobTitleRequired", { defaultValue: "Enter a job title" }))
-                    await updateEmployee.mutateAsync({ employeeId: Number(row.id), params: { jobTitle } })
-                  },
-                },
-              }),
+              entityConfig: withInlineEdits(tab.entityConfig, employeeInlineEdits),
             }
           }
           return tab
@@ -1534,7 +1542,7 @@ function HrClientLoaded({
       buildEditJobPositionForm,
       buildEditContractForm,
       buildEditLeaveTypeForm,
-      updateEmployee,
+      employeeInlineEdits,
     ],
   )
 

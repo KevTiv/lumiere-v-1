@@ -35,6 +35,7 @@ import {
   serialDetailForm,
   lotDetailForm,
   newTraceabilityRecordForm,
+  newTraceabilityReportForm,
   newReplenishmentRuleForm,
   newPickingWaveForm,
   newProductCategoryForm,
@@ -319,6 +320,8 @@ import {
   documentRowsToSelectOptions,
   stockSerialRowsToSelectOptions,
   stockLotRowsToSelectOptions,
+  stockLocationRowsToSelectOptions,
+  warehouseRowsToSelectOptions,
   stockMoveRowsToSelectOptions,
 } from '@/lib/form-lookup';
 import {
@@ -812,6 +815,29 @@ function InventoryClientLoaded({
         locationDestId: transferFieldOptions.emptyLocs,
       }),
     [t, transferFieldOptions],
+  );
+
+  const traceabilityReportFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newTraceabilityReportForm(t), {
+        productIds: productSelectOptions,
+        lotIds: lotSelectOptions,
+        serialIds: serialSelectOptions,
+        locationIds: stockLocationRowsToSelectOptions(locations),
+        warehouseIds: warehouseRowsToSelectOptions(warehouses),
+        partnerIds: linkedRecordOptions(contacts, (contact) => contact.displayName ?? contact.name),
+        pickingTypeIds: transferFieldOptions.picking,
+      }),
+    [
+      t,
+      productSelectOptions,
+      lotSelectOptions,
+      serialSelectOptions,
+      locations,
+      warehouses,
+      contacts,
+      transferFieldOptions,
+    ],
   );
 
   const adjustmentFieldOptions = useMemo(() => {
@@ -4670,6 +4696,7 @@ function InventoryClientLoaded({
       if (tab.id === 'traceability-reports') {
         return {
           ...tab,
+          createForm: traceabilityReportFormConfig,
           entityConfig: {
             ...tab.entityConfig,
             view: {

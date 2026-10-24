@@ -480,12 +480,11 @@ export const logTimesheetForm = (t: TFunction): FormConfig => ({
         {
           id: "employeeCost",
           name: "employeeCost",
-          type: "number",
+          type: "money",
+          validation: { min: 0 },
           label: t("projects.forms.logTimesheet.fields.employeeCost"),
           placeholder: t("projects.forms.logTimesheet.fields.employeeCostPlaceholder"),
           width: "1/2",
-          step: 0.01,
-          min: 0,
           defaultValue: 0,
         },
         {
@@ -631,22 +630,20 @@ export const newProjectRateCardLineForm = (_t: TFunction): FormConfig => ({
         {
           id: "costRate",
           name: "costRate",
-          type: "number",
+          type: "money",
+          validation: { min: 0 },
           label: "Cost rate",
           required: true,
           width: "1/2",
-          step: 0.01,
-          min: 0,
         },
         {
           id: "sellRate",
           name: "sellRate",
-          type: "number",
+          type: "money",
+          validation: { min: 0 },
           label: "Sell rate",
           required: true,
           width: "1/2",
-          step: 0.01,
-          min: 0,
         },
         {
           id: "active",
@@ -732,12 +729,9 @@ export const newResourceAllocationForm = (_t: TFunction): FormConfig => ({
         {
           id: "allocationPercent",
           name: "allocationPercent",
-          type: "number",
+          type: "percent",
           label: "Percent (alt)",
           width: "1/2",
-          step: 1,
-          min: 0,
-          max: 100,
           defaultValue: 0,
         },
         {
@@ -813,7 +807,7 @@ export const newProjectMilestoneForm = (_t: TFunction): FormConfig => ({
         {
           id: "billAmount",
           name: "billAmount",
-          type: "number",
+          type: "money",
           label: "Bill amount",
           width: "1/2",
           defaultValue: 0,
@@ -821,7 +815,7 @@ export const newProjectMilestoneForm = (_t: TFunction): FormConfig => ({
         {
           id: "percentComplete",
           name: "percentComplete",
-          type: "number",
+          type: "percent",
           label: "% complete",
           width: "1/2",
           defaultValue: 0,
@@ -936,7 +930,7 @@ export const newProjectChangeOrderForm = (_t: TFunction): FormConfig => ({
         {
           id: "budgetDelta",
           name: "budgetDelta",
-          type: "number",
+          type: "money",
           label: "Budget delta",
           required: true,
           width: "1/2",
@@ -1008,7 +1002,7 @@ export const linkSubcontractorCostForm = (_t: TFunction): FormConfig => ({
         {
           id: "amount",
           name: "amount",
-          type: "number",
+          type: "money",
           label: "Amount",
           required: true,
           width: "1/2",

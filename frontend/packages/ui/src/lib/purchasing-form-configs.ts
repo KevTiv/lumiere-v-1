@@ -272,13 +272,13 @@ export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
         {
           id: "quantity",
           name: "quantity",
-          type: "number",
+          type: "quantity",
+          validation: { min: 0.0001 },
           label: t("purchasing.forms.newPurchaseRequisition.fields.quantity", {
             defaultValue: "Quantity",
           }),
           width: "1/4",
           required: true,
-          min: 0.0001,
         },
       ],
     },
@@ -334,7 +334,7 @@ export const addPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "quantity",
           name: "quantity",
-          type: "number",
+          type: "quantity",
           label: t("purchasing.forms.addPurchaseOrderLine.fields.quantity"),
           required: true,
           width: "1/2",
@@ -342,7 +342,7 @@ export const addPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "priceUnit",
           name: "priceUnit",
-          type: "number",
+          type: "money",
           label: t("purchasing.forms.addPurchaseOrderLine.fields.priceUnit"),
           required: true,
           width: "1/2",
@@ -375,7 +375,7 @@ export const receivePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "qty",
           name: "qty",
-          type: "number",
+          type: "quantity",
           label: t("purchasing.forms.receivePurchaseOrderLine.fields.qty"),
           required: true,
           width: "1/2",
@@ -418,7 +418,7 @@ export const invoicePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "qty",
           name: "qty",
-          type: "number",
+          type: "quantity",
           label: t("purchasing.forms.invoicePurchaseOrderLine.fields.qty"),
           required: true,
           width: "1/2",
@@ -469,7 +469,7 @@ export const editPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "quantity",
           name: "quantity",
-          type: "number",
+          type: "quantity",
           label: t("purchasing.forms.editPurchaseOrderLine.fields.quantity"),
           required: true,
           width: "1/2",
@@ -477,7 +477,7 @@ export const editPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "priceUnit",
           name: "priceUnit",
-          type: "number",
+          type: "money",
           label: t("purchasing.forms.editPurchaseOrderLine.fields.priceUnit"),
           required: true,
           width: "1/2",
@@ -645,7 +645,7 @@ export const newLandedCostForm = (t: TFunction): FormConfig => ({
         {
           id: "amountTotal",
           name: "amountTotal",
-          type: "number",
+          type: "money",
           label: t("purchasing.forms.newLandedCost.fields.amountTotal"),
           required: true,
           width: "1/2",
@@ -712,7 +712,7 @@ export const editLandedCostForm = (t: TFunction): FormConfig => ({
         {
           id: "amountTotal",
           name: "amountTotal",
-          type: "number",
+          type: "money",
           label: t("purchasing.forms.editLandedCost.fields.amountTotal"),
           width: "1/2",
         },
@@ -782,7 +782,7 @@ export const addLandedCostLineForm = (t: TFunction): FormConfig => ({
         {
           id: "priceUnit",
           name: "priceUnit",
-          type: "number",
+          type: "money",
           label: t("purchasing.forms.landedCostLine.fields.priceUnit"),
           required: true,
           width: "1/2",

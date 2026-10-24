@@ -312,7 +312,7 @@ export const leaveDetailConfig = (t: TFunction): EntityDetailConfig => ({
           type: "number",
           width: "1/2",
         },
-        { key: "notes", label: t("hr.forms.newLeaveRequest.fields.notes"), width: "full" },
+        { key: "notes", type: "markdown", label: t("hr.forms.newLeaveRequest.fields.notes"), width: "full" },
       ],
     },
   ],
@@ -682,7 +682,7 @@ export const onboardingTemplatesTableConfig = (t: TFunction): EntityViewConfig =
     searchKeys: ["name", "description"],
     columns: [
       { key: "name", label: "Name", width: "min-w-40", sortable: true },
-      { key: "description", label: "Description", width: "min-w-48" },
+      { key: "description", type: "markdown", label: "Description", width: "min-w-48" },
       { key: "active", label: "Active", type: "boolean", width: "min-w-20" },
       { key: "companyId", label: "Company", width: "min-w-24" },
     ],
@@ -787,7 +787,7 @@ export const benefitPlansTableConfig = (t: TFunction): EntityViewConfig => ({
     columns: [
       { key: "name", label: "Name", width: "min-w-40", sortable: true },
       { key: "planType", label: "Type", width: "min-w-24" },
-      { key: "description", label: "Description", width: "min-w-48" },
+      { key: "description", type: "markdown", label: "Description", width: "min-w-48" },
       { key: "active", label: "Active", type: "boolean", width: "min-w-20" },
     ],
     emptyMessage: "No benefit plans — create a plan to enroll employees.",

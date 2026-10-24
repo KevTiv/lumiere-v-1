@@ -762,7 +762,7 @@ function DocumentsClientLoaded({
                       { key: "mimetype", label: t("documents.documents.columns.mimetype") },
                       { key: "fileSize", label: t("documents.documents.columns.fileSize"), render: (value: unknown) => formatFileSize(value) },
                       { key: "resName", label: "Attached to" },
-                      { key: "description", label: "Description" },
+                      { key: "description", type: "markdown" as const, label: "Description" },
                     ],
                   },
                 ],

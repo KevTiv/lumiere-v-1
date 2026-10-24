@@ -198,7 +198,7 @@ function CalendarEventPageLoaded({
           { key: 'recurrency', label: t('calendar.events.columns.recurrency'), type: 'boolean' as const },
           { key: 'rrule', label: t('calendar.eventDetail.rrule', { defaultValue: 'Recurrence rule' }) },
           { key: 'rruleType', label: t('calendar.eventDetail.rruleType', { defaultValue: 'Recurrence type' }) },
-          { key: 'description', label: t('calendar.forms.newEvent.fields.description', { defaultValue: 'Description' }) },
+          { key: 'description', type: 'markdown' as const, label: t('calendar.forms.newEvent.fields.description', { defaultValue: 'Description' }) },
         ],
       },
     ],

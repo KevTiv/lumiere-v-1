@@ -19,6 +19,7 @@ import type { Timestamp } from "spacetimedb"
 import { nullableBigIntU64, optionalBigIntU64, optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
+import { parseU64IdList } from "@/lib/id-list"
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
 
@@ -276,15 +277,6 @@ export function salesParamsToJson(
   return stdbParamsToJson(params)
 }
 
-function parseU64IdList(raw: unknown): bigint[] {
-  if (raw == null || String(raw).trim() === '') return []
-  return String(raw)
-    .split(/[,\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((p) => BigInt(p))
-}
-
 export function toCreateSaleOrderLineParams(
   formData: Record<string, unknown>,
 ): CreateSaleOrderLineParams | null {
@@ -374,7 +366,7 @@ function isWaveFromForm(raw: unknown): boolean {
   return PICKING_BATCH_DEFAULT_IS_WAVE
 }
 
-/** Comma- or whitespace-separated stock picking IDs -> `create_picking_batch` params. */
+/** Picked stock picking IDs (or the older comma-separated text) -> `create_picking_batch` params. */
 export function toCreatePickingBatchParams(
   formData: Record<string, unknown>,
 ): CreatePickingBatchParams | null {
@@ -383,14 +375,7 @@ export function toCreatePickingBatchParams(
   const raw = formData.pickingIds
   return {
     name,
-    pickingIds:
-      raw == null || String(raw).trim() === ''
-        ? []
-        : String(raw)
-            .split(/[,\s]+/)
-            .map((s) => s.trim())
-            .filter(Boolean)
-            .map((p) => BigInt(p)),
+    pickingIds: parseU64IdList(raw),
     isWave: isWaveFromForm(formData.isWave),
   } as CreatePickingBatchParams
 }

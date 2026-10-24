@@ -19,6 +19,7 @@ import type {
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
+import { parseU64IdList } from "@/lib/id-list"
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
 
@@ -30,14 +31,7 @@ function timestampFromInput(v: unknown, fallback = new Date()): Timestamp {
   return stbTimestampFromDate(fallback)
 }
 
-function parseU64List(v: unknown): bigint[] {
-  if (v == null || String(v).trim() === '') return []
-  return String(v)
-    .split(/[,;\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((s) => BigInt(s))
-}
+const parseU64List = parseU64IdList
 
 export function buildCreateDeferredRevenueScheduleParams(
   formData: Record<string, unknown>,

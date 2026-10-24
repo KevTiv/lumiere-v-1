@@ -47,7 +47,7 @@ export const newProposalForm = (t: TFunction): FormConfig => ({
         {
           id: "value",
           name: "value",
-          type: "number",
+          type: "money",
           label: t("proposals.forms.newProposal.fields.value"),
           placeholder: "0.00",
           width: "1/2",
@@ -110,7 +110,7 @@ export const editProposalForm = (t: TFunction): FormConfig => ({
         {
           id: "value",
           name: "value",
-          type: "number",
+          type: "money",
           label: t("proposals.forms.newProposal.fields.value"),
           width: "1/2",
         },

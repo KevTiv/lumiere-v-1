@@ -198,26 +198,22 @@ const taskStateForm: FormConfig = {
   ],
 }
 
-const assignUsersForm = (userOptions: Array<{ value: string; label: string }>): FormConfig => ({
+const assignUsersForm = (userOptions: Array<{ value: string; label: string; disabled?: boolean }>): FormConfig => ({
   id: "projects-assign-task-users",
   title: "Assign Task Users",
   submitLabel: "Assign users",
-  description:
-    userOptions.length > 0
-      ? `Available users: ${userOptions.map((o) => `${o.label} (${o.value})`).slice(0, 5).join(", ")}${userOptions.length > 5 ? "…" : ""}`
-      : undefined,
   sections: [
     {
       id: "users",
       fields: [
         {
           id: "user-ids",
-          type: "textarea",
+          type: "multiselect",
           name: "userIds",
-          label: "User IDs, one per line",
+          label: "Users",
           required: true,
-          rows: 4,
           width: "full",
+          options: userOptions,
         },
       ],
     },
@@ -276,11 +272,10 @@ function selectedIds(rows: Record<string, unknown>[]): Array<string | number | b
     .filter((id): id is string | number | bigint => id != null && String(id).trim() !== "")
 }
 
+/** Picked ids (`string[]`) or the older one-id-per-line text. */
 function idLines(value: unknown): Array<string | number | bigint> {
-  return String(value ?? "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
+  const lines = Array.isArray(value) ? value.map((item) => String(item ?? "")) : String(value ?? "").split(/\r?\n/)
+  return lines.map((line) => line.trim()).filter(Boolean)
 }
 
 function timesheetStatus(row: Record<string, unknown>): string {

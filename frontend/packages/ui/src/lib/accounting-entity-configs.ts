@@ -457,7 +457,7 @@ export const paymentTermsTableConfig = (t: TFunction): EntityViewConfig => ({
     columns: [
       { key: "name", label: t("accounting.entities.paymentTerms.columns.name"), width: "min-w-40" },
       { key: "isActive", label: t("accounting.entities.paymentTerms.columns.isActive"), type: "boolean", align: "center" },
-      { key: "note", label: t("accounting.entities.paymentTerms.columns.note"), width: "min-w-48" },
+      { key: "note", type: "markdown", label: t("accounting.entities.paymentTerms.columns.note"), width: "min-w-48" },
     ],
     emptyMessage: t("accounting.entities.paymentTerms.emptyMessage"),
   },
@@ -1050,7 +1050,7 @@ export const partnerCreditControlsTableConfig = (t: TFunction): EntityViewConfig
         align: "center",
         width: "min-w-24",
       },
-      { key: "notes", label: t("accounting.creditControl.colNotes"), width: "min-w-40" },
+      { key: "notes", type: "markdown", label: t("accounting.creditControl.colNotes"), width: "min-w-40" },
     ],
     emptyMessage: t("accounting.creditControl.listEmpty"),
   },
@@ -1076,7 +1076,7 @@ export const amortizationSchedulesTableConfig = (t: TFunction): EntityViewConfig
           prepaid: t("accounting.amortization.kind.prepaid"),
         },
       },
-      { key: "description", label: t("accounting.amortization.colDescription"), width: "min-w-48" },
+      { key: "description", type: "markdown", label: t("accounting.amortization.colDescription"), width: "min-w-48" },
       {
         key: "totalAmount",
         label: t("accounting.amortization.colTotal"),

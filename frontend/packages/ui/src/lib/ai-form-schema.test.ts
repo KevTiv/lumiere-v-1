@@ -58,4 +58,21 @@ describe("serializeAiFormSchema", () => {
       },
     ])
   })
+
+  it("describes money, percent and quantity as numbers with their default bounds", () => {
+    const config: FormConfig = {
+      id: "deal", title: "Deal",
+      sections: [{ id: "main", fields: [
+        { id: "revenue", name: "revenue", type: "money", currency: "USD" },
+        { id: "probability", name: "probability", type: "percent" },
+        { id: "qty", name: "qty", type: "quantity", validation: { max: 10 } },
+      ] }],
+    }
+
+    expect(serializeAiFormSchema(config)).toEqual([
+      { name: "revenue", label: undefined, type: "number", required: false },
+      { name: "probability", label: undefined, type: "number", required: false, validation: { min: 0, max: 100 } },
+      { name: "qty", label: undefined, type: "number", required: false, validation: { min: 0, max: 10 } },
+    ])
+  })
 })
