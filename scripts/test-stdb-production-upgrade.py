@@ -2,6 +2,7 @@
 """Prove that the production module can upgrade populated pre-release tables."""
 
 import json
+import os
 from pathlib import Path
 import socket
 import subprocess
@@ -48,7 +49,8 @@ def main():
          "--locked", "--release", "--target", "wasm32-unknown-unknown"],
         check=True,
     )
-    baseline = FIXTURE / "target/wasm32-unknown-unknown/release/lumiere_upgrade_baseline.wasm"
+    target = Path(os.environ.get("CARGO_TARGET_DIR", FIXTURE / "target")).resolve()
+    baseline = target / "wasm32-unknown-unknown/release/lumiere_upgrade_baseline.wasm"
     with tempfile.TemporaryDirectory(prefix="lumiere-upgrade-") as directory:
         temp = Path(directory)
         with socket.socket() as listener:
@@ -110,6 +112,9 @@ def main():
                 acceptance = query("SELECT acceptance_status FROM country_pack_definition")
                 if "legacy_enabled" not in json.dumps(acceptance):
                     raise RuntimeError("country pack migration did not retain the legacy acceptance gate")
+                embeddings = query("SELECT expected_fingerprint, index_generation FROM search_embedding")
+                if embeddings != [["", "legacy-unverified"]]:
+                    raise RuntimeError("legacy embedding did not receive fail-closed canonical defaults")
                 print("Production schema upgrade passed with data deletion disabled")
             except Exception as error:
                 if isinstance(error, subprocess.CalledProcessError):

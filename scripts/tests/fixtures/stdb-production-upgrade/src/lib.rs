@@ -153,6 +153,115 @@ pub struct CompanyCountryPack {
     pub updated_by: spacetimedb::Identity,
 }
 
+#[spacetimedb::table(
+    accessor = document,
+    public,
+    index(accessor = document_by_org, btree(columns = [organization_id])),
+    index(name = "by_folder", accessor = document_by_folder, btree(columns = [folder_id])),
+    index(accessor = document_by_owner, btree(columns = [owner_id])),
+    index(accessor = document_by_company, btree(columns = [company_id]))
+)]
+pub struct Document {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    pub organization_id: u64, // Tenant isolation
+    pub name: String,
+    pub description: Option<String>,
+    pub file_name: String,
+    pub file_size: u64,
+    pub mimetype: String,
+    pub checksum: Option<String>,
+    /// Legacy wire-compatibility slot. New rows leave this empty; AI text lives
+    /// in `ai_evidence_passage`. Retain existing values until an audited retirement.
+    pub index_content: Option<String>,
+    /// Analyzer/locale hint for FTS (from country pack or explicit index).
+    pub index_language: Option<String>,
+    pub access_token: Option<String>,
+    pub url: Option<String>,
+    pub res_model: Option<String>,
+    pub res_id: Option<u64>,
+    pub res_name: Option<String>,
+    pub partner_id: Option<u64>,
+    pub owner_id: Identity,
+    pub company_id: Option<u64>, // ERP company entity scope (within org)
+    pub folder_id: Option<u64>,
+    pub tag_ids: Vec<u64>,
+    pub is_locked: bool,
+    pub locked_by: Option<Identity>,
+    pub locked_at: Option<Timestamp>,
+    /// When set, lock auto-expires at this timestamp (optional lease TTL).
+    pub locked_until: Option<Timestamp>,
+    pub is_favorite: bool,
+    pub is_shared: bool,
+    pub share_link: Option<String>,
+    pub share_expires: Option<Timestamp>,
+    pub is_deleted: bool,
+    pub deleted_at: Option<Timestamp>,
+    pub deleted_by: Option<Identity>,
+    /// Link to `data_classification` for retention policy.
+    pub classification_id: Option<u64>,
+    pub retention_days: Option<u32>,
+    /// When set and in the past, soft-deleted docs are eligible for hard purge.
+    pub purge_after: Option<Timestamp>,
+    /// Pack-aware fiscal archive kind (`nfe_xml`, `myinvois_xml`, …).
+    pub fiscal_kind: Option<String>,
+    /// Object-store residency tag inherited from folder/pack/upload.
+    pub residency_region: Option<String>,
+    pub version_count: u32,
+    pub current_version_id: Option<u64>,
+    pub download_count: u32,
+    pub last_viewed_at: Option<Timestamp>,
+    pub last_viewed_by: Option<Identity>,
+    pub activity_ids: Vec<u64>,
+    pub message_follower_ids: Vec<u64>,
+    pub message_ids: Vec<u64>,
+    pub create_uid: Identity,
+    pub create_date: Timestamp,
+    pub write_uid: Identity,
+    pub write_date: Timestamp,
+    pub metadata: Option<String>,
+}
+
+#[spacetimedb::table(
+    accessor = search_embedding,
+    public,
+    index(name = "by_content", accessor = embedding_by_content, btree(columns = [content_type])),
+    index(accessor = embedding_by_org, btree(columns = [organization_id])),
+    index(accessor = embedding_by_company, btree(columns = [company_id])),
+    index(name = "by_sync_status", accessor = embedding_by_sync_status, btree(columns = [sync_status]))
+)]
+pub struct SearchEmbedding {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+
+    pub organization_id: u64, // AI-003: Tenant isolation
+    pub content_type: String,
+    pub content_id: u64,
+    /// Legacy wire-compatibility slots. New rows contain no copied text or vectors.
+    /// Existing payloads are not used as canonical evidence and require an audited retirement.
+    pub text: String,
+    pub embedding: Vec<f32>,
+    pub embedding_hash: Option<String>,
+
+    // Qdrant sync tracking
+    pub sync_status: String, // "pending" | "synced" | "failed" | "deleted"
+    pub vector_db_id: Option<String>, // Qdrant point ID (stringified STDB id)
+    pub embedding_model: Option<String>, // e.g. "voyage-3", "text-embedding-3-small"
+    pub embedding_dim: Option<u32>, // e.g. 1024, 1536 — for model migration tracking
+    pub last_synced_at: Option<Timestamp>,
+    pub sync_error: Option<String>, // Last sync error message
+
+    pub company_id: Option<u64>,
+    pub create_uid: Identity,
+    pub create_date: Timestamp,
+    pub write_uid: Identity,
+    pub write_date: Timestamp,
+    pub metadata: Option<String>,
+}
+
 #[spacetimedb::reducer(init)]
 pub fn init(ctx: &ReducerContext) {
     ctx.db.account_payment().insert(AccountPayment {
@@ -233,5 +342,78 @@ pub fn init(ctx: &ReducerContext) {
         activated_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         updated_by: ctx.sender(),
+    });
+
+    ctx.db.document().insert(Document {
+        id: 42,
+        organization_id: 42,
+        name: "legacy-name".to_string(),
+        description: Some("legacy-description".to_string()),
+        file_name: "legacy-file_name".to_string(),
+        file_size: 42,
+        mimetype: "legacy-mimetype".to_string(),
+        checksum: Some("legacy-checksum".to_string()),
+        index_content: Some("legacy-index_content".to_string()),
+        index_language: Some("legacy-index_language".to_string()),
+        access_token: Some("legacy-access_token".to_string()),
+        url: Some("legacy-url".to_string()),
+        res_model: Some("legacy-res_model".to_string()),
+        res_id: Some(17),
+        res_name: Some("legacy-res_name".to_string()),
+        partner_id: Some(17),
+        owner_id: ctx.sender(),
+        company_id: Some(17),
+        folder_id: Some(17),
+        tag_ids: vec![12, 13],
+        is_locked: true,
+        locked_by: Some(ctx.sender()),
+        locked_at: Some(ctx.timestamp),
+        locked_until: Some(ctx.timestamp),
+        is_favorite: true,
+        is_shared: true,
+        share_link: Some("legacy-share_link".to_string()),
+        share_expires: Some(ctx.timestamp),
+        is_deleted: true,
+        deleted_at: Some(ctx.timestamp),
+        deleted_by: Some(ctx.sender()),
+        classification_id: Some(17),
+        retention_days: Some(13),
+        purge_after: Some(ctx.timestamp),
+        fiscal_kind: Some("legacy-fiscal_kind".to_string()),
+        residency_region: Some("legacy-residency_region".to_string()),
+        version_count: 7,
+        current_version_id: Some(17),
+        download_count: 7,
+        last_viewed_at: Some(ctx.timestamp),
+        last_viewed_by: Some(ctx.sender()),
+        activity_ids: vec![12, 13],
+        message_follower_ids: vec![12, 13],
+        message_ids: vec![12, 13],
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: Some("legacy-metadata".to_string()),
+    });
+    ctx.db.search_embedding().insert(SearchEmbedding {
+        id: 42,
+        organization_id: 42,
+        content_type: "legacy-content_type".to_string(),
+        content_id: 42,
+        text: "legacy-text".to_string(),
+        embedding: vec![0.125, 0.5],
+        embedding_hash: Some("legacy-embedding_hash".to_string()),
+        sync_status: "legacy-sync_status".to_string(),
+        vector_db_id: Some("legacy-vector_db_id".to_string()),
+        embedding_model: Some("legacy-embedding_model".to_string()),
+        embedding_dim: Some(13),
+        last_synced_at: Some(ctx.timestamp),
+        sync_error: Some("legacy-sync_error".to_string()),
+        company_id: Some(17),
+        create_uid: ctx.sender(),
+        create_date: ctx.timestamp,
+        write_uid: ctx.sender(),
+        write_date: ctx.timestamp,
+        metadata: Some("legacy-metadata".to_string()),
     });
 }
