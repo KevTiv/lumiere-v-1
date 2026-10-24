@@ -90,7 +90,11 @@ the real graph and exact fixture output, source mismatch, independence from
 expected output, foreign tenant and company data, live-agent binding, policy
 limit drift, transcript mismatch/leftovers, forged passage text hash, and a
 claimless generated answer held for review. The normal readiness test now uses
-the actual compiled source hash and rejects a stale hash.
+the actual compiled source hash and rejects a stale hash. Development-only
+seeded releases for the three source-bound adapters use the same compiled
+hashes. The seed module's WASM-target check and focused seed formatting check
+passed. A full module formatting check reports existing differences outside
+this change; those files were not edited.
 
 These are local code/fixture checks. The new commit still needs hosted checks,
 the exact immutable runtime image and ordered deployment, a real worker

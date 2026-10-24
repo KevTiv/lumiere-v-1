@@ -642,10 +642,16 @@ fn seed_active_release_for_skill(
         return;
     }
 
-    let hash = source_hash_char.to_string().repeat(64);
     let skill_key = skill.skill_key.as_str();
+    // Development fixture only. Keep exact adapter bindings aligned with
+    // `gateway certification-bundles`; these rows are not production certificates.
+    let source_hash = if skill_key == "report_analysis" {
+        "sha256:61a80f786acc7f08b12a750ccdb3a300c4d831d3b96a3cc35977f20277fdc696".to_string()
+    } else {
+        format!("sha256:{}", source_hash_char.to_string().repeat(64))
+    };
     let manifest_json = format!(
-        r#"{{"limits":{{"max_steps":8,"max_tool_calls":12}},"output_types":["{output_type}"],"permissions":["report:read"],"resources":["{resource}"],"risk":"green","schema_version":1,"skill_key":"{skill_key}","source_hash":"sha256:{hash}","version":"1.0.0"}}"#,
+        r#"{{"limits":{{"max_steps":8,"max_tool_calls":12}},"output_types":["{output_type}"],"permissions":["report:read"],"resources":["{resource}"],"risk":"green","schema_version":1,"skill_key":"{skill_key}","source_hash":"{source_hash}","version":"1.0.0"}}"#,
     );
     let version = ctx.db.ai_skill_version().insert(AiSkillVersion {
         id: 0,
@@ -656,7 +662,7 @@ fn seed_active_release_for_skill(
         version: "1.0.0".to_string(),
         manifest_schema_version: 1,
         manifest_json,
-        source_hash: format!("sha256:{hash}"),
+        source_hash,
         risk: AiSkillRisk::Green,
         max_steps: 8,
         max_tool_calls: 12,
@@ -8190,7 +8196,7 @@ Prioritize high-severity findings and cite related records."#,
     );
 
     let report_composer_source_hash =
-        "sha256:e0dd18d042e585ae5dbb7ee37064b24506b126b024fabe80b449a74232d28add";
+        "sha256:c94724332d82909ac2e46e79dee3784b18bb7236a01cc663093c973d3bf154aa";
     let report_composer_manifest = format!(
         r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["reports.daily_business_summary.summary.v1"],"permissions":["report:read"],"resources":["reports.daily_business_summary.v1"],"risk":"green","schema_version":1,"skill_key":"report_composer","source_hash":"{report_composer_source_hash}","version":"1.0.0"}}"#
     );
@@ -8351,7 +8357,7 @@ Prioritize high-severity findings and cite related records."#,
     );
 
     let low_stock_source_hash =
-        "sha256:3317b1a5bd83c522f3c5f020965cf2959fcc629d38a75c40034cd31756be13b3";
+        "sha256:ff2a8646b891a17be112434ffabd3b44e61f91e0682675301c16050b4f6fd520";
     let low_stock_manifest = format!(
         r#"{{"limits":{{"max_steps":1,"max_tool_calls":1}},"output_types":["inventory.low_stock.result.v1"],"permissions":["inventory:read"],"resources":["inventory.low_stock.v1"],"risk":"green","schema_version":1,"skill_key":"low_stock","source_hash":"{low_stock_source_hash}","version":"1.0.0"}}"#
     );
