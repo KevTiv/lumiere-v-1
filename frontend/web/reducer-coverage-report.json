@@ -1,17 +1,21 @@
 {
-  "totalRustReducers": 1212,
-  "productRustReducers": 1114,
-  "totalWebReducers": 867,
+  "totalRustReducers": 1226,
+  "productRustReducers": 1128,
+  "totalWebReducers": 865,
   "missingFromWeb": [
+    "abandon_bank_statement_settlement",
     "accept_ai_provider_attempt",
+    "accept_user_invite",
     "activate_pos_config",
     "add_helpdesk_team_member",
     "add_purchase_rfq_line",
     "add_subscription_bundle_item",
     "advance_ai_run_checkpoint",
+    "allocate_payment_transaction",
     "answer_proposal_clarification",
     "append_ai_agent_run_step",
     "apply_global_migrations",
+    "apply_historical_payment_allocations",
     "apply_hr_integration_intent",
     "apply_index_linked_renewal",
     "apply_org_migrations",
@@ -57,6 +61,8 @@
     "claim_ai_skill_certification",
     "claim_hub_with_token",
     "claim_queue_job",
+    "claim_reviewed_mail_delivery",
+    "cleanup_abandoned_account_move_import",
     "cleanup_stale_proposal_presence",
     "clear_document_presence",
     "clear_inventory_audit_violations",
@@ -108,6 +114,8 @@
     "create_hr_skill",
     "create_incoterm",
     "create_loss_category",
+    "create_manual_account_invoice",
+    "create_manual_invoice",
     "create_operational_message",
     "create_project_revenue_line",
     "create_project_revenue_schedule",
@@ -115,6 +123,8 @@
     "create_proposal_clarification",
     "create_proposal_clause",
     "create_public_holiday",
+    "create_purchase_order",
+    "create_purchase_order_once",
     "create_sale_order_option",
     "create_sale_promotion",
     "create_statutory_id",
@@ -152,6 +162,7 @@
     "fail_scheduled_owner_report_run",
     "fail_subscription_payment_intent",
     "fail_workorder_quality_check",
+    "finalize_embedding_job",
     "finalize_pos_order_archive",
     "finish_manufacturing_order_with_tracking",
     "fork_ai_run_checked",
@@ -186,6 +197,7 @@
     "rebase_deferred_schedules_for_subscription",
     "rebuild_manufacturing_associations",
     "receive_crm_provider_message",
+    "receive_po_line_once",
     "recognize_project_revenue",
     "recompute_workflow_timers_for_calendar",
     "reconcile_ai_provider_attempt",
@@ -221,6 +233,7 @@
     "record_whatsapp_health_check",
     "record_whatsapp_message_sent",
     "record_workflow_outbox_result",
+    "recover_ai_provider_attempt",
     "refresh_policy_snapshot",
     "refresh_project_margin",
     "refresh_resource_capacity",
@@ -243,8 +256,10 @@
     "reset_account_move_to_draft",
     "resolve_ai_evidence_dependency",
     "resolve_inventory_audit_violation",
+    "resubmit_bank_statement_settlement",
     "resume_ai_run_checked",
     "retry_dead_letter_queue_job",
+    "reverse_bank_statement_settlement",
     "review_ai_artifact_component_links",
     "review_ai_evidence_claim",
     "review_ai_evidence_decision",
@@ -294,10 +309,12 @@
     "set_form_field_label",
     "set_google_drive_conflict_policy",
     "set_helpdesk_related_record",
+    "set_member_access",
     "set_whatsapp_primary_account",
     "set_workflow_candidate_group_member",
     "settle_ai_spend",
     "stage_ai_workflow_node_provenance",
+    "stage_bank_statement_import",
     "steer_ai_run",
     "submit_purchase_requisition",
     "sync_external_file_to_document",
@@ -307,7 +324,6 @@
     "update_account_tax",
     "update_ai_chat_session_title",
     "update_billing_account",
-    "update_document_template",
     "update_fleet_vehicle_details",
     "update_google_drive_connection",
     "update_hr_employee_skill",
@@ -351,16 +367,16 @@
   ],
   "coverageModel": "matrix-hook-ui",
   "matrixStatusSummary": {
-    "backend-only": 167,
-    "reachable-ui": 862,
-    "command-only": 120,
-    "future-disabled": 33,
+    "backend-only": 175,
+    "reachable-ui": 860,
+    "future-disabled": 34,
+    "command-only": 127,
     "internal-intentional": 19,
     "api-only-intentional": 11
   },
   "matrixClassificationSummary": {
-    "user-facing": 1047,
-    "admin": 77,
+    "user-facing": 1059,
+    "admin": 79,
     "internal/background": 20,
     "dev-only": 7,
     "import": 61
@@ -394,6 +410,9 @@
         "delete_account_reconciliation_widget",
         "apply_reconciliation_rules",
         "match_bank_line",
+        "abandon_bank_statement_settlement",
+        "resubmit_bank_statement_settlement",
+        "reverse_bank_statement_settlement",
         "create_crossovered_budget",
         "update_crossovered_budget",
         "create_budget_line",
@@ -455,6 +474,7 @@
         "run_fx_revaluation",
         "run_fx_revaluation_batch",
         "post_realized_fx_gain_loss",
+        "apply_historical_payment_allocations",
         "create_intercompany_rule",
         "update_intercompany_rule",
         "delete_intercompany_rule",
@@ -470,6 +490,7 @@
         "compute_invoice_totals",
         "post_invoice",
         "create_account_move",
+        "create_manual_invoice",
         "add_account_move_line",
         "post_account_move",
         "cancel_account_move",
@@ -481,6 +502,7 @@
         "create_credit_note_from_invoice",
         "reconcile_payment_with_invoice",
         "bill_project_milestone",
+        "create_manual_account_invoice",
         "run_accounting_ownership_backfill",
         "validate_accounting_ownership_backfill",
         "create_payment_account",
@@ -534,7 +556,6 @@
       ],
       "web": [
         "add_account_move_line",
-        "allocate_payment_transaction",
         "apply_reconciliation_rules",
         "approve_bank_statement_import",
         "approve_intercompany_transaction",
@@ -640,7 +661,6 @@
         "set_consolidation_company_rate",
         "set_intercompany_rule_active",
         "setup_fiscal_calendar",
-        "stage_bank_statement_import",
         "unmatch_elimination_entry",
         "unreconciled_account_bank_statement_line",
         "update_account_account",
@@ -676,18 +696,26 @@
         "waive_tax_deadline"
       ],
       "missing": [
+        "stage_bank_statement_import",
+        "abandon_bank_statement_settlement",
+        "resubmit_bank_statement_settlement",
+        "reverse_bank_statement_settlement",
         "create_account_account",
         "backfill_consolidation_organization_ownership",
         "backfill_fiscal_period_organization_ownership",
         "backfill_fixed_asset_organization_ownership",
+        "apply_historical_payment_allocations",
         "backfill_intercompany_organization_ownership",
+        "create_manual_invoice",
         "reset_account_move_to_draft",
         "bill_project_milestone",
+        "create_manual_account_invoice",
         "run_accounting_ownership_backfill",
         "validate_accounting_ownership_backfill",
         "update_payment_account",
         "archive_payment_account",
         "update_payment_transaction",
+        "allocate_payment_transaction",
         "unregister_payment_allocations",
         "create_account_tax",
         "update_account_tax",
@@ -699,7 +727,7 @@
         "create_subscription_tax_settle_intent",
         "apply_subscription_tax_settle_intent"
       ],
-      "coverage": 87,
+      "coverage": 82,
       "productReducers": [
         "create_amortization_schedule",
         "recognize_amortization_line",
@@ -727,6 +755,9 @@
         "delete_account_reconciliation_widget",
         "apply_reconciliation_rules",
         "match_bank_line",
+        "abandon_bank_statement_settlement",
+        "resubmit_bank_statement_settlement",
+        "reverse_bank_statement_settlement",
         "create_crossovered_budget",
         "update_crossovered_budget",
         "create_budget_line",
@@ -788,6 +819,7 @@
         "run_fx_revaluation",
         "run_fx_revaluation_batch",
         "post_realized_fx_gain_loss",
+        "apply_historical_payment_allocations",
         "create_intercompany_rule",
         "update_intercompany_rule",
         "delete_intercompany_rule",
@@ -803,6 +835,7 @@
         "compute_invoice_totals",
         "post_invoice",
         "create_account_move",
+        "create_manual_invoice",
         "add_account_move_line",
         "post_account_move",
         "cancel_account_move",
@@ -814,6 +847,7 @@
         "create_credit_note_from_invoice",
         "reconcile_payment_with_invoice",
         "bill_project_milestone",
+        "create_manual_account_invoice",
         "run_accounting_ownership_backfill",
         "validate_accounting_ownership_backfill",
         "create_payment_account",
@@ -860,7 +894,7 @@
         "create_subscription_tax_settle_intent",
         "apply_subscription_tax_settle_intent"
       ],
-      "productCoverage": 87
+      "productCoverage": 82
     },
     "reports": {
       "rust": [
@@ -1165,6 +1199,7 @@
         "dismiss_insight",
         "upsert_search_embedding",
         "mark_embedding_synced",
+        "finalize_embedding_job",
         "delete_search_embedding",
         "request_embedding_job",
         "register_ai_model_profile",
@@ -1215,6 +1250,7 @@
         "accept_ai_provider_attempt",
         "mark_ai_provider_attempt_dispatched",
         "record_ai_provider_attempt_result",
+        "recover_ai_provider_attempt",
         "begin_ai_workflow_generation",
         "stage_ai_workflow_node_provenance"
       ],
@@ -1292,6 +1328,7 @@
         "set_ai_evidence_passage_status",
         "upsert_search_embedding",
         "mark_embedding_synced",
+        "finalize_embedding_job",
         "delete_search_embedding",
         "request_embedding_job",
         "register_ai_model_profile",
@@ -1328,10 +1365,11 @@
         "accept_ai_provider_attempt",
         "mark_ai_provider_attempt_dispatched",
         "record_ai_provider_attempt_result",
+        "recover_ai_provider_attempt",
         "begin_ai_workflow_generation",
         "stage_ai_workflow_node_provenance"
       ],
-      "coverage": 25,
+      "coverage": 24,
       "productReducers": [
         "create_ai_action_draft",
         "create_ai_run_action_draft",
@@ -1388,6 +1426,7 @@
         "set_ai_evidence_passage_status",
         "create_ai_insight",
         "dismiss_insight",
+        "finalize_embedding_job",
         "register_ai_model_profile",
         "set_ai_model_profile_active",
         "register_ai_intelligence_policy",
@@ -1436,10 +1475,11 @@
         "accept_ai_provider_attempt",
         "mark_ai_provider_attempt_dispatched",
         "record_ai_provider_attempt_result",
+        "recover_ai_provider_attempt",
         "begin_ai_workflow_generation",
         "stage_ai_workflow_node_provenance"
       ],
-      "productCoverage": 26
+      "productCoverage": 25
     },
     "auth": {
       "rust": [
@@ -1455,6 +1495,7 @@
         "mark_password_reset_token_projection_used",
         "create_user_invite",
         "mark_invite_accepted",
+        "accept_user_invite",
         "update_user_email",
         "apply_org_migrations",
         "create_role",
@@ -1515,6 +1556,7 @@
         "bind_password_reset_token",
         "mark_password_reset_token_projection_used",
         "mark_invite_accepted",
+        "accept_user_invite",
         "update_user_email",
         "apply_org_migrations",
         "update_user_profile",
@@ -1524,7 +1566,7 @@
         "clear_inventory_audit_violations",
         "resolve_inventory_audit_violation"
       ],
-      "coverage": 58,
+      "coverage": 56,
       "productReducers": [
         "set_ai_capability_role_grant",
         "log_audit_event",
@@ -1537,6 +1579,7 @@
         "mark_password_reset_token_projection_used",
         "create_user_invite",
         "mark_invite_accepted",
+        "accept_user_invite",
         "update_user_email",
         "apply_org_migrations",
         "create_role",
@@ -1562,11 +1605,12 @@
         "resolve_inventory_audit_violation",
         "assign_user_to_picking"
       ],
-      "productCoverage": 57
+      "productCoverage": 56
     },
     "settings": {
       "rust": [
         "archive_ai_chat_session",
+        "set_member_access",
         "create_billing_account",
         "update_billing_account",
         "set_billing_status",
@@ -1642,6 +1686,7 @@
       ],
       "missing": [
         "archive_ai_chat_session",
+        "set_member_access",
         "create_billing_account",
         "update_billing_account",
         "set_billing_status",
@@ -1669,9 +1714,10 @@
         "set_whatsapp_primary_account",
         "delete_whatsapp_business_account"
       ],
-      "coverage": 45,
+      "coverage": 44,
       "productReducers": [
         "archive_ai_chat_session",
+        "set_member_access",
         "create_billing_account",
         "update_billing_account",
         "set_billing_status",
@@ -1713,7 +1759,7 @@
         "set_whatsapp_primary_account",
         "delete_whatsapp_business_account"
       ],
-      "productCoverage": 49
+      "productCoverage": 48
     },
     "documents": {
       "rust": [
@@ -1769,7 +1815,8 @@
         "create_document_template",
         "update_document_template",
         "create_mail_template",
-        "update_mail_template"
+        "update_mail_template",
+        "claim_reviewed_mail_delivery"
       ],
       "web": [
         "acknowledge_insight",
@@ -1806,6 +1853,7 @@
         "update_document",
         "update_document_folder",
         "update_document_presence",
+        "update_document_template",
         "update_knowledge_article",
         "update_knowledge_category"
       ],
@@ -1825,10 +1873,10 @@
         "update_knowledge_article_presence",
         "clear_knowledge_article_presence",
         "run_document_retention_purge",
-        "update_document_template",
-        "update_mail_template"
+        "update_mail_template",
+        "claim_reviewed_mail_delivery"
       ],
-      "coverage": 68,
+      "coverage": 69,
       "productReducers": [
         "acknowledge_insight",
         "create_document_processing_job",
@@ -1880,7 +1928,8 @@
         "create_document_template",
         "update_document_template",
         "create_mail_template",
-        "update_mail_template"
+        "update_mail_template",
+        "claim_reviewed_mail_delivery"
       ],
       "productCoverage": 67
     },
@@ -2794,6 +2843,7 @@
         "delete_import_mapping_template",
         "finalize_import_assistant_job",
         "import_csv_tracked",
+        "cleanup_abandoned_account_move_import",
         "rollback_import_job",
         "import_lot_csv",
         "import_manufacturing_order_csv",
@@ -2844,16 +2894,18 @@
         "save_import_mapping_template"
       ],
       "missing": [
-        "import_csv_tracked"
+        "import_csv_tracked",
+        "cleanup_abandoned_account_move_import"
       ],
-      "coverage": 97,
+      "coverage": 95,
       "productReducers": [
         "save_import_mapping_template",
         "delete_import_mapping_template",
         "finalize_import_assistant_job",
+        "cleanup_abandoned_account_move_import",
         "rollback_import_job"
       ],
-      "productCoverage": 100
+      "productCoverage": 80
     },
     "helpdesk": {
       "rust": [
@@ -3924,6 +3976,7 @@
         "delete_landed_cost",
         "remove_landed_cost_line",
         "apply_landed_costs",
+        "create_purchase_order_once",
         "create_purchase_blanket_order",
         "release_blanket_to_po",
         "create_purchase_contract",
@@ -3961,6 +4014,7 @@
         "create_purchase_return",
         "confirm_purchase_return",
         "create_vendor_credit_from_purchase_return",
+        "receive_po_line_once",
         "create_purchase_rfq",
         "add_purchase_rfq_line",
         "add_purchase_rfq_bid",
@@ -3994,7 +4048,6 @@
         "create_partner_bank",
         "create_purchase_blanket_order",
         "create_purchase_contract",
-        "create_purchase_order",
         "create_purchase_requisition",
         "create_purchase_return",
         "create_purchase_rfq",
@@ -4033,7 +4086,9 @@
         "post_landed_costs",
         "cancel_landed_cost",
         "clear_landed_cost_field",
+        "create_purchase_order_once",
         "clear_vendor_risk_reason",
+        "create_purchase_order",
         "send_purchase_order",
         "confirm_purchase_order",
         "cancel_purchase_order",
@@ -4041,10 +4096,11 @@
         "approve_purchase_requisition",
         "close_purchase_requisition",
         "cancel_purchase_requisition",
+        "receive_po_line_once",
         "add_purchase_rfq_line",
         "clear_supplier_intake_field"
       ],
-      "coverage": 76,
+      "coverage": 72,
       "productReducers": [
         "purchasing_integrity_inventory",
         "create_landed_cost",
@@ -4057,6 +4113,7 @@
         "delete_landed_cost",
         "remove_landed_cost_line",
         "apply_landed_costs",
+        "create_purchase_order_once",
         "create_purchase_blanket_order",
         "release_blanket_to_po",
         "create_purchase_contract",
@@ -4094,6 +4151,7 @@
         "create_purchase_return",
         "confirm_purchase_return",
         "create_vendor_credit_from_purchase_return",
+        "receive_po_line_once",
         "create_purchase_rfq",
         "add_purchase_rfq_line",
         "add_purchase_rfq_bid",
@@ -4110,7 +4168,7 @@
         "clear_supplier_intake_field",
         "delete_supplier_intake"
       ],
-      "productCoverage": 76
+      "productCoverage": 72
     },
     "workflows": {
       "rust": [
@@ -4339,11 +4397,11 @@
     }
   },
   "detectionSources": {
-    "apiCallLiteral": 6,
+    "apiCallLiteral": 7,
     "useStdbReducer": 3,
     "useStdbReducerWithInvalidation": 2,
     "useStdbCallMutation": 1,
-    "stdbBffCommandPost": 862,
+    "stdbBffCommandPost": 864,
     "callReducerLiteral": 4,
     "callReducersBatch": 2,
     "stdbBrowserCommand": 21,

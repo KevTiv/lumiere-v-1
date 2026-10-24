@@ -507,9 +507,14 @@ fn is_authored_column_addition(table: &str, line: &str) -> bool {
     matches!(
         (table, line.strip_suffix(',').unwrap_or(line)),
         (
-            "country_pack_definition",
-            "    \"acceptance_status\" TEXT NOT NULL"
-        ) | ("country_pack_definition", "    \"effective_from\" BIGINT")
+            "search_embedding",
+            "    \"expected_fingerprint\" TEXT NOT NULL"
+        ) | ("search_embedding", "    \"index_generation\" TEXT NOT NULL")
+            | (
+                "country_pack_definition",
+                "    \"acceptance_status\" TEXT NOT NULL"
+            )
+            | ("country_pack_definition", "    \"effective_from\" BIGINT")
             | ("country_pack_definition", "    \"effective_to\" BIGINT")
             | (
                 "country_pack_tax_rule",
@@ -521,6 +526,18 @@ fn is_authored_column_addition(table: &str, line: &str) -> bool {
                 "company_country_pack",
                 "    \"pinned_pack_version\" TEXT NOT NULL"
             )
+    )
+}
+
+/// Exact retired definitions archived and verified by API migrations 22–25. Other removals
+/// and type/nullability changes still fail the source compatibility check.
+fn is_authored_column_removal(table: &str, line: &str) -> bool {
+    matches!(
+        (table, line.strip_suffix(',').unwrap_or(line)),
+        ("document", "    \"index_content\" TEXT")
+            | ("search_embedding", "    \"text\" TEXT NOT NULL")
+            | ("search_embedding", "    \"embedding\" JSONB NOT NULL")
+            | ("search_embedding", "    \"embedding_hash\" TEXT")
     )
 }
 
@@ -561,6 +578,10 @@ fn pending_delta_body(
         let now_columns = now_columns
             .into_iter()
             .filter(|line| !is_authored_column_addition(table, line))
+            .collect::<Vec<_>>();
+        let covered_columns = covered_columns
+            .into_iter()
+            .filter(|line| !is_authored_column_removal(table, line) || now_columns.contains(line))
             .collect::<Vec<_>>();
         if canonical_columns(&now_columns) != canonical_columns(&covered_columns)
             || now_rest != covered_rest
@@ -983,6 +1004,41 @@ mod tests {
             "organization_ownership": if org.is_some() { "direct" } else { "platform_global" },
             "organization_column": org,
         })
+    }
+
+    #[test]
+    fn canonical_index_retirement_accepts_only_exact_authored_columns() {
+        let old = vec![
+            "CREATE TABLE IF NOT EXISTS \"document\" (".to_string(),
+            "    \"id\" NUMERIC(20,0) NOT NULL,".to_string(),
+            "    \"index_content\" TEXT,".to_string(),
+            "    \"name\" TEXT NOT NULL,".to_string(),
+            ");".to_string(),
+        ];
+        let covered = BTreeMap::from([("document".to_string(), old)]);
+        let current = BTreeMap::from([("document".to_string(),
+            "-- Durable projection: document\nCREATE TABLE IF NOT EXISTS \"document\" (\n    \"id\" NUMERIC(20,0) NOT NULL,\n    \"name\" TEXT NOT NULL,\n);\n".to_string())]);
+        assert!(pending_delta_body(&covered, &current).unwrap().is_empty());
+        let mut changed = current.clone();
+        changed.get_mut("document").unwrap().replace_range(
+            ..,
+            current["document"]
+                .replace("    \"name\" TEXT NOT NULL,\n", "")
+                .as_str(),
+        );
+        assert!(pending_delta_body(&covered, &changed).is_err());
+        assert!(!is_authored_column_removal(
+            "document",
+            "    \"index_content\" JSONB,"
+        ));
+        assert!(!is_authored_column_removal(
+            "another_table",
+            "    \"index_content\" TEXT,"
+        ));
+        assert!(!is_authored_column_addition(
+            "search_embedding",
+            "    \"index_generation\" TEXT,"
+        ));
     }
 
     #[test]
@@ -1429,7 +1485,7 @@ mod tests {
         );
         assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (22, "0022_durable_projection_delta")
+            (26, "0026_durable_projection_delta")
         );
     }
     #[test]

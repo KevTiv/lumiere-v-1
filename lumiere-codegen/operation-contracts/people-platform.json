@@ -1721,6 +1721,16 @@
       },
       "evidence": "spacetimedb/src/analytics/reports.rs: body loads current state and enforces a uniqueness, revision, or lifecycle guard"
     },
+    "finalize_embedding_job": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/intelligence.rs: body delegates through an explicit replay/idempotency receipt guard"
+    },
     "finalize_import_assistant_job": {
       "semantic_kind": "command",
       "client_facing": true,

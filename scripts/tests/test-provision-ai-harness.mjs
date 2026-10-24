@@ -177,11 +177,13 @@ test('BFF smoke requires durable matching settlement, never retries and redacts 
   await provision(config, client, true)
   const sql = client.sql
   let state = 'settled'
+  let stepNumbers = [1, 2]
+  let duplicateAttempt = false
   client.sql = async (statement, role) => {
     if (statement.includes('FROM ai_agent_run ')) return [{ id: 42, company_id: 3, agent_id: 12, status: 'completed' }]
-    if (statement.includes('FROM ai_agent_run_step ')) return [{ step_no: 1 }, { step_no: 2 }]
-    if (statement.includes('FROM ai_provider_attempt_read ')) return [{ reservation_id: 8, request_key: 'exact',
-      company_id: 3, agent_id: 12, provider: 'mistral', model: 'fixture-primary', status: 'succeeded', input_tokens: 11, output_tokens: 12 }]
+    if (statement.includes('FROM ai_agent_run_step ')) return stepNumbers.map(step_no => ({ step_no }))
+    if (statement.includes('FROM ai_provider_attempt_read ')) return Array.from({ length: duplicateAttempt ? 2 : 1 }, () => ({ reservation_id: 8, request_key: 'exact',
+      company_id: 3, agent_id: 12, provider: 'mistral', model: 'fixture-primary', status: 'succeeded', input_tokens: 11, output_tokens: 12 }))
     if (statement.includes('FROM ai_spend_reservation_read ')) return [{ id: 8, request_key: 'exact', status: state,
       company_id: 3, agent_id: 12, provider: 'mistral', model: 'fixture-primary',
       settled_input_tokens: 11, settled_output_tokens: 12 }]
@@ -201,6 +203,14 @@ test('BFF smoke requires durable matching settlement, never retries and redacts 
     runId: 42, organizationId: 9, companyId: 3, providerAttempts: 1, durableSteps: 2, settled: true,
   })
   assert.equal(calls, 1)
+  for (const invalid of [[1, 1], [1, 3], [0, 1]]) {
+    stepNumbers = invalid
+    await assert.rejects(smokePilot(config, client, env, fetcher), /pilot (lacks ordered|step number)/)
+  }
+  stepNumbers = [1, 2]
+  duplicateAttempt = true
+  await assert.rejects(smokePilot(config, client, env, fetcher), /provider\/spend evidence|duplicate provider/)
+  duplicateAttempt = false
   state = 'reserved'
   await assert.rejects(smokePilot(config, client, env, fetcher), /settlement mismatch/)
   const before = calls
@@ -223,4 +233,21 @@ test('provisioning payloads match the immutable released parameter contracts', a
     return call(name, args)
   }
   await provision(manifest(), client, true)
+})
+
+test('Railway environment manifest supports plan-only operation without credentials', () => {
+  const script = fileURLToPath(new URL('../provision-ai-harness.mjs', import.meta.url))
+  const output = execFileSync(process.execPath, [script, '--plan', '--env'], {
+    encoding: 'utf8', env: { ...process.env, AI_HARNESS_MANIFEST_JSON: JSON.stringify(manifest()) },
+  })
+  assert.equal(JSON.parse(output).billableCalls, 0)
+  assert.equal(JSON.parse(output).profiles.length, 2)
+})
+
+test('placeholder models and rolling aliases cannot be provisioned', () => {
+  for (const model of ['ACCOUNT_VISIBLE_PRIMARY_MODEL', 'REPLACE_MODEL', 'PLACEHOLDER', 'mistral-latest']) {
+    const config = manifest()
+    config.primary.model = model
+    assert.throws(() => validateManifest(config), /exact reviewed model id/)
+  }
 })

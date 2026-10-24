@@ -111,6 +111,24 @@ if env "${common_env[@]}" TEST_SERVICES_FILE="$TMP/services-disabled-ai.json" \
 fi
 grep -Fq 'ai-gateway has no active EU replica' "$TMP/ai-region.out"
 
+# A selected pilot must have one replica and distinct service credentials.
+jq '. + [{id:"service-ai-gateway",name:"ai-gateway",regions:[{name:"europe-west4-drams3a",configured:1}]}]' "$TMP/services.json" >"$TMP/ai-services.json"
+jq -n '{LUMIERE_BIN:"gateway",LUMIERE_ENV:"production",STDB_HOST:"http://spacetimedb.railway.internal:3000",STDB_MODULE:"lumiere-v1",STDB_TOKEN:null,AI_SPEND_READ_STDB_TOKEN:null,AI_CERTIFICATION_STDB_TOKEN:null,AI_EXECUTION_ENVELOPE_KEY:null,LUMIERE_AI_GATEWAY_INTERNAL_SECRET:null,MISTRAL_API_KEY:null,AI_CERTIFICATION_RUNTIME_HASH:"sha256:0123456789abcdef"}' >"$TMP/ai-gateway.variables.json"
+env "${common_env[@]}" RAILWAY_ENABLE_AI=true TEST_SERVICES_FILE="$TMP/ai-services.json" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST"
+jq 'map(if .name == "ai-gateway" then .regions[0].configured=2 else . end)' "$TMP/ai-services.json" >"$TMP/ai-replicas.json"
+if env "${common_env[@]}" RAILWAY_ENABLE_AI=true TEST_SERVICES_FILE="$TMP/ai-replicas.json" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST" >"$TMP/ai-replicas.out" 2>&1; then
+  echo 'AI profile limits accepted multiple replicas' >&2; exit 1
+fi
+grep -Fq 'ai-gateway profile admission requires at most 1' "$TMP/ai-replicas.out"
+jq '. + {KONG_LLM_URL:"https://proxy.invalid"}' "$TMP/ai-gateway.variables.json" >"$TMP/ai-proxy.json"
+cp "$TMP/ai-gateway.variables.json" "$TMP/ai-direct.json"
+cp "$TMP/ai-proxy.json" "$TMP/ai-gateway.variables.json"
+if env "${common_env[@]}" RAILWAY_ENABLE_AI=true TEST_SERVICES_FILE="$TMP/ai-services.json" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST" >"$TMP/ai-proxy.out" 2>&1; then
+  echo 'direct pilot accepted proxy routing' >&2; exit 1
+fi
+grep -Fq 'invalid KONG_LLM_URL' "$TMP/ai-proxy.out"
+cp "$TMP/ai-direct.json" "$TMP/ai-gateway.variables.json"
+
 if env "${common_env[@]}" RAILWAY_ENABLE_AI=true \
   bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST" >"$TMP/ai.out" 2>&1; then
   echo "production preflight accepted a missing enabled AI service" >&2

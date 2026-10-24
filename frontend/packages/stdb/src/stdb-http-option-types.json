@@ -3144,7 +3144,6 @@
   "Document": {
     "description": "string",
     "checksum": "string",
-    "index_content": "string",
     "index_language": "string",
     "access_token": "string",
     "url": "string",
@@ -5259,7 +5258,6 @@
     "completed_at": "timestamp"
   },
   "SearchEmbedding": {
-    "embedding_hash": "string",
     "vector_db_id": "string",
     "embedding_model": "string",
     "embedding_dim": "u32",
@@ -7281,7 +7279,6 @@
     "ai_suggestion": "string"
   },
   "UpsertSearchEmbeddingParams": {
-    "embedding_hash": "string",
     "metadata": "string"
   },
   "UpsertSubscriptionPriceIndexParams": {

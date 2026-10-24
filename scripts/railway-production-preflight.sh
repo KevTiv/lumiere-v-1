@@ -68,13 +68,17 @@ while IFS= read -r service; do
     failures=$((failures + 1))
   fi
 
-  max_replicas="$(jq -r '.localStorage.maxReplicas // empty' <<<"$service")"
+  max_replicas="$(jq -r '.maxReplicas // .localStorage.maxReplicas // empty' <<<"$service")"
   if [[ -n "$max_replicas" ]] && ! jq -e --arg name "$name" --argjson maximum "$max_replicas" '
     [.[] | select(.name == $name)][0].regions
     | (map(.configured) | add) as $total
     | $total >= 1 and $total <= $maximum
   ' >/dev/null <<<"$services_json"; then
-    echo "[railway-preflight] $name local document storage requires at most $max_replicas configured replica(s)" >&2
+    if [[ "$(jq -r '.localStorage.maxReplicas // empty' <<<"$service")" != "" ]]; then
+      echo "[railway-preflight] $name local document storage requires at most $max_replicas configured replica(s)" >&2
+    else
+      echo "[railway-preflight] $name profile admission requires at most $max_replicas configured replica(s)" >&2
+    fi
     failures=$((failures + 1))
   fi
 
@@ -127,6 +131,10 @@ while IFS= read -r service; do
 
     valid=false
     case "$kind" in
+      empty)
+        jq -e --arg key "$variable" 'has($key) | not' >/dev/null <<<"$variables_json" && valid=true
+        jq -e --arg key "$variable" '.[$key] == ""' >/dev/null <<<"$variables_json" && valid=true
+        ;;
       exact)
         jq -e --arg key "$variable" --arg expected "$expected" \
           'has($key) and .[$key] == $expected' >/dev/null <<<"$variables_json" && valid=true

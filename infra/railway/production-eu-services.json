@@ -66,7 +66,74 @@
       "role": "ai",
       "runtimeBinary": "gateway",
       "required": false,
-      "featureGate": "RAILWAY_ENABLE_AI"
+      "featureGate": "RAILWAY_ENABLE_AI",
+      "maxReplicas": 1,
+      "optionalFeatures": [
+        {
+          "name": "governed-mistral-pilot",
+          "selectionVariable": "RAILWAY_ENABLE_AI",
+          "configuredVariables": [
+            "MISTRAL_API_KEY"
+          ],
+          "requiredVariables": {
+            "LUMIERE_BIN": {
+              "kind": "exact",
+              "value": "gateway"
+            },
+            "LUMIERE_ENV": {
+              "kind": "exact",
+              "value": "production"
+            },
+            "STDB_HOST": {
+              "kind": "url"
+            },
+            "STDB_MODULE": {
+              "kind": "non-placeholder"
+            },
+            "STDB_TOKEN": {
+              "kind": "secret"
+            },
+            "AI_SPEND_READ_STDB_TOKEN": {
+              "kind": "secret"
+            },
+            "AI_CERTIFICATION_STDB_TOKEN": {
+              "kind": "secret"
+            },
+            "AI_EXECUTION_ENVELOPE_KEY": {
+              "kind": "secret"
+            },
+            "LUMIERE_AI_GATEWAY_INTERNAL_SECRET": {
+              "kind": "secret"
+            },
+            "MISTRAL_API_KEY": {
+              "kind": "secret"
+            },
+            "AI_CERTIFICATION_RUNTIME_HASH": {
+              "kind": "non-placeholder"
+            },
+            "KONG_LLM_URL": {
+              "kind": "empty"
+            },
+            "STDB_SERVER_TOKEN": {
+              "kind": "empty"
+            }
+          },
+          "distinctSecrets": [
+            [
+              "STDB_TOKEN",
+              "AI_SPEND_READ_STDB_TOKEN"
+            ],
+            [
+              "STDB_TOKEN",
+              "AI_CERTIFICATION_STDB_TOKEN"
+            ],
+            [
+              "AI_SPEND_READ_STDB_TOKEN",
+              "AI_CERTIFICATION_STDB_TOKEN"
+            ]
+          ]
+        }
+      ]
     },
     { "name": "projection-worker", "role": "projection", "runtimeBinary": "projection-worker" },
     { "name": "workflow-worker", "role": "workflow", "runtimeBinary": "workflow-worker" },

@@ -2398,6 +2398,10 @@
       "name": "fail_workorder_quality_check",
       "shape_fingerprint": "sha256:7d3c3d3d3a00753a414866812dd5cd68e9866cff2beabfba51f80ec2f51fce0f"
     },
+    "erp.finalize_embedding_job": {
+      "name": "finalize_embedding_job",
+      "shape_fingerprint": "sha256:2f63a005787f2ff194e2863b095c0cba1ba2d01b4aae708aeff7bf3174e6ba76"
+    },
     "erp.finalize_import_assistant_job": {
       "name": "finalize_import_assistant_job",
       "shape_fingerprint": "sha256:da5bffb757ef21834ad44ea6fd7a767bf922abe8d396f13e29a98bc27d16f689"
@@ -3500,7 +3504,7 @@
     },
     "erp.request_embedding_job": {
       "name": "request_embedding_job",
-      "shape_fingerprint": "sha256:286df1a723f67733ef9ee625d75de71d18126a9f48328c24744fd6885e1e2684"
+      "shape_fingerprint": "sha256:e876da5a61bd16ff74d484cc0561fb9be82c5b93d70812e220b873219fd88d7c"
     },
     "erp.request_expense_policy_exception": {
       "name": "request_expense_policy_exception",
@@ -6112,6 +6116,14 @@
       "current_operations_fingerprint": "sha256:380394220a565218bb424cb3779d6e78b567f57737f30ee22415081d3c391286",
       "operation_count": 1460,
       "reason": "release on top of v0.3.138: add none; change the shape of update_document_template"
+    },
+    {
+      "previous_release": "v0.3.139",
+      "previous_ir_sha256": "sha256:0d62256574145532018f11c69567802fa969dcc4e131d4c079ac138bb4552e99",
+      "previous_operations_fingerprint": "sha256:380394220a565218bb424cb3779d6e78b567f57737f30ee22415081d3c391286",
+      "current_operations_fingerprint": "sha256:13a10ff03adb59f361ba190ddc321c48fea5766a3731dc5e74a307bb78686328",
+      "operation_count": 1461,
+      "reason": "Add claimed embedding-job finalization and canonical passage-reference payloads on top of v0.3.139; preserve every other released operation identity."
     }
   ]
 }

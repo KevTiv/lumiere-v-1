@@ -55,6 +55,7 @@ DOMAIN_OWNERS = {
 }
 
 CORE_FILE_OWNERS = {
+    "access_lifecycle.rs": "COV-23",
     "audit.rs": "COV-23",
     "auth.rs": "COV-23",
     "billing.rs": "COV-23",

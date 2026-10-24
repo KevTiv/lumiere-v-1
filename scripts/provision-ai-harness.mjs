@@ -37,6 +37,7 @@ export function validateManifest(config) {
     const profile = config[role]
     requireValue(profile && typeof profile === 'object' && Object.keys(profile).every(key => fields.includes(key)), `invalid ${role} profile`)
     label(profile.model, `${role}.model`)
+    requireValue(!/^(ACCOUNT_VISIBLE|REPLACE|PLACEHOLDER)/i.test(profile.model) && !/-latest$/i.test(profile.model), `${role} requires an exact reviewed model id`)
     for (const key of fields.slice(1)) positive(profile[key], `${role}.${key}`, key.includes('Units') ? Number.MAX_SAFE_INTEGER : 0xffffffff)
     requireValue(profile.maxTokens < profile.contextWindow, `${role} output ceiling must leave input capacity`)
   }
@@ -333,10 +334,13 @@ export async function smokePilot(config, client, env, fetcher = fetch) {
   requireValue(Number(run.company_id) === config.companyId && Number(run.agent_id) === readiness.agentId
     && run.status === 'completed', 'durable run scope or settlement mismatch')
   const steps = await client.sql(`SELECT step_no FROM ai_agent_run_step WHERE run_id = ${runId} AND organization_id = ${config.organizationId}`)
-  requireValue(steps.length >= 2 && new Set(steps.map(step => Number(step.step_no))).size === steps.length, 'pilot lacks ordered durable trace')
+  const orderedSteps = steps.map(step => positive(Number(step.step_no), 'pilot step number')).sort((a, b) => a - b)
+  requireValue(steps.length >= 2 && orderedSteps.every((number, index) => number === index + 1), 'pilot lacks ordered durable trace')
   const attempts = await client.sql(`SELECT * FROM ai_provider_attempt_read WHERE run_id = ${runId} AND organization_id = ${config.organizationId}`, 'spend')
   const reservations = await client.sql(`SELECT * FROM ai_spend_reservation_read WHERE run_id = ${runId} AND organization_id = ${config.organizationId}`, 'spend')
   requireValue(attempts.length > 0 && reservations.length === attempts.length, 'pilot lacks durable provider/spend evidence')
+  requireValue(new Set(attempts.map(row => row.reservation_id)).size === attempts.length
+    && new Set(reservations.map(row => row.id)).size === reservations.length, 'pilot has duplicate provider/spend bindings')
   for (const attempt of attempts) {
     requireValue(attempt.status === 'succeeded' && attempt.provider === 'mistral'
       && readiness.models.includes(attempt.model) && Number(attempt.agent_id) === readiness.agentId
@@ -356,8 +360,9 @@ export async function smokePilot(config, client, env, fetcher = fetch) {
 async function main() {
   const [mode, filename, ...extra] = process.argv.slice(2)
   requireValue(['--plan', '--check', '--apply', '--verify-key', '--smoke'].includes(mode) && filename && !extra.length,
-    'usage: node scripts/provision-ai-harness.mjs --plan|--check|--apply|--verify-key|--smoke manifest.json')
-  const raw = await readFile(filename, 'utf8')
+    'usage: node scripts/provision-ai-harness.mjs --plan|--check|--apply|--verify-key|--smoke manifest.json|--env')
+  const raw = filename === '--env' ? process.env.AI_HARNESS_MANIFEST_JSON : await readFile(filename, 'utf8')
+  requireValue(typeof raw === 'string' && raw.trim(), 'missing AI_HARNESS_MANIFEST_JSON')
   let config
   try { config = JSON.parse(raw) } catch { throw new Error('manifest contains invalid JSON') }
   validateManifest(config)

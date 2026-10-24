@@ -26,8 +26,12 @@ pub fn run_ai_document_processing_job_document_relation_test(
 
 #[spacetimedb::reducer]
 pub fn run_ai_embedding_org_isolation_test(ctx: &ReducerContext) -> Result<(), String> {
+    embedding_isolation_test::test_embedding_uses_canonical_passage_and_reference_only_job(ctx)
+        .map_err(|e| format!("embedding_canonical_passage: {e}"))?;
     embedding_isolation_test::test_search_embedding_org_isolation(ctx)
-        .map_err(|e| format!("search_embedding_org_isolation: {e}"))
+        .map_err(|e| format!("search_embedding_org_isolation: {e}"))?;
+    embedding_isolation_test::test_embedding_finalization_scrubs_payload_and_rebuilds(ctx)
+        .map_err(|e| format!("embedding_finalization_and_rebuild: {e}"))
 }
 
 #[spacetimedb::reducer]
