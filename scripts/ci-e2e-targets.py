@@ -3,8 +3,10 @@
 
 A spec is selected when the PR adds or edits it, or when it imports (directly
 or through other e2e support modules) an e2e support file the PR edits. The
-selection is empty when the PR touches no e2e files; the workflow then falls
-back to the full P0 suite. Paths are emitted relative to frontend/web.
+selection is empty when the PR touches no e2e files or exceeds the targeted
+limit; the workflow then falls back to the full P0 suite. Over-limit changes
+also retain explicitly changed specs in bounded supplemental batches, since
+P0 excludes some fixtures. Paths are emitted relative to frontend/web.
 """
 
 from __future__ import annotations
@@ -88,6 +90,27 @@ def e2e_sources(root: Path) -> dict[str, str]:
     }
 
 
+def _relative_specs(specs: list[str]) -> str:
+    return " ".join(str(PurePosixPath(spec).relative_to(WEB_DIR)) for spec in specs)
+
+
+def plan_targets(changed: list[str], sources: dict[str, str]) -> dict[str, str | list[dict[str, str]]]:
+    """Keep the P0 fallback and supplement it with directly changed specs."""
+    specs = select_specs(changed, sources)
+    fallback_configs: list[dict[str, str]] = []
+    if len(specs) > MAX_TARGETED_SPECS:
+        explicit = sorted({path for path in changed if _is_spec(path) and path in sources})
+        for offset in range(0, len(explicit), MAX_TARGETED_SPECS):
+            fallback_configs.append({
+                "suite": "targeted",
+                "clear_db": "0",
+                "specs": _relative_specs(explicit[offset:offset + MAX_TARGETED_SPECS]),
+                "slot": f"changed-{offset // MAX_TARGETED_SPECS + 1}",
+            })
+        specs = []
+    return {"specs": _relative_specs(specs), "count": str(len(specs)), "fallback_configs": fallback_configs}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", required=True)
@@ -95,15 +118,13 @@ def main() -> None:
     parser.add_argument("--github-output")
     args = parser.parse_args()
 
-    specs = select_specs(changed_paths(args.base, args.head), e2e_sources(Path.cwd()))
-    if len(specs) > MAX_TARGETED_SPECS:
-        specs = []
-    relative = " ".join(str(PurePosixPath(spec).relative_to(WEB_DIR)) for spec in specs)
-    result = {"specs": relative, "count": str(len(specs))}
+    result = plan_targets(changed_paths(args.base, args.head), e2e_sources(Path.cwd()))
     print(json.dumps(result))
     if args.github_output:
         with open(args.github_output, "a", encoding="utf-8") as handle:
             for key, value in result.items():
+                if not isinstance(value, str):
+                    value = json.dumps(value, separators=(",", ":"))
                 handle.write(f"{key}={value}\n")
 
 
