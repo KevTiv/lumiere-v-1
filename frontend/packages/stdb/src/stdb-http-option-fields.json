@@ -3144,6 +3144,7 @@
   "Document": [
     "description",
     "checksum",
+    "index_content",
     "index_language",
     "access_token",
     "url",
@@ -5258,6 +5259,7 @@
     "completed_at"
   ],
   "SearchEmbedding": [
+    "embedding_hash",
     "vector_db_id",
     "embedding_model",
     "embedding_dim",
