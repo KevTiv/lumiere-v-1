@@ -91,7 +91,7 @@ export const knowledgeArticlesTableConfig = (t: TFunction): EntityViewConfig => 
     ],
     columns: [
       { key: "name", sensitive: true, label: t("documents.knowledgeBase.columns.name"), width: "min-w-48" },
-      { key: "description", sensitive: true, label: t("documents.knowledgeBase.columns.description"), width: "min-w-48" },
+      { key: "description", type: "markdown", sensitive: true, label: t("documents.knowledgeBase.columns.description"), width: "min-w-48" },
       { key: "isPublished", label: t("documents.knowledgeBase.columns.isPublished"), type: "boolean" },
       { key: "articleItemCount", label: t("documents.knowledgeBase.columns.articleItemCount"), type: "number", align: "right" },
       { key: "articleMemberCount", label: t("documents.knowledgeBase.columns.articleMemberCount"), type: "number", align: "right" },
@@ -115,7 +115,7 @@ export const knowledgeCategoriesTableConfig = (t: TFunction): EntityViewConfig =
     searchKeys: ["name", "description"],
     columns: [
       { key: "name", label: t("documents.knowledgeCategories.columns.name"), width: "min-w-48" },
-      { key: "description", label: t("documents.knowledgeCategories.columns.description"), width: "min-w-48" },
+      { key: "description", type: "markdown", label: t("documents.knowledgeCategories.columns.description"), width: "min-w-48" },
       { key: "articleCount", label: t("documents.knowledgeCategories.columns.articleCount"), type: "number", align: "right" },
       { key: "sequence", label: t("documents.knowledgeCategories.columns.sequence"), type: "number", align: "right" },
       { key: "createDate", label: t("documents.knowledgeCategories.columns.createDate"), type: "date" },

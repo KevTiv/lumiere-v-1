@@ -1,5 +1,6 @@
 "use client"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { AssetDepreciationSchedule } from "@lumiere/ui/accounting-components/asset-depreciation-schedule"
 import { useModuleTab } from "@/hooks/use-module-tab"
@@ -835,13 +836,16 @@ function AccountingClientReady({
   const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   const accountingTabIds = useMemo(
-    () => [
-      ...moduleConfigBase.tabs.map((tab) => tab.id),
-      "account-journals",
-      "move-lines",
-      "period-close",
-      "work",
-    ],
+    () => {
+      const workTabId = moduleWorkBoardTabId(moduleConfigBase)
+      return [
+        ...moduleConfigBase.tabs.map((tab) => tab.id),
+        "account-journals",
+        "move-lines",
+        "period-close",
+        ...(workTabId ? [workTabId] : []),
+      ]
+    },
     [moduleConfigBase],
   )
   const { activeTab: accountingActiveTab, setActiveTab: setAccountingActiveTab } = useModuleTab(
@@ -5618,6 +5622,7 @@ function AccountingClientReady({
                       budgets={budgets}
                       budgetLines={budgetLines}
                       budgetPosts={budgetPosts}
+                      accountOptions={glAccountSelectOptions}
                       onCreateBudget={(params) =>
                         createBudget.mutateAsync(toCreateCrossoveredBudgetParams(params, operatingCompanyId))
                       }
@@ -6378,7 +6383,6 @@ function AccountingClientReady({
       /> : <p role="status" className="rounded-lg border p-4 text-sm">Select an active company to continue. Original pending operations have been retained.</p>}
       {companyAvailable ? <ModuleWorkView
         organizationId={organizationId}
-        workScope="accounting"
         config={config}
         data={data}
         dataLoading={dataLoading}

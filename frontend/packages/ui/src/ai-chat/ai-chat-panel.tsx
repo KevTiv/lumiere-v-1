@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -993,7 +994,7 @@ export function AIChatPanel({
           <div className="p-3 border-t border-border bg-card/50">
             <div className="flex items-end gap-2">
               <div className="flex-1 relative">
-                <textarea
+                <Textarea variant="plain"
                   ref={inputRef}
                   data-testid="erp-ai-chat-input"
                   value={input}
@@ -1002,9 +1003,9 @@ export function AIChatPanel({
                   placeholder={config?.placeholder || t("aiChat.placeholder")}
                   rows={1}
                   className={cn(
-                    "w-full resize-none rounded-lg border border-input bg-background px-3 py-2 pr-10",
-                    "text-xs placeholder:text-muted-foreground",
-                    "focus:outline-none focus:ring-1 focus:ring-ring",
+                    "field-sizing-fixed resize-none px-3 py-2 pr-10 shadow-none",
+                    "text-xs placeholder:text-muted-foreground md:text-xs",
+                    "focus-visible:ring-1",
                     "min-h-[36px] max-h-[120px]"
                   )}
                 />

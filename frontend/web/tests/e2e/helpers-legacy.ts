@@ -6,6 +6,7 @@ import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
 import { matchesOperationResponse } from "./operation-response"
 import type { StdbBffReducerKey } from "@lumiere/stdb/commands"
+import type { CreateWorkflowParams } from "@lumiere/stdb/types"
 
 export const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? "test@email.com"
 export const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? "Password123$"
@@ -892,7 +893,7 @@ export async function submitForm(page: Page, formId: string) {
   await expectNoAppError(page)
 }
 
-/** `YYYY-MM-DD` for `<input type="date">`. */
+/** `YYYY-MM-DD` for date fields (DatePicker accepts it typed or filled). */
 export function isoDate(daysFromNow = 0) {
   const d = new Date()
   d.setDate(d.getDate() + daysFromNow)
@@ -902,7 +903,7 @@ export function isoDate(daysFromNow = 0) {
   return `${y}-${m}-${day}`
 }
 
-/** `YYYY-MM-DDTHH:mm` for `<input type="datetime-local">`. */
+/** `YYYY-MM-DDTHH:mm` for datetime fields (filled into the DateTimePicker date input). */
 export function isoDateTimeLocal(y: number, month: number, day: number, hour = 0, minute = 0) {
   const mm = String(month).padStart(2, "0")
   const dd = String(day).padStart(2, "0")
@@ -2831,8 +2832,8 @@ export async function generateVatReportViaUi(
   await gotoModule(page, "/reports", "reports")
   await selectModuleTab(page, "reports", "vat-report")
   await page.getByLabel(/name/i).first().fill(options.name)
-  await page.locator('input[type="date"]').first().fill(options.dateFrom)
-  await page.locator('input[type="date"]').nth(1).fill(options.dateTo)
+  await page.locator('input[data-slot="date-picker-input"]').first().fill(options.dateFrom)
+  await page.locator('input[data-slot="date-picker-input"]').nth(1).fill(options.dateTo)
   const [res] = await Promise.all([
     page.waitForResponse(
       (r) => matchesOperationResponse(r, "generate_eu_vat_report") && r.ok(),
@@ -3024,7 +3025,14 @@ export async function waitForWorkflowVersionStatus(
 /** Seed a minimal publishable linear draft (start → end) via BFF reducers. */
 export async function seedPublishableWorkflowDraft(
   page: Page,
-  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string; companyId?: number },
+  options?: {
+    workflowKey?: string
+    model?: string
+    name?: string
+    signalKey?: string
+    companyId?: number
+    snapshotFields?: CreateWorkflowParams["snapshotFields"]
+  },
 ): Promise<{
   organizationId: number
   companyId: number
@@ -3049,7 +3057,7 @@ export async function seedPublishableWorkflowDraft(
       description: WORKFLOW_NONE,
       trigger: { tag: "Manual" },
       schemaVersion: 1,
-      snapshotFields: [],
+      snapshotFields: options?.snapshotFields ?? [],
       metadata: WORKFLOW_NONE,
     },
   ])

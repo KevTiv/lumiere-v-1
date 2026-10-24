@@ -165,8 +165,14 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       expect(before.actingForOptions![0]!.identityHex).toBe(principal.identityHex)
       expect(before.actingForOptions![0]!.workActions).toContain("approve")
       const title = before.workSourceTitle || `${before.subjectModel ?? before.subject_model ?? ""} #${before.subjectId ?? before.subject_id ?? before.id}`
-      const review = delegatePage.getByRole("dialog")
-      await expect(review.getByLabel("Acting as", { exact: true })).toHaveValue(principal.identityHex)
+      const review = delegatePage.getByRole("dialog", { name: title, exact: true })
+      // The native label also contains its option text. Use the control's
+      // accessible name, then verify the exact principal being reviewed.
+      const actingAs = review.getByRole("combobox", { name: "Acting as", exact: true })
+      await expect(review).toBeVisible()
+      await expect(actingAs).toBeVisible()
+      await expect(actingAs).toBeEnabled()
+      await expect(actingAs).toHaveValue(principal.identityHex)
       await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeEnabled()
       await review.getByRole("textbox").fill("A delegated comment that must be discarded after revocation")
       const evidenceScope = { ...workflow, ...pending }
@@ -228,8 +234,11 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       await expect(restored).toBeVisible({ timeout: 35_000 })
       await expect(review).toHaveCount(0)
       await restored.click()
-      await expect(review.getByRole("textbox")).toHaveText("")
-      await expect(review.getByLabel("Acting as", { exact: true })).toHaveValue(principal.identityHex)
+      await expect(review).toBeVisible()
+      await expect(review.getByRole("textbox")).toHaveValue("")
+      await expect(actingAs).toBeVisible()
+      await expect(actingAs).toBeEnabled()
+      await expect(actingAs).toHaveValue(principal.identityHex)
       await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeEnabled()
     } finally {
       if (pendingRoute) await pendingRoute.abort().catch(() => {})

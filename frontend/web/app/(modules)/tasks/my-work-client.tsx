@@ -21,7 +21,11 @@ export function MyWorkClient({ organizationId }: { organizationId?: number }) {
             {t("workBoard.projectTasks")}
           </Link>
         )}
-      <WorkBoardWorkspace organizationId={organizationId} initialView="mine" />
+      <WorkBoardWorkspace
+        organizationId={organizationId}
+        initialView="mine"
+        defaultLayout="list"
+      />
     </div>
   )
 }

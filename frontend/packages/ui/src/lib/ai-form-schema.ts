@@ -1,4 +1,5 @@
 import type { FormConfig, FormField, FieldType } from "./form-types"
+import { isNumericField, numericFieldBounds } from "./form-types"
 
 export interface AiSafeFormOption {
   value: string
@@ -27,6 +28,9 @@ const AI_SUPPORTED_FIELD_TYPES = new Set<FieldType>([
   "text",
   "email",
   "number",
+  "money",
+  "percent",
+  "quantity",
   "tel",
   "url",
   "textarea",
@@ -51,11 +55,13 @@ function optionsForField(field: FormField): AiSafeFormOption[] | undefined {
 
 function validationForField(field: FormField): AiSafeFormValidation | undefined {
   const validation = field.validation
-  if (!validation) return undefined
+  const bounds = isNumericField(field) ? numericFieldBounds(field) : validation
+  if (!validation && !bounds) return undefined
 
   const safe: AiSafeFormValidation = {}
-  if (validation.min !== undefined) safe.min = validation.min
-  if (validation.max !== undefined) safe.max = validation.max
+  if (bounds?.min !== undefined) safe.min = bounds.min
+  if (bounds?.max !== undefined) safe.max = bounds.max
+  if (!validation) return Object.keys(safe).length > 0 ? safe : undefined
   if (validation.minLength !== undefined) safe.minLength = validation.minLength
   if (validation.maxLength !== undefined) safe.maxLength = validation.maxLength
   if (validation.pattern !== undefined) safe.pattern = validation.pattern
@@ -71,7 +77,8 @@ export function serializeAiFormSchema(config: FormConfig): AiSafeFormField[] {
         const safeField: AiSafeFormField = {
           name: field.name,
           label: field.label,
-          type: field.type,
+          // The gateway coerces "number" suggestions; money/percent/quantity store numbers too.
+          type: isNumericField(field) ? "number" : field.type,
           required: field.required === true,
         }
         const options = optionsForField(field)

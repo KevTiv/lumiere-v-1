@@ -39,6 +39,9 @@ export interface RuntimeFormModalProps {
   renderPreview?: React.ComponentProps<typeof FormModal>["renderPreview"]
   onValuesChange?: React.ComponentProps<typeof FormModal>["onValuesChange"]
   submissionDisabled?: boolean
+  draft?: React.ComponentProps<typeof FormModal>["draft"]
+  /** Pass the edited record's id so its draft is kept apart from other records. */
+  draftKey?: React.ComponentProps<typeof FormModal>["draftKey"]
 }
 
 export function RuntimeFormModal({

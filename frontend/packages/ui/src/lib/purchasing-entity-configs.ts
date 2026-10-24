@@ -309,7 +309,7 @@ export const purchaseRfqsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "state", label: t("purchasing.rfqs.columns.state"), width: "min-w-24" },
       { key: "requisitionId", label: t("purchasing.rfqs.columns.requisitionId"), width: "min-w-28" },
       { key: "purchaseOrderId", label: t("purchasing.rfqs.columns.purchaseOrderId"), width: "min-w-28" },
-      { key: "notes", label: t("purchasing.rfqs.columns.notes"), width: "min-w-40" },
+      { key: "notes", type: "markdown", label: t("purchasing.rfqs.columns.notes"), width: "min-w-40" },
     ],
     emptyMessage: t("purchasing.rfqs.emptyMessage"),
   },

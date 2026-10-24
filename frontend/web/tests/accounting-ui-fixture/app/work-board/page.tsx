@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   QueryClient,
   QueryClientProvider,
@@ -11,6 +12,9 @@ import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
 import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
 import { I18nProvider } from "@lumiere/i18n"
 import { WorkBoardWorkspace } from "../../../../components/work-board/work-board-workspace"
+import { ModuleWorkView } from "../../../../components/work-board/module-work-view"
+import { useModuleTab } from "../../../../hooks/use-module-tab"
+import type { ModuleConfig } from "../../../../../packages/ui/src/lib/module-types"
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 import type {
   PolicyRule,
@@ -35,6 +39,75 @@ const scopes: WorkScope[] = [
   "accounting",
   "expenses",
 ]
+const moduleFixtureTabs = ["overview", "work"]
+
+function EmbeddedModuleFixture() {
+  const [configured, setConfigured] = useState(true)
+  // Keep `work` in this controlled parent's allowlist even after removal. The
+  // actual module wrapper must retire the view and choose an available tab.
+  const { activeTab, setActiveTab } = useModuleTab("overview", moduleFixtureTabs)
+  useEffect(() => {
+    const channel = new BroadcastChannel("synthetic-work-board-controls")
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      if (event.data === "configuration") setConfigured((current) => !current)
+    }
+    return () => channel.close()
+  }, [])
+  const config = useMemo<ModuleConfig>(
+    () => ({
+      id: "fixture-purchasing",
+      title: "Purchasing fixture",
+      defaultTab: "overview",
+      tabs: [
+        {
+          id: "overview",
+          label: "Overview",
+          type: "custom",
+          customContent: (
+            <p data-testid="module-work-fixture-overview">
+              Ordinary purchasing overview
+            </p>
+          ),
+        },
+      ],
+      workspaceNav: {
+        workspaces: [
+          { id: "overview", label: "Overview", tabIds: ["overview"] },
+        ],
+      },
+      workBoard: configured
+        ? {
+            scope: "purchasing",
+            label: "Kanban",
+            sources: ["workflow"],
+            defaultLayout: "list",
+            workflowColumnOrder: ["Claimed", "Open"],
+            workflowColumnLabels: { Claimed: "Awaiting purchasing review" },
+          }
+        : undefined,
+    }),
+    [configured],
+  )
+  return (
+    <>
+      <button
+        type="button"
+        className="rounded border px-3 py-2 text-sm"
+        onClick={() => setConfigured((current) => !current)}
+      >
+        {configured
+          ? "Disable synthetic Kanban view"
+          : "Enable synthetic Kanban view"}
+      </button>
+      <ModuleWorkView
+        organizationId={7}
+        config={config}
+        activeTab={activeTab}
+        onActiveTabChange={setActiveTab}
+      />
+    </>
+  )
+}
 
 function fixtureUser(identity: string): User {
   return {
@@ -216,6 +289,8 @@ function Controls({
 
 /** Production workspace with explicit synthetic session/grants; HTTP is intercepted by Playwright. */
 export default function WorkBoardFixture() {
+  const params = useSearchParams()
+  const moduleHost = params.get("fixtureHost") === "module"
   const [client] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } }),
   )
@@ -307,29 +382,35 @@ export default function WorkBoardFixture() {
                       }
                       allowed={allowed}
                     />
-                    <label className="inline-flex items-center gap-2 text-sm">
-                      Synthetic module scope
-                      <select
-                        aria-label="Synthetic module scope"
-                        className="min-h-11 rounded border bg-background px-2"
-                        value={scope}
-                        onChange={(event) =>
-                          setScope(event.target.value as WorkScope)
-                        }
-                      >
-                        {scopes.map((value) => (
-                          <option key={value} value={value}>
-                            {value}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <WorkBoardWorkspace
-                      key={scope}
-                      organizationId={7}
-                      scope={scope}
-                      initialView="eligible"
-                    />
+                    {moduleHost ? (
+                      <EmbeddedModuleFixture />
+                    ) : (
+                      <>
+                        <label className="inline-flex items-center gap-2 text-sm">
+                          Synthetic module scope
+                          <select
+                            aria-label="Synthetic module scope"
+                            className="min-h-11 rounded border bg-background px-2"
+                            value={scope}
+                            onChange={(event) =>
+                              setScope(event.target.value as WorkScope)
+                            }
+                          >
+                            {scopes.map((value) => (
+                              <option key={value} value={value}>
+                                {value}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <WorkBoardWorkspace
+                          key={scope}
+                          organizationId={7}
+                          scope={scope}
+                          initialView="eligible"
+                        />
+                      </>
+                    )}
                   </main>
                 </NavigationGuardProvider>
               </ThemeProvider>

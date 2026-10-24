@@ -18,7 +18,6 @@ import { Textarea } from "@lumiere/ui/components/textarea"
 import { Field, FieldGroup, FieldLabel } from "@lumiere/ui/components/field"
 import { useWorkBoard } from "@lumiere/query-hooks/hooks/work-board"
 import {
-  WORK_STATUSES,
   canMoveWorkTask,
   workActionForColumn,
   workActionsForActor,
@@ -27,7 +26,9 @@ import {
   type WorkAction,
   type WorkBoardScope,
   type WorkTaskRow,
+  type WorkStatus,
 } from "@lumiere/query-hooks/hooks/work-board-model"
+import { workBoardStatuses } from "./work-board-config"
 import {
   approvalActorOptions,
   approvalSelection,
@@ -78,6 +79,8 @@ export function WorkflowWorkContent({
   scope,
   online,
   layout,
+  columnOrder,
+  columnLabels,
   navigationPending = false,
   authorityRefreshing = false,
   onTeamChange,
@@ -85,6 +88,8 @@ export function WorkflowWorkContent({
   scope: WorkBoardScope
   online: boolean
   layout: "board" | "list"
+  columnOrder?: readonly WorkStatus[]
+  columnLabels?: Partial<Record<WorkStatus, string>>
   navigationPending?: boolean
   authorityRefreshing?: boolean
   onTeamChange: (team: string | null) => void
@@ -158,9 +163,9 @@ export function WorkflowWorkContent({
     query.isError ||
     busy ||
     unresolved != null
-  const columns = WORK_STATUSES.map((status) => ({
+  const columns = workBoardStatuses(columnOrder).map((status) => ({
     id: status,
-    title: t(`workBoard.status.${status}`),
+    title: columnLabels?.[status] ?? t(`workBoard.status.${status}`),
   }))
   const current = review
     ? rows.find((row) => String(row.id) === String(review.row.id))

@@ -2,7 +2,7 @@
 
 ## Purpose and scope
 
-The Work workspace is a shared Kanban/list presentation of canonical ERP assignments. It belongs inside a module, with a Finance aggregate and a personal My work entry. Source records, workflow decisions, company access and task attribution remain authoritative in their existing modules.
+Kanban is an optional view within the existing module workspace. Each module enables and specializes it through `ModuleConfig.workBoard`; the shared renderer presents canonical ERP assignments as a board or list. The same configuration supports the Finance group scope, and the personal My work entry opens as a list. Source records, workflow decisions, company access and task attribution remain authoritative in their existing modules.
 
 This change builds on the Finance alpha navigation profile and the shared Kanban renderer. Tasks and business lifecycle remain canonical in their existing modules. Explicit recovery adds typed operations and private recovery evidence through the same workflow/contract pipeline. Operations, workforce and project modules remain subject to their existing discovery and destination gates.
 
@@ -18,13 +18,36 @@ CRM, Reports and Subscriptions remain visible Finance modules, but this slice do
 
 ## User entry points
 
-- `/tasks` opens My work with the mine filter: workflow tasks claimed by the current actor, or record follow-ups assigned to them. The workspace selector can broaden this to eligible or available work and to a supported module.
-- `/purchasing?tab=work`, `/sales?tab=work`, `/accounting?tab=work` and `/expenses?tab=work` open the module's Work workspace.
+- `/tasks` opens the personal My work list with the mine filter: workflow tasks claimed by the current actor, or record follow-ups assigned to them. The workspace selector can broaden this to eligible or available work and to a supported module.
+- `/purchasing?tab=work`, `/sales?tab=work`, `/accounting?tab=work` and `/expenses?tab=work` select the module's configured **Kanban** tab within its existing page. The tab ID defaults to `work` so existing links remain valid; it does not require a separate Kanban route.
 - `workSource=activities` selects Record follow-ups where supported. Follow-ups are created from the source record's existing activity form.
 - `workView=mine|eligible|available`, `workTeam=department:<id>|workflow-group:<id>` and `workLayout=board|list` preserve the selected view in the URL. Activities support department teams; switching work type clears the previous team filter.
 - `/tasks?source=projects` retains the project-task workspace. Existing project task filters/tabs and Overview task/deadline links continue to enter that workspace.
 
 Team choices come from authorized loaded cards and current membership/delegation. They are not an organization-wide team directory. Counts explicitly describe loaded records; they are not unrestricted totals.
+
+### Module configuration
+
+A module opts in through its existing `ModuleConfig` and renders through `ModuleWorkView`. Without `workBoard`, the ordinary module tabs render on their own. The four Finance module configs enable the view explicitly; source choices match the supported subjects in the table above.
+
+```ts
+workBoard: {
+  scope: "purchasing",
+  tabId: "work",
+  label: t("workBoard.kanban"),
+  sources: ["workflow", "activities"],
+  initialView: "eligible",
+  defaultLayout: "board",
+  workflowColumnOrder: ["Claimed", "Open"],
+  workflowColumnLabels: { Claimed: "Under review" },
+}
+```
+
+Use `scope: "finance"` when an existing group workspace needs the supported Finance union. `sources: ["workflow"]` narrows a host to approvals; `sources: []` disables its assignment view. `description`, `initialView`, and `defaultLayout` configure the presentation. URL parameters cannot broaden a fixed scope or enable a source excluded by the host. An explicitly selected source that loses permission continues to show denial instead of silently displaying another source.
+
+Column order and labels are presentation options over canonical status IDs. Omitted statuses are appended, including cancelled history, and no configuration changes command authority or introduces new business transitions. Actions still come from the source adapter and current backend authorization. A removed configuration or revoked access unmounts the selected board and its review state, then returns a controlled module to its ordinary tab.
+
+The personal `/tasks` entry preserves existing access and project-task links. Its list/board control is a presentation choice; module Kanban views remain available directly through the module navigation. Additional ERP modules need their canonical assignment adapter and authorization before opting in; this slice does not infer unsupported subjects from a module name.
 
 ## Canonical actions
 
@@ -107,7 +130,7 @@ The scanner uses 128-ID windows, at most four complete windows and a shared budg
 
 ## Validation and release gate
 
-The change includes shared Kanban interaction tests, typed board/assignment/command model tests, API authorization and pagination tests, and a Playwright fixture that mounts the actual Work components with synthetic HTTP/session boundaries. The fixture covers review before dispatch, exact receipt readback, unresolved-outcome reconciliation without another POST, refusal/staleness, delegated principals, omitted/redacted rows, context changes, reconnect authority sequencing and desktop/mobile containment. The existing Frontend CI job runs it through `test:e2e:work-board` with one configured worker and retains failure screenshots and traces.
+The change includes shared Kanban interaction tests, typed board/assignment/command model tests, API authorization and pagination tests, and a Playwright fixture that mounts the actual Work components with synthetic HTTP/session boundaries. The fixture covers review before dispatch, exact receipt readback, unresolved-outcome reconciliation without another POST, refusal/staleness, delegated principals, omitted/redacted rows, context changes, reconnect authority sequencing and desktop/mobile containment. The existing Frontend CI job runs it through `test:e2e:work-board` with one configured worker and retains failure screenshots and traces. Module-host cases exercise in-page navigation, fixed scope/source configuration, layout/column specialization and removal of an open review after access or configuration changes.
 
 The browser fixture is not a live SpacetimeDB authorization proof. Native workflow tests cover current role/group/department eligibility, frozen quorum, revoked/expired delegation, same-key receipt ownership and replay authorization, source-read policy and cancellation history. They run through the existing workflow domain reducers. Existing project assignment and CRM Activity regression reducers are also included in the standard E2E domain list.
 

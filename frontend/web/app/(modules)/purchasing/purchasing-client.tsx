@@ -1,5 +1,6 @@
 "use client"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
@@ -413,7 +414,10 @@ function PurchasingClientLoaded({
   })
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
   const purchasingTabIds = useMemo(
-    () => [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders", "operations", "work"],
+    () => {
+      const workTabId = moduleWorkBoardTabId(moduleConfig)
+      return [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders", "operations", ...(workTabId ? [workTabId] : [])]
+    },
     [moduleConfig],
   )
   const { activeTab, setActiveTab } = useModuleTab(
@@ -2817,7 +2821,6 @@ function PurchasingClientLoaded({
       )}
       <ModuleWorkView
         organizationId={organizationId}
-        workScope="purchasing"
         config={configWithOperations}
         dashboardContent={<ModuleInsights input={{ module: "purchasing", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: ordersRead.state }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}

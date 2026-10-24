@@ -201,7 +201,7 @@ const taskStateForm: FormConfig = {
   ],
 }
 
-const assignUsersForm = (userOptions: Array<{ value: string; label: string }>): FormConfig => ({
+const assignUsersForm = (userOptions: Array<{ value: string; label: string; disabled?: boolean }>): FormConfig => ({
   id: "projects-assign-task-users",
   title: "Assign Task Users",
   submitLabel: "Assign users",
@@ -215,9 +215,9 @@ const assignUsersForm = (userOptions: Array<{ value: string; label: string }>): 
           type: "multiselect",
           name: "userIds",
           label: "Assignees",
-          options: userOptions,
           defaultValue: [],
           width: "full",
+          options: userOptions,
         },
       ],
     },
@@ -1532,6 +1532,7 @@ function ProjectsClientLoaded({
           // Billing references may finish after this modal opens; retain the
           // draft while resolving its options from the current query results.
           config={lifecycleModal.type === "billTimesheets" ? billTimesheetsFormConfig : lifecycleModal.type === "assignUsers" ? assignUsersFormConfig : lifecycleModal.form}
+          draft={lifecycleModal.type !== "assignUsers"}
           isPending={isFormMutationPending}
           submissionDisabled={lifecycleModal.type === "assignUsers" && (!canAssignTask || !assignmentOnline || !taskAssignees.isSuccess || taskAssignees.isFetching || taskAssignees.isError)}
           closeOnSubmit={false}

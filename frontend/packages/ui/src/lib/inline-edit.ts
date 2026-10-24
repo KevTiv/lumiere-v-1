@@ -11,7 +11,13 @@ export function parseInlineValue(kind: EntityInlineEdit["kind"], raw: string): I
     if (!Number.isFinite(value)) return { ok: false, error: "Enter a number" }
     return { ok: true, value }
   }
+  if (isMultilineInlineKind(kind)) return { ok: true, value: raw.replace(/\s+$/, "") }
   return { ok: true, value: kind === "text" ? text : raw }
+}
+
+/** Kinds where Enter inserts a newline and Cmd/Ctrl+Enter saves. */
+export function isMultilineInlineKind(kind: EntityInlineEdit["kind"]): boolean {
+  return kind === "textarea" || kind === "markdown"
 }
 
 /** True when saving would change nothing, so no command should be sent. */

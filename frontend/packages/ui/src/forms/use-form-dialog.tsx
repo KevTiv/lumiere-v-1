@@ -48,6 +48,8 @@ export function useFormDialog(): {
       }}
       config={toFormConfig(active)}
       showSubmitSuccessToast={false}
+      // Short one-off prompts share generic ids; a stale draft would leak between them.
+      draft={false}
       onSubmit={(values) => settle(values)}
     />
   ) : null

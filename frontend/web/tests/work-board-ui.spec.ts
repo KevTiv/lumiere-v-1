@@ -41,6 +41,7 @@ type FixtureState = {
   rows: FixtureTask[]
   activities: FixtureActivity[]
   activityReads: string[]
+  workflowReads: string[]
   writes: FixtureWrite[]
   commandEvidence: FixtureCommandEvidence[]
   commandReads: string[]
@@ -198,6 +199,7 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
       },
     ],
     activityReads: [],
+    workflowReads: [],
     writes: [],
     commandEvidence: [],
     commandReads: [],
@@ -256,6 +258,7 @@ async function fixtureBackend(page: Page): Promise<FixtureState> {
       if (!url.searchParams.has("workScope"))
         return respond(route, { data: state.rows })
       state.scopedReads += 1
+      state.workflowReads.push(url.search)
       await state.boardWait
       const companyId = Number(url.searchParams.get("companyId"))
       const module = url.searchParams.get("workScope")
@@ -576,6 +579,83 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
   test.afterEach(() => {
     expect(state.unexpected).toEqual([])
   })
+
+  test("an embedded module opens Kanban in its existing navigation and fixes its configured scope and source", async ({ page }) => {
+    await page.goto("/work-board?fixtureHost=module&workScope=sales&workSource=activities")
+    await expect(page.getByTestId("module-work-fixture-overview")).toBeVisible()
+    const kanban = page.getByTestId("module-workspace-fixture-purchasing-work")
+    await expect(kanban).toHaveText("Kanban")
+    expect(state.scopedReads).toBe(0)
+    await kanban.click()
+    await expect(page).toHaveURL((url) =>
+      url.pathname === "/work-board" &&
+      url.searchParams.get("fixtureHost") === "module" &&
+      url.searchParams.get("tab") === "work",
+    )
+    await expect(page.getByRole("table")).toBeVisible()
+    await expect(page.getByRole("button", { name: "Purchase review 41", exact: true })).toBeVisible()
+    await expect(page.getByText("Sales handoff 51", { exact: true })).toHaveCount(0)
+    await expect(page.getByRole("combobox", { name: "Work type", exact: true })).toHaveCount(0)
+    expect(state.activityReads).toEqual([])
+    expect(state.workflowReads.length).toBeGreaterThan(0)
+    expect(state.workflowReads.every((query) => {
+      const params = new URLSearchParams(query)
+      return params.get("workScope") === "purchasing" && params.get("companyId") === "11"
+    })).toBe(true)
+    await page.getByTestId("module-workspace-fixture-purchasing-overview").click()
+    await expect(page.getByTestId("module-work-fixture-overview")).toBeVisible()
+    await expect(page.getByRole("table")).toHaveCount(0)
+    await expect(page).toHaveURL((url) => url.pathname === "/work-board" && !url.searchParams.has("tab"))
+    expect(state.writes).toHaveLength(0)
+  })
+
+  test("an embedded module applies its default layout and column presentation while retaining cancelled history", async ({ page }) => {
+    state.rows.push(cancelledTask())
+    await page.goto("/work-board?fixtureHost=module&tab=work")
+    await expect(page.getByRole("table")).toBeVisible()
+    await expect(page.getByRole("button", { name: "List", exact: true })).toHaveAttribute("aria-pressed", "true")
+    await expect(page.getByTestId("kanban-board")).toHaveCount(0)
+    await page.getByRole("button", { name: "Board", exact: true }).click()
+    await expect(page.getByTestId("kanban-column-Claimed")).toContainText("Awaiting purchasing review")
+    await expect(page.locator('[data-testid^="kanban-column-"]')).toHaveCount(7)
+    expect(await page.locator('[data-testid^="kanban-column-"]').evaluateAll((columns) =>
+      columns.map((column) => column.getAttribute("data-testid")),
+    )).toEqual([
+      "kanban-column-Claimed", "kanban-column-Open", "kanban-column-Approved",
+      "kanban-column-Completed", "kanban-column-Rejected", "kanban-column-Invalidated",
+      "kanban-column-Cancelled",
+    ])
+    await expect(page.getByTestId("kanban-column-Cancelled").getByTestId("kanban-card-45")).toBeAttached()
+    await expect(page).toHaveURL((url) =>
+      url.pathname === "/work-board" && url.searchParams.get("tab") === "work" &&
+      url.searchParams.get("workLayout") === "board",
+    )
+    expect(state.writes).toHaveLength(0)
+  })
+
+  for (const command of ["access", "configuration"] as const) {
+    test(`an embedded controlled module retires its review after ${command} removal and restores a clean view`, async ({ page }) => {
+      await page.goto("/work-board?fixtureHost=module&tab=work")
+      await page.getByRole("button", { name: "Purchase review 42", exact: true }).click()
+      const review = page.getByRole("dialog", { name: "Purchase review 42" })
+      await expect(review).toBeVisible()
+      await review.getByRole("textbox").fill("Private draft to discard on view retirement")
+      await control(page, command)
+      await expect(review).toHaveCount(0)
+      await expect(page.getByTestId("module-work-fixture-overview")).toBeVisible()
+      await expect(page.getByTestId("module-workspace-fixture-purchasing-work")).toHaveCount(0)
+      await expect(page.getByRole("table")).toHaveCount(0)
+      // The parent still controls `work` via the URL; the module host must
+      // choose its ordinary fallback and clear review state without a command.
+      await expect(page).toHaveURL((url) => url.searchParams.get("tab") === "work")
+      expect(state.writes).toHaveLength(0)
+      await control(page, command)
+      await page.getByRole("button", { name: "Purchase review 42", exact: true }).click()
+      await expect(review).toBeVisible()
+      await expect(review.getByRole("textbox")).toHaveValue("")
+      expect(state.writes).toHaveLength(0)
+    })
+  }
 
   test("a drag opens review, dispatches once after confirmation and follows canonical claim readback", async ({
     page,

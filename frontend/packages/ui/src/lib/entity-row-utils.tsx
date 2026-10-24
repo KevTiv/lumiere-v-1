@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "../components/avatar"
 import { Progress } from "../components/progress"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip"
 import { cn } from "./utils"
+import { markdownToPlainText } from "./markdown"
 import { entryTableStatusDotClass } from "./theme-colors"
 import type { BadgeVariant, EntityViewConfig } from "./entity-view-types"
 import {
@@ -118,6 +119,11 @@ export function formatEntityFieldValue(
 
     case "percent":
       return typeof value === "number" ? `${value.toFixed(1)}%` : String(value)
+
+    case "markdown": {
+      const text = markdownToPlainText(String(value))
+      return <span className="line-clamp-2" title={text}>{text}</span>
+    }
 
     case "date": {
       const d = formatTimestampLike(value)

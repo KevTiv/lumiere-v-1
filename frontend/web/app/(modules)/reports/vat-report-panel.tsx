@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { DatePicker } from "@lumiere/ui/components/date-picker"
 
 type VatReportPanelProps = {
   organizationId: bigint
@@ -238,11 +239,11 @@ export function VatReportPanel({ organizationId, companyId, financialReports, pe
         </div>
         <div className="space-y-2">
           <Label>{t("reports.vat.dateFrom")}</Label>
-          <Input type="date" value={dateFrom} disabled={Boolean(periodContext)} onChange={(e) => setDateFrom(e.target.value)} />
+          <DatePicker value={dateFrom} disabled={Boolean(periodContext)} onChange={(value) => setDateFrom(value)} />
         </div>
         <div className="space-y-2">
           <Label>{t("reports.vat.dateTo")}</Label>
-          <Input type="date" value={dateTo} disabled={Boolean(periodContext)} onChange={(e) => setDateTo(e.target.value)} />
+          <DatePicker value={dateTo} disabled={Boolean(periodContext)} onChange={(value) => setDateTo(value)} />
         </div>
         <div className="space-y-2">
           <Label>{t("reports.vat.locale")}</Label>

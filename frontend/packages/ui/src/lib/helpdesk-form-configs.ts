@@ -52,7 +52,7 @@ export const newHelpdeskTicketForm = (t: TFunction): FormConfig => ({
         {
           id: "partnerEmail",
           name: "partnerEmail",
-          type: "text",
+          type: "email",
           label: t("helpdesk.forms.newTicket.fields.partnerEmail"),
           placeholder: t("helpdesk.forms.newTicket.fields.partnerEmailPlaceholder"),
           width: "1/2",

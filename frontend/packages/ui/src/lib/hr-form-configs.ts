@@ -60,7 +60,7 @@ export const newEmployeeForm = (t: TFunction): FormConfig => ({
       fields: [
         {
           id: "emp-work-email",
-          type: "text",
+          type: "email",
           name: "workEmail",
           label: t("hr.forms.newEmployee.fields.workEmail"),
           placeholder: t("hr.forms.newEmployee.fields.workEmailPlaceholder"),
@@ -68,7 +68,7 @@ export const newEmployeeForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "emp-work-phone",
-          type: "text",
+          type: "tel",
           name: "workPhone",
           label: t("hr.forms.newEmployee.fields.workPhone"),
           placeholder: t("hr.forms.newEmployee.fields.workPhonePlaceholder"),
@@ -191,7 +191,7 @@ export const newContractForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "contract-wage",
-          type: "number",
+          type: "money",
           name: "wage",
           label: t("hr.forms.newContract.fields.wage"),
           placeholder: "0.00",
@@ -273,7 +273,7 @@ export const newPayslipForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "payslip-basic-wage",
-          type: "number",
+          type: "money",
           name: "basicWage",
           label: t("hr.forms.newPayslip.fields.basicWage"),
           placeholder: "0.00",
@@ -566,7 +566,7 @@ export const newSalaryRuleForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "rule-amount-fix",
-          type: "number",
+          type: "money",
           name: "amountFix",
           label: t("hr.forms.newSalaryRule.fields.amountFix"),
           width: "1/2",
@@ -637,14 +637,14 @@ export const editEmployeeForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "emp-edit-work-email",
-          type: "text",
+          type: "email",
           name: "workEmail",
           label: t("hr.forms.newEmployee.fields.workEmail"),
           width: "1/2",
         },
         {
           id: "emp-edit-work-phone",
-          type: "text",
+          type: "tel",
           name: "workPhone",
           label: t("hr.forms.newEmployee.fields.workPhone"),
           width: "1/2",
@@ -787,7 +787,7 @@ export const editContractForm = (t: TFunction): FormConfig => ({
         },
         {
           id: "contract-edit-wage",
-          type: "number",
+          type: "money",
           name: "wage",
           label: t("hr.forms.newContract.fields.wage"),
           width: "1/2",

@@ -144,7 +144,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
                       { key: "start", label: t("calendar.events.columns.start"), type: "datetime" as const },
                       { key: "stop", label: t("calendar.events.columns.stop"), type: "datetime" as const },
                       { key: "location", label: t("calendar.events.columns.location") },
-                      { key: "description", label: "Description" },
+                      { key: "description", type: "markdown" as const, label: "Description" },
                     ],
                   },
                 ],

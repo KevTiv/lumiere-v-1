@@ -177,7 +177,7 @@ export const leadDetailConfig = (t: TFunction): EntityDetailConfig => ({
           type: "relative-date",
           width: "1/2",
         },
-        { key: "description", label: t("crm.forms.newLead.fields.description"), width: "full" },
+        { key: "description", type: "markdown", label: t("crm.forms.newLead.fields.description"), width: "full" },
       ],
     },
   ],
@@ -334,6 +334,7 @@ export const opportunityDetailConfig = (t: TFunction): EntityDetailConfig => ({
         },
         {
           key: "description",
+          type: "markdown",
           label: t("crm.forms.editOpportunity.fields.description"),
           width: "full",
         },
@@ -460,6 +461,7 @@ export const contactDetailConfig = (t: TFunction): EntityDetailConfig => ({
         { key: "website", label: t("crm.forms.editContactDetails.fields.website"), width: "1/2" },
         {
           key: "description",
+          type: "markdown",
           label: t("crm.forms.editContactDetails.fields.description"),
           width: "full",
         },
@@ -515,7 +517,7 @@ export const contactTagsTableConfig = (t: TFunction): EntityViewConfig => ({
     columns: [
       { key: "name", label: t("crm.contactTags.columns.name"), width: "min-w-36" },
       { key: "color", label: t("crm.contactTags.columns.color"), width: "min-w-24" },
-      { key: "description", label: t("crm.contactTags.columns.description"), width: "min-w-48" },
+      { key: "description", type: "markdown", label: t("crm.contactTags.columns.description"), width: "min-w-48" },
     ],
     emptyMessage: t("crm.contactTags.emptyMessage"),
   },
@@ -556,7 +558,7 @@ export const contactSegmentsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "isDynamic", label: t("crm.contactSegments.columns.isDynamic"), type: "boolean", align: "center" },
       { key: "isActive", label: t("crm.contactSegments.columns.isActive"), type: "boolean", align: "center" },
       { key: "memberCount", label: t("crm.contactSegments.columns.memberCount"), type: "number", align: "right" },
-      { key: "description", label: t("crm.contactSegments.columns.description"), width: "min-w-48" },
+      { key: "description", type: "markdown", label: t("crm.contactSegments.columns.description"), width: "min-w-48" },
     ],
     emptyMessage: t("crm.contactSegments.emptyMessage"),
   },
