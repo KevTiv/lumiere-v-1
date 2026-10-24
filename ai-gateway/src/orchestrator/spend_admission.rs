@@ -48,7 +48,7 @@ use crate::ai_spend::{
     STATUS_RELEASED, STATUS_RESERVED, STATUS_SETTLED,
 };
 use crate::providers::llm::{
-    CompletionTermination, LlmCompletion, LlmMessage, LlmRequest, LlmResponse,
+    CompletionTermination, LlmCompletion, LlmMessage, LlmRequest, LlmResponse, ProviderRejection,
 };
 
 /// Persistence operations needed for admission; implemented over SpacetimeDB
@@ -676,7 +676,7 @@ pub(super) struct SpendAdmittedLlm<'a> {
 #[error("provider attempt requires reconciliation: {0}")]
 pub(super) struct UnresolvedProviderAttempt(#[source] anyhow::Error);
 
-type ProfilePermits = HashMap<(u64, String), Weak<tokio::sync::Semaphore>>;
+type ProfilePermits = HashMap<(u64, String), (u32, Weak<tokio::sync::Semaphore>)>;
 static PROFILE_PERMITS: OnceLock<Mutex<ProfilePermits>> = OnceLock::new();
 
 impl<'a> SpendAdmittedLlm<'a> {
@@ -703,25 +703,40 @@ impl<'a> SpendAdmittedLlm<'a> {
         mut self,
         profile: &super::model_configuration::ModelProfile,
     ) -> Result<Self> {
-        if profile.timeout_ms == 0 || profile.max_concurrency == 0 {
+        if profile.timeout_ms == 0
+            || profile.max_concurrency == 0
+            || profile.max_concurrency as usize > tokio::sync::Semaphore::MAX_PERMITS
+        {
             bail!("profile timeout and concurrency limits must be positive");
         }
         let mut permits = PROFILE_PERMITS
             .get_or_init(Mutex::default)
             .lock()
             .map_err(|_| anyhow::anyhow!("profile concurrency registry unavailable"))?;
-        permits.retain(|_, value| value.strong_count() > 0);
+        permits.retain(|_, (_, value)| value.strong_count() > 0);
         let key = (self.binding.organization_id, profile.reference.stable_ref());
-        let semaphore = permits
+        let limit = if profile.supports_parallel_requests {
+            profile.max_concurrency
+        } else {
+            1
+        };
+        let semaphore = match permits
             .get(&key)
-            .and_then(Weak::upgrade)
-            .unwrap_or_else(|| {
-                let semaphore = Arc::new(tokio::sync::Semaphore::new(
-                    profile.max_concurrency as usize,
-                ));
-                permits.insert(key, Arc::downgrade(&semaphore));
+            .and_then(|(prior, weak)| weak.upgrade().map(|value| (*prior, value)))
+        {
+            Some((prior, semaphore)) => {
+                anyhow::ensure!(
+                    prior == limit,
+                    "immutable profile concurrency limit changed"
+                );
                 semaphore
-            });
+            }
+            None => {
+                let semaphore = Arc::new(tokio::sync::Semaphore::new(limit as usize));
+                permits.insert(key, (limit, Arc::downgrade(&semaphore)));
+                semaphore
+            }
+        };
         self.profile_limits = Some((
             semaphore,
             Duration::from_millis(u64::from(profile.timeout_ms)),
@@ -915,6 +930,22 @@ impl LlmCompletion for SpendAdmittedLlm<'_> {
         let response = match completion.await {
             Ok(response) => response,
             Err(error) => {
+                if error.downcast_ref::<ProviderRejection>().is_some() {
+                    self.ledger
+                        .record_attempt_result(
+                            organization_id,
+                            &AttemptResult::failed(attempt.id, 0, 0, &error.to_string()),
+                        )
+                        .await
+                        .context("could not record definite provider rejection; retry denied")
+                        .map_err(UnresolvedProviderAttempt)?;
+                    self.ledger
+                        .settle(organization_id, reservation.id, 0, 0)
+                        .await
+                        .context("could not settle definite provider rejection; retry denied")
+                        .map_err(UnresolvedProviderAttempt)?;
+                    return Err(error.context("provider rejection recorded and zero usage settled"));
+                }
                 // The provider may have run, so the outcome is unknown rather
                 // than failed, and the reservation stays reserved.
                 self.ledger
@@ -1171,6 +1202,7 @@ pub(crate) mod tests {
         attempts: Mutex<Vec<ProviderAttempt>>,
         settled: Mutex<Vec<(u64, u32, u32)>>,
         reconciliations: Mutex<Vec<(u64, String, String, String)>>,
+        result_failures: AtomicU32,
         settle_failures: AtomicU32,
         settle_response_losses: AtomicU32,
         /// Ledger writes in call order, so tests can assert the sequence.
@@ -1385,6 +1417,15 @@ pub(crate) mod tests {
                 .lock()
                 .unwrap()
                 .push(format!("result:{}", result.status));
+            if self
+                .result_failures
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_ok()
+            {
+                bail!("scripted result recording failure");
+            }
             let reservations = self.reservations.lock().unwrap();
             let mut rows = self.attempts.lock().unwrap();
             let row = rows
@@ -1606,6 +1647,149 @@ pub(crate) mod tests {
             &first.profile_limits.unwrap().0,
             &second.profile_limits.unwrap().0
         ));
+    }
+
+    #[test]
+    fn nonparallel_profile_is_serial_and_immutable_limits_cannot_change() {
+        let provider = Provider::new(Ok(response(40, 20)));
+        let ledger = FakeLedger::configured();
+        let mut profile = limited_profile("immutable-serial-limit");
+        profile.max_concurrency = 3;
+        profile.supports_parallel_requests = false;
+        let first = admitted(&provider, &ledger)
+            .with_profile_limits(&profile)
+            .unwrap();
+        assert_eq!(
+            first.profile_limits.as_ref().unwrap().0.available_permits(),
+            1
+        );
+        profile.supports_parallel_requests = true;
+        let error = admitted(&provider, &ledger)
+            .with_profile_limits(&profile)
+            .err()
+            .unwrap();
+        assert!(error.to_string().contains("immutable profile"));
+        assert!(ledger.writes().is_empty());
+    }
+
+    #[tokio::test]
+    async fn cancellation_retains_dispatch_and_releases_profile_permit_without_redispatch() {
+        struct PendingProvider(tokio::sync::Notify);
+        #[async_trait]
+        impl LlmCompletion for PendingProvider {
+            async fn complete(&self, _: LlmRequest) -> Result<LlmResponse> {
+                self.0.notify_one();
+                std::future::pending().await
+            }
+        }
+        let provider = PendingProvider(tokio::sync::Notify::new());
+        let ledger = FakeLedger::configured();
+        let mut profile = limited_profile("cancel-profile");
+        profile.timeout_ms = 1_000;
+        let admitted = SpendAdmittedLlm::with_clock(&provider, &ledger, binding(), fixed_clock)
+            .unwrap()
+            .with_profile_limits(&profile)
+            .unwrap();
+        let mut call = Box::pin(admitted.complete(request()));
+        tokio::select! {
+            _ = provider.0.notified() => {},
+            _ = &mut call => panic!("provider completed before cancellation"),
+        }
+        drop(call);
+        assert_eq!(
+            admitted
+                .profile_limits
+                .as_ref()
+                .unwrap()
+                .0
+                .available_permits(),
+            1
+        );
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_DISPATCHED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
+        let recovered = SpendAdmittedLlm::with_clock(&provider, &ledger, binding(), fixed_clock)
+            .unwrap()
+            .with_profile_limits(&profile)
+            .unwrap();
+        assert!(recovered
+            .complete(request())
+            .await
+            .unwrap_err()
+            .is::<UnresolvedProviderAttempt>());
+        assert_eq!(ledger.writes(), vec!["reserve", "accept", "dispatch"]);
+    }
+
+    #[tokio::test]
+    async fn explicit_rejection_settles_zero_before_allowing_retry() {
+        let rejection =
+            crate::providers::llm::check_mistral_status(reqwest::StatusCode::TOO_MANY_REQUESTS)
+                .unwrap_err();
+        let provider = Provider::new(Err(rejection));
+        let ledger = FakeLedger::configured();
+        let error = admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        assert!(error
+            .downcast_ref::<ProviderRejection>()
+            .unwrap()
+            .retryable());
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_FAILED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_SETTLED
+        );
+        assert_eq!(*ledger.settled.lock().unwrap(), vec![(100, 0, 0)]);
+        assert_eq!(
+            ledger.writes(),
+            vec!["reserve", "accept", "dispatch", "result:failed", "settle"]
+        );
+    }
+
+    #[tokio::test]
+    async fn rejection_with_failed_settlement_does_not_authorize_retry() {
+        let rejection =
+            crate::providers::llm::check_mistral_status(reqwest::StatusCode::TOO_MANY_REQUESTS)
+                .unwrap_err();
+        let provider = Provider::new(Err(rejection));
+        let ledger = FakeLedger::configured();
+        ledger.settle_failures.store(1, Ordering::SeqCst);
+        let error = admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        assert!(error.downcast_ref::<ProviderRejection>().is_none());
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_FAILED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
+        assert_eq!(provider.calls(), 1);
+    }
+
+    #[tokio::test]
+    async fn rejection_with_failed_result_recording_does_not_authorize_retry() {
+        let rejection =
+            crate::providers::llm::check_mistral_status(reqwest::StatusCode::TOO_MANY_REQUESTS)
+                .unwrap_err();
+        let provider = Provider::new(Err(rejection));
+        let ledger = FakeLedger::configured();
+        ledger.result_failures.store(1, Ordering::SeqCst);
+        let error = admitted(&provider, &ledger)
+            .complete(request())
+            .await
+            .unwrap_err();
+        assert!(error.downcast_ref::<ProviderRejection>().is_none());
+        assert_eq!(ledger.attempt(KEY).status, ATTEMPT_DISPATCHED);
+        assert_eq!(
+            ledger.reservations.lock().unwrap()[0].status,
+            STATUS_RESERVED
+        );
+        assert!(ledger.settled.lock().unwrap().is_empty());
+        assert_eq!(provider.calls(), 1);
     }
 
     fn reconciliation(outcome: ReconciledOutcome) -> ProviderAttemptReconciliation {

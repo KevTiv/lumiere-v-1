@@ -202,7 +202,8 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
       ),
       desk.getByTestId("reconciliation-confirm").click(),
     ])
-    expect(accepted.ok(), `Reconciliation HTTP ${accepted.status()}: ${await accepted.text()}`).toBe(true)
+    const failureBody = accepted.ok() ? "" : (await accepted.text()).slice(0, 2_000)
+    expect(accepted.ok(), `Reconciliation HTTP ${accepted.status()}: ${failureBody}`).toBe(true)
     await expect.poll(() => fetchBankLine(page, lineId)).toEqual({
       id: lineId,
       statementId,
