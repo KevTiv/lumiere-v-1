@@ -161,6 +161,6 @@ mod tests {
         ));
         let release = include_str!("../../release-compatibility-manifest.json");
         assert!(release.contains("\"version\": \"0.3.143\""));
-        assert!(release.contains("\"revision\": \"fcfe7dff63a6f42b54e4dac2bf306f16e07eed9a\""));
+        assert!(release.contains("\"revision\": \"a4f54b97c49fa78514233f19f4461323b9e5d0d4\""));
     }
 }

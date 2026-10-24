@@ -36,7 +36,13 @@ The final release image still requires its own exact-image verification.
 - PostgreSQL migration tests passed: exact archive, tenant/company scope,
   quarantine, forced mismatch rollback, canonical-row preservation, and partial
   legacy-shape rejection. Legacy columns and their values remain intact.
-- 20 focused durable migration generator tests passed.
+- Full codegen: 136 passed, one existing ignored.
+- Consumer on contracts 0.3.143: 30 PostgreSQL migration tests passed against
+  disposable databases; gateway 729 passed with eight existing ignored;
+  525 web unit tests, TypeScript, and 12 release-manifest regressions passed.
+- The corrected exact release-revision assertion passed its focused test.
+- Fresh generation matches every pinned binding, manifest, TypeScript SDK and
+  frozen SQL artifact. The canonical schema hash matches 0.3.143.
 - Railway stack release shell tests and 13 workflow tests passed.
 - Pilot provisioning script tests and the offline USD 1 plan passed without
   provider requests or spending.
