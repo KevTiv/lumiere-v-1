@@ -60,6 +60,7 @@ import {
   useFormDialog,
 } from "@lumiere/ui"
 import type { EntityRow, EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import { EntityLabelsProvider, labelsFromOptions } from "@lumiere/ui"
 import type { Product, Uom } from "@lumiere/stdb/types"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -1247,6 +1248,16 @@ function PurchasingClientLoaded({
       expenseAccountFieldOptions,
       payableAccountFieldOptions,
     ])
+
+  const entityLabels = useMemo(
+    () => ({
+      partnerId: labelsFromOptions(vendorFieldOptions),
+      vendorId: labelsFromOptions(vendorFieldOptions),
+      productId: labelsFromOptions(productFieldOptions),
+      currencyId: labelsFromOptions(currencyFieldOptions),
+    }),
+    [vendorFieldOptions, productFieldOptions, currencyFieldOptions],
+  )
 
   const partnerBankFormConfig = useMemo(
     () =>
@@ -2808,7 +2819,7 @@ function PurchasingClientLoaded({
   } as ModuleConfig
 
   return (
-    <>
+    <EntityLabelsProvider value={entityLabels}>
       {activeTabUsable && formDialog}
       {contactsReferenceStatus && (
         <p role="status" className="text-sm text-muted-foreground">
@@ -3013,6 +3024,6 @@ function PurchasingClientLoaded({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </EntityLabelsProvider>
   )
 }

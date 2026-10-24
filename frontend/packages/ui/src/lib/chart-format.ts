@@ -32,14 +32,14 @@ function isCurrencyCode(code: string): boolean {
 }
 
 /** Full-precision value for tooltips and tables. */
-export function formatChartValue(value: number, format: ChartValueFormat = { kind: "number" }): string {
+export function formatChartValue(value: number, format: ChartValueFormat = { kind: "number" }, locale?: string): string {
   if (!Number.isFinite(value)) return "—"
   if (format.kind === "percent") {
-    return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value)}%`
+    return `${new Intl.NumberFormat(locale ?? "en-US", { maximumFractionDigits: 1 }).format(value)}%`
   }
   if (format.kind === "currency" && isCurrencyCode(format.currency)) {
     try {
-      return new Intl.NumberFormat("en-US", {
+      return new Intl.NumberFormat(locale ?? "en-US", {
         style: "currency",
         currency: format.currency.toUpperCase(),
         maximumFractionDigits: 0,
@@ -48,17 +48,17 @@ export function formatChartValue(value: number, format: ChartValueFormat = { kin
       // unknown ISO code: fall through to a plain number
     }
   }
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value)
+  return new Intl.NumberFormat(locale ?? "en-US", { maximumFractionDigits: 2 }).format(value)
 }
 
 /** Short value for axis ticks and dense labels: 1.2k, 3.4M, $12k. */
-export function formatChartTick(value: number, format: ChartValueFormat = { kind: "number" }): string {
+export function formatChartTick(value: number, format: ChartValueFormat = { kind: "number" }, locale?: string): string {
   if (!Number.isFinite(value)) return ""
   if (format.kind === "percent") return `${Math.round(value)}%`
   const options: Intl.NumberFormatOptions = { notation: "compact", maximumFractionDigits: 1 }
   if (format.kind === "currency" && isCurrencyCode(format.currency)) {
     try {
-      return new Intl.NumberFormat("en-US", {
+      return new Intl.NumberFormat(locale ?? "en-US", {
         ...options,
         style: "currency",
         currency: format.currency.toUpperCase(),
@@ -67,7 +67,7 @@ export function formatChartTick(value: number, format: ChartValueFormat = { kind
       // unknown ISO code: fall through
     }
   }
-  return new Intl.NumberFormat("en-US", options).format(value)
+  return new Intl.NumberFormat(locale ?? "en-US", options).format(value)
 }
 
 /** Value as a share of a total, 0 when the total is empty. */
@@ -103,14 +103,14 @@ function medianOf(values: readonly number[]): number {
 }
 
 /** Month buckets ending at `now`: [{ key: "2026-07", label: "Jul" }, …], oldest first. */
-export function monthBuckets(count: number, now: Date = new Date()): Array<{ key: string; label: string; startMs: number; endMs: number }> {
+export function monthBuckets(count: number, now: Date = new Date(), locale?: string): Array<{ key: string; label: string; startMs: number; endMs: number }> {
   const buckets: Array<{ key: string; label: string; startMs: number; endMs: number }> = []
   for (let offset = count - 1; offset >= 0; offset -= 1) {
     const start = new Date(now.getFullYear(), now.getMonth() - offset, 1)
     const end = new Date(now.getFullYear(), now.getMonth() - offset + 1, 1)
     buckets.push({
       key: monthKey(start.getTime()),
-      label: new Intl.DateTimeFormat("en-US", { month: "short" }).format(start),
+      label: new Intl.DateTimeFormat(locale ?? "en-US", { month: "short" }).format(start),
       startMs: start.getTime(),
       endMs: end.getTime() - 1,
     })

@@ -1,5 +1,7 @@
 "use client"
 
+import { useCurrencyFormat } from "../../lib/currency-context"
+
 interface AccountEntry {
   code: string
   name: string
@@ -12,7 +14,7 @@ interface AccountBalanceData {
 }
 
 export function AccountBalanceWidget({ data }: { data: AccountBalanceData }) {
-  const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
+  const { money } = useCurrencyFormat()
 
   if (data.accounts.length === 0) {
     return (
@@ -34,7 +36,7 @@ export function AccountBalanceWidget({ data }: { data: AccountBalanceData }) {
           <span
             className={`text-sm font-semibold tabular-nums shrink-0 ${a.balance < 0 ? "text-destructive" : ""}`}
           >
-            {fmt.format(a.balance)}
+            {money(a.balance)}
           </span>
         </div>
       ))}

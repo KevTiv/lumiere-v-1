@@ -22,6 +22,10 @@ import { EntityPivotView } from "./entity-pivot"
 import { ALL_FILTER_VALUE, matchesSearch, rowFilterValue } from "../lib/entity-table-engine"
 import { formatEntityFieldValue, getRowField } from "../lib/entity-row-utils"
 import { useCurrencyFormat } from "../lib/currency-context"
+import { useEntityLabels } from "../lib/entity-labels-context"
+import { resolveAccountingRelationLabel } from "@lumiere/stdb/read-models"
+
+export { EntityLabelsProvider, labelsFromOptions, labelsFromRows, useEntityLabels } from "../lib/entity-labels-context"
 import { unwrapEntityValue } from "../lib/entity-row-values"
 import { Input } from "../components/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
@@ -70,6 +74,7 @@ export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTab
   const columns = useEntitySurfaceFilter(config.columns)
   const actions = useEntitySurfaceFilter(config.actions)
   const currency = useCurrencyFormat()
+  const labels = useEntityLabels()
   return useMemo(
     () => ({
       ...config,
@@ -77,7 +82,20 @@ export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTab
       // currency record id), else the company's, in the user's locale. They are right-aligned, and
       // negatives are tinted so they stand out in a column of figures.
       columns: columns.map((column) => {
+        // A related-record column (partnerId, productId, …) shows the record's name when the page
+        // supplied names for that field; ids with no known name show as "#id", empty cells as "—".
+        const names = labels?.[column.key]
+        if (names && !column.render && (!column.type || column.type === "number" || column.type === "text") && !column.inlineEdit) {
+          return {
+            ...column,
+            render: (value: unknown) => {
+              const shown = resolveAccountingRelationLabel(value, names)
+              return shown === "—" ? <span className="text-muted-foreground">—</span> : shown
+            },
+          }
+        }
         if (column.type !== "currency" || column.render) return column
+        const rowCurrencyKey = column.currencyKey ?? currency.rowCurrencyKey
         return {
           ...column,
           align: column.align ?? "right",
@@ -87,7 +105,7 @@ export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTab
               "currency",
               undefined,
               undefined,
-              (column.currencyKey ? currency.codeFor(getRowField(row, column.currencyKey)) : undefined) ??
+              (rowCurrencyKey ? currency.codeFor(getRowField(row, rowCurrencyKey)) : undefined) ??
                 currency.defaultCode,
               currency.locale,
             )
@@ -102,7 +120,7 @@ export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTab
       }),
       actions: actions.length > 0 ? actions : undefined,
     }),
-    [config, columns, actions, currency],
+    [config, columns, actions, currency, labels],
   )
 }
 

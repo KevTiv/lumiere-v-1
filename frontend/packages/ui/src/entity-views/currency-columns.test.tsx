@@ -62,6 +62,30 @@ describe("currency columns", () => {
     expect(positive.container.textContent).toBe("$12.50")
   })
 
+  it("follow the provider's row currency field when a column names none, and its own key first", () => {
+    const [, fee, custom] = renderHook(() => useScopedEntityTableConfig(table), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <CurrencyFormatProvider locale="de-DE" defaultCode="EUR" currencies={currencies} rowCurrencyKey="currencyId">
+          {children}
+        </CurrencyFormatProvider>
+      ),
+    }).result.current.columns
+    expect(plain(fee.render?.(1500, { currencyId: 7n }))).toBe("1.500 RWF")
+    expect(plain(fee.render?.(2.5, {}))).toBe("2,50 €")
+    expect(custom.render?.(1, {})).toBe("mine")
+    const own = renderHook(
+      () => useScopedEntityTableConfig({ ...table, columns: [{ key: "x", label: "X", type: "currency", currencyKey: "companyCurrencyId" }] }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <CurrencyFormatProvider currencies={currencies} rowCurrencyKey="currencyId">
+            {children}
+          </CurrencyFormatProvider>
+        ),
+      },
+    ).result.current.columns[0]
+    expect(plain(own.render?.(1500, { currencyId: 3n, companyCurrencyId: 7n }))).toBe("RWF 1,500")
+  })
+
   it("keep a column's own alignment", () => {
     const columns = renderHook(
       () => useScopedEntityTableConfig({ ...table, columns: [{ key: "fee", label: "Fee", type: "currency", align: "left" }] }),

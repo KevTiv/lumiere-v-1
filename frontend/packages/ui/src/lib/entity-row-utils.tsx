@@ -110,7 +110,7 @@ let warnedMissingCurrency = false
 export function formatCurrencyAmount(
   value: number,
   currencyCode?: string,
-  options?: { locale?: string },
+  options?: { locale?: string; /** Short form for tiles and axes: "$1.2M". */ compact?: boolean },
 ): string {
   const resolved = resolveCurrencyCode(currencyCode)
   if (!resolved && !warnedMissingCurrency && process.env.NODE_ENV === "development") {
@@ -122,6 +122,7 @@ export function formatCurrencyAmount(
     style: "currency",
     currency: resolved ?? "USD",
     currencySign: "accounting",
+    ...(options?.compact ? { notation: "compact" as const } : {}),
   }).format(value)
 }
 
