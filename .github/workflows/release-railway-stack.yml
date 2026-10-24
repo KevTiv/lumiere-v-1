@@ -152,6 +152,16 @@ jobs:
             exit 1
           }
 
+      - name: Verify Railway access and context
+        shell: bash
+        run: |
+          set -euo pipefail
+          railway link --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT"
+          railway service list \
+            --project "$RAILWAY_PROJECT_ID" \
+            --environment "$RAILWAY_ENVIRONMENT" \
+            --json | jq '[.[] | {id, name}]'
+
       - name: Verify production Railway topology and worker configuration
         if: inputs.environment == 'production'
         shell: bash
@@ -159,15 +169,6 @@ jobs:
           set -euo pipefail
           bash scripts/railway-production-preflight.sh \
             infra/railway/production-eu-services.json
-
-      - name: Verify Railway access and context
-        shell: bash
-        run: |
-          set -euo pipefail
-          railway service list \
-            --project "$RAILWAY_PROJECT_ID" \
-            --environment "$RAILWAY_ENVIRONMENT" \
-            --json | jq '[.[] | {id, name}]'
 
       - name: Phase 1 — gate EU infrastructure
         shell: bash

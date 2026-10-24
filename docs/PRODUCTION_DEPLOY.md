@@ -284,6 +284,12 @@ dedicated worker tokens, placeholder credentials, and invalid organization-ID
 lists without printing variable values. This pass intentionally defines only
 production; development infrastructure and data remain deferred.
 
+The production control plane reports `europe-west4`; the exact runtime zone is
+`europe-west4-drams3a`. The manifest records these identifiers separately.
+Preflight checks configured replicas, including explicit configuration for a
+service that has never deployed. The ordered rollout still verifies the exact
+`RAILWAY_REPLICA_REGION` after deployment. It does not move existing volumes.
+
 1. Existing `Postgres` and `spacetimedb` deployments must be successful and
    report the configured EU `RAILWAY_REPLICA_REGION`. `qdrant` is required only
    when `enable_ai=true`. Kong uses instance-local protective rate limits, so

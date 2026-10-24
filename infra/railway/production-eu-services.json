@@ -3,6 +3,7 @@
   "projectId": "cc695d4b-030c-43e3-bbd6-a41095b09257",
   "environment": "production",
   "expectedRegion": "europe-west4-drams3a",
+  "configurationRegion": "europe-west4",
   "services": [
     { "name": "Postgres", "role": "database" },
     {

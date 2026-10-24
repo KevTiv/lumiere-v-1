@@ -24,6 +24,7 @@ jq -e '.schemaVersion == 1 and (.services | type == "array")' "$MANIFEST" >/dev/
 manifest_project="$(jq -r '.projectId' "$MANIFEST")"
 manifest_environment="$(jq -r '.environment' "$MANIFEST")"
 manifest_region="$(jq -r '.expectedRegion' "$MANIFEST")"
+configuration_region="$(jq -r '.configurationRegion // .expectedRegion' "$MANIFEST")"
 [[ "$RAILWAY_PROJECT_ID" == "$manifest_project" ]] \
   || die "manifest project does not match RAILWAY_PROJECT_ID"
 [[ "$RAILWAY_ENVIRONMENT" == production && "$RAILWAY_ENVIRONMENT" == "$manifest_environment" ]] \
@@ -36,6 +37,7 @@ services_json="$(railway service list \
   --environment "$RAILWAY_ENVIRONMENT" \
   --json)"
 
+config_json=""
 failures=0
 while IFS= read -r service; do
   name="$(jq -r '.name' <<<"$service")"
@@ -59,21 +61,35 @@ while IFS= read -r service; do
     continue
   fi
 
-  if ! jq -e --arg name "$name" --arg region "$manifest_region" '
-    [.[] | select(.name == $name)][0].regions as $regions
-    | ($regions | length) > 0
-      and all($regions[]; .name == $region and .configured > 0)
-  ' >/dev/null <<<"$services_json"; then
-    echo "[railway-preflight] $name has no active EU replica in $manifest_region" >&2
+  regions_json="$(jq -c --arg name "$name" '[.[] | select(.name == $name)][0].regions // []' <<<"$services_json")"
+  # A service that has never deployed has no deployment regions. Read its
+  # explicit planned configuration; runtime location is checked after rollout.
+  if [[ "$(jq 'length' <<<"$regions_json")" == 0 ]]; then
+    if [[ -z "$config_json" ]]; then
+      railway status --json | jq -e --arg project "$RAILWAY_PROJECT_ID" '.id == $project' >/dev/null \
+        || die "linked project does not match RAILWAY_PROJECT_ID"
+      # Config can contain variables. Keep it captured and never print it.
+      config_json="$(railway environment config --environment "$RAILWAY_ENVIRONMENT" --json)"
+    fi
+    service_id="$(jq -r --arg name "$name" '[.[] | select(.name == $name)][0].id' <<<"$services_json")"
+    regions_json="$(jq -c --arg id "$service_id" '
+      (.services[$id].deploy.multiRegionConfig // {}) | to_entries
+      | map(select(.value != null) | {name: .key, configured: .value.numReplicas})
+    ' <<<"$config_json")"
+  fi
+  if ! jq -e --arg region "$configuration_region" '
+    length > 0 and all(.[]; .name == $region and (.configured | type == "number")
+      and .configured > 0 and .configured == (.configured | floor))
+  ' >/dev/null <<<"$regions_json"; then
+    echo "[railway-preflight] $name has no configured EU replica in $configuration_region (runtime $manifest_region)" >&2
     failures=$((failures + 1))
   fi
 
   max_replicas="$(jq -r '.maxReplicas // .localStorage.maxReplicas // empty' <<<"$service")"
-  if [[ -n "$max_replicas" ]] && ! jq -e --arg name "$name" --argjson maximum "$max_replicas" '
-    [.[] | select(.name == $name)][0].regions
-    | (map(.configured) | add) as $total
+  if [[ -n "$max_replicas" ]] && ! jq -e --argjson maximum "$max_replicas" '
+    (map(.configured) | add) as $total
     | $total >= 1 and $total <= $maximum
-  ' >/dev/null <<<"$services_json"; then
+  ' >/dev/null <<<"$regions_json"; then
     if [[ "$(jq -r '.localStorage.maxReplicas // empty' <<<"$service")" != "" ]]; then
       echo "[railway-preflight] $name local document storage requires at most $max_replicas configured replica(s)" >&2
     else
