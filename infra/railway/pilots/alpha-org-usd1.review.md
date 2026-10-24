@@ -1,7 +1,10 @@
 # Alpha org pilot proposal
 
-Prepared 2026-10-24 at the user's request. This file records a proposal, not a
-provisioned or approved production configuration. No billable call was made.
+Prepared and approved by the user on 2026-10-24. The user approved the exact
+tenant, models, published rates, concurrency limits and USD 1 cap. This is not
+a provisioned database configuration. No billable call was made.
+The JSON SHA-256 is `9497d92cb7f15a4ef2693066a91b9ba05a1668fcde8a82a4261168109e01b958`.
+It was staged on Railway ai-gateway with deployment disabled and read back exactly.
 
 - Scope: production organization 1 and company 1, both named Alpha org.
 - Budget: USD 1 per UTC calendar month for the dedicated pilot agent. The
@@ -20,7 +23,7 @@ Pricing and capabilities were checked against the official model pages:
 Account model visibility must still pass the read-only catalog check. These
 published IDs do not establish account access.
 
-Before apply: approve the exact JSON, add MISTRAL_API_KEY directly to Railway,
+Before database apply: add MISTRAL_API_KEY directly to Railway,
 complete a real report_analysis skill certification and independent promotion,
 and run the key/catalog check and provisioning preflight. Do not copy credentials
 into this manifest. The provisioning script rejects a missing certified release.
@@ -30,5 +33,5 @@ this pilot proposal does not change vector collections or embedding spaces.
 Offline plan (zero network requests and zero billable calls):
 
 ```sh
-node scripts/provision-ai-harness.mjs --plan infra/railway/pilots/alpha-org-usd1.proposed.json
+node scripts/provision-ai-harness.mjs --plan infra/railway/pilots/alpha-org-usd1.json
 ```

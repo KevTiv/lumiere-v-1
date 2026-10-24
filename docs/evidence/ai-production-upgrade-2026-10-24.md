@@ -1,8 +1,9 @@
 # AI production upgrade checks — 2026-10-24
 
 The combined repair preserves live row layouts and the canonical passage owner.
-PR #257 remains a release candidate. No production publish, migration, or AI
-provisioning has run during these checks.
+PR #257 remains a release candidate. No production publish, database migration, or tenant AI
+provisioning has run during these checks. The approved Railway manifest is
+staged without deployment.
 
 ## Schema
 
@@ -19,11 +20,12 @@ column prefixes match; only `search_embedding.expected_fingerprint` and
 `search_embedding.index_generation` are appended to existing tables.
 
 The production server's read-only `pre_publish` check returned `AutoMigrate`, with
-`major_version_upgrade=false`, for the lean source repair at `782f61bf8`.
-WASM SHA-256: `3103db9676569949de05b3628a98441a758f08902a2f70ddcaebd9c7a9d79f72`.
-This check did not publish and did not retain or display the migration token.
-The later combined source also incorporates PR #258's defaults and upgrade guard.
-Its final release image still requires its own exact-artifact check before deployment.
+`major_version_upgrade=false`, for the final combined lean source at
+`011eebf15012a1dc36519f9a70b3e27b3500afdb`.
+WASM SHA-256: `d3b308223cc7644aaadf2cc782a2352967bb4a3454d6942c60e53b2dc1c8e72e`.
+The same artifact passed the populated seven-table upgrade test. The checks did
+not publish to production and did not retain or display the migration token.
+The final release image still requires its own exact-image verification.
 
 ## Executed checks
 
@@ -45,14 +47,19 @@ Its final release image still requires its own exact-artifact check before deplo
 
 Contracts 0.3.141 remains immutable. Concurrent contracts 0.3.142 came from
 PR #258's source and omitted the workflow additions carried by 0.3.141, including
-migration 22. The combined successor must retain the union of both sources and
-preserve the released migration bytes from 0.3.141. Do not repin directly to
+migration 22. Contracts 0.3.143 retains the union of both sources and
+preserves the released migration bytes from 0.3.141. It was published at
+`a4f54b97c49fa78514233f19f4461323b9e5d0d4` after
+[PR #23](https://github.com/KevTiv/lumiere-contracts/pull/23) and
+[exact merged-commit CI](https://github.com/KevTiv/lumiere-contracts/actions/runs/40117966192) passed. Do not repin directly to
 0.3.142 or overwrite either tag.
 
 The requested USD 1 proposal is
-`infra/railway/pilots/alpha-org-usd1.proposed.json`, with its review record beside it.
-It is not yet an approved or applied production configuration. Railway still
-lacks MISTRAL_API_KEY and AI_HARNESS_MANIFEST_JSON at the last presence-only check.
+`infra/railway/pilots/alpha-org-usd1.json`, with its review record beside it.
+The user approved the exact JSON on 2026-10-24. AI_HARNESS_MANIFEST_JSON was
+staged on the production ai-gateway service with `--skip-deploys` and read back
+exactly. No tenant database configuration was applied. Railway still lacks
+MISTRAL_API_KEY at the last presence-only check.
 
 Production has Alpha org/company 1, no AI agents/profiles/policies/budgets, and no
 active report_analysis skill release. The production certification registry only
