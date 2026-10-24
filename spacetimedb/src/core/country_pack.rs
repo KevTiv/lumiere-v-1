@@ -41,6 +41,8 @@ pub struct CountryPackDefinition {
     /// versions require a future primary-key migration. Company pins therefore fail
     /// closed if this value ever stops matching their activated version.
     pub version: String,
+    pub is_active: bool,
+    pub metadata: Option<String>,
     /// Lifecycle gate. Only `accepted` definitions may be enabled.
     #[default("legacy_enabled")]
     pub acceptance_status: String,
@@ -48,8 +50,6 @@ pub struct CountryPackDefinition {
     pub effective_from: Option<Timestamp>,
     #[default(None::<Timestamp>)]
     pub effective_to: Option<Timestamp>,
-    pub is_active: bool,
-    pub metadata: Option<String>,
 }
 
 #[spacetimedb::table(
@@ -69,19 +69,19 @@ pub struct CountryPackTaxRule {
     #[unique]
     pub organization_pack_code_key: String,
     pub pack_key: String,
-    /// Exact definition version that owns this rule.
-    #[default("1.0.0")]
-    pub pack_version: String,
     pub code: String,
     pub name: String,
     pub rate: f64,
     pub tax_use: String,
+    pub is_active: bool,
+    pub metadata: Option<String>,
+    /// Exact definition version that owns this rule.
+    #[default("1.0.0")]
+    pub pack_version: String,
     #[default(None::<Timestamp>)]
     pub effective_from: Option<Timestamp>,
     #[default(None::<Timestamp>)]
     pub effective_to: Option<Timestamp>,
-    pub is_active: bool,
-    pub metadata: Option<String>,
 }
 
 #[spacetimedb::table(
@@ -97,14 +97,14 @@ pub struct CompanyCountryPack {
     pub organization_id: u64,
     pub company_id: u64,
     pub pack_key: String,
-    /// Version resolved at activation. Runtime lookup never silently upgrades this pin.
-    #[default("1.0.0")]
-    pub pinned_pack_version: String,
     pub enabled: bool,
     pub configuration: Option<String>,
     pub activated_at: Timestamp,
     pub updated_at: Timestamp,
     pub updated_by: spacetimedb::Identity,
+    /// Version resolved at activation. Runtime lookup never silently upgrades this pin.
+    #[default("1.0.0")]
+    pub pinned_pack_version: String,
 }
 
 // ── Input Params ─────────────────────────────────────────────────────────────

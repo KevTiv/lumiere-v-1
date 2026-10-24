@@ -96,6 +96,9 @@ pub struct Document {
     pub file_size: u64,
     pub mimetype: String,
     pub checksum: Option<String>,
+    /// Legacy wire-compatibility slot. New rows leave this empty; AI text lives
+    /// in `ai_evidence_passage`. Retain existing values until an audited retirement.
+    pub index_content: Option<String>,
     /// Analyzer/locale hint for FTS (from country pack or explicit index).
     pub index_language: Option<String>,
     pub access_token: Option<String>,
@@ -687,6 +690,7 @@ pub fn create_document(
         .or_else(|| document_residency_region_for_company(ctx, organization_id, company_id));
 
     let doc = ctx.db.document().insert(Document {
+        index_content: None,
         id: 0,
         organization_id,
         name: params.name,

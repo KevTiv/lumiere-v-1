@@ -27,7 +27,8 @@ FROM search_embedding;
 $embedding$;
         -- No legacy vector is certified by schema adoption.
         UPDATE search_embedding SET sync_status = 'failed',
-            sync_error = 'legacy index requires canonical passage reconciliation';
+            sync_error = 'legacy index requires canonical passage reconciliation'
+        WHERE expected_fingerprint = '' OR index_generation = 'legacy-unverified';
     END IF;
 END
 $backfill$;

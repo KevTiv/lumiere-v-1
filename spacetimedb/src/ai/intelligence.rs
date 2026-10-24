@@ -261,10 +261,11 @@ pub struct SearchEmbedding {
     pub organization_id: u64, // AI-003: Tenant isolation
     pub content_type: String,
     pub content_id: u64,
-    /// Hash of the canonical passage text that the external index must contain.
-    pub expected_fingerprint: String,
-    /// Provider/index generation identity used to make rebuilds explicit.
-    pub index_generation: String,
+    /// Legacy wire-compatibility slots. New rows contain no copied text or vectors.
+    /// Existing payloads are not used as canonical evidence and require an audited retirement.
+    pub text: String,
+    pub embedding: Vec<f32>,
+    pub embedding_hash: Option<String>,
 
     // Qdrant sync tracking
     pub sync_status: String, // "pending" | "synced" | "failed" | "deleted"
@@ -280,6 +281,13 @@ pub struct SearchEmbedding {
     pub write_uid: Identity,
     pub write_date: Timestamp,
     pub metadata: Option<String>,
+    /// Hash of the canonical passage text that the external index must contain.
+    /// Empty on upgraded legacy rows, so they cannot pass canonical sync admission.
+    #[default("")]
+    pub expected_fingerprint: String,
+    /// Provider/index generation identity used to make rebuilds explicit.
+    #[default("legacy-unverified")]
+    pub index_generation: String,
 }
 
 // ============================================================================
@@ -979,6 +987,9 @@ fn upsert_search_embedding_inner(
         );
     } else {
         ctx.db.search_embedding().insert(SearchEmbedding {
+            text: String::new(),
+            embedding: Vec::new(),
+            embedding_hash: None,
             id: 0,
             organization_id,
             content_type: params.content_type.clone(),

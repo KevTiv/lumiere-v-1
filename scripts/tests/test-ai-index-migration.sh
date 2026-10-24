@@ -46,9 +46,10 @@ DO $$ BEGIN
     NOT EXISTS (SELECT 1 FROM lumiere_platform.ai_legacy_index_payload WHERE organization_id=9 AND company_id=3 AND source_id=3 AND payload='{"text":"passage","embedding":[0.125,0.5],"embedding_hash":"exact-hash"}'::jsonb) OR
     NOT EXISTS (SELECT 1 FROM lumiere_platform.ai_legacy_index_payload WHERE organization_id=10 AND company_id IS NULL AND source_id=4) OR
     EXISTS (SELECT 1 FROM search_embedding WHERE sync_status <> 'failed' OR expected_fingerprint <> '' OR index_generation <> 'legacy-unverified') OR
-    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='document' AND column_name='index_content') OR
-    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='search_embedding' AND column_name IN ('text','embedding','embedding_hash')) THEN
-   RAISE EXCEPTION 'migration lost payload/scope or certified a legacy index';
+    (SELECT count(*) FROM document WHERE index_content IS NOT NULL) <> 2 OR
+    (SELECT count(*) FROM search_embedding WHERE text <> '') <> 2 OR
+    NOT EXISTS (SELECT 1 FROM search_embedding WHERE id=3 AND embedding='[0.125,0.5]'::jsonb AND embedding_hash='exact-hash') THEN
+   RAISE EXCEPTION 'migration lost compatibility payload/scope or certified a legacy index';
  END IF;
 END $$;
 SQL
@@ -69,7 +70,21 @@ DO $$ BEGIN
    RAISE EXCEPTION 'current projection adoption changed canonical data';
  END IF;
 END $$;
-ALTER TABLE search_embedding ADD COLUMN text TEXT;
+-- The safe producer retains empty compatibility fields on canonical rows.
+ALTER TABLE document ADD COLUMN index_content TEXT;
+ALTER TABLE search_embedding ADD COLUMN text TEXT NOT NULL DEFAULT '';
+ALTER TABLE search_embedding ADD COLUMN embedding JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE search_embedding ADD COLUMN embedding_hash TEXT;
+SQL
+{ printf 'BEGIN;\n'; cat "$MIGRATIONS/ai_index_backfill.sql" "$MIGRATIONS/ai_index_verify.sql" "$MIGRATIONS/ai_index_contract.sql"; printf 'COMMIT;\n';
+} | psql -X -q -v ON_ERROR_STOP=1
+psql -X -q -v ON_ERROR_STOP=1 <<'SQL'
+DO $$ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM search_embedding WHERE id=3 AND expected_fingerprint='canonical-fingerprint' AND index_generation='canonical-generation' AND sync_status='synced') THEN
+   RAISE EXCEPTION 'compatibility slots quarantined a canonical row';
+ END IF;
+END $$;
+ALTER TABLE search_embedding DROP COLUMN embedding;
 SQL
 if { printf 'BEGIN;\n'; cat "$MIGRATIONS/ai_index_backfill.sql" "$MIGRATIONS/ai_index_verify.sql" "$MIGRATIONS/ai_index_contract.sql"; printf 'COMMIT;\n';
 } | psql -X -q -v ON_ERROR_STOP=1 >/dev/null 2>&1; then

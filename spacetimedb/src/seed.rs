@@ -7592,6 +7592,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
 
     // ── 12.2 Documents ────────────────────────────────────────────────────────
     ctx.db.document().insert(Document {
+        index_content: None,
         id: 0,
         organization_id: org_id,
         name: "Acme Master Services Agreement".to_string(),
@@ -7643,6 +7644,7 @@ pub fn seed_dev_data(ctx: &ReducerContext) -> Result<(), String> {
     });
 
     ctx.db.document().insert(Document {
+        index_content: None,
         id: 0,
         organization_id: org_id,
         name: "Q1 Product Deck".to_string(),

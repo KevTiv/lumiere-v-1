@@ -529,18 +529,6 @@ fn is_authored_column_addition(table: &str, line: &str) -> bool {
     )
 }
 
-/// Exact retired definitions archived and verified by API migrations 23–26. Other removals
-/// and type/nullability changes still fail the source compatibility check.
-fn is_authored_column_removal(table: &str, line: &str) -> bool {
-    matches!(
-        (table, line.strip_suffix(',').unwrap_or(line)),
-        ("document", "    \"index_content\" TEXT")
-            | ("search_embedding", "    \"text\" TEXT NOT NULL")
-            | ("search_embedding", "    \"embedding\" JSONB NOT NULL")
-            | ("search_embedding", "    \"embedding_hash\" TEXT")
-    )
-}
-
 /// The follow-up body for what `current` adds over `covered`, or an empty
 /// string when nothing is new.  Tables are processed in name order.
 ///
@@ -578,10 +566,6 @@ fn pending_delta_body(
         let now_columns = now_columns
             .into_iter()
             .filter(|line| !is_authored_column_addition(table, line))
-            .collect::<Vec<_>>();
-        let covered_columns = covered_columns
-            .into_iter()
-            .filter(|line| !is_authored_column_removal(table, line) || now_columns.contains(line))
             .collect::<Vec<_>>();
         if canonical_columns(&now_columns) != canonical_columns(&covered_columns)
             || now_rest != covered_rest
@@ -1007,7 +991,7 @@ mod tests {
     }
 
     #[test]
-    fn canonical_index_retirement_accepts_only_exact_authored_columns() {
+    fn canonical_index_retains_legacy_columns_until_an_audited_retirement() {
         let old = vec![
             "CREATE TABLE IF NOT EXISTS \"document\" (".to_string(),
             "    \"id\" NUMERIC(20,0) NOT NULL,".to_string(),
@@ -1018,7 +1002,7 @@ mod tests {
         let covered = BTreeMap::from([("document".to_string(), old)]);
         let current = BTreeMap::from([("document".to_string(),
             "-- Durable projection: document\nCREATE TABLE IF NOT EXISTS \"document\" (\n    \"id\" NUMERIC(20,0) NOT NULL,\n    \"name\" TEXT NOT NULL,\n);\n".to_string())]);
-        assert!(pending_delta_body(&covered, &current).unwrap().is_empty());
+        assert!(pending_delta_body(&covered, &current).is_err());
         let mut changed = current.clone();
         changed.get_mut("document").unwrap().replace_range(
             ..,
@@ -1027,14 +1011,6 @@ mod tests {
                 .as_str(),
         );
         assert!(pending_delta_body(&covered, &changed).is_err());
-        assert!(!is_authored_column_removal(
-            "document",
-            "    \"index_content\" JSONB,"
-        ));
-        assert!(!is_authored_column_removal(
-            "another_table",
-            "    \"index_content\" TEXT,"
-        ));
         assert!(!is_authored_column_addition(
             "search_embedding",
             "    \"index_generation\" TEXT,"

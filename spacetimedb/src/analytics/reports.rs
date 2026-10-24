@@ -685,6 +685,7 @@ pub fn record_generated_owner_report(
         &checksum[..checksum.len().min(16)]
     );
     let mut document = ctx.db.document().insert(Document {
+        index_content: None,
         id: 0,
         organization_id,
         name: format!("Owner report: {}", params.report_key),
