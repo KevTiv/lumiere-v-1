@@ -50,6 +50,25 @@ describe("runtime form cardinality", () => {
     assert.deepEqual(result.config.sections[0].fields[0], scalar.sections[0].fields[0])
     assert.match(result.bindingErrors[0], /incompatible cardinality/)
   })
+  it("keeps a static picker over legacy text metadata that carries no default", () => {
+    const staticConfig: FormConfig = { ...empty, sections: [{ id: "main", fields: [{
+      id: "taxIds", name: "taxIds", type: "multiselect", options: [{ value: "1", label: "VAT 20%" }],
+    }] }] }
+    for (const type of ["Text", "Textarea"] as ParsedFormField["type"][]) {
+      const result = mergeRuntimeFormConfig(staticConfig, runtime(field({
+        fieldId: "taxIds", name: "taxIds", type, label: "Tax IDs", options: [], validation: { required: false },
+      })))
+      assert.deepEqual(result.bindingErrors, [])
+      const merged = result.config.sections[0].fields[0]
+      assert.equal(merged.type, "multiselect")
+      assert.equal(merged.label, "Tax IDs")
+      assert.equal(merged.defaultValue, undefined)
+    }
+    const withDefault = mergeRuntimeFormConfig(staticConfig, runtime(field({
+      fieldId: "taxIds", name: "taxIds", type: "Text", defaultValue: "1,2", options: [],
+    })))
+    assert.match(withDefault.bindingErrors[0], /incompatible cardinality/)
+  })
   it("retains a declared static renderer when runtime metadata requests Custom", () => {
     const staticConfig: FormConfig = { ...empty, sections: [{ id: "main", fields: [{ id: "regions", name: "regions", type: "text" }] }] }
     const result = mergeRuntimeFormConfig(staticConfig, runtime(field({ fieldId: "regions", type: "Custom", label: "Updated label" })))
