@@ -49,10 +49,8 @@ pub struct AccountPayment {
     pub id: u64,
     pub organization_id: u64,
     pub company_id: u64,
-    pub name: Option<String>, // "PAY-0001" — set on post
-    pub move_id: Option<u64>, // Linked AccountMove (set on post)
-    /// Exact posted reversal created by `cancel_payment`; at most one per payment.
-    pub reversal_move_id: Option<u64>,
+    pub name: Option<String>,      // "PAY-0001" — set on post
+    pub move_id: Option<u64>,      // Linked AccountMove (set on post)
     pub payment_type: PaymentType, // InBound (customer pays) | OutBound (we pay supplier)
     pub partner_type: PartnerType, // Customer | Supplier
     pub partner_id: u64,
@@ -67,6 +65,10 @@ pub struct AccountPayment {
     pub state: PaymentState,              // NotPaid (Draft) | Paid (Posted) | Reversed (Cancelled)
     pub created_at: Timestamp,
     pub create_uid: Identity,
+    // Append new columns to preserve the deployed table layout.
+    /// Exact posted reversal created by `cancel_payment`; at most one per payment.
+    #[default(None::<u64>)]
+    pub reversal_move_id: Option<u64>,
 }
 
 // ── Params ────────────────────────────────────────────────────────────────────

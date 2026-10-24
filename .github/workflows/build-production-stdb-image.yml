@@ -42,6 +42,11 @@ jobs:
       - uses: ./.github/actions/setup-spacetime-cli
         with:
           version: '2.8.2'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Verify populated production schema upgrade
+        run: python3 scripts/test-stdb-production-upgrade.py .ci/contracts-module.wasm
       - name: Verify production module provisioning in an isolated database
         shell: bash
         run: |
