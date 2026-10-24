@@ -64,15 +64,38 @@ The requested USD 1 proposal is
 `infra/railway/pilots/alpha-org-usd1.json`, with its review record beside it.
 The user approved the exact JSON on 2026-10-24. AI_HARNESS_MANIFEST_JSON was
 staged on the production ai-gateway service with `--skip-deploys` and read back
-exactly. No tenant database configuration was applied. Railway still lacks
-MISTRAL_API_KEY at the last presence-only check.
+exactly. No tenant database configuration was applied. The user then added
+MISTRAL_API_KEY directly to Railway. The read-only key/catalog check found both
+approved models and returned `catalogVerified=true`, `billableCalls=0`.
+Production preflight also passed with `RAILWAY_ENABLE_AI=true`.
 
 Production has Alpha org/company 1, no AI agents/profiles/policies/budgets, and no
-active report_analysis skill release. The production certification registry only
-executes low_stock and report_composer candidates. A report_analysis candidate
-adapter that executes the real governed runtime in an isolated immutable fixture
-is still required, followed by real certification, independent promotion, and the
-live spend-settled pilot. Do not seed or fabricate a passed certificate/release.
+active report_analysis skill release. The new report_analysis certification adapter runs the same typed governed
+program, policy, calibration, capability admission and answer gate as the live
+runtime. Its brokers replay only pinned public synthetic analytics and provider
+transcripts. They have no credentials, network, filesystem or live tenant state.
+The expected output stays outside adapter input. Provider metadata explicitly
+says `certification-fixture`; no model call or spending is implied.
+
+The adapter and active release both require exact version 1.0.0 and the compiled
+bundle hash. `gateway certification-bundles` returns these public hashes before
+loading configuration or credentials. The reviewed-source proposal is
+`infra/railway/pilots/report-analysis-certification-manifest.proposed.json`;
+its public dataset and exact assertion are in
+`infra/railway/pilots/report-analysis-certification-fixture.json`.
+The source hash is `sha256:61a80f786acc7f08b12a750ccdb3a300c4d831d3b96a3cc35977f20277fdc696`.
+
+All 736 gateway tests passed with eight existing ignored. Seven new tests cover
+the real graph and exact fixture output, source mismatch, independence from
+expected output, foreign tenant and company data, live-agent binding, policy
+limit drift, transcript mismatch/leftovers, forged passage text hash, and a
+claimless generated answer held for review. The normal readiness test now uses
+the actual compiled source hash and rejects a stale hash.
+
+These are local code/fixture checks. The new commit still needs hosted checks,
+the exact immutable runtime image and ordered deployment, a real worker
+certification record, independent promotion, and the live spend-settled pilot.
+Do not seed or fabricate a passed certificate/release.
 
 Embedding and vision provider variables are unset and currently default to Ollama.
 No Ollama service was found. This pilot proposal does not select an embedding

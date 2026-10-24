@@ -84,6 +84,18 @@ async fn require_gateway_secret(
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    if std::env::args().nth(1).as_deref() == Some("certification-bundles") {
+        println!(
+            "{}",
+            serde_json::json!({
+                "schemaVersion": 1,
+                "low_stock": {"version": "1.0.0", "sourceHash": harness::certification::low_stock_certification_bundle_hash()},
+                "report_composer": {"version": "1.0.0", "sourceHash": harness::certification::report_composer_certification_bundle_hash()},
+                "report_analysis": {"version": "1.0.0", "sourceHash": harness::certification::report_analysis_certification_bundle_hash()}
+            })
+        );
+        return Ok(());
+    }
     let _ = dotenvy::dotenv();
 
     #[cfg(feature = "phase4-acceptance")]

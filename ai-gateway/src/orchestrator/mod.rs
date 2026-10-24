@@ -1,6 +1,7 @@
 mod agent_loop;
 mod agent_loop_adapters;
 mod answer_gate;
+pub(crate) mod candidate_certification;
 mod decision_graph;
 mod decision_type;
 pub mod evidence_inspector;

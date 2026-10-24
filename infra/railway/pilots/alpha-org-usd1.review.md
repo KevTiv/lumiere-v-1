@@ -20,12 +20,12 @@ It was staged on Railway ai-gateway with deployment disabled and read back exact
 Pricing and capabilities were checked against the official model pages:
 [Mistral Small 4](https://docs.mistral.ai/models/mistral-small-4-0-26-03) and
 [Mistral Medium 3.5](https://docs.mistral.ai/models/mistral-medium-3-5-26-04).
-Account model visibility must still pass the read-only catalog check. These
-published IDs do not establish account access.
+The read-only account catalog check passed for both model IDs after the user
+added the Railway key. It made zero billable calls. This does not prove a model
+completion or spend settlement.
 
-Before database apply: add MISTRAL_API_KEY directly to Railway,
-complete a real report_analysis skill certification and independent promotion,
-and run the key/catalog check and provisioning preflight. Do not copy credentials
+Before database apply: complete a real report_analysis skill certification and
+independent promotion, then run the provisioning preflight. Do not copy credentials
 into this manifest. The provisioning script rejects a missing certified release.
 Embedding and vision provider settings require separate explicit selection;
 this pilot proposal does not change vector collections or embedding spaces.

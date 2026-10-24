@@ -286,7 +286,7 @@ mod tests {
                 vec![
                     json!({"version": if case == "release" {"2.0.0"} else {"1.0.0"}, "risk": "green",
                     "max_steps": 8, "max_tool_calls": 12, "resources": ["analytics.report_analysis.v1"],
-                    "output_types": ["analytics.report_analysis.result.v1"], "source_hash": "a".repeat(64)}),
+                    "output_types": ["analytics.report_analysis.result.v1"], "source_hash": if case == "source" { format!("sha256:{}", "a".repeat(64)) } else { crate::harness::certification::report_analysis_certification_bundle_hash() }}),
                 ]
             } else if statement.contains("FROM ai_skill_config ") {
                 vec![
@@ -351,6 +351,7 @@ mod tests {
             "ready",
             "company",
             "release",
+            "source",
             "disabled",
             "bootstrap",
             "budget",
