@@ -176,6 +176,7 @@ import {
   useAccountJournals,
   useAccountAccounts,
   useAccountPaymentTerms,
+  useAccountTaxes,
   useComputeInvoiceTotals,
   usePartnerCreditControls,
   usePartnerCreditHolds,
@@ -233,6 +234,7 @@ import {
   paymentTermRowsToSelectOptions,
   productCategoryRowsToSelectOptions,
   currencyOptionsFromRows,
+  taxRowsToSelectOptions,
 } from '@/lib/form-lookup';
 import { enumTag } from '@/lib/accounting-post-draft';
 import { saleOrderLineCanBeDeleted } from './sale-order-line-gates';
@@ -452,6 +454,7 @@ function SalesClientLoaded({
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
+  const { data: accountTaxes = [] } = useAccountTaxes(orgId);
   const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId);
   const { data: partnerCreditHolds = [] } = usePartnerCreditHolds(orgId);
   const currenciesQuery = useCurrencies();
@@ -922,8 +925,12 @@ function SalesClientLoaded({
       mergeSelectOptionsForFields(newDeliveryCarrierForm(t), {
         productId: productFieldOptions,
         currencyId: currencyFieldOptions,
+        priceRuleIds: linkedRecordOptions(
+          deliveryPriceRules,
+          (rule) => `${rule.variable} ${rule.operator} ${rule.maxValue} → ${rule.listPrice}`,
+        ),
       }),
-    [t, productFieldOptions, currencyFieldOptions],
+    [t, productFieldOptions, currencyFieldOptions, deliveryPriceRules],
   );
 
   const shippingMethodFormConfig = useMemo(
@@ -949,8 +956,9 @@ function SalesClientLoaded({
     () =>
       mergeSelectOptionsForFields(newLoyaltyProgramForm(t), {
         currencyId: currencyFieldOptions,
+        triggerProductIds: productFieldOptions,
       }),
-    [t, currencyFieldOptions],
+    [t, currencyFieldOptions, productFieldOptions],
   );
 
   const draftSaleOrderOptions = useMemo(() => {
@@ -995,14 +1003,17 @@ function SalesClientLoaded({
     [t, partnerFieldOptions, returnSourceSaleOrderOptions, productFieldOptions, uomFieldOptions],
   );
 
+  const saleTaxFieldOptions = useMemo(() => taxRowsToSelectOptions(accountTaxes, 'Sale'), [accountTaxes]);
+
   const addSaleOrderLineFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(addSaleOrderLineForm(t), {
         orderId: draftSaleOrderOptions,
         productId: productFieldOptions,
         uomId: uomFieldOptions,
+        taxIds: saleTaxFieldOptions,
       }),
-    [t, draftSaleOrderOptions, productFieldOptions, uomFieldOptions],
+    [t, draftSaleOrderOptions, productFieldOptions, uomFieldOptions, saleTaxFieldOptions],
   );
 
   const editSaleOrderLineOptions = useMemo(() => {
@@ -1165,7 +1176,13 @@ function SalesClientLoaded({
     };
   }, [t, orderLines, partnerLabelById, orgId, operatingCompanyId, stockPickings, accountMoves, returnOrders, accountPayments]);
 
-  const pickingBatchFormConfig = useMemo(() => newPickingBatchForm(t), [t]);
+  const pickingBatchFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newPickingBatchForm(t), {
+        pickingIds: linkedRecordOptions(stockPickings, (picking) => picking.name),
+      }),
+    [t, stockPickings],
+  );
 
   const loyaltyProgramFieldOptions = useMemo(() => {
     const fromApi = loyaltyProgramRowsToSelectOptions(loyaltyPrograms);

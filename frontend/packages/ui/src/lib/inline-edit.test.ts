@@ -14,6 +14,11 @@ describe("inline edit values", () => {
     expect(parseInlineValue("select", "Open")).toEqual({ ok: true, value: "Open" })
   })
 
+  it("keeps multi-line text but drops trailing whitespace", () => {
+    expect(parseInlineValue("textarea", "  a\nb \n\n")).toEqual({ ok: true, value: "  a\nb" })
+    expect(parseInlineValue("markdown", "**x**\n")).toEqual({ ok: true, value: "**x**" })
+  })
+
   it("treats an equal value as unchanged", () => {
     expect(isUnchangedInline("a", "a")).toBe(true)
     expect(isUnchangedInline(5, 5)).toBe(true)

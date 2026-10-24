@@ -7,6 +7,9 @@ export type FieldType =
   | "email"
   | "password"
   | "number"
+  | "money"
+  | "percent"
+  | "quantity"
   | "tel"
   | "url"
   | "textarea"
@@ -60,6 +63,44 @@ export interface NumberField extends BaseField {
   max?: number
 }
 
+/** An amount stored as a plain number in major units (e.g. 1234.5), shown with grouping. */
+export interface MoneyField extends BaseField {
+  type: "money"
+  defaultValue?: number
+  /** ISO 4217 code shown beside the amount. */
+  currency?: string
+  /** Fraction digits always shown (default 2). Extra typed digits are kept, not rounded away. */
+  decimals?: number
+}
+
+/** A percentage stored as 0–100 (not a 0–1 fraction). Bounds default to 0–100. */
+export interface PercentField extends BaseField {
+  type: "percent"
+  defaultValue?: number
+  decimals?: number
+}
+
+/** A non-negative amount of something, optionally with a unit of measure. */
+export interface QuantityField extends BaseField {
+  type: "quantity"
+  defaultValue?: number
+  unit?: string
+  decimals?: number
+}
+
+export type NumericField = MoneyField | PercentField | QuantityField
+
+export function isNumericField(field: FormField): field is NumericField {
+  return field.type === "money" || field.type === "percent" || field.type === "quantity"
+}
+
+/** Effective min/max for a numeric field: `validation` wins over the type's default range. */
+export function numericFieldBounds(field: NumericField): { min?: number; max?: number } {
+  const min = field.validation?.min ?? (field.type === "money" ? undefined : 0)
+  const max = field.validation?.max ?? (field.type === "percent" ? 100 : undefined)
+  return { min, max }
+}
+
 export interface TextareaField extends BaseField {
   type: "textarea"
   defaultValue?: string
@@ -72,7 +113,7 @@ export interface TextareaField extends BaseField {
 }
 
 /** Field names whose values are machine-read (IDs, CSV, JSON, HTML, templates). */
-const RAW_TEXT_FIELD_NAME = /(Ids|Json|Csv|Data|Domain|Html|Values|Prompt|Template|Expression|Sql)$/
+const RAW_TEXT_FIELD_NAME = /(Ids|Json|Csv|Data|Domain|Html|Values|Prompt|Template|Expression|Sql)$|^metadata$/
 
 /** Whether a textarea field should use the bare textarea instead of the rich text editor. */
 export function isPlainTextareaField(field: Pick<TextareaField, "name" | "format">): boolean {
@@ -122,6 +163,10 @@ export interface RadioField extends BaseField {
 export interface DateField extends BaseField {
   type: "date" | "time" | "datetime"
   defaultValue?: string
+  /** Earliest allowed value in the field's string format (`YYYY-MM-DD` for dates). */
+  minDate?: string
+  /** Latest allowed value in the field's string format (`YYYY-MM-DD` for dates). */
+  maxDate?: string
 }
 
 export interface FileField extends BaseField {
@@ -150,6 +195,9 @@ export interface CustomField extends BaseField {
 export type FormField =
   | TextField
   | NumberField
+  | MoneyField
+  | PercentField
+  | QuantityField
   | TextareaField
   | SelectField
   | MultiSelectField

@@ -23,7 +23,7 @@ export const newManufacturingOrderForm = (t: TFunction): FormConfig => ({
           options: emptySelect,
         },
         {
-          type: "number",
+          type: "quantity",
           name: "productQty",
           id: "productQty",
           label: t("manufacturing.forms.newManufacturingOrder.fields.productQty"),
@@ -154,7 +154,7 @@ export const newBomForm = (t: TFunction): FormConfig => ({
           options: emptySelect,
         },
         {
-          type: "number",
+          type: "quantity",
           name: "productQty",
           id: "productQty",
           label: t("manufacturing.forms.newBom.fields.productQty"),
@@ -232,7 +232,7 @@ export const newWorkcenterForm = (t: TFunction): FormConfig => ({
           width: "1/3",
         },
         {
-          type: "number",
+          type: "percent",
           name: "oeeTarget",
           id: "oeeTarget",
           label: t("manufacturing.forms.newWorkcenter.fields.oeeTarget"),

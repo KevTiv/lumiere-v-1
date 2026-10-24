@@ -349,7 +349,7 @@ function DocumentPageLoaded({
             field.key === 'fileSize' ? { ...field, render: (value: unknown) => formatFileSize(value) } : field,
           ),
           { key: 'resName', label: t('documents.documents.columns.resName', { defaultValue: 'Attached to' }) },
-          { key: 'description', label: t('documents.documents.columns.description', { defaultValue: 'Description' }) },
+          { key: 'description', type: 'markdown' as const, label: t('documents.documents.columns.description', { defaultValue: 'Description' }) },
         ],
       },
     ],

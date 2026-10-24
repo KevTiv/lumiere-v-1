@@ -673,7 +673,7 @@ export function manufacturingWorkcenterRowActionForm(
             width: "full",
           },
           {
-            type: "text",
+            type: "url",
             id: "routingWorksheetUrl",
             name: "routingWorksheetUrl",
             label: t("manufacturing.rowActions.form.routingWorksheetUrl"),
@@ -684,6 +684,7 @@ export function manufacturingWorkcenterRowActionForm(
             id: "routingBlockedByIds",
             name: "routingBlockedByIds",
             label: t("manufacturing.rowActions.form.routingBlockedByIds"),
+            description: t("manufacturing.rowActions.form.routingBlockedByIdsHint"),
             width: "full",
           },
         ],

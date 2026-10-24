@@ -30,6 +30,29 @@ export type CompanyLookupRow = {
   name?: unknown
 }
 
+type TaxLookupRow = {
+  id?: unknown
+  name?: unknown
+  active?: unknown
+  typeTaxUse?: unknown
+  type_tax_use?: unknown
+}
+
+/** Active taxes usable on `use`-side lines (scope `use` or `None`), for tax multi-pickers. */
+export function taxRowsToSelectOptions(
+  rows: readonly TaxLookupRow[],
+  use: 'Sale' | 'Purchase',
+): Array<{ value: string; label: string }> {
+  return rows
+    .filter((row) =>
+      row.id != null
+      && row.active !== false
+      && [use, 'None'].includes(expenseVariantTag(row.typeTaxUse ?? row.type_tax_use))
+      && String(row.name ?? '').trim() !== '',
+    )
+    .map((row) => ({ value: String(row.id), label: String(row.name) }))
+}
+
 /** Chart of accounts — code + name for GL pickers. */
 export function accountAccountRowsToSelectOptions(
   rows: Record<string, unknown>[],
@@ -122,8 +145,15 @@ export function pricelistRowsToSelectOptions(
     }))
 }
 
+type WarehouseLookupRow = {
+  id?: unknown
+  code?: unknown
+  name?: unknown
+  active?: unknown
+}
+
 export function warehouseRowsToSelectOptions(
-  rows: Record<string, unknown>[],
+  rows: readonly WarehouseLookupRow[],
 ): Array<{ value: string; label: string }> {
   return rows
     .filter((r) => r.active !== false && r.active !== 0)
@@ -787,8 +817,14 @@ export function orgMemberRowsToSelectOptions(
   }))
 }
 
+type StockLocationLookupRow = {
+  id?: unknown
+  name?: unknown
+  completeName?: unknown
+}
+
 export function stockLocationRowsToSelectOptions(
-  rows: Record<string, unknown>[],
+  rows: readonly StockLocationLookupRow[],
 ): Array<{ value: string; label: string }> {
   return rows.map((row) => ({
     value: String(row.id ?? ''),

@@ -41,6 +41,7 @@ import type {
   TeamMember,
 } from "@/lib/task-board-types"
 import { defaultColumns, priorityConfig, taskTypeConfig } from "@/lib/task-board-types"
+import { DatePicker } from "@/components/ui/date-picker"
 
 interface CreateTaskModalProps {
   open: boolean
@@ -265,11 +266,10 @@ export function CreateTaskModal({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="dueDate">{t("tasks.fields.dueDate")}</Label>
-              <Input
+              <DatePicker
                 id="dueDate"
-                type="date"
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={(value) => setDueDate(value)}
               />
             </div>
 

@@ -49,7 +49,7 @@ export const subscriptionsTableConfig = (
     ],
     columns: [
       { key: "code", label: t("subscriptions.subscriptions.columns.code"), width: "min-w-28" },
-      { key: "description", label: t("subscriptions.subscriptions.columns.description"), width: "min-w-40" },
+      { key: "description", type: "markdown", label: t("subscriptions.subscriptions.columns.description"), width: "min-w-40" },
       { key: "state", label: t("subscriptions.subscriptions.columns.state"), type: "badge", ...subscriptionStateBadges(t) },
       { key: "health", label: t("subscriptions.subscriptions.columns.health"), type: "badge", ...healthBadges(t) },
       { key: "recurringMonthly", label: t("subscriptions.subscriptions.columns.recurringMonthly"), type: "currency", align: "right" },
@@ -195,6 +195,7 @@ export const subscriptionAmendmentsTableConfig = (t: TFunction): EntityViewConfi
       },
       {
         key: "notes",
+        type: "markdown",
         label: t("subscriptions.amendments.columns.notes", { defaultValue: "Notes" }),
         width: "min-w-40",
       },
@@ -218,7 +219,7 @@ export const deferredRevenueSchedulesTableConfig = (t: TFunction): EntityViewCon
     searchKeys: ["description", "state"],
     columns: [
       { key: "id", label: t("subscriptions.deferredSchedules.columns.id"), type: "number", align: "right" },
-      { key: "description", label: t("subscriptions.deferredSchedules.columns.description"), width: "min-w-40" },
+      { key: "description", type: "markdown", label: t("subscriptions.deferredSchedules.columns.description"), width: "min-w-40" },
       { key: "state", label: t("subscriptions.deferredSchedules.columns.state"), type: "badge" },
       {
         key: "totalAmount",
@@ -300,7 +301,7 @@ export const revenueRecognitionRulesTableConfig = (
     searchKeys: ["description", "notes"],
     columns: [
       { key: "id", label: t("subscriptions.recognitionRules.columns.id"), type: "number", align: "right" },
-      { key: "description", label: t("subscriptions.recognitionRules.columns.description"), width: "min-w-40" },
+      { key: "description", type: "markdown", label: t("subscriptions.recognitionRules.columns.description"), width: "min-w-40" },
       {
         key: "priority",
         label: t("subscriptions.recognitionRules.columns.priority"),
@@ -567,7 +568,7 @@ export const subscriptionsWithBoard = (t: TFunction, config: EntityViewConfig): 
     groupKey: "state",
     card: {
       titleKey: "code",
-      fields: [{ key: "description", label: t("subscriptions.subscriptions.columns.description") }],
+      fields: [{ key: "description", type: "markdown", label: t("subscriptions.subscriptions.columns.description") }],
       footerFields: [
         { key: "recurringMonthly", label: t("subscriptions.subscriptions.columns.recurringMonthly"), type: "currency" },
         { key: "recurringNextDate", label: t("subscriptions.subscriptions.columns.recurringNextDate"), type: "date" },
