@@ -4,7 +4,7 @@ import type { JsonObject } from "@lumiere/api-client/json-object"
 
 import { useState } from "react"
 import { AlertCircle, History } from "lucide-react"
-import { Button } from "@lumiere/ui"
+import { Button, buttonVariants } from "@lumiere/ui/components/button"
 import { Alert, AlertDescription, AlertTitle } from "@lumiere/ui/components/alert"
 import { Badge } from "@lumiere/ui/components/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@lumiere/ui/components/card"
@@ -18,7 +18,7 @@ type HistoryState =
   | { status: "error"; message: string; previous: RunHistoryView | null }
   | { status: "success"; data: RunHistoryView }
 
-export function RunHistoryPanel({ companyId, onInspect }: { companyId: number | null; onInspect: (runId: number) => void }) {
+export function RunHistoryPanel({ companyId }: { companyId: number | null }) {
   const [state, setState] = useState<HistoryState>({ status: "idle" })
   const data = state.status === "success" ? state.data : state.status === "loading" || state.status === "error" ? state.previous : null
 
@@ -98,7 +98,7 @@ export function RunHistoryPanel({ companyId, onInspect }: { companyId: number | 
                 </div>
               ) : null}
             </div>
-            <Button type="button" size="sm" variant="outline" onClick={() => onInspect(run.runId)}>Inspect</Button>
+            <a className={buttonVariants({ size: "sm", variant: "outline" })} href={`/ai-harness?tab=evidence-reviewer&companyId=${companyId}&runId=${run.runId}`}>Inspect</a>
           </div>
         ))}
         {data?.nextCursor ? (

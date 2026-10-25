@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test"
 import type { QueryRowFor } from "@lumiere/stdb/query-row-map"
-import { fetchSessionOrganizationId, scalarQueryId, smokeName } from "./helpers"
+import { fetchSessionOrganizationId, fillField, scalarQueryId, smokeName } from "./helpers"
 import { matchesOperationResponse } from "./operation-response"
 
 test("registered skill administration survives an unavailable AI runtime", { tag: ["@p0", "@ai-registry"] }, async ({ page }) => {
@@ -17,9 +17,9 @@ test("registered skill administration survives an unavailable AI runtime", { tag
   await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
   await page.getByTestId("ai-skills-create").click()
   const modal = page.getByTestId("form-modal-ai-skills-create")
-  await modal.getByLabel("Skill key", { exact: true }).fill(skillKey)
-  await modal.getByLabel("Name", { exact: true }).fill(name)
-  await modal.getByLabel("Prompt template", { exact: true }).fill("Read-only test skill. Do not run a provider.")
+  await fillField(modal, "skillKey", skillKey)
+  await fillField(modal, "name", name)
+  await fillField(modal, "promptTemplate", "Read-only test skill. Do not run a provider.")
   const [created] = await Promise.all([
     page.waitForResponse((response) => matchesOperationResponse(response, "create_ai_skill")),
     modal.getByRole("button", { name: /^create skill$/i }).click(),

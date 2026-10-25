@@ -140,11 +140,6 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
     void submit({ kind: "inspect", runId: parsedRunId })
   }
 
-  const inspectHistoryRun = (selectedRunId: number) => {
-    setRunId(String(selectedRunId))
-    void submit({ kind: "inspect", runId: selectedRunId })
-  }
-
   const changeRun = (update: () => void) => {
     lifecycleRequestId.current += 1
     observationRequest.current += 1
@@ -184,7 +179,7 @@ export function RunLifecyclePanel({ companies }: RunLifecyclePanelProps) {
         </CardContent>
       </Card>
 
-      <RunHistoryPanel key={companyId} companyId={Number(companyId) || null} onInspect={inspectHistoryRun} />
+      <RunHistoryPanel key={companyId} companyId={Number(companyId) || null} />
 
       {request.status === "idle" ? <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">{t("aiHarness.runLifecycle.idle")}</CardContent></Card> : null}
       {request.status === "loading" ? <div className="flex flex-col gap-3"><Skeleton className="h-28 w-full" /><Skeleton className="h-52 w-full" /></div> : null}
