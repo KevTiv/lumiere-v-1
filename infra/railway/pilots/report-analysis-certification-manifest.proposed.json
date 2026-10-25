@@ -1,0 +1,1 @@
+{"limits":{"max_steps":8,"max_tool_calls":12},"output_types":["analytics.report_analysis.result.v1"],"permissions":["report:read"],"resources":["analytics.report_analysis.v1"],"risk":"green","schema_version":1,"skill_key":"report_analysis","source_hash":"sha256:61a80f786acc7f08b12a750ccdb3a300c4d831d3b96a3cc35977f20277fdc696","version":"1.0.0"}

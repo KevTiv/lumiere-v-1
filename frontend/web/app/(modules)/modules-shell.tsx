@@ -51,6 +51,7 @@ import { useRecordEvidenceContribution } from "@lumiere/query-hooks/hooks/ai-evi
 import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { ErpAiRouteContextProvider, ErpAiChatControllerProvider, useErpAiRouteContext } from "@/lib/erp-ai-context"
+import { AI_WORKSPACE_SCOPES, resolveAiWorkspaceScope } from "@/lib/ai-workspace-scope"
 import { performSignOut } from "@/lib/auth-sign-out"
 import { recordPageHref } from "@/lib/record-page-href"
 import { useCurrentUserProfile } from "@lumiere/query-hooks/hooks/auth"
@@ -133,6 +134,11 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
   const rag = useAiMemoryRag()
   const actionDraft = useAiActionDraft()
   const [sessionKey, setSessionKey] = useState<string | null>(null)
+  const [selectedScope, setSelectedScope] = useState("current")
+  const workspaceScope = useMemo(
+    () => resolveAiWorkspaceScope(selectedScope, route, selection),
+    [selectedScope, route, selection],
+  )
 
   const persistActionDrafts = usePersistGatewayActionDrafts(orgId, operatingCompanyId ?? 0)
   const approveActionDraft = useApproveAiActionDraft(orgId, operatingCompanyId ?? 0)
@@ -150,14 +156,14 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
 
   const chatContext = useMemo(
     (): ChatContext => ({
-      activeView: module ?? route,
-      route,
-      module: module ?? undefined,
-      activeTab: activeTab ?? undefined,
+      activeView: workspaceScope.usesCurrentPage ? module ?? route : workspaceScope.label,
+      route: workspaceScope.pathname,
+      module: workspaceScope.usesCurrentPage ? module ?? undefined : undefined,
+      activeTab: workspaceScope.usesCurrentPage ? activeTab ?? undefined : undefined,
       companyId: operatingCompanyId ?? undefined,
-      selectedData: selection ?? undefined,
+      selectedData: workspaceScope.selection ?? undefined,
     }),
-    [activeTab, operatingCompanyId, module, route, selection],
+    [activeTab, operatingCompanyId, module, route, workspaceScope],
   )
 
   const initialMessages = useMemo((): ChatMessage[] | undefined => {
@@ -190,7 +196,7 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
     try {
       await createSession.mutateAsync({
         session_key: sessionKey,
-        title: "ERP Assistant",
+        title: "Lumière Assistant",
         route,
         module: module ?? null,
         active_tab: activeTab ?? null,
@@ -248,20 +254,20 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
 
   const buildRequestContext = useCallback(
     (userText: string) => {
-      const atCommands = parseAtCommands(userText)
+      const atCommands = [...new Set([...parseAtCommands(userText), ...workspaceScope.commands])]
       return {
         atCommands,
         includeTypes: atCommandsToIncludeTypes(atCommands),
         uiContext: buildAiUiContext({
-          pathname: route,
+          pathname: workspaceScope.pathname,
           companyId: operatingCompanyId,
-          activeTab,
+          activeTab: workspaceScope.usesCurrentPage ? activeTab : null,
           atCommands,
-          selection,
+          selection: workspaceScope.selection,
         }),
       }
     },
-    [activeTab, operatingCompanyId, route, selection],
+    [activeTab, operatingCompanyId, workspaceScope],
   )
 
   const resolveActionDrafts = useCallback(
@@ -525,6 +531,9 @@ function ErpAiChatPanel(props: Omit<ComponentProps<typeof AIChatPanel>, "onSendM
       config={chatConfig}
       context={chatContext}
       initialMessages={initialMessages}
+      contextOptions={AI_WORKSPACE_SCOPES}
+      selectedContext={selectedScope}
+      onContextChange={setSelectedScope}
       onSendMessage={onSendMessage}
       onStreamMessage={onStreamMessage}
     />
@@ -589,13 +598,13 @@ function ModulesContent({
   return (
     <ErpAiChatControllerProvider open={openAiChat}>
       <DashboardWorkspace
-        forceCollapsed={isAIChatDocked || isNotebookOpen}
+        forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
         onOpenSearch={() => setIsSearchOpen(true)}
         notifications={orgReady ? <HeaderNotificationBell organizationId={orgId} /> : null}
         sidebar={
           <DashboardSidebar
             firstOrgProfile={firstOrgProfile}
-            forceCollapsed={isAIChatDocked || isNotebookOpen}
+            forceCollapsed={(isAIChatOpen && isAIChatDocked) || isNotebookOpen}
             navBadges={navBadges}
             onOpenJournal={() => setIsJournalOpen(true)}
             onOpenNotebook={() => setIsNotebookOpen(true)}
@@ -615,9 +624,9 @@ function ModulesContent({
               docked={isAIChatDocked}
               onDockToggle={() => setIsAIChatDocked((prev) => !prev)}
               config={{
-                title: "ERP Assistant",
-                welcomeMessage: "Ask questions about your data or use @ commands for quick actions.",
-                placeholder: "Ask anything... Type @ for commands",
+                title: "Lumière Assistant",
+                welcomeMessage: "Explore your business, prepare a draft, or turn an insight into a report.",
+                placeholder: "Ask about your work or describe what you need...",
               }}
             />
 

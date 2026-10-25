@@ -14,18 +14,38 @@ test('maps bounded lifecycle state without exposing answer bodies', () => {
   const view = mapRunLifecycle({
     runId: 7,
     state: 'waiting_input',
+    truncated: true,
     continuation,
     questions: [{ id: 9, key: 'currency', prompt: 'Which currency?', status: 'open', required: true, revision: 1, answer: { secret: 'hidden' } }],
     events: [{ id: 11, kind: 'question_asked', fromVersion: 1, toVersion: 2, cursor: 4, createdAt: '2026-09-19T12:00:00Z', payload: { secret: 'hidden' } }],
-    comparison: { leftRunId: 7, rightRunId: 8, leftContinuation: continuation, rightContinuation: { ...continuation, runId: 8 } },
+    comparison: {
+      leftRunId: 7,
+      rightRunId: 8,
+      leftContinuation: continuation,
+      rightContinuation: { ...continuation, runId: 8 },
+      details: {
+        leftStatus: 'completed',
+        rightStatus: 'failed',
+        leftStepCount: 3,
+        rightStepCount: 4,
+        leftTokensUsed: 100,
+        rightTokensUsed: 120,
+        toolsOnlyLeft: ['inventory.read'],
+        toolsOnlyRight: ['catalog.read'],
+        toolDiffTruncated: false,
+      },
+    },
   })
 
   assert.ok(view)
   assert.equal(view.questions[0]?.answered, true)
+  assert.equal(view.truncated, true)
   assert.equal('answer' in (view.questions[0] ?? {}), false)
   assert.equal(view.events[0]?.summary, 'Version 1 → 2; cursor 4')
   assert.equal('payload' in (view.events[0] ?? {}), false)
   assert.equal(view.comparison?.rightRunId, 8)
+  assert.deepEqual(view.comparison?.details?.toolsOnlyLeft, ['inventory.read'])
+  assert.equal(view.comparison?.details?.rightTokensUsed, 120)
 })
 
 test('continuations fail closed on malformed lineage or concurrency', () => {

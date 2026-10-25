@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
   X,
@@ -13,7 +12,6 @@ import {
   Sparkles,
   Copy,
   Check,
-  RotateCcw,
   Loader2,
   TrendingUp,
   Package,
@@ -30,11 +28,6 @@ import {
   BookOpen,
   AtSign,
   Command,
-  Minimize2,
-  Maximize2,
-  Minus,
-  Move,
-  ChevronsUpDown,
   PanelRight,
   PanelRightClose,
 } from "lucide-react"
@@ -43,16 +36,6 @@ import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { AiActionDraftCard } from "./ai-action-draft-card"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
-
-interface Position {
-  x: number
-  y: number
-}
-
-interface Size {
-  width: number
-  height: number
-}
 
 interface ChatReply {
   content: string
@@ -64,8 +47,12 @@ interface ChatReply {
 interface AIChatPanelProps {
   open: boolean
   onClose: () => void
+  /** Side chat shares the same mounted conversation as the full workspace. */
   docked?: boolean
   onDockToggle?: () => void
+  contextOptions?: readonly { value: string; label: string; group: string }[]
+  selectedContext?: string
+  onContextChange?: (value: string) => void
   config?: Partial<AIChatConfig>
   context?: ChatContext
   initialMessages?: ChatMessage[]
@@ -98,11 +85,6 @@ const iconMap: Record<string, React.ReactNode> = {
 }
 
 const categoryColors: Record<string, string> = aiChatCategoryPillClass
-
-const MIN_WIDTH = 320
-const MIN_HEIGHT = 300
-const DEFAULT_WIDTH = 400
-const DEFAULT_HEIGHT = 500
 
 function selectionSummaryFromContext(context?: ChatContext): string | null {
   const selected = context?.selectedData
@@ -141,6 +123,9 @@ export function AIChatPanel({
   onClose,
   docked = false,
   onDockToggle,
+  contextOptions,
+  selectedContext,
+  onContextChange,
   config,
   context,
   initialMessages,
@@ -157,20 +142,8 @@ export function AIChatPanel({
   const [citeStatus, setCiteStatus] = useState<Record<string, "pending" | "done" | "error">>({})
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0)
 
-  // Floating panel state
-  const [position, setPosition] = useState<Position>({ x: -1, y: -1 })
-  const [size, setSize] = useState<Size>({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT })
-  const [isDragging, setIsDragging] = useState(false)
-  const [isResizing, setIsResizing] = useState<string | null>(null)
-  const [isMinimized, setIsMinimized] = useState(false)
-  const [isMaximized, setIsMaximized] = useState(false)
-  const [prevState, setPrevState] = useState<{ position: Position; size: Size } | null>(null)
-
-  const panelRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number }>({ x: 0, y: 0, posX: 0, posY: 0 })
-  const resizeStartRef = useRef<{ x: number; y: number; width: number; height: number; posX: number; posY: number }>({ x: 0, y: 0, width: 0, height: 0, posX: 0, posY: 0 })
 
   const commands = config?.commands || defaultAtCommands
   const selectionSummary = selectionSummaryFromContext(context)
@@ -194,16 +167,6 @@ export function AIChatPanel({
     return acc
   }, {} as Record<string, AtCommand[]>)
 
-  // Initialize position on first open
-  useEffect(() => {
-    if (open && position.x === -1) {
-      setPosition({
-        x: window.innerWidth - DEFAULT_WIDTH - 24,
-        y: 80,
-      })
-    }
-  }, [open, position.x])
-
   // Scroll to bottom on new messages
   useEffect(() => {
     if (scrollRef.current && messages) {
@@ -211,12 +174,10 @@ export function AIChatPanel({
     }
   }, [messages])
 
-  // Focus input when panel opens
+  // Focus the composer on entering either workspace mode.
   useEffect(() => {
-    if (open && !isMinimized && inputRef.current) {
-      setTimeout(() => inputRef.current?.focus(), 100)
-    }
-  }, [open, isMinimized])
+    if (open) inputRef.current?.focus()
+  }, [open, docked])
 
   // Handle @ command detection
   useEffect(() => {
@@ -238,114 +199,6 @@ export function AIChatPanel({
       setShowCommands(false)
     }
   }, [input])
-
-  // Drag handlers
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    if (isMaximized) return
-    e.preventDefault()
-    setIsDragging(true)
-    dragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      posX: position.x,
-      posY: position.y,
-    }
-  }, [position, isMaximized])
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
-        const dx = e.clientX - dragStartRef.current.x
-        const dy = e.clientY - dragStartRef.current.y
-        const newX = Math.max(0, Math.min(window.innerWidth - size.width, dragStartRef.current.posX + dx))
-        const newY = Math.max(0, Math.min(window.innerHeight - 60, dragStartRef.current.posY + dy))
-        setPosition({ x: newX, y: newY })
-      }
-
-      if (isResizing) {
-        const dx = e.clientX - resizeStartRef.current.x
-        const dy = e.clientY - resizeStartRef.current.y
-
-        let newWidth = resizeStartRef.current.width
-        let newHeight = resizeStartRef.current.height
-        let newX = position.x
-        let newY = position.y
-
-        if (isResizing.includes("e")) {
-          newWidth = Math.max(MIN_WIDTH, resizeStartRef.current.width + dx)
-        }
-        if (isResizing.includes("w")) {
-          const widthDelta = Math.min(dx, resizeStartRef.current.width - MIN_WIDTH)
-          newWidth = resizeStartRef.current.width - widthDelta
-          newX = resizeStartRef.current.posX + widthDelta
-        }
-        if (isResizing.includes("s")) {
-          newHeight = Math.max(MIN_HEIGHT, resizeStartRef.current.height + dy)
-        }
-        if (isResizing.includes("n")) {
-          const heightDelta = Math.min(dy, resizeStartRef.current.height - MIN_HEIGHT)
-          newHeight = resizeStartRef.current.height - heightDelta
-          newY = resizeStartRef.current.posY + heightDelta
-        }
-
-        setSize({ width: newWidth, height: newHeight })
-        if (isResizing.includes("w") || isResizing.includes("n")) {
-          setPosition({ x: newX, y: newY })
-        }
-      }
-    }
-
-    const handleMouseUp = () => {
-      setIsDragging(false)
-      setIsResizing(null)
-    }
-
-    if (isDragging || isResizing) {
-      document.addEventListener("mousemove", handleMouseMove)
-      document.addEventListener("mouseup", handleMouseUp)
-      return () => {
-        document.removeEventListener("mousemove", handleMouseMove)
-        document.removeEventListener("mouseup", handleMouseUp)
-      }
-    }
-  }, [isDragging, isResizing, size.width, position.x, position.y])
-
-  // Resize handlers
-  const handleResizeStart = useCallback((direction: string) => (e: React.MouseEvent) => {
-    if (isMaximized) return
-    e.preventDefault()
-    e.stopPropagation()
-    setIsResizing(direction)
-    resizeStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      width: size.width,
-      height: size.height,
-      posX: position.x,
-      posY: position.y,
-    }
-  }, [size, position, isMaximized])
-
-  const toggleMaximize = () => {
-    if (isMaximized) {
-      if (prevState) {
-        setPosition(prevState.position)
-        setSize(prevState.size)
-      }
-      setIsMaximized(false)
-    } else {
-      setPrevState({ position, size })
-      setPosition({ x: 20, y: 20 })
-      setSize({ width: window.innerWidth - 40, height: window.innerHeight - 40 })
-      setIsMaximized(true)
-    }
-    setIsMinimized(false)
-  }
-
-  const toggleMinimize = () => {
-    setIsMinimized(!isMinimized)
-    setIsMaximized(false)
-  }
 
   const insertCommand = useCallback((cmd: AtCommand) => {
     const atIndex = input.lastIndexOf("@")
@@ -605,167 +458,121 @@ export function AIChatPanel({
     [config, citeStatus],
   )
 
-  const handleClearHistory = () => {
-    setMessages([])
-  }
-
   if (!open) return null
 
-  // Shared inner content — same markup reused for both floating and docked modes
-  const chatContent = (
-    <>
-      {/* Resize handles — floating only */}
-      {!docked && !isMinimized && !isMaximized && (
-        <>
-          <div className="absolute top-0 left-0 w-3 h-3 cursor-nw-resize z-10" onMouseDown={handleResizeStart("nw")} />
-          <div className="absolute top-0 right-0 w-3 h-3 cursor-ne-resize z-10" onMouseDown={handleResizeStart("ne")} />
-          <div className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize z-10" onMouseDown={handleResizeStart("sw")} />
-          <div className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize z-10" onMouseDown={handleResizeStart("se")} />
-          <div className="absolute top-0 left-3 right-3 h-1 cursor-n-resize" onMouseDown={handleResizeStart("n")} />
-          <div className="absolute bottom-0 left-3 right-3 h-1 cursor-s-resize" onMouseDown={handleResizeStart("s")} />
-          <div className="absolute left-0 top-3 bottom-3 w-1 cursor-w-resize" onMouseDown={handleResizeStart("w")} />
-          <div className="absolute right-0 top-3 bottom-3 w-1 cursor-e-resize" onMouseDown={handleResizeStart("e")} />
-        </>
+  return (
+    <section
+      data-testid="erp-ai-chat-panel"
+      data-mode={docked ? "side" : "full"}
+      aria-label={config?.title || t("aiChat.title")}
+      className={cn(
+        "relative z-50 flex min-h-0 flex-col overflow-hidden bg-background text-foreground",
+        docked
+          ? "fixed inset-0 sm:relative sm:inset-auto sm:h-full sm:w-[380px] sm:shrink-0 sm:border-l sm:border-border xl:w-[420px]"
+          : "fixed inset-0 h-dvh w-screen",
       )}
-
-      {/* Header */}
-      <div
-        className={cn(
-          "flex items-center justify-between px-2 py-2 border-b border-border bg-card/50 select-none",
-          isMinimized && "border-b-0"
-        )}
-      >
-        <div className="flex items-center gap-1.5">
-          {/* Drag button — floating mode only */}
-          {!docked && (
-            <button
-              type="button"
-              title={t("aiChat.dragToMove")}
-              onMouseDown={handleDragStart}
-              className={cn(
-                "flex items-center justify-center h-7 w-7 rounded-md transition-colors shrink-0",
-                "hover:bg-muted text-muted-foreground hover:text-foreground",
-                isDragging ? "bg-primary/10 text-primary cursor-grabbing" : "cursor-grab"
-              )}
-            >
-              <Move className="h-3.5 w-3.5" />
-            </button>
-          )}
-
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary/80 to-primary flex items-center justify-center shrink-0">
-            <Sparkles className="h-3 w-3 text-primary-foreground" />
+    >
+      <header className="flex min-h-[64px] shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-card">
+            <Sparkles className="size-4 text-foreground" aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold truncate">{config?.title || t("aiChat.title")}</h2>
-            {!isMinimized && (
-              <p className="text-[10px] text-muted-foreground truncate">{t("aiChat.subtitle")}</p>
-            )}
+            <h2 className="truncate text-sm font-semibold tracking-tight">{config?.title || t("aiChat.title")}</h2>
+            <p className="truncate text-xs text-muted-foreground">{docked ? "Working alongside your module" : "Business workspace"}</p>
           </div>
         </div>
-
-        <div className="flex items-center gap-0.5">
-          {/* Dock / undock toggle */}
-          {onDockToggle && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onDockToggle}
-              className="h-7 w-7"
-              title={docked ? t("aiChat.undock") : t("aiChat.dock")}
-            >
-              {docked ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRight className="h-3.5 w-3.5" />}
+        <div className="flex min-w-0 items-center gap-1.5">
+          {contextOptions && contextOptions.length > 0 && onContextChange ? (
+            <label className="min-w-0">
+              <span className="sr-only">Assistant context</span>
+              <select
+                data-testid="erp-ai-chat-context"
+                value={selectedContext ?? contextOptions[0]?.value}
+                onChange={(event) => onContextChange(event.target.value)}
+                className="h-9 max-w-[128px] rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[190px]"
+              >
+                {Array.from(new Set(contextOptions.map((option) => option.group))).map((group) => (
+                  <optgroup key={group} label={group}>
+                    {contextOptions.filter((option) => option.group === group).map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {onDockToggle ? (
+            <Button variant="ghost" size="icon" onClick={onDockToggle} className="size-9 shrink-0" title={docked ? "Open full workspace" : "Dock beside ERP"} aria-label={docked ? "Open full workspace" : "Dock beside ERP"}>
+              {docked ? <PanelRightClose className="size-4" /> : <PanelRight className="size-4" />}
             </Button>
-          )}
-          {/* Minimize / maximize only in floating mode */}
-          {!docked && (
-            <>
-              <Button variant="ghost" size="icon" onClick={toggleMinimize} className="h-7 w-7" title={t("aiChat.minimize")}>
-                <Minus className="h-3.5 w-3.5" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={toggleMaximize} className="h-7 w-7" title={isMaximized ? t("aiChat.restore") : t("aiChat.maximize")}>
-                {isMaximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-              </Button>
-            </>
-          )}
-          <Button variant="ghost" size="icon" onClick={handleClearHistory} className="h-7 w-7" title={t("aiChat.clearHistory")}>
-            <RotateCcw className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7" title={t("common.close")}>
-            <X className="h-3.5 w-3.5" />
+          ) : null}
+          <Button variant="ghost" size="icon" onClick={onClose} className="size-9 shrink-0" aria-label={t("common.close")}>
+            <X className="size-4" />
           </Button>
         </div>
-      </div>
+      </header>
 
-      {/* Content - Hidden when minimized */}
-      {!isMinimized && (
-        <>
-          {/* Messages */}
-          <ScrollArea className="flex-1 p-3" ref={scrollRef}>
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <ScrollArea className="min-h-0 flex-1" ref={scrollRef}>
+          <div className={cn("mx-auto w-full max-w-[820px] px-4 py-8 sm:px-8", docked ? "sm:px-4" : "sm:py-12")}>
             {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-3">
-                  <Sparkles className="h-6 w-6 text-primary" />
+              <div className={cn("flex flex-col justify-center", docked ? "py-8" : "min-h-[48vh] py-12")}>
+                <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <span className="inline-block size-1.5 rounded-full bg-primary" aria-hidden="true" />
+                  {context?.activeView ?? "Your organization"}
                 </div>
-                <h3 className="text-sm font-medium mb-1">{t("aiChat.emptyState.heading")}</h3>
-                <p className="text-xs text-muted-foreground max-w-[240px] mb-4">
+                <h3 className={cn("font-semibold tracking-tight text-foreground", docked ? "text-xl" : "text-3xl sm:text-4xl")}>
+                  What would you like to work on?
+                </h3>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
                   {config?.welcomeMessage || t("aiChat.emptyState.welcome")}
                 </p>
-
-                {/* Quick actions */}
-                <div className="grid grid-cols-2 gap-1.5 w-full max-w-70">
+                <div className={cn("mt-8 grid gap-2", docked ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
                   {([
                     { labelKey: "aiChat.quickActions.salesSummary", icon: TrendingUp },
                     { labelKey: "aiChat.quickActions.checkInventory", icon: Package },
                     { labelKey: "aiChat.quickActions.listCustomers", icon: Users },
                     { labelKey: "aiChat.quickActions.generateReport", icon: FileText },
-                  ] as const).map((action) => (
+                  ] as const).map(({ labelKey, icon: Icon }) => (
                     <button
                       type="button"
-                      key={action.labelKey}
-                      onClick={() => setInput(t(action.labelKey))}
-                      className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/50 transition-colors text-left text-xs"
+                      key={labelKey}
+                      onClick={() => { setInput(t(labelKey)); inputRef.current?.focus() }}
+                      className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left text-sm text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      <action.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="truncate">{t(action.labelKey)}</span>
+                      <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span>{t(labelKey)}</span>
                     </button>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-8 pb-8">
                 {messages.map((message) => (
                   <div
                     key={message.id}
                     data-testid={`erp-ai-chat-message-${message.role}`}
                     className={cn(
-                      "flex gap-2",
-                      message.role === "user" ? "flex-row-reverse" : ""
+                      "flex w-full",
+                      message.role === "user" ? "justify-end" : "justify-start"
                     )}
                   >
-                    <Avatar className="h-6 w-6 shrink-0">
-                      <AvatarFallback className={cn(
-                        "text-[10px]",
-                        message.role === "assistant"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
-                      )}>
-                        {message.role === "assistant" ? <Sparkles className="h-3 w-3" /> : "U"}
-                      </AvatarFallback>
-                    </Avatar>
+                    
                     <div className={cn(
-                      "flex min-w-0 flex-col gap-0.5 max-w-[85%]",
-                      message.role === "user" ? "items-end" : "items-start"
+                      "flex min-w-0 flex-col gap-2",
+                      message.role === "user" ? "items-end max-w-[90%]" : "items-start w-full"
                     )}>
                       <div className={cn(
-                        "min-w-0 max-w-full rounded-xl px-3 py-2 text-xs",
+                        "max-w-full min-w-0 break-words text-[14px] leading-7",
                         message.role === "user"
-                          ? "bg-primary text-primary-foreground rounded-br-sm"
-                          : "bg-muted rounded-bl-sm"
+                          ? "rounded-2xl rounded-br-md bg-muted px-4 py-2.5 text-foreground"
+                          : "text-foreground"
                       )}>
                         <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{message.content}</p>
                       </div>
                       {message.role === "assistant" && message.sources != null && message.sources.length > 0 && (
-                        <div className="mt-1 max-w-[95%] rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-[10px] text-muted-foreground">
+                        <div className="mt-2 w-full max-w-full rounded-lg border border-border bg-card p-3 text-xs leading-5 text-muted-foreground">
                           <div className="font-medium text-foreground/80 mb-0.5">{t("aiChat.sources")}</div>
                           <ul className="space-y-0.5 list-disc list-inside">
                             {(message.sources as ChatMessageSourceRef[]).map((src, i) => {
@@ -795,7 +602,7 @@ export function AIChatPanel({
                                 <li key={sourceKey} className="break-all">
                                   <span
                                     className={cn(
-                                      "mr-1 inline-flex rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide",
+                                      "mr-1 inline-flex rounded px-1 py-px text-[11px] font-medium uppercase tracking-wide",
                                       isLive
                                         ? "bg-success/15 text-success"
                                         : "bg-muted text-muted-foreground",
@@ -826,7 +633,7 @@ export function AIChatPanel({
                                       disabled={status === "pending" || status === "done"}
                                       onClick={() => handleCiteSource(message.id, sourceKey, src)}
                                       className={cn(
-                                        "ml-1.5 inline-flex items-center gap-0.5 rounded px-1 py-px text-[9px] font-medium underline-offset-2",
+                                        "ml-1.5 inline-flex items-center gap-0.5 rounded px-1 py-px text-[11px] font-medium underline-offset-2",
                                         status === "done"
                                           ? "text-success"
                                           : status === "error"
@@ -835,9 +642,9 @@ export function AIChatPanel({
                                       )}
                                     >
                                       {status === "pending" ? (
-                                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                                        <Loader2 className="h-3 w-3 animate-spin" />
                                       ) : status === "done" ? (
-                                        <Check className="h-2.5 w-2.5" />
+                                        <Check className="h-3 w-3" />
                                       ) : null}
                                       {status === "pending"
                                         ? t("aiChat.citeSourcePending")
@@ -855,7 +662,7 @@ export function AIChatPanel({
                         </div>
                       )}
                       {message.role === "assistant" && message.actions != null && message.actions.length > 0 && (
-                        <div className="mt-1 w-full max-w-[95%] space-y-2">
+                        <div className="mt-2 w-full min-w-0 space-y-3">
                           {message.actions.map((action) =>
                             action.type === "draft" && action.draft ? (
                               <AiActionDraftCard
@@ -875,8 +682,8 @@ export function AIChatPanel({
                           )}
                         </div>
                       )}
-                      <div className="flex items-center gap-1.5 px-1">
-                        <span className="text-[9px] text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-3 px-1 pt-1">
+                        <span className="text-[11px] text-muted-foreground">
                           {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                         {message.role === "assistant" && (
@@ -886,9 +693,9 @@ export function AIChatPanel({
                             title="Copy answer"
                           >
                             {copiedId === message.id ? (
-                              <Check className="h-2.5 w-2.5 text-success" />
+                              <Check className="h-3 w-3 text-success" />
                             ) : (
-                              <Copy className="h-2.5 w-2.5" />
+                              <Copy className="h-3 w-3" />
                             )}
                           </button>
                         )}
@@ -896,7 +703,7 @@ export function AIChatPanel({
                           <button
                             type="button"
                             onClick={() => handleUseAnswerInForm(message.content)}
-                            className="text-[9px] text-muted-foreground hover:text-foreground transition-colors"
+                            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                           >
                             Use in form
                           </button>
@@ -904,13 +711,13 @@ export function AIChatPanel({
                         {message.role === "assistant" && message.metadata?.runId != null ? (
                           <a
                             href={`/ai-harness?runId=${message.metadata.runId}${message.metadata.companyId ? `&companyId=${message.metadata.companyId}` : ""}`}
-                            className="text-[9px] text-primary hover:underline"
+                            className="text-[11px] text-primary hover:underline"
                           >
                             Inspect run
                           </a>
                         ) : null}
                         {message.metadata?.tokens != null ? (
-                          <span className="text-[9px] text-muted-foreground">
+                          <span className="text-[11px] text-muted-foreground">
                             {message.metadata.tokens}t
                           </span>
                         ) : null}
@@ -919,28 +726,18 @@ export function AIChatPanel({
                   </div>
                 ))}
                 {isLoading && (
-                  <div className="flex gap-2">
-                    <Avatar className="h-6 w-6 shrink-0">
-                      <AvatarFallback className="bg-primary text-primary-foreground">
-                        <Sparkles className="h-3 w-3" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="bg-muted rounded-xl rounded-bl-sm px-3 py-2">
-                      <div className="flex items-center gap-1.5">
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        <span className="text-xs text-muted-foreground">{t("aiChat.thinking")}</span>
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground" role="status">
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    {t("aiChat.thinking")}
                   </div>
                 )}
               </div>
             )}
-          </ScrollArea>
-
-          {/* Command palette */}
-          {showCommands && filteredCommands.length > 0 && (
+          </div>
+        </ScrollArea>
+        {showCommands && filteredCommands.length > 0 && (
             <div
-              className="absolute bottom-[100px] left-3 right-3 bg-popover border border-border rounded-lg shadow-lg max-h-[200px] overflow-auto"
+              className="absolute bottom-[152px] left-4 right-4 z-20 mx-auto max-w-[790px] overflow-auto rounded-xl border border-border bg-popover p-1 shadow-lg max-h-[240px]"
             >
               <div className="p-1.5 border-b border-border">
                 <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground px-1.5">
@@ -989,117 +786,48 @@ export function AIChatPanel({
               </div>
             </div>
           )}
-
-          {/* Input area */}
-          <div className="p-3 border-t border-border bg-card/50">
-            <div className="flex items-end gap-2">
-              <div className="flex-1 relative">
-                <Textarea variant="plain"
-                  ref={inputRef}
-                  data-testid="erp-ai-chat-input"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={config?.placeholder || t("aiChat.placeholder")}
-                  rows={1}
-                  className={cn(
-                    "field-sizing-fixed resize-none px-3 py-2 pr-10 shadow-none",
-                    "text-xs placeholder:text-muted-foreground md:text-xs",
-                    "focus-visible:ring-1",
-                    "min-h-[36px] max-h-[120px]"
-                  )}
-                />
-                <Button
-                  size="icon"
-                  data-testid="erp-ai-chat-send"
-                  onClick={handleSend}
-                  disabled={!input.trim() || isLoading}
-                  className="absolute right-1.5 bottom-1.5 h-6 w-6 rounded-md"
-                >
-                  <Send className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-            <div className="flex items-center justify-between mt-1.5 px-0.5">
-              <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground">
-                <kbd className="px-1 py-0.5 bg-muted rounded">@</kbd>
-                <span>{t("aiChat.hints.cmds")}</span>
-                <span className="mx-0.5">|</span>
-                <kbd className="px-1 py-0.5 bg-muted rounded">Enter</kbd>
-                <span>{t("aiChat.hints.send")}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                {context?.activeView && (
-                  <Badge variant="outline" className="text-[9px] h-4 px-1.5">
-                    <Layout className="h-2.5 w-2.5 mr-0.5" />
-                    {context.activeView}
-                  </Badge>
-                )}
-                {selectionSummary && (
-                  <Badge
-                    variant="outline"
-                    className="text-[9px] h-4 max-w-48 px-1.5"
-                    title={t("aiChat.selectionContext")}
-                  >
-                    <CheckSquare className="h-2.5 w-2.5 mr-0.5" />
+        <div className="shrink-0 border-t border-border/70 bg-background/95 px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 sm:px-5">
+          <div className="mx-auto w-full max-w-[790px] rounded-2xl border border-border bg-card p-2 shadow-sm transition-colors focus-within:border-ring">
+            <Textarea
+              variant="plain"
+              ref={inputRef}
+              data-testid="erp-ai-chat-input"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={config?.placeholder || t("aiChat.placeholder")}
+              rows={2}
+              aria-label="Message Lumière assistant"
+              className="block field-sizing-fixed min-h-[58px] max-h-[180px] w-full resize-none rounded-none border-0 bg-transparent px-3 pt-2 text-sm leading-6 text-foreground shadow-none placeholder:text-muted-foreground focus:outline-none focus-visible:ring-0 dark:bg-transparent"
+            />
+            <div className="flex min-h-10 flex-wrap items-center justify-between gap-2 pl-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span><kbd className="rounded bg-muted px-1 py-0.5">@</kbd> {t("aiChat.hints.cmds")}</span>
+                {selectionSummary ? (
+                  <Badge variant="outline" className="max-w-[180px] truncate text-[10px]" title={t("aiChat.selectionContext")}>
+                    <CheckSquare className="mr-1 size-3 shrink-0" aria-hidden="true" />
                     <span className="truncate">{selectionSummary}</span>
                   </Badge>
-                )}
-                {/* Resize button — floating mode only */}
-                {!docked && !isMaximized && (
-                  <button
-                    type="button"
-                    title={t("aiChat.dragToResize")}
-                    onMouseDown={handleResizeStart("se")}
-                    className={cn(
-                      "flex items-center justify-center h-5 w-5 rounded transition-colors",
-                      "text-muted-foreground hover:text-foreground hover:bg-muted",
-                      isResizing === "se" ? "bg-primary/10 text-primary cursor-se-resize" : "cursor-se-resize"
-                    )}
-                  >
-                    <ChevronsUpDown className="h-3 w-3 rotate-45" />
-                  </button>
-                )}
+                ) : null}
               </div>
+              <Button
+                size="icon"
+                data-testid="erp-ai-chat-send"
+                onClick={handleSend}
+                disabled={!input.trim() || isLoading}
+                className="size-9 shrink-0 rounded-xl"
+                aria-label="Send message"
+              >
+                {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+              </Button>
             </div>
           </div>
-        </>
-      )}
-    </>
-  )
-
-  // ----- Docked mode: right sidebar rail -----
-  if (docked) {
-    return (
-      <aside
-        data-testid="erp-ai-chat-panel"
-        className="h-screen w-[24vw] min-w-[320px] shrink-0 flex flex-col bg-sidebar border-l border-sidebar-border relative overflow-hidden"
-      >
-        {chatContent}
-      </aside>
-    )
-  }
-
-  // ----- Floating mode: draggable island -----
-  return (
-    <div
-      ref={panelRef}
-      data-testid="erp-ai-chat-panel"
-      className={cn(
-        "fixed bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden",
-        "transition-shadow duration-200",
-        isDragging && "shadow-2xl shadow-primary/20",
-        isMinimized && "!h-auto"
-      )}
-      style={{
-        left: position.x,
-        top: position.y,
-        width: isMinimized ? 280 : size.width,
-        height: isMinimized ? "auto" : size.height,
-      }}
-    >
-      {chatContent}
-    </div>
+          <p className="mx-auto mt-2 max-w-[790px] text-center text-[11px] text-muted-foreground">
+            Suggested actions require review. Lumière checks your current permissions.
+          </p>
+        </div>
+      </div>
+    </section>
   )
 }
 

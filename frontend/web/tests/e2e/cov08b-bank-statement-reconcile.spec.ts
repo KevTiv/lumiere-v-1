@@ -93,8 +93,9 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
     const salesJournalId = scalarQueryId(journals.find((row) =>
       scalarQueryId(row.companyId ?? row.company_id) === companyId && row.code === "INV",
     )?.id)
-    // An incoming payment settles only against a customer; other specs in the shard may have
-    // added supplier contacts to the same company first.
+    // Other specs create suppliers in the same company. Inbound settlement
+    // requires a customer even though the trusted invoice fixture accepts a
+    // general contact; keep this positive fixture independent of read order.
     const partnerId = scalarQueryId((await queryRows(page, "contacts")).find((row) =>
       scalarQueryId(row.companyId ?? row.company_id) === companyId &&
       (row.isCustomer ?? row.is_customer) === true,
@@ -201,7 +202,8 @@ test.describe("COV-08b exact bank statement reconciliation", { tag: ["@p0", "@co
       ),
       desk.getByTestId("reconciliation-confirm").click(),
     ])
-    expect(accepted.ok()).toBe(true)
+    const failureBody = accepted.ok() ? "" : (await accepted.text()).slice(0, 2_000)
+    expect(accepted.ok(), `Reconciliation HTTP ${accepted.status()}: ${failureBody}`).toBe(true)
     await expect.poll(() => fetchBankLine(page, lineId)).toEqual({
       id: lineId,
       statementId,

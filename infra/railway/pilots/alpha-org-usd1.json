@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "organizationId": 1,
+  "companyId": 1,
+  "agentName": "mistral-alpha-usd1",
+  "policyKey": "mistral-alpha-usd1",
+  "policyVersion": 1,
+  "currency": "USD",
+  "monthlyLimitUnits": 1000000,
+  "priceReviewedAt": "2026-10-24",
+  "primary": {
+    "model": "mistral-small-2603",
+    "maxTokens": 2048,
+    "contextWindow": 32768,
+    "timeoutMs": 60000,
+    "maxConcurrency": 1,
+    "inputUnitsPer1k": 150,
+    "outputUnitsPer1k": 600
+  },
+  "review": {
+    "model": "mistral-medium-3-5",
+    "maxTokens": 2048,
+    "contextWindow": 32768,
+    "timeoutMs": 60000,
+    "maxConcurrency": 1,
+    "inputUnitsPer1k": 1500,
+    "outputUnitsPer1k": 7500
+  }
+}

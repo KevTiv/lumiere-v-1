@@ -4,8 +4,7 @@ use spacetimedb::{ReducerContext, Table};
 
 use crate::ai::capability_grants::{
     ai_capability_role_grant, delete_ai_capability_role_grant,
-    provision_owner_ai_capability_grants, set_ai_capability_role_grant,
-    OWNER_AI_CAPABILITY_GRANTS,
+    provision_owner_ai_capability_grants, set_ai_capability_role_grant, OWNER_AI_CAPABILITY_GRANTS,
 };
 use crate::core::permissions::{create_role, role, CreateRoleParams};
 use crate::test_harness::{ensure_test_superuser, OrgFixture};
@@ -49,11 +48,11 @@ pub fn test_capability_grant_org_scope(ctx: &ReducerContext) -> Result<(), Strin
         true,
     );
     match result {
-        Err(ref e) if e.to_lowercase().contains("permission") => {}
+        Err(ref e) if e.to_lowercase().contains("organization") => {}
         other => {
             return Err(format!(
-                "AI-CG-001 expected permission error writing foreign org grant, got {other:?}"
-            ))
+            "AI-CG-001 expected organization-scope error writing foreign org grant, got {other:?}"
+        ))
         }
     }
     Ok(())
@@ -274,14 +273,18 @@ pub fn test_capability_grant_upsert_and_delete(ctx: &ReducerContext) -> Result<(
     Ok(())
 }
 
-
 /// AI-CG-005: the production owner baseline is exact, idempotent, and cannot
 /// be applied to an ordinary role.
 pub fn test_owner_capability_provisioning(ctx: &ReducerContext) -> Result<(), String> {
     ensure_test_superuser(ctx)?;
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let owner_role_id = seed_role(ctx, fixture.organization_id, "AI-CG-005 Owner")?;
-    let mut owner_role = ctx.db.role().id().find(&owner_role_id).ok_or("owner role missing")?;
+    let mut owner_role = ctx
+        .db
+        .role()
+        .id()
+        .find(&owner_role_id)
+        .ok_or("owner role missing")?;
     owner_role.permissions = vec!["*:*".to_string()];
     owner_role.is_system = true;
     ctx.db.role().id().update(owner_role.clone());

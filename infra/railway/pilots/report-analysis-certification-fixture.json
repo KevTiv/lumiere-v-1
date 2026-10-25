@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "organizationId": 1,
+  "companyId": 1,
+  "fixtureKey": "grounded-synthetic-report-v1",
+  "name": "Grounded synthetic report",
+  "description": "Public synthetic transcript replay through the production governed program. This does not prove live Mistral output or spend settlement.",
+  "input": {
+    "inputs": {
+      "query": "Summarize the synthetic report."
+    }
+  },
+  "dataset": {
+    "analytics.report_analysis.v1": {
+      "organizationId": 1,
+      "companyId": 1,
+      "data": {
+        "analyticsArguments": {
+          "query": "Summarize the synthetic report."
+        },
+        "analyticsOutput": {
+          "summary": "Synthetic report",
+          "data": {
+            "artifacts": [
+              {
+                "companyId": 1,
+                "summary": "This synthetic report has no overdue items."
+              }
+            ]
+          },
+          "citations": [],
+          "row_count": 1
+        },
+        "decisions": [
+          {
+            "decisionType": {
+              "name": "ReportAttentionNeed",
+              "version": 1
+            },
+            "response": {
+              "kind": "probability",
+              "choice": null,
+              "probability": 0.5,
+              "confidence": 0.5,
+              "score": null,
+              "rationale": "Pinned synthetic reply",
+              "model": "fixture",
+              "provider": "fixture",
+              "input_tokens": 0,
+              "output_tokens": 0
+            }
+          },
+          {
+            "decisionType": {
+              "name": "ClaimEvidenceSupport",
+              "version": 1
+            },
+            "response": {
+              "kind": "choice",
+              "choice": "supported",
+              "probability": null,
+              "confidence": 1,
+              "score": null,
+              "rationale": "Pinned synthetic reply",
+              "model": "fixture",
+              "provider": "fixture",
+              "input_tokens": 0,
+              "output_tokens": 0
+            }
+          }
+        ],
+        "generations": [],
+        "reasoning": [
+          {
+            "outcome": "final_draft",
+            "content": "This synthetic report has no overdue items.",
+            "citations": [],
+            "claims": [
+              {
+                "text": "This synthetic report has no overdue items.",
+                "supports": [
+                  {
+                    "kind": "report",
+                    "id": "synthetic-report",
+                    "source_version": "v1",
+                    "passage_key": "summary"
+                  }
+                ]
+              }
+            ],
+            "calculations": []
+          }
+        ],
+        "passages": [
+          {
+            "id": 1,
+            "kind": "report",
+            "sourceKey": "synthetic-report",
+            "version": "v1",
+            "passageKey": "summary",
+            "text": "This synthetic report has no overdue items.",
+            "contentHash": "9d3ee8be62e6432e74811f3d3604bc5284c0e3e429c783c57c6f5ba6202f39d1",
+            "effectiveFromMicros": 0,
+            "effectiveToMicros": null,
+            "applicability": [],
+            "status": "current"
+          }
+        ],
+        "asOfMicros": 1000
+      }
+    }
+  },
+  "virtualFiles": {},
+  "expectedOutput": {
+    "status": "completed",
+    "summary": "This synthetic report has no overdue items.",
+    "steps": [
+      {
+        "node_id": "analytics",
+        "kind": "capability",
+        "summary": "governed capability completed"
+      },
+      {
+        "node_id": "verify_analytics",
+        "kind": "verify",
+        "summary": "verification passed"
+      },
+      {
+        "node_id": "attention_need",
+        "kind": "probability",
+        "summary": "typed probability completed"
+      },
+      {
+        "node_id": "route",
+        "kind": "gate",
+        "summary": "deterministic gate selected a branch"
+      }
+    ],
+    "decisionCalls": 1,
+    "capabilityCalls": 1
+  }
+}

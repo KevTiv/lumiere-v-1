@@ -507,9 +507,14 @@ fn is_authored_column_addition(table: &str, line: &str) -> bool {
     matches!(
         (table, line.strip_suffix(',').unwrap_or(line)),
         (
-            "country_pack_definition",
-            "    \"acceptance_status\" TEXT NOT NULL"
-        ) | ("country_pack_definition", "    \"effective_from\" BIGINT")
+            "search_embedding",
+            "    \"expected_fingerprint\" TEXT NOT NULL"
+        ) | ("search_embedding", "    \"index_generation\" TEXT NOT NULL")
+            | (
+                "country_pack_definition",
+                "    \"acceptance_status\" TEXT NOT NULL"
+            )
+            | ("country_pack_definition", "    \"effective_from\" BIGINT")
             | ("country_pack_definition", "    \"effective_to\" BIGINT")
             | (
                 "country_pack_tax_rule",
@@ -986,6 +991,33 @@ mod tests {
     }
 
     #[test]
+    fn canonical_index_retains_legacy_columns_until_an_audited_retirement() {
+        let old = vec![
+            "CREATE TABLE IF NOT EXISTS \"document\" (".to_string(),
+            "    \"id\" NUMERIC(20,0) NOT NULL,".to_string(),
+            "    \"index_content\" TEXT,".to_string(),
+            "    \"name\" TEXT NOT NULL,".to_string(),
+            ");".to_string(),
+        ];
+        let covered = BTreeMap::from([("document".to_string(), old)]);
+        let current = BTreeMap::from([("document".to_string(),
+            "-- Durable projection: document\nCREATE TABLE IF NOT EXISTS \"document\" (\n    \"id\" NUMERIC(20,0) NOT NULL,\n    \"name\" TEXT NOT NULL,\n);\n".to_string())]);
+        assert!(pending_delta_body(&covered, &current).is_err());
+        let mut changed = current.clone();
+        changed.get_mut("document").unwrap().replace_range(
+            ..,
+            current["document"]
+                .replace("    \"name\" TEXT NOT NULL,\n", "")
+                .as_str(),
+        );
+        assert!(pending_delta_body(&covered, &changed).is_err());
+        assert!(!is_authored_column_addition(
+            "search_embedding",
+            "    \"index_generation\" TEXT,"
+        ));
+    }
+
+    #[test]
     fn emits_deterministic_checksum_and_skips_external_relations() {
         let schema = fixture_manifest();
         let policies = serde_json::json!({ "version": 1, "policies": [
@@ -1434,7 +1466,7 @@ mod tests {
         );
         assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (23, "0023_durable_projection_delta")
+            (27, "0027_durable_projection_delta")
         );
     }
     #[test]

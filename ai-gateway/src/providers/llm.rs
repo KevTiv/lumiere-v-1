@@ -641,12 +641,34 @@ impl LlmClient {
     }
 }
 
-fn check_mistral_status(status: reqwest::StatusCode) -> Result<()> {
-    anyhow::ensure!(
-        status.is_success(),
-        "Mistral request failed with HTTP {status}"
-    );
-    Ok(())
+/// An explicit provider rejection that did not produce a completion. Network,
+/// server, response-decoding and timeout errors are deliberately not rejections.
+#[derive(Debug, thiserror::Error)]
+#[error("provider rejected completion with HTTP {status}")]
+pub(crate) struct ProviderRejection {
+    status: u16,
+}
+
+impl ProviderRejection {
+    pub(crate) fn retryable(&self) -> bool {
+        self.status == 429
+    }
+}
+
+/// Classify direct Mistral HTTP status without reading private error bodies.
+pub(crate) fn check_mistral_status(status: reqwest::StatusCode) -> Result<()> {
+    if status.is_success() {
+        return Ok(());
+    }
+    // Only explicit request/auth/rate rejections prove that no completion ran.
+    // In particular 408 and all server failures retain unknown-outcome handling.
+    if matches!(status.as_u16(), 400 | 401 | 403 | 404 | 413 | 422 | 429) {
+        return Err(ProviderRejection {
+            status: status.as_u16(),
+        }
+        .into());
+    }
+    anyhow::bail!("Mistral request failed with HTTP {status}")
 }
 
 /// Decode direct Mistral responses without exposing a constructor for native
@@ -1519,9 +1541,24 @@ mod tests {
         let error = check_mistral_status(reqwest::StatusCode::BAD_REQUEST).unwrap_err();
         assert_eq!(
             error.to_string(),
-            "Mistral request failed with HTTP 400 Bad Request"
+            "provider rejected completion with HTTP 400"
         );
         assert!(!format!("{error:?} {error:#}").contains(sentinel));
+    }
+
+    #[test]
+    fn mistral_rejections_distinguish_retryable_rate_limits_from_unknown_outcomes() {
+        for status in [400, 401, 403, 404, 413, 422, 429] {
+            let error =
+                check_mistral_status(reqwest::StatusCode::from_u16(status).unwrap()).unwrap_err();
+            let rejection = error.downcast_ref::<ProviderRejection>().unwrap();
+            assert_eq!(rejection.retryable(), status == 429);
+        }
+        for status in [408, 500, 502, 503, 504] {
+            let error =
+                check_mistral_status(reqwest::StatusCode::from_u16(status).unwrap()).unwrap_err();
+            assert!(error.downcast_ref::<ProviderRejection>().is_none());
+        }
     }
 
     #[test]

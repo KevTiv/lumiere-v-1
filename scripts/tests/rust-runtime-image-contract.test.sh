@@ -65,6 +65,23 @@ def selected_targets(commands, prefix):
 
 if selected_targets(dependencies, "cargo chef cook ") != selected_targets(application, "cargo build "):
     raise SystemExit("dependency recipe and application must build the same packages and binaries")
+
+# Compile-time certification inputs outside the gateway tree must be present
+# before compilation, and their changes must rebuild the image on push and PR.
+application_inputs = application.split("RUN cargo build ", 1)[0]
+external_inputs = set()
+for source in [root / "ai-gateway/src/harness/certification.rs"]:
+    for include in re.findall(r'include_(?:bytes|str)!\(\s*"([^"]+)"\s*\)', source.read_text()):
+        included = (source.parent / include).resolve()
+        if included.is_relative_to(root) and not included.is_relative_to(root / "ai-gateway"):
+            external_inputs.add(included.relative_to(root).as_posix())
+for path in external_inputs:
+    if not (root / path).is_file():
+        raise SystemExit(f"gateway compile-time input does not exist: {path}")
+    if f"COPY {path} ./{path}" not in application_inputs:
+        raise SystemExit(f"runtime application stage omits gateway compile-time input: {path}")
+    if workflow.count(f"      - {path}\n") != 2:
+        raise SystemExit(f"runtime image must rebuild on push and PR changes to: {path}")
 builder_sources = {
     source.removeprefix("./").rstrip("/")
     for line in builder_commands.splitlines()

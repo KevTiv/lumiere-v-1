@@ -7281,7 +7281,6 @@
     "ai_suggestion"
   ],
   "UpsertSearchEmbeddingParams": [
-    "embedding_hash",
     "metadata"
   ],
   "UpsertSubscriptionPriceIndexParams": [

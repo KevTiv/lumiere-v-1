@@ -7281,7 +7281,6 @@
     "ai_suggestion": "string"
   },
   "UpsertSearchEmbeddingParams": {
-    "embedding_hash": "string",
     "metadata": "string"
   },
   "UpsertSubscriptionPriceIndexParams": {

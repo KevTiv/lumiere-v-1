@@ -2398,6 +2398,10 @@
       "name": "fail_workorder_quality_check",
       "shape_fingerprint": "sha256:7d3c3d3d3a00753a414866812dd5cd68e9866cff2beabfba51f80ec2f51fce0f"
     },
+    "erp.finalize_embedding_job": {
+      "name": "finalize_embedding_job",
+      "shape_fingerprint": "sha256:2f63a005787f2ff194e2863b095c0cba1ba2d01b4aae708aeff7bf3174e6ba76"
+    },
     "erp.finalize_import_assistant_job": {
       "name": "finalize_import_assistant_job",
       "shape_fingerprint": "sha256:da5bffb757ef21834ad44ea6fd7a767bf922abe8d396f13e29a98bc27d16f689"
@@ -3504,7 +3508,7 @@
     },
     "erp.request_embedding_job": {
       "name": "request_embedding_job",
-      "shape_fingerprint": "sha256:286df1a723f67733ef9ee625d75de71d18126a9f48328c24744fd6885e1e2684"
+      "shape_fingerprint": "sha256:e876da5a61bd16ff74d484cc0561fb9be82c5b93d70812e220b873219fd88d7c"
     },
     "erp.request_expense_policy_exception": {
       "name": "request_expense_policy_exception",
@@ -6128,6 +6132,14 @@
       "current_operations_fingerprint": "sha256:5cca890c71074d8d79b710f550b94fe7fc7e10cc51bce7bde92f42648b061d04",
       "operation_count": 1462,
       "reason": "release on top of v0.3.142: add repair_cancelled_workflow_tasks, resubmit_workflow_human_task; change the shape of none"
+    },
+    {
+      "previous_release": "v0.3.144",
+      "previous_ir_sha256": "sha256:f856aef96f41c74d313b3e5d16168b646b8d52aee8073a7b191044204ff02aa9",
+      "previous_operations_fingerprint": "sha256:5cca890c71074d8d79b710f550b94fe7fc7e10cc51bce7bde92f42648b061d04",
+      "current_operations_fingerprint": "sha256:9f581a9b17c58845cb18d9487da60520a9927caa016ea8f5f5791de1929ec87b",
+      "operation_count": 1463,
+      "reason": "release on top of v0.3.144: add finalize_embedding_job; change the shape of request_embedding_job"
     }
   ]
 }
