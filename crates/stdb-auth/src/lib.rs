@@ -22,3 +22,46 @@ pub use field_policy::{
     FieldAccessContext, FieldPermissionLike,
 };
 pub use resource_registry::{registry_get, registry_json, registry_keys, ResourceEntry};
+
+/// Apply the server-owned bootstrap lease to a SpacetimeDB SQL profile row.
+/// The trusted authority query must select metadata, including SATS Option values.
+pub fn profile_bootstrap_lease_active(profile: &serde_json::Value, now_micros: i64) -> bool {
+    use serde_json::Value;
+    fn metadata(value: &Value) -> Result<Option<&str>, ()> {
+        match value {
+            Value::Null => Ok(None),
+            Value::String(text) => Ok(Some(text)),
+            Value::Object(fields) if fields.contains_key("some") => metadata(&fields["some"]),
+            Value::Object(fields) if fields.contains_key("none") => Ok(None),
+            Value::Array(fields) if fields.len() == 2 && fields[0] == 0 => metadata(&fields[1]),
+            Value::Array(fields) if fields.len() == 2 && fields[0] == 1 => Ok(None),
+            _ => Err(()),
+        }
+    }
+    let value = profile.get("metadata").unwrap_or(&Value::Null);
+    metadata(value).is_ok_and(|metadata| {
+        lumiere_policy_core::platform_bootstrap_lease_active(metadata, now_micros)
+    })
+}
+
+pub use lumiere_policy_core::platform_bootstrap_lease_active;
+
+#[cfg(test)]
+mod bootstrap_lease_tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn expired_bootstrap_profile_is_rejected_in_every_supported_wire_shape() {
+        let lease = "lumiere-platform-bootstrap-v1:1:10";
+        for value in [json!(lease), json!({"some":lease}), json!([0, lease])] {
+            let profile = json!({"metadata":value});
+            assert!(profile_bootstrap_lease_active(&profile, 1));
+            assert!(!profile_bootstrap_lease_active(&profile, 10));
+        }
+        assert!(!profile_bootstrap_lease_active(
+            &json!({"metadata":[0,42]}),
+            1
+        ));
+        assert!(profile_bootstrap_lease_active(&json!({"metadata":null}), 1));
+    }
+}

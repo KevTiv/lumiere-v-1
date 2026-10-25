@@ -73,7 +73,7 @@ pub async fn find_user_profile_by_platform_id(
         .context("get PG client for profile lookup")?;
     client
         .query_opt(
-            "SELECT platform_user_id, stdb_identity_hex, email, email_verified, name, first_name, last_name, timezone, language, is_active, is_superuser \
+            "SELECT platform_user_id, stdb_identity_hex, email, email_verified, name, first_name, last_name, timezone, language, is_active, is_superuser, metadata::text AS bootstrap_metadata \
              FROM lumiere_platform.user_profile WHERE platform_user_id = $1",
             &[&platform_user_id.as_str()],
         )
@@ -92,7 +92,7 @@ pub async fn find_user_profile_by_stdb_identity(
         .context("get PG client for profile binding lookup")?;
     client
         .query_opt(
-            "SELECT platform_user_id, stdb_identity_hex, email, email_verified, name, first_name, last_name, timezone, language, is_active, is_superuser \
+            "SELECT platform_user_id, stdb_identity_hex, email, email_verified, name, first_name, last_name, timezone, language, is_active, is_superuser, metadata::text AS bootstrap_metadata \
              FROM lumiere_platform.user_profile WHERE stdb_identity_hex = $1",
             &[&stdb_identity_hex],
         )
@@ -214,4 +214,14 @@ pub async fn update_user_email(
         .await
         .context("commit user email transaction")?;
     Ok(true)
+}
+
+/// Resolve active status without granting an expired operator lease authority.
+pub fn profile_is_active(row: &tokio_postgres::Row) -> bool {
+    row.get::<_, bool>("is_active")
+        && stdb_auth::platform_bootstrap_lease_active(
+            row.get::<_, Option<String>>("bootstrap_metadata")
+                .as_deref(),
+            chrono::Utc::now().timestamp_micros(),
+        )
 }

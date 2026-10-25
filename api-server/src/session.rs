@@ -89,6 +89,10 @@ pub async fn load_field_access_context(
         return Ok(None);
     }
 
+    if !stdb_auth::profile_bootstrap_lease_active(profile, chrono::Utc::now().timestamp_micros()) {
+        return Ok(None);
+    }
+
     let is_superuser = profile
         .get("isSuperuser")
         .and_then(|v| v.as_bool())

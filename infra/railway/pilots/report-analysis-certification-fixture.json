@@ -24,7 +24,16 @@
             "artifacts": [
               {
                 "companyId": 1,
-                "summary": "This synthetic report has no overdue items."
+                "summary": "This synthetic report has no overdue items.",
+                "artifacts": {
+                  "evidencePassage": {
+                    "kind": "report",
+                    "id": "synthetic-report",
+                    "source_version": "v1",
+                    "passage_key": "summary",
+                    "text": "This synthetic report has no overdue items."
+                  }
+                }
               }
             ]
           },

@@ -70,6 +70,8 @@ pub fn run_core_sod_test(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_core_permissions_test(ctx: &ReducerContext) -> Result<(), String> {
+    permissions_tests::test_expired_operator_cannot_register_certification_runtime(ctx)
+        .map_err(|e| format!("expired_operator_registration: {e}"))?;
     permissions_tests::test_grant_and_revoke_field_permission(ctx)
         .map_err(|e| format!("field_permission_grant_revoke: {e}"))
 }

@@ -279,6 +279,16 @@ pub(crate) fn find_user_profile_for_organization(
         .user_profile_by_identity_organization()
         .filter((&identity, &organization_id))
         .min_by_key(|profile| profile.id)
+        .map(|mut profile| {
+            if !lumiere_policy_core::platform_bootstrap_lease_active(
+                profile.metadata.as_deref(),
+                ctx.timestamp.to_micros_since_unix_epoch(),
+            ) {
+                profile.is_active = false;
+                profile.is_superuser = false;
+            }
+            profile
+        })
 }
 
 /// Return whether an organization already has a different profile binding for

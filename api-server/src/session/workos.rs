@@ -385,7 +385,7 @@ pub async fn verify_binding(
                 .await
                 .map_err(ApiError::internal)?
                 .ok_or(ApiError::Unauthorized)?;
-            if !profile.get::<_, bool>("is_active") {
+            if !platform_control::profile_is_active(&profile) {
                 return Err(ApiError::Unauthorized);
             }
             if !platform_control::attach_workos_subject(pool, &id, &claims.sub, true)
@@ -447,7 +447,7 @@ pub async fn verify_binding(
         .await
         .map_err(ApiError::internal)?
         .ok_or(ApiError::Unauthorized)?;
-    if !profile.get::<_, bool>("is_active")
+    if !platform_control::profile_is_active(&profile)
         || profile.get::<_, String>("stdb_identity_hex") != identity_hex
     {
         return Err(ApiError::Unauthorized);
