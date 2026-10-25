@@ -959,7 +959,14 @@
       "name",
       "start",
       "stop",
-      "state"
+      "state",
+      "allday",
+      "privacy",
+      "show_as",
+      "description",
+      "location",
+      "user_id",
+      "partner_ids"
     ],
     "mandatory": [
       "id",
@@ -2218,7 +2225,8 @@
       "filter_analytic_account_ids",
       "filter_account_ids",
       "filter_partner_ids",
-      "filter_journal_ids"
+      "filter_journal_ids",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -3795,7 +3803,20 @@
       "partner_id",
       "stage_id",
       "probability",
-      "company_id"
+      "company_id",
+      "expected_revenue",
+      "company_currency_id",
+      "is_won",
+      "is_lost",
+      "date_deadline",
+      "priority",
+      "date_open",
+      "date_closed",
+      "lead_id",
+      "contact_id",
+      "user_id",
+      "description",
+      "created_at"
     ],
     "mandatory": [
       "id",
@@ -5361,7 +5382,15 @@
       "invoice_lines",
       "qty_received",
       "qty_invoiced",
-      "qty_to_invoice"
+      "qty_to_invoice",
+      "date_planned",
+      "price_subtotal",
+      "price_tax",
+      "price_total",
+      "currency_id",
+      "partner_id",
+      "product_uom_qty",
+      "sequence"
     ],
     "mandatory": [
       "id",
@@ -5428,7 +5457,18 @@
       "picking_ids",
       "invoice_ids",
       "invoice_count",
-      "invoice_status"
+      "invoice_status",
+      "currency_id",
+      "date_order",
+      "date_planned",
+      "amount_untaxed",
+      "amount_tax",
+      "amount_total",
+      "partner_ref",
+      "notes",
+      "payment_term_id",
+      "user_id",
+      "receipt_status"
     ],
     "mandatory": [
       "id",
@@ -6119,7 +6159,9 @@
       "invoice_ids",
       "invoice_count",
       "invoice_status",
-      "origin_so_id"
+      "origin_so_id",
+      "commitment_date",
+      "expected_date"
     ],
     "mandatory": [
       "id",
@@ -6792,7 +6834,20 @@
     "default_restricted": [
       "name",
       "company_id",
-      "active"
+      "active",
+      "code",
+      "description",
+      "currency_id",
+      "journal_id",
+      "product_id",
+      "billing_period",
+      "billing_period_unit",
+      "recurring_invoice_day",
+      "payment_mode",
+      "trial_period",
+      "trial_duration",
+      "trial_unit",
+      "is_default"
     ],
     "mandatory": [
       "id",
@@ -6922,7 +6977,22 @@
       "code",
       "state",
       "company_id",
-      "description"
+      "description",
+      "plan_id",
+      "partner_id",
+      "currency_id",
+      "recurring_next_date",
+      "date_start",
+      "recurring_total",
+      "recurring_mrr",
+      "recurring_monthly",
+      "payment_mode",
+      "is_active",
+      "is_trial",
+      "health",
+      "invoice_count",
+      "pricelist_id",
+      "created_at"
     ],
     "mandatory": [
       "id",
