@@ -24,6 +24,7 @@ expected = {
     "project-integration-worker",
     "storage-migrate",
     "workflow-worker",
+    "whatsapp-inbox-worker",
 }
 
 for binary in expected - {"gateway"}:

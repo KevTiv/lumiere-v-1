@@ -1,5 +1,7 @@
 # Operational Messaging Plan
 
+> **Alpha status, 22 October 2026:** the original copy-first scope remains the safe fallback. Phone identity, operational message intents, batch approval, WhatsApp account configuration, and CRM provider-receipt primitives have since landed. A direct Meta webhook boundary is now being implemented; outbound provider delivery and unknown-contact/media quarantine remain gated. See [WhatsApp Cloud API alpha implementation](./whatsapp-meta-alpha-implementation.md).
+
 ## Scope
 
 Add phone-first operational communication for customers and suppliers. Version

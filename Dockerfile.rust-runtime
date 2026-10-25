@@ -47,6 +47,7 @@ RUN cargo chef cook --locked --release --recipe-path recipe.json \
       --bin project-integration-worker \
       --bin storage-migrate \
       --bin workflow-worker \
+      --bin whatsapp-inbox-worker \
     && cargo chef cook --locked --release --recipe-path recipe.json \
       -p ai-gateway --bin gateway
 
@@ -78,6 +79,7 @@ RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
       --bin project-integration-worker \
       --bin storage-migrate \
       --bin workflow-worker \
+      --bin whatsapp-inbox-worker \
     && cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
       -p ai-gateway --bin gateway \
     && install -d /out \
@@ -91,6 +93,7 @@ RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
       target/release/project-integration-worker \
       target/release/storage-migrate \
       target/release/workflow-worker \
+      target/release/whatsapp-inbox-worker \
       /out/
 
 FROM debian:bookworm-slim AS runtime
