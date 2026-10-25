@@ -44,6 +44,21 @@ export function addOrgMemberForm(t: TFunction, roleOptions: { value: string; lab
             width: "1/2",
           },
           {
+            id: "companyId",
+            name: "companyId",
+            type: "number",
+            label: t("settings.adminOps.members.companyId", { defaultValue: "Company ID (optional)" }),
+            width: "1/2",
+          },
+          {
+            id: "temporarySetupAccess",
+            name: "temporarySetupAccess",
+            type: "switch",
+            label: t("settings.adminOps.members.temporarySetupAccess", { defaultValue: "Temporary setup access (one hour)" }),
+            defaultValue: false,
+            width: "full",
+          },
+          {
             id: "isDefault",
             name: "isDefault",
             type: "switch",
@@ -100,6 +115,21 @@ export function addUserToOrganizationForm(
             label: t("settings.users.statuses.active"),
             defaultValue: true,
             width: "1/2",
+          },
+          {
+            id: "companyId",
+            name: "companyId",
+            type: "number",
+            label: t("settings.adminOps.members.companyId", { defaultValue: "Company ID (optional)" }),
+            width: "1/2",
+          },
+          {
+            id: "temporarySetupAccess",
+            name: "temporarySetupAccess",
+            type: "switch",
+            label: t("settings.adminOps.members.temporarySetupAccess", { defaultValue: "Temporary setup access (one hour)" }),
+            defaultValue: false,
+            width: "full",
           },
           {
             id: "isDefault",

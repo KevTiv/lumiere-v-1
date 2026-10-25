@@ -1214,6 +1214,15 @@ export function useDelegatedAdminScopes(organizationId: bigint) {
   })
 }
 
+function memberSetupMetadata(formData: Record<string, unknown>): string | null {
+  if (formData.temporarySetupAccess !== true) return optionalStringField(formData.metadata)
+  if (formData.companyId == null || String(formData.companyId).trim() === "" || BigInt(String(formData.companyId)) <= 0n) {
+    throw new Error("Select a company for temporary setup access")
+  }
+  if (optionalStringField(formData.metadata)) throw new Error("Temporary setup access cannot replace other metadata")
+  return "lumiere-platform-bootstrap-request-v1"
+}
+
 export function useAddOrgMember(organizationId: bigint) {
   const qc = useQueryClient()
   return useMutation<void, Error, Record<string, unknown>>({
@@ -1232,7 +1241,7 @@ export function useAddOrgMember(organizationId: bigint) {
         employeeId: optionalStringField(formData.employeeId),
         isActive: formData.isActive !== false,
         isDefault: Boolean(formData.isDefault),
-        metadata: optionalStringField(formData.metadata),
+        metadata: memberSetupMetadata(formData),
       }
       const { urlPath, init } = stdbBffCommandPost("add_org_member", {
         userIdentity: identityForReducer(String(formData.userIdentity ?? "")),
@@ -1265,7 +1274,7 @@ export function useAddUserToOrganization(organizationId: bigint) {
         employeeId: optionalStringField(formData.employeeId),
         isActive: formData.isActive !== false,
         isDefault: Boolean(formData.isDefault),
-        metadata: optionalStringField(formData.metadata),
+        metadata: memberSetupMetadata(formData),
       }
       const { urlPath, init } = stdbBffCommandPost("add_user_to_organization", {
         userIdentity: identityForReducer(String(formData.userIdentity ?? "")),

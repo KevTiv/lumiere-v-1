@@ -54,6 +54,21 @@ live Mistral/GOV00 acceptance remain separate gates. Railway inspection in Dia
 still found no source attached to the offline AI gateway; its Mistral key and
 pilot manifest variable names are present. No live provider request was made.
 
+## Setup membership follow-up
+
+The existing advanced member form now has explicit company scope and a one-hour
+setup option. The native member reducer chooses the issue/expiry timestamps and
+copies only the reserved lease into a new profile. Replays preserve the original
+expiry; existing profiles and expired leases cannot be silently replaced. This
+creates a membership with the selected role, not a superuser or a login credential.
+The approved operator uses a dedicated role with no permissions before the
+separate, verified temporary administrator grant. The contract shape is unchanged.
+
+Local checks passed the five member mutation tests, query-hooks/UI type checks,
+and module/tests compilation. The same existing permissions reducer exercises
+lease issuance, malformed/future/overlong rejection, replay and expiry behavior in
+disposable E2E setup. Hosted acceptance and production execution remain pending.
+
 ## Historical local convergence on 2026-10-24
 
 The isolated `codex/harness-gap-closure` branch combines #135, #136, #193,

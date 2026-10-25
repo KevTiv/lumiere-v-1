@@ -208,6 +208,16 @@ pub(crate) fn ensure_user_profile_for_organization(
     if find_user_profile_for_organization(ctx, identity, organization_id).is_some() {
         return;
     }
+    // Only the reserved setup lease is copied from the validated membership.
+    // This creates no privilege; it makes later authority expire automatically.
+    let setup_lease = ctx
+        .db
+        .user_organization()
+        .user_org_by_user()
+        .filter(&identity)
+        .filter(|membership| membership.organization_id == organization_id && membership.is_active)
+        .filter_map(|membership| membership.metadata)
+        .find(|metadata| is_setup_lease(metadata));
     ctx.db.user_profile().insert(UserProfile {
         id: 0,
         identity,
@@ -231,7 +241,7 @@ pub(crate) fn ensure_user_profile_for_organization(
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
         last_login: Some(ctx.timestamp),
-        metadata: None,
+        metadata: setup_lease,
     });
 }
 
@@ -307,6 +317,72 @@ pub(crate) fn has_duplicate_platform_user_binding(
             .user_profile_by_organization_platform_user()
             .filter((&organization_id, &platform_user_id.to_string()))
             .any(|profile| profile.id != profile_id)
+}
+
+fn is_setup_lease(metadata: &str) -> bool {
+    metadata.trim().starts_with("lumiere-platform-bootstrap-")
+}
+
+fn resolve_new_member_setup_lease(
+    ctx: &ReducerContext,
+    identity: Identity,
+    organization_id: u64,
+    metadata: Option<String>,
+    company_id: Option<u64>,
+) -> Result<Option<String>, String> {
+    let now = ctx.timestamp.to_micros_since_unix_epoch();
+    let existing = find_user_profile_for_organization(ctx, identity, organization_id);
+    if existing
+        .as_ref()
+        .and_then(|profile| profile.metadata.as_deref())
+        .is_some_and(|lease| {
+            is_setup_lease(lease)
+                && !lumiere_policy_core::platform_bootstrap_lease_active(Some(lease), now)
+        })
+    {
+        return Err("expired setup access requires explicit operator review".to_string());
+    }
+    // The UI requests a lease. Only the server chooses its issue/expiry times.
+    // An identical request replay reuses the stored lease, never resets its clock.
+    let metadata = if metadata.as_deref() == Some("lumiere-platform-bootstrap-request-v1") {
+        Some(match &existing {
+            Some(profile) => profile
+                .metadata
+                .as_deref()
+                .filter(|lease| is_setup_lease(lease))
+                .ok_or("temporary setup access cannot replace an existing profile")?
+                .to_string(),
+            None => format!(
+                "lumiere-platform-bootstrap-v1:{now}:{}",
+                now + 3_600_000_000
+            ),
+        })
+    } else {
+        metadata
+    };
+    let Some(lease) = metadata
+        .as_deref()
+        .filter(|metadata| is_setup_lease(metadata))
+    else {
+        return Ok(metadata);
+    };
+    crate::core::organization::require_company_in_organization(
+        ctx,
+        organization_id,
+        company_id.ok_or("temporary setup access requires a company")?,
+    )?;
+    if !lumiere_policy_core::platform_bootstrap_lease_active(Some(lease), now) {
+        return Err("temporary setup access needs a current lease of at most one hour".to_string());
+    }
+    if let Some(profile) = existing {
+        if profile.metadata.as_deref() != Some(lease) {
+            return Err(
+                "temporary setup access cannot replace an existing profile or renew its lease"
+                    .to_string(),
+            );
+        }
+    }
+    Ok(metadata)
 }
 
 /// Update the calling user's own profile fields.
@@ -405,7 +481,7 @@ pub fn add_user_to_organization(
     ctx: &ReducerContext,
     user_identity: Identity,
     organization_id: u64,
-    params: AddUserToOrganizationParams,
+    mut params: AddUserToOrganizationParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_organization", "create")?;
 
@@ -430,6 +506,14 @@ pub fn add_user_to_organization(
     if role.organization_id != organization_id || !role.is_active {
         return Err("Role is inactive or does not belong to this organization".to_string());
     }
+
+    params.metadata = resolve_new_member_setup_lease(
+        ctx,
+        user_identity,
+        organization_id,
+        params.metadata.take(),
+        params.company_id,
+    )?;
 
     let already_member = ctx
         .db
@@ -500,7 +584,7 @@ pub fn add_org_member(
     ctx: &ReducerContext,
     user_identity: Identity,
     organization_id: u64,
-    params: AddOrgMemberParams,
+    mut params: AddOrgMemberParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "user_organization", "create")?;
 
@@ -530,6 +614,14 @@ pub fn add_org_member(
                 && r.name.trim().to_lowercase() == normalized_role
         })
         .ok_or("Role not found in organization")?;
+
+    params.metadata = resolve_new_member_setup_lease(
+        ctx,
+        user_identity,
+        organization_id,
+        params.metadata.take(),
+        params.company_id,
+    )?;
 
     let already_member = ctx
         .db

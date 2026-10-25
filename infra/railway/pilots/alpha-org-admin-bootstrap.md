@@ -11,7 +11,7 @@ no trusted service bindings or certification runtime. The normal registration
 reducers require an active platform superuser. Reusing the existing module-owner
 token does not satisfy that application check.
 
-## Proposed temporary operator
+## Approved temporary operator
 
 Use the existing production server operator, whose server-verified SpacetimeDB
 identity is:
@@ -26,6 +26,28 @@ company (1) application membership/binding. Grant platform-superuser authority
 only for this bootstrap window. This flag is a broad application administrator
 capability; it is not an AI-only permission. Do not change either human account.
 The operator must have no password, invitation or WorkOS login path.
+
+## Entry and expiry
+
+Use the existing Alpha administrator's normal member workflow. Create a dedicated
+role with no permissions and no parent. In the advanced Add Member form, select
+company 1, the existing server operator identity above, that role, active/default
+membership, and **Temporary setup access (one hour)**. This operation creates no
+administrator grant or credential. Existing human accounts and roles stay intact.
+
+The member reducer issues the lease from server time, stores it on the new
+membership and profile, and rejects missing/foreign company scope, malformed
+leases, replacement of ordinary profiles, and renewal of existing leases. An
+identical request replay keeps the original expiry. Keep the canonical platform
+profile metadata equal to this verified lease when binding its opaque platform
+ID. Do not create a password, WorkOS identity or credential row for the operator.
+
+Before setting the operator's administrator flag, verify its exact identity,
+organization/company, empty role, current server-issued lease and canonical
+profile binding. The approved module owner can then update only this operator's
+scalar `is_superuser` flag. SpacetimeDB SQL cannot construct a profile's Option
+fields, so it cannot replace the normal member-creation step. The deployment
+must include the new lease-creation and expiry checks before this workflow runs.
 
 Use that authority only to register the dedicated AI spend reader and
 certification executor through their existing reducers, prepare the proposed

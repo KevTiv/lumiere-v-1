@@ -146,3 +146,119 @@ pub fn test_expired_operator_cannot_register_certification_runtime(
         Ok(()) => Err("expired operator registered a certification runtime".to_string()),
     }
 }
+
+/// The ordinary member reducer may create an expiring identity, never an admin.
+pub fn test_setup_membership_carries_lease_without_granting_privilege(
+    ctx: &ReducerContext,
+) -> Result<(), String> {
+    use crate::core::permissions::role;
+    use crate::core::users::{
+        add_user_to_organization, find_user_profile_for_organization, user_profile,
+        AddUserToOrganizationParams, UserProfile,
+    };
+    let fixture = OrgFixture::seed_minimal(ctx)?;
+    let role = ctx
+        .db
+        .role()
+        .role_by_org()
+        .filter(&fixture.organization_id)
+        .next()
+        .ok_or("setup role missing")?;
+    let identity = spacetimedb::Identity::from_byte_array([43; 32]);
+    let issued = ctx.timestamp.to_micros_since_unix_epoch();
+    let lease = format!(
+        "lumiere-platform-bootstrap-v1:{issued}:{}",
+        issued + 3_600_000_000
+    );
+    let params = AddUserToOrganizationParams {
+        role_id: role.id,
+        company_id: Some(fixture.company_id),
+        job_title: None,
+        department_id: None,
+        employee_id: None,
+        is_active: true,
+        is_default: true,
+        metadata: Some("lumiere-platform-bootstrap-request-v1".to_string()),
+    };
+    for invalid in [
+        "lumiere-platform-bootstrap-v2:1:10".to_string(),
+        format!(
+            "lumiere-platform-bootstrap-v1:{issued}:{}",
+            issued + 3_600_000_001
+        ),
+        format!(
+            "lumiere-platform-bootstrap-v1:{}:{}",
+            issued + 1,
+            issued + 10
+        ),
+    ] {
+        if add_user_to_organization(
+            ctx,
+            identity,
+            fixture.organization_id,
+            AddUserToOrganizationParams {
+                metadata: Some(invalid),
+                ..params.clone()
+            },
+        )
+        .is_ok()
+            || find_user_profile_for_organization(ctx, identity, fixture.organization_id).is_some()
+        {
+            return Err("invalid setup lease created a member profile".to_string());
+        }
+    }
+    add_user_to_organization(ctx, identity, fixture.organization_id, params.clone())?;
+    let profile = find_user_profile_for_organization(ctx, identity, fixture.organization_id)
+        .ok_or("setup profile missing")?;
+    if profile.metadata.as_deref() != Some(lease.as_str())
+        || profile.is_superuser
+        || !profile.is_active
+    {
+        return Err(
+            "setup membership did not preserve lease without granting administrator authority"
+                .to_string(),
+        );
+    }
+    // Identical replay is safe; an attempted clock reset must leave the old lease.
+    add_user_to_organization(ctx, identity, fixture.organization_id, params.clone())?;
+    let replacement = format!(
+        "lumiere-platform-bootstrap-v1:{issued}:{}",
+        issued + 3_599_000_000
+    );
+    if add_user_to_organization(
+        ctx,
+        identity,
+        fixture.organization_id,
+        AddUserToOrganizationParams {
+            metadata: Some(replacement),
+            ..params.clone()
+        },
+    )
+    .is_ok()
+    {
+        return Err("setup membership silently renewed an existing lease".to_string());
+    }
+    ctx.db.user_profile().id().update(UserProfile {
+        metadata: Some(format!(
+            "lumiere-platform-bootstrap-v1:{}:{issued}",
+            issued - 1
+        )),
+        ..profile
+    });
+    if add_user_to_organization(
+        ctx,
+        identity,
+        fixture.organization_id,
+        AddUserToOrganizationParams {
+            metadata: None,
+            ..params
+        },
+    )
+    .is_ok()
+    {
+        return Err(
+            "expired setup access was accepted as an ordinary membership retry".to_string(),
+        );
+    }
+    Ok(())
+}

@@ -39,6 +39,8 @@ function memberMutation() {
     useSetMemberAccess(org: bigint): Mutation
     useCreateRole(org: bigint): Mutation
     useUpdateRole(org: bigint): Mutation
+    useAddOrgMember(org: bigint): Mutation
+    useAddUserToOrganization(org: bigint): Mutation
   } }
   runInNewContext(compiled, {
     module, exports: module.exports,
@@ -84,4 +86,27 @@ test("role creation and permission edits send the distinct required and optional
   assert.deepEqual(calls.map(c => (c.body.params as Record<string, unknown>).permissions), [
     ["contact:read"], { some: ["contact:write"] }, { some: [] },
   ])
+})
+
+
+test("both member entry paths encode one-hour company-scoped setup leases", async () => {
+  const { calls, hooks } = memberMutation()
+  const input = { userIdentity: "ab".repeat(32), roleId: "7", roleName: "Setup", companyId: "1", temporarySetupAccess: true }
+  await hooks.useAddOrgMember(1n).mutationFn(input)
+  await hooks.useAddUserToOrganization(1n).mutationFn(input)
+  for (const call of calls) {
+    const params = call.body.params as Record<string, unknown>
+    assert.equal(params.company_id, 1)
+    assert.equal(params.metadata, "lumiere-platform-bootstrap-request-v1")
+    assert.equal(params.is_superuser, undefined)
+  }
+})
+
+test("setup membership rejects missing scope or conflicting metadata before dispatch", async () => {
+  const { calls, hooks } = memberMutation()
+  const hook = hooks.useAddUserToOrganization(1n)
+  const input = { userIdentity: "ab".repeat(32), roleId: "7", temporarySetupAccess: true }
+  await assert.rejects(hook.mutationFn(input), /Select a company/)
+  await assert.rejects(hook.mutationFn({ ...input, companyId: "1", metadata: "keep" }), /cannot replace/)
+  assert.equal(calls.length, 0)
 })
