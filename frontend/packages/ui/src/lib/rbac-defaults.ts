@@ -696,11 +696,6 @@ export function isSettingsSectionVisibleForProfile(
   return sectionId === "ai" && isAdmin
 }
 
-/** Personal sections ("enabled" exposure) act on the caller's own data, so no RBAC permission gates them. */
-export function isPersonalSettingsSection(sectionId: string): boolean {
-  return settingsExposureById.get(sectionId)?.exposure === "enabled"
-}
-
 // Dashboard view to permission mapping
 export const dashboardViewPermissions: DashboardViewPermission[] = [
   { viewId: "overview", resource: "dashboard:overview", label: "Overview" },

@@ -7,7 +7,7 @@ import { useTranslation } from "@lumiere/i18n"
 
 import { cn } from "@/lib/utils"
 import { useRBAC } from "@/lib/rbac-context"
-import { isPersonalSettingsSection, isSettingsSectionVisibleForProfile, settingsSections } from "@/lib/rbac-defaults"
+import { isSettingsSectionVisibleForProfile, settingsSections } from "@/lib/rbac-defaults"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -116,8 +116,7 @@ export function SettingsModule({
     .filter(
       (section) =>
         isSettingsSectionVisibleForProfile(section.id, isAdmin(), firstOrgProfile) &&
-        (isPersonalSettingsSection(section.id) ||
-          checkPermission(section.requiredPermission, section.requiredAction).allowed),
+        checkPermission(section.requiredPermission, section.requiredAction).allowed,
     )
     .map((section) => {
       const group = settingsGroups.find((g) => (g.sectionIds as readonly string[]).includes(section.id))
