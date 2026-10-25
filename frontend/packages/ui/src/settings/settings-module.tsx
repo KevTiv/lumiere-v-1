@@ -128,6 +128,19 @@ export function SettingsModule({
         Icon: iconMap[section.icon] || User,
       }
     })
+  // Users without dashboard:settings lose the gated Profile section but can still edit their own profile.
+  const ownProfile: NavSection[] =
+    firstOrgProfile || builtIn.some((section) => section.id === "profile")
+      ? []
+      : [
+          {
+            id: "my-profile",
+            groupId: "account",
+            title: "My profile",
+            description: "Your name, language and time zone.",
+            Icon: User,
+          },
+        ]
   const extras: NavSection[] = extraSections.map((section) => ({
     id: section.id,
     groupId: section.groupId,
@@ -143,6 +156,7 @@ export function SettingsModule({
         ...group.sectionIds
           .map((id) => builtIn.find((section) => section.id === id))
           .filter((section): section is NavSection => Boolean(section)),
+        ...ownProfile.filter((section) => section.groupId === group.id),
         ...extras.filter((section) => section.groupId === group.id),
       ],
     }))
@@ -174,6 +188,8 @@ export function SettingsModule({
         return <SsoSettings />
       case "audit":
         return <AuditLog />
+      case "my-profile":
+        return <ProfileSettings section="profile" />
       case "profile":
       case "notifications":
       case "appearance":
