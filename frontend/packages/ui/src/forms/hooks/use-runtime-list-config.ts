@@ -13,10 +13,11 @@ export interface UseRuntimeListConfigOptions {
   roleId?: string
   /** localStorage key for saved filter state */
   listViewKey?: string
+  fieldAliases?: Readonly<Record<string, string | null>>
 }
 
 export function useRuntimeListConfig(options: UseRuntimeListConfigOptions): EntityTableConfig {
-  const { base, moduleId, formId, organizationId, roleId, listViewKey } = options
+  const { base, moduleId, formId, organizationId, roleId, listViewKey, fieldAliases } = options
 
   const { config: runtime, isLoading } = useFormConfiguration({
     moduleId,
@@ -28,13 +29,13 @@ export function useRuntimeListConfig(options: UseRuntimeListConfigOptions): Enti
 
   return useMemo(() => {
     if (isLoading) return { ...base, listViewKey }
-    const merged = mergeRuntimeListConfig(base, runtime)
-    const extraFilters = runtimeListFiltersFromFields(runtime)
+    const merged = mergeRuntimeListConfig(base, runtime, fieldAliases)
+    const extraFilters = runtimeListFiltersFromFields(runtime, fieldAliases)
     const filters = [...(base.filters ?? []), ...extraFilters]
     return {
       ...merged,
       filters: filters.length > 0 ? filters : undefined,
       listViewKey,
     }
-  }, [base, runtime, isLoading, listViewKey])
+  }, [base, runtime, isLoading, listViewKey, fieldAliases])
 }

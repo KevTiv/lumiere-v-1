@@ -1,0 +1,864 @@
+{
+  "verifiedAt": "2026-10-25T17:33:18.598Z",
+  "environment": "Railway production",
+  "organizationId": 1,
+  "companyId": 1,
+  "liveSeedContractVersion": "0.3.145",
+  "fixtureChecks": 105,
+  "distinctExplicitRecords": 97,
+  "tables": 33,
+  "repeatCreatedRows": 0,
+  "repeatActionCount": 0,
+  "actorVerified": true,
+  "receiptFilesVerifiedThroughExpenseCapture": 6,
+  "method": "Private runtime with existing tenant actor; permission-checked reducers; scoped SQL readback.",
+  "repeatReport": {
+    "fixtureKey": "alpha-ui-scenarios-v1",
+    "organizationId": 1,
+    "generatedAt": "2026-10-25T17:33:18.598Z",
+    "createdRows": 0,
+    "outcomes": [
+      {
+        "key": "contact0",
+        "table": "contact",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "contact1",
+        "table": "contact",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "contact2",
+        "table": "contact",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "contact3",
+        "table": "contact",
+        "id": 4100,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "personUI0",
+        "table": "contact",
+        "id": 4101,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "completeLeadUI0",
+        "table": "lead",
+        "id": 4103,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "completeOpportunityUI0",
+        "table": "opportunity",
+        "id": 4103,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "personUI1",
+        "table": "contact",
+        "id": 4102,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "completeLeadUI1",
+        "table": "lead",
+        "id": 4104,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "completeOpportunityUI1",
+        "table": "opportunity",
+        "id": 4104,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "leadUI0",
+        "table": "lead",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "opportunityUI0",
+        "table": "opportunity",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "leadUI1",
+        "table": "lead",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "opportunityUI1",
+        "table": "opportunity",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "leadUI2",
+        "table": "lead",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "opportunityUI2",
+        "table": "opportunity",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "leadUI3",
+        "table": "lead",
+        "id": 4100,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "opportunityUI3",
+        "table": "opportunity",
+        "id": 4100,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "leadUI4",
+        "table": "lead",
+        "id": 4101,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "opportunityUI4",
+        "table": "opportunity",
+        "id": 4101,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "leadUI5",
+        "table": "lead",
+        "id": 4102,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "opportunityUI5",
+        "table": "opportunity",
+        "id": 4102,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUI0",
+        "table": "sale_order",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUILine0",
+        "table": "sale_order_line",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUIState0",
+        "table": "sale_order",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUI1",
+        "table": "sale_order",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUILine1",
+        "table": "sale_order_line",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUIState1",
+        "table": "sale_order",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUI2",
+        "table": "sale_order",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUILine2",
+        "table": "sale_order_line",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUIState2",
+        "table": "sale_order",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUI3",
+        "table": "sale_order",
+        "id": 4100,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "saleUILine3",
+        "table": "sale_order_line",
+        "id": 4100,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "purchaseUI0",
+        "table": "purchase_order",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "purchaseUILine0",
+        "table": "purchase_order_line",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "purchaseUIState0",
+        "table": "purchase_order",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "purchaseUI1",
+        "table": "purchase_order",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "purchaseUILine1",
+        "table": "purchase_order_line",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "purchaseUIState1",
+        "table": "purchase_order",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "purchaseUI2",
+        "table": "purchase_order",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "purchaseUILine2",
+        "table": "purchase_order_line",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "supportPlanUI",
+        "table": "subscription_plan",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "subscriptionUI0",
+        "table": "subscription",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "subscriptionUI1",
+        "table": "subscription",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "sheetUI0",
+        "table": "expense_sheet",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "receiptUI0-0",
+        "table": "hr_expense_receipt",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "expenseUI0-0",
+        "table": "hr_expense",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "receiptUI0-1",
+        "table": "hr_expense_receipt",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "expenseUI0-1",
+        "table": "hr_expense",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "sheetUIState0",
+        "table": "expense_sheet",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "sheetUI1",
+        "table": "expense_sheet",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "receiptUI1-0",
+        "table": "hr_expense_receipt",
+        "id": 3,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "expenseUI1-0",
+        "table": "hr_expense",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "receiptUI1-1",
+        "table": "hr_expense_receipt",
+        "id": 4,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "expenseUI1-1",
+        "table": "hr_expense",
+        "id": 4100,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "sheetUIState1",
+        "table": "expense_sheet",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "sheetUI2",
+        "table": "expense_sheet",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "receiptUI2-0",
+        "table": "hr_expense_receipt",
+        "id": 5,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "expenseUI2-0",
+        "table": "hr_expense",
+        "id": 4101,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "receiptUI2-1",
+        "table": "hr_expense_receipt",
+        "id": 6,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "expenseUI2-1",
+        "table": "hr_expense",
+        "id": 4102,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "reportUI0",
+        "table": "financial_report",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "reportUI1",
+        "table": "financial_report",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "reportUI2",
+        "table": "financial_report",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "reportUI3",
+        "table": "financial_report",
+        "id": 4100,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "budgetUI",
+        "table": "crossovered_budget",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "budgetLineUI",
+        "table": "crossovered_budget_lines",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "calendarUI0",
+        "table": "calendar_event",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "calendarUI1",
+        "table": "calendar_event",
+        "id": 4098,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "calendarUI2",
+        "table": "calendar_event",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "calendarUI3",
+        "table": "calendar_event",
+        "id": 4100,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "followUpUI0",
+        "table": "activity",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "followUpUI1",
+        "table": "activity",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "followUpUI2",
+        "table": "activity",
+        "id": 3,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "messageTemplateUI0",
+        "table": "message_template",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "messageTemplateUI1",
+        "table": "message_template",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "sourcingUI0",
+        "table": "purchase_requisition",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "sourcingLineUI0",
+        "table": "purchase_requisition_line",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "sourcingReviewUI",
+        "table": "purchase_requisition",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "rfqUI0",
+        "table": "purchase_rfq",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "rfqBidUI0-0",
+        "table": "purchase_rfq_bid",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "rfqBidUI0-1",
+        "table": "purchase_rfq_bid",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "sourcingUI1",
+        "table": "purchase_requisition",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "sourcingLineUI1",
+        "table": "purchase_requisition_line",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "rfqUI1",
+        "table": "purchase_rfq",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "rfqBidUI1-0",
+        "table": "purchase_rfq_bid",
+        "id": 3,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "rfqBidUI1-1",
+        "table": "purchase_rfq_bid",
+        "id": 4,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "priceUI0",
+        "table": "product_pricelist_item",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "priceUI1",
+        "table": "product_pricelist_item",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "financeTypeUIAsset",
+        "table": "account_account_type",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "financeTypeUILiability",
+        "table": "account_account_type",
+        "id": 4100,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "fixedAssetUI",
+        "table": "account_account",
+        "id": 4099,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "depreciationUI",
+        "table": "account_account",
+        "id": 4100,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "prepaidUI",
+        "table": "account_account",
+        "id": 4101,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "deferredUI",
+        "table": "account_account",
+        "id": 4102,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "generalJournalUI",
+        "table": "account_journal",
+        "id": 4097,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "equipmentAssetUI",
+        "table": "account_asset",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "prepaidScheduleUI",
+        "table": "amortization_schedule",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "deferredScheduleUI",
+        "table": "deferred_revenue_schedule",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "priceTierUI",
+        "table": "subscription_price_tier",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "usageUI0",
+        "table": "subscription_usage_event",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "usageUI1",
+        "table": "subscription_usage_event",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "deadlineUI0",
+        "table": "tax_deadline",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "deadlineUI1",
+        "table": "tax_deadline",
+        "id": 2,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      },
+      {
+        "key": "taxScheduleUI",
+        "table": "tax_schedule",
+        "id": 1,
+        "created": false,
+        "posted": false,
+        "actionCount": 0
+      }
+    ]
+  },
+  "confirmedDemoCalendarEvents": 4
+}

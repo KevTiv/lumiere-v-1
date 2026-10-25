@@ -23,8 +23,13 @@ export function encodeSeedValue(type, value, path = '') {
   }
   if (type.kind === 'array') return (value ?? []).map(item => encodeSeedValue(type.element, item, path))
   if (type.kind === 'enum') {
-    if (!own(type.fields, value)) throw new Error(`Invalid fixture enum ${path}: ${value}`)
-    return { [value[0].toLowerCase() + value.slice(1)]: [] }
+    const entry = typeof value === 'string' ? [value, undefined] :
+      value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 1 ? Object.entries(value)[0] : []
+    const [variant, payload] = entry
+    if (!own(type.fields, variant)) throw new Error(`Invalid fixture enum ${path}: ${String(variant)}`)
+    const field = type.fields[variant]
+    if (field.kind !== 'unit' && payload == null) throw new Error(`Missing fixture enum payload ${path}.${variant}`)
+    return { [variant[0].toLowerCase() + variant.slice(1)]: encodeSeedValue(field, payload, `${path}.${variant}`) }
   }
   if (type.kind === 'timestamp') {
     const millis = Date.parse(value)

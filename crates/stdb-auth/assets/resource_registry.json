@@ -60,7 +60,14 @@
       "original_value",
       "company_id",
       "organization_id",
-      "depreciation_board_ids"
+      "depreciation_board_ids",
+      "currency_id",
+      "method",
+      "method_number",
+      "method_period",
+      "salvage_value",
+      "book_value",
+      "journal_id"
     ],
     "mandatory": [
       "id",
@@ -314,7 +321,9 @@
       "summary",
       "activity_type",
       "state",
-      "is_done"
+      "is_done",
+      "activity_type_id",
+      "date_deadline"
     ],
     "mandatory": [
       "id",
@@ -519,7 +528,10 @@
       "remaining_amount",
       "state",
       "company_id",
-      "metadata"
+      "metadata",
+      "start_date",
+      "end_date",
+      "recognition_period"
     ],
     "mandatory": [
       "id",
@@ -959,7 +971,15 @@
       "name",
       "start",
       "stop",
-      "state"
+      "state",
+      "allday",
+      "privacy",
+      "show_as",
+      "description",
+      "location",
+      "user_id",
+      "partner_ids",
+      "recurrency"
     ],
     "mandatory": [
       "id",
@@ -1398,7 +1418,14 @@
       "company_id",
       "is_vendor",
       "is_customer",
-      "supplier_rank"
+      "supplier_rank",
+      "type",
+      "display_name",
+      "website",
+      "first_name",
+      "last_name",
+      "industry",
+      "customer_rank"
     ],
     "mandatory": [
       "id",
@@ -1601,7 +1628,14 @@
       "description",
       "state",
       "total_amount",
-      "company_id"
+      "company_id",
+      "currency_id",
+      "deferred_amount",
+      "recognized_amount",
+      "start_date",
+      "end_date",
+      "recognition_method",
+      "recognition_period"
     ],
     "mandatory": [
       "id",
@@ -1755,7 +1789,11 @@
       "name",
       "parent_id",
       "document_count",
-      "company_id"
+      "company_id",
+      "parent_path",
+      "is_favorite",
+      "is_hidden",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -1884,7 +1922,15 @@
       "mimetype",
       "file_name",
       "owner_id",
-      "metadata"
+      "metadata",
+      "folder_id",
+      "fiscal_kind",
+      "residency_region",
+      "retention_days",
+      "is_favorite",
+      "is_shared",
+      "version_count",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -2218,7 +2264,8 @@
       "filter_analytic_account_ids",
       "filter_account_ids",
       "filter_partner_ids",
-      "filter_journal_ids"
+      "filter_journal_ids",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -2259,7 +2306,14 @@
       "state",
       "acquisition_date",
       "original_value",
-      "company_id"
+      "company_id",
+      "currency_id",
+      "method",
+      "method_number",
+      "method_period",
+      "salvage_value",
+      "book_value",
+      "journal_id"
     ],
     "mandatory": [
       "id",
@@ -3065,7 +3119,10 @@
       "name",
       "is_published",
       "member_ids",
-      "article_member_count"
+      "article_member_count",
+      "description",
+      "article_item_count",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -3084,7 +3141,8 @@
       "color",
       "article_count",
       "parent_id",
-      "sequence"
+      "sequence",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -3251,7 +3309,14 @@
       "phone",
       "state",
       "probability",
-      "deleted_at"
+      "deleted_at",
+      "company_name",
+      "partner_id",
+      "expected_revenue",
+      "priority",
+      "date_deadline",
+      "description",
+      "created_at"
     ],
     "mandatory": [
       "id",
@@ -3795,7 +3860,22 @@
       "partner_id",
       "stage_id",
       "probability",
-      "company_id"
+      "company_id",
+      "expected_revenue",
+      "company_currency_id",
+      "is_won",
+      "is_lost",
+      "date_deadline",
+      "priority",
+      "date_open",
+      "date_closed",
+      "lead_id",
+      "contact_id",
+      "user_id",
+      "description",
+      "created_at",
+      "updated_at",
+      "date_last_stage_update"
     ],
     "mandatory": [
       "id",
@@ -4351,7 +4431,12 @@
       "sequence",
       "fixed_price",
       "product_id",
-      "min_quantity"
+      "min_quantity",
+      "applied_on",
+      "compute_price",
+      "date_start",
+      "date_end",
+      "percent_price"
     ],
     "mandatory": [
       "id",
@@ -5361,7 +5446,15 @@
       "invoice_lines",
       "qty_received",
       "qty_invoiced",
-      "qty_to_invoice"
+      "qty_to_invoice",
+      "date_planned",
+      "price_subtotal",
+      "price_tax",
+      "price_total",
+      "currency_id",
+      "partner_id",
+      "product_uom_qty",
+      "sequence"
     ],
     "mandatory": [
       "id",
@@ -5428,7 +5521,18 @@
       "picking_ids",
       "invoice_ids",
       "invoice_count",
-      "invoice_status"
+      "invoice_status",
+      "currency_id",
+      "date_order",
+      "date_planned",
+      "amount_untaxed",
+      "amount_tax",
+      "amount_total",
+      "partner_ref",
+      "notes",
+      "payment_term_id",
+      "user_id",
+      "receipt_status"
     ],
     "mandatory": [
       "id",
@@ -5542,7 +5646,10 @@
       "line_ids",
       "purchase_ids",
       "order_count",
-      "write_uid"
+      "write_uid",
+      "ordering_date",
+      "date_end",
+      "schedule_date"
     ],
     "mandatory": [
       "id",
@@ -6119,7 +6226,9 @@
       "invoice_ids",
       "invoice_count",
       "invoice_status",
-      "origin_so_id"
+      "origin_so_id",
+      "commitment_date",
+      "expected_date"
     ],
     "mandatory": [
       "id",
@@ -6792,7 +6901,20 @@
     "default_restricted": [
       "name",
       "company_id",
-      "active"
+      "active",
+      "code",
+      "description",
+      "currency_id",
+      "journal_id",
+      "product_id",
+      "billing_period",
+      "billing_period_unit",
+      "recurring_invoice_day",
+      "payment_mode",
+      "trial_period",
+      "trial_duration",
+      "trial_unit",
+      "is_default"
     ],
     "mandatory": [
       "id",
@@ -6830,7 +6952,9 @@
       "max_qty",
       "unit_price",
       "active",
-      "company_id"
+      "company_id",
+      "sequence",
+      "product_id"
     ],
     "mandatory": [
       "id",
@@ -6905,7 +7029,9 @@
       "quantity",
       "unit",
       "status",
-      "company_id"
+      "company_id",
+      "occurred_at",
+      "product_id"
     ],
     "mandatory": [
       "id",
@@ -6922,7 +7048,22 @@
       "code",
       "state",
       "company_id",
-      "description"
+      "description",
+      "plan_id",
+      "partner_id",
+      "currency_id",
+      "recurring_next_date",
+      "date_start",
+      "recurring_total",
+      "recurring_mrr",
+      "recurring_monthly",
+      "payment_mode",
+      "is_active",
+      "is_trial",
+      "health",
+      "invoice_count",
+      "pricelist_id",
+      "created_at"
     ],
     "mandatory": [
       "id",

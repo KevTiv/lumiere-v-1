@@ -4,6 +4,18 @@ import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
 import { formatTimestampLike, getRowField } from "./entity-row-utils"
 import { resolveIdentityLabel } from "./identity-label"
 
+export const crmLeadListFieldAliases = {
+  firstname: "contactName", lastname: "contactName", email: "emailFrom", company: "partnerName",
+  leadsource: null, leadstatus: "state", tags: null,
+} as const
+export const crmContactListFieldAliases = {
+  firstname: "firstName", lastname: "lastName", company: "companyName", tags: null,
+} as const
+export const crmOpportunityListFieldAliases = {
+  opportunityname: "name", contact: "contactName", account: "partnerName", stage: "stageName",
+  amount: "expectedRevenue", expectedclosedate: "dateDeadline", tags: null,
+} as const
+
 export interface CrmEntityConfigOptions {
   ownerLabelMap?: ReadonlyMap<string, string>
   formatContactDisplayName?: (row: Record<string, unknown>) => string
@@ -424,7 +436,7 @@ export const contactsTableConfig = (
         },
         { key: "city", label: t("crm.contacts.columns.city"), width: "min-w-24" },
         {
-          key: "countryId",
+          key: "countryCode",
           label: t("crm.contacts.columns.countryId"),
           width: "min-w-20",
         },
@@ -448,7 +460,7 @@ export const contactDetailConfig = (t: TFunction): EntityDetailConfig => ({
         { key: "phone", label: t("crm.contacts.columns.phone"), width: "1/2" },
         { key: "isCompany", label: t("crm.contacts.columns.isCompany"), type: "boolean", width: "1/2" },
         { key: "city", label: t("crm.contacts.columns.city"), width: "1/2" },
-        { key: "countryId", label: t("crm.contacts.columns.countryId"), width: "1/2" },
+        { key: "countryCode", label: t("crm.contacts.columns.countryId"), width: "1/2" },
       ],
     },
     {

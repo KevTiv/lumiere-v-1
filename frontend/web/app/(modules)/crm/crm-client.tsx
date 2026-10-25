@@ -1,4 +1,7 @@
 "use client"
+
+import { crmContactListRow, crmLeadListRow } from "@/lib/crm-list-rows"
+import { crmContactListFieldAliases, crmLeadListFieldAliases, crmOpportunityListFieldAliases } from "@lumiere/ui/lib/crm-entity-configs"
 import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
@@ -370,6 +373,7 @@ function CrmClientLoaded({
     organizationId,
     roleId: runtimeRoleId,
     listViewKey: `list-filters:crm:leads:${organizationId}`,
+    fieldAliases: crmLeadListFieldAliases,
   })
   const contactsTableRuntime = useRuntimeListConfig({
     base: entityTableConfigFromView(
@@ -380,6 +384,7 @@ function CrmClientLoaded({
     organizationId,
     roleId: runtimeRoleId,
     listViewKey: `list-filters:crm:contacts:${organizationId}`,
+    fieldAliases: crmContactListFieldAliases,
   })
   const opportunitiesTableRuntime = useRuntimeListConfig({
     base: entityTableConfigFromView(opportunitiesTableConfig(t, { ownerLabelMap }).view),
@@ -388,6 +393,7 @@ function CrmClientLoaded({
     organizationId,
     roleId: runtimeRoleId,
     listViewKey: `list-filters:crm:opportunities:${organizationId}`,
+    fieldAliases: crmOpportunityListFieldAliases,
   })
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
   const crmCustomFieldModel = {
@@ -446,6 +452,7 @@ function CrmClientLoaded({
   const opportunityLines = opportunityLinesRead.rows
   const contactsRead = moduleCollection(useContacts(orgId, initialContacts))
   const contacts = contactsRead.rows
+  const contactNamesForLists = useMemo(() => new Map(contacts.map((row) => [String(row.id), row.name])), [contacts])
   const contactsLoading = contactsRead.state.status === "loading"
   const contactTagsRead = moduleCollection(useContactTags(orgId))
   const contactTags = contactTagsRead.rows
@@ -577,9 +584,11 @@ function CrmClientLoaded({
         return {
           ...row,
           stageName: stageById.get(stageId) ?? "—",
+          partnerName: contactNamesForLists.get(String(row.partnerId ?? row.partner_id ?? "")),
+          contactName: contactNamesForLists.get(String(row.contactId ?? row.contact_id ?? "")),
         }
       }),
-    [opportunities, stageById],
+    [opportunities, stageById, contactNamesForLists],
   )
 
   const pricelistSelectOptions = useMemo(
@@ -2195,16 +2204,16 @@ function CrmClientLoaded({
 
   const data = useMemo(
     () => ({
-      leads: leads as unknown as Record<string, unknown>[],
+      leads: leads.map((row) => crmLeadListRow(row, contactNamesForLists)) as unknown as Record<string, unknown>[],
       opportunities: enrichedOpportunities,
       "opportunity-lines": opportunityLines as unknown as Record<string, unknown>[],
-      contacts: contacts as unknown as Record<string, unknown>[],
+      contacts: contacts.map((row) => crmContactListRow(row, contactNamesForLists)) as unknown as Record<string, unknown>[],
       activities: activities as unknown as Record<string, unknown>[],
       "contact-tags": contactTags as unknown as Record<string, unknown>[],
       "contact-categories": contactCategories as unknown as Record<string, unknown>[],
       "contact-segments": contactSegments as unknown as Record<string, unknown>[],
     }),
-    [leads, enrichedOpportunities, opportunityLines, contacts, activities, contactTags, contactCategories, contactSegments],
+    [leads, enrichedOpportunities, opportunityLines, contacts, contactNamesForLists, activities, contactTags, contactCategories, contactSegments],
   )
 
   const currenciesQuery = useCurrencies()

@@ -216,7 +216,35 @@ static GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashSet<String>> = Lazy::new(|| {
 
 /// Per-resource columns allowed to survive global exclusions when selected by field policy.
 static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy::new(|| {
-    let mut m = HashMap::new();
+    let mut m: HashMap<String, HashSet<String>> = HashMap::new();
+    // These Alpha views group records by their real creation date. Keep the
+    // selected timestamp after field authorization; never synthesize a date.
+    for (resource, column) in [
+        ("opportunities", "created_at"),
+        ("leads", "created_at"),
+        ("expense-sheets", "created_at"),
+        ("subscriptions", "created_at"),
+        ("financial-reports", "create_date"),
+        ("document-folders", "create_date"),
+        ("knowledge-articles", "create_date"),
+        ("knowledge-categories", "create_date"),
+    ] {
+        m.insert(
+            resource.to_string(),
+            [column.to_string()].into_iter().collect(),
+        );
+    }
+    m.insert(
+        "calendar-events".to_string(),
+        ["partner_ids".to_string()].into_iter().collect(),
+    );
+    m.entry("opportunities".to_string())
+        .or_default()
+        .insert("updated_at".to_string());
+    m.insert(
+        "activities".to_string(),
+        ["date_deadline".to_string()].into_iter().collect(),
+    );
     m.insert(
         "tasks".to_string(),
         ["user_ids", "message_ids"]
@@ -259,7 +287,10 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     for resource in ["documents", "document-versions"] {
         m.insert(
             resource.to_string(),
-            ["metadata"].into_iter().map(String::from).collect(),
+            ["metadata", "create_date"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
         );
     }
     // Preserve the template library's existing readback fields while routing
@@ -1590,6 +1621,170 @@ mod tests {
             cols.iter().any(|column| column == "metadata"),
             "expected metadata in mail-messages projection, got: {cols:?}"
         );
+    }
+
+    #[test]
+    fn alpha_insights_select_real_amounts_states_currencies_and_dates() {
+        for (resource, fields) in [
+            ("activities", &["activity_type_id", "date_deadline"][..]),
+            (
+                "purchase-requisitions",
+                &["ordering_date", "date_end", "schedule_date"][..],
+            ),
+            (
+                "account-assets",
+                &["currency_id", "method", "book_value"][..],
+            ),
+            ("fixed-assets", &["currency_id", "method", "book_value"][..]),
+            (
+                "amortization-schedules",
+                &["start_date", "end_date", "recognition_period"][..],
+            ),
+            (
+                "deferred-revenue-schedules",
+                &["currency_id", "deferred_amount", "start_date", "end_date"][..],
+            ),
+            (
+                "pricelist-items",
+                &["applied_on", "compute_price", "date_start", "date_end"][..],
+            ),
+            ("subscription-price-tiers", &["sequence", "product_id"][..]),
+            (
+                "subscription-usage-events",
+                &["occurred_at", "product_id"][..],
+            ),
+            (
+                "leads",
+                &["partner_id", "expected_revenue", "created_at"][..],
+            ),
+            ("contacts", &["type", "website", "display_name"][..]),
+            (
+                "opportunities",
+                &[
+                    "expected_revenue",
+                    "company_currency_id",
+                    "is_won",
+                    "is_lost",
+                    "date_deadline",
+                    "created_at",
+                ][..],
+            ),
+            (
+                "purchase-orders",
+                &[
+                    "amount_total",
+                    "currency_id",
+                    "date_order",
+                    "date_planned",
+                    "receipt_status",
+                ][..],
+            ),
+            (
+                "purchase-order-lines",
+                &["currency_id", "price_subtotal", "date_planned"][..],
+            ),
+            (
+                "subscriptions",
+                &[
+                    "currency_id",
+                    "plan_id",
+                    "partner_id",
+                    "recurring_monthly",
+                    "recurring_next_date",
+                    "is_trial",
+                ][..],
+            ),
+            (
+                "subscription-plans",
+                &[
+                    "code",
+                    "billing_period",
+                    "billing_period_unit",
+                    "trial_duration",
+                ][..],
+            ),
+            ("expense-sheets", &["created_at"][..]),
+            ("financial-reports", &["create_date"][..]),
+            (
+                "calendar-events",
+                &["location", "partner_ids", "user_id"][..],
+            ),
+            (
+                "documents",
+                &[
+                    "residency_region",
+                    "retention_days",
+                    "version_count",
+                    "is_favorite",
+                    "create_date",
+                ][..],
+            ),
+            (
+                "document-folders",
+                &["parent_path", "is_hidden", "create_date"][..],
+            ),
+            (
+                "knowledge-articles",
+                &["description", "article_item_count", "create_date"][..],
+            ),
+            ("knowledge-categories", &["create_date"][..]),
+        ] {
+            let access = field_access(&["*:*"]);
+            let columns =
+                resolve_http_sql_columns(resource, Some(&access)).expect("Alpha projection");
+            let row_type = match resource {
+                "activities" => "Activity",
+                "purchase-requisitions" => "PurchaseRequisition",
+                "account-assets" | "fixed-assets" => "AccountAsset",
+                "amortization-schedules" => "AmortizationSchedule",
+                "deferred-revenue-schedules" => "DeferredRevenueSchedule",
+                "pricelist-items" => "ProductPricelistItem",
+                "subscription-price-tiers" => "SubscriptionPriceTier",
+                "subscription-usage-events" => "SubscriptionUsageEvent",
+                "leads" => "Lead",
+                "contacts" => "Contact",
+                "opportunities" => "Opportunity",
+                "purchase-orders" => "PurchaseOrder",
+                "purchase-order-lines" => "PurchaseOrderLine",
+                "subscriptions" => "Subscription",
+                "subscription-plans" => "SubscriptionPlan",
+                "expense-sheets" => "HrExpenseSheet",
+                "financial-reports" => "FinancialReport",
+                "calendar-events" => "CalendarEvent",
+                "documents" => "Document",
+                "document-folders" => "DocFolder",
+                "knowledge-articles" => "KnowledgeArticle",
+                "knowledge-categories" => "KbCategory",
+                _ => unreachable!("test case must name its released row type"),
+            };
+            let generated =
+                sql_column_list_for_generated_type(row_type).expect("released Alpha table");
+            for field in fields {
+                assert!(
+                    columns.iter().any(|column| column == field),
+                    "missing {resource}.{field}"
+                );
+                assert!(
+                    generated.iter().any(|column| column == field),
+                    "unknown {resource}.{field}"
+                );
+            }
+            let mut masked_access = field_access(&["module:finance:read"]);
+            select_fields(&mut masked_access, resource, &["id"]);
+            let masked = resolve_http_sql_columns(resource, Some(&masked_access))
+                .expect("masked Alpha projection");
+            for field in fields {
+                assert!(
+                    !masked.iter().any(|column| column == field),
+                    "mask exposed {resource}.{field}"
+                );
+            }
+        }
+        assert!(filter_http_sql_unsafe_columns(
+            &["created_at".into(), "partner_ids".into()],
+            Some("products")
+        )
+        .is_empty());
     }
 
     #[test]

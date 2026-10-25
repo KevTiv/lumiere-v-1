@@ -5,6 +5,17 @@ import { createElement } from "react"
 import type { EntityDetailConfig, EntityViewConfig, EntityTableConfig } from "./entity-view-types"
 import { transfersTableConfig } from "./inventory-entity-configs"
 
+/** Legacy create-form names mapped to this list's canonical read projection. */
+export const saleOrderListFieldAliases = {
+  ordernumber: "reference",
+  customer: "partnerName",
+  orderdate: "dateOrder",
+  deliverydate: "expectedDate",
+  status: "state",
+  // Sale orders have no tag relation in the released model.
+  tags: null,
+} as const
+
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const saleStateBadges = (t: TFunction) => ({
   badgeVariants: {
@@ -207,6 +218,12 @@ export const saleOrdersTableConfig = (
       columns: [
         referenceColumn,
         {
+          key: "partnerName",
+          label: t("sales.salesOrders.columns.partnerName"),
+          width: "min-w-40",
+          sortable: true,
+        },
+        {
           key: "clientOrderRef",
           label: t("sales.salesOrders.columns.clientOrderRef"),
           width: "min-w-28",
@@ -260,6 +277,12 @@ export const saleOrdersTableConfig = (
           label: t("sales.salesOrders.columns.deliveryCount"),
           type: "number",
           align: "right",
+        },
+        {
+          key: "expectedDate",
+          label: t("sales.forms.newSaleOrder.fields.commitmentDate"),
+          type: "date",
+          sortable: true,
         },
       ],
       emptyMessage: t("sales.salesOrders.emptyMessage"),

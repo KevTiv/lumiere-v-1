@@ -1,4 +1,6 @@
 'use client';
+
+import { saleOrderListFieldAliases } from '@lumiere/ui/lib/sales-entity-configs';
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
 import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { useCurrencyFormat } from "@lumiere/ui"
@@ -402,6 +404,7 @@ function SalesClientLoaded({
     organizationId,
     roleId: runtimeRoleId,
     listViewKey: `list-filters:sales:orders:${organizationId}`,
+    fieldAliases: saleOrderListFieldAliases,
   });
   const [quickActionForm, setQuickActionForm] = useState<{
     form: FormConfig;
@@ -2372,6 +2375,7 @@ function SalesClientLoaded({
         stockPickings as unknown as EntityRow[],
       ).map((row) => ({
         ...row,
+        partnerName: partnerNameById.get(String(getRowField(row, 'partnerId'))) ?? '',
         sheetTitle: saleOrderPrimaryLabel(row) || String(row.reference ?? row.id ?? ''),
       })) as unknown as Record<string, unknown>[],
       'order-lines': orderLines as unknown as Record<string, unknown>[],
@@ -2398,6 +2402,7 @@ function SalesClientLoaded({
       orderLines,
       accountMoves,
       stockPickings,
+      partnerNameById,
       pricelists,
       pricelistItems,
       deliveries,

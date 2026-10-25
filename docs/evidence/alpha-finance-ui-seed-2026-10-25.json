@@ -1,0 +1,336 @@
+{
+  "initial": {
+    "fixtureKey": "alpha-finance-ui-v1",
+    "organizationId": 1,
+    "generatedAt": "2026-10-25T15:18:11.473Z",
+    "createdRows": 21,
+    "outcomes": [
+      {
+        "key": "taxAssetType",
+        "table": "account_account_type",
+        "id": 4097,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "taxAsset",
+        "table": "account_account",
+        "id": 4097,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "taxLiabilityType",
+        "table": "account_account_type",
+        "id": 4098,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "taxLiability",
+        "table": "account_account",
+        "id": 4098,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "demoTaxGroup",
+        "table": "account_tax_group",
+        "id": 4097,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "demoTaxSale",
+        "table": "account_tax",
+        "id": 1,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "demoTaxPurchase",
+        "table": "account_tax",
+        "id": 2,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "invoice0",
+        "table": "account_move",
+        "id": 4097,
+        "created": true,
+        "posted": true
+      },
+      {
+        "key": "invoice1",
+        "table": "account_move",
+        "id": 4098,
+        "created": true,
+        "posted": true
+      },
+      {
+        "key": "invoice2",
+        "table": "account_move",
+        "id": 4099,
+        "created": true,
+        "posted": true
+      },
+      {
+        "key": "invoice3",
+        "table": "account_move",
+        "id": 4100,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "bill0",
+        "table": "account_move",
+        "id": 4101,
+        "created": true,
+        "posted": true
+      },
+      {
+        "key": "bill1",
+        "table": "account_move",
+        "id": 4102,
+        "created": true,
+        "posted": true
+      },
+      {
+        "key": "bill2",
+        "table": "account_move",
+        "id": 4103,
+        "created": true,
+        "posted": true
+      },
+      {
+        "key": "bill3",
+        "table": "account_move",
+        "id": 4104,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "bank0",
+        "table": "account_bank_statement",
+        "id": 4097,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "bankLine0",
+        "table": "account_bank_statement_line",
+        "id": 4097,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "bank1",
+        "table": "account_bank_statement",
+        "id": 4098,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "bankLine1",
+        "table": "account_bank_statement_line",
+        "id": 4098,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "bank2",
+        "table": "account_bank_statement",
+        "id": 4099,
+        "created": true,
+        "posted": false
+      },
+      {
+        "key": "bankLine2",
+        "table": "account_bank_statement_line",
+        "id": 4099,
+        "created": true,
+        "posted": false
+      }
+    ]
+  },
+  "repeat": {
+    "fixtureKey": "alpha-finance-ui-v1",
+    "organizationId": 1,
+    "generatedAt": "2026-10-25T15:19:26.392Z",
+    "createdRows": 0,
+    "outcomes": [
+      {
+        "key": "taxAssetType",
+        "table": "account_account_type",
+        "id": 4097,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "taxAsset",
+        "table": "account_account",
+        "id": 4097,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "taxLiabilityType",
+        "table": "account_account_type",
+        "id": 4098,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "taxLiability",
+        "table": "account_account",
+        "id": 4098,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "demoTaxGroup",
+        "table": "account_tax_group",
+        "id": 4097,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "demoTaxSale",
+        "table": "account_tax",
+        "id": 1,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "demoTaxPurchase",
+        "table": "account_tax",
+        "id": 2,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "invoice0",
+        "table": "account_move",
+        "id": 4097,
+        "created": false,
+        "posted": true
+      },
+      {
+        "key": "invoice1",
+        "table": "account_move",
+        "id": 4098,
+        "created": false,
+        "posted": true
+      },
+      {
+        "key": "invoice2",
+        "table": "account_move",
+        "id": 4099,
+        "created": false,
+        "posted": true
+      },
+      {
+        "key": "invoice3",
+        "table": "account_move",
+        "id": 4100,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "bill0",
+        "table": "account_move",
+        "id": 4101,
+        "created": false,
+        "posted": true
+      },
+      {
+        "key": "bill1",
+        "table": "account_move",
+        "id": 4102,
+        "created": false,
+        "posted": true
+      },
+      {
+        "key": "bill2",
+        "table": "account_move",
+        "id": 4103,
+        "created": false,
+        "posted": true
+      },
+      {
+        "key": "bill3",
+        "table": "account_move",
+        "id": 4104,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "bank0",
+        "table": "account_bank_statement",
+        "id": 4097,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "bankLine0",
+        "table": "account_bank_statement_line",
+        "id": 4097,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "bank1",
+        "table": "account_bank_statement",
+        "id": 4098,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "bankLine1",
+        "table": "account_bank_statement_line",
+        "id": 4098,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "bank2",
+        "table": "account_bank_statement",
+        "id": 4099,
+        "created": false,
+        "posted": false
+      },
+      {
+        "key": "bankLine2",
+        "table": "account_bank_statement_line",
+        "id": 4099,
+        "created": false,
+        "posted": false
+      }
+    ]
+  },
+  "browserVerification": {
+    "url": "https://api-gateway-production-d680.up.railway.app/accounting",
+    "afterGatewayDeployment": true,
+    "accountingSetup": "ready",
+    "currency": "EUR",
+    "postedInvoiceTotal": 15600,
+    "postedBillTotal": 6800,
+    "overdueReceivables": 2,
+    "unreconciledBankLinesIncludingEarlierFixture": 4,
+    "invoice4097BalancedMoveLinesVerified": true,
+    "remainingObservation": "CRM overview reports incomplete or unavailable source fields"
+  },
+  "gatewayDeployment": {
+    "projectId": "cc695d4b-030c-43e3-bbd6-a41095b09257",
+    "environmentId": "dbeb35da-dcc5-43bb-ad1d-0066aa530199",
+    "serviceId": "89d4159e-1e9f-40e7-953b-861d3da135b0",
+    "deploymentId": "747942d3-c943-42e2-960b-ef792d33d022",
+    "status": "deployment successful; active",
+    "image": "ghcr.io/kevtiv/lumiere-v-1-api-gateway@sha256:d9b7bba1feae070389be6ffa65d752ca8223d55168bdb5603f18df00264eda22",
+    "buildRunId": 40199070994,
+    "sourceCommit": "b6ce379a6e2258414cdfef1994cfa60852128bfb",
+    "onlyStagedChange": "api-gateway source image",
+    "authenticatedCompanyQueryAfterDeployment": "passed"
+  }
+}

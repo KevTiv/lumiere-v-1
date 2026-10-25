@@ -58,6 +58,7 @@ function parsedFieldToColumn(field: ParsedFormField): EntityColumn {
 export function mergeRuntimeListConfig(
   base: EntityTableConfig,
   runtime: MergedFormConfiguration | null,
+  fieldAliases: Readonly<Record<string, string | null>> = {},
 ): EntityTableConfig {
   if (!runtime) return base
 
@@ -72,6 +73,13 @@ export function mergeRuntimeListConfig(
     .filter((f) => f.showInList && f.isEnabled)
     .sort((a, b) => a.order - b.order)
     .map(parsedFieldToColumn)
+    .flatMap((column) => {
+      // Only the owning list can map legacy form names to its row projection.
+      // Custom metadata keys retain their own identity.
+      if (column.key.startsWith("metadata:")) return [column]
+      const alias = fieldAliases[normalizeFormFieldKey(column.key)]
+      return alias === null ? [] : [{ ...column, key: alias ?? column.key }]
+    })
     .filter((col) => {
       const bare = col.key.replace(/^metadata:/, "")
       const norm = normalizeFormFieldKey(bare)
@@ -93,10 +101,14 @@ export function mergeRuntimeListConfig(
 /** Build select filters from STDB select fields marked showInList (optional extension). */
 export function runtimeListFiltersFromFields(
   runtime: MergedFormConfiguration | null,
+  fieldAliases: Readonly<Record<string, string | null>> = {},
 ): EntityFilter[] {
   if (!runtime) return []
   return (runtime.fields ?? [])
     .filter((f) => f.showInList && f.isEnabled && (f.type === "Select" || f.type === "Radio"))
+    // Legacy form choices can use different values from the list's real states
+    // and relations. The owning list supplies those canonical filters.
+    .filter((f) => isCustomField(f.fieldId) || !(normalizeFormFieldKey(f.name || f.fieldId) in fieldAliases))
     .map((f) => ({
       key: f.name || f.fieldId,
       label: f.label,
