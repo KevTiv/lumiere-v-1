@@ -304,7 +304,8 @@ jobs:
     name: Frontend
     needs: scope
     if: needs.scope.outputs.run_frontend == 'true'
-    runs-on: ubuntu-latest
+    # Playwright 1.59 cannot install Chromium on ubuntu-latest (Ubuntu 26.04).
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
