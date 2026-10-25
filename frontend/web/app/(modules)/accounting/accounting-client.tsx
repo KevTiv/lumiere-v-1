@@ -1,4 +1,6 @@
 "use client"
+import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { AssetDepreciationSchedule } from "@lumiere/ui/accounting-components/asset-depreciation-schedule"
@@ -35,7 +37,6 @@ import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
-  ModuleView,
   DashboardWidgetRenderer,
   FormModal,
   CsvImportModal,
@@ -836,12 +837,16 @@ function AccountingClientReady({
   const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   const accountingTabIds = useMemo(
-    () => [
-      ...moduleConfigBase.tabs.map((tab) => tab.id),
-      "account-journals",
-      "move-lines",
-      "period-close",
-    ],
+    () => {
+      const workTabId = moduleWorkBoardTabId(moduleConfigBase)
+      return [
+        ...moduleConfigBase.tabs.map((tab) => tab.id),
+        "account-journals",
+        "move-lines",
+        "period-close",
+        ...(workTabId ? [workTabId] : []),
+      ]
+    },
     [moduleConfigBase],
   )
   const { activeTab: accountingActiveTab, setActiveTab: setAccountingActiveTab } = useModuleTab(
@@ -6385,7 +6390,8 @@ function AccountingClientReady({
         onResolve={handleReadinessResolve}
         className="mb-4"
       /> : <p role="status" className="rounded-lg border p-4 text-sm">Select an active company to continue. Original pending operations have been retained.</p>}
-      {companyAvailable ? <ModuleView
+      {companyAvailable ? <ModuleWorkView
+        organizationId={organizationId}
         config={config}
         data={data}
         dataLoading={dataLoading}

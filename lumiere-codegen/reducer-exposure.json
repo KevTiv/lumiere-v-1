@@ -3480,6 +3480,11 @@
       "reason": "invoked by an enumerated frontend BFF call site"
     },
     {
+      "name": "repair_cancelled_workflow_tasks",
+      "exposure": "session",
+      "reason": "explicit actor-owned replay receipt and cancelled instance revision guard an audited task-projection repair; current organization, company, source and workflow authorization remains reducer-enforced"
+    },
+    {
       "name": "replace_contact_categories",
       "exposure": "session",
       "reason": "invoked by an enumerated frontend BFF call site"
@@ -3558,6 +3563,11 @@
       "name": "resubmit_bank_statement_settlement",
       "exposure": "session",
       "reason": "reviewed bank settlement lifecycle action; exact expected payment, tenant/company and financial capability checks remain reducer-enforced"
+    },
+    {
+      "name": "resubmit_workflow_human_task",
+      "exposure": "session",
+      "reason": "explicit actor-owned replay receipt and unique predecessor link guard a revision-bound Finance approval resubmission; current organization, company, source and workflow authorization remains reducer-enforced"
     },
     {
       "name": "resume_ai_run_checked",

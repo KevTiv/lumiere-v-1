@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use stdb_auth::{identity_sql_literal, FieldAccessContext};
 use stdb_client::StdbClient;
 
-pub(super) async fn allowed_company_ids(
+pub(crate) async fn allowed_company_ids(
     owner: &StdbClient,
     organization_id: u64,
     fa: Option<&FieldAccessContext>,

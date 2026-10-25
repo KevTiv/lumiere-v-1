@@ -416,6 +416,7 @@ export const accountingDashboard: DashboardConfig = {
 
 export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "accounting",
+  workBoard: { scope: "accounting", sources: ["workflow", "activities"], label: t("workBoard.kanban") },
   title: "Accounting",
   description: "Financial overview — P&L, cash position, and budget tracking",
   defaultTab: "dashboard",
@@ -793,6 +794,7 @@ export const salesDashboard: DashboardConfig = {
 
 export const salesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "sales",
+  workBoard: { scope: "sales", sources: ["workflow", "activities"], label: t("workBoard.kanban") },
   workspaceNav: businessWorkspaceNavigation("sales", t),
   title: "Sales",
   description: "Revenue performance, pipeline health, and deal activity",
@@ -1566,6 +1568,7 @@ export const purchasingDashboard: DashboardConfig = {
 
 export const purchasingModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "purchasing",
+  workBoard: { scope: "purchasing", sources: ["workflow", "activities"], label: t("workBoard.kanban") },
   workspaceNav: businessWorkspaceNavigation("purchasing", t),
   title: "Purchasing",
   description: "Purchase orders, vendor performance, and spend analysis",
@@ -2993,6 +2996,7 @@ export const subscriptionsModuleConfig = (t: TFunction): ModuleConfig => ({
 
 export const expensesModuleConfig = (t: TFunction): ModuleConfig => ({
   id: "expenses",
+  workBoard: { scope: "expenses", sources: ["workflow"], label: t("workBoard.kanban") },
   workspaceNav: businessWorkspaceNavigation("expenses", t),
   title: "Expenses",
   description: "Employee expense management and reimbursement",

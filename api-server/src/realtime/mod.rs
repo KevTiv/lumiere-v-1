@@ -7,6 +7,8 @@ mod wire {
 mod bridge;
 mod socket;
 mod subscription;
+mod workflow;
+mod workflow_tables;
 
 use axum::extract::ws::WebSocketUpgrade;
 use axum::extract::State;
@@ -32,6 +34,15 @@ use self::subscription::{
 use stdb_auth::{
     create_client_subscriptions, full_client_subscription_resources_vec, SubscriptionQueryContext,
 };
+
+/// Snapshot inserts/deletes are subscription lifecycle events, not authority
+/// mutations. Only committed live row changes may invalidate or close a socket.
+pub(crate) fn is_live_row_event<R>(event: &spacetimedb_sdk::Event<R>) -> bool {
+    matches!(
+        event,
+        spacetimedb_sdk::Event::Transaction | spacetimedb_sdk::Event::Reducer(_)
+    )
+}
 
 pub(crate) fn notify_row_change(
     tx: &tokio::sync::mpsc::UnboundedSender<String>,
@@ -155,6 +166,30 @@ pub async fn realtime_info() -> Json<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn initial_authority_snapshot_does_not_invalidate_or_force_reconnect() {
+        use spacetimedb_sdk::Event;
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let resources = vec!["workflow-candidate-group-members".to_string()];
+        for event in [
+            Event::<()>::SubscribeApplied,
+            Event::<()>::UnsubscribeApplied,
+            Event::<()>::Disconnected,
+        ] {
+            if is_live_row_event(&event) {
+                notify_row_change(&tx, "insert", "workflow_candidate_group_member", &resources);
+            }
+            assert!(rx.try_recv().is_err());
+        }
+
+        if is_live_row_event(&Event::<()>::Transaction) {
+            notify_row_change(&tx, "update", "workflow_candidate_group_member", &resources);
+        }
+        let live_change = serde_json::from_str(&rx.try_recv().unwrap()).unwrap();
+        assert!(workflow::authority_refresh_notice(&live_change).is_some());
+    }
 
     #[test]
     fn workos_websocket_requires_exact_frontend_origin() {

@@ -18,7 +18,7 @@ import {
 import { ErpSessionProvider, useErpSession } from "@lumiere/erp-session"
 import { LumiereApiProvider } from "@lumiere/api-client"
 import { useStdbReducer, realtimeQueryKeysForResource } from "@lumiere/query-hooks/hooks/stdb"
-import { useLumiereRealtime } from "@lumiere/query-hooks/hooks/realtime"
+import { withAuthorizedWorkRealtimeResources, useLumiereRealtime } from "@lumiere/query-hooks/hooks/realtime"
 import type { FieldAccessContext } from "@lumiere/stdb/field-policy"
 import {
   StdbSubscriptionProvider,
@@ -31,6 +31,8 @@ import { webApi } from "@/lib/lumiere-web-http"
 import { PostHogPageView } from "@/lib/posthog-pageview"
 import { apiFetch } from "@/lib/api-fetch"
 import { EFFECTIVE_ACCESS_ROLE_ID } from "@lumiere/ui/lib/runtime-form-role"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { canReadWorkflowWork } from "../components/work-board/work-board-permissions"
 import { DocumentTemplateProvider } from "./document-template-provider"
 
 /** Amounts and numbers follow the language the user picked. */
@@ -129,12 +131,15 @@ function LumiereRealtimeBridge({
   const queryClient = useQueryClient()
   const workOsEnabled = useWorkOsAuthMode()
   const { activeCompanyId, activeCompanyReady, companyIds } = useErpSession()
-  const resources = useMemo(() => FULL_CLIENT_SUBSCRIPTION_RESOURCES, [])
+  const { currentUser, permissionsReady, checkPermission } = useRBAC()
+  const workflowRead = permissionsReady !== false && currentUser != null && canReadWorkflowWork(checkPermission)
+  const resources = useMemo(() => withAuthorizedWorkRealtimeResources(FULL_CLIENT_SUBSCRIPTION_RESOURCES, workflowRead), [workflowRead])
   useLumiereRealtime({
     queryClient,
     organizationId,
     companyIds,
     activeCompanyId: activeCompanyReady ? activeCompanyId : null,
+    actorIdentity: currentUser?.id,
     resources,
     enabled: organizationId != null && organizationId > 0,
     sameOrigin: workOsEnabled,
@@ -232,7 +237,6 @@ export function Providers({
                   organizationId={organizationId}
                   companyIds={companyIds}
                 >
-                  <LumiereRealtimeBridge organizationId={organizationId} />
                   <AuthorityExpiryRefresh
                     expiresAtMicros={authorityExpiresAtMicros}
                     onUnavailable={markAuthorityUnavailable}
@@ -241,6 +245,7 @@ export function Providers({
                     serverIdentity={serverIdentity}
                     organizationId={organizationId}
                   >
+                    <LumiereRealtimeBridge organizationId={organizationId} />
                     <DocumentTemplateProvider>
                       <NavigationGuardProvider>{children}</NavigationGuardProvider>
                     </DocumentTemplateProvider>

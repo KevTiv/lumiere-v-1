@@ -3221,6 +3221,16 @@
       },
       "evidence": "spacetimedb/src/core/queue.rs: body inserts or appends a new effect without a replay guard"
     },
+    "repair_cancelled_workflow_tasks": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/cancellation_repair.rs: explicit actor-owned replay receipt and cancelled instance revision guard an audited task-projection repair"
+    },
     "reply_ai_run_question": {
       "semantic_kind": "internal",
       "client_facing": false,
@@ -3290,6 +3300,16 @@
         "version": 1
       },
       "evidence": "spacetimedb/src/ai/evidence_dependency.rs: a valid dependency, an invalid reaffirmation and a required-edge acknowledgement are rejected"
+    },
+    "resubmit_workflow_human_task": {
+      "semantic_kind": "command",
+      "client_facing": true,
+      "idempotency": "request_guarded",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/workflow/recovery.rs: explicit actor-owned replay receipt and unique predecessor link guard a revision-bound Finance approval resubmission"
     },
     "resume_ai_run_checked": {
       "semantic_kind": "internal",

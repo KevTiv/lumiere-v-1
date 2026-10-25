@@ -6,6 +6,7 @@ import { stringifyReducerCallBody } from "@lumiere/api-client"
 import { encodeReducerCallArgs } from "@lumiere/erp-shared/stdb-params-json"
 import { matchesOperationResponse } from "./operation-response"
 import type { StdbBffReducerKey } from "@lumiere/stdb/commands"
+import type { CreateWorkflowParams } from "@lumiere/stdb/types"
 
 export const TEST_EMAIL = process.env.E2E_TEST_EMAIL ?? "test@email.com"
 export const TEST_PASSWORD = process.env.E2E_TEST_PASSWORD ?? "Password123$"
@@ -3024,7 +3025,14 @@ export async function waitForWorkflowVersionStatus(
 /** Seed a minimal publishable linear draft (start → end) via BFF reducers. */
 export async function seedPublishableWorkflowDraft(
   page: Page,
-  options?: { workflowKey?: string; model?: string; name?: string; signalKey?: string; companyId?: number },
+  options?: {
+    workflowKey?: string
+    model?: string
+    name?: string
+    signalKey?: string
+    companyId?: number
+    snapshotFields?: CreateWorkflowParams["snapshotFields"]
+  },
 ): Promise<{
   organizationId: number
   companyId: number
@@ -3049,7 +3057,7 @@ export async function seedPublishableWorkflowDraft(
       description: WORKFLOW_NONE,
       trigger: { tag: "Manual" },
       schemaVersion: 1,
-      snapshotFields: [],
+      snapshotFields: options?.snapshotFields ?? [],
       metadata: WORKFLOW_NONE,
     },
   ])

@@ -1,7 +1,7 @@
 name: E2E smoke
 
 # Full browser smoke requires local SpacetimeDB, api-server, and seeded fixtures.
-# Default CI (ci.yml) only validates Playwright tests compile via `playwright test --list`.
+# Default CI (ci.yml) validates live specs load and runs the synthetic work-board browser suite.
 on:
   push:
     branches: [main]
@@ -100,6 +100,7 @@ jobs:
       - id: plan
         env:
           TARGET_SPECS: ${{ steps.targets.outputs.specs }}
+          FALLBACK_CONFIGS: ${{ steps.targets.outputs.fallback_configs || '[]' }}
           DISPATCH_SPECS: ${{ github.event.inputs.specs }}
           DISPATCH_SUITE: ${{ github.event.inputs.suite || 'p0' }}
           DISPATCH_CLEAR_DB: ${{ github.event.inputs.clear_db }}
@@ -130,7 +131,8 @@ jobs:
               elif [ -n "${TARGET_SPECS}" ]; then
                 configs="$(jq -cn --arg specs "${TARGET_SPECS}" '[{suite:"targeted",clear_db:"0",specs:$specs}]')"
               else
-                configs="$(shard p0 0)"
+                # Broad helper changes retain P0 plus explicitly changed fixtures.
+                configs="$(jq -cn --argjson p0 "$(shard p0 0)" --argjson changed "$FALLBACK_CONFIGS" '$p0 + $changed')"
               fi
               ;;
             schedule)
@@ -418,7 +420,7 @@ jobs:
           compression-level: 0
 
   e2e-smoke:
-    name: Playwright smoke (${{ matrix.config.suite }}${{ matrix.config.shard && format(' {0}', matrix.config.shard) || '' }})
+    name: Playwright smoke (${{ matrix.config.suite }}${{ matrix.config.shard && format(' {0}', matrix.config.shard) || matrix.config.slot && format(' {0}', matrix.config.slot) || '' }})
     needs: [scope, plan, build-e2e]
     if: needs.plan.result == 'success' && needs.build-e2e.result == 'success' && needs.scope.outputs.run_e2e == 'true'
     runs-on: ubuntu-latest
