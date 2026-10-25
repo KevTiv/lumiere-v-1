@@ -7,7 +7,8 @@ import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useTranslation, i18n } from "@lumiere/i18n"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { isWorkspaceSurfaceVisible } from "@lumiere/ui/lib/workspace-profile"
-import { DashboardHeader, FormModal, MissingOrganization, SettingsModule, type FormConfig } from "@lumiere/ui"
+import { Plug, Upload, Wrench } from "lucide-react"
+import { DashboardHeader, FormModal, MissingOrganization, SettingsModule, type FormConfig, type SettingsExtraSection } from "@lumiere/ui"
 import {
   toCreateCompanyParams,
   toCreateWhatsAppBusinessAccountParams,
@@ -35,29 +36,14 @@ import {
   useUpdateGoogleDriveCredentials,
   useUpdateOrgMemberRole,
   useUpdateUserEmail,
-  useUpdateUserProfile,
   useUpdateWhatsappCredentials,
 } from "@lumiere/query-hooks/hooks/auth"
-import {
-  useCreateCompany,
-  useCreateDataClassification,
-  useCreateDataClassificationRule,
-  useDeleteCompany,
-  useUpdateCompany,
-  useUpdateCompanyAddress,
-  useUpdateCompanyBusiness,
-  useUpdateCompanyHierarchy,
-} from "@lumiere/query-hooks/hooks/organization-company"
-import type {
-  CreateDataClassificationParams,
-  CreateDataClassificationRuleParams,
-} from "@lumiere/stdb/types"
 import { GuidedImportWizard } from "@/lib/guided-import-wizard"
 import { useSettingsModuleSubscription } from "@/lib/module-subscription-hooks"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { currencyOptionsFromRows } from "@/lib/form-lookup"
 import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
-import { useCompanies } from "@lumiere/query-hooks/hooks/organization-company"
+import { useCompanies, useCreateCompany } from "@lumiere/query-hooks/hooks/organization-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { uploadDocumentBlob } from "@/lib/document-blob-upload"
 
@@ -73,7 +59,6 @@ type SettingsAction =
   | "createAuditRule"
   | "updateAuditRule"
   | "endSession"
-  | "updateProfile"
   | "updateEmail"
   | "recordPrivacyConsent"
   | "googleDriveCredentials"
@@ -88,14 +73,6 @@ type SettingsAction =
   | "grantPermission"
   | "revokePermission"
   | "archiveAiChatSession"
-  | "createCompany"
-  | "updateCompany"
-  | "updateCompanyAddress"
-  | "updateCompanyBusiness"
-  | "updateCompanyHierarchy"
-  | "deleteCompany"
-  | "createDataClassification"
-  | "createDataClassificationRule"
   | "updateOrgMemberRole"
   | "createUserInviteDirect"
   | "createUserSession"
@@ -132,7 +109,24 @@ const permissionActionOptions = [
   { value: "All", label: "All" },
 ]
 
-const settingsActionForms: Record<SettingsAction, FormConfig> = {
+// `createCompany` is only used by the first-organization setup; Settings edits companies inline.
+const settingsActionForms: Record<SettingsAction | "createCompany", FormConfig> = {
+  createCompany: {
+    id: "settings-create-company",
+    title: "Create Company",
+    submitLabel: "Create company",
+    sections: [
+      {
+        id: "company",
+        fields: [
+          { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
+          { id: "code", type: "text", name: "code", label: "Code", required: true, width: "1/2" },
+          { id: "currency", type: "number", name: "currencyId", label: "Currency", required: true, width: "1/2" },
+          { id: "country", type: "text", name: "addressCountryCode", label: "Country code", width: "1/2" },
+        ],
+      },
+    ],
+  },
   createAuditRule: {
     id: "settings-create-audit-rule",
     title: "Create Audit Rule",
@@ -173,22 +167,6 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
     title: "End User Session",
     submitLabel: "End session",
     sections: [{ id: "session", fields: [{ id: "session-id", type: "number", name: "sessionId", label: "Session ID", required: true }] }],
-  },
-  updateProfile: {
-    id: "settings-update-profile",
-    title: "Update Profile",
-    submitLabel: "Update profile",
-    sections: [
-      {
-        id: "profile",
-        fields: [
-          { id: "name", type: "text", name: "name", label: "Name", width: "1/2" },
-          { id: "department", type: "text", name: "department", label: "Department", width: "1/2" },
-          { id: "timezone", type: "text", name: "timezone", label: "Timezone", width: "1/2" },
-          { id: "locale", type: "text", name: "locale", label: "Locale", width: "1/2" },
-        ],
-      },
-    ],
   },
   updateEmail: {
     id: "settings-update-email",
@@ -401,124 +379,6 @@ const settingsActionForms: Record<SettingsAction, FormConfig> = {
       { id: "session-key", type: "text", name: "sessionKey", label: "Session key", required: true, width: "1/2" },
       { id: "archived", type: "switch", name: "archived", label: "Archived", defaultValue: true, width: "1/2" },
     ] }],
-  },
-  createCompany: {
-    id: "settings-create-company",
-    title: "Create Company",
-    submitLabel: "Create company",
-    sections: [
-      {
-        id: "company",
-        fields: [
-          { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
-          { id: "code", type: "text", name: "code", label: "Code", required: true, width: "1/2" },
-          { id: "currency", type: "number", name: "currencyId", label: "Currency", required: true, width: "1/2" },
-          { id: "country", type: "text", name: "addressCountryCode", label: "Country code", width: "1/2" },
-        ],
-      },
-    ],
-  },
-  updateCompany: {
-    id: "settings-update-company",
-    title: "Update Company",
-    submitLabel: "Update company",
-    sections: [
-      {
-        id: "company",
-        fields: [
-          { id: "company-id", type: "number", name: "companyId", label: "Company ID", required: true, width: "1/2" },
-          { id: "name", type: "text", name: "name", label: "Name", width: "1/2" },
-          { id: "code", type: "text", name: "code", label: "Code", width: "1/2" },
-          { id: "active", type: "switch", name: "isActive", label: "Active", width: "1/2" },
-        ],
-      },
-    ],
-  },
-  updateCompanyAddress: {
-    id: "settings-update-company-address",
-    title: "Update Company Address",
-    submitLabel: "Update address",
-    sections: [
-      {
-        id: "address",
-        fields: [
-          { id: "company-id", type: "number", name: "companyId", label: "Company ID", required: true, width: "1/2" },
-          { id: "street", type: "text", name: "addressStreet", label: "Street", width: "1/2" },
-          { id: "city", type: "text", name: "addressCity", label: "City", width: "1/2" },
-          { id: "zip", type: "text", name: "addressZip", label: "Zip", width: "1/2" },
-          { id: "country", type: "text", name: "addressCountryCode", label: "Country code", width: "1/2" },
-        ],
-      },
-    ],
-  },
-  updateCompanyBusiness: {
-    id: "settings-update-company-business",
-    title: "Update Company Business",
-    submitLabel: "Update business",
-    sections: [
-      {
-        id: "business",
-        fields: [
-          { id: "company-id", type: "number", name: "companyId", label: "Company ID", required: true, width: "1/2" },
-          { id: "tax", type: "text", name: "taxId", label: "Tax ID", width: "1/2" },
-          { id: "registry", type: "text", name: "companyRegistry", label: "Company registry", width: "1/2" },
-        ],
-      },
-    ],
-  },
-  updateCompanyHierarchy: {
-    id: "settings-update-company-hierarchy",
-    title: "Update Company Hierarchy",
-    submitLabel: "Update hierarchy",
-    sections: [
-      {
-        id: "hierarchy",
-        fields: [
-          { id: "company-id", type: "number", name: "companyId", label: "Company ID", required: true, width: "1/3" },
-          { id: "parent-id", type: "number", name: "parentId", label: "Parent ID", width: "1/3" },
-          { id: "is-parent", type: "switch", name: "isParent", label: "Is parent", width: "1/3" },
-        ],
-      },
-    ],
-  },
-  deleteCompany: {
-    id: "settings-delete-company",
-    title: "Delete Company",
-    submitLabel: "Delete company",
-    sections: [{ id: "company", fields: [{ id: "company-id", type: "number", name: "companyId", label: "Company ID", required: true }] }],
-  },
-  createDataClassification: {
-    id: "settings-create-data-classification",
-    title: "Create Data Classification",
-    submitLabel: "Create classification",
-    sections: [
-      {
-        id: "classification",
-        fields: [
-          { id: "name", type: "text", name: "name", label: "Name", required: true, width: "1/2" },
-          { id: "level", type: "number", name: "level", label: "Level", defaultValue: 2, width: "1/2" },
-          { id: "description", type: "textarea", name: "description", label: "Description", rows: 3, width: "full" },
-          { id: "retention", type: "number", name: "retentionDays", label: "Retention days", width: "1/2" },
-          { id: "encrypt", type: "switch", name: "encryptionRequired", label: "Encryption required", width: "1/2" },
-        ],
-      },
-    ],
-  },
-  createDataClassificationRule: {
-    id: "settings-create-data-classification-rule",
-    title: "Create Data Classification Rule",
-    submitLabel: "Create rule",
-    sections: [
-      {
-        id: "rule",
-        fields: [
-          { id: "table", type: "text", name: "tableName", label: "Table name", required: true, width: "1/2" },
-          { id: "column", type: "text", name: "columnName", label: "Column name", required: true, width: "1/2" },
-          { id: "classification", type: "number", name: "classificationId", label: "Classification ID", required: true, width: "1/2" },
-          { id: "applies", type: "text", name: "appliesTo", label: "Applies to", defaultValue: "all", width: "1/2" },
-        ],
-      },
-    ],
   },
   updateOrgMemberRole: {
     id: "settings-update-org-member-role",
@@ -760,35 +620,22 @@ function SettingsLoaded({
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const { data: companyRows = [] } = useCompanies(organizationId, true)
-  const { data: currencyRows = [] } = useCurrencies()
   const linkedOptions = useMemo(() => {
     const companyOptions = recordOptions(companyRows as unknown as Record<string, unknown>[], (row) => row.name)
     return {
       companyId: companyOptions,
-      // Company hierarchy: the parent is another company.
-      parentId: companyOptions,
-      currencyId: currencyOptionsFromRows(currencyRows),
     }
   },
-    [companyRows, currencyRows],
+    [companyRows],
   )
 
   const createAuditRule = useCreateAuditRule(orgId)
   const updateAuditRule = useUpdateAuditRule(orgId)
   const endSession = useEndUserSession(orgId)
-  const updateProfile = useUpdateUserProfile(orgId)
   const updateEmail = useUpdateUserEmail(orgId)
   const recordPrivacyConsent = useRecordPrivacyConsent(orgId)
   const updateGoogleDriveCredentials = useUpdateGoogleDriveCredentials(orgId)
   const updateWhatsappCredentials = useUpdateWhatsappCredentials(orgId)
-  const createCompany = useCreateCompany(organizationId)
-  const updateCompany = useUpdateCompany()
-  const updateCompanyAddress = useUpdateCompanyAddress()
-  const updateCompanyBusiness = useUpdateCompanyBusiness()
-  const updateCompanyHierarchy = useUpdateCompanyHierarchy()
-  const deleteCompany = useDeleteCompany()
-  const createDataClassification = useCreateDataClassification(organizationId)
-  const createDataClassificationRule = useCreateDataClassificationRule(organizationId)
   const updateOrgMemberRole = useUpdateOrgMemberRole(orgId)
   const createUserInviteDirect = useCreateUserInviteReducer(orgId)
   const createUserSession = useCreateUserSession(orgId)
@@ -798,19 +645,10 @@ function SettingsLoaded({
     createAuditRule.isPending ||
     updateAuditRule.isPending ||
     endSession.isPending ||
-    updateProfile.isPending ||
     updateEmail.isPending ||
     recordPrivacyConsent.isPending ||
     updateGoogleDriveCredentials.isPending ||
     updateWhatsappCredentials.isPending ||
-    createCompany.isPending ||
-    updateCompany.isPending ||
-    updateCompanyAddress.isPending ||
-    updateCompanyBusiness.isPending ||
-    updateCompanyHierarchy.isPending ||
-    deleteCompany.isPending ||
-    createDataClassification.isPending ||
-    createDataClassificationRule.isPending ||
     updateOrgMemberRole.isPending ||
     createUserInviteDirect.isPending ||
     createUserSession.isPending ||
@@ -831,8 +669,7 @@ function SettingsLoaded({
         })
       } else if (activeAction === "endSession") {
         await endSession.mutateAsync(formData.sessionId as string | number)
-      } else if (activeAction === "updateProfile") {
-        await updateProfile.mutateAsync(compactParams(formData, ["name", "department", "timezone", "locale"]))
+
       } else if (activeAction === "updateEmail") {
         await updateEmail.mutateAsync({
           email: String(formData.email ?? ""),
@@ -942,53 +779,14 @@ function SettingsLoaded({
           String(formData.sessionKey ?? ""),
           Boolean(formData.archived),
         )
-      } else if (activeAction === "createCompany") {
-        const currencyRaw = formData.currencyId
-        const currencyId =
-          currencyRaw != null && String(currencyRaw).trim() !== ""
-            ? BigInt(String(currencyRaw))
-            : undefined
-        const params = toCreateCompanyParams(formData, currencyId ? { currencyId } : undefined)
-        if (!params) throw new Error(i18n.t("common.paramsMapper.invalidCompany"))
-        await createCompany.mutateAsync(params)
-      } else if (activeAction === "updateCompany") {
-        await updateCompany.mutateAsync({
-          companyId: toBigIntId(formData.companyId, "Company ID"),
-          organizationId,
-          params: compactParams(formData, ["name", "code", "isActive"]),
-        })
-      } else if (activeAction === "updateCompanyAddress") {
-        await updateCompanyAddress.mutateAsync({
-          companyId: toBigIntId(formData.companyId, "Company ID"),
-          organizationId,
-          params: compactParams(formData, ["addressStreet", "addressCity", "addressZip", "addressCountryCode"]),
-        })
-      } else if (activeAction === "updateCompanyBusiness") {
-        await updateCompanyBusiness.mutateAsync({
-          companyId: toBigIntId(formData.companyId, "Company ID"),
-          organizationId,
-          params: compactParams(formData, ["taxId", "companyRegistry"]),
-        })
-      } else if (activeAction === "updateCompanyHierarchy") {
-        const parentRaw = String(formData.parentId ?? "").trim()
-        await updateCompanyHierarchy.mutateAsync({
-          companyId: toBigIntId(formData.companyId, "Company ID"),
-          organizationId,
-          params: {
-            ...compactParams(formData, ["isParent"]),
-            parentId: parentRaw !== "" ? BigInt(parentRaw) : undefined,
-          },
-        })
-      } else if (activeAction === "deleteCompany") {
-        if (!(await confirmDialog({ description: "Delete this company?" }))) return
-        await deleteCompany.mutateAsync({
-          companyId: toBigIntId(formData.companyId, "Company ID"),
-          organizationId,
-        })
-      } else if (activeAction === "createDataClassification") {
-        await createDataClassification.mutateAsync(compactParams(formData, ["name", "level", "description", "retentionDays", "encryptionRequired"]) as unknown as CreateDataClassificationParams)
-      } else if (activeAction === "createDataClassificationRule") {
-        await createDataClassificationRule.mutateAsync(compactParams(formData, ["tableName", "columnName", "classificationId", "appliesTo"]) as unknown as CreateDataClassificationRuleParams)
+
+
+
+
+
+
+
+
       } else if (activeAction === "updateOrgMemberRole") {
         await updateOrgMemberRole.mutateAsync({
           userOrgId: formData.userOrgId as string | number,
@@ -1045,7 +843,6 @@ function SettingsLoaded({
     { id: "createAuditRule", title: "Create audit rule", description: "Add a new audit rule for monitored resources." },
     { id: "updateAuditRule", title: "Update audit rule", description: "Patch an existing audit rule by ID." },
     { id: "endSession", title: "End session", description: "Terminate a user session by session ID." },
-    { id: "updateProfile", title: "Profile", description: "Update profile fields for the current identity." },
     { id: "updateEmail", title: "Email", description: "Update email and verification state." },
     { id: "recordPrivacyConsent", title: "Privacy consent", description: "Record a contact consent decision." },
     { id: "googleDriveCredentials", title: "Google Drive", description: "Update integration credentials." },
@@ -1060,14 +857,6 @@ function SettingsLoaded({
     { id: "grantPermission", title: "Grant permission", description: "Create a role or user permission grant." },
     { id: "revokePermission", title: "Revoke permission", description: "Delete an organization permission by ID." },
     { id: "archiveAiChatSession", title: "AI chat archive", description: "Archive or restore an AI chat session." },
-    { id: "createCompany", title: "Create company", description: "Create a company record in the organization." },
-    { id: "updateCompany", title: "Update company", description: "Patch core company fields." },
-    { id: "updateCompanyAddress", title: "Company address", description: "Update company address fields." },
-    { id: "updateCompanyBusiness", title: "Company business", description: "Update tax and registry fields." },
-    { id: "updateCompanyHierarchy", title: "Company hierarchy", description: "Update parent/company hierarchy settings." },
-    { id: "deleteCompany", title: "Delete company", description: "Delete a company by ID." },
-    { id: "createDataClassification", title: "Data classification", description: "Create a data privacy classification." },
-    { id: "createDataClassificationRule", title: "Classification rule", description: "Map a classification to a table column." },
     { id: "updateOrgMemberRole", title: "Org member role", description: "Set membership role by role display name." },
     { id: "createUserInviteDirect", title: "Invite (direct reducer)", description: "Superuser: create invite row directly." },
     { id: "createUserSession", title: "Create session", description: "Record a user session row (admin/testing)." },
@@ -1088,67 +877,75 @@ function SettingsLoaded({
     setActiveAction(id)
   }
 
+  const actionCards = (list: typeof actions, testIdPrefix?: string) => (
+    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+      {list.map((action) => (
+        <button
+          key={action.id}
+          type="button"
+          className="rounded-lg border border-border bg-background p-3 text-left shadow-xs transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
+          data-testid={testIdPrefix ? `${testIdPrefix}${action.id}` : undefined}
+          onClick={() => openAction(action.id)}
+        >
+          <p className="text-sm font-medium">{action.title}</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{action.description}</p>
+        </button>
+      ))}
+    </div>
+  )
+
+  const extraSections: SettingsExtraSection[] = [
+    {
+      id: "imports",
+      groupId: "data",
+      title: "Data import",
+      description: "Bring existing records into the workspace from CSV files.",
+      icon: Upload,
+      content: (
+        <section className="rounded-xl border border-border bg-card p-4">
+          <GuidedImportWizard organizationId={organizationId} />
+        </section>
+      ),
+    },
+    {
+      id: "integrations",
+      groupId: "data",
+      title: "Integrations",
+      description:
+        "Google Drive & WhatsApp Business: connect credentials, manage sync health, verification state, and primary WhatsApp accounts.",
+      icon: Plug,
+      content: (
+        <section className="space-y-3 rounded-xl border border-border bg-card p-4">
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+            OAuth flows and webhooks are recorded via these admin reducers until polished OAuth UI ships.
+          </p>
+          {actionCards(integrationActions)}
+        </section>
+      ),
+    },
+    {
+      id: "advanced",
+      groupId: "platform",
+      title: "Advanced actions",
+      description: "Less common administration tasks that are not part of the other sections.",
+      icon: Wrench,
+      content: (
+        <section className="rounded-xl border border-dashed border-border bg-card p-4">
+          {actionCards(adminActions, "settings-admin-action-")}
+        </section>
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-6">
       <DashboardHeader title={title} description={description} />
-      <SettingsModule uploadInvoiceLogo={uploadInvoiceLogo} />
-
-      <section className="rounded-xl border border-border bg-card p-4">
-        <GuidedImportWizard organizationId={organizationId} />
-      </section>
-
-      <section className="rounded-xl border border-border bg-card">
-        <div className="border-b border-border px-4 py-4">
-          <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Integrations</p>
-          <h2 className="mt-1 text-base font-semibold tracking-[-0.01em]">Google Drive & WhatsApp Business</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Connect credentials, manage sync health, verification state, and primary WhatsApp accounts. OAuth flows
-            and webhooks are recorded via these admin reducers until polished OAuth UI ships.
-          </p>
+      {successMessage ? (
+        <div role="status" className="rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-sm text-success">
+          {successMessage}
         </div>
-        {successMessage ? (
-          <div className="mx-4 mt-4 rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-sm text-success">
-            {successMessage}
-          </div>
-        ) : null}
-        <div className="grid gap-2 p-4 md:grid-cols-2 xl:grid-cols-3">
-          {integrationActions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              className="rounded-lg border border-border bg-background p-3 text-left shadow-xs transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
-              onClick={() => openAction(action.id)}
-            >
-              <p className="text-sm font-medium">{action.title}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">{action.description}</p>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-dashed border-border bg-card">
-        <div className="border-b border-border px-4 py-4">
-          <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Advanced</p>
-          <h2 className="mt-1 text-base font-semibold tracking-[-0.01em]">More administrative actions</h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Less common administration tasks that are not part of the sections above.
-          </p>
-        </div>
-        <div className="grid gap-2 p-4 md:grid-cols-2 xl:grid-cols-3">
-          {adminActions.map((action) => (
-            <button
-              key={action.id}
-              type="button"
-              className="rounded-lg border border-border bg-background p-3 text-left shadow-xs transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
-              data-testid={`settings-admin-action-${action.id}`}
-              onClick={() => openAction(action.id)}
-            >
-              <p className="text-sm font-medium">{action.title}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">{action.description}</p>
-            </button>
-          ))}
-        </div>
-      </section>
+      ) : null}
+      <SettingsModule extraSections={extraSections} uploadInvoiceLogo={uploadInvoiceLogo} />
 
       {activeAction ? (
         <FormModal

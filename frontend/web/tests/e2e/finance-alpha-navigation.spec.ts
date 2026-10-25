@@ -96,6 +96,7 @@ test.describe("Finance Alpha discovery", { tag: ["@p0", "@finance-alpha"] }, () 
       await expect(page.getByTestId(`settings-section-${id}`)).toBeVisible()
     }
     await expect(page.getByRole("button", { name: /AI chat archive/ })).toHaveCount(0)
+    await page.getByTestId("settings-section-imports").click()
     await page.getByTestId("guided-import-entity").click()
     for (const name of ["Contacts", "Products", "Employees", "Departments", "Journal entries", "Expenses", "Subscriptions"]) {
       await expect(page.getByRole("option", { name, exact: true })).toBeVisible()

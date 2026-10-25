@@ -44,9 +44,9 @@ test.describe("Phase 8 AI and communications smoke", { tag: "@phase-8" }, () => 
   })
 
   test("settings integrations section renders without error", async ({ page }) => {
-    await page.goto("/settings")
+    await page.goto("/settings?section=integrations")
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
-    await expect(page.getByRole("heading", { name: /google drive & whatsapp business/i })).toBeVisible()
+    await expect(page.getByRole("heading", { name: /^integrations$/i, level: 2 })).toBeVisible()
     await expectNoAppError(page)
   })
 })
