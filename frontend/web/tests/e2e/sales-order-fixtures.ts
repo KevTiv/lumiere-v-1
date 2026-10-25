@@ -9,6 +9,7 @@ import {
   activeTabEntityTable,
   chooseFirstEnabledOption,
   chooseSelectOptionByLabel,
+  chooseSelectOptionByValue,
   clickEntityActionAndWaitForReducer,
   fetchSaleOrderSelectLabel,
   fillField,
@@ -39,7 +40,14 @@ export async function createDraftSaleOrder(page: Page, clientRef: string): Promi
   await waitForBffQueryMinRows(page, "/api/query/warehouses")
   await page.getByTestId("module-create-sales-orders").click()
   await expect(page.getByTestId("form-modal-new-sale-order")).toBeVisible()
-  await chooseSelectOptionByLabel(page, "partnerId", SEEDED_CUSTOMER_NAME)
+  // The person's display label also contains the company name. Select the
+  // canonical company record by ID instead of the first substring match.
+  const contactsResponse = await page.request.get("/api/query/contacts")
+  expect(contactsResponse.ok()).toBe(true)
+  const contacts = (await contactsResponse.json()) as { data: QueryRowFor<"contacts">[] }
+  const customers = contacts.data.filter((row) => row.name === SEEDED_CUSTOMER_NAME && row.type === "company")
+  expect(customers).toHaveLength(1)
+  await chooseSelectOptionByValue(page, "partnerId", String(customers[0]!.id))
   await chooseFirstEnabledOption(page, "pricelistId")
   await chooseFirstEnabledOption(page, "warehouseId")
   await fillField(page, "clientOrderRef", clientRef)
