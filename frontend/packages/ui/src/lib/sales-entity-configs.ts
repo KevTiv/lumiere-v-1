@@ -219,7 +219,7 @@ export const saleOrdersTableConfig = (
         referenceColumn,
         {
           key: "partnerName",
-          label: t("common.customer", { defaultValue: "Customer" }),
+          label: t("sales.salesOrders.columns.partnerName"),
           width: "min-w-40",
           sortable: true,
         },
@@ -280,7 +280,7 @@ export const saleOrdersTableConfig = (
         },
         {
           key: "expectedDate",
-          label: t("sales.salesOrders.columns.expectedDate", { defaultValue: "Expected delivery" }),
+          label: t("sales.forms.newSaleOrder.fields.commitmentDate"),
           type: "date",
           sortable: true,
         },

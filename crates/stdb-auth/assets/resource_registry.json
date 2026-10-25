@@ -966,7 +966,8 @@
       "description",
       "location",
       "user_id",
-      "partner_ids"
+      "partner_ids",
+      "recurrency"
     ],
     "mandatory": [
       "id",
@@ -1405,7 +1406,14 @@
       "company_id",
       "is_vendor",
       "is_customer",
-      "supplier_rank"
+      "supplier_rank",
+      "type",
+      "display_name",
+      "website",
+      "first_name",
+      "last_name",
+      "industry",
+      "customer_rank"
     ],
     "mandatory": [
       "id",
@@ -1762,7 +1770,11 @@
       "name",
       "parent_id",
       "document_count",
-      "company_id"
+      "company_id",
+      "parent_path",
+      "is_favorite",
+      "is_hidden",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -1891,7 +1903,15 @@
       "mimetype",
       "file_name",
       "owner_id",
-      "metadata"
+      "metadata",
+      "folder_id",
+      "fiscal_kind",
+      "residency_region",
+      "retention_days",
+      "is_favorite",
+      "is_shared",
+      "version_count",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -3073,7 +3093,10 @@
       "name",
       "is_published",
       "member_ids",
-      "article_member_count"
+      "article_member_count",
+      "description",
+      "article_item_count",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -3092,7 +3115,8 @@
       "color",
       "article_count",
       "parent_id",
-      "sequence"
+      "sequence",
+      "create_date"
     ],
     "mandatory": [
       "id",
@@ -3259,7 +3283,14 @@
       "phone",
       "state",
       "probability",
-      "deleted_at"
+      "deleted_at",
+      "company_name",
+      "partner_id",
+      "expected_revenue",
+      "priority",
+      "date_deadline",
+      "description",
+      "created_at"
     ],
     "mandatory": [
       "id",

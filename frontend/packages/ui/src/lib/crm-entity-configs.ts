@@ -424,7 +424,7 @@ export const contactsTableConfig = (
         },
         { key: "city", label: t("crm.contacts.columns.city"), width: "min-w-24" },
         {
-          key: "countryId",
+          key: "countryCode",
           label: t("crm.contacts.columns.countryId"),
           width: "min-w-20",
         },
@@ -448,7 +448,7 @@ export const contactDetailConfig = (t: TFunction): EntityDetailConfig => ({
         { key: "phone", label: t("crm.contacts.columns.phone"), width: "1/2" },
         { key: "isCompany", label: t("crm.contacts.columns.isCompany"), type: "boolean", width: "1/2" },
         { key: "city", label: t("crm.contacts.columns.city"), width: "1/2" },
-        { key: "countryId", label: t("crm.contacts.columns.countryId"), width: "1/2" },
+        { key: "countryCode", label: t("crm.contacts.columns.countryId"), width: "1/2" },
       ],
     },
     {

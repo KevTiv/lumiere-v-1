@@ -1,4 +1,6 @@
 "use client"
+
+import { crmContactListRow, crmLeadListRow } from "@/lib/crm-list-rows"
 import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
@@ -2193,18 +2195,19 @@ function CrmClientLoaded({
     [moduleConfig, liveSections],
   )
 
+  const contactNamesForLists = useMemo(() => new Map(contacts.map((row) => [String(row.id), row.name])), [contacts])
   const data = useMemo(
     () => ({
-      leads: leads as unknown as Record<string, unknown>[],
+      leads: leads.map((row) => crmLeadListRow(row, contactNamesForLists)) as unknown as Record<string, unknown>[],
       opportunities: enrichedOpportunities,
       "opportunity-lines": opportunityLines as unknown as Record<string, unknown>[],
-      contacts: contacts as unknown as Record<string, unknown>[],
+      contacts: contacts.map((row) => crmContactListRow(row, contactNamesForLists)) as unknown as Record<string, unknown>[],
       activities: activities as unknown as Record<string, unknown>[],
       "contact-tags": contactTags as unknown as Record<string, unknown>[],
       "contact-categories": contactCategories as unknown as Record<string, unknown>[],
       "contact-segments": contactSegments as unknown as Record<string, unknown>[],
     }),
-    [leads, enrichedOpportunities, opportunityLines, contacts, activities, contactTags, contactCategories, contactSegments],
+    [leads, enrichedOpportunities, opportunityLines, contacts, contactNamesForLists, activities, contactTags, contactCategories, contactSegments],
   )
 
   const currenciesQuery = useCurrencies()
