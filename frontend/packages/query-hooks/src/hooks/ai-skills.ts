@@ -399,6 +399,7 @@ export function useAiDailyBriefing() {
 
 function useGovernedLlmSkill(path: string) {
   return useMutation({
+    retry: false,
     mutationFn: async (input: GovernedLlmSkillInput) =>
       postHarnessSkill<GovernedLlmSkillResult>(path, {
         ...input,

@@ -1,11 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import { Tabs, TabsContent } from "@lumiere/ui/components/tabs"
 import { WorkspaceTabsList as TabsList, WorkspaceTabsTrigger as TabsTrigger } from "@lumiere/ui/components/workspace-tabs"
 import { DashboardHeader } from "@lumiere/ui"
 
+import { ReportAnalysisPanel } from "./report-analysis-panel"
 import { ReportComposerPanel } from "./report-composer-panel"
 import { LowStockPanel } from "./low-stock-panel"
 import { RedActionDraftPanel } from "./red-action-draft-panel"
@@ -22,13 +24,19 @@ export function AiHarnessClient({
   companies,
 }: AiHarnessClientProps) {
   const { t } = useTranslation()
-  const [tab, setTab] = useState("report-composer")
+  const searchParams = useSearchParams()
+  const [tab, setTab] = useState(() => {
+    const requested = searchParams.get("tab")
+    if (["report-analysis", "report-composer", "low-stock", "red-action-drafts", "evidence-reviewer", "run-lifecycle"].includes(requested ?? "")) return requested!
+    return searchParams.has("runId") ? "evidence-reviewer" : "report-composer"
+  })
 
   return (
     <div className="flex flex-col gap-2">
     <DashboardHeader title={t("aiHarness.title")} description={t("aiHarness.description")} />
     <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-6">
       <TabsList scrollable>
+        <TabsTrigger value="report-analysis">{t("aiHarness.reportAnalysis.title")}</TabsTrigger>
         <TabsTrigger value="report-composer">
           {t("aiHarness.tabs.reportComposer")}
         </TabsTrigger>
@@ -45,6 +53,10 @@ export function AiHarnessClient({
           {t("aiHarness.tabs.runLifecycle")}
         </TabsTrigger>
       </TabsList>
+
+      <TabsContent value="report-analysis">
+        <ReportAnalysisPanel organizationId={organizationId} companies={companies} />
+      </TabsContent>
 
       <TabsContent value="report-composer">
         <ReportComposerPanel

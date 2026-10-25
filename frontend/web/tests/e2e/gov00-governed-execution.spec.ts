@@ -3,6 +3,7 @@ import { governedPilotAgentId } from "./governed-pilot"
 import { mapRunObservation } from "../../app/(modules)/ai-harness/run-observation"
 
 import {
+  chooseSelectOptionByTriggerValue,
   fetchDefaultCompanyId,
   fetchSessionOrganizationId,
   scalarQueryId,
@@ -59,17 +60,17 @@ test.describe("GOV-00 governed execution", { tag: ["@gov00", "@ai-live"] }, () =
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
-    const response = await page.request.post("/api/ai/skills/report-analysis", {
-      data: {
-        companyId,
-        inputs: {
-          query: "Summarize the current report and identify any items needing operator attention.",
-        },
-        agentId,
-        maxSteps: 5,
-      },
-      timeout: 120_000,
-    })
+    await page.goto("/ai-harness")
+    await page.getByRole("tab", { name: "Report analysis", exact: true }).click()
+    await chooseSelectOptionByTriggerValue(page, page.getByLabel("Company", { exact: true }), companyId)
+    await chooseSelectOptionByTriggerValue(page, page.getByLabel("AI agent", { exact: true }), agentId)
+    await page.getByLabel("What do you want to know?", { exact: true }).fill(
+      "Summarize the current report and identify any items needing operator attention.",
+    )
+    const [response] = await Promise.all([
+      page.waitForResponse((reply) => new URL(reply.url()).pathname === "/api/ai/skills/report-analysis", { timeout: 120_000 }),
+      page.getByRole("button", { name: "Analyze report", exact: true }).click(),
+    ])
     const body = (await response.json()) as RunBody
 
     expect(response.ok(), `governed request failed: HTTP ${response.status()}`).toBeTruthy()
@@ -86,6 +87,9 @@ test.describe("GOV-00 governed execution", { tag: ["@gov00", "@ai-live"] }, () =
     expect(stepNumbers).toEqual(stepNumbers.map((_, index) => index + 1))
 
     const runId = body.run?.run_id ?? 0
+    await expect(page.getByRole("link", { name: "Inspect saved run and cost", exact: true })).toHaveAttribute(
+      "href", `/ai-harness?tab=evidence-reviewer&companyId=${companyId}&runId=${runId}`,
+    )
     await expect
       .poll(
         async () => {

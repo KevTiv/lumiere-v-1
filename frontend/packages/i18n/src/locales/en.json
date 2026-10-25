@@ -12221,6 +12221,24 @@
     }
   },
   "aiHarness": {
+    "reportAnalysis": {
+      "title": "Report analysis",
+      "description": "Ask a question about company reports. The approved AI agent uses the governed report skill.",
+      "company": "Company",
+      "agent": "AI agent",
+      "chooseAgent": "Select an approved agent",
+      "loading": "Loading AI agents…",
+      "agentsUnavailable": "AI agents are unavailable. Reload the page to check again.",
+      "noAgents": "No active AI agent is available for this company. Complete pilot setup before starting an analysis.",
+      "question": "What do you want to know?",
+      "spendNotice": "Starting an analysis uses the selected agent and its configured spending limit.",
+      "run": "Analyze report",
+      "running": "Analyzing…",
+      "failed": "The request did not return a result. It may have saved a run. Check run history before starting another analysis.",
+      "history": "Open run history",
+      "result": "Analysis result",
+      "inspect": "Inspect saved run and cost"
+    },
     "title": "AI Workbench",
     "description": "Compose AI reports, scan stock and review AI-proposed actions with their evidence",
     "enums": {
