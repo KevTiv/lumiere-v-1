@@ -81,9 +81,76 @@ pub fn allows_in_module(
             .any(|p| p.rsplit_once(':').is_some_and(|(r, a)| matches(r, a)))
 }
 
+/// Check an operator bootstrap lease stored in server-owned profile metadata.
+/// Ordinary metadata has no lease. Reserved lease metadata must be well formed,
+/// start no later than `now_micros`, and expire within one hour of issue.
+/// PostgreSQL JSON string literals and SpacetimeDB strings use the same format.
+pub fn platform_bootstrap_lease_active(metadata: Option<&str>, now_micros: i64) -> bool {
+    const PREFIX: &str = "lumiere-platform-bootstrap-v1";
+    let Some(raw) = metadata else {
+        return true;
+    };
+    let raw = raw.trim();
+    let raw = raw
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .unwrap_or(raw);
+    if !raw.starts_with("lumiere-platform-bootstrap-") {
+        return true;
+    }
+    let Some(lease) = raw
+        .strip_prefix(PREFIX)
+        .and_then(|value| value.strip_prefix(':'))
+    else {
+        return false;
+    };
+    let Some((issued, expires)) = lease.split_once(':') else {
+        return false;
+    };
+    let (Ok(issued), Ok(expires)) = (issued.parse::<i64>(), expires.parse::<i64>()) else {
+        return false;
+    };
+    issued >= 0
+        && expires > issued
+        && expires.saturating_sub(issued) <= 3_600_000_000
+        && now_micros >= issued
+        && now_micros < expires
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bootstrap_authority_expires_without_a_cleanup_write() {
+        let lease = "lumiere-platform-bootstrap-v1:100:3600000100";
+        assert!(platform_bootstrap_lease_active(Some(lease), 100));
+        assert!(platform_bootstrap_lease_active(Some(lease), 3600000099));
+        assert!(!platform_bootstrap_lease_active(Some(lease), 99));
+        assert!(!platform_bootstrap_lease_active(Some(lease), 3600000100));
+        assert!(!platform_bootstrap_lease_active(Some(lease), i64::MAX));
+        assert!(platform_bootstrap_lease_active(
+            Some(&format!("\"{lease}\"")),
+            100
+        ));
+    }
+
+    #[test]
+    fn malformed_or_overlong_bootstrap_leases_never_authorize() {
+        for lease in [
+            "lumiere-platform-bootstrap-v1",
+            "lumiere-platform-bootstrap-v2:1:2",
+            "lumiere-platform-bootstrap-v1:bad:2",
+            "lumiere-platform-bootstrap-v1:1:1",
+            "lumiere-platform-bootstrap-v1:-1:2",
+            "lumiere-platform-bootstrap-v1:1:3600000002",
+            "lumiere-platform-bootstrap-v1:1:9999999999999999999999999",
+        ] {
+            assert!(!platform_bootstrap_lease_active(Some(lease), 1), "{lease}");
+        }
+        assert!(platform_bootstrap_lease_active(None, 1));
+        assert!(platform_bootstrap_lease_active(Some("{\"seed\":true}"), 1));
+    }
 
     #[test]
     fn payment_operations_keep_explicit_capabilities_under_accounting_module_denies() {

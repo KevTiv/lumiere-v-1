@@ -97,6 +97,13 @@ pub(super) enum GateCondition {
         calibration_profile: Option<CalibrationProfileRef>,
         on: GateDecision,
     },
+    /// Calibrates the probability value. Confidence remains a separate signal
+    /// checked by decision admission before this gate can run.
+    ProbabilityThresholdPolicy {
+        policy: ThresholdGatePolicy,
+        calibration_profile: Option<CalibrationProfileRef>,
+        on: GateDecision,
+    },
     /// Matches when no other branch does. A gate must have exactly one.
     Default,
 }
@@ -544,6 +551,11 @@ fn validate_gates(graph: &DecisionGraph) -> Result<()> {
         }
         for branch in &gate.branches {
             if let GateCondition::ThresholdPolicy {
+                policy,
+                calibration_profile,
+                ..
+            }
+            | GateCondition::ProbabilityThresholdPolicy {
                 policy,
                 calibration_profile,
                 ..

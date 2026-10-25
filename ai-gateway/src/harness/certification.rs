@@ -519,6 +519,7 @@ pub fn report_analysis_certification_bundle_hash() -> String {
         include_bytes!("../orchestrator/probabilistic.rs"),
         include_bytes!("../orchestrator/invocation_policy.rs"),
         include_bytes!("../orchestrator/answer_gate.rs"),
+        include_bytes!("../tools/analytics.rs"),
         include_bytes!("../../../erp-skills/report_analysis/SKILL.md"),
     ])
 }

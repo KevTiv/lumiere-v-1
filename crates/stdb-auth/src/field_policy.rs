@@ -934,7 +934,12 @@ pub fn select_user_profile_by_identity_sql(
     identity_hex: &str,
     field_access: Option<&FieldAccessContext>,
 ) -> Result<String, String> {
-    let cols = resolve_http_sql_columns("user-profile", field_access)?;
+    let mut cols = resolve_http_sql_columns("user-profile", field_access)?;
+    // Internal authority reads must also carry the server-owned operator lease.
+    // Explicit field policies continue to control ordinary profile responses.
+    if field_access.is_none() && !cols.iter().any(|column| column == "metadata") {
+        cols.push("metadata".to_string());
+    }
     let col_part = cols.join(", ");
     let id = identity_sql_literal(identity_hex)?;
     Ok(format!(
@@ -947,7 +952,12 @@ pub fn select_user_profile_for_organization_sql(
     organization_id: u64,
     field_access: Option<&FieldAccessContext>,
 ) -> Result<String, String> {
-    let cols = resolve_http_sql_columns("user-profile", field_access)?;
+    let mut cols = resolve_http_sql_columns("user-profile", field_access)?;
+    // Internal authority reads must also carry the server-owned operator lease.
+    // Explicit field policies continue to control ordinary profile responses.
+    if field_access.is_none() && !cols.iter().any(|column| column == "metadata") {
+        cols.push("metadata".to_string());
+    }
     let col_part = cols.join(", ");
     let id = identity_sql_literal(identity_hex)?;
     Ok(format!(
@@ -1434,6 +1444,10 @@ mod tests {
 
         assert!(sql.contains(&format!("identity = 0x{identity}")));
         assert!(sql.contains("organization_id = 42"));
+        assert!(
+            sql.contains("metadata"),
+            "authority reads must include the operator expiry lease"
+        );
         assert!(sql.ends_with("LIMIT 1"));
     }
 

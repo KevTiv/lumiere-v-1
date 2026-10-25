@@ -2,8 +2,10 @@ use std::collections::BTreeMap;
 
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use stdb_client::StdbClient;
 
-use crate::tools::types::{ToolContext, ToolOutput, ToolResult};
+use crate::tools::types::{SkillCitation, ToolContext, ToolOutput, ToolResult};
 
 /// Named, server-owned analytics operations available to released skills.
 ///
@@ -223,6 +225,55 @@ fn operations_for_skill(skill_key: &str) -> &'static [AnalyticsOperation] {
     }
 }
 
+/// Immutable evidence for one bounded, server-selected analytics result.
+/// The source names the run and operation; its version hashes the exact text.
+/// It describes an observation, not the current state of ERP rows on later runs.
+fn snapshot_passage(run_id: u64, operation: AnalyticsOperation, rows: &[Value]) -> Result<Value> {
+    if run_id == 0 {
+        bail!("analytics evidence requires a persisted run");
+    }
+    let text = serde_json::to_string(&json!({
+        "scope": "observed analytics result for this run; at most 20 ranked groups",
+        "operation": operation.key(),
+        "rows": rows,
+    }))?;
+    Ok(json!({
+        "kind": "analytics_snapshot",
+        "id": format!("run:{run_id}:{}", operation.key()),
+        "source_version": format!("{:x}", Sha256::digest(text.as_bytes())),
+        "passage_key": "result",
+        "text": text,
+    }))
+}
+
+async fn record_snapshot(
+    writer: &StdbClient,
+    org_id: u64,
+    company_id: u64,
+    passage: &Value,
+) -> Result<()> {
+    writer
+        .call_reducer(stdb_client::reducer_call!(
+            "record_ai_evidence_passage",
+            json!([org_id, company_id, {
+                "source_kind": passage["kind"],
+                "source_key": passage["id"],
+                "source_version": passage["source_version"],
+                "passage_key": passage["passage_key"],
+                "passage_text": passage["text"],
+                "effective_from_micros": {"none": []},
+                "effective_to_micros": {"none": []},
+                "applicability": [],
+                "source_version_id": {"none": []},
+                "coordinates": [],
+                "text_origin": "original",
+                "processor_ref": {"none": []},
+            }]),
+        ))
+        .await
+        .context("record immutable analytics observation")
+}
+
 pub async fn execute(ctx: &ToolContext, _input: &Value) -> ToolResult {
     let operations = operations_for_skill(&ctx.skill_key);
     if operations.is_empty() {
@@ -234,6 +285,7 @@ pub async fn execute(ctx: &ToolContext, _input: &Value) -> ToolResult {
 
     let mut artifacts = Vec::new();
     let mut row_count = 0_u32;
+    let mut citations = Vec::new();
     for operation in operations {
         let rows = ctx
             .stdb
@@ -243,6 +295,39 @@ pub async fn execute(ctx: &ToolContext, _input: &Value) -> ToolResult {
         let rows = operation
             .aggregate(rows)
             .with_context(|| format!("aggregate analytics operation {}", operation.key()))?;
+        if ctx.skill_key == "report_analysis" {
+            let passage = snapshot_passage(ctx.run_id, *operation, &rows)?;
+            record_snapshot(
+                ctx.state.stdb.as_ref(),
+                ctx.org_id,
+                ctx.company_id,
+                &passage,
+            )
+            .await?;
+            citations.push(SkillCitation {
+                kind: "analytics_snapshot".to_string(),
+                trust: "authoritative".to_string(),
+                content_type: Some("application/json".to_string()),
+                entity_id: passage["id"].as_str().map(str::to_string),
+                score: None,
+                text_snippet: passage["text"].as_str().map(str::to_string),
+                label: Some(format!(
+                    "Observed {} for run {}",
+                    operation.key(),
+                    ctx.run_id
+                )),
+                snapshot_at: None,
+                url: None,
+                title: None,
+                fetched_at: None,
+            });
+            artifacts.push(json!({
+                "summary": format!("approved analytics operation {}", operation.key()),
+                "artifacts": {"operation": operation.key(), "rows": rows, "evidencePassage": passage},
+            }));
+            row_count = row_count.saturating_add(1);
+            continue;
+        }
         row_count = row_count.saturating_add(rows.len() as u32);
         artifacts.extend(rows.into_iter().map(|row| {
             json!({
@@ -262,7 +347,7 @@ pub async fn execute(ctx: &ToolContext, _input: &Value) -> ToolResult {
             row_count
         ),
         data: json!({ "artifacts": artifacts }),
-        citations: vec![],
+        citations,
         row_count: Some(row_count),
     })
 }
@@ -270,6 +355,71 @@ pub async fn execute(ctx: &ToolContext, _input: &Value) -> ToolResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn observations_require_a_run_and_preserve_empty_and_changed_results() {
+        let operation = AnalyticsOperation::SalesRevenueByProduct;
+        assert!(snapshot_passage(0, operation, &[]).is_err());
+        let empty = snapshot_passage(42, operation, &[]).unwrap();
+        let first =
+            snapshot_passage(42, operation, &[json!({"productId": 1, "revenue": 10})]).unwrap();
+        let changed =
+            snapshot_passage(42, operation, &[json!({"productId": 1, "revenue": 20})]).unwrap();
+        assert_ne!(empty["source_version"], first["source_version"]);
+        assert_ne!(first["source_version"], changed["source_version"]);
+        assert_ne!(
+            empty["id"],
+            snapshot_passage(43, operation, &[]).unwrap()["id"]
+        );
+        let text: Value = serde_json::from_str(empty["text"].as_str().unwrap()).unwrap();
+        assert_eq!(text["rows"], json!([]));
+        assert_eq!(text["operation"], "sales_revenue_by_product");
+    }
+
+    #[tokio::test]
+    async fn snapshot_persistence_uses_the_contract_and_fails_on_reducer_rejection() {
+        use axum::{routing::post, Json, Router};
+        use std::sync::{Arc, Mutex};
+        let received = Arc::new(Mutex::new(Vec::<Value>::new()));
+        let captured = received.clone();
+        let app = Router::new().route(
+            "/v1/database/test/call/record_ai_evidence_passage",
+            post(move |Json(body): Json<Value>| {
+                let captured = captured.clone();
+                async move {
+                    captured.lock().unwrap().push(body);
+                    axum::http::StatusCode::OK
+                }
+            }),
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let writer = StdbClient::new(
+            format!("http://{address}"),
+            "test".into(),
+            "test-writer".into(),
+        );
+        let passage = snapshot_passage(42, AnalyticsOperation::SalesRevenueByProduct, &[]).unwrap();
+        record_snapshot(&writer, 7, 9, &passage).await.unwrap();
+        let rows = received.lock().unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0][0], 7);
+        assert_eq!(rows[0][1], 9);
+        assert_eq!(rows[0][2]["source_key"], "run:42:sales_revenue_by_product");
+        assert_eq!(rows[0][2]["passage_text"], passage["text"]);
+        assert_eq!(rows[0][2]["source_version_id"], json!({"none": []}));
+        drop(rows);
+        let wrong_module = StdbClient::new(
+            format!("http://{address}"),
+            "missing".into(),
+            "test-writer".into(),
+        );
+        assert!(record_snapshot(&wrong_module, 7, 9, &passage)
+            .await
+            .is_err());
+        server.abort();
+    }
 
     #[test]
     fn report_analysis_has_only_named_operations() {

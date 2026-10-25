@@ -67,7 +67,7 @@ pub(super) fn report_analysis_graph() -> DecisionGraph {
                     source: "attention_need".to_string(),
                     branches: vec![
                         GateBranch {
-                            condition: GateCondition::ThresholdPolicy {
+                            condition: GateCondition::ProbabilityThresholdPolicy {
                                 policy: ThresholdGatePolicy {
                                     name: "report-attention-routing".to_string(),
                                     hard_stop_at_least: Some(0.65),
@@ -83,7 +83,7 @@ pub(super) fn report_analysis_graph() -> DecisionGraph {
                             target: "generate_attention".to_string(),
                         },
                         GateBranch {
-                            condition: GateCondition::ThresholdPolicy {
+                            condition: GateCondition::ProbabilityThresholdPolicy {
                                 policy: ThresholdGatePolicy {
                                     name: "report-attention-routing".to_string(),
                                     hard_stop_at_least: Some(0.65),

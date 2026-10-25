@@ -1493,6 +1493,10 @@ async fn validate_governed_runtime_configuration(
                 if let GateCondition::ThresholdPolicy {
                     calibration_profile: Some(reference),
                     ..
+                }
+                | GateCondition::ProbabilityThresholdPolicy {
+                    calibration_profile: Some(reference),
+                    ..
                 } = &branch.condition
                 {
                     calibration
