@@ -9,6 +9,7 @@ interface CurrencyFormatContextValue {
   locale?: string
   defaultCode?: string
   codesById?: ReadonlyMap<string, string>
+  rowCurrencyKey?: string
 }
 
 const CurrencyFormatContext = createContext<CurrencyFormatContextValue>({})
@@ -20,6 +21,8 @@ interface CurrencyFormatProviderProps {
   defaultCode?: string
   /** Currency records, so rows that carry a currency id can show that currency. */
   currencies?: ReadonlyArray<{ id?: unknown; code?: unknown }>
+  /** Row field naming the currency for currency columns that give no `currencyKey` of their own. */
+  rowCurrencyKey?: string
   children: ReactNode
 }
 
@@ -27,7 +30,7 @@ interface CurrencyFormatProviderProps {
  * Tells the shared money formatting which locale and currencies apply below it. Providers nest:
  * anything left out is inherited from the one above.
  */
-export function CurrencyFormatProvider({ locale, defaultCode, currencies, children }: CurrencyFormatProviderProps) {
+export function CurrencyFormatProvider({ locale, defaultCode, currencies, rowCurrencyKey, children }: CurrencyFormatProviderProps) {
   const parent = useContext(CurrencyFormatContext)
   const value = useMemo<CurrencyFormatContextValue>(() => {
     let codesById = parent.codesById
@@ -43,18 +46,20 @@ export function CurrencyFormatProvider({ locale, defaultCode, currencies, childr
       locale: locale ?? parent.locale,
       defaultCode: resolveCurrencyCode(defaultCode) ?? parent.defaultCode,
       codesById,
+      rowCurrencyKey: rowCurrencyKey ?? parent.rowCurrencyKey,
     }
-  }, [locale, defaultCode, currencies, parent])
+  }, [locale, defaultCode, currencies, rowCurrencyKey, parent])
   return <CurrencyFormatContext.Provider value={value}>{children}</CurrencyFormatContext.Provider>
 }
 
 export interface CurrencyFormat {
   locale?: string
   defaultCode?: string
+  rowCurrencyKey?: string
   /** ISO code for a row's currency value (an ISO code or a currency record id); undefined if unknown. */
   codeFor: (raw: unknown) => string | undefined
   /** An amount in `currency` (a code or record id), else in the default currency. */
-  money: (value: number, currency?: unknown) => string
+  money: (value: number, currency?: unknown, options?: { compact?: boolean }) => string
   /** A calendar date, in the order the browser's own settings use. */
   date: (millis: number) => string
 }
@@ -62,16 +67,18 @@ export interface CurrencyFormat {
 const DATE_OPTIONS: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" }
 
 export function useCurrencyFormat(): CurrencyFormat {
-  const { locale, defaultCode, codesById } = useContext(CurrencyFormatContext)
+  const { locale, defaultCode, codesById, rowCurrencyKey } = useContext(CurrencyFormatContext)
   return useMemo(() => {
     const codeFor = (raw: unknown): string | undefined =>
       resolveCurrencyCode(raw) ?? codesById?.get(String(unwrapEntityValue(raw)))
     return {
       locale,
       defaultCode,
+      rowCurrencyKey,
       codeFor,
-      money: (value, currency) => formatCurrencyAmount(value, codeFor(currency) ?? defaultCode, { locale }),
+      money: (value, currency, options) =>
+        formatCurrencyAmount(value, codeFor(currency) ?? defaultCode, { locale, compact: options?.compact }),
       date: (millis) => new Date(millis).toLocaleDateString(undefined, DATE_OPTIONS),
     }
-  }, [locale, defaultCode, codesById])
+  }, [locale, defaultCode, codesById, rowCurrencyKey])
 }

@@ -78,4 +78,26 @@ describe("useCurrencyFormat", () => {
     expect(f.locale).toBe("pt-BR")
     expect(plain(f.money(1234.5))).toBe("R$ 1.234,50")
   })
+
+  it("can show amounts in the short form for tiles and axes", () => {
+    const f = format(({ children }) => <CurrencyFormatProvider defaultCode="USD">{children}</CurrencyFormatProvider>)
+    expect(f.money(1_500_000, undefined, { compact: true })).toBe("$1.5M")
+    expect(f.money(1_500_000)).toBe("$1,500,000.00")
+  })
+
+  it("passes on the row field that names a row's currency, unless a nearer provider says otherwise", () => {
+    const f = format(({ children }) => (
+      <CurrencyFormatProvider rowCurrencyKey="currencyId">
+        <CurrencyFormatProvider defaultCode="EUR">{children}</CurrencyFormatProvider>
+      </CurrencyFormatProvider>
+    ))
+    expect(f.rowCurrencyKey).toBe("currencyId")
+    const g = format(({ children }) => (
+      <CurrencyFormatProvider rowCurrencyKey="currencyId">
+        <CurrencyFormatProvider rowCurrencyKey="companyCurrencyId">{children}</CurrencyFormatProvider>
+      </CurrencyFormatProvider>
+    ))
+    expect(g.rowCurrencyKey).toBe("companyCurrencyId")
+    expect(renderHook(() => useCurrencyFormat()).result.current.rowCurrencyKey).toBeUndefined()
+  })
 })

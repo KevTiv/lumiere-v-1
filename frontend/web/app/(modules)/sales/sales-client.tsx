@@ -1,4 +1,5 @@
 'use client';
+import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
@@ -65,6 +66,7 @@ import {
   recordOptions,
   useFormDialog,
 } from '@lumiere/ui';
+import { EntityLabelsProvider, labelsFromOptions } from '@lumiere/ui';
 import type {
   EntityRow,
   EntityViewConfig,
@@ -890,6 +892,15 @@ function SalesClientLoaded({
     if (fromApi.length > 0) return fromApi;
     return [{ value: '', label: 'No currencies available', disabled: true }];
   }, [currencies, t]);
+
+  const entityLabels = useMemo(
+    () => ({
+      partnerId: labelsFromOptions(partnerFieldOptions),
+      productId: labelsFromOptions(productFieldOptions),
+      currencyId: labelsFromOptions(currencyFieldOptions),
+    }),
+    [partnerFieldOptions, productFieldOptions, currencyFieldOptions],
+  );
 
   const productCategoryFieldOptions = useMemo(() => {
     const fromApi = productCategoryRowsToSelectOptions(productCategories as Record<string, unknown>[]);
@@ -2397,18 +2408,20 @@ function SalesClientLoaded({
     ],
   );
 
+  const { locale } = useCurrencyFormat()
   const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
     () => ({
       orders: {
         tiles: saleOrderKpis(data.orders, {
           t,
           now: new Date(),
+          locale,
           currencyCodeById: currencyCodeMap(currencies as Record<string, unknown>[]),
         }),
         loading: ordersLoading,
       },
     }),
-    [data.orders, currencies, ordersLoading, t],
+    [data.orders, currencies, ordersLoading, t, locale],
   );
 
   const dataState = {
@@ -2580,7 +2593,7 @@ function SalesClientLoaded({
     pickingWorkflow.isPending;
 
   return (
-    <>
+    <EntityLabelsProvider value={entityLabels}>
       <ModuleView
         config={config}
         dashboardContent={<ModuleInsights input={{ module: "sales", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: ordersRead.state }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
@@ -2834,6 +2847,6 @@ function SalesClientLoaded({
           }}
         />
       ) : null}
-    </>
+    </EntityLabelsProvider>
   );
 }

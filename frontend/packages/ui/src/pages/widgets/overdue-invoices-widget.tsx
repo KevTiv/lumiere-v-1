@@ -1,5 +1,7 @@
 "use client"
 
+import { useCurrencyFormat } from "../../lib/currency-context"
+
 interface OverdueInvoicesData {
   count: number
   totalAmount: number
@@ -7,7 +9,7 @@ interface OverdueInvoicesData {
 }
 
 export function OverdueInvoicesWidget({ data }: { data: OverdueInvoicesData }) {
-  const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
+  const { money } = useCurrencyFormat()
   const status = data.count === 0 ? "green" : data.oldestDays > 60 ? "red" : "amber"
   const colorClass =
     status === "green" ? "text-success" : status === "red" ? "text-destructive" : "text-warning"
@@ -28,7 +30,7 @@ export function OverdueInvoicesWidget({ data }: { data: OverdueInvoicesData }) {
           </p>
         </div>
         <div className="text-right">
-          <p className={`text-lg font-semibold ${colorClass}`}>{fmt.format(data.totalAmount)}</p>
+          <p className={`text-lg font-semibold ${colorClass}`}>{money(data.totalAmount)}</p>
           <p className="text-xs text-muted-foreground">total outstanding</p>
         </div>
       </div>

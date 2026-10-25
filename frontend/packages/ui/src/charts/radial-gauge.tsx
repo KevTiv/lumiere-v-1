@@ -1,5 +1,6 @@
 "use client"
 
+import { useCurrencyFormat } from "../lib/currency-context"
 import { PolarAngleAxis, RadialBar, RadialBarChart } from "recharts"
 import { ChartContainer } from "../components/chart"
 import { cn } from "../lib/utils"
@@ -43,9 +44,10 @@ export function gaugeFraction(value: number, max: number): number {
 
 /** A half-circle gauge with a centre figure and three sub-stats — collection rate, cash runway. */
 export function RadialGauge({ value, max, label, valueFormat, display, stats = [], tone = "default", className }: RadialGaugeProps) {
+  const { locale } = useCurrencyFormat()
   const fraction = gaugeFraction(value, max)
   const color = toneColor[tone]
-  const centre = display ?? (valueFormat ? formatChartValue(value, valueFormat) : formatChartValue(fraction * 100, { kind: "percent" }))
+  const centre = display ?? (valueFormat ? formatChartValue(value, valueFormat, locale) : formatChartValue(fraction * 100, { kind: "percent" }, locale))
 
   return (
     <div className={cn("flex w-full flex-col items-center", className)}>
