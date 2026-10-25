@@ -21,6 +21,13 @@ from pathlib import Path, PurePosixPath
 E2E_DIR = "frontend/web/tests/e2e"
 WEB_DIR = "frontend/web"
 MAX_TARGETED_SPECS = 25
+# Every test in these files requires a live provider. Normal CI excludes
+# @ai-live; emitting a dedicated lane for either file produces no runnable
+# tests. Explicit E2E_REQUIRE_AI=1 acceptance still owns their execution.
+LIVE_PROVIDER_ONLY_SPECS = frozenset({
+    f"{E2E_DIR}/gov00-governed-execution.spec.ts",
+    f"{E2E_DIR}/ai-rag-evidence-access.spec.ts",
+})
 IMPORT_RE = re.compile(r"""(?:from|import)\s*\(?\s*["'](\.{1,2}/[^"']+)["']""")
 
 
@@ -96,10 +103,11 @@ def _relative_specs(specs: list[str]) -> str:
 
 def plan_targets(changed: list[str], sources: dict[str, str]) -> dict[str, str | list[dict[str, str]]]:
     """Keep the P0 fallback and supplement it with directly changed specs."""
-    specs = select_specs(changed, sources)
+    specs = [path for path in select_specs(changed, sources) if path not in LIVE_PROVIDER_ONLY_SPECS]
     fallback_configs: list[dict[str, str]] = []
     if len(specs) > MAX_TARGETED_SPECS:
-        explicit = sorted({path for path in changed if _is_spec(path) and path in sources})
+        explicit = sorted({path for path in changed if _is_spec(path) and path in sources
+                           and path not in LIVE_PROVIDER_ONLY_SPECS})
         for offset in range(0, len(explicit), MAX_TARGETED_SPECS):
             fallback_configs.append({
                 "suite": "targeted",

@@ -71,6 +71,10 @@ class E2eWorkflowPlanTests(unittest.TestCase):
                                     HEAD_REF="codex/base05-pretenant-integrated-certification"),
                            "full", "1", count=6)
 
+    def test_provider_only_edit_still_runs_all_three_p0_shards(self):
+        path = f"{E2E}/gov00-governed-execution.spec.ts"
+        self.assert_shards(self.plan_changed([path], {path: '// @ai-live\n'}), "p0", "0")
+
     def test_ordinary_unselected_pr_retains_p0(self):
         self.assert_shards(self.plan(), "p0", "0")
 

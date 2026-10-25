@@ -84,6 +84,20 @@ class TargetPlanTests(unittest.TestCase):
                                                      self.broad_sources()),
                                  {"specs": "", "count": "0", "fallback_configs": []})
 
+    def test_live_provider_only_edits_keep_p0_without_an_empty_targeted_lane(self):
+        for path in module.LIVE_PROVIDER_ONLY_SPECS:
+            with self.subTest(path=path):
+                sources = {**self.broad_sources(), path: '// @ai-live\n'}
+                for changed in ([path], [f"{E2E}/helpers-legacy.ts", path]):
+                    self.assertEqual(module.plan_targets(changed, sources),
+                                     {"specs": "", "count": "0", "fallback_configs": []})
+
+    def test_mixed_live_and_non_live_file_keeps_its_ordinary_coverage(self):
+        path = f"{E2E}/ai-human-review-provenance.spec.ts"
+        result = module.plan_targets([path], {path: '// @p0 and @ai-live cases\n'})
+        self.assertEqual(result, {"specs": "tests/e2e/ai-human-review-provenance.spec.ts",
+                                  "count": "1", "fallback_configs": []})
+
     def test_no_e2e_change_has_no_supplemental_batches(self):
         self.assertEqual(module.plan_targets(["docs/plan.md"], SOURCES),
                          {"specs": "", "count": "0", "fallback_configs": []})
