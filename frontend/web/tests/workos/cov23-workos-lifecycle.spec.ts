@@ -23,8 +23,9 @@ async function rows(page: Page, resource: string): Promise<Row[]> {
 async function openSettingsSection(page: Page, name: RegExp) {
   await page.goto("/settings")
   await expect(page.getByTestId("dashboard-sidebar")).toHaveCount(1, { timeout: 30_000 })
-  await page.getByRole("button", { name }).first().click()
-  await expect(page.getByRole("button", { name: /back to settings/i })).toBeVisible({ timeout: 30_000 })
+  const section = page.getByRole("button", { name }).first()
+  await section.click()
+  await expect(section).toHaveAttribute("aria-current", "page", { timeout: 30_000 })
 }
 
 test.describe("COV-23 WorkOS organization lifecycle", { tag: ["@cov23", "@workos"] }, () => {
@@ -53,7 +54,7 @@ test.describe("COV-23 WorkOS organization lifecycle", { tag: ["@cov23", "@workos
 
   test("settings expose the organization, user and role sections to the owner", async ({ page }) => {
     await openSettingsSection(page, /^Organization/i)
-    await expect(page.getByTestId("settings-admin-action-createCompany")).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId("form-submit-settings-company-create")).toBeVisible({ timeout: 30_000 })
     await openSettingsSection(page, /User Management/i)
     await expect(page.getByText(/Users \(1\)/)).toBeVisible({ timeout: 30_000 })
     await openSettingsSection(page, /Roles & Permissions/i)

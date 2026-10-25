@@ -2395,7 +2395,7 @@ export async function grantPermissionViaSettings(
   page: Page,
   options: { roleId: number; resource: string; action?: string },
 ) {
-  await gotoModule(page, "/settings")
+  await gotoModule(page, "/settings?section=advanced")
   await page.getByTestId("settings-admin-action-grantPermission").click()
   await expect(page.getByTestId("form-modal-settings-grant-permission")).toBeVisible()
   // subjectType defaults to Role in settings form config
@@ -2475,7 +2475,7 @@ export async function waitForOrgPermissionAbsent(
 }
 
 export async function revokePermissionViaSettings(page: Page, permissionId: number) {
-  await gotoModule(page, "/settings")
+  await gotoModule(page, "/settings?section=advanced")
   await page.getByTestId("settings-admin-action-revokePermission").click()
   await expect(page.getByTestId("form-modal-settings-revoke-permission")).toBeVisible()
   await fillField(page, "permissionId", String(permissionId))
