@@ -180,7 +180,8 @@ jobs:
     name: Build exact-commit E2E artifacts
     needs: scope
     if: needs.scope.outputs.run_e2e == 'true'
-    runs-on: ubuntu-latest
+    # Playwright 1.59 cannot install Chromium on ubuntu-latest (Ubuntu 26.04).
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     # Fingerprints and compilation must see the same build-time configuration.
     env:
@@ -423,7 +424,8 @@ jobs:
     name: Playwright smoke (${{ matrix.config.suite }}${{ matrix.config.shard && format(' {0}', matrix.config.shard) || matrix.config.slot && format(' {0}', matrix.config.slot) || '' }})
     needs: [scope, plan, build-e2e]
     if: needs.plan.result == 'success' && needs.build-e2e.result == 'success' && needs.scope.outputs.run_e2e == 'true'
-    runs-on: ubuntu-latest
+    # Playwright 1.59 cannot install Chromium on ubuntu-latest (Ubuntu 26.04).
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     services:
       postgres:
