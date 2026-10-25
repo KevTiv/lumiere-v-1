@@ -73,7 +73,7 @@ pub(super) async fn require_current_scope(
     let organization_sql =
         format!("SELECT id, is_active FROM organization WHERE id = {org} LIMIT 2");
     let company_sql = format!("SELECT id, organization_id, deleted_at FROM company WHERE organization_id = {org} AND id = {company} LIMIT 2");
-    let profile_sql = format!("SELECT identity, organization_id, is_active, is_superuser FROM user_profile WHERE organization_id = {org} AND identity = {identity} LIMIT 2");
+    let profile_sql = format!("SELECT identity, organization_id, is_active, is_superuser, metadata FROM user_profile WHERE organization_id = {org} AND identity = {identity} LIMIT 2");
     let membership_sql = format!("SELECT user_identity, organization_id, company_id, is_active FROM user_organization WHERE organization_id = {org} AND user_identity = {identity} AND is_active = true LIMIT 2");
     let (organizations, companies, profiles, memberships) = tokio::try_join!(
         owner.query_sql(&organization_sql),
@@ -141,6 +141,10 @@ fn current_scope_matches(
         || number(profile, "organizationId", "organization_id") != Some(org)
         || !identity_matches(profile, "identity", "identity", actor)
         || !active(profile)
+        || !stdb_auth::profile_bootstrap_lease_active(
+            profile,
+            chrono::Utc::now().timestamp_micros(),
+        )
         || cell(profile, "isSuperuser", "is_superuser").and_then(Value::as_bool)
             != Some(expected_superuser)
     {

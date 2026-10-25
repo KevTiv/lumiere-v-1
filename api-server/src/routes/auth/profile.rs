@@ -49,8 +49,8 @@ pub(super) async fn profile_get(
         "lastName": row.get::<_, Option<String>>("last_name"),
         "timezone": row.get::<_, String>("timezone"),
         "language": row.get::<_, String>("language"),
-        "isActive": row.get::<_, bool>("is_active"),
-        "isSuperuser": row.get::<_, bool>("is_superuser"),
+        "isActive": platform_control::profile_is_active(&row),
+        "isSuperuser": platform_control::profile_is_active(&row) && row.get::<_, bool>("is_superuser"),
     });
     Ok(Json(json!({ "data": profile })))
 }

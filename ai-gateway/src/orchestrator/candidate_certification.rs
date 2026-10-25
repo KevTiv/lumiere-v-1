@@ -507,6 +507,18 @@ mod tests {
         &mut request.environment.dataset[REPORT_ANALYSIS_RESOURCE]["data"]
     }
 
+    #[test]
+    fn proposed_manifest_and_dev_fixture_bind_the_current_report_bundle() {
+        let manifest: Value = serde_json::from_str(include_str!(
+            "../../../infra/railway/pilots/report-analysis-certification-manifest.proposed.json"
+        ))
+        .unwrap();
+        let bundle = report_analysis_certification_bundle_hash();
+        assert_eq!(manifest["source_hash"], bundle);
+        let seed = include_str!("../../../spacetimedb/src/seed.rs");
+        assert!(seed.contains(&format!("\"{bundle}\".to_string()")));
+    }
+
     #[tokio::test]
     async fn executes_the_shared_graph_and_releases_a_grounded_synthetic_claim() {
         let execution = execute_report_analysis(request()).await.unwrap();
@@ -642,6 +654,86 @@ mod tests {
         assert!(execution.actual_output["summary"].is_null());
     }
 
+    fn generated_report(probability: f64) -> CandidateExecutionRequest {
+        let mut request = request();
+        let fixture = data(&mut request);
+        fixture["decisions"][0]["response"]["probability"] = json!(probability);
+        fixture["decisions"][0]["response"]["confidence"] = json!(0.9);
+        let draft = fixture["reasoning"][0].clone();
+        fixture["reasoning"] = json!([]);
+        let format = if probability < 0.35 {
+            "concise factual analytics summary"
+        } else {
+            "concise report highlighting anomalies, material changes, and concrete follow-up questions"
+        };
+        let mut draft = draft;
+        draft.as_object_mut().unwrap().remove("outcome");
+        fixture["generations"] = json!([{
+            "format": format,
+            "response": {"content": serde_json::to_string(&draft).unwrap(),
+                "provider": "fixture", "model": "fixture", "input_tokens": 0, "output_tokens": 0}
+        }]);
+        request
+    }
+
+    #[tokio::test]
+    async fn both_generation_routes_release_structured_evidence_checked_prose() {
+        for probability in [0.1, 0.9] {
+            let execution = execute_report_analysis(generated_report(probability))
+                .await
+                .unwrap();
+            assert_eq!(execution.actual_output["status"], "completed");
+            assert_eq!(
+                execution.actual_output["summary"],
+                "This synthetic report has no overdue items."
+            );
+            let steps = execution.actual_output["steps"].as_array().unwrap();
+            assert_eq!(steps.last().unwrap()["kind"], "generate");
+            assert!(!execution.actual_output["summary"]
+                .as_str()
+                .unwrap()
+                .starts_with('{'));
+        }
+    }
+
+    #[tokio::test]
+    async fn generated_claims_still_need_independent_semantic_support() {
+        let mut request = generated_report(0.1);
+        data(&mut request)["decisions"][1]["response"]["choice"] = json!("unsupported");
+        let execution = execute_report_analysis(request).await.unwrap();
+        assert_ne!(execution.actual_output["status"], "completed");
+        assert!(execution.actual_output["summary"].is_null());
+    }
+
+    #[tokio::test]
+    async fn reports_cannot_cite_another_runs_observation_or_hide_unchecked_prose() {
+        for generated in [false, true] {
+            let mut request = if generated {
+                generated_report(0.1)
+            } else {
+                request()
+            };
+            data(&mut request)["analyticsOutput"]["data"]["artifacts"][0]["artifacts"] = json!({});
+            let error = execute_report_analysis(request).await.unwrap_err();
+            assert!(error.to_string().contains("outside this run"));
+        }
+        let mut request = generated_report(0.1);
+        let raw = data(&mut request)["generations"][0]["response"]["content"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let mut draft: Value = serde_json::from_str(&raw).unwrap();
+        draft["content"] =
+            json!("This synthetic report has no overdue items. Profits will double.");
+        data(&mut request)["generations"][0]["response"]["content"] =
+            json!(serde_json::to_string(&draft).unwrap());
+        assert!(execute_report_analysis(request)
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("complete answer"));
+    }
+
     #[tokio::test]
     async fn a_claimless_generation_is_held_for_review() {
         let mut claimless = request();
@@ -650,6 +742,7 @@ mod tests {
             .unwrap()
             .truncate(1);
         data(&mut claimless)["decisions"][0]["response"]["confidence"] = json!(0.9);
+        data(&mut claimless)["decisions"][0]["response"]["probability"] = json!(0.9);
         data(&mut claimless)["reasoning"] = json!([]);
         data(&mut claimless)["generations"] = json!([{
             "format": "concise report highlighting anomalies, material changes, and concrete follow-up questions",

@@ -33,8 +33,9 @@ pub use password_resets::{
     insert_password_reset_token,
 };
 pub use profiles::{
-    find_user_profile_by_platform_id, find_user_profile_by_stdb_identity, save_profile_patch,
-    sync_workos_email, update_user_email, update_user_profile, upsert_user_profile,
+    find_user_profile_by_platform_id, find_user_profile_by_stdb_identity, profile_is_active,
+    save_profile_patch, sync_workos_email, update_user_email, update_user_profile,
+    upsert_user_profile,
 };
 pub use schema::{
     ensure_schema, PLATFORM_CONTROL_DDL, PLATFORM_IDENTITY_LIFECYCLE_DDL,

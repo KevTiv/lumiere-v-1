@@ -1852,15 +1852,16 @@ impl GovernedProgramExecutor<'_> {
                                 &evidence_overlays,
                             ),
                             format: generate.format.clone(),
-                            instructions: context.generation_instructions.clone(),
+                            instructions: report_generation_instructions(context),
                             max_tokens: context.generation_max_tokens,
                         })
                         .await?;
-                    let draft = FinalDraft {
-                        content: response.content.clone(),
-                        citations: evidence_for_node(&node, &values, &context.evidence),
-                        ..Default::default()
-                    };
+                    let draft = generated_draft(
+                        context,
+                        &response.content,
+                        evidence_for_node(&node, &values, &context.evidence),
+                    )?;
+                    validate_report_support(context, &draft, &values)?;
                     let known_evidence = known_evidence_for_run(context, &values);
                     let data_figures = data_figures_for_run(&values);
                     let report = self
@@ -1875,10 +1876,10 @@ impl GovernedProgramExecutor<'_> {
                         .await?;
                     let admitted = match report.outcome {
                         AnswerAdmissionOutcome::Admitted => {
-                            Ok((response.content.clone(), "generated answer admitted"))
+                            Ok((draft.content.clone(), "generated answer admitted"))
                         }
                         AnswerAdmissionOutcome::Qualified { limitations } => Ok((
-                            qualified_content(&response.content, &limitations),
+                            qualified_content(&draft.content, &limitations),
                             "generated answer admitted with limitations",
                         )),
                         AnswerAdmissionOutcome::RequiresReview { reason } => {
@@ -1964,7 +1965,7 @@ impl GovernedProgramExecutor<'_> {
                         Err(reason) => {
                             let mut review = outcome(
                                 GovernedProgramStop::ReviewRequired(reason),
-                                Some(response.content.clone()),
+                                Some(draft.content.clone()),
                                 values,
                                 trace,
                                 decision_calls,
@@ -2168,6 +2169,7 @@ impl GovernedProgramExecutor<'_> {
                             ));
                         }
                         ReasoningOutcome::FinalDraft(draft) => {
+                            validate_report_support(context, &draft, &values)?;
                             let known_evidence = known_evidence_for_run(context, &values);
                             let data_figures = data_figures_for_run(&values);
                             let report = self
@@ -2772,11 +2774,24 @@ impl GovernedProgramExecutor<'_> {
                     policy,
                     calibration_profile,
                     on,
+                }
+                | GateCondition::ProbabilityThresholdPolicy {
+                    policy,
+                    calibration_profile,
+                    on,
                 } => {
-                    // No confidence signal at all: this branch cannot
+                    // No selected signal at all: this branch cannot
                     // match — try the remaining branches rather than
                     // failing the whole gate.
-                    let Some(raw) = decision.confidence else {
+                    let signal = if matches!(
+                        branch.condition,
+                        GateCondition::ProbabilityThresholdPolicy { .. }
+                    ) {
+                        decision.probability
+                    } else {
+                        decision.confidence
+                    };
+                    let Some(raw) = signal else {
                         continue;
                     };
                     let mut confidence = Confidence::Raw(raw);
@@ -2826,6 +2841,106 @@ fn decision_value(response: &DecisionResponse) -> Result<Value> {
 fn json_fingerprint(value: &Value) -> Result<String> {
     let encoded = serde_json::to_vec(value)?;
     Ok(format!("{:x}", Sha256::digest(encoded)))
+}
+
+fn report_generation_instructions(context: &GovernedProgramContext) -> Option<String> {
+    if context.program_ref != super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF {
+        return context.generation_instructions.clone();
+    }
+    let schema = r#"Return only a JSON FinalDraft, without Markdown fences:
+{"content":"...","citations":[],"claims":[{"text":"...","supports":[{"kind":"analytics_snapshot","id":"copy from evidencePassage","source_version":"copy exactly","passage_key":"result"}]}],"calculations":[]}.
+Use only the server-recorded observations in the analytics result (artifacts[].artifacts.evidencePassage). Copy their
+citation identity exactly. State at most eight claims. Their text, in order,
+must cover all content (apart from whitespace). Every claim must be supported
+by the cited observation. Describe bounded snapshot results, including empty
+results, without asserting that they describe all records or current future state.
+Do not invent causes, trends, currencies, or comparisons. Each stated calculation
+must include its operation, operands, label, and claimed_result."#;
+    Some(match &context.generation_instructions {
+        Some(existing) => format!("{existing}\n{schema}"),
+        None => schema.to_string(),
+    })
+}
+
+fn generated_draft(
+    context: &GovernedProgramContext,
+    content: &str,
+    citations: Vec<EvidenceRef>,
+) -> Result<FinalDraft> {
+    if context.program_ref != super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF {
+        return Ok(FinalDraft {
+            content: content.to_string(),
+            citations,
+            ..Default::default()
+        });
+    }
+    let Ok(mut draft) = serde_json::from_str::<FinalDraft>(content) else {
+        // Older providers may still return prose. It cannot acquire claims or
+        // citations by co-occurrence; the unchanged answer gate holds it.
+        return Ok(FinalDraft {
+            content: content.to_string(),
+            citations,
+            ..Default::default()
+        });
+    };
+    draft.validate()?;
+    for citation in citations {
+        if !draft.citations.contains(&citation) {
+            draft.citations.push(citation);
+        }
+    }
+    Ok(draft)
+}
+
+/// A report can cite only the observations returned by its own analytics node.
+/// The catalog still resolves status, text/hash and scope independently.
+fn validate_report_support(
+    context: &GovernedProgramContext,
+    draft: &FinalDraft,
+    values: &HashMap<String, NodeValue>,
+) -> Result<()> {
+    if context.program_ref != super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF
+        || draft.claims.is_empty()
+    {
+        return Ok(());
+    }
+    let normalized_content = draft
+        .content
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let normalized_claims = draft
+        .claims
+        .iter()
+        .flat_map(|claim| claim.text.split_whitespace())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if draft.claims.len() > 8 || normalized_content != normalized_claims {
+        bail!("report claims must cover the complete answer in order, with at most eight claims");
+    }
+    let passages = match values.get("analytics") {
+        Some(NodeValue::Tool(output)) => output.data.get("artifacts").and_then(Value::as_array),
+        _ => None,
+    };
+    for support in draft.claims.iter().flat_map(|claim| &claim.supports) {
+        let bound = passages.is_some_and(|passages| {
+            passages
+                .iter()
+                .filter_map(|artifact| artifact.get("artifacts")?.get("evidencePassage"))
+                .any(|passage| {
+                    passage.get("kind").and_then(Value::as_str) == Some(support.kind.as_str())
+                        && passage.get("id").and_then(Value::as_str) == Some(support.id.as_str())
+                        && passage.get("source_version").and_then(Value::as_str)
+                            == Some(support.source_version.as_str())
+                        && passage.get("passage_key").and_then(Value::as_str)
+                            == Some(support.passage_key.as_str())
+                })
+        });
+        if !bound {
+            bail!("report cites a passage outside this run's analytics observations");
+        }
+    }
+    Ok(())
 }
 
 fn evidence_for_node(

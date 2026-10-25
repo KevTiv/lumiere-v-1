@@ -29,6 +29,31 @@ pin; the PR records those results. Service configuration, worker certification
 and promotion, real-provider settled-spend acceptance and deployed-alpha
 acceptance remain release gates.
 
+## Alpha report and operator lease closure on 2026-10-25
+
+The alpha follow-up records each report analytics operation as an immutable,
+run-scoped `analytics_snapshot` passage with the exact bounded result, including
+empty results. Evidence metadata stays inside the existing privacy-filtered
+artifact envelope. Both generated and reasoned answers must cover their complete
+content with claims that select only their own run's observations. The existing
+catalog, arithmetic, figure and independent semantic review checks still decide
+admission; plain prose remains held for review. Report routing calibrates the
+estimated attention probability separately from the confidence used by decision
+admission.
+
+The approved temporary operator lease is enforced in shared policy, native
+profile resolution, API field access, admin checks, WorkOS session binding and
+workflow realtime scope checks. Expired authority is rejected even if cleanup
+has not run. These changes do not grant production access. The approved bootstrap
+window has not started.
+
+Local validation: the complete gateway suite passed 742 tests (eight existing
+ignored tests); shared policy/auth suites passed 7 and 83 tests. API and module/tests compile checks and all 24 provisioning/preflight Node tests passed. The expired-operator reducer regression is included in disposable E2E setup. Hosted final-head
+CI, deployed worker certification, independent skill promotion, provisioning and
+live Mistral/GOV00 acceptance remain separate gates. Railway inspection in Dia
+still found no source attached to the offline AI gateway; its Mistral key and
+pilot manifest variable names are present. No live provider request was made.
+
 ## Historical local convergence on 2026-10-24
 
 The isolated `codex/harness-gap-closure` branch combines #135, #136, #193,

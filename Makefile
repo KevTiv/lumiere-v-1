@@ -79,6 +79,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	run_accounting_payment_management_test \
 	run_core_operational_messaging_test \
 	run_core_sod_test \
+	run_core_permissions_test \
 	run_queue_foundation_tests \
 	run_tenant_isolation_tests \
 	run_country_pack_test \

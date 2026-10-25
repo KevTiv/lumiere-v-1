@@ -49,7 +49,9 @@ async fn require_superuser(
         .ok_or(ApiError::Unauthorized)?;
 
     let id = normalize_identity_hex_for_sql(&session.identity_hex);
-    let sql = format!("SELECT is_superuser FROM user_profile WHERE identity = 0x{id}");
+    let sql = format!(
+        "SELECT is_active, is_superuser, metadata FROM user_profile WHERE identity = 0x{id}"
+    );
     let client = state.client_with_token(&session.stdb_token);
     let rows = client.query_sql(&sql).await.map_err(ApiError::internal)?;
     let is_superuser = rows
@@ -57,7 +59,19 @@ async fn require_superuser(
         .and_then(|r| r.get("isSuperuser").or_else(|| r.get("is_superuser")))
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
-    if !is_superuser {
+    if !is_superuser
+        || !rows.first().is_some_and(|profile| {
+            profile
+                .get("isActive")
+                .or_else(|| profile.get("is_active"))
+                .and_then(serde_json::Value::as_bool)
+                == Some(true)
+                && stdb_auth::profile_bootstrap_lease_active(
+                    profile,
+                    chrono::Utc::now().timestamp_micros(),
+                )
+        })
+    {
         return Err(ApiError::Forbidden("Superuser required".into()));
     }
     Ok(SuperuserSession { session })
