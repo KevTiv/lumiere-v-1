@@ -65,7 +65,7 @@ async function uploadInvoiceLogo(file: File, companyId: string | null): Promise<
   if (companyId !== null && (!/^[1-9]\d*$/.test(companyId) || !Number.isSafeInteger(Number(companyId)))) {
     throw new Error("This company identifier cannot be safely used for logo upload")
   }
-  const uploaded = await uploadDocumentBlob({ file, companyId: companyId === null ? undefined : BigInt(companyId) })
+  const uploaded = await uploadDocumentBlob({ file, companyId: companyId === null ? undefined : BigInt(companyId), purpose: "branding" })
   return `${uploaded.url}?sha256=${uploaded.checksum}`
 }
 

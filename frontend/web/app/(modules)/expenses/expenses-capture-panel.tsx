@@ -187,7 +187,7 @@ export function ExpensesCapturePanel({
               "Unable to confirm the receipt",
             ),
           upload: (file, scopeCompanyId) =>
-            uploadDocumentBlob({ file, companyId: scopeCompanyId }),
+            uploadDocumentBlob({ file, companyId: scopeCompanyId, purpose: "expense_receipt" }),
           register: (params) => createExpenseReceiptAndResolveId(orgId, params),
           create: (params) => createExpense.mutateAsync(params),
           save: (next) => {

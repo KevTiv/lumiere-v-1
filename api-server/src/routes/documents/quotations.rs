@@ -180,21 +180,15 @@ pub(super) async fn generate(
             "quotation provenance exceeds the supported snapshot size".into(),
         ));
     }
-    let root = state.config.document_blob_dir.clone();
-    let stored_name = file_name.clone();
-    let actor_identity = session.identity_hex.clone();
-    let blob = tokio::task::spawn_blocking(move || {
-        store_generated_pdf(
-            &root,
-            org_id,
-            company_id,
-            &actor_identity,
-            &stored_name,
-            &pdf,
-        )
-    })
-    .await
-    .map_err(ApiError::internal)??;
+    let blob = store_generated_pdf(
+        &state.config.document_blob_store,
+        org_id,
+        company_id,
+        &session.identity_hex,
+        &file_name,
+        &pdf,
+    )
+    .await?;
     let params = document_registration_params(
         order_id,
         parse_id(&current.data.partner_id)?,
@@ -377,13 +371,13 @@ async fn prepare(
         ));
     }
     let logo_uri = if let Some(url) = &template.logo_url {
-        let root = state.config.document_blob_dir.clone();
-        let url = url.clone();
-        let logo = tokio::task::spawn_blocking(move || {
-            read_completed_branding_blob(&root, org_id, company_id, &url)
-        })
-        .await
-        .map_err(ApiError::internal)??;
+        let logo = read_completed_branding_blob(
+            &state.config.document_blob_store,
+            org_id,
+            company_id,
+            url,
+        )
+        .await?;
         Some(format!(
             "data:{};base64,{}",
             logo.content_type,

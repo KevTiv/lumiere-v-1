@@ -1,15 +1,15 @@
-//! Local object-store boundary for DMS uploads (Wave A).
+//! Private local/S3 object-store boundary for managed DMS uploads.
 //!
 //! Flow: presign → PUT bytes → complete (size + sha-256 verify) → register via reducer.
-//! Swap the disk backend for S3/R2 later without changing reducer contracts.
+//! Stable managed URLs keep storage credentials and object keys behind authorization.
 
-use std::fs;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
+#[cfg(test)]
+use std::{fs, path::PathBuf};
 
 use axum::body::Bytes;
-use axum::extract::{Path as AxumPath, Query, State};
+use axum::extract::{DefaultBodyLimit, Path as AxumPath, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
@@ -19,16 +19,31 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tower_cookies::Cookies;
 
+use crate::document_blob_store::{self as storage, DocumentBlobStoreConfig};
 use crate::error::ApiError;
 use crate::evidence_ingestion::{configured_network_hosts, validate_network_url};
 use crate::query_exec::{execute_resource_query_for_company, resolve_membership_company_id};
+use crate::session::ApiSession;
 use crate::state::AppState;
 use crate::trusted_context::TrustedOperationContext;
 use crate::web_session::{require_org, resolve_session, OrgSession};
 
 #[path = "document_blob_access.rs"]
 mod generated_access;
-use generated_access::{generated_pdf_is_visible, GeneratedBlobScope};
+use generated_access::{
+    branding_blob_is_visible, document_blob_is_visible, expense_receipt_blob_is_visible,
+    DocumentBlobScope,
+};
+
+#[path = "document_blob_policy.rs"]
+mod upload_policy;
+use upload_policy::{
+    creator_matches, require_upload_permission, validate_upload_purpose, BlobPurpose,
+};
+
+#[cfg(test)]
+#[path = "document_blob_route_tests.rs"]
+mod route_tests;
 
 const MAX_UPLOAD_BYTES: u64 = 50 * 1024 * 1024; // 50 MiB pilot cap
 
@@ -45,7 +60,12 @@ struct BlobMeta {
     residency: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     source_url: Option<String>,
-    /// Set only by the server PDF writer; uploaded assets keep their existing access policy.
+    /// Set from the authenticated session, never supplied by a reservation caller.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    created_by: Option<String>,
+    #[serde(default)]
+    purpose: BlobPurpose,
+    /// Kept for compatibility with already archived server-generated output.
     #[serde(default)]
     generated_pdf: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -55,8 +75,20 @@ struct BlobMeta {
     actual_checksum: Option<String>,
 }
 
+impl BlobMeta {
+    fn creator_identity(&self) -> Option<&str> {
+        self.created_by.as_deref().or_else(|| {
+            if self.generated_pdf {
+                self.generated_by.as_deref()
+            } else {
+                None
+            }
+        })
+    }
+}
+
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct PresignBody {
     file_name: String,
     content_type: String,
@@ -64,8 +96,10 @@ struct PresignBody {
     company_id: Option<u64>,
     /// Optional client-computed sha-256 hex; verified on complete when present.
     checksum: Option<String>,
-    /// Optional residency tag (e.g. au, sg) — selects subdirectory only in Wave A.
+    /// Logical namespace only. The configured bucket determines physical residency.
     residency: Option<String>,
+    #[serde(default)]
+    purpose: BlobPurpose,
 }
 
 #[derive(Debug, Serialize)]
@@ -112,7 +146,7 @@ pub fn blob_router() -> Router<Arc<AppState>> {
         .route("/documents/blobs/presign", post(presign))
         .route(
             "/documents/blobs/upload/:organization_id/:residency/:object_id",
-            put(upload),
+            put(upload).layer(DefaultBodyLimit::max(MAX_UPLOAD_BYTES as usize)),
         )
         .route("/documents/blobs/complete", post(complete))
         .route("/documents/blobs/import-network", post(import_network))
@@ -138,6 +172,12 @@ async fn import_network(
     }: OrgSession,
     Json(body): Json<NetworkImportBody>,
 ) -> Result<Json<CompleteResponse>, ApiError> {
+    require_upload_permission(
+        session.field_access.as_ref(),
+        organization_id,
+        &session.identity_hex,
+        BlobPurpose::Document,
+    )?;
     if body.company_id == 0 {
         return Err(ApiError::BadRequest("companyId must be positive".into()));
     }
@@ -217,18 +257,12 @@ async fn import_network(
     rand::thread_rng().fill_bytes(&mut id_bytes);
     let object_id = hex::encode(id_bytes);
     let object_key = format!("org-{organization_id}/{residency}/{object_id}");
-    let (bin_path, meta_path) = object_paths(
-        &state.config.document_blob_dir,
-        organization_id,
-        &object_id,
-        &residency,
-    );
-    if let Some(parent) = bin_path.parent() {
-        fs::create_dir_all(parent).map_err(ApiError::internal)?;
-    }
-    fs::write(&bin_path, &bytes).map_err(ApiError::internal)?;
+    let store = &state.config.document_blob_store;
+    let (bin_path, meta_path) = object_keys(organization_id, &object_id, &residency);
+    storage::put_immutable(store, &bin_path, &bytes, &content_type).await?;
     let checksum = hex::encode(Sha256::digest(&bytes));
-    write_meta(
+    create_meta(
+        store,
         &meta_path,
         &BlobMeta {
             organization_id,
@@ -240,13 +274,16 @@ async fn import_network(
             expected_checksum: Some(checksum.clone()),
             residency: Some(residency.clone()),
             source_url: Some(source_url.to_string()),
+            created_by: Some(session.identity_hex.clone()),
+            purpose: BlobPurpose::Document,
             generated_pdf: false,
             generated_by: None,
             completed: true,
             actual_size: Some(bytes.len() as u64),
             actual_checksum: Some(checksum.clone()),
         },
-    )?;
+    )
+    .await?;
     Ok(Json(CompleteResponse {
         url: format!("/api/documents/blobs/object/{organization_id}/{residency}/{object_id}"),
         object_key,
@@ -298,16 +335,20 @@ fn residency_segment(residency: Option<&str>) -> String {
     }
 }
 
+fn object_keys(organization_id: u64, object_id: &str, residency: &str) -> (String, String) {
+    let key = format!("org-{organization_id}/{residency}/{object_id}");
+    (format!("{key}.bin"), format!("{key}.meta.json"))
+}
+
+#[cfg(test)]
 fn object_paths(
     root: &Path,
     organization_id: u64,
     object_id: &str,
     residency: &str,
 ) -> (PathBuf, PathBuf) {
-    let dir = root.join(format!("org-{organization_id}")).join(residency);
-    let bin = dir.join(format!("{object_id}.bin"));
-    let meta = dir.join(format!("{object_id}.meta.json"));
-    (bin, meta)
+    let (binary, metadata) = object_keys(organization_id, object_id, residency);
+    (root.join(binary), root.join(metadata))
 }
 
 fn parse_object_key(object_key: &str) -> Result<(u64, String, String), ApiError> {
@@ -371,8 +412,8 @@ pub(crate) struct GeneratedPdfBlob {
 
 /// Write a new, company-owned object without an upload URL that could replace it.
 /// Callers register the result through the canonical `create_document` operation.
-pub(crate) fn store_generated_pdf(
-    root: &Path,
+pub(crate) async fn store_generated_pdf(
+    store: &DocumentBlobStoreConfig,
     organization_id: u64,
     company_id: u64,
     actor_identity: &str,
@@ -394,18 +435,8 @@ pub(crate) fn store_generated_pdf(
     rand::thread_rng().fill_bytes(&mut id_bytes);
     let object_id = hex::encode(id_bytes);
     let residency = "generated";
-    let (bin_path, meta_path) = object_paths(root, organization_id, &object_id, residency);
-    let parent = bin_path
-        .parent()
-        .ok_or_else(|| ApiError::Internal("generated blob path has no parent".into()))?;
-    fs::create_dir_all(parent).map_err(ApiError::internal)?;
-    let mut binary = fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&bin_path)
-        .map_err(ApiError::internal)?;
-    binary.write_all(bytes).map_err(ApiError::internal)?;
-    binary.sync_all().map_err(ApiError::internal)?;
+    let (bin_path, meta_path) = object_keys(organization_id, &object_id, residency);
+    storage::put_immutable(store, &bin_path, bytes, "application/pdf").await?;
     let checksum = hex::encode(Sha256::digest(bytes));
     let meta = BlobMeta {
         organization_id,
@@ -417,21 +448,15 @@ pub(crate) fn store_generated_pdf(
         expected_checksum: Some(checksum.clone()),
         residency: Some(residency.into()),
         source_url: None,
+        created_by: Some(generated_by.clone()),
+        purpose: BlobPurpose::Document,
         generated_pdf: true,
         generated_by: Some(generated_by),
         completed: true,
         actual_size: Some(bytes.len() as u64),
         actual_checksum: Some(checksum.clone()),
     };
-    let mut metadata = fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&meta_path)
-        .map_err(ApiError::internal)?;
-    metadata
-        .write_all(&serde_json::to_vec(&meta).map_err(ApiError::internal)?)
-        .map_err(ApiError::internal)?;
-    metadata.sync_all().map_err(ApiError::internal)?;
+    create_meta(store, &meta_path, &meta).await?;
     Ok(GeneratedPdfBlob {
         url: format!("/api/documents/blobs/object/{organization_id}/{residency}/{object_id}"),
         checksum,
@@ -439,39 +464,86 @@ pub(crate) fn store_generated_pdf(
     })
 }
 
-pub(crate) fn read_completed_blob(
-    root: &Path,
+/// Apply the current download policy before private bytes reach extraction or OCR.
+pub(crate) async fn read_authorized_document_blob(
+    state: &AppState,
+    session: &ApiSession,
+    expected_company_id: u64,
+    document_id: u64,
+    object_url: &str,
+) -> Result<CompletedBlob, ApiError> {
+    let organization_id = require_org(session)?;
+    let key = completed_blob_key(object_url)?;
+    let (key_organization_id, residency, object_id) = parse_object_key(&key)?;
+    if key_organization_id != organization_id {
+        return Err(ApiError::NotFound("document blob not found".into()));
+    }
+    let store = &state.config.document_blob_store;
+    let (bin_path, meta_path) = object_keys(organization_id, &object_id, &residency);
+    let meta = read_meta(store, &meta_path).await?;
+    if !meta.completed
+        || meta.organization_id != organization_id
+        || meta.company_id != Some(expected_company_id)
+        || meta.object_key != key
+        || meta.purpose != BlobPurpose::Document
+    {
+        return Err(ApiError::NotFound("document blob not found".into()));
+    }
+    require_blob_company(state, session, meta.company_id).await?;
+    require_blob_read(state, session, &meta, object_url, None, Some(document_id)).await?;
+    let bytes = storage::read(store, &bin_path, MAX_UPLOAD_BYTES)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("blob bytes not found".into()))?;
+    let checksum = meta
+        .actual_checksum
+        .as_deref()
+        .ok_or_else(|| ApiError::NotFound("blob checksum is unavailable".into()))?;
+    verify_pinned_download(&meta, &bytes, organization_id, checksum)?;
+    Ok(CompletedBlob {
+        object_key: meta.object_key,
+        content_type: meta.content_type,
+        checksum: checksum.to_owned(),
+        source_url: meta.source_url,
+        bytes,
+    })
+}
+
+#[cfg(test)]
+async fn read_completed_blob(
+    store: &DocumentBlobStoreConfig,
     expected_organization_id: u64,
     expected_company_id: u64,
     object_url: &str,
 ) -> Result<CompletedBlob, ApiError> {
     read_completed_scoped_blob(
-        root,
+        store,
         expected_organization_id,
         expected_company_id,
         object_url,
         false,
         None,
     )
+    .await
 }
 
 /// Branding may use an organization logo or the invoice's exact company logo.
 /// This exception does not change the stricter company-owned evidence boundary.
-pub(crate) fn read_completed_branding_blob(
-    root: &Path,
+pub(crate) async fn read_completed_branding_blob(
+    store: &DocumentBlobStoreConfig,
     expected_organization_id: u64,
     expected_company_id: u64,
     object_url: &str,
 ) -> Result<CompletedBlob, ApiError> {
     let (object_url, expected_checksum) = pinned_branding_reference(object_url)?;
     let blob = read_completed_scoped_blob(
-        root,
+        store,
         expected_organization_id,
         expected_company_id,
         object_url,
         true,
         Some(2 * 1024 * 1024),
-    )?;
+    )
+    .await?;
     if blob.checksum != expected_checksum {
         return Err(ApiError::Conflict(
             "pinned invoice logo content has changed".into(),
@@ -516,8 +588,8 @@ fn completed_blob_key(object_url: &str) -> Result<String, ApiError> {
     })
 }
 
-fn read_completed_scoped_blob(
-    root: &Path,
+async fn read_completed_scoped_blob(
+    store: &DocumentBlobStoreConfig,
     expected_organization_id: u64,
     expected_company_id: u64,
     object_url: &str,
@@ -529,27 +601,43 @@ fn read_completed_scoped_blob(
     if organization_id != expected_organization_id {
         return Err(ApiError::Forbidden("organization mismatch".into()));
     }
-    let (bin_path, meta_path) = object_paths(root, organization_id, &object_id, &residency);
-    let meta = read_meta(&meta_path)?;
+    let (bin_path, meta_path) = object_keys(organization_id, &object_id, &residency);
+    let meta = read_meta(store, &meta_path).await?;
     let company_allowed = meta.company_id == Some(expected_company_id)
         || (allow_organization_owned && meta.company_id.is_none());
-    if !meta.completed || meta.organization_id != expected_organization_id || !company_allowed {
+    if !meta.completed
+        || meta.organization_id != expected_organization_id
+        || meta.object_key != key
+        || !company_allowed
+    {
         return Err(ApiError::NotFound(
             "completed company blob not found".into(),
         ));
     }
+    // A confidential image uploaded as a document cannot be reused as a logo to
+    // bypass the document reader through a template or generated invoice.
+    if allow_organization_owned
+        && (meta.purpose != BlobPurpose::Branding
+            || meta
+                .creator_identity()
+                .and_then(|identity| stdb_auth::identity_sql_literal(identity).ok())
+                .is_none())
+    {
+        return Err(ApiError::NotFound("branding asset not found".into()));
+    }
     if let Some(limit) = max_bytes {
-        let size = fs::metadata(&bin_path)
-            .map_err(|_| ApiError::NotFound("blob bytes not found".into()))?
-            .len();
+        let size = storage::size(store, &bin_path)
+            .await?
+            .ok_or_else(|| ApiError::NotFound("blob bytes not found".into()))?;
         if size == 0 || size > limit {
             return Err(ApiError::Unprocessable(
                 "invoice logo must be at most 2 MiB".into(),
             ));
         }
     }
-    let bytes =
-        fs::read(&bin_path).map_err(|_| ApiError::NotFound("blob bytes not found".into()))?;
+    let bytes = storage::read(store, &bin_path, max_bytes.unwrap_or(MAX_UPLOAD_BYTES))
+        .await?
+        .ok_or_else(|| ApiError::NotFound("blob bytes not found".into()))?;
     if max_bytes.is_some_and(|limit| bytes.is_empty() || bytes.len() as u64 > limit) {
         return Err(ApiError::Unprocessable(
             "invoice logo must be at most 2 MiB".into(),
@@ -651,20 +739,78 @@ fn jpeg_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
     None
 }
 
-fn read_meta(path: &Path) -> Result<BlobMeta, ApiError> {
-    let bytes = fs::read(path).map_err(|e| ApiError::NotFound(format!("blob meta: {e}")))?;
+async fn read_meta(store: &DocumentBlobStoreConfig, key: &str) -> Result<BlobMeta, ApiError> {
+    let bytes = storage::read(store, key, 256 * 1024)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("blob metadata not found".into()))?;
     serde_json::from_slice(&bytes)
-        .map_err(|e| ApiError::Internal(format!("corrupt blob meta: {e}")))
+        .map_err(|e| ApiError::Internal(format!("corrupt blob metadata: {e}")))
 }
 
-fn write_meta(path: &Path, meta: &BlobMeta) -> Result<(), ApiError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(ApiError::internal)?;
-    }
+async fn create_meta(
+    store: &DocumentBlobStoreConfig,
+    key: &str,
+    meta: &BlobMeta,
+) -> Result<(), ApiError> {
     let json = serde_json::to_vec_pretty(meta).map_err(ApiError::internal)?;
-    let mut f = fs::File::create(path).map_err(ApiError::internal)?;
-    f.write_all(&json).map_err(ApiError::internal)?;
+    storage::put_immutable(store, key, &json, "application/json").await
+}
+
+async fn write_meta(
+    store: &DocumentBlobStoreConfig,
+    key: &str,
+    meta: &BlobMeta,
+) -> Result<(), ApiError> {
+    let json = serde_json::to_vec_pretty(meta).map_err(ApiError::internal)?;
+    storage::write_metadata(store, key, &json).await
+}
+
+async fn require_blob_company(
+    state: &AppState,
+    session: &ApiSession,
+    company_id: Option<u64>,
+) -> Result<(), ApiError> {
+    let trusted = TrustedOperationContext::for_resource_read(state, session)?;
+    if let Some(company_id) = company_id {
+        resolve_membership_company_id(
+            trusted.client(),
+            trusted.organization_id(),
+            trusted.actor_identity(),
+            Some(company_id),
+            "document blob company scope mismatch",
+        )
+        .await?;
+    }
     Ok(())
+}
+
+async fn require_blob_upload(
+    state: &AppState,
+    session: &ApiSession,
+    meta: &BlobMeta,
+    object_key: &str,
+) -> Result<(), ApiError> {
+    let organization_id = require_org(session)?;
+    if meta.organization_id != organization_id
+        || meta.object_key != object_key
+        || !creator_matches(meta.creator_identity(), &session.identity_hex)
+        || meta.generated_pdf
+    {
+        return Err(ApiError::NotFound("upload reservation not found".into()));
+    }
+    require_upload_permission(
+        session.field_access.as_ref(),
+        organization_id,
+        &session.identity_hex,
+        meta.purpose,
+    )?;
+    validate_upload_purpose(
+        meta.purpose,
+        &meta.content_type,
+        meta.expected_size,
+        meta.company_id,
+    )?;
+    require_blob_company(state, session, meta.company_id).await
 }
 
 async fn presign(
@@ -689,6 +835,19 @@ async fn presign(
     if body.content_type.trim().is_empty() {
         return Err(ApiError::Unprocessable("content_type is required".into()));
     }
+    require_upload_permission(
+        session.field_access.as_ref(),
+        org_id,
+        &session.identity_hex,
+        body.purpose,
+    )?;
+    validate_upload_purpose(
+        body.purpose,
+        body.content_type.trim(),
+        body.content_length,
+        body.company_id,
+    )?;
+    require_blob_company(&state, &session, body.company_id).await?;
     let expected_checksum = match body.checksum.as_deref() {
         Some(c) if !c.trim().is_empty() => Some(normalize_checksum(c)?),
         _ => None,
@@ -701,12 +860,7 @@ async fn presign(
     let object_key = format!("org-{org_id}/{residency}/{object_id}");
     let file_name = sanitize_file_name(&body.file_name);
 
-    let (_, meta_path) = object_paths(
-        &state.config.document_blob_dir,
-        org_id,
-        &object_id,
-        &residency,
-    );
+    let (_, meta_path) = object_keys(org_id, &object_id, &residency);
     let meta = BlobMeta {
         organization_id: org_id,
         company_id: body.company_id,
@@ -717,13 +871,15 @@ async fn presign(
         expected_checksum,
         residency: Some(residency.clone()),
         source_url: None,
+        created_by: Some(session.identity_hex.clone()),
+        purpose: body.purpose,
         generated_pdf: false,
         generated_by: None,
         completed: false,
         actual_size: None,
         actual_checksum: None,
     };
-    write_meta(&meta_path, &meta)?;
+    create_meta(&state.config.document_blob_store, &meta_path, &meta).await?;
 
     // Same-origin `/api/...` paths so Next BFF can forward cookies to api-server `/v1/...`.
     let upload_url = format!("/api/documents/blobs/upload/{org_id}/{residency}/{object_id}");
@@ -758,23 +914,15 @@ async fn upload(
         return Err(ApiError::Forbidden("organization mismatch".into()));
     }
 
-    let residency = residency_segment(Some(&path.residency));
-    let (bin_path, meta_path) = object_paths(
-        &state.config.document_blob_dir,
-        path.organization_id,
-        &path.object_id,
-        &residency,
-    );
-    if !meta_path.exists() {
-        return Err(ApiError::NotFound(
-            "upload slot not found — call presign first".into(),
-        ));
-    }
-
-    let mut meta = read_meta(&meta_path)?;
-    if meta.organization_id != org_id {
-        return Err(ApiError::Forbidden("organization mismatch".into()));
-    }
+    let (_, residency, object_id) = parse_object_key(&format!(
+        "org-{}/{}/{}",
+        path.organization_id, path.residency, path.object_id,
+    ))?;
+    let store = &state.config.document_blob_store;
+    let (bin_path, meta_path) = object_keys(path.organization_id, &object_id, &residency);
+    let meta = read_meta(store, &meta_path).await?;
+    let object_key = format!("org-{org_id}/{residency}/{object_id}");
+    require_blob_upload(&state, &session, &meta, &object_key).await?;
     if meta.completed {
         return Err(ApiError::Unprocessable("blob already completed".into()));
     }
@@ -795,28 +943,24 @@ async fn upload(
         )));
     }
 
-    if let Some(parent) = bin_path.parent() {
-        fs::create_dir_all(parent).map_err(ApiError::internal)?;
-    }
-    fs::write(&bin_path, &body).map_err(ApiError::internal)?;
-
     let mut hasher = Sha256::new();
     hasher.update(&body);
     let digest = hex::encode(hasher.finalize());
 
     if let Some(expected) = meta.expected_checksum.as_ref() {
         if expected != &digest {
-            let _ = fs::remove_file(&bin_path);
             return Err(ApiError::Unprocessable(
                 "uploaded bytes checksum mismatch vs presign checksum".into(),
             ));
         }
     }
+    if meta.purpose == BlobPurpose::Branding {
+        validate_branding_raster(&meta.content_type, &body)?;
+    }
 
-    meta.actual_size = Some(len);
-    meta.actual_checksum = Some(digest);
-    write_meta(&meta_path, &meta)?;
-
+    // Reserve bytes exactly once. Completion alone advances metadata, so a
+    // concurrent/late upload cannot reset an already completed slot.
+    storage::put_immutable(store, &bin_path, &body, &meta.content_type).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -836,26 +980,26 @@ async fn complete(
         return Err(ApiError::Forbidden("organization mismatch".into()));
     }
 
-    let (bin_path, meta_path) = object_paths(
-        &state.config.document_blob_dir,
-        organization_id,
-        &object_id,
-        &residency,
-    );
-    let mut meta = read_meta(&meta_path)?;
-    if !bin_path.exists() {
-        return Err(ApiError::Unprocessable(
-            "object bytes missing — PUT upload before complete".into(),
-        ));
-    }
-
-    let bytes = fs::read(&bin_path).map_err(ApiError::internal)?;
+    let store = &state.config.document_blob_store;
+    let (bin_path, meta_path) = object_keys(organization_id, &object_id, &residency);
+    let mut meta = read_meta(store, &meta_path).await?;
+    require_blob_upload(&state, &session, &meta, &body.object_key).await?;
+    let bytes = storage::read(store, &bin_path, MAX_UPLOAD_BYTES)
+        .await?
+        .ok_or_else(|| {
+            ApiError::Unprocessable("object bytes missing — PUT upload before complete".into())
+        })?;
     let len = bytes.len() as u64;
     let mut hasher = Sha256::new();
     hasher.update(&bytes);
     let digest = hex::encode(hasher.finalize());
 
-    if digest != checksum {
+    if digest != checksum
+        || meta
+            .expected_checksum
+            .as_deref()
+            .is_some_and(|expected| expected != digest)
+    {
         return Err(ApiError::Unprocessable(
             "checksum does not match stored object bytes".into(),
         ));
@@ -865,11 +1009,14 @@ async fn complete(
             "stored size does not match presign content_length".into(),
         ));
     }
+    if meta.purpose == BlobPurpose::Branding {
+        validate_branding_raster(&meta.content_type, &bytes)?;
+    }
 
     meta.completed = true;
     meta.actual_size = Some(len);
     meta.actual_checksum = Some(digest.clone());
-    write_meta(&meta_path, &meta)?;
+    write_meta(store, &meta_path, &meta).await?;
 
     let url = format!("/api/documents/blobs/object/{organization_id}/{residency}/{object_id}");
 
@@ -905,96 +1052,36 @@ async fn download(
         "org-{}/{}/{}",
         path.organization_id, path.residency, path.object_id
     ))?;
-    let (bin_path, meta_path) = object_paths(
-        &state.config.document_blob_dir,
-        path.organization_id,
-        &object_id,
-        &residency,
-    );
-    if !meta_path.exists() {
-        return Err(ApiError::NotFound("blob not found".into()));
+    let store = &state.config.document_blob_store;
+    let (bin_path, meta_path) = object_keys(path.organization_id, &object_id, &residency);
+    let meta = read_meta(store, &meta_path).await?;
+    let object_key = format!("org-{org_id}/{residency}/{object_id}");
+    if !meta.completed || meta.organization_id != org_id || meta.object_key != object_key {
+        return Err(ApiError::NotFound("completed blob not found".into()));
     }
-    let meta = read_meta(&meta_path)?;
-    if !meta.completed {
-        return Err(ApiError::NotFound("blob not completed".into()));
-    }
-    if let Some(company_id) = meta.company_id {
-        let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
-        resolve_membership_company_id(
-            trusted.client(),
-            org_id,
-            trusted.actor_identity(),
-            Some(company_id),
-            "document blob company scope mismatch",
-        )
-        .await?;
-    }
-    if meta.generated_pdf {
-        let access = session.field_access.as_ref();
-        if !stdb_auth::has_resource_read_permission(access, "documents") {
-            return Err(ApiError::Forbidden(
-                "document read permission is required".into(),
-            ));
-        }
-        let trusted = TrustedOperationContext::for_resource_read(&state, &session)?;
-        let company_id = meta.company_id.ok_or_else(|| {
-            ApiError::NotFound("generated document company is unavailable".into())
-        })?;
-        let url = format!("/api/documents/blobs/object/{org_id}/{residency}/{object_id}");
-        let scope = GeneratedBlobScope {
-            organization_id: org_id,
-            company_id,
-            creator_identity: meta.generated_by.as_deref().ok_or_else(|| {
-                ApiError::NotFound("generated document creator is unavailable".into())
-            })?,
-            url: &url,
-            checksum: meta.actual_checksum.as_deref().ok_or_else(|| {
-                ApiError::NotFound("generated document checksum is unavailable".into())
-            })?,
-        };
-        let documents = execute_resource_query_for_company(
-            trusted.client(),
-            "documents",
-            org_id,
-            trusted.actor_identity(),
-            access,
-            Some(company_id),
-        )
-        .await?;
-        if !generated_pdf_is_visible(&scope, access, &documents, &[]) {
-            // Resolve historical URLs through the same authorized version query
-            // used by Documents; a copied URL never widens record visibility.
-            let versions = if stdb_auth::has_resource_read_permission(access, "document-versions") {
-                execute_resource_query_for_company(
-                    trusted.client(),
-                    "document-versions",
-                    org_id,
-                    trusted.actor_identity(),
-                    access,
-                    Some(company_id),
-                )
-                .await?
-            } else {
-                Vec::new()
-            };
-            if !generated_pdf_is_visible(&scope, access, &documents, &versions) {
-                return Err(ApiError::NotFound("generated document not found".into()));
-            }
-        }
-    }
-    let bytes = fs::read(&bin_path).map_err(|e| ApiError::NotFound(e.to_string()))?;
-    if meta.generated_pdf {
-        verify_pinned_download(
-            &meta,
-            &bytes,
-            org_id,
-            meta.actual_checksum.as_deref().ok_or_else(|| {
-                ApiError::NotFound("generated document checksum is unavailable".into())
-            })?,
-        )?;
-    }
-    if let Some(expected_checksum) = query.sha256.as_deref() {
-        verify_pinned_download(&meta, &bytes, org_id, expected_checksum)?;
+    require_blob_company(&state, &session, meta.company_id).await?;
+    let url = format!("/api/documents/blobs/object/{org_id}/{residency}/{object_id}");
+    require_blob_read(&state, &session, &meta, &url, query.sha256.as_deref(), None).await?;
+    let max_bytes = if meta.purpose == BlobPurpose::Branding {
+        2 * 1024 * 1024
+    } else {
+        MAX_UPLOAD_BYTES
+    };
+    let bytes = storage::read(store, &bin_path, max_bytes)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("blob bytes not found".into()))?;
+    let checksum = meta
+        .actual_checksum
+        .as_deref()
+        .ok_or_else(|| ApiError::NotFound("blob checksum is unavailable".into()))?;
+    verify_pinned_download(
+        &meta,
+        &bytes,
+        org_id,
+        query.sha256.as_deref().unwrap_or(checksum),
+    )?;
+    if meta.purpose == BlobPurpose::Branding {
+        validate_branding_raster(&meta.content_type, &bytes)?;
     }
 
     let mut response = bytes.into_response();
@@ -1007,12 +1094,148 @@ async fn download(
     headers_mut.insert(
         header::CONTENT_DISPOSITION,
         header::HeaderValue::from_str(&format!(
-            "attachment; filename=\"{}\"",
+            "{}; filename=\"{}\"",
+            if meta.purpose == BlobPurpose::Branding {
+                "inline"
+            } else {
+                "attachment"
+            },
             meta.file_name.replace('"', "")
         ))
         .unwrap_or_else(|_| header::HeaderValue::from_static("attachment")),
     );
+    headers_mut.insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("private, no-store"),
+    );
+    headers_mut.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        header::HeaderValue::from_static("nosniff"),
+    );
     Ok(response)
+}
+
+/// Each purpose resolves through canonical projected records. The only
+/// preregistration read is a bounded, write-authorized branding preview.
+async fn require_blob_read(
+    state: &AppState,
+    session: &ApiSession,
+    meta: &BlobMeta,
+    url: &str,
+    pinned_checksum: Option<&str>,
+    document_id: Option<u64>,
+) -> Result<(), ApiError> {
+    let trusted = TrustedOperationContext::for_resource_read(state, session)?;
+    let access = Some(trusted.field_access());
+    let scope = DocumentBlobScope {
+        organization_id: trusted.organization_id(),
+        company_id: meta.company_id,
+        creator_identity: meta.creator_identity(),
+        url,
+        checksum: meta
+            .actual_checksum
+            .as_deref()
+            .ok_or_else(|| ApiError::NotFound("blob checksum is unavailable".into()))?,
+    };
+    if scope
+        .creator_identity
+        .and_then(|identity| stdb_auth::identity_sql_literal(identity).ok())
+        .is_none()
+    {
+        return Err(ApiError::NotFound("blob creator is unavailable".into()));
+    }
+    let query = |resource: &'static str| {
+        execute_resource_query_for_company(
+            trusted.client(),
+            resource,
+            scope.organization_id,
+            trusted.actor_identity(),
+            access,
+            scope.company_id,
+        )
+    };
+    let visible = match meta.purpose {
+        BlobPurpose::Document => {
+            if !stdb_auth::has_resource_read_permission(access, "documents") {
+                return Err(ApiError::Forbidden(
+                    "document read permission is required".into(),
+                ));
+            }
+            let mut documents = query("documents").await?;
+            if let Some(document_id) = document_id {
+                // Ingestion is bound to its exact source record. Another owned
+                // record for the same bytes cannot authorize a different source.
+                documents.retain(|row| {
+                    crate::query_exec::row_u64(row, "id", "id").ok().flatten() == Some(document_id)
+                });
+            }
+            if document_blob_is_visible(&scope, access, &documents, &[]) {
+                true
+            } else {
+                let versions =
+                    if stdb_auth::has_resource_read_permission(access, "document-versions") {
+                        query("document-versions").await?
+                    } else {
+                        Vec::new()
+                    };
+                document_blob_is_visible(&scope, access, &documents, &versions)
+            }
+        }
+        BlobPurpose::ExpenseReceipt => {
+            if !stdb_auth::has_resource_read_permission(access, "expense-receipts") {
+                return Err(ApiError::Forbidden(
+                    "receipt read permission is required".into(),
+                ));
+            }
+            let receipts = query("expense-receipts").await?;
+            expense_receipt_blob_is_visible(&scope, &meta.object_key, access, &receipts)
+        }
+        BlobPurpose::Branding => {
+            if pinned_checksum != Some(scope.checksum) {
+                return Err(ApiError::NotFound("pinned branding asset not found".into()));
+            }
+            validate_upload_purpose(
+                meta.purpose,
+                &meta.content_type,
+                meta.actual_size.unwrap_or(0),
+                meta.company_id,
+            )?;
+            if creator_matches(scope.creator_identity, trusted.actor_identity())
+                && require_upload_permission(
+                    access,
+                    scope.organization_id,
+                    trusted.actor_identity(),
+                    BlobPurpose::Branding,
+                )
+                .is_ok()
+            {
+                true
+            } else {
+                let templates =
+                    if stdb_auth::has_resource_read_permission(access, "document-templates") {
+                        query("document-templates").await?
+                    } else {
+                        Vec::new()
+                    };
+                if branding_blob_is_visible(&scope, access, &templates, &[]) {
+                    true
+                } else {
+                    let invoices =
+                        if stdb_auth::has_resource_read_permission(access, "account-moves") {
+                            query("account-moves").await?
+                        } else {
+                            Vec::new()
+                        };
+                    branding_blob_is_visible(&scope, access, &templates, &invoices)
+                }
+            }
+        }
+    };
+    if visible {
+        Ok(())
+    } else {
+        Err(ApiError::NotFound("document blob not found".into()))
+    }
 }
 
 fn verify_pinned_download(
@@ -1040,27 +1263,56 @@ mod tests {
     use super::*;
     use base64::Engine;
 
-    #[test]
-    fn generated_pdf_is_completed_company_bound_and_checksum_pinned() {
+    fn read_fixture_meta(path: &Path) -> Result<BlobMeta, ApiError> {
+        serde_json::from_slice(&fs::read(path).map_err(ApiError::internal)?)
+            .map_err(ApiError::internal)
+    }
+
+    fn write_fixture_meta(path: &Path, meta: &BlobMeta) -> Result<(), ApiError> {
+        fs::create_dir_all(path.parent().expect("fixture parent")).map_err(ApiError::internal)?;
+        fs::write(path, serde_json::to_vec(meta).map_err(ApiError::internal)?)
+            .map_err(ApiError::internal)
+    }
+
+    #[tokio::test]
+    async fn generated_pdf_is_completed_company_bound_and_checksum_pinned() {
         let root =
             std::env::temp_dir().join(format!("lumiere-generated-{}", rand::random::<u64>()));
+        let store = DocumentBlobStoreConfig::Local { root: root.clone() };
         let bytes = b"%PDF-1.7\ngenerated quotation test";
         let actor = "a".repeat(64);
-        let generated =
-            store_generated_pdf(&root, 7, 3, &actor, "quotation.pdf", bytes).expect("store output");
-        let read = read_completed_blob(&root, 7, 3, &generated.url).expect("read immutable output");
+        let generated = store_generated_pdf(&store, 7, 3, &actor, "quotation.pdf", bytes)
+            .await
+            .expect("store output");
+        let read = read_completed_blob(&store, 7, 3, &generated.url)
+            .await
+            .expect("read immutable output");
         assert_eq!(read.bytes, bytes);
         assert_eq!(read.checksum, generated.checksum);
         assert_eq!(generated.size, bytes.len() as u64);
-        assert!(read_completed_blob(&root, 7, 4, &generated.url).is_err());
-        assert!(read_completed_blob(&root, 8, 3, &generated.url).is_err());
-        assert!(store_generated_pdf(&root, 7, 3, &actor, "bad.pdf", b"not PDF").is_err());
-        assert!(store_generated_pdf(&root, 7, 3, "invalid", "quotation.pdf", bytes).is_err());
-        let next = store_generated_pdf(&root, 7, 3, &actor, "quotation.pdf", b"%PDF-1.7\nchanged")
+        assert!(read_completed_blob(&store, 7, 4, &generated.url)
+            .await
+            .is_err());
+        assert!(read_completed_blob(&store, 8, 3, &generated.url)
+            .await
+            .is_err());
+        assert!(
+            store_generated_pdf(&store, 7, 3, &actor, "bad.pdf", b"not PDF")
+                .await
+                .is_err()
+        );
+        assert!(
+            store_generated_pdf(&store, 7, 3, "invalid", "quotation.pdf", bytes)
+                .await
+                .is_err()
+        );
+        let next = store_generated_pdf(&store, 7, 3, &actor, "quotation.pdf", b"%PDF-1.7\nchanged")
+            .await
             .expect("new output");
         assert_ne!(generated.url, next.url);
         assert_eq!(
-            read_completed_blob(&root, 7, 3, &generated.url)
+            read_completed_blob(&store, 7, 3, &generated.url)
+                .await
                 .unwrap()
                 .bytes,
             bytes
@@ -1070,6 +1322,7 @@ mod tests {
 
     struct BrandingFixture {
         root: PathBuf,
+        store: DocumentBlobStoreConfig,
         url: String,
         pinned_url: String,
         bin: PathBuf,
@@ -1097,15 +1350,18 @@ mod tests {
                 expected_checksum: Some(checksum.clone()),
                 residency: Some("eu".into()),
                 source_url: None,
+                created_by: Some("a".repeat(64)),
+                purpose: BlobPurpose::Branding,
                 generated_pdf: false,
                 generated_by: None,
                 completed,
                 actual_size: Some(bytes.len() as u64),
                 actual_checksum: Some(checksum.clone()),
             };
-            write_meta(&meta_path, &meta).expect("fixture metadata");
+            write_fixture_meta(&meta_path, &meta).expect("fixture metadata");
             fs::write(&bin, bytes).expect("fixture PNG");
             Self {
+                store: DocumentBlobStoreConfig::Local { root: root.clone() },
                 root,
                 url: format!("/api/documents/blobs/object/7/eu/{object_id}"),
                 pinned_url: format!(
@@ -1134,54 +1390,78 @@ mod tests {
         assert!(managed_blob_url(7, "org-7/../0123456789abcdef0123456789abcdef").is_err());
     }
 
-    #[test]
-    fn branding_allows_same_org_logo_without_relaxing_company_evidence_scope() {
+    #[tokio::test]
+    async fn branding_allows_same_org_logo_without_relaxing_company_evidence_scope() {
         let organization_logo = BrandingFixture::new(None, true);
         assert!(read_completed_branding_blob(
-            &organization_logo.root,
+            &organization_logo.store,
             7,
             3,
             &organization_logo.pinned_url
         )
+        .await
         .is_ok());
         assert!(
-            read_completed_blob(&organization_logo.root, 7, 3, &organization_logo.url).is_err()
+            read_completed_blob(&organization_logo.store, 7, 3, &organization_logo.url)
+                .await
+                .is_err()
         );
         let company_logo = BrandingFixture::new(Some(3), true);
         assert!(
-            read_completed_branding_blob(&company_logo.root, 7, 3, &company_logo.pinned_url)
+            read_completed_branding_blob(&company_logo.store, 7, 3, &company_logo.pinned_url)
+                .await
                 .is_ok()
         );
-        assert!(read_completed_blob(&company_logo.root, 7, 3, &company_logo.url).is_ok());
         assert!(
-            read_completed_branding_blob(&company_logo.root, 7, 4, &company_logo.pinned_url)
+            read_completed_blob(&company_logo.store, 7, 3, &company_logo.url)
+                .await
+                .is_ok()
+        );
+        assert!(
+            read_completed_branding_blob(&company_logo.store, 7, 4, &company_logo.pinned_url)
+                .await
                 .is_err()
         );
         assert!(
-            read_completed_branding_blob(&company_logo.root, 8, 3, &company_logo.pinned_url)
+            read_completed_branding_blob(&company_logo.store, 8, 3, &company_logo.pinned_url)
+                .await
                 .is_err()
         );
     }
 
-    #[test]
-    fn branding_requires_completed_integrity_checked_local_raster() {
+    #[tokio::test]
+    async fn branding_requires_completed_integrity_checked_local_raster() {
         let fixture = BrandingFixture::new(Some(3), false);
-        assert!(read_completed_branding_blob(&fixture.root, 7, 3, &fixture.pinned_url).is_err());
+        assert!(
+            read_completed_branding_blob(&fixture.store, 7, 3, &fixture.pinned_url)
+                .await
+                .is_err()
+        );
         let fixture = BrandingFixture::new(Some(3), true);
         fs::write(&fixture.bin, b"changed after completion").expect("corrupt fixture");
-        assert!(read_completed_branding_blob(&fixture.root, 7, 3, &fixture.pinned_url).is_err());
+        assert!(
+            read_completed_branding_blob(&fixture.store, 7, 3, &fixture.pinned_url)
+                .await
+                .is_err()
+        );
         for url in [
             "https://example.test/logo.png",
             "data:image/png;base64,AA==",
             "/api/documents/blobs/object/7/../0123456789abcdef0123456789abcdef",
         ] {
-            assert!(read_completed_branding_blob(&fixture.root, 7, 3, url).is_err());
+            assert!(read_completed_branding_blob(&fixture.store, 7, 3, url)
+                .await
+                .is_err());
         }
         let fixture = BrandingFixture::new(Some(3), true);
-        let mut meta = read_meta(&fixture.meta).expect("meta");
+        let mut meta = read_fixture_meta(&fixture.meta).expect("meta");
         meta.content_type = "image/svg+xml".into();
-        write_meta(&fixture.meta, &meta).expect("change MIME");
-        assert!(read_completed_branding_blob(&fixture.root, 7, 3, &fixture.pinned_url).is_err());
+        write_fixture_meta(&fixture.meta, &meta).expect("change MIME");
+        assert!(
+            read_completed_branding_blob(&fixture.store, 7, 3, &fixture.pinned_url)
+                .await
+                .is_err()
+        );
     }
 
     #[test]
@@ -1199,25 +1479,33 @@ mod tests {
         assert!(validate_branding_raster("image/jpeg", &jpeg).is_err());
     }
 
-    #[test]
-    fn logo_hash_pin_rejects_mutation_even_when_completed_blob_metadata_is_replaced() {
+    #[tokio::test]
+    async fn logo_hash_pin_rejects_mutation_even_when_completed_blob_metadata_is_replaced() {
         let fixture = BrandingFixture::new(Some(3), true);
-        let original = read_meta(&fixture.meta)
+        let original = read_fixture_meta(&fixture.meta)
             .expect("original metadata")
             .actual_checksum
             .expect("checksum");
         assert!(
-            read_completed_branding_blob(&fixture.root, 7, 3, &fixture.url).is_err(),
+            read_completed_branding_blob(&fixture.store, 7, 3, &fixture.url)
+                .await
+                .is_err(),
             "unversioned logo must be rejected"
         );
         let mut bytes = fs::read(&fixture.bin).expect("original bytes");
         bytes[32] ^= 1;
         fs::write(&fixture.bin, &bytes).expect("replace bytes");
-        let mut meta = read_meta(&fixture.meta).expect("metadata");
+        let mut meta = read_fixture_meta(&fixture.meta).expect("metadata");
         meta.actual_checksum = Some(hex::encode(Sha256::digest(&bytes)));
-        write_meta(&fixture.meta, &meta).expect("replace completed metadata");
-        assert!(read_completed_blob(&fixture.root, 7, 3, &fixture.url).is_ok());
-        assert!(read_completed_branding_blob(&fixture.root, 7, 3, &fixture.pinned_url).is_err());
+        write_fixture_meta(&fixture.meta, &meta).expect("replace completed metadata");
+        assert!(read_completed_blob(&fixture.store, 7, 3, &fixture.url)
+            .await
+            .is_ok());
+        assert!(
+            read_completed_branding_blob(&fixture.store, 7, 3, &fixture.pinned_url)
+                .await
+                .is_err()
+        );
         assert!(verify_pinned_download(&meta, &bytes, 7, &original).is_err());
         assert!(verify_pinned_download(
             &meta,
@@ -1236,11 +1524,12 @@ mod tests {
         }
     }
 
-    #[test]
-    fn branding_rejects_oversized_blob_before_image_decode() {
+    #[tokio::test]
+    async fn branding_rejects_oversized_blob_before_image_decode() {
         let fixture = BrandingFixture::new(Some(3), true);
         fs::write(&fixture.bin, vec![0_u8; 2 * 1024 * 1024 + 1]).expect("oversized fixture");
-        let error = read_completed_branding_blob(&fixture.root, 7, 3, &fixture.pinned_url)
+        let error = read_completed_branding_blob(&fixture.store, 7, 3, &fixture.pinned_url)
+            .await
             .err()
             .expect("size error");
         assert!(matches!(error, ApiError::Unprocessable(message) if message.contains("2 MiB")));
