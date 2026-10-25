@@ -208,8 +208,8 @@ export function SettingsModule({
   }
 
   return (
-    <div className={cn("grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start", className)}>
-      <nav aria-label={t("settings.page.title")} className="lg:sticky lg:top-4">
+    <div className={cn("grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start", className)}>
+      <nav aria-label={t("settings.page.title")} className="min-w-0 lg:sticky lg:top-4">
         {isAdmin() && (
           <Badge variant="outline" className="mb-3 hidden gap-1 border-border text-muted-foreground lg:inline-flex">
             <Shield className="h-3 w-3" />
