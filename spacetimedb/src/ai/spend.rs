@@ -149,20 +149,25 @@ pub struct AiProviderAttempt {
     pub failure_reason: Option<String>,
     /// Required explanation when an `outcome_unknown` attempt is reconciled.
     pub resolution: Option<String>,
-    /// Attributable recovery command that moved a stranded dispatched attempt
-    /// to outcome_unknown, or abandoned an accepted pre-dispatch attempt.
-    pub recovery_actor: Option<String>,
-    pub recovery_approval_id: Option<String>,
-    pub recovery_at: Option<Timestamp>,
-    /// Attributable approved command that resolved outcome_unknown.
-    pub reconciliation_actor: Option<String>,
-    pub reconciliation_approval_id: Option<String>,
     pub accepted_by: spacetimedb::Identity,
     pub write_uid: spacetimedb::Identity,
     pub created_at: Timestamp,
     pub dispatched_at: Option<Timestamp>,
     pub finished_at: Option<Timestamp>,
     pub write_date: Timestamp,
+    /// Attributable recovery command that moved a stranded dispatched attempt
+    /// to outcome_unknown, or abandoned an accepted pre-dispatch attempt.
+    #[default(None::<String>)]
+    pub recovery_actor: Option<String>,
+    #[default(None::<String>)]
+    pub recovery_approval_id: Option<String>,
+    #[default(None::<Timestamp>)]
+    pub recovery_at: Option<Timestamp>,
+    /// Attributable approved command that resolved outcome_unknown.
+    #[default(None::<String>)]
+    pub reconciliation_actor: Option<String>,
+    #[default(None::<String>)]
+    pub reconciliation_approval_id: Option<String>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
