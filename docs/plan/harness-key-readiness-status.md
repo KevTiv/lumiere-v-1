@@ -1,10 +1,35 @@
-# Harness key readiness — 2026-10-24
+# Harness key readiness — 2026-10-25
 
 This status supersedes the September execution board for the bounded Mistral
 pilot. It distinguishes code integration, disposable acceptance, deployment
 provisioning, and real-provider admission.
 
-## Local convergence on 2026-10-24
+## Main integration on 2026-10-25
+
+The branch now retains merged main through `712cd2c6`, including #249's current
+Work-board, delegation and recovery fixes, #258's production layout repairs,
+#260's currency and record labels, and #262's expense-authoring test correction.
+The combined immutable contracts release is `v0.3.145` at
+`b8ea146ebcbc75b9d45acf3f9f9fa682b8e351f6`, generated from application source
+`cb72e325ab04b40a08dddfc34cb06e9d618c7f9c`. Its history continues v0.3.144,
+adds embedding-job finalization and records the changed embedding request shape.
+The consumer catalog includes AI migration phases 23–26; released migration 22
+remains byte-identical.
+
+Local integration checks passed 149 Python script tests, 24 provisioning/preflight
+tests, 537 web unit tests, 24 focused chat/Kanban/currency tests, and the runtime
+image and publisher orchestration checks. The existing production-publisher
+workflow now validates PR heads without publishing registry images. Its
+[populated upgrade run](https://github.com/KevTiv/lumiere-v-1/actions/runs/40193064361)
+preserved every existing column in all seven tables through the actual publisher,
+with data deletion disabled, and passed production provisioning checks.
+
+Merge requires fresh hosted CI, P0 and production-upgrade validation for the final
+pin; the PR records those results. Service configuration, worker certification
+and promotion, real-provider settled-spend acceptance and deployed-alpha
+acceptance remain release gates.
+
+## Historical local convergence on 2026-10-24
 
 The isolated `codex/harness-gap-closure` branch combines #135, #136, #193,
 #252–#254, #226 and #232. The published v0.3.140 source from #249 is a
@@ -22,8 +47,8 @@ upgrade uses phases 23–26. This local integration does not merge those PRs.
   Its browser execution is a separate check from component tests and discovery.
 - The embedding worker finalizes only its claimed job after confirmed vector
   persistence. The upgrade archives legacy document text and vector payloads
-  privately, verifies exact tenant/company/payload matches, then retires the
-  duplicate columns. Existing index rows remain unverified until canonical
+  privately and verifies exact tenant/company/payload matches. Compatibility
+  columns remain until an audited retirement. Existing index rows remain unverified until canonical
   reconciliation; the archive cannot supply retrieval evidence.
 - The existing Railway preflight now requires one AI replica, distinct service
   credentials, no owner token on the gateway, and direct Mistral transport.
@@ -32,19 +57,19 @@ upgrade uses phases 23–26. This local integration does not merge those PRs.
   environment variables. The provisioning job needs the owner token; the
   gateway must not receive it.
 
-The embedding request contract changes. The published immutable release is
+That initial embedding-request convergence published the immutable release
 v0.3.141 at `fcfe7dff63a6f42b54e4dac2bf306f16e07eed9a`, generated from
 application source `6d6e8eeb75b5cd2e5daa10c241c181accfa3b3bb`. It preserves the
 published v0.3.140 baseline. The consumer pin, Rust archive, frontend package,
-lockfiles and release assertions agree. Live local generation passes the full
-contracts drift comparison and release-manifest verification. Contracts `main`
-and annotated tag `v0.3.141` both resolve to the verified release commit.
+lockfiles and release assertions agreed. Live local generation passed the full
+contracts drift comparison and release-manifest verification. At that point,
+contracts `main` and annotated tag `v0.3.141` resolved to the verified release commit.
 [Hosted Contracts CI](https://github.com/KevTiv/lumiere-contracts/actions/runs/40093161295)
 passed for that exact commit, including offline generation, emitter tests,
 Rust v2 contracts, TypeScript type-check/build and package validation. This
 publishes contract artifacts; it does not deploy the application.
 
-## Executed local acceptance after convergence
+## Historical local acceptance after that convergence
 
 - Gateway: **729 passed**, eight existing ignored tests. API and gateway binaries
   build against the v0.3.141 candidate. Codegen: **136 passed**, one existing
