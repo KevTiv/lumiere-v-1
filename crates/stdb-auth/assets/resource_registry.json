@@ -60,7 +60,14 @@
       "original_value",
       "company_id",
       "organization_id",
-      "depreciation_board_ids"
+      "depreciation_board_ids",
+      "currency_id",
+      "method",
+      "method_number",
+      "method_period",
+      "salvage_value",
+      "book_value",
+      "journal_id"
     ],
     "mandatory": [
       "id",
@@ -314,7 +321,9 @@
       "summary",
       "activity_type",
       "state",
-      "is_done"
+      "is_done",
+      "activity_type_id",
+      "date_deadline"
     ],
     "mandatory": [
       "id",
@@ -519,7 +528,10 @@
       "remaining_amount",
       "state",
       "company_id",
-      "metadata"
+      "metadata",
+      "start_date",
+      "end_date",
+      "recognition_period"
     ],
     "mandatory": [
       "id",
@@ -1616,7 +1628,14 @@
       "description",
       "state",
       "total_amount",
-      "company_id"
+      "company_id",
+      "currency_id",
+      "deferred_amount",
+      "recognized_amount",
+      "start_date",
+      "end_date",
+      "recognition_method",
+      "recognition_period"
     ],
     "mandatory": [
       "id",
@@ -2287,7 +2306,14 @@
       "state",
       "acquisition_date",
       "original_value",
-      "company_id"
+      "company_id",
+      "currency_id",
+      "method",
+      "method_number",
+      "method_period",
+      "salvage_value",
+      "book_value",
+      "journal_id"
     ],
     "mandatory": [
       "id",
@@ -3847,7 +3873,9 @@
       "contact_id",
       "user_id",
       "description",
-      "created_at"
+      "created_at",
+      "updated_at",
+      "date_last_stage_update"
     ],
     "mandatory": [
       "id",
@@ -4403,7 +4431,12 @@
       "sequence",
       "fixed_price",
       "product_id",
-      "min_quantity"
+      "min_quantity",
+      "applied_on",
+      "compute_price",
+      "date_start",
+      "date_end",
+      "percent_price"
     ],
     "mandatory": [
       "id",
@@ -5613,7 +5646,10 @@
       "line_ids",
       "purchase_ids",
       "order_count",
-      "write_uid"
+      "write_uid",
+      "ordering_date",
+      "date_end",
+      "schedule_date"
     ],
     "mandatory": [
       "id",
@@ -6916,7 +6952,9 @@
       "max_qty",
       "unit_price",
       "active",
-      "company_id"
+      "company_id",
+      "sequence",
+      "product_id"
     ],
     "mandatory": [
       "id",
@@ -6991,7 +7029,9 @@
       "quantity",
       "unit",
       "status",
-      "company_id"
+      "company_id",
+      "occurred_at",
+      "product_id"
     ],
     "mandatory": [
       "id",

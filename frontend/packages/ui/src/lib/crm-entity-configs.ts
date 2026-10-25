@@ -4,6 +4,18 @@ import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
 import { formatTimestampLike, getRowField } from "./entity-row-utils"
 import { resolveIdentityLabel } from "./identity-label"
 
+export const crmLeadListFieldAliases = {
+  firstname: "contactName", lastname: "contactName", email: "emailFrom", company: "partnerName",
+  leadsource: null, leadstatus: "state", tags: null,
+} as const
+export const crmContactListFieldAliases = {
+  firstname: "firstName", lastname: "lastName", company: "companyName", tags: null,
+} as const
+export const crmOpportunityListFieldAliases = {
+  opportunityname: "name", contact: "contactName", account: "partnerName", stage: "stageName",
+  amount: "expectedRevenue", expectedclosedate: "dateDeadline", tags: null,
+} as const
+
 export interface CrmEntityConfigOptions {
   ownerLabelMap?: ReadonlyMap<string, string>
   formatContactDisplayName?: (row: Record<string, unknown>) => string

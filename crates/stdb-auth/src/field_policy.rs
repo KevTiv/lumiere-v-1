@@ -216,7 +216,7 @@ static GLOBAL_HTTP_SQL_EXCLUDED_COLUMNS: Lazy<HashSet<String>> = Lazy::new(|| {
 
 /// Per-resource columns allowed to survive global exclusions when selected by field policy.
 static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy::new(|| {
-    let mut m = HashMap::new();
+    let mut m: HashMap<String, HashSet<String>> = HashMap::new();
     // These Alpha views group records by their real creation date. Keep the
     // selected timestamp after field authorization; never synthesize a date.
     for (resource, column) in [
@@ -237,6 +237,13 @@ static HTTP_SQL_INCLUDED_COLUMNS: Lazy<HashMap<String, HashSet<String>>> = Lazy:
     m.insert(
         "calendar-events".to_string(),
         ["partner_ids".to_string()].into_iter().collect(),
+    );
+    m.entry("opportunities".to_string())
+        .or_default()
+        .insert("updated_at".to_string());
+    m.insert(
+        "activities".to_string(),
+        ["date_deadline".to_string()].into_iter().collect(),
     );
     m.insert(
         "tasks".to_string(),
@@ -1605,6 +1612,33 @@ mod tests {
     #[test]
     fn alpha_insights_select_real_amounts_states_currencies_and_dates() {
         for (resource, fields) in [
+            ("activities", &["activity_type_id", "date_deadline"][..]),
+            (
+                "purchase-requisitions",
+                &["ordering_date", "date_end", "schedule_date"][..],
+            ),
+            (
+                "account-assets",
+                &["currency_id", "method", "book_value"][..],
+            ),
+            ("fixed-assets", &["currency_id", "method", "book_value"][..]),
+            (
+                "amortization-schedules",
+                &["start_date", "end_date", "recognition_period"][..],
+            ),
+            (
+                "deferred-revenue-schedules",
+                &["currency_id", "deferred_amount", "start_date", "end_date"][..],
+            ),
+            (
+                "pricelist-items",
+                &["applied_on", "compute_price", "date_start", "date_end"][..],
+            ),
+            ("subscription-price-tiers", &["sequence", "product_id"][..]),
+            (
+                "subscription-usage-events",
+                &["occurred_at", "product_id"][..],
+            ),
             (
                 "leads",
                 &["partner_id", "expected_revenue", "created_at"][..],
@@ -1685,6 +1719,14 @@ mod tests {
             let columns =
                 resolve_http_sql_columns(resource, Some(&access)).expect("Alpha projection");
             let row_type = match resource {
+                "activities" => "Activity",
+                "purchase-requisitions" => "PurchaseRequisition",
+                "account-assets" | "fixed-assets" => "AccountAsset",
+                "amortization-schedules" => "AmortizationSchedule",
+                "deferred-revenue-schedules" => "DeferredRevenueSchedule",
+                "pricelist-items" => "ProductPricelistItem",
+                "subscription-price-tiers" => "SubscriptionPriceTier",
+                "subscription-usage-events" => "SubscriptionUsageEvent",
                 "leads" => "Lead",
                 "contacts" => "Contact",
                 "opportunities" => "Opportunity",

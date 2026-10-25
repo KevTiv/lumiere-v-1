@@ -4,6 +4,8 @@ import type { MergedFormConfiguration, ParsedFormField } from "../forms/config/t
 import { salesForms } from "../forms/config/modules/sales.config"
 import { mergeRuntimeListConfig, runtimeListFiltersFromFields } from "./runtime-list-config"
 import { saleOrderListFieldAliases, saleOrdersTableConfig } from "./sales-entity-configs"
+import { crmForms } from "../forms/config/modules/crm.config"
+import { crmContactListFieldAliases, crmLeadListFieldAliases, crmOpportunityListFieldAliases, contactsTableConfig, leadsTableConfig, opportunitiesTableConfig } from "./crm-entity-configs"
 
 const t = ((key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key) as TFunction
 
@@ -30,5 +32,23 @@ describe("Sales runtime list projection", () => {
     // Custom field data remains bound to metadata, even when its name is an alias.
     const customColumn = merged.columns.find((column) => column.key === "metadata:custom:status")!
     expect(customColumn.render?.(undefined, { metadata: '{"custom:status":"Needs review"}' })).toBe("Needs review")
+  })
+})
+
+describe("CRM legacy form fields", () => {
+  it.each([
+    ["new-lead", leadsTableConfig(t), crmLeadListFieldAliases],
+    ["new-contact", contactsTableConfig(t), crmContactListFieldAliases],
+    ["new-opportunity", opportunitiesTableConfig(t), crmOpportunityListFieldAliases],
+  ] as const)("%s uses canonical keys without duplicate legacy columns", (formId, config, aliases) => {
+    const defaults = crmForms.find((form) => form.formId === formId)!.defaultConfig()
+    const fields: ParsedFormField[] = defaults.fields.map((field, id) => ({ ...field, id, type: field.fieldType, options: field.options ?? [], validation: field.validation ?? { required: false } }))
+    const runtime: MergedFormConfiguration = { config: {} as MergedFormConfiguration["config"], fields, sourceFields: fields, customFields: [] }
+    const base = config.view.mode === "table-or-board" ? config.view.table : config.view
+    if (base.mode !== "table") throw new Error("Expected CRM table")
+    const columns = mergeRuntimeListConfig(base, runtime, aliases).columns
+    const keys = columns.map((column) => column.key)
+    expect(new Set(keys).size).toBe(keys.length)
+    for (const key of ["company", "lead_status", "lead_source", "opportunity_name", "expected_close_date", "amount", "tags"]) expect(keys).not.toContain(key)
   })
 })
