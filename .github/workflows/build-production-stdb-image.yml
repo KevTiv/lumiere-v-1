@@ -10,6 +10,21 @@ on:
       - lumiere-codegen/storage-policy-manifest.json
       - crates/stdb-auth/assets/resource_registry.json
       - scripts/railway-publish-spacetimedb.sh
+      - scripts/test-stdb-production-upgrade.py
+      - scripts/tests/fixtures/stdb-production-upgrade/**
+      - Dockerfile.spacetimedb-publisher-artifact
+      - .github/workflows/build-contracts-module.yml
+      - .github/workflows/build-production-stdb-image.yml
+  pull_request:
+    paths:
+      - spacetimedb/**
+      - crates/presentation-core/**
+      - crates/policy-core/**
+      - lumiere-codegen/storage-policy-manifest.json
+      - crates/stdb-auth/assets/resource_registry.json
+      - scripts/railway-publish-spacetimedb.sh
+      - scripts/test-stdb-production-upgrade.py
+      - scripts/tests/fixtures/stdb-production-upgrade/**
       - Dockerfile.spacetimedb-publisher-artifact
       - .github/workflows/build-contracts-module.yml
       - .github/workflows/build-production-stdb-image.yml
@@ -35,6 +50,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/download-artifact@v4
         with:
           name: contracts-module
@@ -69,6 +86,7 @@ jobs:
           fi
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -76,12 +94,14 @@ jobs:
       - name: Image coordinates
         id: image
         shell: bash
+        env:
+          IMAGE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           repository="ghcr.io/${GITHUB_REPOSITORY,,}-spacetimedb-publisher"
           echo "repository=$repository" >> "$GITHUB_OUTPUT"
-          echo "tag=$repository:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
-          if docker buildx imagetools inspect "$repository:$GITHUB_SHA" >/dev/null 2>&1; then
+          echo "tag=$repository:$IMAGE_SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          if [[ '${{ github.event_name }}' != 'pull_request' ]] && docker buildx imagetools inspect "$repository:$IMAGE_SOURCE_SHA" >/dev/null 2>&1; then
             echo 'Refusing to overwrite immutable commit image' >&2
             exit 1
           fi
@@ -90,16 +110,17 @@ jobs:
         with:
           context: .
           file: Dockerfile.spacetimedb-publisher-artifact
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.image.outputs.tag }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
           cache-from: type=gha,scope=production-stdb-publisher
           cache-to: type=gha,scope=production-stdb-publisher,mode=max
           provenance: mode=max
           sbom: true
       - name: Verify public immutable deployment coordinate
+        if: github.event_name != 'pull_request'
         env:
           IMAGE: ${{ steps.image.outputs.repository }}@${{ steps.build.outputs.digest }}
         run: |
