@@ -66,7 +66,7 @@ are retained. Unexpected record states and ambiguous matches stop the run.
 
 PR #264 adds schema-backed amount, currency, date, relationship, and lifecycle
 fields to the existing API read policies. Field masks and tenant scopes still
-apply. The Web change maps legacy form field names to actual list columns.
+apply. The Web change maps legacy Sales, Purchasing, and CRM form field names to actual list columns.
 It also derives CRM company and contact labels from their exact stored IDs.
 Unsupported standard Tags columns are omitted. Custom field identities remain
 unchanged.

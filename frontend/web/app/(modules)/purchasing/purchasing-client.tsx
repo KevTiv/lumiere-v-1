@@ -174,6 +174,7 @@ import { useProducts, useUoms, useStockPickings, useWarehouses } from "@lumiere/
 import { useDepartments, type HrDepartment } from "@lumiere/query-hooks/hooks/hr"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useRuntimeListConfig } from "@lumiere/ui/forms"
+import { purchaseOrderListFieldAliases } from "@lumiere/ui/lib/purchasing-entity-configs"
 import {
   customFieldEntriesFromMetadata,
   findNewestRowByPartnerId,
@@ -407,6 +408,7 @@ function PurchasingClientLoaded({
 
   const purchaseOrdersTableRuntime = useRuntimeListConfig({
     base: purchaseOrdersTableConfig(t).view as EntityTableConfig,
+    fieldAliases: purchaseOrderListFieldAliases,
     moduleId: "purchasing",
     formId: "new-purchase-order",
     organizationId,

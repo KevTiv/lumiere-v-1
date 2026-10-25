@@ -6,6 +6,8 @@ import { mergeRuntimeListConfig, runtimeListFiltersFromFields } from "./runtime-
 import { saleOrderListFieldAliases, saleOrdersTableConfig } from "./sales-entity-configs"
 import { crmForms } from "../forms/config/modules/crm.config"
 import { crmContactListFieldAliases, crmLeadListFieldAliases, crmOpportunityListFieldAliases, contactsTableConfig, leadsTableConfig, opportunitiesTableConfig } from "./crm-entity-configs"
+import { purchasingForms } from "../forms/config/modules/purchasing.config"
+import { purchaseOrderListFieldAliases, purchaseOrdersTableConfig } from "./purchasing-entity-configs"
 
 const t = ((key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key) as TFunction
 
@@ -50,5 +52,20 @@ describe("CRM legacy form fields", () => {
     const keys = columns.map((column) => column.key)
     expect(new Set(keys).size).toBe(keys.length)
     for (const key of ["company", "lead_status", "lead_source", "opportunity_name", "expected_close_date", "amount", "tags"]) expect(keys).not.toContain(key)
+  })
+})
+
+describe("Purchasing legacy form fields", () => {
+  it("uses one canonical column for each order value and the real state filter", () => {
+    const defaults = purchasingForms.find((form) => form.formId === "new-purchase-order")!.defaultConfig()
+    const fields: ParsedFormField[] = defaults.fields.map((field, id) => ({ ...field, id, type: field.fieldType, options: field.options ?? [], validation: field.validation ?? { required: false } }))
+    const runtime: MergedFormConfiguration = { config: {} as MergedFormConfiguration["config"], fields, sourceFields: fields, customFields: [] }
+    const base = purchaseOrdersTableConfig(t).view
+    if (base.mode !== "table") throw new Error("Expected Purchasing table")
+    const keys = mergeRuntimeListConfig(base, runtime, purchaseOrderListFieldAliases).columns.map((column) => column.key)
+    expect(new Set(keys).size).toBe(keys.length)
+    for (const key of ["name", "partnerId", "dateOrder", "datePlanned", "state"]) expect(keys.filter((column) => column === key)).toHaveLength(1)
+    for (const key of ["po_number", "vendor", "order_date", "expected_date", "status"]) expect(keys).not.toContain(key)
+    expect(runtimeListFiltersFromFields(runtime, purchaseOrderListFieldAliases)).toEqual([])
   })
 })

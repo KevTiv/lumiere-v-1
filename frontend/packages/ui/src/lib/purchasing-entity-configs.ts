@@ -3,6 +3,15 @@ import Link from "next/link"
 import { createElement } from "react"
 import type { EntityDetailConfig, EntityViewConfig } from "./entity-view-types"
 
+export const purchaseOrderListFieldAliases: Readonly<Record<string, string | null>> = {
+  ponumber: "name",
+  vendor: "partnerId",
+  orderdate: "dateOrder",
+  expecteddate: "datePlanned",
+  status: "state",
+  tags: null,
+}
+
 // ── Badge maps ────────────────────────────────────────────────────────────────
 const poInvoiceStatusBadges = (t: TFunction) => ({
   badgeVariants: {
