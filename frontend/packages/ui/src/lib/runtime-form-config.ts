@@ -234,6 +234,12 @@ export function mergeRuntimeFormConfig(
           const defaultIsArray = Array.isArray(inRoleOrEnabled.defaultValue)
           const invalidArrayDefault = staticIsArray && inRoleOrEnabled.defaultValue !== undefined &&
             (!defaultIsArray || !(inRoleOrEnabled.defaultValue as unknown[]).every((item) => typeof item === "string"))
+          // Registries seeded before an ID list became a picker still describe it as text. With no
+          // runtime default to carry over, the static picker stays authoritative.
+          const legacyTextForPicker = staticIsArray && !runtimeIsArray &&
+            (inRoleOrEnabled.type === "Text" || inRoleOrEnabled.type === "Textarea") &&
+            (inRoleOrEnabled.defaultValue === undefined || inRoleOrEnabled.defaultValue === "")
+          if (legacyTextForPicker) return applyStdbOverrides(field, { ...inRoleOrEnabled, defaultValue: undefined })
           if (runtimeIsArray !== staticIsArray || invalidArrayDefault || (!staticIsArray && defaultIsArray)) {
             bindingErrors.push(`Runtime field ${inRoleOrEnabled.fieldId} has incompatible cardinality for ${field.name}`)
             return field

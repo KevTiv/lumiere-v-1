@@ -9,14 +9,22 @@ use serde_json::Value;
 use stdb_auth::{identity_sql_literal, FieldAccessContext};
 use stdb_client::StdbClient;
 
+pub(crate) mod bounded_windows;
 mod candidate_scope;
 mod company_scope;
 mod definitions;
 mod human_tasks;
 mod operations;
+mod work_boards;
+
+pub(crate) use company_scope::allowed_company_ids;
+pub(crate) use work_boards::{
+    read_work_board, work_source_for_model, WorkBoardRequest, WorkScope, WorkSource,
+    WorkTaskReadbackRequest,
+};
 
 use candidate_scope::query_human_task_inbox;
-use company_scope::{allowed_company_ids, row_company_allowed, row_optional_company_allowed};
+use company_scope::{row_company_allowed, row_optional_company_allowed};
 use definitions::project_workflow_version;
 use human_tasks::{project_human_task, project_task_event};
 use operations::{
@@ -382,11 +390,11 @@ fn enum_tag(row: &Value, camel: &str) -> Option<String> {
     }
     // Tagged unit enum object: { "Open": [] } or { "tag": "Open" }
     if let Some(obj) = v.as_object() {
-        if obj.len() == 1 {
-            return obj.keys().next().cloned();
-        }
         if let Some(tag) = obj.get("tag").and_then(|t| t.as_str()) {
             return Some(tag.to_string());
+        }
+        if obj.len() == 1 {
+            return obj.keys().next().cloned();
         }
     }
     None

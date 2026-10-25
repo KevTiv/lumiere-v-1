@@ -138,3 +138,41 @@ test("aggregate overflow and duplicate currency definitions fail closed", () => 
   const duplicate = buildAccountantInsights(data({ currencies: read([{ id: 1, code: "EUR", decimalPlaces: 2 }, { id: 1, code: "EUR", decimalPlaces: 2 }]) }), 30, "1", now)
   assert.equal(duplicate.period.value, null)
 })
+
+test("days sales and payables outstanding scale open balances by the period's postings", () => {
+  const sample = data({ moves: read([
+    invoice(1, { amountTotal: 200, amountResidual: 100 }),
+    invoice(2, { moveType: "InInvoice", amountTotal: 100, amountResidual: 50 }),
+    invoice(3, { state: "Draft", amountTotal: 999, amountResidual: 999 }),
+  ]) })
+  assert.deepEqual(buildAccountantInsights(sample, 30, "1", now).turnover.value, { dso: 15, dpo: 15 })
+  // Nothing posted in the period: no figure rather than a misleading zero or infinity.
+  const quiet = data({ moves: read([invoice(1, { invoiceDate: "2026-06-01", amountTotal: 200, amountResidual: 100 })]) })
+  assert.deepEqual(buildAccountantInsights(quiet, 30, "1", now).turnover.value, { dso: null, dpo: null })
+})
+
+const statement = (id: number, extra: OverviewRow = {}): OverviewRow => ({ id, organizationId: 42, companyId: 7, currencyId: 1, journalId: 10, state: "Confirm", date: "2026-10-05", balanceEndReal: 700, ...extra })
+
+test("cash position is the latest closing balance per bank journal, with a month-end trend", () => {
+  const result = buildAccountantInsights(data({ bankStatements: read([
+    statement(1, { date: "2026-09-20", balanceEndReal: 500 }),
+    statement(2),
+    statement(3, { journalId: 11, date: "2026-10-10", balanceEndReal: 300 }),
+    statement(4, { date: "2026-10-20", balanceEndReal: 9999 }),
+    statement(5, { state: "Cancel", date: "2026-10-12", balanceEndReal: 8888 }),
+    statement(6, { currencyId: 2, balanceEndReal: 7777 }),
+    statement(7, { companyId: 8, balanceEndReal: 6666 }),
+  ]) }), 30, "1", now)
+  assert.equal(result.cash.value?.position, 1000)
+  assert.equal(result.cash.value?.accounts, 2)
+  assert.equal(result.cash.value?.asOfMs, Date.parse("2026-10-10T00:00:00Z"))
+  assert.deepEqual(result.cash.value?.months.map((point) => point.balance), [500, 1000])
+})
+
+test("cash is unavailable when a statement lacks its currency or balance, and empty without statements", () => {
+  assert.equal(buildAccountantInsights(data({ bankStatements: read([statement(1, { currencyId: undefined })]) }), 30, "1", now).cash.value, null)
+  assert.equal(buildAccountantInsights(data({ bankStatements: read([statement(1, { balanceEndReal: undefined })]) }), 30, "1", now).cash.value, null)
+  const none = buildAccountantInsights(data(), 30, "1", now).cash.value
+  assert.equal(none?.accounts, 0)
+  assert.deepEqual(none?.months.map((point) => point.balance), [null, null])
+})

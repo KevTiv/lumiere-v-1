@@ -1,5 +1,6 @@
 import type { EntityRow } from "./entity-view-types"
 import { rowFilterValue } from "./entity-table-engine"
+import { unwrapEntityValue } from "./entity-row-values"
 
 /** What a user chose about how a list looks, kept per browser (not synced to the server). */
 export interface EntityTableViewState {
@@ -139,6 +140,39 @@ export function sumRowsBy(rows: readonly EntityRow[], groupKey: string, valueKey
     const amount = typeof value === "number" ? value : typeof value === "bigint" ? Number(value) : NaN
     const group = rowFilterValue(row, groupKey)
     sums.set(group, (sums.get(group) ?? 0) + (Number.isFinite(amount) ? amount : 0))
+  }
+  return sums
+}
+
+/** A group's total; `currency` is the one currency its rows share, or null when they mix several. */
+export interface GroupSum {
+  total: number
+  currency: string | null
+}
+
+/**
+ * Like {@link sumRowsBy}, but never presents a sum across different currencies as one amount: when
+ * `currencyKey` names a row field and a group's rows differ in it, that group's currency is null.
+ */
+export function sumRowsByCurrency(
+  rows: readonly EntityRow[],
+  groupKey: string,
+  valueKey: string,
+  currencyKey?: string,
+): Map<string, GroupSum> {
+  const sums = new Map<string, GroupSum>()
+  for (const row of rows) {
+    const value = row[valueKey]
+    const amount = typeof value === "number" ? value : typeof value === "bigint" ? Number(value) : NaN
+    const group = rowFilterValue(row, groupKey)
+    const currency = currencyKey ? String(unwrapEntityValue(row[currencyKey]) ?? "") : ""
+    const current = sums.get(group)
+    if (!current) {
+      sums.set(group, { total: Number.isFinite(amount) ? amount : 0, currency })
+    } else {
+      current.total += Number.isFinite(amount) ? amount : 0
+      if (current.currency !== currency) current.currency = null
+    }
   }
   return sums
 }

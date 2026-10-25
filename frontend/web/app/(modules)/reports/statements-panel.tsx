@@ -9,8 +9,8 @@ import {
   useProfitLossLines,
 } from "@lumiere/query-hooks/hooks/bff-company-rows"
 import { statementKindForReportType, type StatementKind } from "@lumiere/query-hooks/hooks/read-ui-rows"
-import { Button, downloadCsv, rowsToCsv } from "@lumiere/ui"
-import { FileSpreadsheet } from "lucide-react"
+import { Button, downloadCsv, resolveCurrencyCode, rowsToCsv } from "@lumiere/ui"
+import { ChevronDown, ChevronRight, FileSpreadsheet, Printer } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -21,8 +21,12 @@ import {
 } from "@/components/ui/table"
 import {
   buildStatementRows,
+  collapsibleSectionKeys,
   formatStatementAmount,
+  formatStatementPercent,
   journalItemsHref,
+  statementVariance,
+  visibleStatementRows,
   type StatementDisplayRow,
 } from "./statement-tree"
 import {
@@ -38,13 +42,16 @@ type StatementsPanelProps = {
   financialReports: Record<string, unknown>[]
 }
 
+const EMPTY_SET: ReadonlySet<string> = new Set()
+
 function reportIdOf(row: Record<string, unknown>): string {
   const v = row.id
   return typeof v === "bigint" || typeof v === "number" || typeof v === "string" ? String(v) : ""
 }
 
 export function StatementsPanel({ organizationId, financialReports }: StatementsPanelProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language
 
   const statementReports = useMemo(
     () =>
@@ -84,20 +91,46 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
     )
   }, [query.data, selected, t])
 
+  const currency = resolveCurrencyCode(selected?.row.currency ?? selected?.row.currencyCode ?? selected?.row.currency_code)
+
+  // Collapsed groups are remembered per report so switching reports starts fully expanded.
+  const [collapsedByReport, setCollapsedByReport] = useState<Record<string, ReadonlySet<string>>>({})
+  const collapsed = (selected && collapsedByReport[selected.id]) || EMPTY_SET
+  const sectionKeys = useMemo(() => collapsibleSectionKeys(rows), [rows])
+  const visibleRows = useMemo(() => visibleStatementRows(rows, collapsed), [rows, collapsed])
+  const setCollapsed = (next: ReadonlySet<string>) => {
+    if (selected) setCollapsedByReport((prev) => ({ ...prev, [selected.id]: next }))
+  }
+  const toggleSection = (key: string) => {
+    const next = new Set(collapsed)
+    if (!next.delete(key)) next.add(key)
+    setCollapsed(next)
+  }
+  const allCollapsed = sectionKeys.length > 0 && sectionKeys.every((key) => collapsed.has(key))
+
   const exportCsv = () => {
     if (!selected) return
     const headers = [
       t("reports.statements.columns.line", { defaultValue: "Line" }),
       t("reports.statements.columns.amount", { defaultValue: "Amount" }),
       ...(showComparison
-        ? [t("reports.statements.columns.comparison", { defaultValue: "Comparison" })]
+        ? [
+            t("reports.statements.columns.comparison", { defaultValue: "Comparison" }),
+            t("reports.statements.columns.variance", { defaultValue: "Variance" }),
+            t("reports.statements.columns.variancePercent", { defaultValue: "Variance %" }),
+          ]
         : []),
     ]
-    const body = rows.map((r) => [
-      `${"  ".repeat(r.depth)}${r.label}`,
-      r.amount ?? "",
-      ...(showComparison ? [r.comparisonAmount ?? ""] : []),
-    ])
+    const body = rows.map((r) => {
+      const variance = statementVariance(r)
+      return [
+        `${"  ".repeat(r.depth)}${r.label}`,
+        r.amount ?? "",
+        ...(showComparison
+          ? [r.comparisonAmount ?? "", variance?.amount ?? "", variance?.percent == null ? "" : Math.round(variance.percent * 10) / 10]
+          : []),
+      ]
+    })
     const name = typeof selected.row.name === "string" ? selected.row.name : `statement-${selected.id}`
     downloadCsv(name, rowsToCsv(headers, body))
   }
@@ -115,7 +148,7 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3 print:hidden">
         <div className="min-w-60 flex-1 space-y-1">
           <label htmlFor="statement-report" className="text-sm font-medium">
             {t("reports.statements.report", { defaultValue: "Report" })}
@@ -142,7 +175,27 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
           <FileSpreadsheet className="mr-2 h-4 w-4" aria-hidden />
           {t("reports.statements.exportCsv", { defaultValue: "Export CSV" })}
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={sectionKeys.length === 0}
+          onClick={() => setCollapsed(allCollapsed ? EMPTY_SET : new Set(sectionKeys))}
+        >
+          {allCollapsed
+            ? t("reports.statements.expandAll", { defaultValue: "Expand all" })
+            : t("reports.statements.collapseAll", { defaultValue: "Collapse all" })}
+        </Button>
+        <Button type="button" variant="outline" disabled={rows.length === 0} onClick={() => window.print()}>
+          <Printer className="mr-2 h-4 w-4" aria-hidden />
+          {t("reports.statements.print", { defaultValue: "Print / PDF" })}
+        </Button>
       </div>
+
+      {selected ? (
+        <h2 className="hidden text-lg font-semibold print:block">
+          {typeof selected.row.name === "string" && selected.row.name !== "" ? selected.row.name : `#${selected.id}`}
+        </h2>
+      ) : null}
 
       {query.isLoading ? (
         <div className="p-6 text-sm text-muted-foreground" role="status">
@@ -170,16 +223,26 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
                   {t("reports.statements.columns.amount", { defaultValue: "Amount" })}
                 </TableHead>
                 {showComparison ? (
-                  <TableHead className="text-right">
-                    {t("reports.statements.columns.comparison", { defaultValue: "Comparison" })}
-                  </TableHead>
+                  <>
+                    <TableHead className="text-right">
+                      {t("reports.statements.columns.comparison", { defaultValue: "Comparison" })}
+                    </TableHead>
+                    <TableHead className="text-right">
+                      {t("reports.statements.columns.variance", { defaultValue: "Variance" })}
+                    </TableHead>
+                    <TableHead className="text-right">
+                      {t("reports.statements.columns.variancePercent", { defaultValue: "Variance %" })}
+                    </TableHead>
+                  </>
                 ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => {
+              {visibleRows.map((r) => {
                 const href = journalItemsHref(r.accountId)
                 const bold = r.kind !== "line"
+                const variance = statementVariance(r)
+                const isCollapsed = r.kind === "section" && collapsed.has(r.key)
                 return (
                   <TableRow
                     key={r.key}
@@ -189,6 +252,20 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
                       className={bold ? "font-semibold" : undefined}
                       style={{ paddingLeft: `${0.75 + r.depth * 1.25}rem` }}
                     >
+                      {r.kind === "section" ? (
+                        <button
+                          type="button"
+                          className="mr-1 inline-flex align-middle print:hidden"
+                          aria-expanded={!isCollapsed}
+                          aria-label={t(isCollapsed ? "reports.statements.expandSection" : "reports.statements.collapseSection", {
+                            defaultValue: isCollapsed ? "Expand {{name}}" : "Collapse {{name}}",
+                            name: r.label,
+                          })}
+                          onClick={() => toggleSection(r.key)}
+                        >
+                          {isCollapsed ? <ChevronRight className="h-4 w-4" aria-hidden /> : <ChevronDown className="h-4 w-4" aria-hidden />}
+                        </button>
+                      ) : null}
                       {href ? (
                         <Link
                           href={href}
@@ -204,12 +281,20 @@ export function StatementsPanel({ organizationId, financialReports }: Statements
                       )}
                     </TableCell>
                     <TableCell className={`text-right tabular-nums ${bold ? "font-semibold" : ""}`}>
-                      {r.amount == null ? "" : formatStatementAmount(r.amount)}
+                      {r.amount == null ? "" : formatStatementAmount(r.amount, locale, currency)}
                     </TableCell>
                     {showComparison ? (
-                      <TableCell className={`text-right tabular-nums ${bold ? "font-semibold" : ""}`}>
-                        {r.comparisonAmount == null ? "" : formatStatementAmount(r.comparisonAmount)}
-                      </TableCell>
+                      <>
+                        <TableCell className={`text-right tabular-nums ${bold ? "font-semibold" : ""}`}>
+                          {r.comparisonAmount == null ? "" : formatStatementAmount(r.comparisonAmount, locale, currency)}
+                        </TableCell>
+                        <TableCell className={`text-right tabular-nums ${bold ? "font-semibold" : ""} ${variance && variance.amount < 0 ? "text-destructive" : ""}`}>
+                          {variance ? formatStatementAmount(variance.amount, locale, currency) : ""}
+                        </TableCell>
+                        <TableCell className={`text-right tabular-nums ${bold ? "font-semibold" : ""} ${variance?.percent != null && variance.percent < 0 ? "text-destructive" : ""}`}>
+                          {variance ? formatStatementPercent(variance.percent, locale) : ""}
+                        </TableCell>
+                      </>
                     ) : null}
                   </TableRow>
                 )

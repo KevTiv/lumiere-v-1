@@ -30,10 +30,13 @@ jobs:
         run: python3 scripts/ci-change-scope.py --github-output "$GITHUB_OUTPUT"
       - name: Test change classifier
         run: python3 -B -m unittest discover -s scripts/tests
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Test external readiness probe
         run: node scripts/tests/test-compose-readiness.mjs
-      - name: Test production identity bootstrap
-        run: node --test scripts/tests/test_production_identity_bootstrap.mjs
+      - name: Test operational Node scripts
+        run: node --test scripts/tests/test_production_identity_bootstrap.mjs scripts/tests/inventory-workflow-cancellations.test.mjs scripts/tests/test_mistral_alpha_preflight.mjs scripts/tests/test-provision-ai-harness.mjs
       - name: Test ordered Railway release orchestration
         run: |
           bash scripts/tests/test-railway-stack-release.sh
@@ -137,6 +140,15 @@ jobs:
       - name: Query authorization and field projection tests
         run: cargo test --locked -p stdb-auth --lib
 
+      - name: Work board authorization and pagination tests
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib workflow_reads
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::activity_work
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib routes::queries::task_assignees
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::authoritative::tests
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib query_exec::tests::private_workflow_reads
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib realtime::
+
       - name: Presentation contracts and draft validator
         run: cargo test --locked -p lumiere-presentation-core
 
@@ -175,9 +187,9 @@ jobs:
           PG_USER: lumiere
           PG_PASSWORD: lumiere
           PG_TLS_MODE: disable
-        run: >-
-          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib
-          cold_tier::migrate::postgres_compatibility_tests:: -- --nocapture --test-threads=1
+        run: |
+          python3 scripts/run-required-cargo-tests.py --locked -p api-server --lib cold_tier::migrate::postgres_compatibility_tests:: -- --nocapture --test-threads=1
+          bash scripts/tests/test-ai-index-migration.sh
 
       - name: C5 manifest-driven finalization
         env:
@@ -354,6 +366,22 @@ jobs:
 
       - name: Unit tests (accounting and cross-module overview models)
         run: pnpm --dir web test:accounting-ui:models
+
+      - name: Install Playwright Chromium
+        working-directory: frontend/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Work-board browser regressions
+        run: pnpm --dir web test:e2e:work-board
+
+      - name: Upload work-board browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: work-board-browser-diagnostics
+          path: frontend/web/test-results/
+          retention-days: 7
+          if-no-files-found: warn
 
       - name: Verify vendored frontend contracts pin
         run: pnpm contracts:verify-vendored

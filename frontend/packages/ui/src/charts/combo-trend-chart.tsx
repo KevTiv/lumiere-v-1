@@ -1,5 +1,6 @@
 "use client"
 
+import { useCurrencyFormat } from "../lib/currency-context"
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip } from "../components/chart"
 import { cn } from "../lib/utils"
@@ -33,6 +34,7 @@ export function ComboTrendChart({
   lineFormat,
   className,
 }: ComboTrendChartProps) {
+  const { locale } = useCurrencyFormat()
   const config = seriesChartConfig([...bars, line])
   const lineColor = line.color ?? chartColor(bars.length)
   const ownAxis = lineAxis === "right"
@@ -48,7 +50,7 @@ export function ComboTrendChart({
           tickLine={false}
           axisLine={false}
           width={52}
-          tickFormatter={(value: number) => formatChartTick(value, valueFormat)}
+          tickFormatter={(value: number) => formatChartTick(value, valueFormat, locale)}
         />
         {ownAxis ? (
           <YAxis
@@ -57,10 +59,10 @@ export function ComboTrendChart({
             tickLine={false}
             axisLine={false}
             width={44}
-            tickFormatter={(value: number) => formatChartTick(value, lineValueFormat)}
+            tickFormatter={(value: number) => formatChartTick(value, lineValueFormat, locale)}
           />
         ) : null}
-        <ChartTooltip cursor={{ fillOpacity: 0.4 }} content={valueTooltip(config, valueFormat, { [line.key]: lineValueFormat })} />
+        <ChartTooltip cursor={{ fillOpacity: 0.4 }} content={valueTooltip(config, valueFormat, { [line.key]: lineValueFormat }, locale)} />
         <ChartLegend content={<ChartLegendContent />} />
         {bars.map((bar, index) => (
           <Bar

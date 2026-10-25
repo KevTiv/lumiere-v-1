@@ -1,5 +1,10 @@
 # AI Harness Luna Execution Plan
 
+**Historical execution board:** for the 2026-10-23 integrated runtime,
+remaining deployment gates, and Mistral provisioning workflow, use
+[Harness key readiness](../plan/harness-key-readiness-status.md). The September
+statuses below must not be used as the current implementation inventory.
+
 **Status:** Active coordination — 2026-09-12  
 **Stack base:** `codex/ai-harness-tool-calling` / PR #15  
 **Scope:** H2–H8 from the AI harness completion plan.  

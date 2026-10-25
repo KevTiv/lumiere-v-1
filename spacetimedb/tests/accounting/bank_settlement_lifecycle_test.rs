@@ -789,6 +789,7 @@ pub fn test_bank_settlement_recovery_replay_and_denials(
         permissions: vec![
             "workflow_task:approve".into(),
             "workflow_task:reject".into(),
+            "account_payment:read".into(),
             "payment:post".into(),
         ],
         is_system: false,
@@ -1552,6 +1553,7 @@ fn test_coordinated_reversal_approval_identity(ctx: &ReducerContext) -> Result<(
         permissions: vec![
             "workflow_task:approve".into(),
             "workflow_task:reject".into(),
+            "account_payment:read".into(),
             "payment:reverse".into(),
             "account_bank_statement_line:write".into(),
             "account_bank_statement:write".into(),

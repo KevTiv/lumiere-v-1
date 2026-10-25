@@ -268,7 +268,32 @@ impl PrincipalScope {
 }
 
 impl CandidateScope {
-    async fn load(
+    #[cfg(test)]
+    pub(super) fn test_scope() -> Self {
+        Self {
+            principal: PrincipalScope {
+                roles: HashSet::from([2]),
+                groups: vec![(7, 9)],
+                units: vec![(Some(7), 4)],
+                companies: HashSet::from([7]),
+                label: "Operator".into(),
+            },
+            acting_for: vec![DelegatedScope {
+                identity: "ef".repeat(32),
+                company_id: 7,
+                principal: PrincipalScope {
+                    roles: HashSet::from([3]),
+                    groups: vec![(7, 10)],
+                    companies: HashSet::from([7]),
+                    label: "Principal".into(),
+                    ..PrincipalScope::default()
+                },
+            }],
+            is_superuser: false,
+        }
+    }
+
+    pub(super) async fn load(
         owner: &StdbClient,
         org: u64,
         caller_hex: &str,
@@ -329,7 +354,7 @@ impl CandidateScope {
         })
     }
 
-    fn delegated_options(&self, task: &Value, caller: &str) -> Vec<Value> {
+    pub(super) fn delegated_options(&self, task: &Value, caller: &str) -> Vec<Value> {
         let requester = cell(task, "requestedBy", "requested_by").and_then(identity_cell_to_hex);
         if requester.as_deref() == Some(caller) {
             return Vec::new();
@@ -342,7 +367,50 @@ impl CandidateScope {
         }).map(|delegation| serde_json::json!({"identityHex":delegation.identity,"label":delegation.principal.label})).collect()
     }
 
-    fn can_view_task(&self, row: &Value, caller: &str) -> bool {
+    pub(super) fn directly_eligible(&self, task: &Value) -> bool {
+        self.principal.matches(task)
+    }
+
+    /// A role-restricted delegation must satisfy the reducer's candidate-role
+    /// check even when a separate group or department also matches the task.
+    pub(super) fn delegated_action_eligible(
+        &self,
+        task: &Value,
+        identity: &str,
+        current_role_ids: &[u64],
+    ) -> bool {
+        let task_roles = u64_list_field(task, "candidateRoleIds", "candidate_role_ids");
+        let role_match = task_roles.iter().any(|id| current_role_ids.contains(id));
+        let company = cell(task, "companyId", "company_id").and_then(id_value);
+        self.acting_for.iter().any(|delegation| {
+            delegation.identity == identity
+                && company == Some(delegation.company_id)
+                && delegation.principal.matches(task)
+                && (!role_match
+                    || task_roles
+                        .iter()
+                        .any(|id| delegation.principal.roles.contains(id)))
+        })
+    }
+
+    /// A board team selector narrows current membership; it never grants access.
+    pub(super) fn has_team(&self, company_id: u64, kind: &str, id: u64) -> bool {
+        let task = match kind {
+            "department" => {
+                serde_json::json!({"company_id": company_id, "candidate_unit_ids": [id]})
+            }
+            "workflow-group" => {
+                serde_json::json!({"company_id": company_id, "candidate_group_ids": [id]})
+            }
+            _ => return false,
+        };
+        self.principal.matches(&task)
+            || self.acting_for.iter().any(|delegation| {
+                delegation.company_id == company_id && delegation.principal.matches(&task)
+            })
+    }
+
+    pub(super) fn can_view_task(&self, row: &Value, caller: &str) -> bool {
         self.is_superuser
             || self.principal.matches(row)
             || (cell(row, "companyId", "company_id")
@@ -404,6 +472,21 @@ mod tests {
         assert!(!scope.matches(&json!({"company_id":8,"candidate_role_ids":[3]})));
         assert!(!scope.matches(&json!({"company_id":8,"candidate_group_ids":[9]})));
         assert!(!scope.matches(&json!({"company_id":8,"candidate_unit_ids":[4]})));
+    }
+
+    #[test]
+    fn delegated_actions_respect_candidate_roles_beyond_a_group_match() {
+        let scope = CandidateScope::test_scope();
+        let principal = "ef".repeat(32);
+        let task = json!({"company_id":7,"candidate_role_ids":[5],"candidate_group_ids":[10]});
+        // Role 3 is delegated; the principal also holds candidate role 5.
+        // The reducer requires delegation of role 5 despite the group match.
+        assert!(!scope.delegated_action_eligible(&task, &principal, &[3, 5]));
+        // With no candidate role, the eligible group and delegated role suffice.
+        assert!(scope.delegated_action_eligible(&task, &principal, &[3]));
+        let role_task = json!({"company_id":7,"candidate_role_ids":[3]});
+        assert!(scope.delegated_action_eligible(&role_task, &principal, &[3, 5]));
+        assert!(!scope.delegated_action_eligible(&role_task, &"ab".repeat(32), &[3, 5]));
     }
 
     #[test]

@@ -257,9 +257,9 @@
   "AccountPayment": [
     "name",
     "move_id",
-    "reversal_move_id",
     "ref",
-    "memo"
+    "memo",
+    "reversal_move_id"
   ],
   "AccountPaymentTerm": [
     "note"
@@ -610,13 +610,13 @@
   "AiProviderAttempt": [
     "failure_reason",
     "resolution",
+    "dispatched_at",
+    "finished_at",
     "recovery_actor",
     "recovery_approval_id",
     "recovery_at",
     "reconciliation_actor",
-    "reconciliation_approval_id",
-    "dispatched_at",
-    "finished_at"
+    "reconciliation_approval_id"
   ],
   "AiProviderAttemptRead": [
     "failure_reason",
@@ -1210,14 +1210,14 @@
     "metadata"
   ],
   "CountryPackDefinition": [
+    "metadata",
     "effective_from",
-    "effective_to",
-    "metadata"
+    "effective_to"
   ],
   "CountryPackTaxRule": [
+    "metadata",
     "effective_from",
-    "effective_to",
-    "metadata"
+    "effective_to"
   ],
   "CreateAccountAccountParams": [
     "company_id",
@@ -7281,7 +7281,6 @@
     "ai_suggestion"
   ],
   "UpsertSearchEmbeddingParams": [
-    "embedding_hash",
     "metadata"
   ],
   "UpsertSubscriptionPriceIndexParams": [

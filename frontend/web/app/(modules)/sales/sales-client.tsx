@@ -1,4 +1,7 @@
 'use client';
+import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
+import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
@@ -12,7 +15,6 @@ import { useTranslation } from '@lumiere/i18n';
 import { useErpSession } from '@lumiere/erp-session';
 import { QuotationDocumentDialog } from './quotation-document-dialog';
 import {
-  ModuleView,
   FormModal,
   CsvImportModal,
   RuntimeFormModal,
@@ -65,6 +67,7 @@ import {
   recordOptions,
   useFormDialog,
 } from '@lumiere/ui';
+import { EntityLabelsProvider, labelsFromOptions } from '@lumiere/ui';
 import type {
   EntityRow,
   EntityViewConfig,
@@ -176,6 +179,7 @@ import {
   useAccountJournals,
   useAccountAccounts,
   useAccountPaymentTerms,
+  useAccountTaxes,
   useComputeInvoiceTotals,
   usePartnerCreditControls,
   usePartnerCreditHolds,
@@ -233,6 +237,7 @@ import {
   paymentTermRowsToSelectOptions,
   productCategoryRowsToSelectOptions,
   currencyOptionsFromRows,
+  taxRowsToSelectOptions,
 } from '@/lib/form-lookup';
 import { enumTag } from '@/lib/accounting-post-draft';
 import { saleOrderLineCanBeDeleted } from './sale-order-line-gates';
@@ -452,6 +457,7 @@ function SalesClientLoaded({
   const { data: accountJournals = [] } = useAccountJournals(orgId);
   const { data: accountAccounts = [] } = useAccountAccounts(orgId);
   const { data: paymentTerms = [] } = useAccountPaymentTerms(orgId);
+  const { data: accountTaxes = [] } = useAccountTaxes(orgId);
   const { data: partnerCreditControls = [] } = usePartnerCreditControls(orgId);
   const { data: partnerCreditHolds = [] } = usePartnerCreditHolds(orgId);
   const currenciesQuery = useCurrencies();
@@ -819,7 +825,10 @@ function SalesClientLoaded({
 
   const moduleConfig = useMemo(() => salesModuleConfig(t), [t]);
 
-  const salesTabIds = useMemo(() => moduleConfig.tabs.map((tab) => tab.id), [moduleConfig]);
+  const salesTabIds = useMemo(() => {
+    const workTabId = moduleWorkBoardTabId(moduleConfig);
+    return [...moduleConfig.tabs.map((tab) => tab.id), ...(workTabId ? [workTabId] : [])];
+  }, [moduleConfig]);
   const { activeTab, setActiveTab } = useModuleTab(
     moduleConfig.defaultTab ?? 'dashboard',
     salesTabIds,
@@ -888,6 +897,15 @@ function SalesClientLoaded({
     return [{ value: '', label: 'No currencies available', disabled: true }];
   }, [currencies, t]);
 
+  const entityLabels = useMemo(
+    () => ({
+      partnerId: labelsFromOptions(partnerFieldOptions),
+      productId: labelsFromOptions(productFieldOptions),
+      currencyId: labelsFromOptions(currencyFieldOptions),
+    }),
+    [partnerFieldOptions, productFieldOptions, currencyFieldOptions],
+  );
+
   const productCategoryFieldOptions = useMemo(() => {
     const fromApi = productCategoryRowsToSelectOptions(productCategories as Record<string, unknown>[]);
     if (fromApi.length > 0) return fromApi;
@@ -922,8 +940,12 @@ function SalesClientLoaded({
       mergeSelectOptionsForFields(newDeliveryCarrierForm(t), {
         productId: productFieldOptions,
         currencyId: currencyFieldOptions,
+        priceRuleIds: linkedRecordOptions(
+          deliveryPriceRules,
+          (rule) => `${rule.variable} ${rule.operator} ${rule.maxValue} → ${rule.listPrice}`,
+        ),
       }),
-    [t, productFieldOptions, currencyFieldOptions],
+    [t, productFieldOptions, currencyFieldOptions, deliveryPriceRules],
   );
 
   const shippingMethodFormConfig = useMemo(
@@ -949,8 +971,9 @@ function SalesClientLoaded({
     () =>
       mergeSelectOptionsForFields(newLoyaltyProgramForm(t), {
         currencyId: currencyFieldOptions,
+        triggerProductIds: productFieldOptions,
       }),
-    [t, currencyFieldOptions],
+    [t, currencyFieldOptions, productFieldOptions],
   );
 
   const draftSaleOrderOptions = useMemo(() => {
@@ -995,14 +1018,17 @@ function SalesClientLoaded({
     [t, partnerFieldOptions, returnSourceSaleOrderOptions, productFieldOptions, uomFieldOptions],
   );
 
+  const saleTaxFieldOptions = useMemo(() => taxRowsToSelectOptions(accountTaxes, 'Sale'), [accountTaxes]);
+
   const addSaleOrderLineFormConfig = useMemo(
     () =>
       mergeSelectOptionsForFields(addSaleOrderLineForm(t), {
         orderId: draftSaleOrderOptions,
         productId: productFieldOptions,
         uomId: uomFieldOptions,
+        taxIds: saleTaxFieldOptions,
       }),
-    [t, draftSaleOrderOptions, productFieldOptions, uomFieldOptions],
+    [t, draftSaleOrderOptions, productFieldOptions, uomFieldOptions, saleTaxFieldOptions],
   );
 
   const editSaleOrderLineOptions = useMemo(() => {
@@ -1165,7 +1191,13 @@ function SalesClientLoaded({
     };
   }, [t, orderLines, partnerLabelById, orgId, operatingCompanyId, stockPickings, accountMoves, returnOrders, accountPayments]);
 
-  const pickingBatchFormConfig = useMemo(() => newPickingBatchForm(t), [t]);
+  const pickingBatchFormConfig = useMemo(
+    () =>
+      mergeSelectOptionsForFields(newPickingBatchForm(t), {
+        pickingIds: linkedRecordOptions(stockPickings, (picking) => picking.name),
+      }),
+    [t, stockPickings],
+  );
 
   const loyaltyProgramFieldOptions = useMemo(() => {
     const fromApi = loyaltyProgramRowsToSelectOptions(loyaltyPrograms);
@@ -2380,18 +2412,20 @@ function SalesClientLoaded({
     ],
   );
 
+  const { locale } = useCurrencyFormat()
   const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
     () => ({
       orders: {
         tiles: saleOrderKpis(data.orders, {
           t,
           now: new Date(),
+          locale,
           currencyCodeById: currencyCodeMap(currencies as Record<string, unknown>[]),
         }),
         loading: ordersLoading,
       },
     }),
-    [data.orders, currencies, ordersLoading, t],
+    [data.orders, currencies, ordersLoading, t, locale],
   );
 
   const dataState = {
@@ -2563,8 +2597,9 @@ function SalesClientLoaded({
     pickingWorkflow.isPending;
 
   return (
-    <>
-      <ModuleView
+    <EntityLabelsProvider value={entityLabels}>
+      <ModuleWorkView
+        organizationId={organizationId}
         config={config}
         dashboardContent={<ModuleInsights input={{ module: "sales", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: ordersRead.state }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
@@ -2817,6 +2852,6 @@ function SalesClientLoaded({
           }}
         />
       ) : null}
-    </>
+    </EntityLabelsProvider>
   );
 }

@@ -41,8 +41,8 @@ function activeAt(row: Subscription, ms: number): boolean {
 }
 
 /** MRR at each month end, the MRR that started in the month, and churn as a share of opening MRR. */
-export function mrrAndChurnByMonth(subscriptions: readonly Subscription[], now: Date, months = 12): ChartDatum[] {
-  return monthBuckets(months, now).map((bucket) => {
+export function mrrAndChurnByMonth(subscriptions: readonly Subscription[], now: Date, months = 12, locale?: string): ChartDatum[] {
+  return monthBuckets(months, now, locale).map((bucket) => {
     const monthEnd = Math.min(bucket.endMs, now.getTime())
     let mrr = 0
     let opening = 0

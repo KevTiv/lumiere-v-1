@@ -25,6 +25,7 @@ export * from "./entity-views/entity-board";
 export * from "./entity-views/entity-board-card";
 export * from "./lib/entity-view-types"; // exports FieldWidth, ColumnType
 export * from "./lib/entity-row-utils";
+export * from "./lib/currency-context";
 export * from "./lib/kanban-board-types";
 export * from "./kanban/kanban-board";
 export * from "./kanban/kanban-column";
@@ -322,6 +323,7 @@ export * from "./entity-views/status-bar";
 export * from "./entity-views/smart-buttons";
 export * from "./entity-views/use-entity-table";
 export * from "./components/record-picker";
+export * from "./components/date-picker";
 export * from "./components/editable-number";
 export * from "./lib/sale-order-line-totals";
 export * from "./entity-views/sale-order-line-grid";

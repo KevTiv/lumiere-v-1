@@ -69,8 +69,9 @@ export function revenueVsExpensesByMonth(
   bills: readonly AccountMoveQueryRow[],
   now: Date,
   months = 6,
+  locale?: string,
 ): ChartDatum[] {
-  return monthBuckets(months, now).map((bucket) => {
+  return monthBuckets(months, now, locale).map((bucket) => {
     const range = { startMs: bucket.startMs, endMs: bucket.endMs }
     const sum = (rows: readonly AccountMoveQueryRow[]) =>
       rows.filter((move) => isPosted(move) && inRange(moveDateMs(move), range)).reduce((total, move) => total + amountTotal(move), 0)

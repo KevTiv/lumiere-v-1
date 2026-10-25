@@ -9,6 +9,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use anyhow::{bail, Context, Result};
 use futures::future::join_all;
 use serde_json::json;
+use std::time::Duration;
 use stdb_client::{ReducerCall, StdbClient};
 
 use super::{
@@ -27,13 +28,44 @@ use super::{
     model_configuration::{
         IntelligenceRole, IntelligenceRoute, IntelligenceRouteResolver, ModelProfile,
     },
-    spend_admission::{spend_binding_for_profile, SpendAdmittedLlm, SpendLedger},
+    spend_admission::{
+        spend_binding_for_profile, SpendAdmittedLlm, SpendLedger, UnresolvedProviderAttempt,
+    },
     text_answer_gate::{gate_text_answer_with_passages_and_reviews, GatedTextAnswer, TextEvidence},
 };
 use crate::{
-    ai_agent::ResolvedAgentConfig, orchestrator::skill_loader::GovernedRunRef,
-    providers::llm::LlmCompletion,
+    ai_agent::ResolvedAgentConfig,
+    orchestrator::skill_loader::GovernedRunRef,
+    providers::llm::{LlmCompletion, ProviderRejection},
 };
+
+const MAX_SAFE_RETRIES: u32 = 2;
+
+pub(super) async fn record_retryable_failure(
+    profile: &ModelProfile,
+    attempt_no: u32,
+    error: anyhow::Error,
+    failures: &mut Vec<String>,
+) -> Result<()> {
+    // Only an explicit rate rejection survives spend result+settlement as this
+    // typed cause. Unknown transport/cancellation/ledger errors stop all routes.
+    if !error
+        .downcast_ref::<ProviderRejection>()
+        .is_some_and(ProviderRejection::retryable)
+    {
+        return Err(error.context("automatic provider retry and fallback stopped"));
+    }
+    failures.push(format!(
+        "{} attempt {}: {}",
+        profile.reference.stable_ref(),
+        attempt_no + 1,
+        error
+    ));
+    if attempt_no < profile.max_retries.min(MAX_SAFE_RETRIES) {
+        tokio::time::sleep(Duration::from_millis(100_u64 << attempt_no)).await;
+    }
+    Ok(())
+}
 
 /// Durable sink for GP-15 zero-authority shadow decision attempts. A shadow
 /// result is recorded regardless of success/failure but never fed back into
@@ -446,7 +478,8 @@ impl<'a> RoutedDecisionProvider<'a> {
             self.run_id,
         )?;
         let admitted =
-            SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, call_scope)?;
+            SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, call_scope)?
+                .with_profile_limits(profile)?;
         LlmDecisionAdapter::from_profile(&admitted, profile)
             .decide(request)
             .await
@@ -467,19 +500,17 @@ impl DecisionProvider for RoutedDecisionProvider<'_> {
 
         let mut failures = Vec::new();
         for profile in profiles {
-            for attempt_no in 0..=profile.max_retries {
+            for attempt_no in 0..=profile.max_retries.min(MAX_SAFE_RETRIES) {
                 let scope = next_call_scope(self.role, &self.next_scope)?;
                 match self.attempt(&profile, request.clone(), scope).await {
                     Ok(response) => {
                         self.run_shadows(&shadows, &request).await;
                         return Ok(response);
                     }
-                    Err(error) => failures.push(format!(
-                        "{} attempt {}: {}",
-                        profile.reference.stable_ref(),
-                        attempt_no + 1,
-                        error
-                    )),
+                    Err(error) if error.is::<UnresolvedProviderAttempt>() => return Err(error),
+                    Err(error) => {
+                        record_retryable_failure(&profile, attempt_no, error, &mut failures).await?
+                    }
                 }
             }
         }
@@ -534,7 +565,7 @@ impl ReasoningProvider for RoutedReasoningProvider<'_> {
         profiles.extend(route.fallbacks);
         let mut failures = Vec::new();
         for profile in profiles {
-            for attempt_no in 0..=profile.max_retries {
+            for attempt_no in 0..=profile.max_retries.min(MAX_SAFE_RETRIES) {
                 let binding = spend_binding_for_profile(
                     self.agent,
                     &profile,
@@ -549,18 +580,17 @@ impl ReasoningProvider for RoutedReasoningProvider<'_> {
                 let mut effective_profile = profile.clone();
                 effective_profile.max_tokens = binding.agent_max_tokens;
                 let admitted =
-                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
+                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?
+                        .with_profile_limits(&profile)?;
                 match AgentLoopReasoner::from_profile(&admitted, &effective_profile)
                     .reason(request.clone())
                     .await
                 {
                     Ok(response) => return Ok(response),
-                    Err(error) => failures.push(format!(
-                        "{} attempt {}: {}",
-                        profile.reference.stable_ref(),
-                        attempt_no + 1,
-                        error
-                    )),
+                    Err(error) if error.is::<UnresolvedProviderAttempt>() => return Err(error),
+                    Err(error) => {
+                        record_retryable_failure(&profile, attempt_no, error, &mut failures).await?
+                    }
                 }
             }
         }
@@ -617,7 +647,7 @@ impl GenerationProvider for RoutedGenerationProvider<'_> {
         profiles.extend(route.fallbacks);
         let mut failures = Vec::new();
         for profile in profiles {
-            for attempt_no in 0..=profile.max_retries {
+            for attempt_no in 0..=profile.max_retries.min(MAX_SAFE_RETRIES) {
                 let binding = spend_binding_for_profile(
                     self.agent,
                     &profile,
@@ -627,18 +657,17 @@ impl GenerationProvider for RoutedGenerationProvider<'_> {
                 )?;
                 let scope = next_call_scope(IntelligenceRole::Generation, &self.next_scope)?;
                 let admitted =
-                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?;
+                    SpendAdmittedLlm::new_scoped(self.transport, self.ledger, binding, scope)?
+                        .with_profile_limits(&profile)?;
                 match LlmGenerationAdapter::from_profile(&admitted, &profile)
                     .generate(request.clone())
                     .await
                 {
                     Ok(response) => return Ok(response),
-                    Err(error) => failures.push(format!(
-                        "{} attempt {}: {}",
-                        profile.reference.stable_ref(),
-                        attempt_no + 1,
-                        error
-                    )),
+                    Err(error) if error.is::<UnresolvedProviderAttempt>() => return Err(error),
+                    Err(error) => {
+                        record_retryable_failure(&profile, attempt_no, error, &mut failures).await?
+                    }
                 }
             }
         }
@@ -779,5 +808,55 @@ mod tests {
         assert_eq!(shadows.len(), 1);
         assert!(shadows[0].response.is_none());
         assert!(shadows[0].error.is_some());
+    }
+    fn limit_profile(key: &str) -> ModelProfile {
+        ModelProfile {
+            reference: super::super::model_configuration::ModelProfileRef {
+                key: key.into(),
+                version: 1,
+            },
+            provider: "mistral".into(),
+            model: "mistral-small".into(),
+            allowed_roles: vec![IntelligenceRole::Generation],
+            temperature: None,
+            top_p: None,
+            max_tokens: 256,
+            context_window: 32_000,
+            timeout_ms: 20,
+            max_retries: 1,
+            max_concurrency: 1,
+            supports_tool_calling: true,
+            supports_structured_output: true,
+            supports_parallel_requests: true,
+            input_cost_per_1k_microunits: None,
+            output_cost_per_1k_microunits: None,
+            per_request_cost_ceiling_microunits: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn only_explicit_rate_rejections_allow_bounded_retry_and_backoff() {
+        let profile = limit_profile("retry-rate");
+        let mut failures = Vec::new();
+        let start = std::time::Instant::now();
+        let rate =
+            crate::providers::llm::check_mistral_status(reqwest::StatusCode::TOO_MANY_REQUESTS)
+                .unwrap_err();
+        record_retryable_failure(&profile, 0, rate, &mut failures)
+            .await
+            .unwrap();
+        assert!(start.elapsed() >= Duration::from_millis(100));
+        assert_eq!(failures.len(), 1);
+        for error in [
+            anyhow::anyhow!("provider deadline exceeded"),
+            anyhow::anyhow!("settlement failed"),
+            crate::providers::llm::check_mistral_status(reqwest::StatusCode::SERVICE_UNAVAILABLE)
+                .unwrap_err(),
+        ] {
+            assert!(record_retryable_failure(&profile, 0, error, &mut failures)
+                .await
+                .is_err());
+        }
+        assert_eq!(failures.len(), 1);
     }
 }

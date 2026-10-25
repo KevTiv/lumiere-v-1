@@ -24,7 +24,7 @@ const schemaPath = path.join(
 const policyPath = path.join(repoRoot, "lumiere-codegen", "storage-policy-manifest.json");
 const resourceRegistryPath = path.join(repoRoot, "crates", "stdb-auth", "assets", "resource_registry.json");
 const checkOnly = process.argv.includes("--check");
-const EXPECTED_SCHEMA_TABLES = 515;
+const EXPECTED_SCHEMA_TABLES = 517;
 
 // C0 no longer permits application-level platform-global tables. Former
 // exceptions must be organization-owned in schema source before policy
@@ -281,6 +281,8 @@ const OPERATIONAL_STATE_TABLES = new Set([
   "ai_spend_budget",
   "ai_spend_reservation",
   "organization_commit_cursor",
+  "workflow_cancellation_repair_receipt",
+  "workflow_human_task_resubmission",
 ]);
 
 const ACTIVE_ARCHIVE_POLICIES = {

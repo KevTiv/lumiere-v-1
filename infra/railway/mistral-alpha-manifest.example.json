@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "REPLACE_WITH_REVIEWED_40_HEX_RELEASE_COMMIT",
+  "contractVersion": "0.3.139",
+  "runtimeHash": "REPLACE_WITH_REGISTERED_CERTIFICATION_SHA256_DIGEST",
+  "deployment": {
+    "projectId": "cc695d4b-030c-43e3-bbd6-a41095b09257",
+    "environment": "production",
+    "region": "europe-west4-drams3a",
+    "stdbModule": "REPLACE_WITH_EXACT_MODULE"
+  },
+  "organizationId": 0,
+  "companyId": 0,
+  "agentId": 0,
+  "skill": { "key": "report_analysis", "releaseId": 0 },
+  "identities": {
+    "writer": "REPLACE_WITH_SERVER_VERIFIED_64_HEX_IDENTITY",
+    "spendReader": "REPLACE_WITH_SERVER_VERIFIED_64_HEX_IDENTITY",
+    "certification": "REPLACE_WITH_SERVER_VERIFIED_64_HEX_IDENTITY"
+  },
+  "profiles": [
+    {
+      "key": "alpha-main",
+      "version": 1,
+      "model": "REPLACE_WITH_ACCOUNT_VISIBLE_EXACT_MODEL_ID",
+      "roles": ["decision", "reasoning", "generation"],
+      "maxTokens": 2048,
+      "contextWindow": 32768,
+      "timeoutMs": 30000,
+      "maxConcurrency": 1
+    },
+    {
+      "key": "alpha-review",
+      "version": 1,
+      "model": "REPLACE_WITH_DIFFERENT_ACCOUNT_VISIBLE_EXACT_MODEL_ID",
+      "roles": ["review"],
+      "maxTokens": 2048,
+      "contextWindow": 32768,
+      "timeoutMs": 30000,
+      "maxConcurrency": 1
+    }
+  ],
+  "policy": {
+    "key": "mistral-alpha",
+    "version": 1,
+    "decision": "alpha-main@1",
+    "reasoning": "alpha-main@1",
+    "generation": "alpha-main@1",
+    "review": "alpha-review@1"
+  },
+  "budget": {
+    "billingPeriod": "REPLACE_WITH_CURRENT_UTC_YYYY_MM",
+    "currency": "EUR",
+    "limitMicrounits": 0,
+    "prices": [
+      { "model": "REPLACE_WITH_ACCOUNT_VISIBLE_EXACT_MODEL_ID", "inputMicrounitsPer1000Tokens": 0, "outputMicrounitsPer1000Tokens": 0 },
+      { "model": "REPLACE_WITH_DIFFERENT_ACCOUNT_VISIBLE_EXACT_MODEL_ID", "inputMicrounitsPer1000Tokens": 0, "outputMicrounitsPer1000Tokens": 0 }
+    ]
+  }
+}

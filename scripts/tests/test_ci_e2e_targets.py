@@ -1,8 +1,13 @@
 import importlib.util
+import io
+import json
 import os
 import subprocess
+import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 
 spec = importlib.util.spec_from_file_location("ci_e2e_targets", Path(__file__).parents[1] / "ci-e2e-targets.py")
@@ -50,6 +55,75 @@ class SelectSpecsTests(unittest.TestCase):
             f"{E2E}/nested/a.spec.ts": 'import { x } from "../shared/util"\n',
         }
         self.assertEqual(module.select_specs([f"{E2E}/shared/util.ts"], sources), [f"{E2E}/nested/a.spec.ts"])
+
+
+class TargetPlanTests(unittest.TestCase):
+    def broad_sources(self):
+        return {
+            **SOURCES,
+            **{f"{E2E}/importer-{index:02}.spec.ts": 'import { signIn } from "./helpers"\n'
+               for index in range(module.MAX_TARGETED_SPECS + 1)},
+        }
+
+    def test_broad_helper_retains_only_explicitly_changed_existing_fixtures(self):
+        fixtures = [f"{E2E}/work-board-{name}.spec.ts"
+                    for name in ("concurrency", "delegation", "revocation", "rollback")]
+        sources = {**self.broad_sources(), **{path: '// @dev-fixture\n' for path in fixtures}}
+        result = module.plan_targets([f"{E2E}/helpers-legacy.ts", *fixtures,
+                                      fixtures[0], f"{E2E}/removed.spec.ts"], sources)
+        self.assertEqual(result, {
+            "specs": "", "count": "0",
+            "fallback_configs": [{"suite": "targeted", "clear_db": "0", "slot": "changed-1",
+                                  "specs": " ".join(path.removeprefix("frontend/web/") for path in fixtures)}],
+        })
+
+    def test_broad_helper_alone_or_with_deleted_spec_keeps_plain_p0_fallback(self):
+        for deleted in ([], [f"{E2E}/removed.spec.ts"]):
+            with self.subTest(deleted=deleted):
+                self.assertEqual(module.plan_targets([f"{E2E}/helpers-legacy.ts", *deleted],
+                                                     self.broad_sources()),
+                                 {"specs": "", "count": "0", "fallback_configs": []})
+
+    def test_no_e2e_change_has_no_supplemental_batches(self):
+        self.assertEqual(module.plan_targets(["docs/plan.md"], SOURCES),
+                         {"specs": "", "count": "0", "fallback_configs": []})
+
+    def test_targeted_cap_is_inclusive(self):
+        specs = [f"{E2E}/fixture-{index:02}.spec.ts" for index in range(module.MAX_TARGETED_SPECS)]
+        result = module.plan_targets(specs, {path: "// @dev-fixture\n" for path in specs})
+        self.assertEqual(result, {
+            "specs": " ".join(path.removeprefix("frontend/web/") for path in specs),
+            "count": str(module.MAX_TARGETED_SPECS), "fallback_configs": [],
+        })
+
+    def test_supplemental_batches_are_bounded_complete_and_unique(self):
+        specs = [f"{E2E}/fixture-{index:02}.spec.ts" for index in range(2 * module.MAX_TARGETED_SPECS + 2)]
+        result = module.plan_targets([*reversed(specs), specs[0], f"{E2E}/removed.spec.ts"],
+                                     {path: "// @dev-fixture\n" for path in specs})
+        self.assertEqual((result["specs"], result["count"]), ("", "0"))
+        batches = result["fallback_configs"]
+        self.assertEqual([batch["slot"] for batch in batches], ["changed-1", "changed-2", "changed-3"])
+        self.assertEqual([len(batch["specs"].split()) for batch in batches], [25, 25, 2])
+        self.assertEqual([path for batch in batches for path in batch["specs"].split()],
+                         [path.removeprefix("frontend/web/") for path in specs])
+        self.assertTrue(all(batch["suite"] == "targeted" and batch["clear_db"] == "0"
+                            and "shard" not in batch for batch in batches))
+
+    def test_github_output_serializes_supplemental_configs_as_json(self):
+        sources = self.broad_sources()
+        changed = [f"{E2E}/helpers-legacy.ts", f"{E2E}/standalone.spec.ts"]
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "github-output"
+            stdout = io.StringIO()
+            with mock.patch("sys.argv", ["ci-e2e-targets.py", "--base", "base", "--github-output", str(output)]), \
+                    mock.patch.object(module, "changed_paths", return_value=changed), \
+                    mock.patch.object(module, "e2e_sources", return_value=sources), redirect_stdout(stdout):
+                module.main()
+            result = json.loads(stdout.getvalue())
+            fields = dict(line.split("=", 1) for line in output.read_text().splitlines())
+            self.assertEqual((fields["specs"], fields["count"]), ("", "0"))
+            self.assertEqual(json.loads(fields["fallback_configs"]), result["fallback_configs"])
+            self.assertEqual(len(result["fallback_configs"]), 1)
 
 
 class TargetedMakeRecipeTests(unittest.TestCase):

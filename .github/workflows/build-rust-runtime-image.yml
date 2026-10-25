@@ -11,6 +11,7 @@ on:
       - Cargo.toml
       - api-server/**
       - ai-gateway/**
+      - erp-skills/report_analysis/SKILL.md
       - crates/**
       - scripts/prepare-vendored-contracts-rust.sh
       - scripts/sync-directory.py
@@ -32,6 +33,7 @@ on:
       - Cargo.toml
       - api-server/**
       - ai-gateway/**
+      - erp-skills/report_analysis/SKILL.md
       - crates/**
       - scripts/prepare-vendored-contracts-rust.sh
       - scripts/sync-directory.py

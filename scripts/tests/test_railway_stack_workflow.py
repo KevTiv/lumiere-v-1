@@ -136,6 +136,7 @@ class RailwayStackWorkflowTests(unittest.TestCase):
         services = {service["name"]: service for service in manifest["services"]}
         self.assertEqual(manifest["environment"], "production")
         self.assertEqual(manifest["expectedRegion"], "europe-west4-drams3a")
+        self.assertEqual(manifest["configurationRegion"], "europe-west4")
         self.assertFalse(services["ai-gateway"]["required"])
         self.assertEqual(services["ai-gateway"]["featureGate"], "RAILWAY_ENABLE_AI")
         for domain, port in (("expense", 8092), ("hr", 8094), ("project", 8093)):

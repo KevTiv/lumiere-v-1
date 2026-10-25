@@ -12,6 +12,7 @@ export type AccountingRelationLabelMaps = {
   companyLabelMap?: ReadonlyMap<string, string>
   parentLabelMap?: ReadonlyMap<string, string>
   sourceDocumentLabelMap?: ReadonlyMap<string, string>
+  scheduleLabelMap?: ReadonlyMap<string, string>
 }
 
 function relationFkColumn(
@@ -73,11 +74,14 @@ export const bankStatementStateBadges = (t: TFunction) => ({
   },
 }) as const
 
-export type BankStatementsTableConfigOptions = {
+export type BankStatementsTableConfigOptions = Pick<AccountingRelationLabelMaps, "journalLabelMap"> & {
   onEmptyAction?: () => void
 }
 
-export const bankStatementDetailConfig = (t: TFunction): EntityDetailConfig => ({
+export const bankStatementDetailConfig = (
+  t: TFunction,
+  options?: Pick<AccountingRelationLabelMaps, "journalLabelMap">,
+): EntityDetailConfig => ({
   mode: "detail",
   sections: [
     {
@@ -105,23 +109,30 @@ export const bankStatementDetailConfig = (t: TFunction): EntityDetailConfig => (
           key: "balanceStart",
           label: t("accounting.entities.bankStatements.columns.balanceStart"),
           type: "currency",
+          currencyKey: "currencyId",
         },
         {
           key: "balanceEndReal",
           label: t("accounting.entities.bankStatements.columns.balanceEndReal"),
           type: "currency",
+          currencyKey: "currencyId",
         },
         {
           key: "balanceEnd",
           label: t("accounting.entities.bankStatements.columns.balanceEnd"),
           type: "currency",
+          currencyKey: "currencyId",
         },
       ],
     },
     {
       id: "meta",
       fields: [
-        { key: "journalId", label: t("accounting.entities.bankStatements.columns.journalId") },
+        relationFkDetailField(
+          "journalId",
+          t("accounting.entities.bankStatements.columns.journalId"),
+          options?.journalLabelMap,
+        ),
         {
           key: "lineIds",
           label: t("accounting.entities.bankStatements.columns.lineIds"),
@@ -166,7 +177,12 @@ export const bankStatementsTableConfig = (
         width: "min-w-32",
         sortable: true,
       },
-      { key: "journalId", label: t("accounting.entities.bankStatements.columns.journalId"), width: "min-w-32" },
+      relationFkColumn(
+        "journalId",
+        t("accounting.entities.bankStatements.columns.journalId"),
+        options?.journalLabelMap,
+        "min-w-32",
+      ),
       {
         key: "state",
         label: t("accounting.entities.bankStatements.columns.state"),
@@ -184,6 +200,7 @@ export const bankStatementsTableConfig = (
         key: "balanceStart",
         label: t("accounting.entities.bankStatements.columns.balanceStart"),
         type: "currency",
+        currencyKey: "currencyId",
         align: "right",
         sortable: true,
       },
@@ -191,6 +208,7 @@ export const bankStatementsTableConfig = (
         key: "balanceEndReal",
         label: t("accounting.entities.bankStatements.columns.balanceEndReal"),
         type: "currency",
+        currencyKey: "currencyId",
         align: "right",
       },
       { key: "lineIds", label: t("accounting.entities.bankStatements.columns.lineIds"), type: "number", align: "right" },
@@ -232,9 +250,9 @@ export const fixedAssetsTableConfig = (t: TFunction): EntityViewConfig => ({
       { key: "active", label: t("accounting.entities.fixedAssets.columns.active"), type: "boolean", align: "center" },
       { key: "state", label: t("accounting.entities.fixedAssets.columns.state"), type: "badge", ...assetStateBadges(t) },
       { key: "acquisitionDate", label: t("accounting.entities.fixedAssets.columns.acquisitionDate"), type: "date" },
-      { key: "originalValue", label: t("accounting.entities.fixedAssets.columns.originalValue"), type: "currency", align: "right" },
-      { key: "bookValue", label: t("accounting.entities.fixedAssets.columns.bookValue"), type: "currency", align: "right" },
-      { key: "depreciatedValue", label: t("accounting.entities.fixedAssets.columns.depreciatedValue"), type: "currency", align: "right" },
+      { key: "originalValue", label: t("accounting.entities.fixedAssets.columns.originalValue"), type: "currency", currencyKey: "currencyId", align: "right" },
+      { key: "bookValue", label: t("accounting.entities.fixedAssets.columns.bookValue"), type: "currency", currencyKey: "currencyId", align: "right" },
+      { key: "depreciatedValue", label: t("accounting.entities.fixedAssets.columns.depreciatedValue"), type: "currency", currencyKey: "currencyId", align: "right" },
       { key: "methodNumberMonth", label: t("accounting.entities.fixedAssets.columns.methodNumberMonth"), type: "number", align: "right" },
     ],
     emptyMessage: t("accounting.entities.fixedAssets.emptyMessage"),
@@ -320,6 +338,7 @@ export const accountPaymentDetailConfig = (
           key: "amount",
           label: t("accounting.entities.payments.columns.amount"),
           type: "currency",
+          currencyKey: "currencyId",
         },
         {
           key: "state",
@@ -399,6 +418,7 @@ export const accountPaymentsTableConfig = (
         key: "amount",
         label: t("accounting.entities.payments.columns.amount"),
         type: "currency",
+        currencyKey: "currencyId",
         align: "right",
         sortable: true,
       },
@@ -457,7 +477,7 @@ export const paymentTermsTableConfig = (t: TFunction): EntityViewConfig => ({
     columns: [
       { key: "name", label: t("accounting.entities.paymentTerms.columns.name"), width: "min-w-40" },
       { key: "isActive", label: t("accounting.entities.paymentTerms.columns.isActive"), type: "boolean", align: "center" },
-      { key: "note", label: t("accounting.entities.paymentTerms.columns.note"), width: "min-w-48" },
+      { key: "note", type: "markdown", label: t("accounting.entities.paymentTerms.columns.note"), width: "min-w-48" },
     ],
     emptyMessage: t("accounting.entities.paymentTerms.emptyMessage"),
   },
@@ -647,7 +667,7 @@ export const analyticLinesTableConfig = (
         options?.accountLabelMap,
         "min-w-28",
       ),
-      { key: "amount", label: t("accounting.entities.analyticLines.columns.amount"), type: "currency", align: "right" },
+      { key: "amount", label: t("accounting.entities.analyticLines.columns.amount"), type: "currency", currencyKey: "currencyId", align: "right" },
       { key: "date", label: t("accounting.entities.analyticLines.columns.date"), type: "date" },
     ],
     emptyMessage: t("accounting.entities.analyticLines.emptyMessage"),
@@ -689,7 +709,10 @@ export const analyticDistributionModelsTableConfig = (t: TFunction): EntityViewC
 })
 
 // ── Reconciliation widgets ────────────────────────────────────────────────────
-export const reconciliationWidgetsTableConfig = (t: TFunction): EntityViewConfig => ({
+export const reconciliationWidgetsTableConfig = (
+  t: TFunction,
+  options?: Pick<AccountingRelationLabelMaps, "accountLabelMap" | "partnerLabelMap">,
+): EntityViewConfig => ({
   id: "reconciliation-widgets-table",
   title: t("accounting.entities.reconciliationWidgets.title"),
   description: t("accounting.entities.reconciliationWidgets.description"),
@@ -700,11 +723,12 @@ export const reconciliationWidgetsTableConfig = (t: TFunction): EntityViewConfig
     searchPlaceholder: t("accounting.entities.reconciliationWidgets.searchPlaceholder"),
     searchKeys: ["mode", "accountId"],
     columns: [
-      {
-        key: "accountId",
-        label: t("accounting.entities.reconciliationWidgets.columns.accountId"),
-        width: "min-w-24",
-      },
+      relationFkColumn(
+        "accountId",
+        t("accounting.entities.reconciliationWidgets.columns.accountId"),
+        options?.accountLabelMap,
+        "min-w-24",
+      ),
       {
         key: "mode",
         label: t("accounting.entities.reconciliationWidgets.columns.mode"),
@@ -715,11 +739,12 @@ export const reconciliationWidgetsTableConfig = (t: TFunction): EntityViewConfig
         label: t("accounting.entities.reconciliationWidgets.columns.toCheck"),
         type: "boolean",
       },
-      {
-        key: "partnerId",
-        label: t("accounting.entities.reconciliationWidgets.columns.partnerId"),
-        width: "min-w-24",
-      },
+      relationFkColumn(
+        "partnerId",
+        t("accounting.entities.reconciliationWidgets.columns.partnerId"),
+        options?.partnerLabelMap,
+        "min-w-24",
+      ),
       {
         key: "moveLineIds",
         label: t("accounting.entities.reconciliationWidgets.columns.moveLineIds"),
@@ -784,8 +809,8 @@ export const accountMoveLinesTableConfig = (
         "min-w-20",
       ),
       { key: "name", label: t("accounting.entities.moveLines.columns.name"), width: "min-w-40" },
-      { key: "debit", label: t("accounting.entities.moveLines.columns.debit"), type: "currency", align: "right" },
-      { key: "credit", label: t("accounting.entities.moveLines.columns.credit"), type: "currency", align: "right" },
+      { key: "debit", label: t("accounting.entities.moveLines.columns.debit"), type: "currency", currencyKey: "companyCurrencyId", align: "right" },
+      { key: "credit", label: t("accounting.entities.moveLines.columns.credit"), type: "currency", currencyKey: "companyCurrencyId", align: "right" },
     ],
     emptyMessage: t("accounting.entities.moveLines.emptyMessage"),
   },
@@ -879,8 +904,8 @@ export const accountMoveDetailConfig = (t: TFunction): EntityDetailConfig => ({
       id: "amounts",
       fields: [
         { key: "invoicePartnerDisplayName", label: t("accounting.journalEntries.partner") },
-        { key: "amountTotal", label: t("accounting.journalEntries.total"), type: "currency" },
-        { key: "amountResidual", label: t("accounting.journalEntries.residual"), type: "currency" },
+        { key: "amountTotal", label: t("accounting.journalEntries.total"), type: "currency", currencyKey: "currencyId" },
+        { key: "amountResidual", label: t("accounting.journalEntries.residual"), type: "currency", currencyKey: "currencyId" },
         {
           key: "paymentState",
           label: t("accounting.invoices.paymentState"),
@@ -949,6 +974,7 @@ export const accountingJournalEntriesTableConfig = (
         key: "amountTotal",
         label: t("accounting.journalEntries.total"),
         type: "currency",
+        currencyKey: "currencyId",
         align: "right",
         sortable: true,
       },
@@ -1000,7 +1026,10 @@ export const accountingEntityConfigs = (t: TFunction): Record<string, EntityView
   "amortization-lines-table": amortizationLinesTableConfig(t),
 })
 
-export const fxRevaluationRunsTableConfig = (t: TFunction): EntityViewConfig => ({
+export const fxRevaluationRunsTableConfig = (
+  t: TFunction,
+  options?: Pick<AccountingRelationLabelMaps, "sourceDocumentLabelMap">,
+): EntityViewConfig => ({
   id: "fx-revaluation-runs-table",
   title: t("accounting.fxRevaluation.runsTitle"),
   view: {
@@ -1018,14 +1047,22 @@ export const fxRevaluationRunsTableConfig = (t: TFunction): EntityViewConfig => 
         align: "right",
         width: "min-w-28",
       },
-      { key: "moveId", label: t("accounting.fxRevaluation.colMove"), width: "min-w-28" },
+      relationFkColumn(
+        "moveId",
+        t("accounting.fxRevaluation.colMove"),
+        options?.sourceDocumentLabelMap,
+        "min-w-28",
+      ),
       { key: "reference", label: t("accounting.fxRevaluation.colReference"), width: "min-w-40" },
     ],
     emptyMessage: t("accounting.fxRevaluation.runsEmpty"),
   },
 })
 
-export const partnerCreditControlsTableConfig = (t: TFunction): EntityViewConfig => ({
+export const partnerCreditControlsTableConfig = (
+  t: TFunction,
+  options?: Pick<AccountingRelationLabelMaps, "partnerLabelMap">,
+): EntityViewConfig => ({
   id: "partner-credit-controls-table",
   title: t("accounting.creditControl.listTitle"),
   view: {
@@ -1035,7 +1072,12 @@ export const partnerCreditControlsTableConfig = (t: TFunction): EntityViewConfig
     searchPlaceholder: t("accounting.creditControl.searchPlaceholder"),
     searchKeys: ["partnerId", "notes"],
     columns: [
-      { key: "partnerId", label: t("accounting.creditControl.colPartner"), width: "min-w-28" },
+      relationFkColumn(
+        "partnerId",
+        t("accounting.creditControl.colPartner"),
+        options?.partnerLabelMap,
+        "min-w-28",
+      ),
       {
         key: "creditLimit",
         label: t("accounting.creditControl.colLimit"),
@@ -1050,7 +1092,7 @@ export const partnerCreditControlsTableConfig = (t: TFunction): EntityViewConfig
         align: "center",
         width: "min-w-24",
       },
-      { key: "notes", label: t("accounting.creditControl.colNotes"), width: "min-w-40" },
+      { key: "notes", type: "markdown", label: t("accounting.creditControl.colNotes"), width: "min-w-40" },
     ],
     emptyMessage: t("accounting.creditControl.listEmpty"),
   },
@@ -1076,7 +1118,7 @@ export const amortizationSchedulesTableConfig = (t: TFunction): EntityViewConfig
           prepaid: t("accounting.amortization.kind.prepaid"),
         },
       },
-      { key: "description", label: t("accounting.amortization.colDescription"), width: "min-w-48" },
+      { key: "description", type: "markdown", label: t("accounting.amortization.colDescription"), width: "min-w-48" },
       {
         key: "totalAmount",
         label: t("accounting.amortization.colTotal"),
@@ -1097,7 +1139,10 @@ export const amortizationSchedulesTableConfig = (t: TFunction): EntityViewConfig
   },
 })
 
-export const amortizationLinesTableConfig = (t: TFunction): EntityViewConfig => ({
+export const amortizationLinesTableConfig = (
+  t: TFunction,
+  options?: Pick<AccountingRelationLabelMaps, "scheduleLabelMap">,
+): EntityViewConfig => ({
   id: "amortization-lines-table",
   title: t("accounting.amortization.linesTitle"),
   description: t("accounting.amortization.linesDescription"),
@@ -1108,7 +1153,12 @@ export const amortizationLinesTableConfig = (t: TFunction): EntityViewConfig => 
     searchPlaceholder: t("accounting.amortization.searchLines"),
     searchKeys: ["scheduleId", "sequence"],
     columns: [
-      { key: "scheduleId", label: t("accounting.amortization.colSchedule"), width: "min-w-28" },
+      relationFkColumn(
+        "scheduleId",
+        t("accounting.amortization.colSchedule"),
+        options?.scheduleLabelMap,
+        "min-w-28",
+      ),
       {
         key: "sequence",
         label: t("accounting.amortization.colSequence"),
@@ -1144,7 +1194,10 @@ const intercompanyRuleTypeBadges = (t: TFunction) => ({
   },
 }) as const
 
-export const intercompanyRulesTableConfig = (t: TFunction): EntityViewConfig => ({
+export const intercompanyRulesTableConfig = (
+  t: TFunction,
+  options?: Pick<AccountingRelationLabelMaps, "companyLabelMap">,
+): EntityViewConfig => ({
   id: "intercompany-rules-table",
   title: t("accounting.entities.intercompanyRules.title"),
   description: t("accounting.entities.intercompanyRules.description"),
@@ -1179,8 +1232,18 @@ export const intercompanyRulesTableConfig = (t: TFunction): EntityViewConfig => 
     columns: [
       { key: "name", label: t("accounting.entities.intercompanyRules.columns.name"), width: "min-w-40" },
       { key: "ruleType", label: t("accounting.entities.intercompanyRules.columns.ruleType"), type: "badge", ...intercompanyRuleTypeBadges(t) },
-      { key: "sourceCompanyId", label: t("accounting.entities.intercompanyRules.columns.sourceCompanyId"), width: "min-w-32" },
-      { key: "destinationCompanyId", label: t("accounting.entities.intercompanyRules.columns.destinationCompanyId"), width: "min-w-32" },
+      relationFkColumn(
+        "sourceCompanyId",
+        t("accounting.entities.intercompanyRules.columns.sourceCompanyId"),
+        options?.companyLabelMap,
+        "min-w-32",
+      ),
+      relationFkColumn(
+        "destinationCompanyId",
+        t("accounting.entities.intercompanyRules.columns.destinationCompanyId"),
+        options?.companyLabelMap,
+        "min-w-32",
+      ),
       { key: "isActive", label: t("accounting.entities.intercompanyRules.columns.isActive"), type: "boolean", align: "center" },
       { key: "autoValidation", label: t("accounting.entities.intercompanyRules.columns.autoValidation"), type: "boolean", align: "center" },
       { key: "autoGenerateInvoice", label: t("accounting.entities.intercompanyRules.columns.autoGenerateInvoice"), type: "boolean", align: "center" },
@@ -1286,7 +1349,7 @@ export const intercompanyTransactionsTableConfig = (
         options?.companyLabelMap,
         "min-w-32",
       ),
-      { key: "amount", label: t("accounting.entities.intercompanyTransactions.columns.amount"), type: "currency", align: "right" },
+      { key: "amount", label: t("accounting.entities.intercompanyTransactions.columns.amount"), type: "currency", currencyKey: "currencyId", align: "right" },
       relationFkColumn(
         "currencyId",
         t("accounting.entities.intercompanyTransactions.columns.currencyId"),
@@ -1301,3 +1364,14 @@ export const intercompanyTransactionsTableConfig = (
     emptyMessage: t("accounting.entities.intercompanyTransactions.emptyMessage"),
   },
 })
+
+/** ID→label map from a select's `{ value, label }` options (the lists screens already load). */
+export function labelMapFromOptions(
+  options: ReadonlyArray<{ value: string; label: string }> | undefined,
+): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const option of options ?? []) {
+    if (option.value !== "" && option.label.trim() !== "") map.set(option.value, option.label)
+  }
+  return map
+}

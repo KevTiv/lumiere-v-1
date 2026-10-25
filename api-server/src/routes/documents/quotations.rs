@@ -676,8 +676,14 @@ mod tests {
         assert_eq!(decoded.0.metadata.as_deref(), Some(metadata));
         assert_eq!(decoded.0.url, blob.url);
         assert_eq!(decoded.0.checksum, blob.checksum);
-        assert!(
-            stdb_client::ReducerCall::from_name("create_document", json!([7, 3, params])).is_ok()
+        assert_eq!(
+            crate::commands::validate_reducer_scope(
+                contract,
+                &[json!(7), json!({"some": 3}), params],
+                7,
+            )
+            .expect("trusted document registration scope"),
+            vec![3],
         );
     }
 }

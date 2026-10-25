@@ -25,6 +25,7 @@ import { StepAnomalyChart, anomalyPoints } from "./step-anomaly-chart"
 import { RankedBarList, rankItems } from "./ranked-bar-list"
 import { SegmentedShareBar, shareRows } from "./segmented-share-bar"
 import { RadialGauge, gaugeFraction } from "./radial-gauge"
+import { CurrencyFormatProvider } from "../lib/currency-context"
 
 describe("chart-format", () => {
   test("formats money, percent and compact ticks", () => {
@@ -35,6 +36,16 @@ describe("chart-format", () => {
     expect(formatChartTick(12_300, { kind: "currency", currency: "EUR" })).toBe("€12.3K")
     expect(formatChartTick(1_500_000)).toBe("1.5M")
     expect(formatChartValue(Number.NaN)).toBe("—")
+  })
+
+  test("follows an explicit locale for values, ticks and month names", () => {
+    const plain = (text: string) => text.replace(/\u00a0|\u202f/g, " ")
+    expect(formatChartValue(1234.567, undefined, "de-DE")).toBe("1.234,57")
+    expect(plain(formatChartValue(1234.5, { kind: "currency", currency: "EUR" }, "de-DE"))).toBe("1.235 €")
+    expect(formatChartValue(12.345, { kind: "percent" }, "de-DE")).toBe("12,3%")
+    expect(formatChartTick(1_500_000, undefined, "de-DE")).toContain("1,5")
+    expect(monthBuckets(1, new Date(2026, 6, 15), "pt-BR")[0]!.label).not.toBe("Jul")
+    expect(monthBuckets(1, new Date(2026, 6, 15))[0]!.label).toBe("Jul")
   })
 
   test("cycles theme colours", () => {
@@ -104,6 +115,16 @@ describe("chart primitives", () => {
     expect(html).toContain("+12.0%")
     expect(html).not.toContain("Zero")
     expect(renderToStaticMarkup(<RankedBarList items={[]} emptyLabel="Nothing" />)).toContain("Nothing")
+    const priced = [{ label: "North", value: 1234.5 }]
+    const eur = { kind: "currency", currency: "EUR" } as const
+    expect(renderToStaticMarkup(<RankedBarList items={priced} valueFormat={eur} />)).toContain("€1,235")
+    expect(
+      renderToStaticMarkup(
+        <CurrencyFormatProvider locale="de-DE">
+          <RankedBarList items={priced} valueFormat={eur} />
+        </CurrencyFormatProvider>,
+      ),
+    ).toMatch(/1\.235(&nbsp;|\u00a0|\u202f| )€/)
   })
 
   test("share bar computes shares and a breakdown table", () => {

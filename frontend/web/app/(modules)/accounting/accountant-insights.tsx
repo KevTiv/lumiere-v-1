@@ -58,8 +58,8 @@ export function AccountantInsights({ data, now }: { data: AccountantOverviewData
     const title = `${widget.title} · ${currencyLabel}`
     const provenance = reportExportSourceProvenance({
       organizationId: data.organizationId, companyId: data.companyId, dashboardId: "accounting-financial-overview", widgetId: widget.id,
-      model: sourceModel, domain: JSON.stringify({ currencyId: model.selectedId, basis: sourceModel === "crossovered_budget" ? "whole-approved-budgets-overlapping-period" : widget.id === "insight-aging" ? "current-posted-invoice-and-bill-residuals" : "posted-invoice-and-bill-totals-including-tax", ...(sourceModel === "crossovered_budget" ? { limit: 8, order: "name", budgetIds: model.budgets.value?.slice(0, 8).map((item) => item.id) } : { creditNotes: "excluded" }) }),
-      groupBy: widget.id === "insight-trend" ? "month" : widget.id === "insight-aging" ? "due-date-bucket" : "budget",
+      model: sourceModel, domain: JSON.stringify({ currencyId: model.selectedId, basis: sourceModel === "crossovered_budget" ? "whole-approved-budgets-overlapping-period" : sourceModel === "account_bank_statement" ? "latest-closing-balance-per-bank-journal-at-month-end" : widget.id === "insight-aging" ? "current-posted-invoice-and-bill-residuals" : "posted-invoice-and-bill-totals-including-tax", ...(sourceModel === "crossovered_budget" ? { limit: 8, order: "name", budgetIds: model.budgets.value?.slice(0, 8).map((item) => item.id) } : sourceModel === "account_bank_statement" ? { cancelledStatements: "excluded" } : { creditNotes: "excluded" }) }),
+      groupBy: widget.id === "insight-trend" || widget.id === "insight-bank-balance" ? "month" : widget.id === "insight-aging" ? "due-date-bucket" : "budget",
       startMs: widget.id === "insight-aging" ? model.asOfMs : model.startMs,
       endMs: widget.id === "insight-aging" ? model.asOfMs : model.endMs,
     })
@@ -76,9 +76,17 @@ export function AccountantInsights({ data, now }: { data: AccountantOverviewData
       </> : <><h3 className={`${workspaceStyles.sectionTitle} mb-3`}>{title}</h3><ReadNotice state={state} /></>}
     </section>
   }
+  const dayMetric = (title: string, value: number | null | undefined, hint: string, testId: string) => <div className="min-w-0 space-y-3 p-4 sm:p-5" data-testid={testId}>
+    <h3 className="text-xs font-medium leading-5 text-muted-foreground">{title}</h3>
+    {model.turnover.state.status === "ready" && value !== undefined
+      ? <><p className={`${workspaceStyles.metricValue} break-words text-xl sm:text-2xl`}>{value === null ? "—" : t("accounting.insights.daysValue", { count: Math.round(value) })}</p><p className="text-xs leading-5 text-muted-foreground">{value === null ? t("accounting.insights.noPostings") : hint}</p></>
+      : <ReadNotice state={model.turnover.state} />}
+  </div>
   const head = (first: string, left: string, right: string) => <thead><tr className="border-b"><th scope="col" className="py-3 pr-3 text-left font-medium">{first}</th><th scope="col" className="px-2 py-3 font-medium">{left}</th><th scope="col" className="pl-2 py-3 font-medium">{right}</th></tr></thead>
   const trend: AreaChartWidget = { id: "insight-trend", type: "area-chart", width: "full", title: t("accounting.insights.trendTitle"), data: { xAxisKey: "month", series, values: (model.period.value?.months ?? []).map((point) => ({ month: month(point.startMs), [invoiceLabel]: point.invoices, [billLabel]: point.bills })) } }
   const aging: BarChartWidget = { id: "insight-aging", type: "bar-chart", width: "full", title: t("accounting.insights.agingTitle"), data: { categoryKey: "bucket", layout: "horizontal", series, values: (model.aging.value ?? []).map((point) => ({ bucket: agingNames[point.bucket], [invoiceLabel]: point.invoices, [billLabel]: point.bills })) } }
+  const balanceLabel = t("accounting.insights.bankBalance")
+  const bankBalance: AreaChartWidget = { id: "insight-bank-balance", type: "area-chart", width: "full", title: t("accounting.insights.bankBalanceTitle"), data: { xAxisKey: "month", series: [{ name: balanceLabel, color: "hsl(var(--chart-1))" }], values: (model.cash.value?.months ?? []).flatMap((point) => point.balance === null ? [] : [{ month: month(point.startMs), [balanceLabel]: point.balance }]) } }
   const budgets: BarChartWidget = { id: "insight-budgets", type: "bar-chart", width: "full", title: t("accounting.insights.budgetTitle"), data: { categoryKey: "budget", series: [{ name: plannedLabel, color: "hsl(var(--chart-1))" }, { name: actualLabel, color: "hsl(var(--chart-2))" }], values: (model.budgets.value ?? []).slice(0, 8).map((point) => ({ budget: `#${point.id}`, [plannedLabel]: point.planned, [actualLabel]: point.actual })) } }
 
   return <div className="min-w-0 space-y-5 [&_button]:min-h-11 [&_button]:min-w-11 [&_summary]:min-h-11" data-testid="accountant-insights">
@@ -101,11 +109,19 @@ export function AccountantInsights({ data, now }: { data: AccountantOverviewData
         {metric(t("accounting.insights.postedInvoices"), model.period.state, model.period.value?.invoices.current, model.period.value ? comparison(model.period.value.invoices) : null, "insight-posted-invoices")}
         {metric(t("accounting.insights.postedBills"), model.period.state, model.period.value?.bills.current, model.period.value ? comparison(model.period.value.bills) : null, "insight-posted-bills")}
       </div>
+      <div className={`${workspaceStyles.surface} grid min-w-0 divide-y sm:grid-cols-3 sm:divide-y-0 [&>div:not(:first-child)]:sm:border-l`}>
+        {metric(t("accounting.insights.cashPosition"), model.cash.state, model.cash.value?.position, model.cash.value ? <p className="text-xs leading-5 text-muted-foreground">{model.cash.value.accounts === 0 ? t("accounting.insights.noBankStatements") : t("accounting.insights.cashHint", { count: model.cash.value.accounts, date: date(model.cash.value.asOfMs) })}</p> : null, "insight-cash-position")}
+        {dayMetric(t("accounting.insights.dso"), model.turnover.value?.dso, t("accounting.insights.dsoHint", { count: days }), "insight-dso")}
+        {dayMetric(t("accounting.insights.dpo"), model.turnover.value?.dpo, t("accounting.insights.dpoHint", { count: days }), "insight-dpo")}
+      </div>
       <p className="text-xs leading-5 text-muted-foreground">{t("accounting.insights.basisHint")}</p>
     </section>
     <section aria-labelledby="accounting-insights-title" className="space-y-4">
       <h2 id="accounting-insights-title" className="scroll-mt-24 text-lg font-semibold tracking-tight">{t("accounting.insights.insightsTitle")}</h2>
       {chart(trend, model.period.state, t("accounting.insights.trendHint"), <>{head(t("accounting.insights.month"), invoiceLabel, billLabel)}<tbody>{model.period.value?.months.map((point) => <tr key={point.startMs} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{month(point.startMs)}</th><td className="px-2 py-3">{money(point.invoices)}</td><td className="pl-2 py-3">{money(point.bills)}</td></tr>)}</tbody></>)}
+      {chart(bankBalance, model.cash.state, t("accounting.insights.bankBalanceHint"), <>
+        <thead><tr className="border-b"><th scope="col" className="py-3 pr-3 text-left font-medium">{t("accounting.insights.month")}</th><th scope="col" className="pl-2 py-3 font-medium">{balanceLabel}</th></tr></thead>
+        <tbody>{model.cash.value?.months.map((point) => <tr key={point.startMs} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{month(point.startMs)}</th><td className="pl-2 py-3">{point.balance === null ? "—" : money(point.balance)}</td></tr>)}</tbody></>, "account_bank_statement")}
       <div className="grid min-w-0 gap-5 xl:grid-cols-2">
         {chart(aging, model.aging.state, t("accounting.insights.agingHint"), <>{head(t("accounting.insights.daysOverdue"), invoiceLabel, billLabel)}<tbody>{model.aging.value?.map((point) => <tr key={point.bucket} className="border-b last:border-0"><th scope="row" className="py-3 pr-3 text-left font-normal">{agingNames[point.bucket]}</th><td className="px-2 py-3">{money(point.invoices)}</td><td className="pl-2 py-3">{money(point.bills)}</td></tr>)}</tbody></>)}
         {chart(budgets, model.budgets.state, `${t("accounting.insights.budgetHint")} ${model.companyCurrencyId && model.companyCurrencyId !== model.selectedId ? t("accounting.insights.budgetCurrencyHint", { currency: model.currencies.find((item) => item.id === model.companyCurrencyId)?.label ?? `#${model.companyCurrencyId}` }) : ""}`, <>{head(t("accounting.insights.budget"), plannedLabel, actualLabel)}<tbody>{model.budgets.value?.map((point) => <tr key={point.id} className="border-b last:border-0"><th scope="row" className="max-w-48 break-words py-3 pr-3 text-left font-normal">{point.name} (#{point.id})</th><td className="px-2 py-3">{money(point.planned)}</td><td className="pl-2 py-3">{money(point.actual)}<span className="block text-muted-foreground">{t("accounting.insights.variance")}: {money(point.variance)}</span></td></tr>)}</tbody></>, "crossovered_budget")}

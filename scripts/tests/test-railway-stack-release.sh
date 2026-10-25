@@ -178,8 +178,14 @@ mkdir -p "$publisher_bin"
 cat >"$publisher_bin/spacetime" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ "${1:-}" == --config-path ]]; then
+  test -s "$2"
+  printf '%s\n' "$2" >> "$TEST_PUBLISHER_CONFIG_LOG"
+  shift 2
+fi
 case "$1" in
   publish)
+    [[ " $* " == *" --delete-data=never "* ]]
     exit 0
     ;;
   describe)
@@ -189,6 +195,9 @@ case "$1" in
         ;;
       map)
         printf '{"reducers":[],"tables":{"organization":{"columns":[]}},"types":[],"typespace":{}}\n'
+        ;;
+      sections)
+        printf '{"sections":[{"Typespace":{"types":[]}},{"Types":[]},{"Tables":[{"source_name":"organization"}]},{"Reducers":[]}]}\n'
         ;;
       missing)
         printf '{"reducers":[],"tables":[],"types":[],"typespace":{}}\n'
@@ -206,20 +215,27 @@ exit 0
 EOF
 chmod +x "$publisher_bin/spacetime" "$publisher_bin/sleep"
 
+export TEST_PUBLISHER_CONFIG_LOG="$TMP/publisher-config-paths"
+
 publisher_output="$(env \
   "PATH=$publisher_bin:$PATH" \
-  "HOME=$TMP/publisher-home" \
   STDB_HOST=http://spacetimedb.test \
   STDB_MODULE=lumiere-test \
   STDB_SERVER_TOKEN=not-a-real-secret \
   bash "$ROOT/scripts/railway-publish-spacetimedb.sh")"
 grep -Fq 'SpacetimeDB publish and schema verification passed for lumiere-test' <<<"$publisher_output"
-test ! -e "$TMP/publisher-home/.config/spacetime/cli.toml"
 
 env \
   "PATH=$publisher_bin:$PATH" \
-  "HOME=$TMP/publisher-map-home" \
   TEST_SCHEMA_FORM=map \
+  STDB_HOST=http://spacetimedb.test \
+  STDB_MODULE=lumiere-test \
+  STDB_SERVER_TOKEN=not-a-real-secret \
+  bash "$ROOT/scripts/railway-publish-spacetimedb.sh" >/dev/null
+
+env \
+  "PATH=$publisher_bin:$PATH" \
+  TEST_SCHEMA_FORM=sections \
   STDB_HOST=http://spacetimedb.test \
   STDB_MODULE=lumiere-test \
   STDB_SERVER_TOKEN=not-a-real-secret \
@@ -227,7 +243,6 @@ env \
 
 if env \
   "PATH=$publisher_bin:$PATH" \
-  "HOME=$TMP/publisher-missing-home" \
   TEST_SCHEMA_FORM=missing \
   STDB_HOST=http://spacetimedb.test \
   STDB_MODULE=lumiere-test \
@@ -236,6 +251,9 @@ if env \
   echo "publisher accepted a schema without the organization table" >&2
   exit 1
 fi
-test ! -e "$TMP/publisher-missing-home/.config/spacetime/cli.toml"
+
+while IFS= read -r config_path; do
+  test ! -e "$config_path"
+done < "$TEST_PUBLISHER_CONFIG_LOG"
 
 echo "railway stack release tests passed"

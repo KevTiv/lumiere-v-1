@@ -48,7 +48,7 @@ export function opportunityKpis(rows: readonly Row[], ctx: KpiContext): KpiTileD
     {
       key: 'expectedRevenue',
       label: t('crm.kpi.expectedRevenue', { defaultValue: 'Expected revenue' }),
-      value: formatMoneyTotals(expected, formatKpiMoney),
+      value: formatMoneyTotals(expected, (amount, code) => formatKpiMoney(amount, code, ctx.locale)),
       tone: 'success',
       matches: isOpenOpportunity,
     },

@@ -12,6 +12,7 @@ import type {
 import type { Timestamp } from "spacetimedb"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
+import { parseU64IdList } from "@/lib/id-list"
 
 import { stdbParamsToJson } from '@/lib/stdb-params-json'
 
@@ -27,16 +28,7 @@ function numF64(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback
 }
 
-function parseU64List(raw: unknown): bigint[] {
-  if (raw == null || raw === '') return []
-  const s = String(raw).trim()
-  if (!s) return []
-  return s
-    .split(/[\s,]+/)
-    .map((x) => x.trim())
-    .filter(Boolean)
-    .map((x) => BigInt(x))
-}
+const parseU64List = parseU64IdList
 
 function parseStringList(raw: unknown): string[] {
   if (raw == null || raw === '') return []

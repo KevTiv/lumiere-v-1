@@ -257,9 +257,9 @@
   "AccountPayment": {
     "name": "string",
     "move_id": "u64",
-    "reversal_move_id": "u64",
     "ref": "string",
-    "memo": "string"
+    "memo": "string",
+    "reversal_move_id": "u64"
   },
   "AccountPaymentTerm": {
     "note": "string"
@@ -610,13 +610,13 @@
   "AiProviderAttempt": {
     "failure_reason": "string",
     "resolution": "string",
+    "dispatched_at": "timestamp",
+    "finished_at": "timestamp",
     "recovery_actor": "string",
     "recovery_approval_id": "string",
     "recovery_at": "timestamp",
     "reconciliation_actor": "string",
-    "reconciliation_approval_id": "string",
-    "dispatched_at": "timestamp",
-    "finished_at": "timestamp"
+    "reconciliation_approval_id": "string"
   },
   "AiProviderAttemptRead": {
     "failure_reason": "string",
@@ -1210,14 +1210,14 @@
     "metadata": "string"
   },
   "CountryPackDefinition": {
+    "metadata": "string",
     "effective_from": "timestamp",
-    "effective_to": "timestamp",
-    "metadata": "string"
+    "effective_to": "timestamp"
   },
   "CountryPackTaxRule": {
+    "metadata": "string",
     "effective_from": "timestamp",
-    "effective_to": "timestamp",
-    "metadata": "string"
+    "effective_to": "timestamp"
   },
   "CreateAccountAccountParams": {
     "company_id": "u64",
@@ -7281,7 +7281,6 @@
     "ai_suggestion": "string"
   },
   "UpsertSearchEmbeddingParams": {
-    "embedding_hash": "string",
     "metadata": "string"
   },
   "UpsertSubscriptionPriceIndexParams": {

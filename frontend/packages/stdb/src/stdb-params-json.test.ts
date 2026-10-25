@@ -3,6 +3,7 @@ import { describe, it } from "node:test"
 
 import {
   camelToSnakeIdentifier,
+  encodeIdentity,
   encodeOptionalString,
   encodeOptionalTimestamp,
   encodeReducerCallArgs,
@@ -11,6 +12,16 @@ import {
 } from "./stdb-params-json"
 
 describe("stdbParamsToJson", () => {
+  it("encodes keyed and legacy return creation with an explicit Option", () => {
+    const legacy = stdbParamsToJson({ partnerId: 1n, lines: [] }, "CreateReturnOrderParams")
+    assert.deepEqual(legacy.idempotency_key, { none: [] })
+    const keyed = stdbParamsToJson(
+      { partnerId: 1n, lines: [], idempotencyKey: "return-1" },
+      "CreateReturnOrderParams",
+    )
+    assert.deepEqual(keyed.idempotency_key, { some: "return-1" })
+  })
+
   it("encodes complete update_role compatibility params for revocation and clearing", () => {
     for (const permissions of [["organization:read"], []]) {
       assert.deepEqual(encodeReducerCallArgs("update_role", [7, {
@@ -875,6 +886,53 @@ describe("encodeReducerCallArgs claim_workflow_human_task", () => {
     assert.equal(params.task_id, 10)
     assert.equal(params.expected_revision, 1)
     assert.deepEqual(params.acting_for, { none: [] })
+  })
+})
+
+describe("workflow task optional identities", () => {
+  const rawIdentity = "AB".repeat(32)
+  const encodedIdentity = encodeIdentity(rawIdentity)
+  const tasks = [
+    ["claim_workflow_human_task", "ClaimWorkflowHumanTaskParams"],
+    ["decide_workflow_human_task", "DecideWorkflowHumanTaskParams"],
+  ] as const
+
+  for (const [reducer, structName] of tasks) {
+    it(`${reducer} encodes raw and encoded identities with exactly one Some wrapper`, () => {
+      for (const identity of [rawIdentity, `0x${rawIdentity}`, encodedIdentity]) {
+        for (const actingFor of [identity, { some: identity }]) {
+          const input = { taskId: 10n, expectedRevision: 1n, actingFor }
+          const params = stdbParamsToJson(input, structName)
+          assert.deepEqual(params.acting_for, { some: encodedIdentity })
+          assert.deepEqual(encodeReducerCallArgs(reducer, [1, input]), [1, params])
+          assert.deepEqual(stdbParamsToJson(params, structName), params)
+          assert.deepEqual(encodeReducerCallArgs(reducer, [1, params]), [1, params])
+        }
+      }
+    })
+
+    it(`${reducer} preserves absent and explicit None identities`, () => {
+      for (const input of [{}, { actingFor: null }, { actingFor: undefined }, { actingFor: { none: [] } }]) {
+        const params = stdbParamsToJson(input, structName)
+        assert.deepEqual(params.acting_for, { none: [] })
+        assert.deepEqual(encodeReducerCallArgs(reducer, [1, input]), [1, params])
+        assert.deepEqual(stdbParamsToJson(params, structName), params)
+      }
+    })
+  }
+
+  it("preserves required identity struct fields and flat arguments without Option wrapping", () => {
+    const params = stdbParamsToJson({
+      delegatorIdentity: encodedIdentity,
+      delegateeIdentity: encodedIdentity,
+    }, "CreateWorkflowDelegationParams")
+    assert.deepEqual(params.delegator_identity, encodedIdentity)
+    assert.deepEqual(params.delegatee_identity, encodedIdentity)
+    assert.deepEqual(stdbParamsToJson(params, "CreateWorkflowDelegationParams"), params)
+    for (const identity of [rawIdentity, encodedIdentity]) {
+      assert.deepEqual(encodeReducerCallArgs("assign_role", [identity, {}])[0], encodedIdentity)
+      assert.deepEqual(encodeReducerCallArgs("add_org_member", [identity, {}])[0], encodedIdentity)
+    }
   })
 })
 

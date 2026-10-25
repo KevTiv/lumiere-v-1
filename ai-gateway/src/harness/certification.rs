@@ -144,6 +144,7 @@ impl CandidateAdapterRegistry {
         Self::new(vec![
             Arc::new(LowStockCertificationAdapter),
             Arc::new(ReportComposerCertificationAdapter),
+            Arc::new(ReportAnalysisCertificationAdapter),
         ])
     }
 
@@ -327,6 +328,29 @@ impl CandidateCertificationAdapter for ReportComposerCertificationAdapter {
     }
 }
 
+/// Executes the real typed report program with immutable fixture brokers.
+/// Replayed provider replies are labelled as fixtures and never count as a
+/// live-provider acceptance or spend-settlement result.
+struct ReportAnalysisCertificationAdapter;
+
+#[async_trait]
+impl CandidateCertificationAdapter for ReportAnalysisCertificationAdapter {
+    fn supports(&self, version: &CandidateSkillVersion) -> bool {
+        version.skill_key == super::governed_llm_skills::REPORT_ANALYSIS_SKILL_KEY
+            && version.version == BUILT_IN_SEMVER
+            && version.source_hash == report_analysis_certification_bundle_hash()
+    }
+
+    async fn execute(
+        &self,
+        request: CandidateExecutionRequest,
+    ) -> Result<CandidateExecution, CertificationExecutionError> {
+        crate::orchestrator::candidate_certification::execute_report_analysis(request)
+            .await
+            .map_err(|error| CertificationExecutionError::Adapter(error.to_string()))
+    }
+}
+
 fn execute_canonical_policy(
     request: &CandidateExecutionRequest,
     candidate_output: Value,
@@ -470,6 +494,32 @@ pub fn report_composer_certification_bundle_hash() -> String {
         include_bytes!("manifest.rs"),
         include_bytes!("policy_engine.rs"),
         include_bytes!("../tools/tenant_files.rs"),
+    ])
+}
+
+pub fn report_analysis_certification_bundle_hash() -> String {
+    compiled_bundle_hash(&[
+        include_bytes!("governed_llm_skills.rs"),
+        include_bytes!("certification.rs"),
+        include_bytes!("certification_fixtures.rs"),
+        include_bytes!("data_scope_resolver.rs"),
+        include_bytes!("manifest.rs"),
+        include_bytes!("policy_engine.rs"),
+        include_bytes!("privacy_guard.rs"),
+        include_bytes!("../orchestrator/candidate_certification.rs"),
+        include_bytes!("../orchestrator/governed_program.rs"),
+        include_bytes!("../orchestrator/governed_programs.rs"),
+        include_bytes!("../orchestrator/governed_services.rs"),
+        include_bytes!("../orchestrator/intelligence.rs"),
+        include_bytes!("../orchestrator/decision_type.rs"),
+        include_bytes!("../orchestrator/decision_graph.rs"),
+        include_bytes!("../orchestrator/precedent.rs"),
+        include_bytes!("release_registry.rs"),
+        include_bytes!("skill_registry.rs"),
+        include_bytes!("../orchestrator/probabilistic.rs"),
+        include_bytes!("../orchestrator/invocation_policy.rs"),
+        include_bytes!("../orchestrator/answer_gate.rs"),
+        include_bytes!("../../../erp-skills/report_analysis/SKILL.md"),
     ])
 }
 

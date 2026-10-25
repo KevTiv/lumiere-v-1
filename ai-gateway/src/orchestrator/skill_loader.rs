@@ -111,6 +111,31 @@ pub fn intelligence_policy_ref(config: &Value) -> Result<Option<String>> {
     Ok(Some(format!("{}@{}", key.trim(), version)))
 }
 
+/// An admin-authored company skill binding avoids changing the organization's
+/// default agent. Explicit agent/persona selection continues to take precedence.
+pub fn skill_agent_id(
+    config: &Value,
+    requested_agent_id: Option<u64>,
+    team_member_id: Option<u64>,
+) -> Result<Option<u64>> {
+    if requested_agent_id.is_some() || team_member_id.is_some() {
+        return Ok(requested_agent_id);
+    }
+    let value = config
+        .get("defaultAgentId")
+        .or_else(|| config.get("default_agent_id"));
+    match value {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => {
+            let id = value
+                .as_u64()
+                .filter(|id| *id > 0)
+                .context("defaultAgentId must be a positive integer")?;
+            Ok(Some(id))
+        }
+    }
+}
+
 pub async fn load_skill(
     stdb: &StdbClient,
     org_id: u64,
@@ -932,6 +957,20 @@ mod tests {
             "intelligencePolicyRef": 7
         }))
         .is_err());
+    }
+
+    #[test]
+    fn company_agent_binding_preserves_explicit_agent_and_persona_selection() {
+        let config = serde_json::json!({"defaultAgentId": 7});
+        assert_eq!(skill_agent_id(&config, None, None).unwrap(), Some(7));
+        assert_eq!(skill_agent_id(&config, Some(8), None).unwrap(), Some(8));
+        assert_eq!(skill_agent_id(&config, None, Some(9)).unwrap(), None);
+        assert_eq!(
+            skill_agent_id(&serde_json::json!({}), None, None).unwrap(),
+            None
+        );
+        assert!(skill_agent_id(&serde_json::json!({"defaultAgentId": 0}), None, None).is_err());
+        assert!(skill_agent_id(&serde_json::json!({"defaultAgentId": "7"}), None, None).is_err());
     }
 
     #[test]

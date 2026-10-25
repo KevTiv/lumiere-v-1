@@ -149,20 +149,25 @@ pub struct AiProviderAttempt {
     pub failure_reason: Option<String>,
     /// Required explanation when an `outcome_unknown` attempt is reconciled.
     pub resolution: Option<String>,
-    /// Attributable recovery command that moved a stranded dispatched attempt
-    /// to outcome_unknown, or abandoned an accepted pre-dispatch attempt.
-    pub recovery_actor: Option<String>,
-    pub recovery_approval_id: Option<String>,
-    pub recovery_at: Option<Timestamp>,
-    /// Attributable approved command that resolved outcome_unknown.
-    pub reconciliation_actor: Option<String>,
-    pub reconciliation_approval_id: Option<String>,
     pub accepted_by: spacetimedb::Identity,
     pub write_uid: spacetimedb::Identity,
     pub created_at: Timestamp,
     pub dispatched_at: Option<Timestamp>,
     pub finished_at: Option<Timestamp>,
     pub write_date: Timestamp,
+    /// Attributable recovery command that moved a stranded dispatched attempt
+    /// to outcome_unknown, or abandoned an accepted pre-dispatch attempt.
+    #[default(None::<String>)]
+    pub recovery_actor: Option<String>,
+    #[default(None::<String>)]
+    pub recovery_approval_id: Option<String>,
+    #[default(None::<Timestamp>)]
+    pub recovery_at: Option<Timestamp>,
+    /// Attributable approved command that resolved outcome_unknown.
+    #[default(None::<String>)]
+    pub reconciliation_actor: Option<String>,
+    #[default(None::<String>)]
+    pub reconciliation_approval_id: Option<String>,
 }
 
 #[derive(SpacetimeType, Clone, Debug)]
@@ -1325,6 +1330,40 @@ mod tests {
         let (settled, outstanding) = settle_units(100, 20, outstanding, 60, 35).unwrap();
         assert_eq!((settled, outstanding), (55, 0));
         assert_eq!(reserve_units(100, settled, outstanding, 45).unwrap(), 45);
+    }
+
+    #[test]
+    fn competing_budget_reservations_never_overspend_in_any_serialization_order() {
+        // Reducers are transactionally serialized by SpacetimeDB. Exercise
+        // both possible commit orders for two contenders whose combined
+        // allowance exceeds the shared budget.
+        for costs in [[60, 50], [50, 60]] {
+            let mut outstanding = 0;
+            let mut admitted = Vec::new();
+            for cost in costs {
+                match reserve_units(100, 0, outstanding, cost) {
+                    Ok(next) => {
+                        outstanding = next;
+                        admitted.push(cost);
+                    }
+                    Err(_) => {}
+                }
+                assert!(outstanding <= 100);
+            }
+            assert_eq!(admitted, vec![costs[0]]);
+            assert_eq!(outstanding, costs[0]);
+        }
+
+        // When the contenders exactly fit, both commit in either order and
+        // the shared outstanding balance reaches, but never exceeds, the cap.
+        for costs in [[60, 40], [40, 60]] {
+            let mut outstanding = 0;
+            for cost in costs {
+                outstanding = reserve_units(100, 0, outstanding, cost).unwrap();
+                assert!(outstanding <= 100);
+            }
+            assert_eq!(outstanding, 100);
+        }
     }
 
     #[test]

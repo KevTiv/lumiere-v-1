@@ -507,9 +507,14 @@ fn is_authored_column_addition(table: &str, line: &str) -> bool {
     matches!(
         (table, line.strip_suffix(',').unwrap_or(line)),
         (
-            "country_pack_definition",
-            "    \"acceptance_status\" TEXT NOT NULL"
-        ) | ("country_pack_definition", "    \"effective_from\" BIGINT")
+            "search_embedding",
+            "    \"expected_fingerprint\" TEXT NOT NULL"
+        ) | ("search_embedding", "    \"index_generation\" TEXT NOT NULL")
+            | (
+                "country_pack_definition",
+                "    \"acceptance_status\" TEXT NOT NULL"
+            )
+            | ("country_pack_definition", "    \"effective_from\" BIGINT")
             | ("country_pack_definition", "    \"effective_to\" BIGINT")
             | (
                 "country_pack_tax_rule",
@@ -986,6 +991,33 @@ mod tests {
     }
 
     #[test]
+    fn canonical_index_retains_legacy_columns_until_an_audited_retirement() {
+        let old = vec![
+            "CREATE TABLE IF NOT EXISTS \"document\" (".to_string(),
+            "    \"id\" NUMERIC(20,0) NOT NULL,".to_string(),
+            "    \"index_content\" TEXT,".to_string(),
+            "    \"name\" TEXT NOT NULL,".to_string(),
+            ");".to_string(),
+        ];
+        let covered = BTreeMap::from([("document".to_string(), old)]);
+        let current = BTreeMap::from([("document".to_string(),
+            "-- Durable projection: document\nCREATE TABLE IF NOT EXISTS \"document\" (\n    \"id\" NUMERIC(20,0) NOT NULL,\n    \"name\" TEXT NOT NULL,\n);\n".to_string())]);
+        assert!(pending_delta_body(&covered, &current).is_err());
+        let mut changed = current.clone();
+        changed.get_mut("document").unwrap().replace_range(
+            ..,
+            current["document"]
+                .replace("    \"name\" TEXT NOT NULL,\n", "")
+                .as_str(),
+        );
+        assert!(pending_delta_body(&covered, &changed).is_err());
+        assert!(!is_authored_column_addition(
+            "search_embedding",
+            "    \"index_generation\" TEXT,"
+        ));
+    }
+
+    #[test]
     fn emits_deterministic_checksum_and_skips_external_relations() {
         let schema = fixture_manifest();
         let policies = serde_json::json!({ "version": 1, "policies": [
@@ -1384,7 +1416,7 @@ mod tests {
             &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("pg-migration-ledger"),
         )
         .unwrap();
-        assert_eq!(ledger.released.len(), 10);
+        assert_eq!(ledger.released.len(), 11);
         // The v0.3.80 migration 1 that existing databases recorded.
         assert_eq!(
             checksum(&ledger.released[0].sql),
@@ -1399,6 +1431,7 @@ mod tests {
         assert_eq!(ledger.released[7].version, 19);
         assert_eq!(ledger.released[8].version, 20);
         assert_eq!(ledger.released[9].version, 21);
+        assert_eq!(ledger.released[10].version, 22);
         assert_eq!(
             checksum(&ledger.released[3].sql),
             "sha256:a06969f4217bd58dba68cc5291fab2699a1252e6c9269e3bc86e3eb2cd4f719e"
@@ -1428,8 +1461,12 @@ mod tests {
             "sha256:336c8a00ce2ad27063336344e95b6273f4c618e4d448fb738359dab9b91502aa"
         );
         assert_eq!(
+            checksum(&ledger.released[10].sql),
+            "sha256:79437df7d1133c0bf9e63499308df502b7824a3fa067074ea5b15262fabcc369"
+        );
+        assert_eq!(
             (ledger.pending_version, ledger.pending_name.as_str()),
-            (22, "0022_durable_projection_delta")
+            (27, "0027_durable_projection_delta")
         );
     }
     #[test]

@@ -162,7 +162,7 @@ export const newUserInviteForm = (t: TFunction): FormConfig => ({
         {
           id: "email",
           name: "email",
-          type: "text",
+          type: "email",
           label: t("auth.forms.newUserInvite.fields.email"),
           placeholder: t("auth.forms.newUserInvite.fields.emailPlaceholder"),
           required: true,

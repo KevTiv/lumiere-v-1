@@ -1,5 +1,6 @@
 "use client"
 
+import { useCurrencyFormat } from "../../lib/currency-context"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "../../components/chart"
 import { formatChartTick } from "../../lib/chart-format"
@@ -7,6 +8,7 @@ import { seriesChartConfig } from "../../charts/chart-kit"
 import type { BarChartWidget as BarChartWidgetType } from "../../lib/dashboard-types"
 
 export function BarChartWidget({ data }: { data: BarChartWidgetType["data"] }) {
+  const { locale } = useCurrencyFormat()
   const isHorizontal = data.layout === "horizontal"
   const clickable = Boolean(data.onCategoryClick || data.onSegmentClick)
   const config = seriesChartConfig(data.series.map((s) => ({ key: s.name, label: s.name })))
@@ -21,13 +23,13 @@ export function BarChartWidget({ data }: { data: BarChartWidgetType["data"] }) {
         <CartesianGrid strokeDasharray="3 3" horizontal={!isHorizontal} vertical={isHorizontal} />
         {isHorizontal ? (
           <>
-            <XAxis allowDecimals={data.allowDecimals} type="number" tickLine={false} axisLine={false} tickFormatter={(value: number) => formatChartTick(value)} />
+            <XAxis allowDecimals={data.allowDecimals} type="number" tickLine={false} axisLine={false} tickFormatter={(value: number) => formatChartTick(value, undefined, locale)} />
             <YAxis type="category" dataKey={data.categoryKey} tickLine={false} axisLine={false} width={80} />
           </>
         ) : (
           <>
             <XAxis dataKey={data.categoryKey} tickLine={false} axisLine={false} tickMargin={8} minTickGap={8} />
-            <YAxis allowDecimals={data.allowDecimals} tickLine={false} axisLine={false} width={48} tickFormatter={(value: number) => formatChartTick(value)} />
+            <YAxis allowDecimals={data.allowDecimals} tickLine={false} axisLine={false} width={48} tickFormatter={(value: number) => formatChartTick(value, undefined, locale)} />
           </>
         )}
         <ChartTooltip cursor={{ fillOpacity: 0.4 }} content={<ChartTooltipContent />} />

@@ -10,6 +10,7 @@ export interface ContinuationView {
 export interface RunLifecycleView {
   runId: number
   state: string
+  truncated: boolean
   continuation: ContinuationView | null
   questions: Array<{
     id: number
@@ -31,6 +32,17 @@ export interface RunLifecycleView {
     rightRunId: number
     leftContinuation: ContinuationView
     rightContinuation: ContinuationView
+    details: null | {
+      leftStatus: string
+      rightStatus: string
+      leftStepCount: number
+      rightStepCount: number
+      leftTokensUsed: number
+      rightTokensUsed: number
+      toolsOnlyLeft: string[]
+      toolsOnlyRight: string[]
+      toolDiffTruncated: boolean
+    }
   }
 }
 
@@ -123,13 +135,35 @@ export function mapRunLifecycle(payload: unknown): RunLifecycleView | null {
   const rightRunId = comparisonRoot && positiveInteger(comparisonRoot.rightRunId)
   const leftContinuation = comparisonRoot && mapContinuation(comparisonRoot.leftContinuation)
   const rightContinuation = comparisonRoot && mapContinuation(comparisonRoot.rightContinuation)
+  const detailsRoot = comparisonRoot && record(comparisonRoot.details)
+  const leftStepCount = detailsRoot && nonnegativeInteger(detailsRoot.leftStepCount)
+  const rightStepCount = detailsRoot && nonnegativeInteger(detailsRoot.rightStepCount)
+  const leftTokensUsed = detailsRoot && nonnegativeInteger(detailsRoot.leftTokensUsed)
+  const rightTokensUsed = detailsRoot && nonnegativeInteger(detailsRoot.rightTokensUsed)
+  const boundedStrings = (value: unknown) => Array.isArray(value)
+    ? value.slice(0, 20).flatMap((item) => typeof item === 'string' && item.length <= 128 ? [item] : [])
+    : []
+  const details = detailsRoot && leftStepCount !== null && rightStepCount !== null && leftTokensUsed !== null && rightTokensUsed !== null
+    ? {
+        leftStatus: text(detailsRoot.leftStatus, 64),
+        rightStatus: text(detailsRoot.rightStatus, 64),
+        leftStepCount,
+        rightStepCount,
+        leftTokensUsed,
+        rightTokensUsed,
+        toolsOnlyLeft: boundedStrings(detailsRoot.toolsOnlyLeft),
+        toolsOnlyRight: boundedStrings(detailsRoot.toolsOnlyRight),
+        toolDiffTruncated: detailsRoot.toolDiffTruncated === true,
+      }
+    : null
   const comparison = leftRunId && rightRunId && leftContinuation && rightContinuation
-    ? { leftRunId, rightRunId, leftContinuation, rightContinuation }
+    ? { leftRunId, rightRunId, leftContinuation, rightContinuation, details }
     : null
 
   return {
     runId,
     state: text(root.state, 64) || 'unknown',
+    truncated: root.truncated === true,
     continuation,
     questions,
     events,

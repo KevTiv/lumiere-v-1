@@ -1,4 +1,5 @@
 "use client"
+import { useCurrencyFormat } from "@lumiere/ui"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
@@ -45,6 +46,7 @@ import {
   deferredRevenueLinesTableConfig,
   revenueRecognitionRulesTableConfig,
 } from "@lumiere/ui"
+import { EntityLabelsProvider, labelsFromOptions, labelsFromRows } from "@lumiere/ui"
 import type { EntityAction, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   PlayCircle,
@@ -116,7 +118,7 @@ import { isSubscriptionActionApplicable, type SubscriptionActionId } from "./sub
 import { useSubscriptionActions, type SubscriptionDialogAction } from "./use-subscription-actions"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useSaleOrders, usePricelists, type SaleOrder, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
-import { useProducts } from "@lumiere/query-hooks/hooks/inventory"
+import { useProductCategories, useProducts } from "@lumiere/query-hooks/hooks/inventory"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import type { ChartValueFormat } from "@lumiere/ui/lib/chart-format"
@@ -131,6 +133,7 @@ import {
   subscriptionPlanRowsToSelectOptions,
   pricelistRowsToSelectOptions,
   productRowsToSelectOptions,
+  productCategoryRowsToSelectOptions,
   accountJournalRowsToSelectOptions,
   accountAccountRowsToSelectOptions,
   accountMoveRowsToSelectOptions,
@@ -257,6 +260,7 @@ function SubscriptionsClientLoaded({
   const { data: saleOrders = [] } = useSaleOrders(orgId, initialSaleOrders)
   const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
   const { data: products = [] } = useProducts(orgId, initialProducts)
+  const { data: productCategories = [] } = useProductCategories(orgId)
   const { data: journals = [] } = useAccountJournals(orgId)
   const { data: accounts = [] } = useAccountAccounts(orgId)
   const { data: accountMoves = [], isLoading: accountMovesLoading, isError: accountMovesError, error: accountMovesFailure, refetch: refetchAccountMoves } = useAccountMoves(orgId)
@@ -343,6 +347,15 @@ function SubscriptionsClientLoaded({
       : [{ value: "", label: "No currencies available", disabled: true }]
   }, [currencies])
 
+  const entityLabels = useMemo(
+    () => ({
+      subscriptionId: labelsFromRows(subscriptions),
+      planId: labelsFromRows(plans),
+      currencyId: labelsFromOptions(currencyFieldOptions),
+    }),
+    [subscriptions, plans, currencyFieldOptions],
+  )
+
   const recognizeMoveSelectOptions = useMemo(() => {
     const posted = (accountMoves as Record<string, unknown>[]).filter((m) => {
       const state = m.state
@@ -403,8 +416,10 @@ function SubscriptionsClientLoaded({
         recognitionAccountId: accountFieldOptions,
         deferredAccountId: accountFieldOptions,
         expenseAccountId: [{ value: "", label: "—" }, ...accountFieldOptions.filter((o) => o.value !== "")],
+        productCategoryIds: productCategoryRowsToSelectOptions(productCategories),
+        productIds: productFieldOptions,
       }),
-    [t, accountFieldOptions],
+    [t, accountFieldOptions, productCategories, productFieldOptions],
   )
 
   const importPlanCsvFormConfig = useMemo(() => importSubscriptionPlanCsvForm(t), [t])
@@ -705,6 +720,7 @@ function SubscriptionsClientLoaded({
     return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
   }, [t, activatePlan, deactivatePlan, updatePlan, createBundle, askForm, plans])
 
+  const { locale } = useCurrencyFormat()
   const liveSections = useMemo(() => {
     const rows = subscriptions as Record<string, unknown>[]
     const activeRows = rows.filter(isSubscriptionActiveForMetrics)
@@ -742,7 +758,7 @@ function SubscriptionsClientLoaded({
           return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
         }
         if (w.type === "combo-chart" && w.id === "sub-mrr-churn") {
-          return { ...w, data: { ...w.data, values: mrrAndChurnByMonth(chartSubscriptions, now), valueFormat: money } }
+          return { ...w, data: { ...w.data, values: mrrAndChurnByMonth(chartSubscriptions, now, 12, locale), valueFormat: money } }
         }
         if (w.type === "share-bar" && w.id === "sub-plan-mix") {
           return { ...w, data: { ...w.data, ...planMix(chartSubscriptions, plans, now), valueFormat: money } }
@@ -790,6 +806,7 @@ function SubscriptionsClientLoaded({
         return w
           })
   }, [
+    locale,
     subscriptions,
     plans,
     currencies,
@@ -820,7 +837,7 @@ function SubscriptionsClientLoaded({
                 openHref: (record) => (record.id == null ? undefined : `/subscriptions/${String(record.id)}`),
                 detailConfig: { mode: "detail", sections: [{ id: "subscription", fields: [
                   { key: "code", label: t("subscriptions.subscriptions.columns.code") },
-                  { key: "description", label: t("subscriptions.subscriptions.columns.description") },
+                  { key: "description", type: "markdown", label: t("subscriptions.subscriptions.columns.description") },
                 ] }] },
                 customTabs: [{
                   id: "handoffs",
@@ -1049,7 +1066,7 @@ function SubscriptionsClientLoaded({
   )
 
   return (
-    <>
+    <EntityLabelsProvider value={entityLabels}>
       <ModuleView config={config} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
       <FormModal
         open={quickActionForm !== null && actionUsable(quickActionForm.action)}
@@ -1090,6 +1107,6 @@ function SubscriptionsClientLoaded({
           setRecognizeLineId(null)
         }}
       />
-    </>
+    </EntityLabelsProvider>
   )
 }
