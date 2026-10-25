@@ -346,7 +346,7 @@ export function useCreateAiSkillVersion(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CreateAiSkillVersionParams) => {
-      const { urlPath, init } = stdbBffCommandPost("create_ai_skill_version", { params: stdbParamsToJson(params as object) })
+      const { urlPath, init } = stdbBffCommandPost("create_ai_skill_version", { params: stdbParamsToJson(params, "CreateAiSkillVersionParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },
@@ -358,7 +358,7 @@ export function useCreateAiSkillFixture(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CreateAiSkillFixtureParams) => {
-      const { urlPath, init } = stdbBffCommandPost("create_ai_skill_fixture", { params: stdbParamsToJson(params as object) })
+      const { urlPath, init } = stdbBffCommandPost("create_ai_skill_fixture", { params: stdbParamsToJson(params, "CreateAiSkillFixtureParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseCallError(r))
     },

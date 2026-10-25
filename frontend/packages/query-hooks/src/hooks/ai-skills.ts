@@ -253,7 +253,7 @@ export function useCreateAiSkill(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: CreateAiSkillParams) => {
-      const { urlPath, init } = stdbBffCommandPost("create_ai_skill", { params: stdbParamsToJson(params as object) })
+      const { urlPath, init } = stdbBffCommandPost("create_ai_skill", { params: stdbParamsToJson(params, "CreateAiSkillParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
@@ -268,7 +268,7 @@ export function useUpsertAiSkill(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: UpsertAiSkillParams) => {
-      const { urlPath, init } = stdbBffCommandPost("upsert_ai_skill", { params: stdbParamsToJson(params as object) })
+      const { urlPath, init } = stdbBffCommandPost("upsert_ai_skill", { params: stdbParamsToJson(params, "UpsertAiSkillParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
@@ -298,7 +298,7 @@ export function useAssignTeamMemberSkill(organizationId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (params: AssignTeamMemberSkillParams) => {
-      const { urlPath, init } = stdbBffCommandPost("assign_team_member_skill", { params: stdbParamsToJson(params as object) })
+      const { urlPath, init } = stdbBffCommandPost("assign_team_member_skill", { params: stdbParamsToJson(params, "AssignTeamMemberSkillParams") })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error(await parseAiError(r))
     },
