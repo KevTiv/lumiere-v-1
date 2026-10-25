@@ -15,6 +15,7 @@ import type {
 } from "../lib/entity-view-types"
 import { filterEntitySurface } from "../lib/entity-view-types"
 import { useRBAC } from "../lib/rbac-context"
+import { useCurrencyFormat } from "../lib/currency-context"
 import {
   Table,
   TableBody,
@@ -81,7 +82,7 @@ import {
   tableViewStorageKey,
   readSavedFilters,
   removeSavedFilter,
-  sumRowsBy,
+  sumRowsByCurrency,
   savedFiltersStorageKey,
   toggleHiddenColumn,
   upsertSavedFilter,
@@ -153,6 +154,7 @@ export function EntityTable({
   externalFilter,
 }: EntityTableProps) {
   const { t } = useTranslation()
+  const currencyFormat = useCurrencyFormat()
   const { checkPermission } = useRBAC()
   const [search, setSearch] = useState("")
   const [persistedFilters, setPersistedFilters] = useState<Record<string, string>>({})
@@ -326,7 +328,9 @@ export function EntityTable({
   const groupSums = useMemo(() => {
     const groupKey = view.groupBy
     if (!groupKey) return null
-    return new Map(currencyColumns.map((col) => [col.key, sumRowsBy(sorted, groupKey, col.key)] as const))
+    return new Map(
+      currencyColumns.map((col) => [col.key, sumRowsByCurrency(sorted, groupKey, col.key, col.currencyKey)] as const),
+    )
   }, [sorted, view.groupBy, currencyColumns])
   // Rows of the group on top of this page that began on the previous one.
   const continuedGroup = useMemo(() => {
@@ -951,14 +955,36 @@ export function EntityTable({
                         </span>
                       </TableCell>
                       {columns.slice(1).map((col) => {
-                        const total = groupSums?.get(col.key)?.get(group.value)
+                        const sum = groupSums?.get(col.key)?.get(group.value)
                         return (
                           <TableCell
                             key={col.key}
-                            className={cn("py-2 text-sm font-medium", col.align === "right" && "text-right")}
-                            data-testid={total === undefined ? undefined : `entity-group-sum-${col.key}`}
+                            className={cn(
+                              "py-2 text-sm font-medium tabular-nums",
+                              col.align === "right" && "text-right",
+                            )}
+                            data-testid={sum === undefined ? undefined : `entity-group-sum-${col.key}`}
                           >
-                            {total === undefined ? null : formatEntityFieldValue(total, col.type)}
+                            {sum === undefined ? null : sum.currency === null ? (
+                              <span
+                                className="text-muted-foreground"
+                                title={t("common.entityView.mixedCurrencies", {
+                                  defaultValue: "This group mixes currencies, so no single total is shown.",
+                                })}
+                              >
+                                —
+                              </span>
+                            ) : (
+                              formatEntityFieldValue(
+                                sum.total,
+                                col.type,
+                                undefined,
+                                undefined,
+                                (col.currencyKey ? currencyFormat.codeFor(sum.currency) : undefined) ??
+                                  currencyFormat.defaultCode,
+                                currencyFormat.locale,
+                              )
+                            )}
                           </TableCell>
                         )
                       })}

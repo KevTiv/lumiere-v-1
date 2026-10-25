@@ -471,7 +471,7 @@ import {
   toBankStatementCreateInput,
   toBankStatementUpdateParams,
 } from "./bank-statement-actions"
-import { useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
+import { CurrencyFormatProvider, useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
 import type {
   AccountAnalyticAccount,
   AccountFiscalYear,
@@ -1266,6 +1266,12 @@ function AccountingClientReady({
     () =>
       companies.find((company) => company.id === operatingCompanyId)?.currencyId ?? 0n,
     [companies, operatingCompanyId],
+  )
+
+  // The operating company's currency: what an amount without its own currency is shown in.
+  const operatingCompanyCurrencyCode = useMemo(
+    () => invoiceCurrencyOptions.find((option) => option.value === String(manualInvoiceCurrencyId))?.code,
+    [invoiceCurrencyOptions, manualInvoiceCurrencyId],
   )
 
   const manualInvoiceOptions = useMemo(() => {
@@ -6367,6 +6373,7 @@ function AccountingClientReady({
   }
 
   return (
+    <CurrencyFormatProvider currencies={currencies} defaultCode={operatingCompanyCurrencyCode}>
     <ReconciliationMoveLineProvider value={reconciliationSelectionContext}>
       {activeTabUsable && formDialog}
       {companyAvailable ? <AccountingSetupReadinessPanel
@@ -7293,5 +7300,6 @@ function AccountingClientReady({
       />
       {confirmDialogNode}
     </ReconciliationMoveLineProvider>
+    </CurrencyFormatProvider>
   )
 }

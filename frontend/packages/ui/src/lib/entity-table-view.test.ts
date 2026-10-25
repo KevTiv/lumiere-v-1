@@ -118,3 +118,30 @@ describe("sumRowsBy", () => {
     expect(sums.get("b")).toBe(4)
   })
 })
+
+import { sumRowsByCurrency } from "./entity-table-view"
+
+describe("sumRowsByCurrency", () => {
+  const rows = [
+    { s: "a", n: 2, c: "1" },
+    { s: "a", n: 3, c: "1" },
+    { s: "b", n: 4, c: "1" },
+    { s: "b", n: 5, c: "2" },
+    { s: "c", n: 6n, c: { some: "2" } },
+    { s: "c", n: 1, c: 2n },
+  ]
+
+  it("keeps the shared currency of a group and totals its amounts", () => {
+    const sums = sumRowsByCurrency(rows, "s", "n", "c")
+    expect(sums.get("a")).toEqual({ total: 5, currency: "1" })
+    expect(sums.get("c")).toEqual({ total: 7, currency: "2" })
+  })
+
+  it("never presents a total across different currencies", () => {
+    expect(sumRowsByCurrency(rows, "s", "n", "c").get("b")?.currency).toBeNull()
+  })
+
+  it("treats rows as one currency when no currency field is named", () => {
+    expect(sumRowsByCurrency(rows, "s", "n").get("b")).toEqual({ total: 9, currency: "" })
+  })
+})

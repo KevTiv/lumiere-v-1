@@ -52,6 +52,7 @@ import {
 } from "../lib/theme-colors"
 import type { AccountAccount } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
+import { useCurrencyFormat } from "../lib/currency-context"
 import { toast } from "sonner"
 import { TablePager, usePagedRows } from "../components/table-pager"
 
@@ -109,9 +110,6 @@ function getDisplayGroup(account: AccountAccount): DisplayGroup {
   return "other"
 }
 
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v)
-
 function accountOpeningBalance(account: AccountAccount): number {
   return typeof account.openingBalance === "number" && Number.isFinite(account.openingBalance)
     ? account.openingBalance
@@ -140,6 +138,7 @@ interface AccountsTableProps {
 }
 
 function AccountsTable({ accounts, t, onAccountClick, onToggleDeprecated, onEdit }: AccountsTableProps) {
+  const { money: formatCurrency } = useCurrencyFormat()
   const accountsPager = usePagedRows(accounts)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   return (
@@ -272,6 +271,7 @@ export function ChartOfAccountsView({
   chartStructureContent,
 }: ChartOfAccountsViewProps) {
   const { t } = useTranslation()
+  const { money: formatCurrency } = useCurrencyFormat()
   const [searchQuery, setSearchQuery] = useState("")
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
