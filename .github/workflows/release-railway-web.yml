@@ -115,6 +115,30 @@ jobs:
           # whose targets were not traced; `railway up` aborts indexing on them.
           find "$RELEASE_ROOT" -xtype l -print -delete
 
+      - name: Add Railway config-as-code to release context
+        shell: bash
+        env:
+          RELEASE_ROOT: ${{ steps.context.outputs.release_root }}
+        run: |
+          set -euo pipefail
+          # Config-as-code overrides dashboard settings. The web service still carries a
+          # leftover Railpack start command (`pnpm --filter ./web start`) that replaces the
+          # image CMD, and the standalone image has no pnpm. Pin the builder and the start
+          # command to what .github/railway/web-standalone.Dockerfile ships.
+          cat > "$RELEASE_ROOT/railway.json" <<'JSON'
+          {
+            "$schema": "https://railway.com/railway.schema.json",
+            "build": {
+              "builder": "DOCKERFILE",
+              "dockerfilePath": "web/Dockerfile"
+            },
+            "deploy": {
+              "startCommand": "node frontend/web/server.js"
+            }
+          }
+          JSON
+          cp "$RELEASE_ROOT/railway.json" "$RELEASE_ROOT/frontend/railway.json"
+
       - name: Verify release context contains no credentials
         shell: bash
         env:
