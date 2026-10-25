@@ -105,6 +105,16 @@ jobs:
           # dockerfilePath=web/Dockerfile, so preserve that archive layout.
           printf 'release_root=%s\n' "$release_root" >> "$GITHUB_OUTPUT"
 
+      - name: Remove dangling symlinks from release context
+        shell: bash
+        env:
+          RELEASE_ROOT: ${{ steps.context.outputs.release_root }}
+        run: |
+          set -euo pipefail
+          # Next standalone output can leave pnpm symlinks (e.g. .pnpm/node_modules/semver)
+          # whose targets were not traced; `railway up` aborts indexing on them.
+          find "$RELEASE_ROOT" -xtype l -print -delete
+
       - name: Verify release context contains no credentials
         shell: bash
         env:
