@@ -13395,6 +13395,8 @@
         "roleName": "Role name",
         "userOrgId": "User organization membership ID",
         "employeeId": "Employee ID",
+        "companyId": "Company ID (optional)",
+        "temporarySetupAccess": "Temporary setup access (one hour)",
         "isDefault": "Default organization",
         "updateDetailsTitle": "Update org member details",
         "updateRoleTitle": "Update org member role"
