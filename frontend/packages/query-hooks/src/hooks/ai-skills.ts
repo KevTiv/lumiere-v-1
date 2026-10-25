@@ -138,6 +138,34 @@ export function useAiSkills() {
   })
 }
 
+export function useRegisteredAiSkills(organizationId: number) {
+  const validOrganization = Number.isSafeInteger(organizationId) && organizationId > 0
+  return useQuery({
+    queryKey: aiSkillsQueryKey(organizationId),
+    enabled: validOrganization,
+    queryFn: async (): Promise<AiSkillListItem[]> => {
+      if (!validOrganization) throw new Error("An organization is required to read registered skills")
+      // Administration reads canonical registered rows while the runtime can
+      // remain disabled. The API still owns tenant and field authorization.
+      const rows = await fetchQueryList("/api/query/ai-skills", "Failed to read registered AI skills")
+      return rows.map((row) => {
+        const id = Number(row.id)
+        if (!Number.isSafeInteger(id) || id <= 0 || typeof row.skillKey !== "string" || !row.skillKey.trim()
+          || typeof row.name !== "string" || !row.name.trim() || typeof row.category !== "string"
+          || typeof row.isSystem !== "boolean") {
+          throw new Error("Registered AI skills are not fully readable")
+        }
+        return {
+          id, skill_key: row.skillKey, name: row.name, category: row.category,
+          description: row.description ?? undefined, is_system: row.isSystem,
+          source: "stdb", legacy_run_supported: false,
+        }
+      })
+    },
+    staleTime: 60_000,
+  })
+}
+
 export function useRunAiSkill() {
   return useMutation({
     mutationFn: async (args: {

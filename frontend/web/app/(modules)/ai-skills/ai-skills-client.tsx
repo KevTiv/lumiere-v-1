@@ -7,7 +7,7 @@ import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { toCreateAiSkillParams } from "@lumiere/erp-shared/ai-create-params"
 import { DashboardHeader, FormModal, MissingOrganization, type FormConfig } from "@lumiere/ui"
 import {
-  useAiSkills,
+  useRegisteredAiSkills,
   useAiTeamMemberSkills,
   useAiTeamMembers,
   useAssignTeamMemberSkill,
@@ -213,7 +213,7 @@ function AiSkillsLoaded({ organizationId }: { organizationId: number }) {
   const { confirm: confirmDialog, dialog: confirmDialogNode } = useConfirmDialog()
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyId(organizationId)
-  const { data: skills = [], isLoading, error } = useAiSkills()
+  const { data: skills = [], isLoading, error } = useRegisteredAiSkills(organizationId)
   const { data: teamMembers = [] } = useAiTeamMembers(orgId)
   const { data: memberSkills = [] } = useAiTeamMemberSkills(orgId)
   const syncSkills = useSyncAiSkills()
