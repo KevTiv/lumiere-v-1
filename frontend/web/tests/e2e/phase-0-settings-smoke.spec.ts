@@ -23,15 +23,12 @@ test.describe("ERP phase-0 settings smoke @phase-0", () => {
   test("key settings sections render without app errors", async ({ page }) => {
     for (const sectionId of KEY_SETTINGS_SECTION_IDS) {
       await openSettingsSection(page, sectionId)
-      const back = page.getByRole("button", { name: /back to settings/i })
-      if ((await back.count()) === 0) {
-        continue
-      }
-      await expect(back).toBeVisible()
+      await expect(page.getByTestId(`settings-section-${sectionId}`)).toHaveAttribute("aria-current", "page")
+      await expect(page).toHaveURL(new RegExp(`[?&]section=${sectionId}(?:&|$)`))
     }
 
-    await page.goto("/settings")
-    await expect(page.getByRole("heading", { name: /google drive & whatsapp business/i })).toBeVisible()
+    await page.goto("/settings?section=integrations")
+    await expect(page.getByRole("heading", { name: /^integrations$/i, level: 2 })).toBeVisible()
     await expectNoAppError(page)
   })
 

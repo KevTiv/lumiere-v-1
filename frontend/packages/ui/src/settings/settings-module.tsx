@@ -1,14 +1,14 @@
 "use client"
 
-import type { ComponentType } from "react"
-import { useState } from "react"
+import type { ComponentType, ReactNode } from "react"
+import { useCallback } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 
 import { cn } from "@/lib/utils"
 import { useRBAC } from "@/lib/rbac-context"
-import { isSettingsSectionVisibleForProfile, settingsSections } from "@/lib/rbac-defaults"
+import { isPersonalSettingsSection, isSettingsSectionVisibleForProfile, settingsSections } from "@/lib/rbac-defaults"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   User,
@@ -17,7 +17,6 @@ import {
   Users,
   Shield,
   ScrollText,
-  ChevronRight,
   Settings2,
   BookMarked,
   Lock,
@@ -53,48 +52,121 @@ const settingsGroups = [
   {
     id: "account",
     title: "Account",
-    description: "Personal preferences and workspace experience.",
     sectionIds: ["profile", "notifications", "appearance", "custom-fields"],
   },
   {
     id: "organization",
     title: "Organization",
-    description: "Company configuration and user access.",
     sectionIds: ["organization", "users", "roles", "sso"],
+  },
+  {
+    id: "data",
+    title: "Data & integrations",
+    sectionIds: [],
   },
   {
     id: "platform",
     title: "Platform",
-    description: "Automation, AI, forms, and audit controls.",
     sectionIds: ["ai", "form-config", "audit"],
   },
 ] as const
 
-type SettingsSectionItem = (typeof settingsSections)[number]
+export type SettingsGroupId = (typeof settingsGroups)[number]["id"]
+
+/** A section supplied by the host app (e.g. integrations) that lives in the same nav as the built-in ones. */
+export interface SettingsExtraSection {
+  id: string
+  groupId: SettingsGroupId
+  title: string
+  description: string
+  icon?: ComponentType<{ className?: string }>
+  content: ReactNode
+}
+
+interface NavSection {
+  id: string
+  groupId: SettingsGroupId
+  title: string
+  description: string
+  Icon: ComponentType<{ className?: string }>
+}
+
+const SECTION_QUERY_PARAM = "section"
 
 interface SettingsModuleProps {
   className?: string
+  extraSections?: SettingsExtraSection[]
   uploadInvoiceLogo?: (file: File, companyId: string | null) => Promise<string>
   firstOrgProfile?: boolean
 }
 
 export function SettingsModule({
   className,
+  extraSections = [],
   uploadInvoiceLogo,
   firstOrgProfile = false,
 }: SettingsModuleProps) {
   const { t } = useTranslation()
-
-  const [activeSection, setActiveSection] = useState<string | null>(null)
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { checkPermission, isAdmin } = useRBAC()
-  const accessibleSections = settingsSections.filter(
-    (section) =>
-      isSettingsSectionVisibleForProfile(section.id, isAdmin(), firstOrgProfile) &&
-      checkPermission(section.requiredPermission, section.requiredAction).allowed,
+
+  const builtIn: NavSection[] = settingsSections
+    .filter(
+      (section) =>
+        isSettingsSectionVisibleForProfile(section.id, isAdmin(), firstOrgProfile) &&
+        (isPersonalSettingsSection(section.id) ||
+          checkPermission(section.requiredPermission, section.requiredAction).allowed),
+    )
+    .map((section) => {
+      const group = settingsGroups.find((g) => (g.sectionIds as readonly string[]).includes(section.id))
+      return {
+        id: section.id,
+        groupId: group?.id ?? "platform",
+        title: section.title,
+        description: section.description,
+        Icon: iconMap[section.icon] || User,
+      }
+    })
+  const extras: NavSection[] = extraSections.map((section) => ({
+    id: section.id,
+    groupId: section.groupId,
+    title: section.title,
+    description: section.description,
+    Icon: section.icon ?? Settings2,
+  }))
+
+  const groups = settingsGroups
+    .map((group) => ({
+      ...group,
+      sections: [
+        ...group.sectionIds
+          .map((id) => builtIn.find((section) => section.id === id))
+          .filter((section): section is NavSection => Boolean(section)),
+        ...extras.filter((section) => section.groupId === group.id),
+      ],
+    }))
+    .filter((group) => group.sections.length > 0)
+
+  const allSections = groups.flatMap((group) => group.sections)
+  const requested = searchParams?.get(SECTION_QUERY_PARAM)
+  const active = allSections.find((section) => section.id === requested) ?? allSections[0] ?? null
+
+  const selectSection = useCallback(
+    (id: string) => {
+      const next = new URLSearchParams(searchParams?.toString() ?? "")
+      next.set(SECTION_QUERY_PARAM, id)
+      router.replace(`${pathname}?${next.toString()}`, { scroll: false })
+    },
+    [pathname, router, searchParams],
   )
 
   const renderSectionContent = () => {
-    switch (activeSection) {
+    if (!active) return null
+    const extra = extraSections.find((section) => section.id === active.id)
+    if (extra) return extra.content
+    switch (active.id) {
       case "users":
         return <UserManagement />
       case "roles":
@@ -106,7 +178,7 @@ export function SettingsModule({
       case "profile":
       case "notifications":
       case "appearance":
-        return <ProfileSettings section={activeSection} />
+        return <ProfileSettings section={active.id} />
       case "form-config":
         return <UnifiedFormConfigSettings />
       case "custom-fields":
@@ -120,103 +192,67 @@ export function SettingsModule({
     }
   }
 
-  if (activeSection) {
-    const section = settingsSections.find(s => s.id === activeSection)
-    return (
-      <div className={cn("space-y-6", className)}>
-        <div className="flex items-start gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setActiveSection(null)}
-            className="gap-2"
-          >
-            <ChevronRight className="h-4 w-4 rotate-180" />
-            {t("settings.backToSettings")}
-          </Button>
-          <div className="min-w-0 pt-1">
-            <h2 className="text-xl font-semibold tracking-[-0.02em]">{section?.title}</h2>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{section?.description}</p>
-          </div>
-        </div>
-        {renderSectionContent()}
-      </div>
-    )
-  }
-
   return (
-    <div className={cn("space-y-6", className)}>
-      <div className="flex items-center justify-between">
+    <div className={cn("grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start", className)}>
+      <nav aria-label={t("settings.page.title")} className="lg:sticky lg:top-4">
         {isAdmin() && (
-          <Badge variant="outline" className="gap-1 border-border text-muted-foreground">
+          <Badge variant="outline" className="mb-3 hidden gap-1 border-border text-muted-foreground lg:inline-flex">
             <Shield className="h-3 w-3" />
             {t("settings.adminAccess")}
           </Badge>
         )}
+        <div className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:gap-5 lg:overflow-visible lg:px-0 lg:pb-0">
+          {groups.map((group) => (
+            <div key={group.id} className="flex shrink-0 gap-1 lg:flex-col">
+              <p className="hidden px-2 pb-1 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground lg:block">
+                {group.title}
+              </p>
+              {group.sections.map((section) => {
+                const isActive = section.id === active?.id
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    data-testid={`settings-section-${section.id}`}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "flex shrink-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20",
+                      isActive
+                        ? "bg-muted font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+                    )}
+                    onClick={() => selectSection(section.id)}
+                  >
+                    <section.Icon className="h-4 w-4 shrink-0" />
+                    <span className="whitespace-nowrap">{section.title}</span>
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </nav>
+
+      <div className="min-w-0 space-y-6">
+        {active ? (
+          <>
+            <header>
+              <h2 className="text-xl font-semibold tracking-[-0.02em]">{active.title}</h2>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{active.description}</p>
+            </header>
+            {renderSectionContent()}
+          </>
+        ) : null}
+
+        {!isAdmin() && (
+          <Card className="border-dashed">
+            <CardContent className="py-8 text-center">
+              <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">{t("settings.restricted")}</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
-
-      <div className="space-y-5">
-        {settingsGroups.map((group) => {
-          const sections = group.sectionIds
-            .map((id) => accessibleSections.find((section) => section.id === id))
-            .filter((section): section is SettingsSectionItem => Boolean(section))
-
-          if (sections.length === 0) return null
-
-          return (
-            <section key={group.id} className="space-y-2">
-              <div className="space-y-1">
-                <h3 className="text-sm font-semibold tracking-[-0.01em]">{group.title}</h3>
-                <p className="text-sm text-muted-foreground">{group.description}</p>
-              </div>
-              <Card>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-border">
-                    {sections.map((section) => {
-                      const Icon = iconMap[section.icon] || User
-
-                      return (
-                        <button
-                          key={section.id}
-                          type="button"
-                          data-testid={`settings-section-${section.id}`}
-                          className="flex w-full items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20"
-                          onClick={() => setActiveSection(section.id)}
-                        >
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground">
-                            <Icon className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground">{section.title}</p>
-                            <p className="mt-0.5 line-clamp-2 text-sm leading-5 text-muted-foreground">
-                              {section.description}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
-                            <span className="hidden sm:inline">{t("settings.configure")}</span>
-                            <ChevronRight className="h-4 w-4" />
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
-          )
-        })}
-      </div>
-
-      {!isAdmin() && (
-        <Card className="border-dashed">
-          <CardContent className="py-8 text-center">
-            <Lock className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">
-              {t("settings.restricted")}
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }
