@@ -14,6 +14,7 @@ import {
   recentNotifications,
 } from "@lumiere/ui"
 import { useWebChatterUploader } from "@/lib/chatter-attachment-uploader"
+import { EntityCurrencyBoundary } from "@/lib/entity-currency-boundary"
 import { useErpSession } from "@lumiere/erp-session"
 import type { ChatContext, ChatMessage, ChatMessageSourceRef, ChatAction } from "@lumiere/ui"
 import {
@@ -659,7 +660,9 @@ export default function ModulesShell({
       <Suspense fallback={null}>
         <ErpAiRouteContextProvider>
           <ChatterUploaderProvider value={useWebChatterUploader}>
-            <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+            <EntityCurrencyBoundary>
+              <ModulesContent firstOrgProfile={firstOrgProfile}>{children}</ModulesContent>
+            </EntityCurrencyBoundary>
           </ChatterUploaderProvider>
         </ErpAiRouteContextProvider>
       </Suspense>

@@ -20,7 +20,13 @@ import { EntityDetail } from "./entity-detail"
 import { EntityBoardView } from "./entity-board"
 import { EntityPivotView } from "./entity-pivot"
 import { ALL_FILTER_VALUE, matchesSearch, rowFilterValue } from "../lib/entity-table-engine"
-import { formatEntityFieldValue, getRowField, resolveCurrencyCode } from "../lib/entity-row-utils"
+import { formatEntityFieldValue, getRowField } from "../lib/entity-row-utils"
+import { useCurrencyFormat } from "../lib/currency-context"
+import { useEntityLabels } from "../lib/entity-labels-context"
+import { resolveAccountingRelationLabel } from "@lumiere/stdb/read-models"
+
+export { EntityLabelsProvider, labelsFromOptions, labelsFromRows, useEntityLabels } from "../lib/entity-labels-context"
+import { unwrapEntityValue } from "../lib/entity-row-values"
 import { Input } from "../components/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Button } from "../components/button"
@@ -67,28 +73,54 @@ export function useEntitySurfaceFilter<T extends EntityPermissioned>(
 export function useScopedEntityTableConfig(config: EntityTableConfig): EntityTableConfig {
   const columns = useEntitySurfaceFilter(config.columns)
   const actions = useEntitySurfaceFilter(config.actions)
+  const currency = useCurrencyFormat()
+  const labels = useEntityLabels()
   return useMemo(
     () => ({
       ...config,
-      // Currency columns that name a row currency field format with that row's currency.
-      columns: columns.map((column) =>
-        column.type === "currency" && column.currencyKey && !column.render
-          ? {
-              ...column,
-              render: (value: unknown, row: Record<string, unknown>) =>
-                formatEntityFieldValue(
-                  value,
-                  "currency",
-                  undefined,
-                  undefined,
-                  resolveCurrencyCode(getRowField(row, column.currencyKey!)),
-                ),
-            }
-          : column,
-      ),
+      // Currency columns format in their row's currency (named by `currencyKey`, as an ISO code or a
+      // currency record id), else the company's, in the user's locale. They are right-aligned, and
+      // negatives are tinted so they stand out in a column of figures.
+      columns: columns.map((column) => {
+        // A related-record column (partnerId, productId, …) shows the record's name when the page
+        // supplied names for that field; ids with no known name show as "#id", empty cells as "—".
+        const names = labels?.[column.key]
+        if (names && !column.render && (!column.type || column.type === "number" || column.type === "text") && !column.inlineEdit) {
+          return {
+            ...column,
+            render: (value: unknown) => {
+              const shown = resolveAccountingRelationLabel(value, names)
+              return shown === "—" ? <span className="text-muted-foreground">—</span> : shown
+            },
+          }
+        }
+        if (column.type !== "currency" || column.render) return column
+        const rowCurrencyKey = column.currencyKey ?? currency.rowCurrencyKey
+        return {
+          ...column,
+          align: column.align ?? "right",
+          render: (value: unknown, row: Record<string, unknown>) => {
+            const content = formatEntityFieldValue(
+              value,
+              "currency",
+              undefined,
+              undefined,
+              (rowCurrencyKey ? currency.codeFor(getRowField(row, rowCurrencyKey)) : undefined) ??
+                currency.defaultCode,
+              currency.locale,
+            )
+            const amount = unwrapEntityValue(value)
+            return typeof amount === "number" && amount < 0 ? (
+              <span className="text-destructive">{content}</span>
+            ) : (
+              content
+            )
+          },
+        }
+      }),
       actions: actions.length > 0 ? actions : undefined,
     }),
-    [config, columns, actions],
+    [config, columns, actions, currency, labels],
   )
 }
 

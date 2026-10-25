@@ -1,5 +1,6 @@
 "use client"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { useCurrencyFormat } from "@lumiere/ui"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { expensesTableConfig } from "@lumiere/ui/lib/expenses-entity-configs"
 import { ExpenseSourcePreview } from "../../../components/finance-source-preview"
@@ -396,6 +397,7 @@ function ExpensesClientLoaded({
     projectId1: projectFieldOptions, projectId2: projectFieldOptions,
     projectId3: projectFieldOptions, projectId4: projectFieldOptions,
   }), [t, projectFieldOptions])
+  const { locale } = useCurrencyFormat()
   const liveSections = useMemo(() => {
     const pendingApproval = sheetsToApprove.length
     const missingReceiptCount = missingReceipts.length
@@ -425,7 +427,7 @@ function ExpensesClientLoaded({
           return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
         }
         if (w.type === "combo-chart" && w.id === "exp-monthly-spend") {
-          return { ...w, data: { ...w.data, values: monthlySpend(chartExpenses, now), valueFormat: money } }
+          return { ...w, data: { ...w.data, values: monthlySpend(chartExpenses, now, 6, locale), valueFormat: money } }
         }
         if (w.type === "ranked-bars" && w.id === "exp-spend-by-category") {
           return {
@@ -509,6 +511,7 @@ function ExpensesClientLoaded({
         return w
           })
   }, [
+    locale,
     expenses,
     sheets,
     expensesRaw,

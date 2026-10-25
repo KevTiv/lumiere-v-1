@@ -1,5 +1,6 @@
 "use client"
 
+import { useCurrencyFormat } from "../lib/currency-context"
 import { useId } from "react"
 import { Area, Bar, CartesianGrid, ComposedChart, ReferenceDot, ReferenceLine, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip } from "../components/chart"
@@ -58,6 +59,7 @@ export function StepAnomalyChart({
   valueFormat,
   className,
 }: StepAnomalyChartProps) {
+  const { locale } = useCurrencyFormat()
   const gradientId = `step-fill-${useId().replace(/:/g, "")}`
   const config = seriesChartConfig([series])
   const color = series.color ?? chartColor(0)
@@ -79,9 +81,9 @@ export function StepAnomalyChart({
             tickLine={false}
             axisLine={false}
             width={52}
-            tickFormatter={(value: number) => formatChartTick(value, valueFormat)}
+            tickFormatter={(value: number) => formatChartTick(value, valueFormat, locale)}
           />
-          <ChartTooltip content={valueTooltip(config, valueFormat)} />
+          <ChartTooltip content={valueTooltip(config, valueFormat, undefined, locale)} />
           {reference ? (
             <ReferenceLine
               y={reference.value}
@@ -125,7 +127,7 @@ export function StepAnomalyChart({
               <span>
                 Unusual {String(point[xAxisKey])}:{" "}
                 <span className="font-medium tabular-nums text-foreground">
-                  {formatChartValue(Number(point[series.key] ?? 0), valueFormat)}
+                  {formatChartValue(Number(point[series.key] ?? 0), valueFormat, locale)}
                 </span>
               </span>
             </li>

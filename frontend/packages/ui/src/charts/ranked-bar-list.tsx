@@ -1,5 +1,6 @@
 "use client"
 
+import { useCurrencyFormat } from "../lib/currency-context"
 import { cn } from "../lib/utils"
 import { TrendBadge } from "../components/trend-badge"
 import { chartColor, formatChartValue, type ChartValueFormat } from "../lib/chart-format"
@@ -45,6 +46,7 @@ export function RankedBarList({
   onItemClick,
   className,
 }: RankedBarListProps) {
+  const { locale } = useCurrencyFormat()
   const ranked = rankItems(items, maxItems)
   if (ranked.length === 0) return <ChartEmpty label={emptyLabel} />
   const max = ranked[0]!.value
@@ -61,7 +63,7 @@ export function RankedBarList({
               </div>
               <div className="flex shrink-0 flex-col items-end">
                 <span className="text-sm font-semibold tabular-nums text-foreground">
-                  {formatChartValue(item.value, valueFormat)}
+                  {formatChartValue(item.value, valueFormat, locale)}
                 </span>
                 {item.change !== undefined ? (
                   <span className="[&>div]:mt-0">

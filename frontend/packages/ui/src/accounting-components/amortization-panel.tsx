@@ -64,7 +64,12 @@ export function AmortizationPanel({
   )
 
   const linesConfig = useMemo((): EntityViewConfig => {
-    const base = amortizationLinesTableConfig(t)
+    const scheduleLabelMap = new Map<string, string>()
+    for (const schedule of schedules) {
+      const label = String(schedule.name ?? "").trim()
+      if (schedule.id != null && label) scheduleLabelMap.set(String(schedule.id), label)
+    }
+    const base = amortizationLinesTableConfig(t, { scheduleLabelMap })
     const view = base.view as EntityTableConfig
     return {
       ...base,
@@ -109,7 +114,7 @@ export function AmortizationPanel({
         ],
       },
     }
-  }, [t, recognizePending, recognizingId, onRecognizeLine])
+  }, [t, schedules, recognizePending, recognizingId, onRecognizeLine])
 
   const createFormConfig = useMemo(
     () =>

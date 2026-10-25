@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { useCurrencyFormat } from "../lib/currency-context"
 import {
   entryTableBadgeVariantClass,
   entryTableProgressBarClass,
@@ -26,6 +27,7 @@ export function EntryTableCell({
   row,
   imagePlaceholder,
 }: EntryTableCellProps) {
+  const { locale } = useCurrencyFormat()
   switch (column.type) {
     case "text": {
       const textCol = column
@@ -68,7 +70,7 @@ export function EntryTableCell({
       const curCol = column
       if (value == null) return <span className="text-muted-foreground">-</span>
       const num = Number(value)
-      const formatted = new Intl.NumberFormat(curCol.locale || "en-US", {
+      const formatted = new Intl.NumberFormat(curCol.locale || locale, {
         style: "currency",
         currency: curCol.currency || "USD",
       }).format(num)

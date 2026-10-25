@@ -1,5 +1,7 @@
 "use client"
 
+import { useCurrencyFormat } from "../../lib/currency-context"
+
 interface BudgetEntry {
   name: string
   planned: number
@@ -12,11 +14,8 @@ interface BudgetProgressData {
 }
 
 export function BudgetProgressWidget({ data }: { data: BudgetProgressData }) {
-  const fmt = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-  })
+  const { money } = useCurrencyFormat()
+  const fmt = { format: (value: number) => money(value, undefined, { compact: true }) }
 
   if (data.budgets.length === 0) {
     return (

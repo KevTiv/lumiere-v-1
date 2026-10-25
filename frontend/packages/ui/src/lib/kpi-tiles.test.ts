@@ -90,6 +90,12 @@ describe("kpi money", () => {
     expect(formatKpiMoney(1, "ZZZZ")).toBe("1.00")
   })
 
+  it("follows an explicit locale", () => {
+    const plain = (text: string) => text.replace(/\u00a0|\u202f/g, " ")
+    expect(plain(formatKpiMoney(1234.5, "EUR", "de-DE"))).toBe("1.234,50 €")
+    expect(formatKpiMoney(1234.5, "", "de-DE")).toBe("1.234,50")
+  })
+
   it("maps currency ids to upper-cased codes", () => {
     const map = currencyCodeMap([{ id: 1n, code: "usd" }, { id: 2, code: "" }, { code: "EUR" }])
     expect([...map]).toEqual([["1", "USD"]])

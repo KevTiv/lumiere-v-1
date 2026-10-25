@@ -5,38 +5,43 @@ set -euo pipefail
 : "${STDB_MODULE:?STDB_MODULE is required}"
 : "${STDB_SERVER_TOKEN:?STDB_SERVER_TOKEN is required}"
 
-config_dir="${HOME:-/root}/.config/spacetime"
-config_file="${config_dir}/cli.toml"
-mkdir -p "${config_dir}"
-chmod 0700 "${config_dir}"
 umask 077
-printf 'spacetimedb_token = "%s"\n' "${STDB_SERVER_TOKEN}" > "${config_file}"
-
+config_file="$(mktemp)"
 schema_file="$(mktemp)"
+printf 'spacetimedb_token = "%s"\n' "${STDB_SERVER_TOKEN}" > "${config_file}"
 cleanup() {
   rm -f -- "${config_file}" "${schema_file}"
 }
 trap cleanup EXIT
 
-spacetime publish "${STDB_MODULE}" \
-  --bin-path /app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm \
+spacetime --config-path "${config_file}" publish "${STDB_MODULE}" \
+  --bin-path "${STDB_WASM_PATH:-/app/spacetimedb/target/wasm32-unknown-unknown/release/lumiere_v1.wasm}" \
   --server "${STDB_HOST}" \
-  -y
+  --delete-data=never \
+  --yes=remote,migrate,break-clients,skip-login --no-config
 
-spacetime describe "${STDB_MODULE}" \
+spacetime --config-path "${config_file}" describe \
   --server "${STDB_HOST}" \
-  --json > "${schema_file}"
+  --json --no-config "${STDB_MODULE}" > "${schema_file}"
 
 test -s "${schema_file}"
 jq -e '
   def canonical_table_name:
     if type == "string" then .
     elif type == "object" then
-      (.name // .table_name // .tableName // .table.name? // empty)
+      (.source_name // .name // .table_name // .tableName // .table.name? // empty)
       | if type == "object" then (.name // .value // empty) else . end
     else empty
     end;
-  type == "object"
+  # CLI 2.8 returns RawModuleDefV10 sections; older schemas use direct fields.
+  if type == "object" and (.sections | type) == "array" then
+    reduce .sections[] as $section ({}; . + $section)
+    | {reducers: .Reducers, tables: .Tables, types: .Types, typespace: .Typespace}
+  else . end
+  | type == "object"
+  and (.reducers | type) == "array"
+  and (.types | type) == "array"
+  and (.typespace | type) == "object"
   and has("reducers")
   and has("tables")
   and has("types")
