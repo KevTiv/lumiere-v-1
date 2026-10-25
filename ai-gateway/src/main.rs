@@ -129,18 +129,19 @@ async fn main() -> anyhow::Result<()> {
 
     let http = reqwest::Client::new();
     let providers = build_providers(&config, http.clone())?;
-    let embed_dim = providers.embedder.dimensions();
-
-    accept_optional_semantic_init(
-        "primary semantic collection",
-        vector_store.ensure_collection(embed_dim).await,
-    );
-
     let rig = RigContext::new(&config, providers.clone()).await?;
-    accept_optional_semantic_init(
-        "activity reference collection",
-        rig.ensure_collection().await,
-    );
+    if config.embedding_enabled() {
+        accept_optional_semantic_init(
+            "primary semantic collection",
+            vector_store
+                .ensure_collection(providers.embedder.dimensions())
+                .await,
+        );
+        accept_optional_semantic_init(
+            "activity reference collection",
+            rig.ensure_collection().await,
+        );
+    }
 
     let config = Arc::new(config);
     let certification_stdb = config.ai_certification_stdb_token.as_ref().map(|token| {
@@ -175,12 +176,16 @@ async fn main() -> anyhow::Result<()> {
         agent_rate_limiter: Arc::new(crate::rate_limit::AgentRateLimiter::new()),
     };
 
-    tokio::spawn(worker::run(
-        config.clone(),
-        providers.embedder.clone(),
-        vector_store.clone(),
-        stdb.clone(),
-    ));
+    if config.embedding_enabled() {
+        tokio::spawn(worker::run(
+            config.clone(),
+            providers.embedder.clone(),
+            vector_store.clone(),
+            stdb.clone(),
+        ));
+    } else {
+        tracing::info!("Embedding collection initialization and queue worker disabled");
+    }
 
     if let Some(certification_stdb) = certification_stdb {
         tokio::spawn(harness::certification::run(

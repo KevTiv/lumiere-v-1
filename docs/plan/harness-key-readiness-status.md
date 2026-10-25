@@ -4,6 +4,25 @@ This status supersedes the September execution board for the bounded Mistral
 pilot. It distinguishes code integration, disposable acceptance, deployment
 provisioning, and real-provider admission.
 
+## Combined Alpha release candidate
+
+PR #266 combines merged #265 with #264's authorized display projections, table
+mappings and seed evidence, and the server-issued setup lease workflow. The
+immutable contracts pin is `v0.3.148` at
+`5159f2191f19c594e6f7e7816bb7d331cce2266c`.
+
+The chat-only pilot can explicitly disable embeddings and OCR. Disabled
+adapters reject requests before provider I/O; startup does not initialize vector
+collections or claim embedding jobs. Selected providers retain their readiness
+checks. The full gateway suite passed 743 tests (eight existing ignored tests),
+policy/auth suites passed 7 and 84 tests, five member mutation tests passed, and
+the combined API compile check passed. Final-head hosted checks remain required.
+
+Production role 4098, `Alpha AI setup (no permissions)`, was created through the
+normal authenticated role form and read back with an empty permission list.
+It is unassigned. No setup lease, superuser grant, AI service binding,
+certification, model provisioning or paid provider call has started.
+
 ## Main integration on 2026-10-25
 
 The branch now retains merged main through `712cd2c6`, including #249's current

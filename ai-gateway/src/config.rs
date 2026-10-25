@@ -119,8 +119,14 @@ pub struct Config {
 }
 
 impl Config {
+    /// Disabled embedding must not initialize collections or claim queued work.
+    pub fn embedding_enabled(&self) -> bool {
+        self.embedding_provider != "disabled"
+    }
+
     pub fn embedding_model_name(&self) -> String {
         match self.embedding_provider.as_str() {
+            "disabled" => "disabled".to_string(),
             "mistral" => "mistral-embed".to_string(),
             "gemini" => self.gemini_embed_model.clone(),
             _ => self.ollama_embed_model.clone(),

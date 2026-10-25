@@ -22,8 +22,47 @@ pub struct Providers {
     pub web_search: Arc<dyn WebSearchProvider>,
 }
 
+/// Explicitly unavailable capabilities never dispatch or return synthetic data.
+struct DisabledProvider;
+
+#[async_trait::async_trait]
+impl EmbedProvider for DisabledProvider {
+    async fn embed(&self, _text: &str) -> Result<Vec<f32>> {
+        anyhow::bail!("embeddings are disabled")
+    }
+
+    async fn embed_batch(&self, _texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        anyhow::bail!("embeddings are disabled")
+    }
+
+    fn dimensions(&self) -> u64 {
+        0
+    }
+
+    fn name(&self) -> &'static str {
+        "disabled"
+    }
+}
+
+#[async_trait::async_trait]
+impl VisionProvider for DisabledProvider {
+    async fn extract(
+        &self,
+        _image_bytes: &[u8],
+        _mime_type: &str,
+        _hint: &str,
+    ) -> Result<super::vision::ExtractedDocument> {
+        anyhow::bail!("vision and OCR are disabled")
+    }
+
+    fn name(&self) -> &'static str {
+        "disabled"
+    }
+}
+
 fn build_embedder(config: &Config) -> Result<Arc<dyn EmbedProvider>> {
     match config.embedding_provider.as_str() {
+        "disabled" => Ok(Arc::new(DisabledProvider)),
         "mistral" => {
             let key = config.mistral_api_key.as_deref().ok_or_else(|| {
                 anyhow::anyhow!("MISTRAL_API_KEY required when EMBEDDING_PROVIDER=mistral")
@@ -48,6 +87,7 @@ pub fn build(config: &Config, http: reqwest::Client) -> Result<Providers> {
     let embedder = build_embedder(config)?;
 
     let vision: Arc<dyn VisionProvider> = match config.vision_provider.as_str() {
+        "disabled" => Arc::new(DisabledProvider),
         "mistral" => {
             let key = config.mistral_api_key.as_deref().ok_or_else(|| {
                 anyhow::anyhow!("MISTRAL_API_KEY required when VISION_PROVIDER=mistral")

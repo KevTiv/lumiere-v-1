@@ -116,9 +116,12 @@ operator checks. A passing preflight always reports `deploymentAcceptance=false`
 It does not establish token least privilege from successful authentication.
 
 Keep `KONG_LLM_URL` unset for direct Mistral. `EMBEDDING_PROVIDER` selects indexing,
-not chat. The preflight reports embedding/vision selections; keep their current
-dependencies reachable. The defaults still require Ollama. Changing embedding
-space requires its own collection migration and reindex proof.
+not chat. For the approved chat-only pilot, set `EMBEDDING_PROVIDER=disabled` and
+`VISION_PROVIDER=disabled`. These selections reject embedding/OCR requests,
+skip collection initialization and leave queued embedding work unclaimed. Their
+unused providers and vector collections are not readiness requirements. Existing
+provider selections still require their dependencies. Changing embedding space
+requires its own collection migration and reindex proof.
 
 ## Deploy and prove the pilot
 

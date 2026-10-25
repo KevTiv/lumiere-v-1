@@ -19,8 +19,11 @@ use crate::config::Config;
 pub async fn check_readiness(config: &Config, http: &reqwest::Client) -> Result<()> {
     validate_configuration(config)?;
 
-    let embedding_uses_ollama = !matches!(config.embedding_provider.as_str(), "mistral" | "gemini");
-    let vision_uses_ollama = config.vision_provider != "mistral";
+    let embedding_uses_ollama = !matches!(
+        config.embedding_provider.as_str(),
+        "disabled" | "mistral" | "gemini"
+    );
+    let vision_uses_ollama = !matches!(config.vision_provider.as_str(), "disabled" | "mistral");
     if embedding_uses_ollama || vision_uses_ollama {
         // Ollama model aliases and tag response shapes vary by release; the
         // readiness contract deliberately checks service reachability only.
@@ -56,8 +59,11 @@ fn validate_configuration(config: &Config) -> Result<()> {
     if config.document_parser == "unstructured" && config.unstructured_url.trim().is_empty() {
         return Err(anyhow!("document parser endpoint is unavailable"));
     }
-    let embedding_uses_ollama = !matches!(config.embedding_provider.as_str(), "mistral" | "gemini");
-    let vision_uses_ollama = config.vision_provider != "mistral";
+    let embedding_uses_ollama = !matches!(
+        config.embedding_provider.as_str(),
+        "disabled" | "mistral" | "gemini"
+    );
+    let vision_uses_ollama = !matches!(config.vision_provider.as_str(), "disabled" | "mistral");
     if embedding_uses_ollama || vision_uses_ollama {
         validate_http_url(&config.ollama_url, "Ollama")?;
     }
@@ -178,6 +184,43 @@ mod readiness_tests {
         let client = reqwest::Client::new();
         assert!(metadata_request(&client, "ollama", "/api/tags", None).is_err());
         assert!(metadata_request(&client, "file:///tmp/provider", "/health", None).is_err());
+    }
+
+    #[tokio::test]
+    async fn disabled_capabilities_need_no_provider_and_reject_execution() {
+        let mut config = test_config();
+        config.embedding_provider = "disabled".into();
+        config.vision_provider = "disabled".into();
+        config.ollama_url = "no provider endpoint".into();
+        let http = reqwest::Client::new();
+        check_readiness(&config, &http)
+            .await
+            .expect("chat-only readiness");
+        let providers = factory::build(&config, http).expect("disabled provider instances");
+        assert!(!config.embedding_enabled());
+        assert_eq!(config.embedding_model_name(), "disabled");
+        assert_eq!(providers.embedder.name(), "disabled");
+        assert_eq!(providers.vision.name(), "disabled");
+        assert!(providers.embedder.embed("text").await.is_err());
+        assert!(providers
+            .embedder
+            .embed_batch(&["text".into()])
+            .await
+            .is_err());
+        assert!(providers
+            .vision
+            .extract(b"image", "image/png", "receipt")
+            .await
+            .is_err());
+        config.vision_provider = "ollama".into();
+        assert!(check_readiness(&config, &reqwest::Client::new())
+            .await
+            .is_err());
+        config.vision_provider = "disabled".into();
+        config.embedding_provider = "ollama".into();
+        assert!(check_readiness(&config, &reqwest::Client::new())
+            .await
+            .is_err());
     }
 
     fn test_config() -> Config {
