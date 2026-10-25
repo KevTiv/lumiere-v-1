@@ -1214,12 +1214,10 @@ export function useDelegatedAdminScopes(organizationId: bigint) {
   })
 }
 
-function memberSetupMetadata(formData: Record<string, unknown>): string | null {
-  if (formData.temporarySetupAccess !== true) return optionalStringField(formData.metadata)
-  if (formData.companyId == null || String(formData.companyId).trim() === "" || BigInt(String(formData.companyId)) <= 0n) {
-    throw new Error("Select a company for temporary setup access")
-  }
-  if (optionalStringField(formData.metadata)) throw new Error("Temporary setup access cannot replace other metadata")
+function memberSetupMetadata(temporary: boolean, companyId: string, metadata: string | null): string | null {
+  if (!temporary) return metadata
+  if (!companyId.trim() || BigInt(companyId) <= 0n) throw new Error("Select a company for temporary setup access")
+  if (metadata) throw new Error("Temporary setup access cannot replace other metadata")
   return "lumiere-platform-bootstrap-request-v1"
 }
 
@@ -1241,7 +1239,11 @@ export function useAddOrgMember(organizationId: bigint) {
         employeeId: optionalStringField(formData.employeeId),
         isActive: formData.isActive !== false,
         isDefault: Boolean(formData.isDefault),
-        metadata: memberSetupMetadata(formData),
+        metadata: memberSetupMetadata(
+          formData.temporarySetupAccess === true,
+          String(formData.companyId ?? ""),
+          optionalStringField(formData.metadata),
+        ),
       }
       const { urlPath, init } = stdbBffCommandPost("add_org_member", {
         userIdentity: identityForReducer(String(formData.userIdentity ?? "")),
@@ -1274,7 +1276,11 @@ export function useAddUserToOrganization(organizationId: bigint) {
         employeeId: optionalStringField(formData.employeeId),
         isActive: formData.isActive !== false,
         isDefault: Boolean(formData.isDefault),
-        metadata: memberSetupMetadata(formData),
+        metadata: memberSetupMetadata(
+          formData.temporarySetupAccess === true,
+          String(formData.companyId ?? ""),
+          optionalStringField(formData.metadata),
+        ),
       }
       const { urlPath, init } = stdbBffCommandPost("add_user_to_organization", {
         userIdentity: identityForReducer(String(formData.userIdentity ?? "")),

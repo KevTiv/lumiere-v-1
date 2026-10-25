@@ -94,7 +94,8 @@ pub fn platform_bootstrap_lease_active(metadata: Option<&str>, now_micros: i64) 
     let raw = raw
         .strip_prefix('"')
         .and_then(|value| value.strip_suffix('"'))
-        .unwrap_or(raw);
+        .unwrap_or(raw)
+        .trim();
     if !raw.starts_with("lumiere-platform-bootstrap-") {
         return true;
     }
@@ -132,6 +133,12 @@ mod tests {
         assert!(platform_bootstrap_lease_active(
             Some(&format!("\"{lease}\"")),
             100
+        ));
+        let spaced_json = format!("\"  {lease}  \"");
+        assert!(platform_bootstrap_lease_active(Some(&spaced_json), 100));
+        assert!(!platform_bootstrap_lease_active(
+            Some(&spaced_json),
+            3600000100
         ));
     }
 
