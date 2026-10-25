@@ -6,7 +6,7 @@ import { EntityView } from "@/components/entity-views/entity-view"
 import { FormModal } from "@/components/forms/form-modal"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { fxRevaluationRunsTableConfig } from "@/lib/accounting-entity-configs"
+import { fxRevaluationRunsTableConfig, labelMapFromOptions } from "@/lib/accounting-entity-configs"
 import {
   postRealizedFxForm,
   runFxRevaluationBatchForm,
@@ -52,7 +52,10 @@ export function FxRevaluationPanel({
   const [showRate, setShowRate] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const runsTableConfig = useMemo(() => fxRevaluationRunsTableConfig(t), [t])
+  const runsTableConfig = useMemo(
+    () => fxRevaluationRunsTableConfig(t, { sourceDocumentLabelMap: labelMapFromOptions(moveSelectOptions) }),
+    [t, moveSelectOptions],
+  )
 
   const runFormConfig = useMemo(
     () =>

@@ -1732,7 +1732,7 @@ function AccountingClientReady({
       statusKey: "state",
       statusBadgeVariants: status.badgeVariants,
       statusBadgeLabels: status.badgeLabels,
-      detailConfig: bankStatementDetailConfig(t),
+      detailConfig: bankStatementDetailConfig(t, { journalLabelMap }),
       auditTableName: "account_bank_statement",
       discussion: {},
       customTabs: [
@@ -1806,7 +1806,7 @@ function AccountingClientReady({
         },
       ],
     }
-  }, [t, bankStatementLines, orgId, operatingCompanyId])
+  }, [t, bankStatementLines, orgId, operatingCompanyId, journalLabelMap])
 
   const consolidationRateLabels = useMemo(() => {
     const toMap = (opts: Array<{ value: string; label: string }>) =>
@@ -2495,7 +2495,7 @@ function AccountingClientReady({
     return mergeFieldDefaultValues(base, accountPeriodRowToFormDefaults(accountPeriodEdit))
   }, [accountPeriodEdit, t])
 
-  const bankStatementsEntityConfig = useMemo(() => bankStatementsTableConfig(t), [t])
+  const bankStatementsEntityConfig = useMemo(() => bankStatementsTableConfig(t, { journalLabelMap }), [t, journalLabelMap])
 
   const detailStatementLines = useMemo(() => {
     if (!bankStatementDetail?.id) return []
@@ -4283,7 +4283,7 @@ function AccountingClientReady({
   }, []);
 
   const intercompanyRulesEntityConfig = useMemo((): EntityViewConfig => {
-    const base = intercompanyRulesTableConfig(t)
+    const base = intercompanyRulesTableConfig(t, { companyLabelMap })
     const view = base.view as EntityTableConfig
     return {
       ...base,
@@ -4342,7 +4342,7 @@ function AccountingClientReady({
         ],
       },
     }
-  }, [t, setIntercompanyRuleActive, deleteIntercompanyRule, intercompanyRuleIsActive])
+  }, [t, setIntercompanyRuleActive, deleteIntercompanyRule, intercompanyRuleIsActive, companyLabelMap])
 
   // Helper to get intercompany transaction state
   const intercompanyTransactionState = (row: Record<string, unknown>): string => {

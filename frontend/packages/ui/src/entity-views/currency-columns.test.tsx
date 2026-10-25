@@ -48,10 +48,25 @@ describe("currency columns", () => {
     expect(plain(fee.render?.(2.5, { currencyId: 7n }))).toBe("2,50 €")
   })
 
-  it("leave columns and their own renderers alone without a provider or a currencyKey", () => {
-    const [, fee, custom] = scoped(({ children }) => <>{children}</>)
-    expect(fee.render).toBeUndefined()
+  it("are right-aligned by default, in brackets and tinted when negative, and keep their own renderers", () => {
+    const [total, fee, custom] = scoped(({ children }) => <>{children}</>)
+    expect(total.align).toBe("right")
+    expect(fee.align).toBe("right")
     expect(custom.render?.(1, {})).toBe("mine")
+
+    const negative = render(<>{fee.render?.(-12.5, {})}</>)
+    expect(negative.container.querySelector(".text-destructive")?.textContent).toBe("($12.50)")
+    negative.unmount()
+    const positive = render(<>{fee.render?.(12.5, {})}</>)
+    expect(positive.container.querySelector(".text-destructive")).toBeNull()
+    expect(positive.container.textContent).toBe("$12.50")
+  })
+
+  it("keep a column's own alignment", () => {
+    const columns = renderHook(
+      () => useScopedEntityTableConfig({ ...table, columns: [{ key: "fee", label: "Fee", type: "currency", align: "left" }] }),
+    ).result.current.columns
+    expect(columns[0].align).toBe("left")
   })
 
   it("are right-aligned and name their row's currency in the accounting tables", async () => {
