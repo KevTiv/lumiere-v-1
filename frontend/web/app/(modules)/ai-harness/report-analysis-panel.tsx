@@ -11,12 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@lumiere/ui/components/textarea"
 import { Alert, AlertDescription } from "@lumiere/ui/components/alert"
 import { Badge } from "@lumiere/ui/components/badge"
-import { companyRowsToSelectOptions } from "../../../lib/form-lookup"
+import { companyRowsToSelectOptions, type CompanyLookupRow } from "../../../lib/form-lookup"
 import { runStatusLabel } from "./enum-labels"
 
 export function ReportAnalysisPanel({ organizationId, companies }: {
   organizationId: bigint
-  companies: Record<string, unknown>[]
+  companies: readonly CompanyLookupRow[]
 }) {
   const { t } = useTranslation()
   const companyOptions = companyRowsToSelectOptions(companies)
