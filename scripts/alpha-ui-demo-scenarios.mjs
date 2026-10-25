@@ -151,9 +151,11 @@ export function alphaUiDemoScenarios(now = new Date()) {
   for (const [i, name, offset] of [[0, 'Willow rollout planning', 1], [1, 'Harbor equipment review', 3], [2, 'Finance Alpha walkthrough', 5], [3, 'Month-end preparation', 7]]) {
     named(`calendarUI${i}`, 'calendar_event', 'create_calendar_event', label(name), {
       start: day(offset), stop: new Date(now.getTime() + offset * 86400000 + 3600000).toISOString(),
-      privacy: 'private', showAs: 'busy', state: 'open', partnerIds: [`@contact${i % 2}`], userId: '@actor',
+      privacy: 'private', showAs: 'busy', state: 'confirmed', partnerIds: [`@contact${i % 2}`], userId: '@actor',
       description: note, location: ['Demo meeting room A', 'Demo workshop', 'Demo finance room', 'Demo meeting room B'][i], color: ['blue', 'green', 'purple', 'orange'][i],
     })
+    fixtures.at(-1).actions = [step('update_calendar_event', { eventId: `@calendarUI${i}`, params: { state: 'confirmed' } },
+      { state: 'open' }, { state: 'confirmed' })]
   }
   for (const [i, summary, target, offset] of [
     [0, 'Confirm Willow delivery details', { SaleOrder: '@saleUI0' }, 2],

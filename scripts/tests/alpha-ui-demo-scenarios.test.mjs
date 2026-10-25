@@ -46,6 +46,7 @@ test('Alpha scenarios have complete, ordered references and pinned command input
   assert.equal(payload.fixtures.filter(row => row.blob).length, 6)
   assert.equal(payload.fixtures.filter(row => row.operation === 'create_opportunity').length, 8)
   assert.ok(payload.fixtures.filter(row => row.operation === 'create_opportunity').every(row => row.input.params.companyCurrencyId === '@currency'))
+  assert.ok(payload.fixtures.filter(row => row.operation === 'create_calendar_event').every(row => row.input.params.state === 'confirmed'))
   assert.ok(!names.some(name => /pay_|reimburse|dispatch|email|deliver|process_payment/.test(name)))
   assert.deepEqual(payload, alphaUiDemoScenarios(new Date('2026-10-25T12:00:00Z')))
 })

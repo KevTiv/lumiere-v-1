@@ -21,7 +21,7 @@ This is persisted-data evidence. It does not certify every module or action.
 | Reports | Four generated reports from the posted demo ledger: trial balance, profit and loss, aged receivables, and aged payables. |
 | Accounting | An EUR 18,000 budget, an active EUR 15,000 asset with 36 depreciation periods, an EUR 1,200 prepaid schedule, and an EUR 2,400 draft deferred-revenue schedule. These extend the separate invoice, bill, and bank-statement seed. |
 | Tax setup | Two clearly labelled illustrative report-review deadlines and one synthetic zero-rate schedule. No jurisdiction or filing result is invented. |
-| Calendar and activities | Four upcoming private events and three assigned follow-ups with exact Sales, Purchasing, or invoice links. |
+| Calendar and activities | Four confirmed private events and three assigned follow-ups with exact Sales, Purchasing, or invoice links. |
 | Messages | Two internal review templates. No outbound delivery or provider history is fabricated. |
 
 ## Run and repeat
@@ -78,6 +78,7 @@ the current API source contains the work-board protocol expected by the Web.
 
 ## Remaining source and workflow limits
 
+- Subscription health remains the stored `healthy` value. The released interface has no subscription-health update command. The new read projection displays the stored value without inventing a state change.
 - Four older baseline opportunities have no currency. The CRM aggregate fails
   closed for these rows. The released update command cannot set their currency.
   The new opportunities have an explicit EUR currency. No direct SQL repair or

@@ -1,5 +1,5 @@
 {
-  "verifiedAt": "2026-10-25T17:06:11.839Z",
+  "verifiedAt": "2026-10-25T17:33:18.598Z",
   "environment": "Railway production",
   "organizationId": 1,
   "companyId": 1,
@@ -15,7 +15,7 @@
   "repeatReport": {
     "fixtureKey": "alpha-ui-scenarios-v1",
     "organizationId": 1,
-    "generatedAt": "2026-10-25T17:06:11.839Z",
+    "generatedAt": "2026-10-25T17:33:18.598Z",
     "createdRows": 0,
     "outcomes": [
       {
@@ -859,5 +859,6 @@
         "actionCount": 0
       }
     ]
-  }
+  },
+  "confirmedDemoCalendarEvents": 4
 }
