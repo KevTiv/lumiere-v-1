@@ -6,6 +6,9 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
+#[path = "src/realtime/workflow_tables.rs"]
+mod workflow_tables;
+
 const EXACT_COMPANY_CRM_TABLES: &[&str] = &[
     "contact",
     "opportunity",
@@ -91,6 +94,11 @@ fn generate_contents(registry_path: &Path, bindings_dir: &Path) -> Result<String
             }
         }
     }
+    tables.extend(
+        workflow_tables::WORKFLOW_INVALIDATION_TABLES
+            .iter()
+            .map(|(_, table)| (*table).to_string()),
+    );
 
     let mut arms = String::new();
     for table in tables.iter() {
@@ -99,6 +107,15 @@ fn generate_contents(registry_path: &Path, bindings_dir: &Path) -> Result<String
         let trait_name = format!("{pascal}TableAccess");
         let table_file = bindings_dir.join(format!("{table_mod}.rs"));
         if !table_file.exists() {
+            if workflow_tables::WORKFLOW_INVALIDATION_TABLES
+                .iter()
+                .any(|(_, private)| *private == table.as_str())
+            {
+                return Err(format!(
+                    "private workflow invalidation binding is missing: {}",
+                    table_file.display()
+                ));
+            }
             continue;
         }
         let tf = fs::read_to_string(&table_file)
@@ -116,7 +133,11 @@ fn generate_contents(registry_path: &Path, bindings_dir: &Path) -> Result<String
             "company_id.map_or(true, |company_id| _row.company_id == Some(company_id))"
         } else if row_tf.contains("pub company_id: u64") {
             "company_id.map_or(true, |company_id| _row.company_id == company_id)"
-        } else if EXACT_COMPANY_CRM_TABLES.contains(&table.as_str()) {
+        } else if EXACT_COMPANY_CRM_TABLES.contains(&table.as_str())
+            || workflow_tables::WORKFLOW_INVALIDATION_TABLES
+                .iter()
+                .any(|(_, private)| *private == table.as_str())
+        {
             panic!(
                 "realtime exact-company table {table} has no company_id in generated row bindings"
             );
@@ -132,10 +153,7 @@ fn generate_contents(registry_path: &Path, bindings_dir: &Path) -> Result<String
             let r = r.clone();
             let tx = tx.clone();
             move |_ctx, _old, _row| {{
-                if matches!(
-                    &_ctx.event,
-                    spacetimedb_sdk::Event::Transaction | spacetimedb_sdk::Event::Reducer(_)
-                )
+                if crate::realtime::is_live_row_event(&_ctx.event)
                     && {company_filter}
                 {{
                     crate::realtime::notify_row_change(&tx, "update", "{table}", &r);
@@ -167,10 +185,7 @@ fn generate_contents(registry_path: &Path, bindings_dir: &Path) -> Result<String
                 let r = r.clone();
                 let tx = tx.clone();
                 move |_ctx, _row| {{
-                    if matches!(
-                        &_ctx.event,
-                        spacetimedb_sdk::Event::Transaction | spacetimedb_sdk::Event::Reducer(_)
-                    )
+                    if crate::realtime::is_live_row_event(&_ctx.event)
                         && {company_filter}
                     {{
                         crate::realtime::notify_row_change(&tx, "insert", "{table}", &r);
@@ -181,10 +196,7 @@ fn generate_contents(registry_path: &Path, bindings_dir: &Path) -> Result<String
                 let r = r.clone();
                 let tx = tx.clone();
                 move |_ctx, _row| {{
-                    if matches!(
-                        &_ctx.event,
-                        spacetimedb_sdk::Event::Transaction | spacetimedb_sdk::Event::Reducer(_)
-                    )
+                    if crate::realtime::is_live_row_event(&_ctx.event)
                         && {company_filter}
                     {{
                         crate::realtime::notify_row_change(&tx, "delete", "{table}", &r);
@@ -261,6 +273,7 @@ fn main() {
     println!("cargo:rerun-if-changed={}", bindings_dir.display());
     println!("cargo:rerun-if-env-changed=CONTRACTS_STAGING_DIR");
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/realtime/workflow_tables.rs");
 }
 
 #[cfg(test)]
@@ -284,10 +297,14 @@ mod tests {
             r#"{"z":{"table":"zeta"},"a":{"table":"alpha"},"d":{"table":"doc_folder"}}"#,
         )
         .unwrap();
-        for table in ["alpha", "zeta"] {
+        for table in ["alpha", "zeta"].into_iter().chain(
+            workflow_tables::WORKFLOW_INVALIDATION_TABLES
+                .iter()
+                .map(|(_, table)| *table),
+        ) {
             fs::write(
                 bindings.join(format!("{table}_table.rs")),
-                if table == "alpha" {
+                if table != "zeta" {
                     "use spacetimedb_sdk::TableWithPrimaryKey;\npub trait AlphaTableAccess {}"
                 } else {
                     "pub trait ZetaTableAccess {}"
@@ -322,10 +339,20 @@ mod tests {
         assert!(first.contains("pub(crate) fn wire_realtime_table_callbacks"));
         assert_eq!(
             first.matches("crate::realtime::notify_row_change").count(),
-            7,
-            "each populated fixture table must emit insert/delete invalidations, plus alpha update"
+            16,
+            "registry and private workflow tables must emit insert/delete/update invalidations"
+        );
+        assert_eq!(
+            first
+                .matches("crate::realtime::is_live_row_event(&_ctx.event)")
+                .count(),
+            first.matches("crate::realtime::notify_row_change").count(),
+            "every callback must exclude initial and removed subscription snapshots"
         );
         assert!(first.contains("notify_row_change(&tx, \"update\", \"alpha\""));
+        for (_, table) in workflow_tables::WORKFLOW_INVALIDATION_TABLES {
+            assert!(first.contains(&format!("notify_row_change(&tx, \"update\", \"{table}\"")));
+        }
         let output = root.join("out.rs");
         write_if_changed(&output, first.as_bytes()).unwrap();
         let before = fs::metadata(&output).unwrap().modified().unwrap();

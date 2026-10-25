@@ -10,6 +10,7 @@ import { Field, FieldGroup, FieldLabel } from "@lumiere/ui/components/field"
 import { Input } from "@lumiere/ui/components/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@lumiere/ui/components/table"
 import { instalmentAmountExample, instalmentDateExample, proposedLedgerTotals, taxAmountExample } from "./accounting-authoring-model"
+import { DatePicker } from "@lumiere/ui/components/date-picker"
 
 type LedgerMove = Parameters<typeof proposedLedgerTotals>[2][number]
 type LedgerLine = Parameters<typeof proposedLedgerTotals>[3][number]
@@ -133,7 +134,7 @@ function PaymentTermExample({ config, values }: { config: FormConfig; values: Fo
     <p>{optionLabel(config, "paymentTermId", values.paymentTermId)}</p>
     <FieldGroup>
       <Field><FieldLabel htmlFor="term-preview-amount">{t("accounting.authoring.exampleInvoiceAmount", { defaultValue: "Example invoice amount" })}</FieldLabel><Input id="term-preview-amount" type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Field>
-      <Field><FieldLabel htmlFor="term-preview-date">{t("accounting.authoring.exampleInvoiceDate", { defaultValue: "Example invoice date" })}</FieldLabel><Input id="term-preview-date" type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} /></Field>
+      <Field><FieldLabel htmlFor="term-preview-date">{t("accounting.authoring.exampleInvoiceDate", { defaultValue: "Example invoice date" })}</FieldLabel><DatePicker id="term-preview-date" value={invoiceDate} onChange={(value) => setInvoiceDate(value)} /></Field>
     </FieldGroup>
     <Table><TableHeader><TableRow><TableHead>{t("accounting.authoring.instalment", { defaultValue: "Instalment" })}</TableHead><TableHead>{t("accounting.authoring.dueDate", { defaultValue: "Due date" })}</TableHead></TableRow></TableHeader><TableBody><TableRow>
       <TableCell>{values.value === "Balance" ? t("accounting.authoring.remainingBalance", { defaultValue: "Remaining balance" }) : instalmentAmount == null ? "—" : money(instalmentAmount)}</TableCell>

@@ -26,6 +26,8 @@ export interface OverviewRow extends PaymentAllocationRow {
   deletedAt?: unknown; deleted_at?: unknown
   name?: unknown; title?: unknown; ref?: unknown; reference?: unknown; code?: unknown
   statementId?: unknown; statement_id?: unknown
+  journalId?: unknown; journal_id?: unknown
+  balanceEndReal?: unknown; balance_end_real?: unknown; balanceEnd?: unknown; balance_end?: unknown
   decimalPlaces?: unknown; decimal_places?: unknown
   dateFrom?: unknown; date_from?: unknown; dateTo?: unknown; date_to?: unknown
   totalPlanned?: unknown; total_planned?: unknown; totalPractical?: unknown; total_practical?: unknown

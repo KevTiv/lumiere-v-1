@@ -6,6 +6,7 @@ import type { FormField, FormValues } from "../lib/form-types"
 import { fieldWidthClasses, isPlainTextareaField } from "../lib/form-types"
 import { Input } from "../components/input"
 import { Textarea } from "../components/textarea"
+import { NumericInput } from "../components/numeric-input"
 import { Checkbox } from "../components/checkbox"
 import { Switch } from "../components/switch"
 import { Label } from "../components/label"
@@ -17,6 +18,8 @@ import {
   SelectValue,
 } from "../components/select"
 import { RecordPicker } from "../components/record-picker"
+import { MultiRecordPicker } from "../components/multi-record-picker"
+import { DatePicker, DateTimePicker } from "../components/date-picker"
 import {
   radixSelectControlledValue,
   radixSelectItemValue,
@@ -120,6 +123,29 @@ export function FormFieldRenderer({
           />
         )
 
+      case "money":
+      case "percent":
+      case "quantity":
+        return (
+          <NumericInput
+            id={field.id}
+            name={field.name}
+            data-testid={`form-field-${field.name}`}
+            kind={field.type}
+            currency={field.type === "money" ? field.currency : undefined}
+            unit={field.type === "quantity" ? field.unit : undefined}
+            decimals={field.decimals}
+            placeholder={field.placeholder}
+            value={value}
+            onValueChange={onChange}
+            disabled={field.disabled}
+            required={field.required}
+            aria-invalid={!!error}
+            aria-describedby={describedBy}
+            className={cn(inputBase, error && "border-destructive focus-visible:ring-destructive/20")}
+          />
+        )
+
       case "textarea":
         return (
           <Textarea
@@ -192,41 +218,23 @@ export function FormFieldRenderer({
         )
 
       case "multiselect":
+        // Disabled and no-longer-listed values stay selected as locked chips.
         return (
-          <select
+          <MultiRecordPicker
             id={field.id}
-            name={field.name}
-            data-testid={`form-field-${field.name}`}
-            multiple
             value={Array.isArray(value) ? value : []}
-            onChange={(event) => {
-              const selected = Array.from(event.target.selectedOptions, (option) => option.value)
-              // Disabled and no-longer-listed values cannot be edited here; keep them intact.
-              const retained = Array.isArray(value) ? value.filter((item) => {
-                const option = field.options.find((option) => option.value === item)
-                return !option || option.disabled
-              }) : []
-              onChange([...new Set([...retained, ...selected])])
-            }}
+            onChange={onChange}
+            options={field.options}
+            placeholder={field.placeholder || t("common.form.multiSelect.placeholder", { defaultValue: "Add..." })}
+            searchPlaceholder={t("common.form.multiSelect.search", { defaultValue: "Search..." })}
+            emptyText={t("common.form.multiSelect.empty", { defaultValue: "No matches" })}
+            removeLabel={(label) => t("common.form.multiSelect.remove", { value: label, defaultValue: "Remove {{value}}" })}
+            unavailableLabel={(missing) => t("common.form.unavailableSelection", { value: missing, defaultValue: "Unavailable selection: {{value}}" })}
             disabled={field.disabled}
-            required={field.required}
-            aria-invalid={!!error}
+            invalid={!!error}
+            data-testid={`form-field-${field.name}`}
             aria-describedby={describedBy}
-            className={cn("w-full rounded-md border p-2", inputBase, error && "border-destructive")}
-          >
-            {Array.isArray(value) ? value
-              .filter((selected) => !field.options.some((option) => option.value === selected))
-              .map((selected) => (
-                <option key={selected} value={selected} disabled>
-                  {t("common.form.unavailableSelection", { value: selected, defaultValue: "Unavailable selection: {{value}}" })}
-                </option>
-              )) : null}
-            {field.options.map((option) => (
-              <option key={option.value} value={option.value} disabled={option.disabled}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          />
         )
 
       case "checkbox":
@@ -302,7 +310,7 @@ export function FormFieldRenderer({
                   disabled={field.disabled || option.disabled}
                   onClick={() => onChange(option.value)}
                   className={cn(
-                    "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150",
+                    "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150 pointer-coarse:min-h-11",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/20",
                     selected
                       ? "border-primary bg-primary text-primary-foreground"
@@ -318,16 +326,37 @@ export function FormFieldRenderer({
         )
 
       case "date":
+      case "datetime": {
+        const Picker = field.type === "datetime" ? DateTimePicker : DatePicker
+        return (
+          <Picker
+            id={field.id}
+            name={field.name}
+            data-testid={`form-field-${field.name}`}
+            value={(value as string) || ""}
+            onChange={(next) => onChange(next)}
+            min={field.minDate}
+            max={field.maxDate}
+            disabled={field.disabled}
+            required={field.required}
+            aria-invalid={!!error}
+            aria-describedby={describedBy}
+            className={cn(inputBase, error && "border-destructive focus-visible:ring-destructive/20")}
+          />
+        )
+      }
+
       case "time":
-      case "datetime":
         return (
           <Input
             id={field.id}
             name={field.name}
             data-testid={`form-field-${field.name}`}
-            type={field.type === "datetime" ? "datetime-local" : field.type}
+            type="time"
             value={(value as string) || ""}
             onChange={(e) => onChange(e.target.value)}
+            min={field.minDate}
+            max={field.maxDate}
             disabled={field.disabled}
             required={field.required}
             aria-invalid={!!error}

@@ -55,6 +55,7 @@ import { expenseCompanyLookupRows } from "./expense-capture-input"
 import { captureFileMatches, syncExpenseCapture } from "./expense-capture-sync"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { CaptureAttachmentPreview } from "./capture-attachment-preview"
+import { DatePicker } from "@lumiere/ui/components/date-picker"
 
 export function ExpensesCapturePanel({
   organizationId,
@@ -186,7 +187,7 @@ export function ExpensesCapturePanel({
               "Unable to confirm the receipt",
             ),
           upload: (file, scopeCompanyId) =>
-            uploadDocumentBlob({ file, companyId: scopeCompanyId }),
+            uploadDocumentBlob({ file, companyId: scopeCompanyId, purpose: "expense_receipt" }),
           register: (params) => createExpenseReceiptAndResolveId(orgId, params),
           create: (params) => createExpense.mutateAsync(params),
           save: (next) => {
@@ -500,11 +501,10 @@ export function ExpensesCapturePanel({
             <FieldLabel htmlFor="capture-date">
               {t("expenses.forms.newExpense.fields.date")}
             </FieldLabel>
-            <Input
+            <DatePicker
               id="capture-date"
-              type="date"
               value={date}
-              onChange={(event) => setDate(event.target.value)}
+              onChange={(value) => setDate(value)}
             />
           </Field>
           {lineKind === "Standard" ? (

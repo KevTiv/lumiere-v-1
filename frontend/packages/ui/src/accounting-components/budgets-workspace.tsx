@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
+import { useCurrencyFormat } from "../lib/currency-context"
 import type { TFunction } from "i18next"
 import { EntityView } from "@/components/entity-views/entity-view"
 import { budgetsTableConfig } from "@/lib/entity-configs"
 import type { EntityTableConfig, EntityViewConfig } from "@/lib/entity-view-types"
 import type { FormConfig } from "@/lib/form-types"
 import { budgetPostForm, newBudgetForm, updateBudgetLineActualsForm } from "@/lib/accounting-form-configs"
-import { mergeFieldDefaultValues } from "@/lib/form-config-merge"
+import { mergeFieldDefaultValues, mergeSelectOptionsForFields } from "@/lib/form-config-merge"
 import { FormModal } from "@/components/forms/form-modal"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -140,6 +141,8 @@ export interface BudgetsWorkspaceProps {
   budgets: Record<string, unknown>[]
   budgetLines: Record<string, unknown>[]
   budgetPosts: Record<string, unknown>[]
+  /** GL accounts a budget post can group (picked instead of typing account ids). */
+  accountOptions?: Array<{ value: string; label: string; disabled?: boolean }>
   onCreateBudget: (params: Record<string, unknown>) => void | Promise<void>
   onUpdateBudget: (budgetId: bigint, params: Record<string, unknown>) => void | Promise<void>
   onCreateBudgetLine: (budgetId: bigint, params: Record<string, unknown>) => void | Promise<void>
@@ -164,6 +167,7 @@ export function BudgetsWorkspace({
   budgets,
   budgetLines,
   budgetPosts,
+  accountOptions = [],
   onCreateBudget,
   onUpdateBudget,
   onCreateBudgetLine,
@@ -181,6 +185,7 @@ export function BudgetsWorkspace({
   postPending,
 }: BudgetsWorkspaceProps) {
   const { t } = useTranslation()
+  const { money } = useCurrencyFormat()
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null)
 
   const [budgetModalOpen, setBudgetModalOpen] = useState(false)
@@ -211,7 +216,7 @@ export function BudgetsWorkspace({
     name: "",
     code: "",
     description: "",
-    accountIds: "",
+    accountIds: [],
     isActive: true,
   })
 
@@ -262,7 +267,10 @@ export function BudgetsWorkspace({
     }
   }, [t])
 
-  const baseBudgetPostForm = useMemo(() => budgetPostForm(t), [t])
+  const baseBudgetPostForm = useMemo(
+    () => mergeSelectOptionsForFields(budgetPostForm(t), { accountIds: accountOptions }),
+    [t, accountOptions],
+  )
   const baseBudgetForm = useMemo(() => newBudgetForm(t), [t])
   const budgetFormConfig = useMemo(() => {
     const merged = mergeFieldDefaultValues(baseBudgetForm, budgetDefaults)
@@ -396,7 +404,7 @@ export function BudgetsWorkspace({
       name: "",
       code: "",
       description: "",
-      accountIds: "",
+      accountIds: [],
       isActive: true,
     })
     setPostModalOpen(true)
@@ -410,7 +418,7 @@ export function BudgetsWorkspace({
       name: String(row.name ?? ""),
       code: row.code != null ? String(row.code) : "",
       description: row.description != null ? String(row.description) : "",
-      accountIds: Array.isArray(ids) ? (ids as unknown[]).map(String).join(", ") : "",
+      accountIds: Array.isArray(ids) ? (ids as unknown[]).map(String) : [],
       isActive: row.isActive !== false,
     })
     setPostModalOpen(true)
@@ -501,10 +509,7 @@ export function BudgetsWorkspace({
                   <Badge variant="secondary">{selectedState}</Badge>
                   <span className="text-sm text-muted-foreground">
                     {t("accounting.budgets.planned")}:{" "}
-                    {Number(selected.totalPlanned ?? 0).toLocaleString(undefined, {
-                      style: "currency",
-                      currency: "USD",
-                    })}
+                    {money(Number(selected.totalPlanned ?? 0), selected.currencyId)}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-2">

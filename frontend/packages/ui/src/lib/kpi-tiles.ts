@@ -120,18 +120,20 @@ export interface KpiContext {
   now: Date
   /** Currency code by numeric currency id, for money figures. */
   currencyCodeById: ReadonlyMap<string, string>
+  /** BCP 47 locale for money figures; en-US when absent. */
+  locale?: string
 }
 
 /** An amount in its currency; a plain number when the currency is unknown (no guessed symbol). */
-export function formatKpiMoney(amount: number, currencyCode: string): string {
+export function formatKpiMoney(amount: number, currencyCode: string, locale?: string): string {
   if (/^[A-Za-z]{3}$/.test(currencyCode)) {
     try {
-      return new Intl.NumberFormat("en-US", { style: "currency", currency: currencyCode.toUpperCase() }).format(amount)
+      return new Intl.NumberFormat(locale ?? "en-US", { style: "currency", currency: currencyCode.toUpperCase() }).format(amount)
     } catch {
       // unknown ISO code: fall through to the plain number
     }
   }
-  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
+  return new Intl.NumberFormat(locale ?? "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)
 }
 
 /** Currency code by id from the currency rows (`{ id, code }`), inactive or code-less rows skipped. */

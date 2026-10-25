@@ -1,11 +1,24 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import type { FormConfig } from "../lib/form-types"
 import { ModularForm } from "./modular-form"
 
 vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string; value?: string }) => options?.defaultValue?.replace("{{value}}", options.value ?? "") ?? key }) }))
 vi.mock("@lumiere/query-hooks/hooks/ai-forms", () => ({ useAiFormSuggest: () => ({}) }))
 vi.mock("sonner", () => ({ toast: { warning: vi.fn(), success: vi.fn(), error: vi.fn() } }))
+
+beforeAll(() => {
+  // cmdk and Base UI popovers use browser APIs jsdom lacks.
+  globalThis.ResizeObserver ??= class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+  Element.prototype.scrollIntoView ??= () => {}
+  if (typeof globalThis.PointerEvent === "undefined") {
+    Object.defineProperty(globalThis, "PointerEvent", { value: MouseEvent, configurable: true })
+  }
+})
 
 afterEach(cleanup)
 
@@ -20,10 +33,11 @@ function config(defaultValue?: string[], required = false): FormConfig {
   }
 }
 
-function select(...values: string[]) {
-  const input = screen.getByRole("listbox") as HTMLSelectElement
-  for (const option of Array.from(input.options)) option.selected = values.includes(option.value)
-  fireEvent.change(input)
+const chipLabels = () => Array.from(screen.queryByTestId("form-field-custom:regions-chips")?.querySelectorAll("li") ?? [], (chip) => chip.textContent)
+
+async function toggle(...labels: string[]) {
+  fireEvent.click(screen.getByTestId("form-field-custom:regions"))
+  for (const label of labels) fireEvent.click(await screen.findByRole("option", { name: label }))
 }
 
 describe("ModularForm array fields", () => {
@@ -32,7 +46,7 @@ describe("ModularForm array fields", () => {
     render(<ModularForm config={config()} onSubmit={submit} />)
     fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
     await waitFor(() => expect(submit).toHaveBeenCalledWith({ "custom:regions": [] }))
-    select("north", "south")
+    await toggle("North", "South")
     fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
     await waitFor(() => expect(submit).toHaveBeenLastCalledWith({ "custom:regions": ["north", "south"] }))
   })
@@ -42,7 +56,7 @@ describe("ModularForm array fields", () => {
     fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
     expect(screen.getByRole("alert").textContent).toContain("common.validation.required")
     expect(submit).not.toHaveBeenCalled()
-    select("south")
+    await toggle("South")
     fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
     await waitFor(() => expect(submit).toHaveBeenCalledWith({ "custom:regions": ["south"] }))
   })
@@ -56,18 +70,20 @@ describe("ModularForm array fields", () => {
   it("resets to multiple defaults and notifies the review owner", () => {
     const onValuesChange = vi.fn()
     render(<ModularForm config={config(["north", "south"])} onValuesChange={onValuesChange} />)
-    select("north")
+    fireEvent.click(screen.getByRole("button", { name: "Remove South" }))
+    expect(chipLabels()).toEqual(["North"])
     fireEvent.click(screen.getByRole("button", { name: "common.reset" }))
     expect(onValuesChange).toHaveBeenLastCalledWith({ "custom:regions": ["north", "south"] })
-    const input = screen.getByRole("listbox") as HTMLSelectElement
-    expect(Array.from(input.selectedOptions, (option) => option.value)).toEqual(["north", "south"])
+    expect(chipLabels()).toEqual(["North", "South"])
   })
   it("preserves unavailable and disabled saved values when other choices change", async () => {
     const submit = vi.fn()
     render(<ModularForm config={config(["retired", "locked"])} onSubmit={submit} />)
-    expect((screen.getByRole("option", { name: "Locked" }) as HTMLOptionElement).disabled).toBe(true)
-    expect((screen.getByRole("option", { name: "Unavailable selection: retired" }) as HTMLOptionElement).disabled).toBe(true)
-    select("north")
+    expect(chipLabels()).toEqual(["Unavailable selection: retired", "Locked"])
+    expect(screen.queryByRole("button", { name: "Remove Locked" })).toBeNull()
+    expect(screen.queryByRole("button", { name: "Remove Unavailable selection: retired" })).toBeNull()
+    await toggle("Locked", "North")
+    expect(screen.getByRole("option", { name: "Locked" }).getAttribute("aria-disabled")).toBe("true")
     fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
     await waitFor(() => expect(submit).toHaveBeenCalledWith({ "custom:regions": ["retired", "locked", "north"] }))
   })

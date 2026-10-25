@@ -22,16 +22,9 @@ import {
 import { Eye } from "lucide-react"
 import type { AccountAccount, AccountMove } from "../lib/accounting-types"
 import { useTranslation } from "@lumiere/i18n"
+import { useCurrencyFormat } from "../lib/currency-context"
 import { TablePager, usePagedRows } from "../components/table-pager"
-
-function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
-  if (!ts) return "—"
-  const ms = Number(ts.microsSinceUnixEpoch) / 1000
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-}
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v)
+import { DatePicker } from "@/components/ui/date-picker"
 
 function lineAccountId(line: Record<string, unknown>): string {
   return String(line.accountId ?? line.account_id ?? "")
@@ -65,6 +58,11 @@ export function AccountGlDrilldownPanel({
   onViewMove,
 }: AccountGlDrilldownPanelProps) {
   const { t } = useTranslation()
+  const currency = useCurrencyFormat()
+  const formatTimestamp = (ts?: { microsSinceUnixEpoch: bigint } | null): string =>
+    ts ? currency.date(Number(ts.microsSinceUnixEpoch) / 1000) : "—"
+  /** In the document's own currency when it names one, else the company's. */
+  const formatCurrency = (value: number, currencyId?: unknown): string => currency.money(value, currencyId)
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [selectedMove, setSelectedMove] = useState<AccountMove | null>(null)
@@ -129,20 +127,18 @@ export function AccountGlDrilldownPanel({
           <div className="grid gap-4 sm:grid-cols-2 py-2">
             <div className="space-y-2">
               <Label htmlFor="gl-drill-from">{t("accounting.glDrilldown.dateFrom")}</Label>
-              <Input
+              <DatePicker
                 id="gl-drill-from"
-                type="date"
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
+                onChange={(value) => setDateFrom(value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="gl-drill-to">{t("accounting.glDrilldown.dateTo")}</Label>
-              <Input
+              <DatePicker
                 id="gl-drill-to"
-                type="date"
                 value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
+                onChange={(value) => setDateTo(value)}
               />
             </div>
           </div>
@@ -180,8 +176,8 @@ export function AccountGlDrilldownPanel({
                         <TableCell className="text-sm text-muted-foreground">
                           {partnerId != null ? `#${String(partnerId)}` : "—"}
                         </TableCell>
-                        <TableCell className="text-right">{formatCurrency(Number(line.debit ?? 0))}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(Number(line.credit ?? 0))}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(Number(line.debit ?? 0), line.companyCurrencyId)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(Number(line.credit ?? 0), line.companyCurrencyId)}</TableCell>
                         <TableCell className="text-right font-medium">
                           {formatCurrency(runningBalance)}
                         </TableCell>
@@ -233,7 +229,7 @@ export function AccountGlDrilldownPanel({
                 </div>
                 <div>
                   <p className="text-muted-foreground">{t("accounting.journalEntries.total")}</p>
-                  <p className="font-medium">{formatCurrency(selectedMove.amountTotal ?? 0)}</p>
+                  <p className="font-medium">{formatCurrency(selectedMove.amountTotal ?? 0, selectedMove.currencyId)}</p>
                 </div>
               </div>
             </>

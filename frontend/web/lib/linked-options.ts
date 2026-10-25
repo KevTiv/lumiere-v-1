@@ -12,7 +12,10 @@ export function labelWithId(name: unknown, id: unknown): string {
 }
 
 /** Select options for a list of records; rows without an id are skipped and options are sorted by label. */
-export function recordOptions(rows: ReadonlyArray<RowLike>, labelOf: (row: RowLike) => unknown): LinkedOption[] {
+export function recordOptions<Row extends { id?: unknown }>(
+  rows: ReadonlyArray<Row>,
+  labelOf: (row: Row) => unknown,
+): LinkedOption[] {
   const seen = new Set<string>()
   const options: LinkedOption[] = []
   for (const row of rows) {

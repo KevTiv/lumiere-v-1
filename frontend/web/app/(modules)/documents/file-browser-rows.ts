@@ -22,6 +22,7 @@ export interface BrowserDocumentRow {
 export interface BrowserFolderRow {
   id: unknown;
   name: string;
+  parentId?: unknown;
   isHidden?: boolean;
   isFavorite?: boolean;
   sequence?: number;
@@ -56,17 +57,21 @@ export function toBrowserFolders(
   folders: readonly BrowserFolderRow[],
   files: readonly FileBrowserFile[],
 ): FileBrowserFolder[] {
-  return folders
-    .filter((folder) => !folder.isHidden)
+  const visibleFolders = folders.filter((folder) => !folder.isHidden);
+  const visibleIds = new Set(visibleFolders.map((folder) => String(folder.id)));
+  return visibleFolders
     .slice()
     .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0) || a.name.localeCompare(b.name))
     .map((folder) => {
       const id = String(folder.id);
+      const parentId = folder.parentId == null ? null : String(folder.parentId);
       const own = files.filter((file) => file.folderId === id);
       const latest = Math.max(epochMs(folder.writeDate) ?? 0, ...own.map((file) => file.updatedAt ?? 0));
       return {
         id,
         name: folder.name,
+        // Never project an ancestor that this actor's folder collection does not expose.
+        parentId: parentId !== id && parentId !== null && visibleIds.has(parentId) ? parentId : null,
         fileCount: own.length,
         totalSize: own.reduce((sum, file) => sum + file.size, 0),
         updatedAt: latest > 0 ? latest : null,

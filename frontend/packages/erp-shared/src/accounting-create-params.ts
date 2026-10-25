@@ -49,7 +49,6 @@ import {
 import {
   formValue as field,
   optionalBigIntU64,
-  parseDelimitedU64Ids,
   u64IdArrayFromForm,
 } from "./form-coercion"
 import { stbTimestampFromDate } from "./stb-timestamp"
@@ -537,8 +536,9 @@ export function toCreateCrossoveredBudgetParams(
   }
 }
 
+/** Picked account ids (`string[]`) or the older comma/space-separated text. */
 function parseAccountIdList(raw: unknown): bigint[] {
-  return parseDelimitedU64Ids(raw)
+  return u64IdArrayFromForm(raw)
 }
 
 /** When `tagIds` is absent from the form payload, do not change tags on update. */

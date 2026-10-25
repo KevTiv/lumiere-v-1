@@ -32,7 +32,9 @@ pub(crate) fn test_config(server_token: Option<&str>) -> Config {
         report_artifact_store: ReportArtifactStoreConfig::Local {
             root: std::env::temp_dir().join("lumiere-owner-reports-test"),
         },
-        document_blob_dir: std::env::temp_dir().join("lumiere-document-blobs-test"),
+        document_blob_store: crate::config::DocumentBlobStoreConfig::Local {
+            root: std::env::temp_dir().join("lumiere-document-blobs-test"),
+        },
         owner_report_worker_poll_secs: 15,
         owner_report_worker_name: "test-owner-report-worker".to_string(),
         owner_report_worker_port: 8091,

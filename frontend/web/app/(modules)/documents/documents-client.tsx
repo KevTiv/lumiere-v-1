@@ -115,6 +115,7 @@ import { documentNameFromFile, toBrowserFiles, toBrowserFolders } from "./file-b
 import { FileBrowser } from "@lumiere/ui"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { documentFolderCanBeDeleted } from "./document-folder-gates"
+import { withDefaultsFromRow } from "@/lib/prefill-form-config"
 import { DocumentTemplateDesignerDialog, customizableDocumentTemplate, type DocumentTemplateDesignSource } from "./document-template-designer-dialog"
 import {
   canDeleteKnowledgeCategory,
@@ -287,6 +288,9 @@ function DocumentsClientLoaded({
   const [templateDesigner, setTemplateDesigner] = useState<{ scopeKey: string; mode: "create" | "edit" | "duplicate"; template?: DocumentTemplateDesignSource } | null>(null)
   useEffect(() => { setTemplateDesigner(null) }, [templateScopeKey])
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  useEffect(() => {
+    setQuickActionForm((current) => current && ["createDocument", "uploadDocument", "createDocumentFolder"].includes(current.action) ? null : current)
+  }, [templateScopeKey])
   const [csvKind, setCsvKind] = useState<"knowledge_category" | "knowledge_article" | null>(null)
   const [processingToolbarError, setProcessingToolbarError] = useState<string | null>(null)
   const [documentToolbarError, setDocumentToolbarError] = useState<string | null>(null)
@@ -310,6 +314,20 @@ function DocumentsClientLoaded({
   const categories = categoriesRead.rows
   const foldersRead = moduleCollection(useDocumentFolders(orgId, initialFolders))
   const folders = foldersRead.rows
+  const browserScopeReady = templateScopeReady && templatePermissionsReady === true &&
+    typeof session.activeCompanyId === "number" && operatingCompanyId === BigInt(session.activeCompanyId)
+  const canUploadDocument = browserScopeReady && documentsRead.state.status === "ready" &&
+    foldersRead.state.status === "ready" && checkPermission("document", "create").allowed
+  const canCreateDocumentFolder = browserScopeReady && foldersRead.state.status === "ready" &&
+    checkPermission("document_folder", "create").allowed
+  const browserActionScope = useRef({ key: templateScopeKey, upload: false, createFolder: false })
+  browserActionScope.current = { key: templateScopeKey, upload: canUploadDocument, createFolder: canCreateDocumentFolder }
+  const assertBrowserAction = (action: "upload" | "createFolder") => {
+    const current = browserActionScope.current
+    if (current.key !== templateScopeKey || !current[action]) {
+      throw new Error("Your company or document permissions changed. Try again in the current workspace.")
+    }
+  }
   const processingJobsRead = moduleCollection(useAiDocumentProcessingJobs(orgId, initialProcessingJobs))
   const processingJobs = processingJobsRead.rows
   const aiInsightsRead = moduleCollection(useAiInsightsForOrg(orgId, initialAiInsights))
@@ -762,7 +780,7 @@ function DocumentsClientLoaded({
                       { key: "mimetype", label: t("documents.documents.columns.mimetype") },
                       { key: "fileSize", label: t("documents.documents.columns.fileSize"), render: (value: unknown) => formatFileSize(value) },
                       { key: "resName", label: "Attached to" },
-                      { key: "description", label: "Description" },
+                      { key: "description", type: "markdown" as const, label: "Description" },
                     ],
                   },
                 ],
@@ -1338,7 +1356,9 @@ function DocumentsClientLoaded({
     updateDocument: "documents", uploadVersion: "documents", setRetention: "documents",
     updateArticle: "knowledge-base", addArticleMember: "knowledge-base", updateFolder: "document-folders",
   }
-  const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action])
+  const quickActionUsable = quickActionForm == null || (tabUsable(actionTabs[quickActionForm.action]) &&
+    (quickActionForm.action !== "createDocumentFolder" || canCreateDocumentFolder) &&
+    (!["createDocument", "uploadDocument"].includes(quickActionForm.action) || canUploadDocument))
   const csvSourceState = csvKind == null ? undefined : dataState[csvKind === "knowledge_category" ? "knowledge-categories" : "knowledge-base"]
   const rowActionUsable = documentRowAction == null || tabUsable(rowActionTabs[documentRowAction.action])
   const processingUsable = tabUsable("document-processing")
@@ -1355,6 +1375,7 @@ function DocumentsClientLoaded({
   }, [quickActionUsable, rowActionUsable, processingUsable, insightsUsable, promptsUsable, cancelForm])
   /** Stores the bytes, registers the document, then queues its evidence ingestion. */
   const uploadAndRegisterDocument = async (file: File, formData: DocumentUploadFields) => {
+    assertBrowserAction("upload")
     const folderId = optionalBigIntU64(formData.folderId)
     const folderResidency =
       folderId != null
@@ -1369,6 +1390,7 @@ function DocumentsClientLoaded({
       companyId: operatingCompanyId,
       residency: residency ? String(residency) : undefined,
     })
+    assertBrowserAction("upload")
     const params = toCreateDocumentParams({
       ...formData,
       fileName: uploaded.fileName,
@@ -1382,6 +1404,7 @@ function DocumentsClientLoaded({
       throw new Error("Document registration params incomplete after upload")
     }
     await createDocument.mutateAsync(params)
+    assertBrowserAction("upload")
     await ingestDocumentEvidence.mutateAsync({
       companyId: operatingCompanyId,
       objectKey: uploaded.objectKey,
@@ -1415,6 +1438,7 @@ function DocumentsClientLoaded({
       if (!params) return
       await createKnowledgeCategory.mutateAsync(params)
     } else if (action === "createDocumentFolder") {
+      assertBrowserAction("createFolder")
       const params = toCreateDocumentFolderParams(formData, operatingCompanyId)
       if (!params) return
       await createDocumentFolder.mutateAsync({
@@ -1502,14 +1526,20 @@ function DocumentsClientLoaded({
                     tableLabel: t("documents.browser.viewTable"),
                     content: (
                       <FileBrowser
+                        key={templateScopeKey}
                         folders={browserFolders}
                         files={browserFiles}
                         storageKey="lumiere:documents-browser-layout"
                         onOpenFile={(id) => router.push(`/documents/${id}`)}
-                        onCreateFolder={() =>
-                          setQuickActionForm({ form: documentFolderFormConfig, action: "createDocumentFolder" })
-                        }
-                        onUpload={async (picked, folderId) => {
+                        onCreateFolder={canCreateDocumentFolder ? (parentId) => {
+                          const current = browserActionScope.current
+                          if (current.key !== templateScopeKey || !current.createFolder) return
+                          setQuickActionForm({
+                            form: withDefaultsFromRow(documentFolderFormConfig, { parentId: parentId ?? "" }),
+                            action: "createDocumentFolder",
+                          })
+                        } : undefined}
+                        onUpload={canUploadDocument ? async (picked, folderId) => {
                           for (const file of picked) {
                             await uploadAndRegisterDocument(file, {
                               name: documentNameFromFile(file.name),
@@ -1520,7 +1550,7 @@ function DocumentsClientLoaded({
                             kind: "success",
                             title: t("common.actionCompleted", { action: t("documents.browser.upload") }),
                           })
-                        }}
+                        } : undefined}
                       />
                     ),
                   },

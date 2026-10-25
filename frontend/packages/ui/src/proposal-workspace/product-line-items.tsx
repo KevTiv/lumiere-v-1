@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { Trash2, GripVertical, ChevronUp, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Textarea } from "@/components/ui/textarea"
 import { productKindBadgeClass } from "@/lib/theme-colors"
 import type { ProposalLineItem } from "@lumiere/stdb/proposal-row-types"
 import { rowBigint, rowNumber, rowString } from "./row-field-utils"
@@ -171,13 +172,13 @@ function LineItemRow({ item, product, onUpdate, onDelete, onMove, isReordering, 
           </div>
           <div className="flex items-start gap-2">
             <span className="text-[10px] text-muted-foreground w-16 shrink-0 pt-1">{t("proposalWorkspace.productLineItems.notes")}</span>
-            <textarea
+            <Textarea variant="plain"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               onBlur={handleSave}
               rows={2}
               placeholder={t("proposalWorkspace.productLineItems.additionalNotes")}
-              className="flex-1 text-xs border border-border rounded px-1.5 py-0.5 bg-background resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+              className="field-sizing-fixed min-h-0 w-auto flex-1 rounded px-1.5 py-0.5 text-xs md:text-xs resize-none shadow-none focus-visible:ring-1"
             />
           </div>
         </div>

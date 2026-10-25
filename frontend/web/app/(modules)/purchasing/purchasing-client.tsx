@@ -1,4 +1,6 @@
 "use client"
+import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
@@ -12,7 +14,6 @@ import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import { Badge } from "@lumiere/ui/components/badge"
 import {
-  ModuleView,
   FormModal,
   CsvImportModal,
   CSV_IMPORT_CONTRACTS,
@@ -60,6 +61,7 @@ import {
   useFormDialog,
 } from "@lumiere/ui"
 import type { EntityRow, EntityViewConfig, EntityTableConfig, EntityRecordSheetConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
+import { EntityLabelsProvider, labelsFromOptions } from "@lumiere/ui"
 import type { Product, Uom } from "@lumiere/stdb/types"
 import { purchasingModuleConfig } from "@/lib/module-dashboard-configs"
 import { usePurchasingModuleSubscription } from "@/lib/module-subscription-hooks"
@@ -413,7 +415,10 @@ function PurchasingClientLoaded({
   })
   const moduleConfig = useMemo(() => purchasingModuleConfig(t), [t])
   const purchasingTabIds = useMemo(
-    () => [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders", "operations"],
+    () => {
+      const workTabId = moduleWorkBoardTabId(moduleConfig)
+      return [...moduleConfig.tabs.map((tab) => tab.id), "rfqs", "rfq-bids", "purchase-returns", "landed-costs", "supplier-intakes", "blanket-orders", "operations", ...(workTabId ? [workTabId] : [])]
+    },
     [moduleConfig],
   )
   const { activeTab, setActiveTab } = useModuleTab(
@@ -1247,6 +1252,16 @@ function PurchasingClientLoaded({
       expenseAccountFieldOptions,
       payableAccountFieldOptions,
     ])
+
+  const entityLabels = useMemo(
+    () => ({
+      partnerId: labelsFromOptions(vendorFieldOptions),
+      vendorId: labelsFromOptions(vendorFieldOptions),
+      productId: labelsFromOptions(productFieldOptions),
+      currencyId: labelsFromOptions(currencyFieldOptions),
+    }),
+    [vendorFieldOptions, productFieldOptions, currencyFieldOptions],
+  )
 
   const partnerBankFormConfig = useMemo(
     () =>
@@ -2808,14 +2823,15 @@ function PurchasingClientLoaded({
   } as ModuleConfig
 
   return (
-    <>
+    <EntityLabelsProvider value={entityLabels}>
       {activeTabUsable && formDialog}
       {contactsReferenceStatus && (
         <p role="status" className="text-sm text-muted-foreground">
           Contacts reference data: {contactsReferenceStatus}. Supplier selection requires CRM contact read access; existing purchasing records remain available.
         </p>
       )}
-      <ModuleView
+      <ModuleWorkView
+        organizationId={organizationId}
         config={configWithOperations}
         dashboardContent={<ModuleInsights input={{ module: "purchasing", organizationId, companyId: operatingCompanyId, records: { rows: orders, state: ordersRead.state }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
@@ -3013,6 +3029,6 @@ function PurchasingClientLoaded({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </EntityLabelsProvider>
   )
 }

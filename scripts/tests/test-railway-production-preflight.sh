@@ -14,7 +14,7 @@ jq '[
   | {
       id: ("service-" + .name),
       name,
-      regions: [{name: "europe-west4-drams3a", configured: 1}]
+      regions: [{name: "europe-west4", configured: 1}]
     }
 ]' "$MANIFEST" >"$TMP/services.json"
 
@@ -52,6 +52,12 @@ cat >"$TMP/railway" <<'SH'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 case "${1:-} ${2:-}" in
+  "status --json")
+    printf '{"id":"%s"}\n' "${TEST_LINKED_PROJECT:-cc695d4b-030c-43e3-bbd6-a41095b09257}"
+    ;;
+  "environment config")
+    cat "$TEST_CONFIG_FILE"
+    ;;
   "service list")
     cat "$TEST_SERVICES_FILE"
     ;;
@@ -95,7 +101,7 @@ env "${common_env[@]}" RAILWAY_ENABLE_INTEGRATIONS=false \
   bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST"
 
 # A disabled optional service must not gate ERP even if its existing deployment
-# has no active EU replica. Enabling the feature makes the same service strict.
+# has no configured EU replica. Enabling the feature makes the same service strict.
 jq '. + [{
   id: "service-ai-gateway",
   name: "ai-gateway",
@@ -109,7 +115,44 @@ if env "${common_env[@]}" TEST_SERVICES_FILE="$TMP/services-disabled-ai.json" \
   echo "production preflight accepted enabled AI without an active EU replica" >&2
   exit 1
 fi
-grep -Fq 'ai-gateway has no active EU replica' "$TMP/ai-region.out"
+grep -Fq 'ai-gateway has no configured EU replica' "$TMP/ai-region.out"
+
+# A selected pilot must have one replica and distinct service credentials.
+jq '. + [{id:"service-ai-gateway",name:"ai-gateway",regions:[{name:"europe-west4",configured:1}]}]' "$TMP/services.json" >"$TMP/ai-services.json"
+jq -n '{LUMIERE_BIN:"gateway",LUMIERE_ENV:"production",STDB_HOST:"http://spacetimedb.railway.internal:3000",STDB_MODULE:"lumiere-v1",STDB_TOKEN:null,AI_SPEND_READ_STDB_TOKEN:null,AI_CERTIFICATION_STDB_TOKEN:null,AI_EXECUTION_ENVELOPE_KEY:null,LUMIERE_AI_GATEWAY_INTERNAL_SECRET:null,MISTRAL_API_KEY:null,AI_CERTIFICATION_RUNTIME_HASH:"sha256:0123456789abcdef"}' >"$TMP/ai-gateway.variables.json"
+env "${common_env[@]}" RAILWAY_ENABLE_AI=true TEST_SERVICES_FILE="$TMP/ai-services.json" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST"
+# Never-deployed services use their explicit EU configuration, not empty
+# deployment metadata. Runtime gates still require the exact Metal location.
+jq 'map(if .name == "ai-gateway" then .regions=[] else . end)' "$TMP/ai-services.json" >"$TMP/ai-new.json"
+jq -n '{services:{"service-ai-gateway":{deploy:{multiRegionConfig:{"europe-west4":{numReplicas:1}}}}}}' >"$TMP/config.json"
+env "${common_env[@]}" RAILWAY_ENABLE_AI=true TEST_SERVICES_FILE="$TMP/ai-new.json" TEST_CONFIG_FILE="$TMP/config.json" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST"
+for bad in wrong-project wrong-region missing-region multiple-replicas; do
+  jq -n '{services:{"service-ai-gateway":{deploy:{multiRegionConfig:{"europe-west4":{numReplicas:1}}}}}}' >"$TMP/config.json"
+  linked=cc695d4b-030c-43e3-bbd6-a41095b09257
+  case "$bad" in
+    wrong-project) linked=another-project ;;
+    wrong-region) jq '.services["service-ai-gateway"].deploy.multiRegionConfig={"us-west2":{numReplicas:1}}' "$TMP/config.json" >"$TMP/bad-config.json"; mv "$TMP/bad-config.json" "$TMP/config.json" ;;
+    missing-region) printf '{"services":{}}' >"$TMP/config.json" ;;
+    multiple-replicas) jq '.services["service-ai-gateway"].deploy.multiRegionConfig["europe-west4"].numReplicas=2' "$TMP/config.json" >"$TMP/bad-config.json"; mv "$TMP/bad-config.json" "$TMP/config.json" ;;
+  esac
+  if env "${common_env[@]}" RAILWAY_ENABLE_AI=true TEST_SERVICES_FILE="$TMP/ai-new.json" TEST_CONFIG_FILE="$TMP/config.json" TEST_LINKED_PROJECT="$linked" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST" >"$TMP/new-$bad.out" 2>&1; then
+    echo "preflight accepted $bad for a new service" >&2; exit 1
+  fi
+done
+
+jq 'map(if .name == "ai-gateway" then .regions[0].configured=2 else . end)' "$TMP/ai-services.json" >"$TMP/ai-replicas.json"
+if env "${common_env[@]}" RAILWAY_ENABLE_AI=true TEST_SERVICES_FILE="$TMP/ai-replicas.json" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST" >"$TMP/ai-replicas.out" 2>&1; then
+  echo 'AI profile limits accepted multiple replicas' >&2; exit 1
+fi
+grep -Fq 'ai-gateway profile admission requires at most 1' "$TMP/ai-replicas.out"
+jq '. + {KONG_LLM_URL:"https://proxy.invalid"}' "$TMP/ai-gateway.variables.json" >"$TMP/ai-proxy.json"
+cp "$TMP/ai-gateway.variables.json" "$TMP/ai-direct.json"
+cp "$TMP/ai-proxy.json" "$TMP/ai-gateway.variables.json"
+if env "${common_env[@]}" RAILWAY_ENABLE_AI=true TEST_SERVICES_FILE="$TMP/ai-services.json" bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST" >"$TMP/ai-proxy.out" 2>&1; then
+  echo 'direct pilot accepted proxy routing' >&2; exit 1
+fi
+grep -Fq 'invalid KONG_LLM_URL' "$TMP/ai-proxy.out"
+cp "$TMP/ai-direct.json" "$TMP/ai-gateway.variables.json"
 
 if env "${common_env[@]}" RAILWAY_ENABLE_AI=true \
   bash "$ROOT/scripts/railway-production-preflight.sh" "$MANIFEST" >"$TMP/ai.out" 2>&1; then

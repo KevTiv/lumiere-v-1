@@ -1,4 +1,5 @@
 "use client"
+import { useCurrencyFormat } from "@lumiere/ui"
 import { mergeModuleStates, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { applyPeriodReportFormContext, periodReportContextState, periodReportFormDefaults, readPeriodReportContext, reportMatchesPeriodContext } from "@lumiere/ui/lib/period-report-context"
 import { ModuleInsights } from "../../../components/module-insights"
@@ -53,6 +54,7 @@ import {
   dashboardWidgetsTableConfig,
   csvImportForm,
 } from "@lumiere/ui"
+import { EntityLabelsProvider, labelsFromRows } from "@lumiere/ui"
 import type { EntityTableConfig, EntityViewConfig, FormConfig } from "@lumiere/ui"
 import type { FormValues } from "@lumiere/ui/lib/form-types"
 import { reportsModuleConfig } from "@/lib/module-dashboard-configs"
@@ -268,6 +270,8 @@ function ReportsClientLoaded({
   const accountMoveLinesQuery = useAccountMoveLines(orgId, { enabled: organizationId > 0 })
   const { data: accountMoveLines = [] } = accountMoveLinesQuery
   const { data: accountPayments = [] } = useAccountPayments(orgId, { enabled: organizationId > 0 })
+
+  const entityLabels = useMemo(() => ({ reportTemplateId: labelsFromRows(reportTemplates) }), [reportTemplates])
 
   const reports = useMemo(
     () =>
@@ -866,6 +870,7 @@ function ReportsClientLoaded({
     }
   }, [t])
 
+  const { locale } = useCurrencyFormat()
   const liveSections = useMemo(() => {
     const generated = reports.filter((r) => String(r.state) === "generated").length
     const exported = reports.filter((r) => String(r.state) === "exported").length
@@ -890,7 +895,7 @@ function ReportsClientLoaded({
         if (w.type === "combo-chart" && w.id === "rep-pl-trend") {
           return {
             ...w,
-            data: { ...w.data, values: profitAndLossByMonth(chartLines, accountsById, now), valueFormat: money },
+            data: { ...w.data, values: profitAndLossByMonth(chartLines, accountsById, now, 12, locale), valueFormat: money },
           }
         }
         if (w.id === "rep-cash-runway") {
@@ -978,6 +983,7 @@ function ReportsClientLoaded({
         return w
           })
   }, [
+    locale,
     reports,
     accountAccounts,
     accountAccountsQuery,
@@ -1204,7 +1210,7 @@ function ReportsClientLoaded({
   if (periodRequested && periodState.status !== "ready") return <ReportPeriodNotice state={periodState} context={periodContext} />
 
   return (
-    <>
+    <EntityLabelsProvider value={entityLabels}>
       {validPeriodContext ? <ReportPeriodNotice state={periodState} context={validPeriodContext} /> : null}
       <ModuleView
         key={reportActionScope}
@@ -1595,6 +1601,6 @@ function ReportsClientLoaded({
           ) : null}
         </DialogContent>
       </Dialog>
-    </>
+    </EntityLabelsProvider>
   )
 }

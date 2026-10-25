@@ -3,6 +3,7 @@ use spacetimedb::{Identity, ReducerContext, Table};
 use crate::accounting::chart_of_accounts::{
     account_journal, create_account_journal, CreateAccountJournalParams,
 };
+use crate::ai::evidence_source::ai_evidence_passage;
 use crate::ai::intelligence::{
     ai_document_processing_job, approve_document_processing_job, complete_document_processing_job,
     create_document_processing_job, CompleteDocumentProcessingJobParams,
@@ -1409,13 +1410,6 @@ pub fn test_documents_wave_c_index_retention_fiscal(ctx: &ReducerContext) -> Res
         .iter()
         .find(|d| d.organization_id == org_id && d.name == "Wave C Indexed")
         .ok_or("wave c doc missing")?;
-    let index = doc
-        .index_content
-        .as_deref()
-        .ok_or("expected default index_content")?;
-    if !index.contains("Wave C Indexed") || !index.contains("searchable body phrase") {
-        return Err(format!("index_content incomplete: {index}"));
-    }
     if doc.index_language.as_deref() != Some("en") {
         return Err(format!(
             "expected index_language en, got {:?}",
@@ -1478,6 +1472,16 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
     let fixture = OrgFixture::seed_minimal(ctx)?;
     let org_id = fixture.organization_id;
     use crate::core::persistence::{organization_commit, organization_row_change};
+    set_company_country_pack(
+        ctx,
+        org_id,
+        fixture.company_id,
+        SetCompanyCountryPackParams {
+            pack_key: "au".into(),
+            enabled: true,
+            configuration: None,
+        },
+    )?;
     let checksum = "d".repeat(64);
 
     create_document(
@@ -1723,13 +1727,32 @@ pub fn test_documents_wave_d_hold_ocr_drive_esign_presence(
         .id()
         .find(&doc_id)
         .ok_or("doc gone after OCR approve")?;
-    if !indexed
-        .index_content
-        .as_deref()
-        .unwrap_or("")
-        .contains("Acme")
-    {
-        return Err("approved OCR should populate index_content".to_string());
+    if indexed.index_language.as_deref() != Some("en") {
+        return Err("approved OCR should retain the derived index language".to_string());
+    }
+    let canonical_passage = ctx
+        .db
+        .ai_evidence_passage()
+        .ai_evidence_passage_by_source()
+        .filter((
+            &org_id,
+            &fixture.company_id,
+            &"document".to_string(),
+            &format!("document:{doc_id}"),
+        ))
+        .find(|passage| passage.status == "current" && passage.text_state == "present")
+        .ok_or("approved OCR should create a canonical evidence passage")?;
+    if !canonical_passage.passage_text.contains("Acme") {
+        return Err("canonical OCR passage does not contain the approved text".to_string());
+    }
+    let approved_job = ctx
+        .db
+        .ai_document_processing_job()
+        .id()
+        .find(&job.id)
+        .ok_or("approved OCR job disappeared")?;
+    if approved_job.extracted_data.is_some() {
+        return Err("approved OCR job retained duplicate extracted text".to_string());
     }
 
     create_document_signature_request(

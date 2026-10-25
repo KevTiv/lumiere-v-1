@@ -1,4 +1,6 @@
 "use client"
+import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { useCurrencyFormat } from "@lumiere/ui"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { expensesTableConfig } from "@lumiere/ui/lib/expenses-entity-configs"
 import { ExpenseSourcePreview } from "../../../components/finance-source-preview"
@@ -7,6 +9,7 @@ import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dash
 import { canUseModuleData, mergeModuleStates, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { ModuleInsights } from "../../../components/module-insights"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
+import { Textarea } from "@lumiere/ui/components/textarea"
 import {
   inlineNumberAbove,
   isDraftExpense,
@@ -17,7 +20,6 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
-  ModuleView,
   EntityDetail,
   FormModal,
   CsvImportModal,
@@ -261,7 +263,7 @@ function ExpensesClientLoaded({
         throw new Error(t("expenses.forms.capture.receiptRequired", { defaultValue: "Choose a receipt file, or clear the receipt checkbox." }))
       }
       const receiptId = await resolveReceiptAttempt(receiptFile, { organizationId: orgId, companyId: operatingCompanyId, employeeId }, {
-        upload: (file, companyId) => uploadDocumentBlob({ file, companyId }),
+        upload: (file, companyId) => uploadDocumentBlob({ file, companyId, purpose: "expense_receipt" }),
         register: (params, companyId) => createExpenseReceipt.mutateAsync({ ...params, companyId }),
         newRequestId: newExpenseReceiptClientRequestId,
       })
@@ -395,6 +397,7 @@ function ExpensesClientLoaded({
     projectId1: projectFieldOptions, projectId2: projectFieldOptions,
     projectId3: projectFieldOptions, projectId4: projectFieldOptions,
   }), [t, projectFieldOptions])
+  const { locale } = useCurrencyFormat()
   const liveSections = useMemo(() => {
     const pendingApproval = sheetsToApprove.length
     const missingReceiptCount = missingReceipts.length
@@ -424,7 +427,7 @@ function ExpensesClientLoaded({
           return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
         }
         if (w.type === "combo-chart" && w.id === "exp-monthly-spend") {
-          return { ...w, data: { ...w.data, values: monthlySpend(chartExpenses, now), valueFormat: money } }
+          return { ...w, data: { ...w.data, values: monthlySpend(chartExpenses, now, 6, locale), valueFormat: money } }
         }
         if (w.type === "ranked-bars" && w.id === "exp-spend-by-category") {
           return {
@@ -508,6 +511,7 @@ function ExpensesClientLoaded({
         return w
           })
   }, [
+    locale,
     expenses,
     sheets,
     expensesRaw,
@@ -1173,7 +1177,8 @@ function ExpensesClientLoaded({
           {toolbarError}
         </p>
       ) : null}
-      <ModuleView
+      <ModuleWorkView
+        organizationId={organizationId}
         config={config}
         dashboardContent={<ModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
@@ -1327,9 +1332,9 @@ function ExpensesClientLoaded({
               <label className="text-sm font-medium" htmlFor="refuse-reason">
                 {t("expenses.workflow.refuseReason")}
               </label>
-              <textarea
+              <Textarea variant="plain"
                 id="refuse-reason"
-                className="w-full min-h-[80px] rounded-md border bg-background px-3 py-2 text-sm"
+                className="min-h-[80px]"
                 value={refuseReason}
                 onChange={(e) => setRefuseReason(e.target.value)}
                 placeholder={t("expenses.workflow.refuseReasonPlaceholder")}

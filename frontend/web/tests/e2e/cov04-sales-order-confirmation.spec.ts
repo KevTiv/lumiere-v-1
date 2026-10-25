@@ -139,10 +139,13 @@ test.describe("COV-04 sale-order confirmation", { tag: ["@p0", "@cov04", "@unaut
         if (tasks.length === 1) taskId = tasks[0]!
         return tasks.length
       }).toBe(1)
-      // The sales role has no workflow-read grant: its private candidate inbox
-      // must fail closed before exposing the admin-only approval task.
-      const requesterInbox = await requester.request.get("/api/query/workflow-human-tasks-inbox")
-      expect(requesterInbox.status()).toBe(403)
+      // This requester has workflow-read permission but is not a candidate for
+      // the admin-only task observed above. Both private lists must stay empty.
+      for (const resource of ["workflow-human-tasks-inbox", "workflow-human-tasks"]) {
+        const requesterTasks = await requester.request.get(`/api/query/${resource}?companyId=${companyId}`)
+        expect(requesterTasks.status(), await requesterTasks.text()).toBe(200)
+        expect((await requesterTasks.json()).data).toEqual([])
+      }
       expect(await fetchOrderPickings(page, orderId, companyId)).toEqual([])
 
       await gotoApprovals(page)

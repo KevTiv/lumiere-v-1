@@ -68,6 +68,7 @@ COPY crates ./crates
 
 # Build the production runtime set once. Keep the package builds separate because
 # Cargo's --bin filters apply to each selected package.
+COPY erp-skills/report_analysis/SKILL.md ./erp-skills/report_analysis/SKILL.md
 RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
       -p api-server \
       --bin api-server \

@@ -1,4 +1,5 @@
 //! Projects / PSA domain test suite — invoke via `run_projects_*_test` reducers.
+mod task_assignment_test;
 pub mod wave_a_test;
 pub mod wave_c_test;
 pub mod wave_d_test;
@@ -58,6 +59,8 @@ pub fn run_projects_wave_e_test(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_projects_wave_f_test(ctx: &ReducerContext) -> Result<(), String> {
+    task_assignment_test::test_task_assignment_scope(ctx)
+        .map_err(|e| format!("task_assignment_scope: {e}"))?;
     wave_f_test::test_project_analytic_account_fk(ctx)
         .map_err(|e| format!("project_analytic_account_fk: {e}"))?;
     wave_f_test::test_task_stage_fk_project_scoped(ctx)

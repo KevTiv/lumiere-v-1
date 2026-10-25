@@ -149,13 +149,13 @@ pub(crate) async fn render_account_move_pdf(
     let logo_uri = if document.profile.logo_url.is_empty() {
         None
     } else {
-        let root = state.config.document_blob_dir.clone();
-        let logo_url = document.profile.logo_url.clone();
-        let logo = tokio::task::spawn_blocking(move || {
-            read_completed_branding_blob(&root, org_id, company_id, &logo_url)
-        })
-        .await
-        .map_err(ApiError::internal)??;
+        let logo = read_completed_branding_blob(
+            &state.config.document_blob_store,
+            org_id,
+            company_id,
+            &document.profile.logo_url,
+        )
+        .await?;
         Some(format!(
             "data:{};base64,{}",
             logo.content_type,

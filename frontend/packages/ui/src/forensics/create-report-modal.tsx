@@ -25,6 +25,7 @@ import {
 } from "lucide-react"
 import type { ForensicReport, IncidentCategory, IncidentSeverity } from "@/lib/forensic-report-types"
 import { incidentCategories, severityConfig, reportTemplates } from "@/lib/forensic-report-types"
+import { DatePicker } from "@/components/ui/date-picker"
 
 interface CreateReportModalProps {
   open: boolean
@@ -279,11 +280,10 @@ export function CreateReportModal({ open, onClose, onSubmit }: CreateReportModal
 
                 <div>
                   <Label htmlFor="incidentDate">{t("forensics.createModal.labelIncidentDate")}</Label>
-                  <Input
+                  <DatePicker
                     id="incidentDate"
-                    type="date"
-                    value={formData.incidentDate?.split("T")[0]}
-                    onChange={(e) => setFormData(prev => ({ ...prev, incidentDate: e.target.value }))}
+                    value={formData.incidentDate?.split("T")[0] ?? ""}
+                    onChange={(value) => setFormData(prev => ({ ...prev, incidentDate: value }))}
                     className="mt-1.5"
                   />
                 </div>

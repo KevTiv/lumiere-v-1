@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 
 use crate::{
     commands::{dispatch_ai_evidence_mutation, dispatch_ai_evidence_search_mutation},
-    document_blobs::{managed_blob_url, read_completed_blob},
+    document_blobs::{managed_blob_url, read_authorized_document_blob},
     error::ApiError,
     query_exec::resolve_membership_company_id,
     state::AppState,
@@ -346,12 +346,14 @@ async fn ingest_document(
     if document.company_id != requested_company || document.is_deleted {
         return Err(ApiError::NotFound("document not found".into()));
     }
-    let blob = read_completed_blob(
-        &state.config.document_blob_dir,
-        organization_id,
+    let blob = read_authorized_document_blob(
+        &state,
+        &session,
         requested_company,
+        document_id,
         &document.url,
-    )?;
+    )
+    .await?;
     if blob.checksum != document.checksum || blob.content_type != document.mimetype {
         return Err(ApiError::Conflict(
             "document version does not match its server-owned blob".into(),
@@ -578,9 +580,8 @@ async fn persist_document_evidence(
             json!([organization_id, company_id, {
                 "content_type": "ai_evidence_passage",
                 "content_id": passage_id,
-                "text": persisted_text,
-                "embedding": [],
-                "embedding_hash": content_hash,
+                "expected_fingerprint": content_hash,
+                "index_generation": "semantic-index-v1",
                 "metadata": json!({
                     "sourceKind": "document",
                     "sourceKey": format!("document:{document_id}"),
@@ -599,7 +600,8 @@ async fn persist_document_evidence(
                 company_id,
                 "ai_evidence_passage",
                 passage_id,
-                persisted_text
+                content_hash,
+                "semantic-index-v1"
             ]),
         )
         .await?;

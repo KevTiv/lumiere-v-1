@@ -4,6 +4,7 @@ mod auth_password;
 pub mod cold_tier;
 mod commands;
 pub mod config;
+pub mod document_blob_store;
 pub mod document_blobs;
 mod document_render;
 pub mod domain_queries;

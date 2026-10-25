@@ -242,6 +242,12 @@ function encodeValue(
     return null
   }
 
+  if (fieldKey && optionTypes?.[fieldKey] === "identity") {
+    const encoded = encodeIdentity(value)
+    // Explicit Some recurses with type metadata but without optionFields.
+    return optionFields?.has(fieldKey) ? { some: encoded } : encoded
+  }
+
   if (typeof value === "bigint") {
     const isOptionalId = fieldKey !== undefined &&
       optionTypes?.[fieldKey] === "u64" && /_(?:id|uid)$/.test(fieldKey)

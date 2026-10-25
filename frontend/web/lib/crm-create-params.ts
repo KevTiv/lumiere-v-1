@@ -19,6 +19,7 @@ import type { Timestamp } from "spacetimedb"
 import { nullableBigIntU64, optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
+import { parseU64IdList } from "@/lib/id-list"
 
 function parseF64(v: unknown, fallback = 0): number {
   if (v == null || v === "") return fallback
@@ -215,14 +216,7 @@ export function toConvertOpportunityParams(formData: Record<string, unknown>): C
   return { pricelistId, warehouseId }
 }
 
-function parseTaxIdList(raw: unknown): bigint[] {
-  if (raw == null || String(raw).trim() === "") return []
-  return String(raw)
-    .split(/[,\s]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((p) => BigInt(p))
-}
+const parseTaxIdList = parseU64IdList
 
 export function toCreateOpportunityLineParams(
   formData: Record<string, unknown>,

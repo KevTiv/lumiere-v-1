@@ -4,8 +4,6 @@ use spacetimedb::ReducerContext;
 
 use crate::core::country_pack::{company_country_pack, require_company_pack_definition_at};
 
-pub(crate) const MAX_INDEX_CONTENT_CHARS: usize = 32_768;
-
 fn pack_metadata_json(meta: &Option<String>) -> Option<serde_json::Value> {
     let raw = meta.as_ref()?;
     serde_json::from_str(raw).ok()
@@ -176,42 +174,6 @@ pub(crate) fn validate_fiscal_archive(
         ));
     }
     Ok(())
-}
-
-pub(crate) fn build_default_index_content(
-    name: &str,
-    description: Option<&str>,
-    file_name: &str,
-    extra: Option<&str>,
-) -> String {
-    let mut parts = vec![name.trim().to_string(), file_name.trim().to_string()];
-    if let Some(d) = description {
-        let t = d.trim();
-        if !t.is_empty() {
-            parts.push(t.to_string());
-        }
-    }
-    if let Some(e) = extra {
-        let t = e.trim();
-        if !t.is_empty() {
-            parts.push(t.to_string());
-        }
-    }
-    let joined = parts.join("\n");
-    if joined.chars().count() > MAX_INDEX_CONTENT_CHARS {
-        joined.chars().take(MAX_INDEX_CONTENT_CHARS).collect()
-    } else {
-        joined
-    }
-}
-
-pub(crate) fn truncate_index_content(content: &str) -> String {
-    let t = content.trim();
-    if t.chars().count() > MAX_INDEX_CONTENT_CHARS {
-        t.chars().take(MAX_INDEX_CONTENT_CHARS).collect()
-    } else {
-        t.to_string()
-    }
 }
 
 pub(crate) fn compute_purge_after(

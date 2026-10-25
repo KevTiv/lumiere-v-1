@@ -7,9 +7,12 @@ import { useAiFormSuggest } from "@lumiere/query-hooks/hooks/ai-forms"
 import { cn } from "../lib/utils"
 import { workspaceStyles } from "../lib/workspace-styles"
 import type { AiFormAssistConfig, FormConfig, FormField, FormPreviewRenderer, FormValues } from "../lib/form-types"
+import { isNumericField, numericFieldBounds } from "../lib/form-types"
+import { storedNumericValue } from "../lib/numeric-format"
 import { serializeAiFormSchema } from "../lib/ai-form-schema"
 import { FormFieldRenderer } from "./forms-field-render"
 import { formValuesDiffer } from "./use-unsaved-changes-guard"
+import { toDraftValues, useFormDraft } from "./form-draft"
 import { Button } from "../components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/card"
 import { Separator } from "../components/separator"
@@ -23,6 +26,17 @@ function isFieldVisible(field: FormField, values: Record<string, unknown>): bool
   if (!rule?.field) return true
   const value = String(values[rule.field] ?? "")
   return "oneOf" in rule ? rule.oneOf.includes(value) : value === rule.equals
+}
+
+// Deliberately loose: catches typos (missing @ or domain) without rejecting unusual valid values.
+const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const URL_FORMAT = /^(https?:\/\/)?[^\s/.]+\.[^\s]+$/i
+
+function formatError(field: FormField, value: unknown): "email" | "url" | null {
+  if (typeof value !== "string" || value.trim() === "") return null
+  if (field.type === "email" && !EMAIL_FORMAT.test(value.trim())) return "email"
+  if (field.type === "url" && !URL_FORMAT.test(value.trim())) return "url"
+  return null
 }
 
 function visibleSectionFields(
@@ -62,6 +76,13 @@ interface ModularFormProps {
   renderPreview?: FormPreviewRenderer
   /** Keep actions outside the scrolling body when embedded in a constrained dialog. */
   scrollable?: boolean
+  /**
+   * Autosave unsaved values to this browser and restore them when the form
+   * reopens. Set `false` for credential or otherwise sensitive forms.
+   */
+  draft?: boolean
+  /** Distinguishes drafts of one config, e.g. the id of the record being edited. */
+  draftKey?: string | number | null
 }
 
 export function ModularForm({
@@ -77,6 +98,8 @@ export function ModularForm({
   onDirtyChange,
   renderPreview,
   scrollable = false,
+  draft = true,
+  draftKey,
 }: ModularFormProps) {
   const { t } = useTranslation()
   const aiSuggest = useAiFormSuggest()
@@ -98,6 +121,9 @@ export function ModularForm({
               values[field.name] = false
               break
             case "number":
+            case "money":
+            case "percent":
+            case "quantity":
               values[field.name] = ""
               break
             case "file":
@@ -149,6 +175,27 @@ export function ModularForm({
   }, [dirty])
 
   useEffect(() => () => onDirtyChangeRef.current?.(false), [])
+  const formDraft = useFormDraft({
+    enabled: draft,
+    config,
+    draftKey,
+    values: toDraftValues(config, (name) => values[name]),
+    initialValues: toDraftValues(config, (name) => baselineRef.current[name]),
+    dirty,
+    onRestore: (restored) => {
+      setValues((prev) => {
+        const next = { ...prev, ...restored }
+        onValuesChange?.(next)
+        return next
+      })
+    },
+    onRevert: () => {
+      const baseline = baselineRef.current
+      setValues(baseline)
+      onValuesChange?.(baseline)
+      setErrors({})
+    },
+  })
   const aiSchema = useMemo(() => serializeAiFormSchema(config), [config])
   const aiEnabled = aiAssist?.enabled !== false && !!aiAssist?.companyId && !!aiAssist?.entityType
 
@@ -271,6 +318,26 @@ export function ModularForm({
       }
     }
 
+    // Only values the user typed are checked, so an old stored value never blocks an unrelated edit.
+    const format = value !== baselineRef.current[field.name] ? formatError(field, value) : null
+    if (format === "email") {
+      return t("common.validation.invalidEmail")
+    }
+    if (format === "url") {
+      return t("common.validation.invalidUrl")
+    }
+
+    if (isNumericField(field)) {
+      // Unparseable text stays in the value so the field can say so instead of submitting it.
+      const numeric = storedNumericValue(value)
+      if (numeric === null) return t("common.validation.invalidNumber")
+      const { min, max } = numericFieldBounds(field)
+      if (numeric !== undefined) {
+        if (min !== undefined && numeric < min) return t("common.validation.min", { min })
+        if (max !== undefined && numeric > max) return t("common.validation.max", { max })
+      }
+    }
+
     if (field.validation) {
       const v = field.validation
 
@@ -340,6 +407,7 @@ export function ModularForm({
         await submitHandler(values)
         // Saved: what is on screen is now the baseline, not unsaved work.
         baselineRef.current = values
+        formDraft.clear()
       } else {
         toast.warning(t("common.formSubmit.noHandler"))
       }
@@ -355,7 +423,16 @@ export function ModularForm({
     }
   }
 
+  // Cmd/Ctrl+Enter submits from any field, so long forms do not need a trip to the footer.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey) || e.nativeEvent.isComposing) return
+    if ((e.target as HTMLElement).closest("[data-form-ai-panel]")) return
+    e.preventDefault()
+    e.currentTarget.requestSubmit()
+  }
+
   const handleReset = () => {
+    formDraft.clear()
     const initial = getInitialValues()
     setValues(initial)
     onValuesChange?.(initial)
@@ -371,8 +448,9 @@ export function ModularForm({
 
   const fieldsContent = (
     <>
+      {formDraft.banner}
       {aiEnabled ? (
-        <div className={cn(workspaceStyles.surface, "space-y-3 bg-muted/30 p-4")}>
+        <div data-form-ai-panel className={cn(workspaceStyles.surface, "space-y-3 bg-muted/30 p-4")}>
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className={workspaceStyles.sectionTitle}>Fill with AI</p>
@@ -490,7 +568,7 @@ export function ModularForm({
   const hasPreview = preview != null && preview !== false
 
   const formContent = (
-    <form noValidate onSubmit={handleSubmit} className={cn("flex flex-col", scrollable ? "min-h-0 flex-1 overflow-hidden" : "gap-6")}>
+    <form noValidate onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={cn("flex flex-col", scrollable ? "min-h-0 flex-1 overflow-hidden" : "gap-6")}>
       <div
         data-form-body={scrollable ? "" : undefined}
         className={cn(

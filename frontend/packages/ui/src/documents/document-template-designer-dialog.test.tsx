@@ -639,7 +639,7 @@ describe("document template designer dialog", () => {
       { target: { files: [file] } },
     )
     await screen.findByText("Brand logo attached")
-    expect(harness.upload).toHaveBeenLastCalledWith({ file, companyId: 2n })
+    expect(harness.upload).toHaveBeenLastCalledWith({ file, companyId: 2n, purpose: "branding" })
     fireEvent.click(screen.getByRole("button", { name: "Save template" }))
     await waitFor(() => expect(harness.create).toHaveBeenCalledOnce())
     const params = harness.create.mock.calls[0]![0]

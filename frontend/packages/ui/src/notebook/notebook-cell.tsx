@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { MarkdownView } from "@/components/ui/markdown-view"
 import {
@@ -255,14 +256,14 @@ export function NotebookCellComponent({
             onEscape={() => setIsEditing(false)}
           />
         ) : isEditing || isSelected ? (
-          <textarea
+          <Textarea variant="plain"
             ref={textareaRef}
             value={cell.content}
             onChange={(e) => handleContentChange(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={() => setIsEditing(false)}
             onFocus={() => setIsEditing(true)}
-            className="w-full bg-transparent border-none outline-none resize-none font-sans text-xs placeholder:text-muted-foreground/50"
+            className="field-sizing-fixed min-h-0 rounded-none border-none bg-transparent p-0 font-sans text-xs shadow-none resize-none placeholder:text-muted-foreground/50 focus-visible:ring-0 md:text-xs dark:bg-transparent"
             placeholder="Enter markdown..."
             rows={Math.max(3, cell.content.split("\n").length)}
           />

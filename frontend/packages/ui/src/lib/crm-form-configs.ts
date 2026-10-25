@@ -40,7 +40,7 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
         {
           id: "phone",
           name: "phone",
-          type: "text",
+          type: "tel",
           label: t("crm.forms.newLead.fields.phone"),
           placeholder: t("crm.forms.newLead.fields.phonePlaceholder"),
           // width: "1/2",
@@ -54,7 +54,7 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
         {
           id: "expectedRevenue",
           name: "expectedRevenue",
-          type: "number",
+          type: "money",
           label: t("crm.forms.newLead.fields.expectedRevenue"),
           placeholder: "0",
           // width: "1/2",
@@ -62,7 +62,7 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
         {
           id: "probability",
           name: "probability",
-          type: "number",
+          type: "percent",
           label: t("crm.forms.newLead.fields.probability"),
           placeholder: t("crm.forms.newLead.fields.probabilityPlaceholder"),
           // width: "1/2",
@@ -143,7 +143,7 @@ export const newOpportunityForm = (
         {
           id: "expectedRevenue",
           name: "expectedRevenue",
-          type: "number",
+          type: "money",
           label: t("crm.forms.newOpportunity.fields.expectedRevenue"),
           placeholder: "0",
           // width: "1/2",
@@ -151,7 +151,7 @@ export const newOpportunityForm = (
         {
           id: "probability",
           name: "probability",
-          type: "number",
+          type: "percent",
           label: t("crm.forms.newOpportunity.fields.probability"),
           placeholder: t("crm.forms.newOpportunity.fields.probabilityPlaceholder"),
           // width: "1/2",
@@ -290,7 +290,7 @@ export const editOpportunityForm = (t: TFunction): FormConfig => ({
         {
           id: "expectedRevenue",
           name: "expectedRevenue",
-          type: "number",
+          type: "money",
           label: t("crm.forms.editOpportunity.fields.expectedRevenue"),
           placeholder: "0",
           width: "1/2",
@@ -358,7 +358,7 @@ export const newContactForm = (t: TFunction): FormConfig => ({
         {
           id: "email",
           name: "email",
-          type: "text",
+          type: "email",
           label: t("crm.forms.newContact.fields.email"),
           placeholder: t("crm.forms.newContact.fields.emailPlaceholder"),
           // width: "1/2",
@@ -366,7 +366,7 @@ export const newContactForm = (t: TFunction): FormConfig => ({
         {
           id: "phone",
           name: "phone",
-          type: "text",
+          type: "tel",
           label: t("crm.forms.newContact.fields.phone"),
           placeholder: t("crm.forms.newContact.fields.phonePlaceholder"),
           // width: "1/2",
@@ -825,9 +825,9 @@ export const editContactForm = (t: TFunction): FormConfig => ({
       title: t("crm.forms.editContact.sections.core"),
       fields: [
         { id: "name", name: "name", type: "text", label: t("crm.forms.editContact.fields.name"), width: "full" },
-        { id: "email", name: "email", type: "text", label: t("crm.forms.editContact.fields.email"), width: "1/2" },
-        { id: "phone", name: "phone", type: "text", label: t("crm.forms.editContact.fields.phone"), width: "1/2" },
-        { id: "mobile", name: "mobile", type: "text", label: t("crm.forms.editContact.fields.mobile"), width: "1/2" },
+        { id: "email", name: "email", type: "email", label: t("crm.forms.editContact.fields.email"), width: "1/2" },
+        { id: "phone", name: "phone", type: "tel", label: t("crm.forms.editContact.fields.phone"), width: "1/2" },
+        { id: "mobile", name: "mobile", type: "tel", label: t("crm.forms.editContact.fields.mobile"), width: "1/2" },
         {
           id: "isCustomer",
           name: "isCustomer",
@@ -887,7 +887,7 @@ export const editContactBusinessForm = (t: TFunction): FormConfig => ({
         { id: "industry", name: "industry", type: "text", label: t("crm.forms.editContactBusiness.fields.industry"), width: "1/2" },
         { id: "companyRegistry", name: "companyRegistry", type: "text", label: t("crm.forms.editContactBusiness.fields.companyRegistry"), width: "1/2" },
         { id: "employeesCount", name: "employeesCount", type: "number", label: t("crm.forms.editContactBusiness.fields.employeesCount"), width: "1/2" },
-        { id: "annualRevenue", name: "annualRevenue", type: "number", label: t("crm.forms.editContactBusiness.fields.annualRevenue"), width: "1/2" },
+        { id: "annualRevenue", name: "annualRevenue", type: "money", label: t("crm.forms.editContactBusiness.fields.annualRevenue"), width: "1/2" },
       ],
     },
   ],
@@ -905,9 +905,9 @@ export const editContactDetailsForm = (t: TFunction): FormConfig => ({
         { id: "firstName", name: "firstName", type: "text", label: t("crm.forms.editContactDetails.fields.firstName"), width: "1/2" },
         { id: "lastName", name: "lastName", type: "text", label: t("crm.forms.editContactDetails.fields.lastName"), width: "1/2" },
         { id: "title", name: "title", type: "text", label: t("crm.forms.editContactDetails.fields.title"), width: "1/2" },
-        { id: "website", name: "website", type: "text", label: t("crm.forms.editContactDetails.fields.website"), width: "1/2" },
+        { id: "website", name: "website", type: "url", label: t("crm.forms.editContactDetails.fields.website"), width: "1/2" },
         { id: "emailSecondary", name: "emailSecondary", type: "text", label: t("crm.forms.editContactDetails.fields.emailSecondary"), width: "1/2" },
-        { id: "fax", name: "fax", type: "text", label: t("crm.forms.editContactDetails.fields.fax"), width: "1/2" },
+        { id: "fax", name: "fax", type: "tel", label: t("crm.forms.editContactDetails.fields.fax"), width: "1/2" },
         { id: "color", name: "color", type: "text", label: t("crm.forms.editContactDetails.fields.color"), width: "1/2" },
         { id: "description", name: "description", type: "textarea", label: t("crm.forms.editContactDetails.fields.description"), width: "full", rows: 3 },
       ],
@@ -926,7 +926,7 @@ export const editLeadDetailsForm = (t: TFunction): FormConfig => ({
       fields: [
         { id: "contactName", name: "contactName", type: "text", label: t("crm.forms.editLeadDetails.fields.contactName"), width: "full" },
         { id: "title", name: "title", type: "text", label: t("crm.forms.editLeadDetails.fields.title"), width: "1/2" },
-        { id: "website", name: "website", type: "text", label: t("crm.forms.editLeadDetails.fields.website"), width: "1/2" },
+        { id: "website", name: "website", type: "url", label: t("crm.forms.editLeadDetails.fields.website"), width: "1/2" },
         { id: "industry", name: "industry", type: "text", label: t("crm.forms.editLeadDetails.fields.industry"), width: "1/2" },
         { id: "referredBy", name: "referredBy", type: "text", label: t("crm.forms.editLeadDetails.fields.referredBy"), width: "1/2" },
         { id: "description", name: "description", type: "textarea", label: t("crm.forms.editLeadDetails.fields.description"), width: "full", rows: 3 },
@@ -962,8 +962,8 @@ export const editLeadRevenueForm = (t: TFunction): FormConfig => ({
       id: "revenue",
       title: t("crm.forms.editLeadRevenue.sections.revenue"),
       fields: [
-        { id: "expectedRevenue", name: "expectedRevenue", type: "number", label: t("crm.forms.editLeadRevenue.fields.expectedRevenue"), width: "1/2" },
-        { id: "probability", name: "probability", type: "number", label: t("crm.forms.editLeadRevenue.fields.probability"), width: "1/2" },
+        { id: "expectedRevenue", name: "expectedRevenue", type: "money", label: t("crm.forms.editLeadRevenue.fields.expectedRevenue"), width: "1/2" },
+        { id: "probability", name: "probability", type: "percent", label: t("crm.forms.editLeadRevenue.fields.probability"), width: "1/2" },
       ],
     },
   ],
@@ -1019,7 +1019,7 @@ export const addOpportunityLineForm = (t: TFunction): FormConfig => ({
         {
           id: "quantity",
           name: "quantity",
-          type: "number",
+          type: "quantity",
           label: t("crm.forms.addOpportunityLine.fields.quantity"),
           required: true,
           width: "1/2",
@@ -1027,7 +1027,7 @@ export const addOpportunityLineForm = (t: TFunction): FormConfig => ({
         {
           id: "priceUnit",
           name: "priceUnit",
-          type: "number",
+          type: "money",
           label: t("crm.forms.addOpportunityLine.fields.priceUnit"),
           required: true,
           width: "1/2",
@@ -1041,7 +1041,7 @@ export const addOpportunityLineForm = (t: TFunction): FormConfig => ({
         {
           id: "discount",
           name: "discount",
-          type: "number",
+          type: "percent",
           label: t("crm.forms.addOpportunityLine.fields.discount"),
           width: "1/3",
           defaultValue: 0,
@@ -1065,12 +1065,12 @@ export const addOpportunityLineForm = (t: TFunction): FormConfig => ({
         {
           id: "taxIds",
           name: "taxIds",
-          type: "textarea",
+          type: "multiselect",
           label: t("crm.forms.addOpportunityLine.fields.taxIds"),
           placeholder: t("crm.forms.addOpportunityLine.fields.taxIdsPlaceholder"),
           description: t("crm.forms.addOpportunityLine.fields.taxIdsHint"),
           width: "full",
-          rows: 2,
+          options: [],
         },
       ],
     },

@@ -54,6 +54,8 @@ export type ColumnType =
   | "progress"
   | "boolean"
   | "percent"
+  /** Long-form text written in `RichTextarea`: one plain line in tables, formatted in detail views. */
+  | "markdown"
   | "custom"
 
 export type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info"
@@ -73,9 +75,9 @@ export interface EntityColumn extends EntityPermissioned {
   /** Map raw value → display label for type="badge" */
   badgeLabels?: Record<string, string>
   /**
-   * For `type: "currency"`: the row field holding the row's ISO 4217 code (e.g. "EUR"). The cell
-   * formats with that currency when the field is such a code and falls back to USD otherwise
-   * (numeric currency ids are not resolved here).
+   * For `type: "currency"`: the row field holding the row's currency, an ISO 4217 code (e.g. "EUR")
+   * or a currency id that the surrounding `CurrencyFormatProvider` can look up. Falls back to the
+   * provider's default currency, then USD.
    */
   currencyKey?: string
   /** Secret or masked values (e.g. statutory IDs): never written by the table's CSV export. */
@@ -87,7 +89,11 @@ export interface EntityColumn extends EntityPermissioned {
 }
 
 export interface EntityInlineEdit {
-  kind: "text" | "number" | "select"
+  /**
+   * `textarea` is multi-line plain text and `markdown` edits with the rich text editor; for both,
+   * Enter inserts a newline and Cmd/Ctrl+Enter saves.
+   */
+  kind: "text" | "number" | "select" | "textarea" | "markdown"
   /** Choices for `kind: "select"`. */
   options?: Array<{ value: string; label: string }>
   /** Rows the cell may be edited on (e.g. only drafts). Defaults to every row. */
@@ -219,7 +225,14 @@ export interface EntityDetailField extends EntityPermissioned {
   width?: FieldWidth
   badgeVariants?: Record<string, string>
   badgeLabels?: Record<string, string>
+  /** For `type: "currency"`: the record field naming its currency (an ISO code or a currency id). */
+  currencyKey?: string
   render?: (value: unknown, record: EntityRow) => ReactNode
+  /**
+   * Makes the field editable where it is read (click, or Enter/Space when focused). The caller
+   * owns the write; a successful save offers Undo.
+   */
+  inlineEdit?: EntityInlineEdit
 }
 
 export interface EntityDetailSection {

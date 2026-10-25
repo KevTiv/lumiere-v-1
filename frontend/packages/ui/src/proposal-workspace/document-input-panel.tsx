@@ -5,6 +5,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { Plus, Clipboard, X, FileText, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { Textarea } from "@/components/ui/textarea"
 import type { SourceDocument, WorkspaceAction } from "@/lib/proposal-workspace-types"
 
 interface DocumentInputPanelProps {
@@ -218,11 +219,11 @@ export function DocumentInputPanel({ sources, dispatch, onAnalyze, isAnalyzing }
                 <Clipboard className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <textarea
+            <Textarea variant="plain"
               value={activeSource.content}
               onChange={(e) => handleContentChange(e.target.value)}
               placeholder={t("proposalWorkspace.documentInputPanel.pasteRfp")}
-              className="flex-1 resize-none p-3 text-xs leading-relaxed text-foreground bg-background outline-none font-mono"
+              className="field-sizing-fixed min-h-0 flex-1 resize-none rounded-none border-0 p-3 font-mono text-xs leading-relaxed text-foreground shadow-none focus-visible:ring-0 md:text-xs"
               spellCheck={false}
             />
           </div>

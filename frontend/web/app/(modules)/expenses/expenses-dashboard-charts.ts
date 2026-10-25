@@ -68,8 +68,8 @@ export function spendByCategory(
 }
 
 /** Monthly spend split by who paid (employee out of pocket vs corporate card), plus the line count. */
-export function monthlySpend(expenses: readonly HrExpense[], now: Date, months = 6): ChartDatum[] {
-  return monthBuckets(months, now).map((bucket) => {
+export function monthlySpend(expenses: readonly HrExpense[], now: Date, months = 6, locale?: string): ChartDatum[] {
+  return monthBuckets(months, now, locale).map((bucket) => {
     let outOfPocket = 0
     let corporateCard = 0
     let count = 0

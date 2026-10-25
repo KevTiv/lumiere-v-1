@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
   "summary": {
-    "total_operations": 1445,
-    "client_facing_operations": 936,
-    "non_client_operations": 509,
+    "total_operations": 1463,
+    "client_facing_operations": 948,
+    "non_client_operations": 515,
     "unowned_client_facing": 0,
     "review_required": 0,
-    "reconciled_reducer_rows": 1212,
-    "contract_only_operations": 233,
+    "reconciled_reducer_rows": 1228,
+    "contract_only_operations": 235,
     "by_owner": {
       "COV-03": 78,
       "COV-04": 95,
-      "COV-05": 73,
+      "COV-05": 76,
       "COV-06": 142,
       "COV-07": 38,
-      "COV-08": 167,
+      "COV-08": 173,
       "COV-09": 68,
       "COV-10": 47,
       "COV-11": 37,
@@ -24,23 +24,35 @@
       "COV-15": 7,
       "COV-16": 25,
       "COV-17": 40,
-      "COV-18": 44,
+      "COV-18": 45,
       "COV-19": 19,
       "COV-20": 24,
-      "COV-21": 41,
-      "COV-22": 84,
-      "COV-23": 84,
-      "GOV/CAP": 134,
+      "COV-21": 43,
+      "COV-22": 85,
+      "COV-23": 86,
+      "GOV/CAP": 137,
       "INTERNAL": 138
     },
     "by_disposition": {
-      "future-disabled": 68,
-      "horizontal": 154,
-      "internal-support": 514,
-      "primary-workflow": 709
+      "future-disabled": 81,
+      "horizontal": 156,
+      "internal-support": 520,
+      "primary-workflow": 706
     }
   },
   "operations": [
+    {
+      "operation": "abandon_bank_statement_settlement",
+      "contract_file": "finance-commercial.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-08",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "abandon_bank_statement_settlement",
+      "source": "accounting/bank_settlement_lifecycle.rs",
+      "basis": "canonical source domain accounting; no detected UI caller (backend-only)"
+    },
     {
       "operation": "accept_ai_provider_attempt",
       "contract_file": "people-platform.json",
@@ -64,6 +76,18 @@
       "reducer": "accept_sale_order_quotation",
       "source": "sales/sales_core.rs",
       "basis": "canonical source domain sales; detected UI caller"
+    },
+    {
+      "operation": "accept_user_invite",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "owner": "COV-23",
+      "disposition": "internal-support",
+      "coverage_status": "future-disabled",
+      "reducer": "accept_user_invite",
+      "source": "core/auth.rs",
+      "basis": "canonical source core/auth.rs; contract client_facing=false"
     },
     {
       "operation": "accrue_sale_commission",
@@ -539,11 +563,11 @@
       "semantic_kind": "command",
       "client_facing": true,
       "owner": "COV-08",
-      "disposition": "primary-workflow",
-      "coverage_status": "reachable-ui",
+      "disposition": "future-disabled",
+      "coverage_status": "command-only",
       "reducer": "allocate_payment_transaction",
       "source": "accounting/payment_management.rs",
-      "basis": "canonical source domain accounting; detected UI caller"
+      "basis": "canonical source domain accounting; no detected UI caller (command-only)"
     },
     {
       "operation": "amend_subscription",
@@ -652,6 +676,18 @@
       "reducer": "apply_global_migrations",
       "source": "core/migrations.rs",
       "basis": "canonical source core/migrations.rs; contract client_facing=false"
+    },
+    {
+      "operation": "apply_historical_payment_allocations",
+      "contract_file": "finance-commercial.json",
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "owner": "COV-08",
+      "disposition": "internal-support",
+      "coverage_status": "backend-only",
+      "reducer": "apply_historical_payment_allocations",
+      "source": "accounting/historical_payment_migration.rs",
+      "basis": "canonical source domain accounting; contract client_facing=false"
     },
     {
       "operation": "apply_hr_integration_intent",
@@ -1668,10 +1704,10 @@
       "client_facing": true,
       "owner": "COV-06",
       "disposition": "future-disabled",
-      "coverage_status": "backend-only",
+      "coverage_status": "command-only",
       "reducer": "cancel_replenishment_run",
       "source": "inventory/replenishment.rs",
-      "basis": "canonical source domain inventory; no detected UI caller (backend-only)"
+      "basis": "canonical source domain inventory; no detected UI caller (command-only)"
     },
     {
       "operation": "cancel_return_order",
@@ -1854,6 +1890,18 @@
       "basis": "contract denies client exposure; contract client_facing=false"
     },
     {
+      "operation": "claim_reviewed_mail_delivery",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "owner": "COV-18",
+      "disposition": "internal-support",
+      "coverage_status": "backend-only",
+      "reducer": "claim_reviewed_mail_delivery",
+      "source": "documents/templates.rs",
+      "basis": "canonical source domain documents; contract client_facing=false"
+    },
+    {
       "operation": "claim_workflow_human_task",
       "contract_file": "people-platform.json",
       "semantic_kind": "command",
@@ -1864,6 +1912,18 @@
       "reducer": "claim_workflow_human_task",
       "source": "workflow/approvals.rs",
       "basis": "canonical source domain workflow; detected UI caller on horizontal surface"
+    },
+    {
+      "operation": "cleanup_abandoned_account_move_import",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-22",
+      "disposition": "horizontal",
+      "coverage_status": "command-only",
+      "reducer": "cleanup_abandoned_account_move_import",
+      "source": "data_ops/import_tracker.rs",
+      "basis": "canonical source domain data_ops; import/forms horizontal owner"
     },
     {
       "operation": "cleanup_stale_proposal_presence",
@@ -4290,6 +4350,30 @@
       "basis": "canonical source domain documents; detected UI caller on horizontal surface"
     },
     {
+      "operation": "create_manual_account_invoice",
+      "contract_file": "finance-commercial.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-08",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "create_manual_account_invoice",
+      "source": "accounting/manual_invoices.rs",
+      "basis": "canonical source domain accounting; no detected UI caller (backend-only)"
+    },
+    {
+      "operation": "create_manual_invoice",
+      "contract_file": "finance-commercial.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-08",
+      "disposition": "future-disabled",
+      "coverage_status": "command-only",
+      "reducer": "create_manual_invoice",
+      "source": "accounting/journal_entries.rs",
+      "basis": "canonical source domain accounting; no detected UI caller (command-only)"
+    },
+    {
       "operation": "create_manufacturing_order",
       "contract_file": "operations.json",
       "semantic_kind": "command",
@@ -4907,11 +4991,23 @@
       "semantic_kind": "command",
       "client_facing": true,
       "owner": "COV-05",
-      "disposition": "primary-workflow",
-      "coverage_status": "reachable-ui",
+      "disposition": "future-disabled",
+      "coverage_status": "command-only",
       "reducer": "create_purchase_order",
       "source": "purchasing/purchase_orders.rs",
-      "basis": "canonical source domain purchasing; detected UI caller"
+      "basis": "canonical source domain purchasing; no detected UI caller (command-only)"
+    },
+    {
+      "operation": "create_purchase_order_once",
+      "contract_file": "finance-commercial.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-05",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "create_purchase_order_once",
+      "source": "purchasing/order_creation_operations.rs",
+      "basis": "canonical source domain purchasing; no detected UI caller (backend-only)"
     },
     {
       "operation": "create_purchase_requisition",
@@ -7122,6 +7218,18 @@
       "basis": "canonical source domain inventory; no detected UI caller (backend-only)"
     },
     {
+      "operation": "finalize_embedding_job",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "owner": "GOV/CAP",
+      "disposition": "internal-support",
+      "coverage_status": "backend-only",
+      "reducer": "finalize_embedding_job",
+      "source": "ai/intelligence.rs",
+      "basis": "canonical source domain ai; contract client_facing=false"
+    },
+    {
       "operation": "finalize_import_assistant_job",
       "contract_file": "people-platform.json",
       "semantic_kind": "command",
@@ -9150,6 +9258,18 @@
       "basis": "canonical source domain purchasing; detected UI caller"
     },
     {
+      "operation": "receive_po_line_once",
+      "contract_file": "finance-commercial.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-05",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "receive_po_line_once",
+      "source": "purchasing/receipt_operations.rs",
+      "basis": "canonical source domain purchasing; no detected UI caller (backend-only)"
+    },
+    {
       "operation": "recognize_amortization_line",
       "contract_file": "finance-commercial.json",
       "semantic_kind": "command",
@@ -9822,6 +9942,18 @@
       "basis": "canonical source domain workflow; contract client_facing=false"
     },
     {
+      "operation": "recover_ai_provider_attempt",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "owner": "GOV/CAP",
+      "disposition": "internal-support",
+      "coverage_status": "backend-only",
+      "reducer": "recover_ai_provider_attempt",
+      "source": "ai/spend.rs",
+      "basis": "canonical source domain ai; contract client_facing=false"
+    },
+    {
       "operation": "refresh_capacity_forecast",
       "contract_file": "operations.json",
       "semantic_kind": "operator",
@@ -10362,6 +10494,18 @@
       "basis": "canonical source domain proposals; detected UI caller"
     },
     {
+      "operation": "repair_cancelled_workflow_tasks",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-21",
+      "disposition": "future-disabled",
+      "coverage_status": "command-only",
+      "reducer": "repair_cancelled_workflow_tasks",
+      "source": "workflow/cancellation_repair.rs",
+      "basis": "canonical source domain workflow; no detected UI caller (command-only)"
+    },
+    {
       "operation": "replace_contact_categories",
       "contract_file": "finance-commercial.json",
       "semantic_kind": "command",
@@ -10602,6 +10746,30 @@
       "basis": "canonical source domain proposals; detected UI caller"
     },
     {
+      "operation": "resubmit_bank_statement_settlement",
+      "contract_file": "finance-commercial.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-08",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "resubmit_bank_statement_settlement",
+      "source": "accounting/bank_settlement_lifecycle.rs",
+      "basis": "canonical source domain accounting; no detected UI caller (backend-only)"
+    },
+    {
+      "operation": "resubmit_workflow_human_task",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-21",
+      "disposition": "future-disabled",
+      "coverage_status": "hook-only",
+      "reducer": "resubmit_workflow_human_task",
+      "source": "workflow/recovery.rs",
+      "basis": "canonical source domain workflow; no detected UI caller (hook-only)"
+    },
+    {
       "operation": "resume_ai_run_checked",
       "contract_file": "people-platform.json",
       "semantic_kind": "internal",
@@ -10672,6 +10840,18 @@
       "reducer": "retry_iot_action",
       "source": "iot/actions.rs",
       "basis": "canonical source domain iot; detected UI caller"
+    },
+    {
+      "operation": "reverse_bank_statement_settlement",
+      "contract_file": "finance-commercial.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-08",
+      "disposition": "future-disabled",
+      "coverage_status": "backend-only",
+      "reducer": "reverse_bank_statement_settlement",
+      "source": "accounting/bank_settlement_lifecycle.rs",
+      "basis": "canonical source domain accounting; no detected UI caller (backend-only)"
     },
     {
       "operation": "reverse_payment_transaction",
@@ -11119,6 +11299,18 @@
     },
     {
       "operation": "run_ai_intelligence_events_tests",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "test",
+      "client_facing": false,
+      "owner": "GOV/CAP",
+      "disposition": "internal-support",
+      "coverage_status": "contract-only",
+      "reducer": null,
+      "source": "ai/mod.rs",
+      "basis": "canonical source domain ai; contract client_facing=false"
+    },
+    {
+      "operation": "run_ai_spend_recovery_tests",
       "contract_file": "people-platform.json",
       "semantic_kind": "test",
       "client_facing": false,
@@ -12954,6 +13146,18 @@
       "basis": "canonical source domain purchasing; contract client_facing=false"
     },
     {
+      "operation": "run_purchasing_keyed_operations_test",
+      "contract_file": "finance-commercial.json",
+      "semantic_kind": "test",
+      "client_facing": false,
+      "owner": "COV-05",
+      "disposition": "internal-support",
+      "coverage_status": "contract-only",
+      "reducer": null,
+      "source": "purchasing/mod.rs",
+      "basis": "canonical source domain purchasing; contract client_facing=false"
+    },
+    {
       "operation": "run_purchasing_lot_receive_test",
       "contract_file": "finance-commercial.json",
       "semantic_kind": "test",
@@ -13692,10 +13896,10 @@
       "client_facing": true,
       "owner": "COV-06",
       "disposition": "future-disabled",
-      "coverage_status": "backend-only",
+      "coverage_status": "command-only",
       "reducer": "schedule_replenishment_run",
       "source": "inventory/replenishment.rs",
-      "basis": "canonical source domain inventory; no detected UI caller (backend-only)"
+      "basis": "canonical source domain inventory; no detected UI caller (command-only)"
     },
     {
       "operation": "schedule_sales_sla_escalation",
@@ -14298,6 +14502,18 @@
       "basis": "canonical source domain iot; detected UI caller"
     },
     {
+      "operation": "set_member_access",
+      "contract_file": "people-platform.json",
+      "semantic_kind": "command",
+      "client_facing": true,
+      "owner": "COV-23",
+      "disposition": "future-disabled",
+      "coverage_status": "command-only",
+      "reducer": "set_member_access",
+      "source": "core/access_lifecycle.rs",
+      "basis": "canonical source core/access_lifecycle.rs; no detected UI caller (command-only)"
+    },
+    {
       "operation": "set_project_active",
       "contract_file": "operations.json",
       "semantic_kind": "command",
@@ -14507,11 +14723,11 @@
       "semantic_kind": "command",
       "client_facing": true,
       "owner": "COV-08",
-      "disposition": "primary-workflow",
-      "coverage_status": "reachable-ui",
+      "disposition": "future-disabled",
+      "coverage_status": "command-only",
       "reducer": "stage_bank_statement_import",
       "source": "accounting/bank_reconciliation.rs",
-      "basis": "canonical source domain accounting; detected UI caller"
+      "basis": "canonical source domain accounting; no detected UI caller (command-only)"
     },
     {
       "operation": "start_cycle_count_session",
@@ -15656,14 +15872,14 @@
     {
       "operation": "update_document_template",
       "contract_file": "operations.json",
-      "semantic_kind": "internal",
-      "client_facing": false,
+      "semantic_kind": "command",
+      "client_facing": true,
       "owner": "COV-18",
-      "disposition": "internal-support",
-      "coverage_status": "command-only",
+      "disposition": "horizontal",
+      "coverage_status": "reachable-ui",
       "reducer": "update_document_template",
       "source": "documents/templates.rs",
-      "basis": "canonical source domain documents; contract client_facing=false"
+      "basis": "canonical source domain documents; detected UI caller on horizontal surface"
     },
     {
       "operation": "update_employee",

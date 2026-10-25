@@ -1,4 +1,5 @@
 //! CRM domain test suite — invoke via `run_all_crm_tests` reducer.
+mod activity_work_test;
 pub mod contact_identity_test;
 pub mod contact_lifecycle_test;
 pub mod deferred_test;
@@ -26,6 +27,8 @@ pub fn run_all_crm_tests(ctx: &ReducerContext) -> Result<(), String> {
 
 #[spacetimedb::reducer]
 pub fn run_crm_relational_fk_test(ctx: &ReducerContext) -> Result<(), String> {
+    activity_work_test::test_finance_activity_authorization(ctx)
+        .map_err(|e| format!("finance_activity_authorization: {e}"))?;
     relational_fk_test::test_lead_stage_and_team_relations(ctx)
         .map_err(|e| format!("lead_stage_and_team_relations: {e}"))?;
     relational_fk_test::test_activity_type_and_contact_relations(ctx)

@@ -58,6 +58,53 @@ function hasPositiveOrganizationId(value: bigint | number): boolean {
   return typeof value === 'bigint' ? value > 0n : value > 0
 }
 
+const AUTHORITY_RESOURCES = new Set([
+  'auth', 'user-profile', 'user-role-assignment', 'user-roles',
+  'user-organization', 'roles', 'auth-role-table', 'org-permissions',
+  'field-permissions', 'policy-snapshot', 'policy-snapshots',
+  'delegated-admin-scopes',
+])
+const WORK_MEMBERSHIP_RESOURCES = new Set(['companies', 'departments', 'employees'])
+const WORK_SOURCE_RESOURCES = new Set([
+  'purchase-orders', 'sale-orders', 'account-moves', 'account-payments', 'expense-sheets',
+])
+const WORKFLOW_MEMBERSHIP_RESOURCES = new Set([
+  'workflow-candidate-group-members', 'workflow-delegations', 'purchase-approval-delegates',
+])
+const WORKFLOW_ASSIGNMENT_RESOURCES = new Set([
+  'workflow-human-tasks', 'workflow-human-tasks-inbox', 'workflow-human-task-events',
+  'workflow-instances', 'workflow-versions', 'workflows',
+  ...WORKFLOW_MEMBERSHIP_RESOURCES,
+])
+
+/** Authorized HTTP projections are not replaced by the direct table-row cache. */
+function workProjectionQueryKeysForResource(
+  resource: string,
+  organizationId: bigint | number,
+): QueryKey[] {
+  const orgString = organizationId.toString()
+  const keys: QueryKey[] = []
+  const authorityChanged = AUTHORITY_RESOURCES.has(resource)
+  const sharedDependencyChanged = authorityChanged
+    || WORK_MEMBERSHIP_RESOURCES.has(resource)
+    || WORK_SOURCE_RESOURCES.has(resource)
+
+  if (authorityChanged || WORKFLOW_MEMBERSHIP_RESOURCES.has(resource)) {
+    // RBACBridge uses a numeric organization ID, followed by the session actor.
+    const orgNumber = Number(organizationId)
+    if (Number.isSafeInteger(orgNumber) && orgNumber > 0) {
+      keys.push(['auth-access', orgNumber])
+    }
+  }
+  if (sharedDependencyChanged || WORKFLOW_ASSIGNMENT_RESOURCES.has(resource)) {
+    keys.push(['workflow-human-tasks', 'work-board', orgString])
+  }
+  if (sharedDependencyChanged || resource === 'activities') {
+    keys.push(['activities', 'work-board', orgString])
+  }
+  return keys
+}
+
 /**
  * Query keys affected by an api-server realtime resource.
  *
@@ -103,6 +150,8 @@ export function realtimeQueryKeysForResource(
       ['current-user-profile'],
     )
   }
+
+  keys.push(...workProjectionQueryKeysForResource(resource, organizationId))
 
   return keys
 }
@@ -172,8 +221,10 @@ export function invalidateStdbQueryResources(
     void qc.invalidateQueries({
       queryKey: typedStdbQueryKey(resource, organizationId),
     })
-    if (!invalidateHttpCaches) continue
-    for (const queryKey of realtimeQueryKeysForResource(resource, organizationId)) {
+    const httpKeys = invalidateHttpCaches
+      ? realtimeQueryKeysForResource(resource, organizationId)
+      : workProjectionQueryKeysForResource(resource, organizationId)
+    for (const queryKey of httpKeys) {
       void qc.invalidateQueries({ queryKey })
     }
   }

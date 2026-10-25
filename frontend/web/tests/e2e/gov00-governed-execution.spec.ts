@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test"
+import { governedPilotAgentId } from "./governed-pilot"
+import { mapRunObservation } from "../../app/(modules)/ai-harness/run-observation"
 
 import {
   fetchDefaultCompanyId,
@@ -40,23 +42,21 @@ type RunBody = {
 }
 
 function requireGovernedRuntime(): number {
-  const rawAgentId = process.env.E2E_GOV00_AGENT_ID?.trim()
-  const agentId = rawAgentId ? Number(rawAgentId) : 0
-  test.skip(
-    !Number.isSafeInteger(agentId) || agentId <= 0,
-    "requires a provisioned governed report-analysis runtime (set E2E_GOV00_AGENT_ID)",
-  )
-  return agentId
+  const agentId = governedPilotAgentId({
+    E2E_GOV00_AGENT_ID: process.env.E2E_GOV00_AGENT_ID,
+    E2E_REQUIRE_AI: process.env.E2E_REQUIRE_AI,
+  })
+  test.skip(agentId === null, "requires a provisioned governed runtime (set E2E_GOV00_AGENT_ID)")
+  return agentId ?? 0
 }
 
-test.describe("GOV-00 governed execution", { tag: "@gov00" }, () => {
+test.describe("GOV-00 governed execution", { tag: ["@gov00", "@ai-live"] }, () => {
   test.setTimeout(180_000)
 
   test("authenticated BFF persists the governed report trace", async ({ page }) => {
+    const agentId = requireGovernedRuntime()
     await page.goto("/overview")
     await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/)
-
-    const agentId = requireGovernedRuntime()
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = await fetchDefaultCompanyId(page)
     const response = await page.request.post("/api/ai/skills/report-analysis", {
@@ -72,16 +72,18 @@ test.describe("GOV-00 governed execution", { tag: "@gov00" }, () => {
     })
     const body = (await response.json()) as RunBody
 
-    expect(response.ok(), body.error ?? JSON.stringify(body)).toBeTruthy()
+    expect(response.ok(), `governed request failed: HTTP ${response.status()}`).toBeTruthy()
     expect(body.decision?.decision?.correlation).toMatchObject({
       organization_id: organizationId,
       company_id: companyId,
     })
     expect(body.decision?.decision?.correlation?.actor_id).toMatch(/^[0-9a-f]{64}$/)
     expect(body.run?.run_id).toBeGreaterThan(0)
-    expect(body.run?.status).toBe("agent_settled")
+    expect(body.run?.status, "pilot must complete; review/clarification is not settlement").toBe("completed")
     expect(body.run?.skill_key).toBe("report_analysis")
-    expect(body.run?.steps?.map((step) => step.step_no)).toEqual([1, 2, 3])
+    const stepNumbers = body.run?.steps?.map((step) => step.step_no) ?? []
+    expect(stepNumbers.length).toBeGreaterThanOrEqual(2)
+    expect(stepNumbers).toEqual(stepNumbers.map((_, index) => index + 1))
 
     const runId = body.run?.run_id ?? 0
     await expect
@@ -99,8 +101,36 @@ test.describe("GOV-00 governed execution", { tag: "@gov00" }, () => {
       .toMatchObject({
         organizationId,
         companyId,
-        status: "agent_settled",
-        stepCount: 3,
+        status: "completed",
+        stepCount: stepNumbers.length,
       })
+
+    const inspect = async () => {
+      const response = await page.request.post("/api/ai/evidence/runs/inspect", {
+        data: { companyId, runId },
+      })
+      expect(response.ok(), `run inspection failed: HTTP ${response.status()}`).toBeTruthy()
+      return mapRunObservation(await response.json())
+    }
+    const observed = await inspect()
+    expect(observed?.runId).toBe(runId)
+    expect(observed?.status).toBe("completed")
+    expect(observed?.transcript.length).toBe(stepNumbers.length)
+    expect(observed?.transcript.every(step => !step.error)).toBe(true)
+    const economics = observed?.economics
+    expect(economics?.truncated).toBe(false)
+    expect(economics?.providerModelsTruncated).toBe(false)
+    expect(economics?.attemptCount).toBeGreaterThan(0)
+    expect(economics?.attemptStatuses).toEqual(["succeeded"])
+    expect(economics?.reservationStatuses).toEqual(["settled"])
+    expect(economics?.outcomeUnknown).toBe(false)
+    expect(economics?.providerModels.length).toBeGreaterThan(0)
+    expect(economics?.providerModels.every(profile => profile.provider === "mistral")).toBe(true)
+    expect(economics?.inputTokens).toBeGreaterThan(0)
+    expect(economics?.outputTokens).toBeGreaterThan(0)
+    expect(economics?.settledUnits).toBeGreaterThan(0)
+    // Reconnect only observes the original run; it does not submit another run.
+    await page.reload()
+    expect(await inspect()).toEqual(observed)
   })
 })

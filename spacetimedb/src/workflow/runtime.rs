@@ -726,6 +726,13 @@ pub fn cancel_workflow(
     params: CancelWorkflowParams,
 ) -> Result<(), String> {
     check_permission(ctx, organization_id, "workflow_instance", "write")?;
+    let company_membership_bypass = super::authorization::require_workflow_company_access(
+        ctx,
+        organization_id,
+        params.company_id,
+        ctx.sender(),
+    )
+    .map_err(|error| format!("Permission denied: {error}"))?;
     validate_command_key(&params.idempotency_key, "idempotency key")?;
     validate_command_key(&params.correlation_id, "correlation id")?;
     validate_required(&params.reason, "cancellation reason")?;
@@ -765,6 +772,13 @@ pub fn cancel_workflow(
         },
         RuntimeMutation::Cancel,
     )?;
+    super::approvals::cancel_active_workflow_human_tasks(
+        ctx,
+        &updated,
+        &params.idempotency_key,
+        &params.correlation_id,
+        company_membership_bypass,
+    )?;
     insert_receipt(
         ctx,
         scope_key,
@@ -776,6 +790,7 @@ pub fn cancel_workflow(
         &params.correlation_id,
         params.causation_id,
     );
+    super::finance_persistence::record_cancelled_workflow(ctx, &updated, &params.correlation_id)?;
     crate::accounting::bank_settlement_lifecycle::synchronize_cancelled_bank_workflow(
         ctx, updated.id,
     )?;

@@ -1,4 +1,7 @@
 "use client"
+import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { moduleWorkBoardTabId } from "@lumiere/ui/lib/module-types"
+import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { AssetDepreciationSchedule } from "@lumiere/ui/accounting-components/asset-depreciation-schedule"
 import { useModuleTab } from "@/hooks/use-module-tab"
@@ -34,7 +37,6 @@ import { canUseModuleData, mergeModuleStates, moduleCollection } from "@lumiere/
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import {
-  ModuleView,
   DashboardWidgetRenderer,
   FormModal,
   CsvImportModal,
@@ -471,7 +473,7 @@ import {
   toBankStatementCreateInput,
   toBankStatementUpdateParams,
 } from "./bank-statement-actions"
-import { useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
+import { CurrencyFormatProvider, useFormDialog, workflowActionsToEntityActions } from "@lumiere/ui"
 import type {
   AccountAnalyticAccount,
   AccountFiscalYear,
@@ -835,12 +837,16 @@ function AccountingClientReady({
   const runtimeRoleId = resolveRuntimeFormRoleId(currentUser?.roles)
   const moduleConfigBase = useMemo(() => accountingModuleConfig(t), [t])
   const accountingTabIds = useMemo(
-    () => [
-      ...moduleConfigBase.tabs.map((tab) => tab.id),
-      "account-journals",
-      "move-lines",
-      "period-close",
-    ],
+    () => {
+      const workTabId = moduleWorkBoardTabId(moduleConfigBase)
+      return [
+        ...moduleConfigBase.tabs.map((tab) => tab.id),
+        "account-journals",
+        "move-lines",
+        "period-close",
+        ...(workTabId ? [workTabId] : []),
+      ]
+    },
     [moduleConfigBase],
   )
   const { activeTab: accountingActiveTab, setActiveTab: setAccountingActiveTab } = useModuleTab(
@@ -1266,6 +1272,12 @@ function AccountingClientReady({
     () =>
       companies.find((company) => company.id === operatingCompanyId)?.currencyId ?? 0n,
     [companies, operatingCompanyId],
+  )
+
+  // The operating company's currency: what an amount without its own currency is shown in.
+  const operatingCompanyCurrencyCode = useMemo(
+    () => invoiceCurrencyOptions.find((option) => option.value === String(manualInvoiceCurrencyId))?.code,
+    [invoiceCurrencyOptions, manualInvoiceCurrencyId],
   )
 
   const manualInvoiceOptions = useMemo(() => {
@@ -1726,7 +1738,7 @@ function AccountingClientReady({
       statusKey: "state",
       statusBadgeVariants: status.badgeVariants,
       statusBadgeLabels: status.badgeLabels,
-      detailConfig: bankStatementDetailConfig(t),
+      detailConfig: bankStatementDetailConfig(t, { journalLabelMap }),
       auditTableName: "account_bank_statement",
       discussion: {},
       customTabs: [
@@ -1800,7 +1812,7 @@ function AccountingClientReady({
         },
       ],
     }
-  }, [t, bankStatementLines, orgId, operatingCompanyId])
+  }, [t, bankStatementLines, orgId, operatingCompanyId, journalLabelMap])
 
   const consolidationRateLabels = useMemo(() => {
     const toMap = (opts: Array<{ value: string; label: string }>) =>
@@ -2489,7 +2501,7 @@ function AccountingClientReady({
     return mergeFieldDefaultValues(base, accountPeriodRowToFormDefaults(accountPeriodEdit))
   }, [accountPeriodEdit, t])
 
-  const bankStatementsEntityConfig = useMemo(() => bankStatementsTableConfig(t), [t])
+  const bankStatementsEntityConfig = useMemo(() => bankStatementsTableConfig(t, { journalLabelMap }), [t, journalLabelMap])
 
   const detailStatementLines = useMemo(() => {
     if (!bankStatementDetail?.id) return []
@@ -4277,7 +4289,7 @@ function AccountingClientReady({
   }, []);
 
   const intercompanyRulesEntityConfig = useMemo((): EntityViewConfig => {
-    const base = intercompanyRulesTableConfig(t)
+    const base = intercompanyRulesTableConfig(t, { companyLabelMap })
     const view = base.view as EntityTableConfig
     return {
       ...base,
@@ -4336,7 +4348,7 @@ function AccountingClientReady({
         ],
       },
     }
-  }, [t, setIntercompanyRuleActive, deleteIntercompanyRule, intercompanyRuleIsActive])
+  }, [t, setIntercompanyRuleActive, deleteIntercompanyRule, intercompanyRuleIsActive, companyLabelMap])
 
   // Helper to get intercompany transaction state
   const intercompanyTransactionState = (row: Record<string, unknown>): string => {
@@ -4684,6 +4696,7 @@ function AccountingClientReady({
   const draftInvoicePersonalization = selectedInvoice && selectedInvoiceCompanyMatches && ["OutInvoice", "OutRefund"].includes(selectedInvoiceMoveType) && invoicePersonalization.profile && invoiceSeller
     ? resolveDraftInvoiceDocument(selectedInvoice.metadata, invoicePersonalization.profile, invoicePersonalization.profileVersionIds, invoiceSeller)
     : null
+  const { locale } = useCurrencyFormat()
   const financeChartSections = useMemo(() => {
     const now = new Date()
     const currentRange = { startMs: new Date(now.getFullYear(), now.getMonth(), 1).getTime(), endMs: now.getTime() }
@@ -4699,7 +4712,7 @@ function AccountingClientReady({
     return mapDashboardWidgets(moduleConfigBase, (w) => {
       if (!ids.includes(w.id)) return w
       if (sourceState.status !== "ready" || !currencyCode) return { ...w, type: "diagnostic", data: { code: "missing-measure", message: sourceState.status !== "ready" ? "Financial source data is not ready. Refresh this overview before interpreting totals." : "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
-      if (w.type === "combo-chart" && w.id === "acc-revenue-expenses") return { ...w, data: { ...w.data, values: revenueVsExpensesByMonth(chartInvoices, chartBills, now), valueFormat: money } }
+      if (w.type === "combo-chart" && w.id === "acc-revenue-expenses") return { ...w, data: { ...w.data, values: revenueVsExpensesByMonth(chartInvoices, chartBills, now, 6, locale), valueFormat: money } }
       if (w.type === "radial-gauge" && w.id === "acc-collection-rate") {
         const rate = collectionRate(chartInvoices, currentRange)
         return { ...w, data: { ...w.data, value: rate.collected, max: rate.invoiced, stats: [{ label: "Invoiced", value: formatChartValue(rate.invoiced, money) }, { label: "Collected", value: formatChartValue(rate.collected, money) }, { label: "Outstanding", value: formatChartValue(rate.outstanding, money) }] } }
@@ -4712,7 +4725,7 @@ function AccountingClientReady({
       }
       return w
     }).map((section) => ({ ...section, widgets: section.widgets.filter((widget) => ids.includes(widget.id)) })).filter((section) => section.widgets.length > 0)
-  }, [invoices, bills, accountPayments, operatingCompanyId, currencies, allMovesRead.state, accountPaymentsRead.state, currenciesRead.state, moduleConfigBase, partnerLabelMap])
+  }, [invoices, bills, accountPayments, operatingCompanyId, currencies, allMovesRead.state, accountPaymentsRead.state, currenciesRead.state, moduleConfigBase, partnerLabelMap, locale])
   const accountantOverview = (
     <AccountantOverview
       companyName={companyLabelMap.get(String(operatingCompanyId))}
@@ -5617,6 +5630,7 @@ function AccountingClientReady({
                       budgets={budgets}
                       budgetLines={budgetLines}
                       budgetPosts={budgetPosts}
+                      accountOptions={glAccountSelectOptions}
                       onCreateBudget={(params) =>
                         createBudget.mutateAsync(toCreateCrossoveredBudgetParams(params, operatingCompanyId))
                       }
@@ -6366,6 +6380,7 @@ function AccountingClientReady({
   }
 
   return (
+    <CurrencyFormatProvider currencies={currencies} defaultCode={operatingCompanyCurrencyCode}>
     <ReconciliationMoveLineProvider value={reconciliationSelectionContext}>
       {activeTabUsable && formDialog}
       {companyAvailable ? <AccountingSetupReadinessPanel
@@ -6375,7 +6390,8 @@ function AccountingClientReady({
         onResolve={handleReadinessResolve}
         className="mb-4"
       /> : <p role="status" className="rounded-lg border p-4 text-sm">Select an active company to continue. Original pending operations have been retained.</p>}
-      {companyAvailable ? <ModuleView
+      {companyAvailable ? <ModuleWorkView
+        organizationId={organizationId}
         config={config}
         data={data}
         dataLoading={dataLoading}
@@ -7292,5 +7308,6 @@ function AccountingClientReady({
       />
       {confirmDialogNode}
     </ReconciliationMoveLineProvider>
+    </CurrencyFormatProvider>
   )
 }

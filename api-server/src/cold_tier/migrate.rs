@@ -241,6 +241,43 @@ pub const MIGRATIONS: &[Migration] = &[
             "../../../lumiere-codegen/pg-migration-ledger/0021_durable_projection_delta.sql"
         ),
     },
+    Migration {
+        version: 22,
+        name: "workflow_approval_recovery",
+        change_set: 14,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0022_durable_projection_delta.sql"
+        ),
+    },
+    Migration {
+        version: 23,
+        name: "canonical_ai_index_expand",
+        change_set: 15,
+        phase: MigrationPhase::Expand,
+        sql: include_str!("ai_index_expand.sql"),
+    },
+    Migration {
+        version: 24,
+        name: "canonical_ai_index_backfill",
+        change_set: 15,
+        phase: MigrationPhase::ProjectBackfill,
+        sql: include_str!("ai_index_backfill.sql"),
+    },
+    Migration {
+        version: 25,
+        name: "canonical_ai_index_verify",
+        change_set: 15,
+        phase: MigrationPhase::Verify,
+        sql: include_str!("ai_index_verify.sql"),
+    },
+    Migration {
+        version: 26,
+        name: "canonical_ai_index_contract",
+        change_set: 15,
+        phase: MigrationPhase::Contract,
+        sql: include_str!("ai_index_contract.sql"),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.
