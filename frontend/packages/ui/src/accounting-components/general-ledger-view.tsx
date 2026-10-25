@@ -36,19 +36,11 @@ import {
 import type { AccountMove } from "../lib/accounting-types"
 import { moveStateIsDraft, moveTypeIsInvoiceOrRefund } from "../lib/accounting-move-utils"
 import { getRowField } from "../lib/entity-row-utils"
+import { useCurrencyFormat } from "../lib/currency-context"
 import { useClearModuleUrlFilter, useModuleUrlFilters } from "../lib/module-url-filters"
 import { useTranslation } from "@lumiere/i18n"
 import type { RowValueMap } from "@lumiere/erp-shared/row-values"
 import { TablePager, usePagedRows } from "../components/table-pager"
-
-function formatTimestamp(ts?: { microsSinceUnixEpoch: bigint } | null): string {
-  if (!ts) return "—"
-  const ms = Number(ts.microsSinceUnixEpoch) / 1000
-  return new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-}
-
-const formatCurrency = (v: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v)
 
 function moveStateStr(state: unknown): string {
   if (state != null && typeof state === 'object' && 'tag' in state) {
@@ -98,6 +90,11 @@ export function GeneralLedgerView({
   computeInvoiceTotalsPending,
 }: GeneralLedgerViewProps) {
   const { t } = useTranslation()
+  const currency = useCurrencyFormat()
+  const formatTimestamp = (ts?: { microsSinceUnixEpoch: bigint } | null): string =>
+    ts ? currency.date(Number(ts.microsSinceUnixEpoch) / 1000) : "—"
+  /** In the document's own currency when it names one, else the company's. */
+  const formatCurrency = (value: number, currencyId?: unknown): string => currency.money(value, currencyId)
   const urlFilters = useModuleUrlFilters()
   const clearUrlFilter = useClearModuleUrlFilter()
   const [searchQuery, setSearchQuery] = useState("")
@@ -252,7 +249,7 @@ export function GeneralLedgerView({
                       {move.ref && <Badge variant="outline" className="text-xs">{move.ref}</Badge>}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{String(move.moveType)}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(move.amountTotal ?? 0)}</TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(move.amountTotal ?? 0, move.currencyId)}</TableCell>
                     <TableCell>
                       <Badge variant={isPosted ? "default" : "secondary"} className="gap-1">
                         {isPosted
@@ -306,16 +303,16 @@ export function GeneralLedgerView({
                     <TableBody>
                       <TableRow>
                         <TableCell>{selectedMove.invoicePartnerDisplayName ?? `Partner #${selectedMove.partnerId}`}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(selectedMove.amountUntaxed ?? 0)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(selectedMove.amountTax ?? 0)}</TableCell>
-                        <TableCell className="text-right font-bold">{formatCurrency(selectedMove.amountTotal ?? 0)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(selectedMove.amountUntaxed ?? 0, selectedMove.currencyId)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(selectedMove.amountTax ?? 0, selectedMove.currencyId)}</TableCell>
+                        <TableCell className="text-right font-bold">{formatCurrency(selectedMove.amountTotal ?? 0, selectedMove.currencyId)}</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
                   <div className="flex justify-end gap-8 p-4 border-t bg-muted/30">
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">{t("accounting.journalEntries.residual")}</p>
-                      <p className="text-lg font-bold">{formatCurrency(selectedMove.amountResidual ?? 0)}</p>
+                      <p className="text-lg font-bold">{formatCurrency(selectedMove.amountResidual ?? 0, selectedMove.currencyId)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">{t("accounting.journalEntries.payment")}</p>

@@ -54,7 +54,7 @@ export function saleOrderKpis(rows: readonly Row[], ctx: KpiContext): KpiTileDef
     {
       key: 'revenue',
       label: t('sales.kpi.revenueThisMonth', { defaultValue: 'Revenue this month' }),
-      value: formatMoneyTotals(revenue, formatKpiMoney),
+      value: formatMoneyTotals(revenue, (amount, code) => formatKpiMoney(amount, code, ctx.locale)),
       hint: t('sales.kpi.revenueOrders', { defaultValue: 'Orders: {{count}}', count: revenueRows.length }),
       tone: 'success',
       matches: (row) => isRevenueThisMonth(row, now),

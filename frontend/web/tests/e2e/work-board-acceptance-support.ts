@@ -32,22 +32,17 @@ export async function seedWorkReviewWorkflow(
   assignment: "AnyCandidate" | "AllCandidates" = "AnyCandidate",
 ) {
   const key = smokeName("work-acceptance").toLowerCase().replace(/-/g, "_")
-  const seed = await seedPublishableWorkflowDraft(owner, { workflowKey: key, model: "purchase_order", name: key })
-  let revision = seed.draftRevision
   // The runtime snapshot request must describe the same condition fields that
-  // the guarded PO adapter pins when it starts an approval instance.
-  await callReducerOwner("update_workflow_draft", [
-    seed.organizationId, seed.versionId, revision,
-    stdbParamsToJson({
-      name: key, description: null, trigger: { tag: "Manual" }, schemaVersion: 1,
-      snapshotFields: [
-        { fieldKey: "amount_total", valueType: { tag: "Money" }, nullable: false },
-        { fieldKey: "state", valueType: { tag: "Code" }, nullable: false },
-      ],
-      metadata: null,
-    }, "UpdateWorkflowDraftParams"),
-  ])
-  revision += 1
+  // the guarded PO adapter pins. Supply them through the supported creation
+  // contract; draft header replacement is an internal operation.
+  const seed = await seedPublishableWorkflowDraft(owner, {
+    workflowKey: key, model: "purchase_order", name: key,
+    snapshotFields: [
+      { fieldKey: "amount_total", valueType: { tag: "Money" }, nullable: false },
+      { fieldKey: "state", valueType: { tag: "Code" }, nullable: false },
+    ],
+  })
+  let revision = seed.draftRevision
   for (const node of [
     {
       nodeKey: "approval", name: "Finance review", kind: { tag: "HumanTask" }, sequence: 2,
@@ -115,9 +110,11 @@ export async function readWorkTask(page: Page, scope: WorkBoardScope, taskId: nu
 export async function openWorkReview(page: Page, scope: WorkBoardScope, taskId: number) {
   const row = await readWorkTask(page, scope, taskId)
   if (!row) throw new Error(`Task ${taskId} is not readable by the ordinary reviewer`)
-  await page.goto("/tasks?workScope=purchasing&workView=eligible&workLayout=list")
+  await page.goto("/purchasing?tab=work&workView=eligible&workLayout=list")
+  const board = page.getByRole("region", { name: "Kanban", exact: true })
+  await expect(board).toBeVisible()
   const title = row.workSourceTitle || `${row.subjectModel ?? row.subject_model ?? ""} #${row.subjectId ?? row.subject_id ?? row.id}`
-  await page.getByRole("button", { name: title, exact: true }).click()
+  await board.getByRole("button", { name: title, exact: true }).click()
   await expect(page.getByRole("dialog")).toBeVisible()
   return row
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import { useCurrencyFormat } from "../lib/currency-context"
 import { Bar, BarChart, XAxis, YAxis } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../components/chart"
 import { cn } from "../lib/utils"
@@ -55,6 +56,7 @@ export function SegmentedShareBar({
   emptyLabel,
   className,
 }: SegmentedShareBarProps) {
+  const { locale } = useCurrencyFormat()
   const data = shareRows(segments, rows)
   if (!data.some((row) => row.total > 0)) return <ChartEmpty label={emptyLabel} />
   const config = seriesChartConfig(segments)
@@ -92,7 +94,7 @@ export function SegmentedShareBar({
                       />
                       <span className="text-muted-foreground">{config[key]?.label ?? key}</span>
                       <span className="ml-auto pl-3 font-mono font-medium tabular-nums text-foreground">
-                        {formatChartValue(Number(value), { kind: "percent" })} · {formatChartValue(amount, valueFormat)}
+                        {formatChartValue(Number(value), { kind: "percent" }, locale)} · {formatChartValue(amount, valueFormat, locale)}
                       </span>
                     </div>
                   )
@@ -141,16 +143,16 @@ export function SegmentedShareBar({
                   </td>
                   {data.map((row) => {
                     const amount = Number(row[`${ABS_PREFIX}${segment.key}`] ?? 0)
-                    const share = formatChartValue(Number(row[segment.key] ?? 0), { kind: "percent" })
+                    const share = formatChartValue(Number(row[segment.key] ?? 0), { kind: "percent" }, locale)
                     return multiRow ? (
                       <td key={row.label} className="py-1.5 pl-3 text-right tabular-nums">
-                        {formatChartValue(amount, valueFormat)}
+                        {formatChartValue(amount, valueFormat, locale)}
                         <span className="ml-1.5 text-xs text-muted-foreground">{share}</span>
                       </td>
                     ) : (
                       [
                         <td key={`${row.label}-amount`} className="py-1.5 pl-3 text-right tabular-nums">
-                          {formatChartValue(amount, valueFormat)}
+                          {formatChartValue(amount, valueFormat, locale)}
                         </td>,
                         <td key={`${row.label}-share`} className="w-16 py-1.5 pl-3 text-right text-xs tabular-nums text-muted-foreground">
                           {share}

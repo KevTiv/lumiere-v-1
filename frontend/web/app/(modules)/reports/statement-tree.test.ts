@@ -4,7 +4,12 @@ import { describe, it } from "node:test"
 import {
   buildStatementRows,
   buildStatementTree,
+  collapsibleSectionKeys,
+  formatStatementAmount,
+  formatStatementPercent,
   journalItemsHref,
+  statementVariance,
+  visibleStatementRows,
   type StatementTreeLine,
 } from "./statement-tree"
 
@@ -92,5 +97,45 @@ describe("journalItemsHref", () => {
   it("returns null without an account id", () => {
     assert.equal(journalItemsHref(null), null)
     assert.equal(journalItemsHref("abc"), null)
+  })
+})
+
+describe("formatStatementAmount", () => {
+  it("brackets negatives and follows the currency's decimals", () => {
+    assert.equal(formatStatementAmount(-1200, "en-US"), "(1,200.00)")
+    assert.equal(formatStatementAmount(1200, "en-US", "RWF"), "1,200")
+    assert.equal(formatStatementAmount(1200.5, "en-US", "USD"), "1,200.50")
+    assert.equal(formatStatementAmount(-0.001, "en-US"), "0.00")
+  })
+})
+
+describe("statementVariance", () => {
+  it("returns the change and its percent of the comparison", () => {
+    assert.deepEqual(statementVariance({ amount: 150, comparisonAmount: 100 }), { amount: 50, percent: 50 })
+    assert.deepEqual(statementVariance({ amount: 50, comparisonAmount: -100 }), { amount: 150, percent: 150 })
+  })
+  it("has no percent against a zero comparison and no variance on headers", () => {
+    assert.deepEqual(statementVariance({ amount: 10, comparisonAmount: 0 }), { amount: 10, percent: null })
+    assert.equal(statementVariance({ amount: null, comparisonAmount: null }), null)
+    assert.equal(formatStatementPercent(null), "—")
+    assert.equal(formatStatementPercent(-12.34, "en-US"), "(12.3%)")
+  })
+})
+
+describe("visibleStatementRows", () => {
+  const rows = buildStatementRows([
+    line({ id: "1", name: "Revenue", lineType: "section" }),
+    line({ id: "2", name: "Sales", parentId: "1", level: 1, amount: 100 }),
+    line({ id: "3", name: "Fees", parentId: "1", level: 1, amount: 20 }),
+    line({ id: "4", name: "Costs", lineType: "section" }),
+    line({ id: "5", name: "Rent", parentId: "4", level: 1, amount: 30 }),
+  ])
+  it("hides a collapsed section's lines but keeps its header and subtotal", () => {
+    const shown = visibleStatementRows(rows, new Set(["s-1"]))
+    assert.deepEqual(shown.map((r) => r.key), ["s-1", "t-1", "s-4", "l-5", "t-4"])
+  })
+  it("shows everything when nothing is collapsed", () => {
+    assert.equal(visibleStatementRows(rows, new Set()).length, rows.length)
+    assert.deepEqual(collapsibleSectionKeys(rows), ["s-1", "s-4"])
   })
 })

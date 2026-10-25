@@ -1,4 +1,5 @@
 "use client"
+import { useCurrencyFormat } from "@lumiere/ui"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
@@ -45,6 +46,7 @@ import {
   deferredRevenueLinesTableConfig,
   revenueRecognitionRulesTableConfig,
 } from "@lumiere/ui"
+import { EntityLabelsProvider, labelsFromOptions, labelsFromRows } from "@lumiere/ui"
 import type { EntityAction, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import {
   PlayCircle,
@@ -344,6 +346,15 @@ function SubscriptionsClientLoaded({
       ? fromApi
       : [{ value: "", label: "No currencies available", disabled: true }]
   }, [currencies])
+
+  const entityLabels = useMemo(
+    () => ({
+      subscriptionId: labelsFromRows(subscriptions),
+      planId: labelsFromRows(plans),
+      currencyId: labelsFromOptions(currencyFieldOptions),
+    }),
+    [subscriptions, plans, currencyFieldOptions],
+  )
 
   const recognizeMoveSelectOptions = useMemo(() => {
     const posted = (accountMoves as Record<string, unknown>[]).filter((m) => {
@@ -709,6 +720,7 @@ function SubscriptionsClientLoaded({
     return { ...base, view: { ...view, actions: [...(view.actions ?? []), ...actions] } } as EntityViewConfig
   }, [t, activatePlan, deactivatePlan, updatePlan, createBundle, askForm, plans])
 
+  const { locale } = useCurrencyFormat()
   const liveSections = useMemo(() => {
     const rows = subscriptions as Record<string, unknown>[]
     const activeRows = rows.filter(isSubscriptionActiveForMetrics)
@@ -746,7 +758,7 @@ function SubscriptionsClientLoaded({
           return { ...w, type: "diagnostic", data: { code: "missing-measure", message: "This aggregate requires one known currency. Mixed currencies need verified conversion." } }
         }
         if (w.type === "combo-chart" && w.id === "sub-mrr-churn") {
-          return { ...w, data: { ...w.data, values: mrrAndChurnByMonth(chartSubscriptions, now), valueFormat: money } }
+          return { ...w, data: { ...w.data, values: mrrAndChurnByMonth(chartSubscriptions, now, 12, locale), valueFormat: money } }
         }
         if (w.type === "share-bar" && w.id === "sub-plan-mix") {
           return { ...w, data: { ...w.data, ...planMix(chartSubscriptions, plans, now), valueFormat: money } }
@@ -794,6 +806,7 @@ function SubscriptionsClientLoaded({
         return w
           })
   }, [
+    locale,
     subscriptions,
     plans,
     currencies,
@@ -1053,7 +1066,7 @@ function SubscriptionsClientLoaded({
   )
 
   return (
-    <>
+    <EntityLabelsProvider value={entityLabels}>
       <ModuleView config={config} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
       <FormModal
         open={quickActionForm !== null && actionUsable(quickActionForm.action)}
@@ -1094,6 +1107,6 @@ function SubscriptionsClientLoaded({
           setRecognizeLineId(null)
         }}
       />
-    </>
+    </EntityLabelsProvider>
   )
 }

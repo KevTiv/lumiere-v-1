@@ -45,8 +45,9 @@ export function profitAndLossByMonth(
   accountsById: ReadonlyMap<string, AccountAccountQueryRow>,
   now: Date,
   months = 12,
+  locale?: string,
 ): ChartDatum[] {
-  const buckets = monthBuckets(months, now)
+  const buckets = monthBuckets(months, now, locale)
   const totals = buckets.map(() => ({ revenue: 0, expenses: 0 }))
   for (const line of lines) {
     if (!linePosted(line)) continue

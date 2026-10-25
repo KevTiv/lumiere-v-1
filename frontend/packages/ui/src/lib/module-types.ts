@@ -9,6 +9,11 @@ import type {
 } from "./entity-view-types"
 import type { FormConfig } from "./form-types"
 import type { KanbanColumnDef, KanbanMoveHandler } from "./kanban-board-types"
+import type {
+  WorkScope,
+  WorkStatus,
+  WorkView,
+} from "@lumiere/query-hooks/hooks/work-board-model"
 
 export interface EntityRecordSheetTab {
   id: string
@@ -92,6 +97,26 @@ export interface ModuleTabAltView {
   content: ReactNode
 }
 
+export type ModuleWorkSource = "workflow" | "activities"
+
+/** An opt-in assignment view; configuration never grants command authority. */
+export interface ModuleWorkBoardConfig {
+  /** Canonical module or group scope, fixed even when the URL requests another. */
+  scope: WorkScope
+  /** A unique tab in this module's existing navigation. Defaults to `work`. */
+  tabId?: string
+  label?: string
+  description?: string
+  /** Limit this module to supported work sources; an empty list disables the view. */
+  sources?: readonly ModuleWorkSource[]
+  initialView?: WorkView
+  defaultLayout?: "board" | "list"
+  /** Presentation only: omitted canonical statuses remain visible after this order. */
+  workflowColumnOrder?: readonly WorkStatus[]
+  /** Labels never replace status IDs or change available workflow transitions. */
+  workflowColumnLabels?: Partial<Record<WorkStatus, string>>
+}
+
 export interface ModuleConfig {
   id: string
   title: string
@@ -107,6 +132,15 @@ export interface ModuleConfig {
   tabNavigation?: "areas"
   /** Curated job-oriented groups for modules using WorkspaceNav. */
   workspaceNav?: ModuleWorkspaceNav
+  /** Embed canonical assignments in the module's existing tabs and view controls. */
+  workBoard?: ModuleWorkBoardConfig
+}
+
+/** Include the configured assignment tab when a module controls its URL tab. */
+export function moduleWorkBoardTabId(
+  config: Pick<ModuleConfig, "workBoard">,
+): string | undefined {
+  return config.workBoard ? config.workBoard.tabId ?? "work" : undefined
 }
 
 export interface ModuleWorkspace {

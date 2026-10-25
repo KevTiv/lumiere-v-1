@@ -6,6 +6,7 @@ import { useTranslation } from "@lumiere/i18n"
 import { useErpSession } from "@lumiere/erp-session"
 import { Button } from "@lumiere/ui/components/button"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import type { ModuleWorkSource } from "@lumiere/ui/lib/module-types"
 import { buildNavGroups } from "@lumiere/ui/lib/navigation-catalog"
 import { useWorkspaceProfile } from "@lumiere/ui/lib/workspace-profile-context"
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
@@ -16,6 +17,7 @@ import {
   isWorkView,
   type WorkBoardScope,
   type WorkScope,
+  type WorkStatus,
   type WorkView,
 } from "@lumiere/query-hooks/hooks/work-board-model"
 import {
@@ -25,6 +27,7 @@ import {
 import { WorkActivitiesContent } from "./work-activities-content"
 import { WorkflowWorkContent } from "./workflow-work-content"
 import { useWorkBoardAuthority } from "./work-board-authority"
+import { resolveWorkBoardSource, workBoardSources } from "./work-board-config"
 
 const selectClass =
   "h-9 max-w-full rounded-md border bg-background px-2 text-sm"
@@ -53,6 +56,11 @@ export interface WorkBoardWorkspaceProps {
   organizationId: number
   scope?: WorkScope
   initialView?: WorkView
+  sources?: readonly ModuleWorkSource[]
+  defaultLayout?: "board" | "list"
+  workflowColumnOrder?: readonly WorkStatus[]
+  workflowColumnLabels?: Partial<Record<WorkStatus, string>>
+  title?: string
   embedded?: boolean
 }
 
@@ -61,6 +69,11 @@ export function WorkBoardWorkspace({
   organizationId,
   scope: fixedScope,
   initialView = "eligible",
+  sources: configuredSources,
+  defaultLayout = "board",
+  workflowColumnOrder,
+  workflowColumnLabels,
+  title,
   embedded = false,
 }: WorkBoardWorkspaceProps) {
   const { t } = useTranslation()
@@ -83,16 +96,19 @@ export function WorkBoardWorkspace({
   const workflowRead = canReadWorkflowWork(checkPermission)
   const activitiesRead =
     scope !== "expenses" && canReadRecordFollowups(checkPermission)
-  const source =
-    scope !== "expenses" &&
-    (params.get("workSource") === "activities" ||
-      (!params.has("workSource") && !workflowRead && activitiesRead))
-      ? "activities"
-      : "workflow"
+  const sources = workBoardSources(scope, configuredSources)
+  const source = resolveWorkBoardSource(params.get("workSource"), sources, {
+    workflow: workflowRead,
+    activities: activitiesRead,
+  })
   const requestedTeam = params.get("workTeam")
   const team =
     requestedTeam && isWorkTeamKey(requestedTeam) ? requestedTeam : undefined
-  const layout = params.get("workLayout") === "list" ? "list" : "board"
+  const requestedLayout = params.get("workLayout")
+  const layout =
+    requestedLayout === "list" || requestedLayout === "board"
+      ? requestedLayout
+      : defaultLayout
   const scopeOptions = buildNavGroups((key) => t(key), {
     workspaceProfile: profile,
   })
@@ -122,7 +138,9 @@ export function WorkBoardWorkspace({
     session.activeCompanyReady !== false &&
     companyId != null
   const allowed =
-    ready && (source === "activities" ? activitiesRead : workflowRead)
+    ready &&
+    source != null &&
+    (source === "activities" ? activitiesRead : workflowRead)
   const boardScope: WorkBoardScope = {
     organizationId,
     companyId: companyId ?? 0,
@@ -132,13 +150,21 @@ export function WorkBoardWorkspace({
     view,
     team,
   }
-  const authority = useWorkBoardAuthority(boardScope, source, online, reconnect)
+  const authority = useWorkBoardAuthority(
+    boardScope,
+    source ?? "workflow",
+    online,
+    reconnect,
+  )
   return (
-    <section className="min-w-0 space-y-4" aria-label={t("workBoard.title")}>
+    <section
+      className="min-w-0 space-y-4"
+      aria-label={title ?? t("workBoard.title")}
+    >
       {!embedded && (
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">
-            {t("workBoard.title")}
+            {title ?? t("workBoard.title")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {t("workBoard.description")}
@@ -146,7 +172,7 @@ export function WorkBoardWorkspace({
         </header>
       )}
       <div className="flex flex-wrap items-end gap-3">
-        {scope !== "expenses" && (
+        {sources.length > 1 && (
           <label className="grid gap-1 text-xs font-medium">
             {t("workBoard.source")}
             <select
@@ -157,12 +183,21 @@ export function WorkBoardWorkspace({
                 updateParams({ workSource: event.target.value, workTeam: null })
               }
             >
-              <option value="workflow" disabled={!workflowRead}>
-                {t("workBoard.workflowWork")}
-              </option>
-              <option value="activities" disabled={!activitiesRead}>
-                {t("workBoard.followUps")}
-              </option>
+              {sources.map((option) => (
+                <option
+                  key={option}
+                  value={option}
+                  disabled={
+                    option === "workflow" ? !workflowRead : !activitiesRead
+                  }
+                >
+                  {t(
+                    option === "workflow"
+                      ? "workBoard.workflowWork"
+                      : "workBoard.followUps",
+                  )}
+                </option>
+              ))}
             </select>
           </label>
         )}
@@ -263,6 +298,8 @@ export function WorkBoardWorkspace({
           scope={boardScope}
           online={online}
           layout={layout}
+          columnOrder={workflowColumnOrder}
+          columnLabels={workflowColumnLabels}
           navigationPending={navigationPending}
           authorityRefreshing={authority.blocked}
           onTeamChange={(value) => updateParams({ workTeam: value })}

@@ -1,4 +1,5 @@
 "use client"
+import { useCurrencyFormat } from "@lumiere/ui"
 import { resolveRuntimeFormRoleId } from "@lumiere/ui/lib/runtime-form-role"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 import { moduleQueryState } from "@lumiere/ui/lib/module-data-state"
@@ -124,6 +125,7 @@ import {
 import { usePricelists } from "@lumiere/query-hooks/hooks/sales"
 import { useProducts, useUoms, useWarehouses } from "@lumiere/query-hooks/hooks/inventory"
 import { useAccountTaxes } from "@lumiere/query-hooks/hooks/accounting"
+import { EntityLabelsProvider, labelsFromOptions } from "@lumiere/ui"
 import type { EntityRecordSheetConfig, EntityTableConfig, EntityViewConfig, FormConfig, ModuleConfig } from "@lumiere/ui"
 import { entityTableConfigFromView } from "@lumiere/ui/lib/entity-view-types"
 import {
@@ -623,6 +625,14 @@ function CrmClientLoaded({
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noProducts"), disabled: true }]
   }, [products, t])
+
+  const entityLabels = useMemo(
+    () => ({
+      partnerId: labelsFromOptions(partnerSelectOptions),
+      productId: labelsFromOptions(productFieldOptions),
+    }),
+    [partnerSelectOptions, productFieldOptions],
+  )
 
   const uomFieldOptions = useMemo(() => {
     const fromApi = uomRowsToSelectOptions(uoms as Record<string, unknown>[])
@@ -2199,18 +2209,20 @@ function CrmClientLoaded({
 
   const currenciesQuery = useCurrencies()
   const { data: kpiCurrencies = [] } = currenciesQuery
+  const { locale } = useCurrencyFormat()
   const kpiStrips = useMemo<Record<string, { tiles: KpiTileDef[]; loading?: boolean }>>(
     () => ({
       opportunities: {
         tiles: opportunityKpis(enrichedOpportunities, {
           t,
           now: new Date(),
+          locale,
           currencyCodeById: currencyCodeMap(kpiCurrencies as Record<string, unknown>[]),
         }),
         loading: opportunitiesLoading,
       },
     }),
-    [enrichedOpportunities, kpiCurrencies, opportunitiesLoading, t],
+    [enrichedOpportunities, kpiCurrencies, opportunitiesLoading, t, locale],
   )
 
   const dataState = {
@@ -2605,7 +2617,7 @@ function CrmClientLoaded({
   )
 
   return (
-    <>
+    <EntityLabelsProvider value={entityLabels}>
       <ModuleView
         config={config}
         dashboardContent={<ModuleInsights input={{ module: "crm", organizationId, companyId: operatingCompanyId, records: { rows: opportunities, state: opportunitiesRead.state }, currencies: { rows: kpiCurrencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} onPeriodRangeChange={setInsightPeriodRange} />}
@@ -2685,6 +2697,6 @@ function CrmClientLoaded({
           }}
         />
       ) : null}
-    </>
+    </EntityLabelsProvider>
   )
 }

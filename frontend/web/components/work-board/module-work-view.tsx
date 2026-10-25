@@ -4,9 +4,12 @@ import { useMemo, type ComponentProps } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { ModuleView } from "@lumiere/ui/pages/module-view"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
-import type { ModuleConfig } from "@lumiere/ui/lib/module-types"
-import type { WorkModule } from "@lumiere/query-hooks/hooks/work-board-model"
+import {
+  moduleWorkBoardTabId,
+  type ModuleConfig,
+} from "@lumiere/ui/lib/module-types"
 import { WorkBoardWorkspace } from "./work-board-workspace"
+import { workBoardSources } from "./work-board-config"
 import {
   canReadRecordFollowups,
   canReadWorkflowWork,
@@ -14,38 +17,50 @@ import {
 
 type ModuleWorkViewProps = ComponentProps<typeof ModuleView> & {
   organizationId: number
-  workScope: WorkModule
 }
 
 /** Compose one shared Work workspace into the existing module navigation. */
 export function ModuleWorkView({
   organizationId,
-  workScope,
   config,
   ...props
 }: ModuleWorkViewProps) {
   const { t } = useTranslation()
   const { checkPermission, permissionsReady } = useRBAC()
+  const work = config.workBoard
   const allowed =
     permissionsReady !== false &&
-    (canReadWorkflowWork(checkPermission) ||
-      (workScope !== "expenses" && canReadRecordFollowups(checkPermission)))
+    work != null &&
+    workBoardSources(work.scope, work.sources).some((source) =>
+      source === "workflow"
+        ? canReadWorkflowWork(checkPermission)
+        : canReadRecordFollowups(checkPermission),
+    )
   const withWork = useMemo<ModuleConfig>(() => {
-    if (!allowed) return config
-    const label = t("workBoard.tab")
+    const tabId = moduleWorkBoardTabId(config)
+    if (!allowed || !work || !tabId) return config
+    // A reserved tab ID must not replace a module's existing record view.
+    if (config.tabs.some((tab) => tab.id === tabId)) return config
+    const label = work.label ?? t("workBoard.kanban")
     return {
       ...config,
       tabs: [
         ...config.tabs,
         {
-          id: "work",
+          id: tabId,
           label,
           type: "custom",
-          description: t("workBoard.description"),
+          description: work.description ?? t("workBoard.description"),
           customContent: (
             <WorkBoardWorkspace
               organizationId={organizationId}
-              scope={workScope}
+              scope={work.scope}
+              sources={work.sources}
+              initialView={work.initialView}
+              defaultLayout={work.defaultLayout}
+              workflowColumnOrder={work.workflowColumnOrder}
+              workflowColumnLabels={work.workflowColumnLabels}
+              title={label}
               embedded
             />
           ),
@@ -57,15 +72,23 @@ export function ModuleWorkView({
               ...config.workspaceNav,
               workspaces: [
                 ...config.workspaceNav.workspaces,
-                { id: "work", label, tabIds: ["work"] },
+                { id: tabId, label, tabIds: [tabId] },
               ],
             },
           }
         : {}),
       ...(config.tabGroups
-        ? { tabGroups: [...config.tabGroups, { label, tabIds: ["work"] }] }
+        ? { tabGroups: [...config.tabGroups, { label, tabIds: [tabId] }] }
         : {}),
     }
-  }, [allowed, config, organizationId, t, workScope])
-  return <ModuleView {...props} config={withWork} />
+  }, [allowed, config, organizationId, t, work])
+  // Permission loss or configuration removal must unmount a selected board,
+  // including in modules that control their own active tab through the URL.
+  const activeTab =
+    props.activeTab != null &&
+    !withWork.tabs.some((tab) => tab.id === props.activeTab)
+      ? withWork.tabs.find((tab) => tab.id === withWork.defaultTab)?.id ??
+        withWork.tabs[0]?.id
+      : props.activeTab
+  return <ModuleView {...props} activeTab={activeTab} config={withWork} />
 }

@@ -38,6 +38,7 @@ export function valueTooltip(
   config: ChartConfig,
   format: ChartValueFormat | undefined,
   formats: { [key: string]: ChartValueFormat | undefined } = {},
+  locale?: string,
 ) {
   return (
     <ChartTooltipContent
@@ -48,7 +49,7 @@ export function valueTooltip(
           <TooltipRow
             color={color}
             label={config[key]?.label ?? key}
-            value={formatChartValue(Number(value), formats[key] ?? format)}
+            value={formatChartValue(Number(value), formats[key] ?? format, locale)}
           />
         )
       }}

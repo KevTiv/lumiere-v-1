@@ -3,6 +3,7 @@
 
 import json
 import os
+import tomllib
 from pathlib import Path
 import socket
 import subprocess
@@ -103,7 +104,21 @@ def main():
                     before[table] = query(f"SELECT {', '.join(columns)} FROM {table}")
                     if len(before[table]) != 1:
                         raise RuntimeError(f"baseline must contain one sentinel row in {table}")
-                publish(module)
+                config = tomllib.loads((temp / "cli.toml").read_text())
+                environment = dict(os.environ, STDB_HOST=host, STDB_MODULE=database,
+                                   STDB_SERVER_TOKEN=config["spacetimedb_token"],
+                                   STDB_WASM_PATH=str(module))
+                publisher = subprocess.run(
+                    ["bash", str(ROOT / "scripts/railway-publish-spacetimedb.sh")],
+                    env=environment, text=True, capture_output=True, timeout=180,
+                )
+                if publisher.returncode:
+                    raise subprocess.CalledProcessError(
+                        publisher.returncode, publisher.args, publisher.stdout + publisher.stderr,
+                    )
+                if "SpacetimeDB publish and schema verification passed" not in publisher.stdout:
+                    raise RuntimeError("publisher did not verify the published schema")
+                print("Production publisher verified the migrated schema")
                 for table, columns in TABLE_COLUMNS.items():
                     after = query(f"SELECT {', '.join(columns)} FROM {table}")
                     if after != before[table]:

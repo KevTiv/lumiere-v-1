@@ -4,6 +4,7 @@ import { stdbBffCallUrl } from "@lumiere/stdb/commands/stdb-http"
 import { encodeIdentity, stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import { workflowDelegationMetadata } from "@lumiere/erp-shared/workflow-delegation"
 import { approvalTaskStatus } from "@lumiere/query-hooks/hooks/approval-controls"
+import { matchesOperationResponse } from "./operation-response"
 import { actorIdentity, canonicalOptionValue, canonicalSumTag } from "./sod-evidence"
 import { field, idOf, openActorPages, provisionActor, queryRows, tagOf, type Actor } from "./pretenant-support"
 import {
@@ -125,7 +126,7 @@ async function expectDelegationDenied(response: APIResponse) {
 }
 
 test.describe("Finance work board live delegation revocation", { tag: ["@dev-fixture", "@work-board"] }, () => {
-  test("revocation removes a principal-specific review and denies its queued decision and same-cookie replay", async ({ page, browser }) => {
+  test("revocation denies queued decisions and replay; restored delegation permits a fresh attributed review", async ({ page, browser }) => {
     test.setTimeout(300_000)
     const [principal, delegate] = await Promise.all([
       provisionActor(page, "work-delegation-principal", WORK_REVIEWER_PERMISSIONS),
@@ -165,8 +166,14 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       expect(before.actingForOptions![0]!.identityHex).toBe(principal.identityHex)
       expect(before.actingForOptions![0]!.workActions).toContain("approve")
       const title = before.workSourceTitle || `${before.subjectModel ?? before.subject_model ?? ""} #${before.subjectId ?? before.subject_id ?? before.id}`
-      const review = delegatePage.getByRole("dialog")
-      await expect(review.getByLabel("Acting as", { exact: true })).toHaveValue(principal.identityHex)
+      const review = delegatePage.getByRole("dialog", { name: title, exact: true })
+      // The native label also contains its option text. Use the control's
+      // accessible name, then verify the exact principal being reviewed.
+      const actingAs = review.getByRole("combobox", { name: "Acting as", exact: true })
+      await expect(review).toBeVisible()
+      await expect(actingAs).toBeVisible()
+      await expect(actingAs).toBeEnabled()
+      await expect(actingAs).toHaveValue(principal.identityHex)
       await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeEnabled()
       await review.getByRole("textbox").fill("A delegated comment that must be discarded after revocation")
       const evidenceScope = { ...workflow, ...pending }
@@ -228,9 +235,39 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       await expect(restored).toBeVisible({ timeout: 35_000 })
       await expect(review).toHaveCount(0)
       await restored.click()
-      await expect(review.getByRole("textbox")).toHaveText("")
-      await expect(review.getByLabel("Acting as", { exact: true })).toHaveValue(principal.identityHex)
+      await expect(review).toBeVisible()
+      await expect(review.getByRole("textbox")).toHaveValue("")
+      await expect(actingAs).toBeVisible()
+      await expect(actingAs).toBeEnabled()
+      await expect(actingAs).toHaveValue(principal.identityHex)
       await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeEnabled()
+      const freshComment = "A fresh review after delegation was restored"
+      await review.getByRole("textbox").fill(freshComment)
+      const [approved] = await Promise.all([
+        delegatePage.waitForResponse((result) => result.request().method() === "POST"
+          && matchesOperationResponse(result, "decide_workflow_human_task")),
+        review.getByRole("button", { name: "Approve", exact: true }).click(),
+      ])
+      expect(approved.ok(), await approved.text()).toBe(true)
+      await expect(delegatePage.getByText("Assignment updated and confirmed.", { exact: true })).toBeVisible({ timeout: 30_000 })
+      const freshParams = approved.request().postDataJSON().params as Record<string, unknown>
+      expect(freshParams.idempotency_key).not.toBe(body.params!.idempotency_key)
+      const completed = await readWorkTask(principalPage, workScopeFor(workflow, principal), pending.taskId)
+      expect(approvalTaskStatus({ status: completed?.status })).toBe("Approved")
+      expect(Number(completed?.revision)).toBe(Number(before.revision) + 1)
+
+      const committed = await committedWorkEvidence(page, evidenceScope)
+      expect(committed.domainReceipts).toHaveLength(1)
+      expect(committed.apiOrders).toHaveLength(1)
+      expect(tagOf(field(committed.apiOrders[0], "state"))).toBe("purchase")
+      const receipts = committed.taskReceipts.filter((row) => row.idempotency_key === freshParams.idempotency_key)
+      const events = committed.taskEvents.filter((row) => row.idempotency_key === freshParams.idempotency_key)
+      expect(receipts).toHaveLength(1)
+      expect(events).toHaveLength(1)
+      expect(actorIdentity(receipts[0]!.created_by)).toBe(delegate.identityHex)
+      expect(actorIdentity(events[0]!.actor)).toBe(delegate.identityHex)
+      expect(actorIdentity(canonicalOptionValue(events[0]!.acting_for))).toBe(principal.identityHex)
+      expect(canonicalOptionValue(events[0]!.comment)).toBe(freshComment)
     } finally {
       if (pendingRoute) await pendingRoute.abort().catch(() => {})
       if (delegationActive && principalPage) await setDelegation(principalPage, workflow.companyId, principal, delegate, false)

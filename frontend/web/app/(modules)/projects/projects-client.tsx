@@ -1532,6 +1532,7 @@ function ProjectsClientLoaded({
           // Billing references may finish after this modal opens; retain the
           // draft while resolving its options from the current query results.
           config={lifecycleModal.type === "billTimesheets" ? billTimesheetsFormConfig : lifecycleModal.type === "assignUsers" ? assignUsersFormConfig : lifecycleModal.form}
+          draft={lifecycleModal.type !== "assignUsers"}
           isPending={isFormMutationPending}
           submissionDisabled={lifecycleModal.type === "assignUsers" && (!canAssignTask || !assignmentOnline || !taskAssignees.isSuccess || taskAssignees.isFetching || taskAssignees.isError)}
           closeOnSubmit={false}

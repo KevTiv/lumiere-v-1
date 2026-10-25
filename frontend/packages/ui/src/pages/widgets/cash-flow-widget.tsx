@@ -1,5 +1,7 @@
 "use client"
 
+import { useCurrencyFormat } from "../../lib/currency-context"
+
 interface CashFlowData {
   arTotal: number
   apTotal: number
@@ -7,11 +9,8 @@ interface CashFlowData {
 }
 
 export function CashFlowWidget({ data }: { data: CashFlowData }) {
-  const fmt = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    notation: "compact",
-  })
+  const { money } = useCurrencyFormat()
+  const fmt = { format: (value: number) => money(value, undefined, { compact: true }) }
   const total = data.arTotal + data.apTotal
   const arPct = total > 0 ? (data.arTotal / total) * 100 : 50
   const isPositive = data.netPosition >= 0
