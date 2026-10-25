@@ -53,10 +53,7 @@ export async function alphaSeedPayload(archive) {
   const operations = await demoContractSchema(archive, [...new Set(['apply_org_migrations', ...fixtures.map(fixture => fixture.operation)])], { tenantMigration: true })
   const temporary = mkdtempSync(join(tmpdir(), 'alpha-contract-tables-'))
   try {
-    const tableFiles = execFileSync('tar', ['-tzf', archive]).toString().split('\n')
-      .filter(name => /^package\/dist\/generated\/[^/]+_table\.js$/.test(name))
-    if (!tableFiles.length) throw new Error('Pinned contracts contain no generated tables')
-    execFileSync('tar', ['-xzf', archive, '-C', temporary, ...tableFiles])
+    execFileSync('tar', ['-xzf', archive, '-C', temporary, '--wildcards', 'package/dist/generated/*_table.js'])
     const root = join(temporary, 'package/dist/generated')
     const tables = readdirSync(root).filter(name => name.endsWith('_table.js')).map(file => {
       const contents = readFileSync(join(root, file), 'utf8')
