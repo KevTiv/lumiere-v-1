@@ -197,7 +197,7 @@ fn execution_request(
 
 const REPORT_PREVIEW_FIXTURE_PATH: &str = "reports/daily_business_summary_v1/preview.json";
 const BUILT_IN_SEMVER: &str = "1.0.0";
-pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.1";
+pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.2";
 
 struct LowStockCertificationAdapter;
 
@@ -1143,13 +1143,15 @@ fn complete_reducer_args(
     serde_json::json!([
         request.organization_id,
         {
-            "requestId": request.id,
-            "actualOutputJson": actual_output_json,
-            "environmentHash": hashes.environment,
-            "policySnapshotHash": hashes.policy_snapshot,
-            "executionEvidenceHash": hashes.execution,
-            "executorRunId": executor_run_id,
-            "metadata": metadata,
+            "request_id": request.id,
+            "actual_output_json": actual_output_json,
+            "environment_hash": hashes.environment,
+            "policy_snapshot_hash": hashes.policy_snapshot,
+            "execution_evidence_hash": hashes.execution,
+            "executor_run_id": executor_run_id,
+            "metadata": metadata
+                .map(|value| serde_json::json!({ "some": value }))
+                .unwrap_or_else(|| serde_json::json!({ "none": [] })),
         }
     ])
 }
@@ -1165,14 +1167,16 @@ fn fail_reducer_args(
     serde_json::json!([
         request.organization_id,
         {
-            "requestId": request.id,
-            "errorCode": error_code,
-            "failureReason": failure_reason,
-            "environmentHash": hashes.environment,
-            "policySnapshotHash": hashes.policy_snapshot,
-            "executionEvidenceHash": hashes.execution,
-            "executorRunId": executor_run_id,
-            "metadata": metadata,
+            "request_id": request.id,
+            "error_code": error_code,
+            "failure_reason": failure_reason,
+            "environment_hash": hashes.environment,
+            "policy_snapshot_hash": hashes.policy_snapshot,
+            "execution_evidence_hash": hashes.execution,
+            "executor_run_id": executor_run_id,
+            "metadata": metadata
+                .map(|value| serde_json::json!({ "some": value }))
+                .unwrap_or_else(|| serde_json::json!({ "none": [] })),
         }
     ])
 }
@@ -2022,7 +2026,7 @@ mod tests {
     }
 
     #[test]
-    fn reducer_payloads_use_sats_camel_case_fields() {
+    fn certification_payloads_match_pinned_native_fields_and_option_encoding() {
         let request = CertificationRequest {
             id: 1,
             organization_id: 7,
@@ -2038,28 +2042,54 @@ mod tests {
             policy_snapshot: format!("sha256:{}", "b".repeat(64)),
             execution: format!("sha256:{}", "c".repeat(64)),
         };
+        let native_fields: Value =
+            serde_json::from_str(lumiere_contracts::manifests::STDB_GENERATED_SQL_COLUMNS)
+                .expect("pinned native type fields should decode");
 
-        let complete = complete_reducer_args(&request, "{}", "run-1", &hashes, None);
-        let complete_params = complete[1]
-            .as_object()
-            .expect("complete params should be an object");
-        assert!(complete_params.contains_key("requestId"));
-        assert!(complete_params.contains_key("actualOutputJson"));
-        assert!(!complete_params.contains_key("request_id"));
-
-        let fail = fail_reducer_args(
-            &request,
-            "unsupported_skill",
-            "unsupported",
-            "run-1",
-            &hashes,
-            None,
-        );
-        let fail_params = fail[1]
-            .as_object()
-            .expect("fail params should be an object");
-        assert!(fail_params.contains_key("errorCode"));
-        assert!(fail_params.contains_key("failureReason"));
-        assert!(!fail_params.contains_key("error_code"));
+        // The native schema, rather than the read-side JSON naming convention,
+        // owns composite reducer fields. STDB requires SATS tags for Option.
+        for metadata in [None, Some("{\"fixture\":true}")] {
+            let complete = complete_reducer_args(&request, "{}", "run-1", &hashes, metadata);
+            let fail = fail_reducer_args(
+                &request,
+                "unsupported_skill",
+                "unsupported",
+                "run-1",
+                &hashes,
+                metadata,
+            );
+            for (args, type_name) in [
+                (&complete, "CompleteAiSkillCertificationParams"),
+                (&fail, "FailAiSkillCertificationParams"),
+            ] {
+                assert_eq!(args[0], request.organization_id);
+                let params = args[1].as_object().expect("params should be a product");
+                let mut expected: Vec<&str> = native_fields[type_name]
+                    .as_array()
+                    .expect("pinned native type should exist")
+                    .iter()
+                    .map(|field| field.as_str().expect("native field should have a name"))
+                    .collect();
+                expected.sort_unstable();
+                let mut actual: Vec<&str> = params.keys().map(String::as_str).collect();
+                actual.sort_unstable();
+                assert_eq!(
+                    actual, expected,
+                    "{type_name} must match the pinned native type"
+                );
+                assert_eq!(params["request_id"], request.id);
+                assert_eq!(params["environment_hash"], hashes.environment);
+                assert_eq!(params["policy_snapshot_hash"], hashes.policy_snapshot);
+                assert_eq!(params["execution_evidence_hash"], hashes.execution);
+                assert_eq!(params["executor_run_id"], "run-1");
+                match metadata {
+                    Some(text) => assert_eq!(params["metadata"], serde_json::json!({"some": text})),
+                    None => assert_eq!(params["metadata"], serde_json::json!({"none": []})),
+                }
+            }
+            assert_eq!(complete[1]["actual_output_json"], "{}");
+            assert_eq!(fail[1]["error_code"], "unsupported_skill");
+            assert_eq!(fail[1]["failure_reason"], "unsupported");
+        }
     }
 }
