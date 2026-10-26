@@ -299,6 +299,27 @@ services:
           fault_tolerant: false
           policy: local
 
+  # Approved Alpha report pilot only. Web still enforces its AI switch, session,
+  # company scope, certified release, capability grants and spend admission.
+  # Exact paths and methods keep every other AI endpoint on the 503 route.
+  - name: web-ai-alpha-pilot
+    url: http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__
+    routes:
+      - name: web-ai-alpha-certification-read
+        paths:
+          - '~/api/ai/skills/certifications(?:/[1-9][0-9]*)?$'
+        methods: [GET]
+        regex_priority: 10
+        strip_path: false
+      - name: web-ai-alpha-report-and-inspect
+        paths:
+          - '~/api/ai/skills/report-analysis$'
+          - '~/api/ai/evidence/runs/inspect$'
+        methods: [POST]
+        regex_priority: 10
+        strip_path: false
+    plugins: *domain_plugins
+
   - name: web-ai
     url: http://127.0.0.1:1
     routes:
