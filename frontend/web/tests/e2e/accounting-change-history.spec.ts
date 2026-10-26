@@ -72,6 +72,7 @@ function historyPath(moveId: number, companyId: number): string {
 async function history(page: Page, moveId: number, companyId: number): Promise<HistoryPage> {
   const response = await page.request.get(historyPath(moveId, companyId))
   expect(response.ok(), `record history HTTP ${response.status()}`).toBe(true)
+  expect(response.headers()["cache-control"]).toContain("no-store")
   const result = (await response.json()) as HistoryPage
   expect(result.schemaVersion).toBe(1)
   expect(result.recordId).toBe(String(moveId))
@@ -170,7 +171,7 @@ test.describe("Accounting trusted change history", { tag: ["@p0", "@finance-hist
     await expect(entry.getByTestId("record-change-after").filter({ hasText: afterName })).toHaveText(afterName)
     await expect(page.getByTestId("record-changes-coverage")).toBeVisible()
     await page.reload()
-    await expect(page).toHaveURL(new RegExp(`/accounting/invoices/${moveId}\\?tab=changes$`))
+    await expect(page).toHaveURL((url) => url.pathname === `/accounting/invoices/${moveId}` && url.searchParams.get("tab") === "changes")
     await expect(page.getByTestId(`record-change-${eventId}`)).toBeVisible({ timeout: 30_000 })
     expect((await history(page, moveId, companyId)).data.map((row) => row.id)).toEqual([eventId])
     expect(lineUpdates, "history reads and reload must not execute another line edit").toBe(1)
