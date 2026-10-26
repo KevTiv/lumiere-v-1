@@ -27,7 +27,7 @@ class PrivateReleaseTests(unittest.TestCase):
             self.assertFalse(route['strip_path'])
             self.assertGreater(route['regex_priority'], 0)
         def allowed(method, path):
-            return any(method in route['methods'] and re.search(pattern[1:], path)
+            return any(method in route['methods'] and re.match(pattern[1:], path)
                        for route in routes for pattern in route['paths'])
         for method, path in [('POST', '/api/ai/skills/report-analysis'),
                              ('POST', '/api/ai/evidence/runs/inspect'),
@@ -40,7 +40,8 @@ class PrivateReleaseTests(unittest.TestCase):
                              ('GET', '/api/ai/skills/certifications/42/extra'),
                              ('POST', '/api/ai/evidence/runs/export'),
                              ('POST', '/api/ai/action-draft/bridge'),
-                             ('POST', '/api/ai/rag'), ('POST', '/api/ai/skills/run')]:
+                             ('POST', '/api/ai/rag'), ('POST', '/api/ai/skills/run'),
+                             ('POST', '/prefix/api/ai/skills/report-analysis')]:
             self.assertFalse(allowed(method, path), (method, path))
 
     def test_every_proxy_service_has_local_fail_closed_rate_limits(self):

@@ -307,14 +307,14 @@ services:
     routes:
       - name: web-ai-alpha-certification-read
         paths:
-          - '~^/api/ai/skills/certifications(?:/[1-9][0-9]*)?$'
+          - '~/api/ai/skills/certifications(?:/[1-9][0-9]*)?$'
         methods: [GET]
         regex_priority: 10
         strip_path: false
       - name: web-ai-alpha-report-and-inspect
         paths:
-          - '~^/api/ai/skills/report-analysis$'
-          - '~^/api/ai/evidence/runs/inspect$'
+          - '~/api/ai/skills/report-analysis$'
+          - '~/api/ai/evidence/runs/inspect$'
         methods: [POST]
         regex_priority: 10
         strip_path: false
