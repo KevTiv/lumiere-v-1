@@ -699,7 +699,7 @@ mod tests {
         .is_ok());
         assert!(validate_active_adapter_binding(
             low_stock::LOW_STOCK_SKILL_KEY,
-            "1.0.1",
+            "1.0.2",
             1,
             &low_stock_hash,
         )
