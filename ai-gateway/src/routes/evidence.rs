@@ -735,10 +735,13 @@ async fn inspect_run(
     transcript.truncate(MAX_RUN_TRANSCRIPT_STEPS.min(remaining_rows));
     remaining_rows = remaining_rows.saturating_sub(transcript.len());
 
-    let contributions = state
-        .stdb
+    let reader = state
+        .spend_read_stdb
+        .as_deref()
+        .ok_or_else(|| AppError::Internal("evidence reader is not configured".into()))?;
+    let contributions = reader
         .query_sql(&format!(
-            "SELECT * FROM ai_evidence_contribution WHERE organization_id = {} AND company_id = {}",
+            "SELECT * FROM ai_evidence_contribution_read WHERE organization_id = {} AND company_id = {}",
             actor.organization_id, actor.company_id
         ))
         .await
@@ -762,10 +765,9 @@ async fn inspect_run(
         .iter()
         .copied()
         .collect::<std::collections::BTreeSet<_>>();
-    let claim_rows = state
-        .stdb
+    let claim_rows = reader
         .query_sql(&format!(
-            "SELECT * FROM ai_evidence_claim WHERE organization_id = {} AND company_id = {}",
+            "SELECT * FROM ai_evidence_claim_read WHERE organization_id = {} AND company_id = {}",
             actor.organization_id, actor.company_id
         ))
         .await
@@ -784,7 +786,7 @@ async fn inspect_run(
 
     let mut claims = Vec::with_capacity(claim_ids.len());
     for claim_id in &claim_ids {
-        let inspection = inspect(state.stdb.as_ref(), viewer, InspectTarget::Claim(*claim_id))
+        let inspection = inspect(reader, viewer, InspectTarget::Claim(*claim_id))
             .await
             .map_err(|error| AppError::Internal(error.to_string()))?;
         claims.push(inspection);

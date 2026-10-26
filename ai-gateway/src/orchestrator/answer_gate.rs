@@ -1241,7 +1241,7 @@ impl PassageCatalog for StdbPassageCatalog<'_> {
         let rows = self
             .reader
             .query_sql(&format!(
-                "SELECT * FROM ai_evidence_passage WHERE organization_id = {organization_id} \
+                "SELECT * FROM ai_evidence_passage_read WHERE organization_id = {organization_id} \
                  AND company_id = {company_id} AND source_kind = '{kind}' \
                  AND source_key = '{source_key}' LIMIT {}",
                 MAX_PASSAGES_PER_SOURCE + 1
