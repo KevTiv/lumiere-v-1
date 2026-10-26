@@ -104,7 +104,7 @@ test("Settings creates a company-scoped setup lease through the member form", { 
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "text/plain" },
       body: `SELECT role_id, company_id, metadata FROM user_organization WHERE user_identity = 0x${identity}`,
     })
-    expect(result.ok()).toBe(true)
+    expect(result.ok).toBe(true)
     const tables = await result.json() as Array<{ rows: Array<[number, [number, unknown], [number, unknown]]> }>
     expect(tables).toHaveLength(1)
     expect(tables[0].rows).toHaveLength(1)
