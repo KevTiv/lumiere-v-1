@@ -1,3 +1,4 @@
+import re
 import unittest
 from pathlib import Path
 import yaml
@@ -16,6 +17,31 @@ class PrivateReleaseTests(unittest.TestCase):
             plugin = service['plugins'][0]
             self.assertEqual(plugin['name'], 'request-termination')
             self.assertEqual(plugin['config']['status_code'], status)
+
+    def test_alpha_pilot_exposes_only_exact_report_inspection_and_status_routes(self):
+        config = yaml.safe_load((ROOT / 'infra/kong/kong.yml').read_text())
+        service = next(item for item in config['services'] if item['name'] == 'web-ai-alpha-pilot')
+        self.assertEqual(service['url'], 'http://__WEB_UPSTREAM_HOST__:__WEB_UPSTREAM_PORT__')
+        routes = service['routes']
+        for route in routes:
+            self.assertFalse(route['strip_path'])
+            self.assertGreater(route['regex_priority'], 0)
+        def allowed(method, path):
+            return any(method in route['methods'] and re.search(pattern[1:], path)
+                       for route in routes for pattern in route['paths'])
+        for method, path in [('POST', '/api/ai/skills/report-analysis'),
+                             ('POST', '/api/ai/evidence/runs/inspect'),
+                             ('GET', '/api/ai/skills/certifications'),
+                             ('GET', '/api/ai/skills/certifications/42')]:
+            self.assertTrue(allowed(method, path), (method, path))
+        for method, path in [('GET', '/api/ai/skills/report-analysis'),
+                             ('POST', '/api/ai/skills/certifications'),
+                             ('POST', '/api/ai/skills/report-analysis/extra'),
+                             ('GET', '/api/ai/skills/certifications/42/extra'),
+                             ('POST', '/api/ai/evidence/runs/export'),
+                             ('POST', '/api/ai/action-draft/bridge'),
+                             ('POST', '/api/ai/rag'), ('POST', '/api/ai/skills/run')]:
+            self.assertFalse(allowed(method, path), (method, path))
 
     def test_every_proxy_service_has_local_fail_closed_rate_limits(self):
         config = yaml.safe_load((ROOT / 'infra/kong/kong.yml').read_text())
