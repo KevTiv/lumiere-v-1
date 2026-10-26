@@ -5,6 +5,7 @@ pub mod decision_events_test;
 pub mod embedding_isolation_test;
 pub mod evidence_provenance_test;
 pub mod relational_integrity_test;
+pub mod runtime_reads_test;
 pub mod spend_recovery_test;
 pub mod workflow_provenance_test;
 
@@ -205,6 +206,7 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_capability_grants_tests(ctx)?;
     run_ai_intelligence_events_tests(ctx)?;
     run_ai_spend_recovery_tests(ctx)?;
+    runtime_reads_test::test_runtime_reads_scope_and_retirement(ctx)?;
     run_ai_evidence_provenance_tests(ctx)?;
     run_workflow_provenance_tests(ctx)?;
     adversarial_drafts_test::test_correlated_draft_replay(ctx)?;
@@ -214,4 +216,9 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     adversarial_drafts_test::test_execution_claim_is_exclusive(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
+}
+
+#[spacetimedb::reducer]
+pub fn run_ai_runtime_read_tests(ctx: &ReducerContext) -> Result<(), String> {
+    runtime_reads_test::test_runtime_reads_scope_and_retirement(ctx)
 }

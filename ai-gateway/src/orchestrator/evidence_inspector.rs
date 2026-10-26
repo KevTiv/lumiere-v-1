@@ -123,6 +123,7 @@ pub trait EvidenceRows: Send + Sync {
 #[async_trait]
 impl EvidenceRows for StdbClient {
     async fn row(&self, table: &'static str, id: u64) -> Result<Option<Value>> {
+        let table = evidence_read_view(table)?;
         let rows = self
             .query_sql(&format!("SELECT * FROM {table} WHERE id = {id} LIMIT 1"))
             .await
@@ -137,7 +138,7 @@ impl EvidenceRows for StdbClient {
         id: u64,
     ) -> Result<Vec<Value>> {
         self.query_sql(&format!(
-            "SELECT * FROM ai_evidence_dependency WHERE organization_id = {organization_id} \
+            "SELECT * FROM ai_evidence_dependency_read WHERE organization_id = {organization_id} \
              AND dependent_kind = '{dependent_kind}' AND dependent_id = {id}"
         ))
         .await
@@ -161,7 +162,7 @@ impl EvidenceRows for StdbClient {
         let key = entry_key.replace('\'', "''");
         let rows = self
             .query_sql(&format!(
-                "SELECT * FROM ai_knowledge_entry WHERE organization_id = {organization_id} \
+                "SELECT * FROM ai_knowledge_entry_read WHERE organization_id = {organization_id} \
                  AND company_id = {company_id} AND entry_key = '{key}' LIMIT 1"
             ))
             .await
@@ -171,7 +172,7 @@ impl EvidenceRows for StdbClient {
 
     async fn knowledge_versions_of(&self, entry_id: u64) -> Result<Vec<Value>> {
         self.query_sql(&format!(
-            "SELECT * FROM ai_knowledge_entry_version WHERE entry_id = {entry_id}"
+            "SELECT * FROM ai_knowledge_entry_version_read WHERE entry_id = {entry_id}"
         ))
         .await
         .context("load knowledge versions")
@@ -179,7 +180,7 @@ impl EvidenceRows for StdbClient {
 
     async fn knowledge_reviews_of(&self, version_id: u64) -> Result<Vec<Value>> {
         self.query_sql(&format!(
-            "SELECT * FROM ai_knowledge_review WHERE version_id = {version_id}"
+            "SELECT * FROM ai_knowledge_review_read WHERE version_id = {version_id}"
         ))
         .await
         .context("load knowledge reviews")
@@ -199,7 +200,7 @@ impl EvidenceRows for StdbClient {
         }
         let rows = self
             .query_sql(&format!(
-                "SELECT * FROM ai_artifact_component WHERE organization_id = {organization_id} \
+                "SELECT * FROM ai_artifact_component_read WHERE organization_id = {organization_id} \
                  AND artifact_ref = 'workflow-version:{workflow_version_id}' \
                  AND component_key = 'node:{node_key}' AND status = 'current' LIMIT 2"
             ))
@@ -224,7 +225,7 @@ impl EvidenceRows for StdbClient {
         }
         let literal = statement.replace('\'', "''");
         self.query_sql(&format!(
-            "SELECT * FROM ai_evidence_claim WHERE organization_id = {organization_id} \
+            "SELECT * FROM ai_evidence_claim_read WHERE organization_id = {organization_id} \
              AND company_id = {company_id} AND verification_method = 'human_reviewed' \
              AND statement = '{literal}' LIMIT 200"
         ))
@@ -260,7 +261,7 @@ impl EvidenceRows for StdbClient {
 
     async fn source_versions_of(&self, source_id: u64) -> Result<Vec<Value>> {
         self.query_sql(&format!(
-            "SELECT * FROM ai_evidence_source_version WHERE source_id = {source_id}"
+            "SELECT * FROM ai_evidence_source_version_read WHERE source_id = {source_id}"
         ))
         .await
         .context("load source versions")
@@ -283,7 +284,7 @@ impl EvidenceRows for StdbClient {
         let kind = source_kind.replace('\'', "''");
         let key = source_key.replace('\'', "''");
         self.query_sql(&format!(
-            "SELECT * FROM ai_evidence_passage WHERE organization_id = {organization_id} \
+            "SELECT * FROM ai_evidence_passage_read WHERE organization_id = {organization_id} \
              AND company_id = {company_id} AND source_kind = '{kind}' AND source_key = '{key}'"
         ))
         .await
@@ -292,10 +293,29 @@ impl EvidenceRows for StdbClient {
 
     async fn source_changes_of_version(&self, source_version_id: u64) -> Result<Vec<Value>> {
         self.query_sql(&format!(
-            "SELECT * FROM ai_evidence_source_change WHERE source_version_id = {source_version_id}"
+            "SELECT * FROM ai_evidence_source_change_read WHERE source_version_id = {source_version_id}"
         ))
         .await
         .context("load source version changes")
+    }
+}
+
+/// Resolve only the private evidence tables used by the inspector.
+fn evidence_read_view(table: &str) -> Result<&'static str> {
+    match table {
+        "ai_evidence_passage" => Ok("ai_evidence_passage_read"),
+        "ai_evidence_source" => Ok("ai_evidence_source_read"),
+        "ai_evidence_source_version" => Ok("ai_evidence_source_version_read"),
+        "ai_evidence_contribution" => Ok("ai_evidence_contribution_read"),
+        "ai_evidence_claim" => Ok("ai_evidence_claim_read"),
+        "ai_evidence_decision" => Ok("ai_evidence_decision_read"),
+        "ai_artifact_component" => Ok("ai_artifact_component_read"),
+        "ai_evidence_dependency" => Ok("ai_evidence_dependency_read"),
+        "ai_evidence_source_change" => Ok("ai_evidence_source_change_read"),
+        "ai_knowledge_entry" => Ok("ai_knowledge_entry_read"),
+        "ai_knowledge_entry_version" => Ok("ai_knowledge_entry_version_read"),
+        "ai_knowledge_review" => Ok("ai_knowledge_review_read"),
+        _ => bail!("unsupported evidence table"),
     }
 }
 
