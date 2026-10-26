@@ -71,7 +71,7 @@ export default function SignInPage() {
     <Card>
       <CardHeader>
         <CardTitle>{t("auth.signIn.title")}</CardTitle>
-        <CardDescription>{t("auth.signIn.description")}</CardDescription>
+        <CardDescription>{t(useWorkOsAuth ? "auth.signIn.descriptionWorkOs" : "auth.signIn.description")}</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -122,9 +122,6 @@ export default function SignInPage() {
                 {t("auth.signIn.continueWithWorkOs")}
               </Button>
             </form>
-            <p className="text-center text-xs text-muted-foreground">
-              {t("auth.signIn.workOsProvidersHint")}
-            </p>
           </div>
         )}
       </CardContent>
