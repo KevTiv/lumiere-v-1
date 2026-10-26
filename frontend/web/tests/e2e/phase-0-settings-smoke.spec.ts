@@ -96,7 +96,15 @@ test("Settings creates a company-scoped setup lease through the member form", { 
     const readMembers = async () => {
       const result = await page.request.get("/api/query/user-organization")
       expect(result.ok()).toBe(true)
-      return (await result.json()).data as Array<Record<string, unknown>>
+      return (await result.json()).data as Array<{
+        userIdentity?: string | { __identity__: string }
+        user_identity?: string | { __identity__: string }
+        companyId?: unknown
+        company_id?: unknown
+        roleId?: unknown
+        role_id?: unknown
+        metadata?: string
+      }>
     }
     const member = (await readMembers()).find(row => {
       const value = row.userIdentity ?? row.user_identity
