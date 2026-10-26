@@ -290,7 +290,7 @@ jobs:
         run: spacetime call lumiere-ci-contracts run_presentation_draft_tests --server local -y --no-config
 
       - name: Runtime reader tenant isolation and retirement proof
-        run: spacetime call lumiere-ci-contracts run_ai_runtime_read_tests --server local -y --no-config
+        run: spacetime call lumiere-ci-contracts run_ai_spend_recovery_tests --server local -y --no-config
 
       # Full source/schema/manifest comparison against an isolated database;
       # CI correctness does not depend on a mutable Maincloud deployment.

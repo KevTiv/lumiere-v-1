@@ -89,6 +89,7 @@ pub fn run_ai_spend_recovery_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("spend_recovery_atomic_release: {e}"))?;
     spend_recovery_test::test_recovery_requires_reconcile_permission(ctx)
         .map_err(|e| format!("spend_recovery_permission: {e}"))?;
+    runtime_reads_test::test_runtime_reads_scope_and_retirement(ctx)?;
     Ok(())
 }
 
@@ -206,7 +207,6 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     run_ai_capability_grants_tests(ctx)?;
     run_ai_intelligence_events_tests(ctx)?;
     run_ai_spend_recovery_tests(ctx)?;
-    runtime_reads_test::test_runtime_reads_scope_and_retirement(ctx)?;
     run_ai_evidence_provenance_tests(ctx)?;
     run_workflow_provenance_tests(ctx)?;
     adversarial_drafts_test::test_correlated_draft_replay(ctx)?;
@@ -216,9 +216,4 @@ pub fn run_all_ai_tests(ctx: &ReducerContext) -> Result<(), String> {
     adversarial_drafts_test::test_execution_claim_is_exclusive(ctx)?;
     log::info!("✅ run_all_ai_tests complete");
     Ok(())
-}
-
-#[spacetimedb::reducer]
-pub fn run_ai_runtime_read_tests(ctx: &ReducerContext) -> Result<(), String> {
-    runtime_reads_test::test_runtime_reads_scope_and_retirement(ctx)
 }
