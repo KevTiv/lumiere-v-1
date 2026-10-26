@@ -21,6 +21,7 @@ use crate::accounting::relations::{
 };
 use crate::accounting::tax_management::{account_tax, account_tax_group};
 use crate::core::audit::audit_log;
+use crate::core::business_changes::{capture_business_change, BusinessChangeInput};
 use crate::core::organization::{company, require_company_in_organization};
 use crate::core::persistence::{record_organization_commit, OrganizationCommitInput, RowChange};
 use crate::crm::contacts::contact;
@@ -3388,33 +3389,12 @@ pub fn update_account_move_line(
     let new_credit = params.credit.unwrap_or(line.credit);
     let new_balance = new_debit - new_credit;
 
-    let old_values = serde_json::json!({
-        "name": line.name,
-        "debit": line.debit,
-        "credit": line.credit,
-    });
-
-    let mut changed_fields = Vec::new();
-    if params.name.is_some() {
-        changed_fields.push("name".to_string());
-    }
-    if params.debit.is_some() {
-        changed_fields.push("debit".to_string());
-    }
-    if params.credit.is_some() {
-        changed_fields.push("credit".to_string());
-    }
-    if params.partner_id.is_some() {
-        changed_fields.push("partner_id".to_string());
-    }
-    if params.analytic_account_id.is_some() {
-        changed_fields.push("analytic_account_id".to_string());
-    }
-    if params.metadata.is_some() {
-        changed_fields.push("metadata".to_string());
-    }
-
-    ctx.db.account_move_line().id().update(AccountMoveLine {
+    let before = accounting_line_change_snapshot(&line)?;
+    let metadata_changed = params
+        .metadata
+        .as_ref()
+        .is_some_and(|metadata| metadata != &line.metadata);
+    let updated = AccountMoveLine {
         name: params.name.unwrap_or(line.name),
         debit: new_debit,
         credit: new_credit,
@@ -3432,30 +3412,103 @@ pub fn update_account_move_line(
         write_date: Some(ctx.timestamp),
         metadata: params.metadata.unwrap_or(line.metadata),
         ..line
-    });
-
-    write_audit_log_v2(
+    };
+    let after = accounting_line_change_snapshot(&updated)?;
+    let Some(captured) = capture_business_change(
         ctx,
-        organization_id,
-        AuditLogParams {
-            company_id: Some(company_id),
-            table_name: "account_move_line",
-            record_id: line_id,
-            action: "UPDATE",
-            old_values: Some(old_values.to_string()),
-            new_values: Some(
-                serde_json::json!({
-                    "debit": new_debit,
-                    "credit": new_credit,
-                })
-                .to_string(),
-            ),
-            changed_fields,
-            metadata: None,
+        BusinessChangeInput {
+            organization_id,
+            company_id,
+            resource: "account_move",
+            record_id: move_record.id,
+            subject_resource: "account_move_line",
+            subject_record_id: line_id,
+            operation: "update_account_move_line",
+            before,
+            after,
+            summary_only_changed_fields: if metadata_changed {
+                vec!["metadata"]
+            } else {
+                vec![]
+            },
         },
-    );
+    )?
+    else {
+        // A replay of an already-applied value is not another business change.
+        return Ok(());
+    };
+    ctx.db.account_move_line().id().update(updated.clone());
+    let mut changes = vec![
+        RowChange::upsert_stdb_row(
+            "account_move",
+            serde_json::json!({"id": move_record.id}),
+            &move_record,
+        )?,
+        RowChange::upsert_stdb_row(
+            "account_move_line",
+            serde_json::json!({"id": updated.id}),
+            &updated,
+        )?,
+        RowChange::upsert_stdb_row(
+            "audit_log",
+            serde_json::json!({"id": captured.audit.id}),
+            &captured.audit,
+        )?,
+    ];
+    if let Some(change) = &captured.change {
+        changes.push(RowChange::upsert_stdb_row(
+            "business_change",
+            serde_json::json!({"id": change.id}),
+            change,
+        )?);
+    }
+    record_organization_commit(
+        ctx,
+        OrganizationCommitInput {
+            organization_id,
+            operation_id: "erp.update_account_move_line".into(),
+            correlation_id: captured
+                .change
+                .as_ref()
+                .map(|change| format!("business-change:{}", change.id))
+                .unwrap_or_else(|| format!("accounting-audit:{}", captured.audit.id)),
+            changes,
+        },
+    )?;
 
     Ok(())
+}
+
+/// Material fields covered by schema-v1 ordinary draft-line update history.
+/// Strings preserve full-width IDs and native decimal representations when
+/// values cross the JSON/browser boundary. This is not an approval snapshot.
+fn accounting_line_change_snapshot(line: &AccountMoveLine) -> Result<serde_json::Value, String> {
+    let amounts = [
+        line.debit,
+        line.credit,
+        line.balance,
+        line.amount_currency,
+        line.amount_residual,
+        line.amount_residual_currency,
+        line.debit_currency,
+        line.credit_currency,
+    ];
+    if amounts.iter().any(|amount| !amount.is_finite()) {
+        return Err("draft-line change evidence requires finite accounting amounts".into());
+    }
+    Ok(serde_json::json!({
+        "name": line.name,
+        "debit": line.debit.to_string(),
+        "credit": line.credit.to_string(),
+        "balance": line.balance.to_string(),
+        "amount_currency": line.amount_currency.to_string(),
+        "amount_residual": line.amount_residual.to_string(),
+        "amount_residual_currency": line.amount_residual_currency.to_string(),
+        "debit_currency": line.debit_currency.to_string(),
+        "credit_currency": line.credit_currency.to_string(),
+        "partner_id": line.partner_id.map(|id| id.to_string()),
+        "analytic_account_id": line.analytic_account_id.map(|id| id.to_string()),
+    }))
 }
 
 #[spacetimedb::reducer]

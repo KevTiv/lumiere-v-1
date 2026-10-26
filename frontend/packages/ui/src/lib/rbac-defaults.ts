@@ -533,6 +533,7 @@ export const resourceGroups: ResourceGroup[] = [
       { resource: "entries:products", label: "Products", actions: ["read", "create", "update", "delete"] },
       { resource: "entries:customers", label: "Customers", actions: ["read", "create", "update", "delete"] },
       { resource: "entries:orders", label: "Orders", actions: ["read", "create", "update", "delete"] },
+      { resource: "business_history", label: "Business change history", actions: ["read"] },
     ]
   },
   {
