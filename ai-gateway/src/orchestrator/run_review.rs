@@ -233,7 +233,7 @@ impl RunReviewRecorder for StdbRunReviewRecorder<'_> {
                         "run_id": run_id,
                         "program_ref": program_ref,
                         "disposition": result.disposition.label(),
-                        "rationale": result.rationale,
+                        "rationale": super::skill_loader::sats_option(result.rationale.clone().map(Value::String)),
                         "provider": result.provider,
                         "model": result.model,
                     }
@@ -246,6 +246,71 @@ impl RunReviewRecorder for StdbRunReviewRecorder<'_> {
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn durable_review_matches_native_fields_and_optional_rationale() {
+        use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+        use std::{
+            collections::BTreeSet,
+            sync::{Arc, Mutex},
+        };
+
+        type Calls = Arc<Mutex<Vec<Value>>>;
+        async fn record(State(calls): State<Calls>, Json(body): Json<Value>) -> StatusCode {
+            calls.lock().unwrap().push(body);
+            StatusCode::OK
+        }
+        let calls: Calls = Arc::new(Mutex::new(Vec::new()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = Router::new()
+            .route("/v1/database/test/call/record_ai_run_review", post(record))
+            .with_state(calls.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let writer = StdbClient::new(format!("http://{address}"), "test".into(), "writer".into());
+        let fields: Value =
+            serde_json::from_str(lumiere_contracts::manifests::STDB_GENERATED_SQL_COLUMNS).unwrap();
+        let expected: BTreeSet<_> = fields["RecordAiRunReviewParams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|name| name.as_str().unwrap())
+            .collect();
+        for rationale in [None, Some("consistent".to_string())] {
+            StdbRunReviewRecorder { writer: &writer }
+                .record(
+                    11,
+                    29,
+                    42,
+                    "report_analysis@1",
+                    &RunReviewResult {
+                        disposition: RunReviewDisposition::Healthy,
+                        rationale: rationale.clone(),
+                        provider: "test".into(),
+                        model: "review".into(),
+                    },
+                )
+                .await
+                .unwrap();
+            let recorded = calls.lock().unwrap();
+            let body = recorded.last().unwrap();
+            assert_eq!(body[0], 11);
+            assert_eq!(body[1], 29);
+            let params = body[2].as_object().unwrap();
+            assert_eq!(
+                params.keys().map(String::as_str).collect::<BTreeSet<_>>(),
+                expected
+            );
+            assert_eq!(params["run_id"], 42);
+            assert_eq!(params["disposition"], "healthy");
+            let expected = match rationale {
+                Some(value) => json!({"some": value}),
+                None => json!({"none": []}),
+            };
+            assert_eq!(params["rationale"], expected);
+        }
+        server.abort();
+    }
+
     use super::super::governed_program::{GovernedProgramStop, GovernedProgramTraceStep};
     use super::super::intelligence::{DecisionProvider, DecisionResponse};
     use super::*;

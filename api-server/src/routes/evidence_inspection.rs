@@ -12,7 +12,7 @@ use axum::{
     body::Body,
     extract::State,
     http::{
-        header::{CACHE_CONTROL, CONTENT_DISPOSITION},
+        header::{AUTHORIZATION, CACHE_CONTROL, CONTENT_DISPOSITION},
         HeaderMap, HeaderValue, Request, StatusCode,
     },
     middleware::{self, Next},
@@ -168,11 +168,38 @@ fn gateway_secret() -> Result<String, ApiError> {
         .ok_or_else(|| ApiError::Unavailable("Evidence inspection is unavailable".into()))
 }
 
+// OrgSession has verified this presented credential. The gateway calls the
+// API to recheck grants, so it must receive the API credential, not the
+// native SpacetimeDB token resolved inside the API's WorkOS binding.
+fn presented_api_token(
+    headers: &HeaderMap,
+    cookies: &tower_cookies::Cookies,
+) -> Result<String, ApiError> {
+    if let Some(value) = headers.get(AUTHORIZATION) {
+        return value
+            .to_str()
+            .ok()
+            .and_then(|value| value.strip_prefix("Bearer "))
+            .map(str::trim)
+            .filter(|token| !token.is_empty())
+            .map(str::to_owned)
+            .ok_or(ApiError::Unauthorized);
+    }
+    cookies
+        .get("stdb_token")
+        .map(|cookie| cookie.value().trim().to_owned())
+        .filter(|token| !token.is_empty())
+        .ok_or(ApiError::Unauthorized)
+}
+
 async fn inspect_evidence(
     State(state): State<Arc<AppState>>,
     org: OrgSession,
+    headers: HeaderMap,
+    cookies: tower_cookies::Cookies,
     Json(body): Json<InspectEvidenceBody>,
 ) -> Result<Response, ApiError> {
+    let api_token = presented_api_token(&headers, &cookies)?;
     validate_body(&body)?;
     let mut target = json!({ "kind": body.kind, "id": body.id });
     if let Some(node_key) = &body.node_key {
@@ -182,6 +209,7 @@ async fn inspect_evidence(
         &state,
         org,
         body.company_id,
+        &api_token,
         "/v1/evidence/inspect",
         target,
         "Evidence inspection",
@@ -192,8 +220,11 @@ async fn inspect_evidence(
 async fn inspect_run_evidence(
     State(state): State<Arc<AppState>>,
     org: OrgSession,
+    headers: HeaderMap,
+    cookies: tower_cookies::Cookies,
     Json(body): Json<RunEvidenceBody>,
 ) -> Result<Response, ApiError> {
+    let api_token = presented_api_token(&headers, &cookies)?;
     if body.company_id == 0 || body.run_id == 0 {
         return Err(ApiError::BadRequest(
             "companyId and runId must be positive integers".into(),
@@ -203,6 +234,7 @@ async fn inspect_run_evidence(
         &state,
         org,
         body.company_id,
+        &api_token,
         "/v1/evidence/run",
         json!({ "runId": body.run_id }),
         "Run evidence inspection",
@@ -213,8 +245,11 @@ async fn inspect_run_evidence(
 async fn export_run_evidence(
     State(state): State<Arc<AppState>>,
     org: OrgSession,
+    headers: HeaderMap,
+    cookies: tower_cookies::Cookies,
     Json(body): Json<RunEvidenceBody>,
 ) -> Result<Response, ApiError> {
+    let api_token = presented_api_token(&headers, &cookies)?;
     if body.company_id == 0 || body.run_id == 0 {
         return Err(ApiError::BadRequest(
             "companyId and runId must be positive integers".into(),
@@ -225,6 +260,7 @@ async fn export_run_evidence(
         &state,
         org,
         body.company_id,
+        &api_token,
         "/v1/evidence/run/export",
         json!({ "runId": run_id }),
         "Run evidence export",
@@ -243,13 +279,17 @@ async fn export_run_evidence(
 async fn run_history(
     State(state): State<Arc<AppState>>,
     org: OrgSession,
+    headers: HeaderMap,
+    cookies: tower_cookies::Cookies,
     Json(body): Json<RunHistoryBody>,
 ) -> Result<Response, ApiError> {
+    let api_token = presented_api_token(&headers, &cookies)?;
     validate_run_history_body(&body)?;
     forward_evidence_read(
         &state,
         org,
         body.company_id,
+        &api_token,
         "/v1/evidence/runs/history",
         json!({ "cursor": body.cursor, "limit": body.limit }),
         "Run history",
@@ -262,8 +302,11 @@ async fn run_history(
 async fn review_queue(
     State(state): State<Arc<AppState>>,
     org: OrgSession,
+    headers: HeaderMap,
+    cookies: tower_cookies::Cookies,
     Json(body): Json<ReviewQueueBody>,
 ) -> Result<Response, ApiError> {
+    let api_token = presented_api_token(&headers, &cookies)?;
     if body.company_id == 0 {
         return Err(ApiError::BadRequest(
             "companyId must be a positive integer".into(),
@@ -273,6 +316,7 @@ async fn review_queue(
         &state,
         org,
         body.company_id,
+        &api_token,
         "/v1/evidence/review-queue",
         json!({}),
         "Evidence review queue",
@@ -291,6 +335,7 @@ async fn forward_evidence_read(
         organization_id,
     }: OrgSession,
     company_intent: u64,
+    api_token: &str,
     gateway_path: &str,
     gateway_body: Value,
     what: &str,
@@ -313,7 +358,7 @@ async fn forward_evidence_read(
         .timeout(Duration::from_secs(15))
         .header(GATEWAY_SECRET_HEADER, gateway_secret()?)
         .header(ACTOR_IDENTITY_HEADER, context.actor_identity())
-        .header(ACTOR_TOKEN_HEADER, &session.stdb_token)
+        .header(ACTOR_TOKEN_HEADER, api_token)
         .header(ORGANIZATION_HEADER, organization_id.to_string())
         .header(COMPANY_HEADER, company_id.to_string())
         .json(&gateway_body)
@@ -362,6 +407,48 @@ pub fn router() -> Router<Arc<AppState>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inspection_forwards_the_verified_api_credential_for_grant_readback() {
+        let cookies = tower_cookies::Cookies::default();
+        cookies.add(tower_cookies::Cookie::new("stdb_token", "cookie-session"));
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer workos-session"),
+        );
+        headers.insert(
+            ACTOR_TOKEN_HEADER,
+            HeaderValue::from_static("forged-native-token"),
+        );
+        assert_eq!(
+            presented_api_token(&headers, &cookies).unwrap(),
+            "workos-session"
+        );
+        headers.remove(AUTHORIZATION);
+        assert_eq!(
+            presented_api_token(&headers, &cookies).unwrap(),
+            "cookie-session"
+        );
+    }
+
+    #[test]
+    fn inspection_never_falls_back_from_rejected_explicit_credentials() {
+        let cookies = tower_cookies::Cookies::default();
+        cookies.add(tower_cookies::Cookie::new("stdb_token", "cookie-session"));
+        for invalid in ["", "Basic rejected", "Bearer "] {
+            let mut headers = HeaderMap::new();
+            headers.insert(AUTHORIZATION, HeaderValue::from_str(invalid).unwrap());
+            assert!(matches!(
+                presented_api_token(&headers, &cookies),
+                Err(ApiError::Unauthorized)
+            ));
+        }
+        assert!(matches!(
+            presented_api_token(&HeaderMap::new(), &tower_cookies::Cookies::default()),
+            Err(ApiError::Unauthorized)
+        ));
+    }
 
     #[test]
     fn browser_contract_rejects_authority_fields() {

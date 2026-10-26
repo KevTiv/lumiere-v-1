@@ -76,7 +76,7 @@ use crate::{
     },
     orchestrator::skill_loader::{
         complete_run, create_run, intelligence_policy_ref, load_run_key, load_skill, resume_run,
-        set_run_wait_state, LoadedSkill,
+        set_run_wait_state, GovernedRunRef, LoadedSkill,
     },
     state::AppState,
     tools::{
@@ -678,6 +678,32 @@ pub struct AdmittedRunRequest {
     pub resume_run_id: Option<u64>,
 }
 
+// Admission proves the interactive actor through api-server. Native run writes
+// use the dedicated runtime writer, as do checkpoints, trace and settlement.
+// A WorkOS access token is not the actor's native SpacetimeDB credential.
+async fn create_new_admitted_run(
+    writer: &stdb_client::StdbClient,
+    req: &AdmittedRunRequest,
+    skill: &LoadedSkill,
+    agent_id: u64,
+    run_key: &str,
+    inputs_json: &str,
+    actor: &ActorCredentials,
+) -> Result<GovernedRunRef> {
+    create_run(
+        writer,
+        req.org_id,
+        req.company_id,
+        skill,
+        agent_id,
+        req.team_member_id,
+        run_key,
+        inputs_json,
+        &actor.identity_hex,
+    )
+    .await
+}
+
 /// Execute a skill run through the full H5b admission stack.
 ///
 /// Requires `AppState::spend_read_stdb` to be present; returns an error when
@@ -819,12 +845,6 @@ pub async fn run_skill_admitted(
     let policy = ReviewedInvocationPolicy::new(engine, base, reviewed_calls.clone())?;
 
     let inputs_json = serde_json::to_string(&req.inputs).context("serialize inputs")?;
-    let triggered_by_hex = req
-        .triggered_by_hex
-        .as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .unwrap_or("0000000000000000000000000000000000000000000000000000000000000000")
-        .to_string();
     let is_resume = req.resume_run_id.is_some();
     let (run_id, run_key) = if let Some(resume_run_id) = req.resume_run_id {
         validate_resume_identity(
@@ -842,16 +862,14 @@ pub async fn run_skill_admitted(
     } else {
         let run_key = Uuid::new_v4().to_string();
         if skill.id > 0 {
-            let run = create_run(
-                &stdb,
-                req.org_id,
-                req.company_id,
+            let run = create_new_admitted_run(
+                state.stdb.as_ref(),
+                &req,
                 &skill,
                 agent.agent_id,
-                req.team_member_id,
                 &run_key,
                 &inputs_json,
-                &triggered_by_hex,
+                &actor,
             )
             .await?;
             (run.run_id, run.run_key)
@@ -1629,6 +1647,126 @@ fn reject_legacy_analytics_sql(inputs: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn admitted_run_creation_uses_runtime_writer_and_preserves_actor() {
+        use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
+        use std::sync::Mutex;
+
+        type Calls = Arc<Mutex<Vec<(String, Value)>>>;
+        async fn create(
+            State(calls): State<Calls>,
+            headers: HeaderMap,
+            Json(body): Json<Value>,
+        ) -> axum::http::StatusCode {
+            let credential = headers["authorization"].to_str().unwrap().to_string();
+            calls.lock().unwrap().push((credential.clone(), body));
+            if credential == "Bearer runtime-writer" {
+                axum::http::StatusCode::OK
+            } else {
+                axum::http::StatusCode::FORBIDDEN
+            }
+        }
+        async fn lookup() -> Json<Value> {
+            Json(json!([{
+                "schema": {"elements": [{
+                    "name": {"some": "id"}, "algebraic_type": {"U64": []}
+                }]},
+                "rows": [[42]]
+            }]))
+        }
+        let calls: Calls = Arc::new(Mutex::new(Vec::new()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = Router::new()
+            .route("/v1/database/test/call/create_ai_agent_run", post(create))
+            .route(
+                "/v1/database/test/call/initialize_ai_run_lifecycle",
+                post(create),
+            )
+            .route("/v1/database/test/sql", post(lookup))
+            .with_state(calls.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let writer = stdb_client::StdbClient::new(
+            format!("http://{address}"),
+            "test".into(),
+            "runtime-writer".into(),
+        );
+        let actor = ActorCredentials::new("workos-session", "a".repeat(64)).unwrap();
+        let request = AdmittedRunRequest {
+            org_id: 11,
+            company_id: 29,
+            skill_key: "report_analysis".into(),
+            skill_version: 1,
+            inputs: json!({"query": "report"}),
+            agent_id: Some(7),
+            team_member_id: None,
+            triggered_by_hex: Some(actor.identity_hex.clone()),
+            stdb_token: Some(actor.stdb_token.clone()),
+            correlation_id: "test".into(),
+            reviewed_calls: vec![],
+            max_steps: Some(5),
+            resume_run_id: None,
+        };
+        let skill = LoadedSkill {
+            id: 3,
+            skill_key: "report_analysis".into(),
+            name: "Report".into(),
+            category: "analytics".into(),
+            prompt_template: String::new(),
+            required_tools: vec![],
+            optional_tools: vec![],
+            default_max_steps: 5,
+            default_max_tool_calls: 12,
+            config_json: json!({}),
+            custom_instructions: None,
+            skill_config_id: Some(5),
+            enabled: true,
+            allowed_action_drafts: vec![],
+            source: super::super::skill_loader::SkillSource::Remote,
+        };
+        let run = create_new_admitted_run(
+            &writer,
+            &request,
+            &skill,
+            7,
+            "run-writer-test",
+            "{}",
+            &actor,
+        )
+        .await
+        .unwrap();
+        assert_eq!(run.run_id, 42);
+        let recorded = calls.lock().unwrap().clone();
+        assert_eq!(recorded.len(), 2);
+        assert!(recorded
+            .iter()
+            .all(|(auth, _)| auth == "Bearer runtime-writer"));
+        assert_eq!(recorded[0].1[0], 11);
+        assert_eq!(recorded[0].1[1]["company_id"], 29);
+        assert_eq!(recorded[0].1[1]["triggered_by_hex"], actor.identity_hex);
+        assert_eq!(recorded[0].1[1]["skill_config_id"], json!({"some": 5}));
+        assert_eq!(recorded[1].1[2], 42);
+
+        // A denied writer must fail. Never fall back to the interactive token.
+        calls.lock().unwrap().clear();
+        let denied_writer = writer.with_token("denied-writer");
+        assert!(create_new_admitted_run(
+            &denied_writer,
+            &request,
+            &skill,
+            7,
+            "denied-run",
+            "{}",
+            &actor,
+        )
+        .await
+        .is_err());
+        let denied = calls.lock().unwrap();
+        assert_eq!(denied.len(), 1);
+        assert_eq!(denied[0].0, "Bearer denied-writer");
+        server.abort();
+    }
 
     #[test]
     fn required_applicability_parses_absent_valid_and_rejects_malformed() {

@@ -181,10 +181,12 @@ test.describe("Accounting module e2e", () => {
       const areaTrigger = page.getByTestId("module-area-accounting")
       await expect(areaTrigger).toBeVisible()
       await expect(areaTrigger).toHaveAttribute("role", "combobox")
-      const areas = JSON.parse(await areaTrigger.getAttribute("data-tab-areas") ?? "{}") as Record<string, string>
-      // Task areas mount only their own triggers; the map must still preserve
-      // every canonical destination covered by the business assertions below.
-      expect(Object.keys(areas).sort()).toEqual([...ACCOUNTING_TAB_IDS].sort())
+      // The Work destination appears after the asynchronous permission check.
+      // Wait for every canonical destination before testing its business surface.
+      await expect.poll(async () => {
+        const areas = JSON.parse(await areaTrigger.getAttribute("data-tab-areas") ?? "{}") as Record<string, string>
+        return Object.keys(areas).sort()
+      }, { timeout: 30_000 }).toEqual([...ACCOUNTING_TAB_IDS].sort())
     }, { timeout: 30_000 })
     for (const tabId of ACCOUNTING_TAB_IDS) {
       await test.step(`Accounting destination: ${tabId}`, async () => {
