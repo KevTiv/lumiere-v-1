@@ -6,6 +6,7 @@ use serde_json::Value;
 
 use crate::{
     ai_agent::ResolvedAgentConfig,
+    orchestrator::skill_loader::sats_option,
     tools::{
         action_draft, analytics, erp_search, erp_snapshot, save_artifact,
         types::{hash_tool_input, ToolContext, ToolOutput},
@@ -650,10 +651,10 @@ pub(crate) async fn persist_step(
                 "tool_name": tool_name,
                 "input_hash": input_hash,
                 "output_summary": bounded_step_summary(output_summary),
-                "output_row_count": output_row_count,
-                "citations_json": citations_json,
+                "output_row_count": sats_option(output_row_count.map(Value::from)),
+                "citations_json": sats_option(citations_json.map(Value::from)),
                 "duration_ms": duration_ms,
-                "error_message": error_message,
+                "error_message": sats_option(error_message.map(Value::from)),
             }
         ]),
     ))
@@ -675,6 +676,87 @@ fn bounded_step_summary(summary: &str) -> String {
 
 #[cfg(test)]
 mod step_persistence_tests {
+    #[tokio::test]
+    async fn persisted_steps_match_native_fields_and_tagged_options() {
+        use super::persist_step;
+        use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+        use serde_json::Value;
+        use std::{
+            collections::BTreeSet,
+            sync::{Arc, Mutex},
+        };
+
+        type Calls = Arc<Mutex<Vec<Value>>>;
+        async fn append(State(calls): State<Calls>, Json(body): Json<Value>) -> StatusCode {
+            calls.lock().unwrap().push(body);
+            StatusCode::OK
+        }
+        let calls: Calls = Arc::new(Mutex::new(Vec::new()));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = Router::new()
+            .route(
+                "/v1/database/test/call/append_ai_agent_run_step",
+                post(append),
+            )
+            .with_state(calls.clone());
+        let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        let writer = stdb_client::StdbClient::new(
+            format!("http://{address}"),
+            "test".into(),
+            "runtime-writer".into(),
+        );
+        let fields: Value =
+            serde_json::from_str(lumiere_contracts::manifests::STDB_GENERATED_SQL_COLUMNS).unwrap();
+        let expected: BTreeSet<_> = fields["AppendAiAgentRunStepParams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|name| name.as_str().unwrap())
+            .collect();
+        for present in [false, true] {
+            persist_step(
+                &writer,
+                11,
+                29,
+                42,
+                1,
+                "governed_program:compute",
+                &"f".repeat(64),
+                "observed",
+                present.then_some(3),
+                present.then_some("[]"),
+                0,
+                present.then_some("denied"),
+            )
+            .await
+            .unwrap();
+            let recorded = calls.lock().unwrap();
+            let body = recorded.last().unwrap();
+            assert_eq!(body[0], 11);
+            assert_eq!(body[1], 29);
+            assert_eq!(body[2], 42);
+            let params = body[3].as_object().unwrap();
+            assert_eq!(
+                params.keys().map(String::as_str).collect::<BTreeSet<_>>(),
+                expected
+            );
+            for (name, value) in [
+                ("output_row_count", serde_json::json!(3)),
+                ("citations_json", serde_json::json!("[]")),
+                ("error_message", serde_json::json!("denied")),
+            ] {
+                let expected = if present {
+                    serde_json::json!({"some": value})
+                } else {
+                    serde_json::json!({"none": []})
+                };
+                assert_eq!(params[name], expected, "native option {name}");
+            }
+        }
+        server.abort();
+    }
+
     use super::bounded_step_summary;
 
     #[test]

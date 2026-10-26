@@ -72,7 +72,7 @@ fn row_string_list(row: &Value, key: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-pub(super) fn sats_option(value: Option<Value>) -> Value {
+pub(crate) fn sats_option(value: Option<Value>) -> Value {
     match value {
         Some(value) => serde_json::json!({ "some": value }),
         None => serde_json::json!({ "none": [] }),
