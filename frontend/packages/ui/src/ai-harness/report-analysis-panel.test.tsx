@@ -71,7 +71,7 @@ describe("governed report analysis", () => {
     render(<ReportAnalysisPanel {...props} />)
     expect(screen.getByText("Operator review is required.")).toBeTruthy()
     expect(screen.getByText("aiHarness.enums.runStatuses.waitingApproval")).toBeTruthy()
-    expect(screen.getByRole("link", { name: key("inspect") }).getAttribute("href")).toBe("/ai-harness?tab=evidence-reviewer&companyId=1&runId=42")
+    expect(screen.getByRole("link", { name: key("inspect") }).getAttribute("href")).toBe("/ai-harness?tab=report-analysis&companyId=1&runId=42")
     expect(state.mutateAsync).not.toHaveBeenCalled()
   })
 

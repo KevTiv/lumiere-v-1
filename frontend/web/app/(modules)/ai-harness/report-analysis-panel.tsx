@@ -1,7 +1,6 @@
 "use client"
 
 import { useRef, useState, type FormEvent } from "react"
-import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import { useAiAgents } from "@lumiere/query-hooks/hooks/ai-agents"
 import { useAiReportAnalysis } from "@lumiere/query-hooks/hooks/ai-skills"
@@ -16,17 +15,15 @@ import { companyRowsToSelectOptions, type CompanyLookupRow } from "../../../lib/
 import { runStatusLabel } from "./enum-labels"
 import { SavedRunObservation } from "./run-observation-panel"
 
-export function ReportAnalysisPanel({ organizationId, companies }: {
+export function ReportAnalysisPanel({ organizationId, companies, savedRun }: {
   organizationId: bigint
   companies: readonly CompanyLookupRow[]
+  savedRun?: { companyId: number; runId: number }
 }) {
   const { t } = useTranslation()
   const companyOptions = companyRowsToSelectOptions(companies)
-  const searchParams = useSearchParams()
-  const linkedRunId = Number(searchParams.get("runId"))
-  const linkedCompanyId = searchParams.get("companyId")
   const [companyId, setCompanyId] = useState(() =>
-    companyOptions.find((company) => company.value === linkedCompanyId)?.value ?? companyOptions[0]?.value ?? "",
+    companyOptions.find((company) => company.value === String(savedRun?.companyId))?.value ?? companyOptions[0]?.value ?? "",
   )
   const [agentId, setAgentId] = useState("")
   const [query, setQuery] = useState("")
@@ -104,8 +101,8 @@ export function ReportAnalysisPanel({ organizationId, companies }: {
         {run && run.run_id > 0 && <a className="underline" href={`/ai-harness?tab=report-analysis&companyId=${companyId}&runId=${run.run_id}`}>{t("aiHarness.reportAnalysis.inspect")}</a>}
       </CardContent>
     </Card>}
-    {Number.isSafeInteger(linkedRunId) && linkedRunId > 0 && linkedCompanyId === companyId
-      ? <SavedRunObservation key={`${companyId}:${linkedRunId}`} companyId={Number(companyId)} runId={linkedRunId} />
+    {savedRun && String(savedRun.companyId) === companyId
+      ? <SavedRunObservation key={`${companyId}:${savedRun.runId}`} companyId={savedRun.companyId} runId={savedRun.runId} />
       : null}
   </div>
 }

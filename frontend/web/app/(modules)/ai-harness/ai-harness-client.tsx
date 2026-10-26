@@ -25,6 +25,11 @@ export function AiHarnessClient({
 }: AiHarnessClientProps) {
   const { t } = useTranslation()
   const searchParams = useSearchParams()
+  const savedRunId = Number(searchParams.get("runId"))
+  const savedCompanyId = Number(searchParams.get("companyId"))
+  const savedRun = Number.isSafeInteger(savedRunId) && savedRunId > 0
+    && Number.isSafeInteger(savedCompanyId) && savedCompanyId > 0
+    ? { companyId: savedCompanyId, runId: savedRunId } : undefined
   const [tab, setTab] = useState(() => {
     const requested = searchParams.get("tab")
     if (["report-analysis", "report-composer", "low-stock", "red-action-drafts", "evidence-reviewer", "run-lifecycle"].includes(requested ?? "")) return requested!
@@ -55,7 +60,7 @@ export function AiHarnessClient({
       </TabsList>
 
       <TabsContent value="report-analysis">
-        <ReportAnalysisPanel organizationId={organizationId} companies={companies} />
+        <ReportAnalysisPanel organizationId={organizationId} companies={companies} savedRun={savedRun} />
       </TabsContent>
 
       <TabsContent value="report-composer">
