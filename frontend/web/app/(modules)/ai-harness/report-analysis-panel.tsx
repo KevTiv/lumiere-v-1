@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, type FormEvent } from "react"
+import { useSearchParams } from "next/navigation"
 import { useTranslation } from "@lumiere/i18n"
 import { useAiAgents } from "@lumiere/query-hooks/hooks/ai-agents"
 import { useAiReportAnalysis } from "@lumiere/query-hooks/hooks/ai-skills"
@@ -13,6 +14,7 @@ import { Alert, AlertDescription } from "@lumiere/ui/components/alert"
 import { Badge } from "@lumiere/ui/components/badge"
 import { companyRowsToSelectOptions, type CompanyLookupRow } from "../../../lib/form-lookup"
 import { runStatusLabel } from "./enum-labels"
+import { SavedRunObservation } from "./run-observation-panel"
 
 export function ReportAnalysisPanel({ organizationId, companies }: {
   organizationId: bigint
@@ -20,7 +22,12 @@ export function ReportAnalysisPanel({ organizationId, companies }: {
 }) {
   const { t } = useTranslation()
   const companyOptions = companyRowsToSelectOptions(companies)
-  const [companyId, setCompanyId] = useState(companyOptions[0]?.value ?? "")
+  const searchParams = useSearchParams()
+  const linkedRunId = Number(searchParams.get("runId"))
+  const linkedCompanyId = searchParams.get("companyId")
+  const [companyId, setCompanyId] = useState(() =>
+    companyOptions.find((company) => company.value === linkedCompanyId)?.value ?? companyOptions[0]?.value ?? "",
+  )
   const [agentId, setAgentId] = useState("")
   const [query, setQuery] = useState("")
   const agents = useAiAgents(Number(organizationId), organizationId > 0n)
@@ -94,8 +101,11 @@ export function ReportAnalysisPanel({ organizationId, companies }: {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <p className="whitespace-pre-wrap">{analysis.data.summary}</p>
-        {run && run.run_id > 0 && <a className="underline" href={`/ai-harness?tab=evidence-reviewer&companyId=${companyId}&runId=${run.run_id}`}>{t("aiHarness.reportAnalysis.inspect")}</a>}
+        {run && run.run_id > 0 && <a className="underline" href={`/ai-harness?tab=report-analysis&companyId=${companyId}&runId=${run.run_id}`}>{t("aiHarness.reportAnalysis.inspect")}</a>}
       </CardContent>
     </Card>}
+    {Number.isSafeInteger(linkedRunId) && linkedRunId > 0 && linkedCompanyId === companyId
+      ? <SavedRunObservation key={`${companyId}:${linkedRunId}`} companyId={Number(companyId)} runId={linkedRunId} />
+      : null}
   </div>
 }
