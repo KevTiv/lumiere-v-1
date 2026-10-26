@@ -1246,8 +1246,8 @@ export function useAddOrgMember(organizationId: bigint) {
         ),
       }
       const { urlPath, init } = stdbBffCommandPost("add_org_member", {
-        userIdentity: identityForReducer(String(formData.userIdentity ?? "")),
-        params: stdbParamsToJson(params),
+        userIdentity: encodeIdentity(identityForReducer(String(formData.userIdentity ?? ""))),
+        params: stdbParamsToJson(params, "AddOrgMemberParams"),
       })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to add organization member")
@@ -1283,8 +1283,8 @@ export function useAddUserToOrganization(organizationId: bigint) {
         ),
       }
       const { urlPath, init } = stdbBffCommandPost("add_user_to_organization", {
-        userIdentity: identityForReducer(String(formData.userIdentity ?? "")),
-        params: stdbParamsToJson(params),
+        userIdentity: encodeIdentity(identityForReducer(String(formData.userIdentity ?? ""))),
+        params: stdbParamsToJson(params, "AddUserToOrganizationParams"),
       })
       const r = await apiFetch(urlPath, init)
       if (!r.ok) throw new Error("Failed to add user to organization")

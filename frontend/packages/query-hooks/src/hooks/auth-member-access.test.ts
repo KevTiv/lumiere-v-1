@@ -96,8 +96,12 @@ test("both member entry paths encode one-hour company-scoped setup leases", asyn
   await hooks.useAddUserToOrganization(1n).mutationFn(input)
   for (const call of calls) {
     const params = call.body.params as Record<string, unknown>
-    assert.equal(params.company_id, 1)
-    assert.equal(params.metadata, "lumiere-platform-bootstrap-request-v1")
+    assert.deepEqual(call.body.userIdentity, { __identity__: `0x${input.userIdentity}` })
+    assert.deepEqual(params.company_id, { some: 1 })
+    assert.deepEqual(params.metadata, { some: "lumiere-platform-bootstrap-request-v1" })
+    assert.deepEqual(params.job_title, { none: [] })
+    assert.deepEqual(params.department_id, { none: [] })
+    assert.deepEqual(params.employee_id, { none: [] })
     assert.equal(params.is_superuser, undefined)
   }
 })
