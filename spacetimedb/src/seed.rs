@@ -646,20 +646,25 @@ fn seed_active_release_for_skill(
     // Development fixture only. Keep exact adapter bindings aligned with
     // `gateway certification-bundles`; these rows are not production certificates.
     let source_hash = if skill_key == "report_analysis" {
-        "sha256:933f6f50814b40b297f075155f73f1c1dab89c3ae981df3dbe1df87fab32e300".to_string()
+        "sha256:3921950f046b7e5ca7a319fd5fcc9c2c4a45f14ed86055e2fa412ac49b6550c1".to_string()
     } else {
         format!("sha256:{}", source_hash_char.to_string().repeat(64))
     };
+    let version = if skill_key == "report_analysis" {
+        "1.0.1"
+    } else {
+        "1.0.0"
+    };
     let manifest_json = format!(
-        r#"{{"limits":{{"max_steps":8,"max_tool_calls":12}},"output_types":["{output_type}"],"permissions":["report:read"],"resources":["{resource}"],"risk":"green","schema_version":1,"skill_key":"{skill_key}","source_hash":"{source_hash}","version":"1.0.0"}}"#,
+        r#"{{"limits":{{"max_steps":8,"max_tool_calls":12}},"output_types":["{output_type}"],"permissions":["report:read"],"resources":["{resource}"],"risk":"green","schema_version":1,"skill_key":"{skill_key}","source_hash":"{source_hash}","version":"{version}"}}"#,
     );
     let version = ctx.db.ai_skill_version().insert(AiSkillVersion {
         id: 0,
-        version_key: format!("{org_id}:{}:1.0.0", skill.id),
+        version_key: format!("{org_id}:{}:{version}", skill.id),
         organization_id: org_id,
         skill_id: skill.id,
         skill_key: skill_key.to_string(),
-        version: "1.0.0".to_string(),
+        version: version.to_string(),
         manifest_schema_version: 1,
         manifest_json,
         source_hash,

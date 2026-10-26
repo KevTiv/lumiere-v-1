@@ -91,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
                 "schemaVersion": 1,
                 "low_stock": {"version": "1.0.0", "sourceHash": harness::certification::low_stock_certification_bundle_hash()},
                 "report_composer": {"version": "1.0.0", "sourceHash": harness::certification::report_composer_certification_bundle_hash()},
-                "report_analysis": {"version": "1.0.0", "sourceHash": harness::certification::report_analysis_certification_bundle_hash()}
+                "report_analysis": {"version": harness::certification::REPORT_ANALYSIS_CERTIFICATION_VERSION, "sourceHash": harness::certification::report_analysis_certification_bundle_hash()}
             })
         );
         return Ok(());

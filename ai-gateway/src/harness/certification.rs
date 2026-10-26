@@ -197,6 +197,7 @@ fn execution_request(
 
 const REPORT_PREVIEW_FIXTURE_PATH: &str = "reports/daily_business_summary_v1/preview.json";
 const BUILT_IN_SEMVER: &str = "1.0.0";
+pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.1";
 
 struct LowStockCertificationAdapter;
 
@@ -337,7 +338,7 @@ struct ReportAnalysisCertificationAdapter;
 impl CandidateCertificationAdapter for ReportAnalysisCertificationAdapter {
     fn supports(&self, version: &CandidateSkillVersion) -> bool {
         version.skill_key == super::governed_llm_skills::REPORT_ANALYSIS_SKILL_KEY
-            && version.version == BUILT_IN_SEMVER
+            && version.version == REPORT_ANALYSIS_CERTIFICATION_VERSION
             && version.source_hash == report_analysis_certification_bundle_hash()
     }
 
@@ -559,6 +560,7 @@ pub async fn run(
         "AI certification worker started"
     );
 
+    let mut scan_after_id = 0;
     loop {
         interval.tick().await;
         match process_batch(
@@ -567,6 +569,7 @@ pub async fn run(
             expected_runtime_hash,
             batch_size,
             execution_timeout,
+            &mut scan_after_id,
         )
         .await
         {
@@ -587,8 +590,9 @@ async fn process_batch(
     expected_runtime_hash: &str,
     batch_size: u32,
     execution_timeout: Duration,
+    scan_after_id: &mut u64,
 ) -> Result<usize> {
-    let requests = load_claim_candidates(stdb, batch_size).await?;
+    let requests = load_claim_candidates(stdb, batch_size, scan_after_id).await?;
     let mut processed = 0;
 
     for queued in requests {
@@ -973,26 +977,59 @@ fn truncate_utf8(value: &str, max_len: usize) -> String {
     value[..end].trim_end().to_string()
 }
 
+// Spacetime SQL cannot construct sum-type literals. Read bounded primary-key
+// windows and inspect the decoded enum in Rust. Advancing the window even when
+// claims fail prevents an old running request from starving newer requests.
 async fn load_claim_candidates(
     stdb: &StdbClient,
     batch_size: u32,
+    scan_after_id: &mut u64,
 ) -> Result<Vec<CertificationRequest>> {
-    let sql = claim_candidate_sql(batch_size);
+    let through_id = scan_after_id.saturating_add(u64::from(MAX_CERTIFICATION_BATCH_SIZE));
     let rows = stdb
-        .query_sql(&sql)
+        .query_sql(&claim_candidate_sql(*scan_after_id, through_id))
         .await
         .context("load queued or reclaimable AI certification requests")?;
-
-    rows.iter().map(parse_request).collect()
+    let candidates = select_claim_candidates(&rows, batch_size)?;
+    let has_later_rows = !stdb
+        .query_sql(&format!(
+            "SELECT id FROM ai_skill_certification_request WHERE id > {through_id} LIMIT 1"
+        ))
+        .await
+        .context("locate next AI certification request window")?
+        .is_empty();
+    *scan_after_id = next_scan_cursor(through_id, has_later_rows);
+    Ok(candidates)
 }
 
-fn claim_candidate_sql(batch_size: u32) -> String {
+fn next_scan_cursor(through_id: u64, has_later_rows: bool) -> u64 {
+    if has_later_rows {
+        through_id
+    } else {
+        0
+    }
+}
+
+fn claim_candidate_sql(after_id: u64, through_id: u64) -> String {
     format!(
-        "SELECT id, organization_id, company_id, skill_id, skill_version_id, fixture_id, runtime_profile_id, certification_environment_id \
+        "SELECT id, organization_id, company_id, skill_id, skill_version_id, fixture_id, runtime_profile_id, certification_environment_id, status \
          FROM ai_skill_certification_request \
-         WHERE status = 'Queued' OR status = 'Running' LIMIT {}",
-        batch_size.clamp(1, MAX_CERTIFICATION_BATCH_SIZE)
+         WHERE id > {after_id} AND id <= {through_id} LIMIT {MAX_CERTIFICATION_BATCH_SIZE}"
     )
+}
+
+fn select_claim_candidates(rows: &[Value], batch_size: u32) -> Result<Vec<CertificationRequest>> {
+    let mut candidates = Vec::new();
+    for row in rows {
+        match row_string(row, "status", "status").as_deref() {
+            Some("Queued" | "Running") => candidates.push(parse_request(row)?),
+            Some("Completed" | "Errored") => {}
+            _ => anyhow::bail!("certification request has an invalid status"),
+        }
+    }
+    candidates.sort_unstable_by_key(|request| request.id);
+    candidates.truncate(batch_size.clamp(1, MAX_CERTIFICATION_BATCH_SIZE) as usize);
+    Ok(candidates)
 }
 
 async fn claim_request(stdb: &StdbClient, request: &CertificationRequest) -> Result<()> {
@@ -1011,13 +1048,16 @@ async fn load_claimed_request(
 ) -> Result<CertificationRequest> {
     let rows = stdb
         .query_sql(&format!(
-            "SELECT id, organization_id, company_id, skill_id, skill_version_id, fixture_id, runtime_profile_id, certification_environment_id \
-             FROM ai_skill_certification_request WHERE id = {request_id} AND organization_id = {organization_id} AND status = 'Running' LIMIT 2"
+            "SELECT id, organization_id, company_id, skill_id, skill_version_id, fixture_id, runtime_profile_id, certification_environment_id, status \
+             FROM ai_skill_certification_request WHERE id = {request_id} AND organization_id = {organization_id} LIMIT 2"
         ))
         .await
         .context("reload claimed AI certification request")?;
     if rows.len() != 1 {
         anyhow::bail!("claimed certification request was not found exactly once");
+    }
+    if row_string(&rows[0], "status", "status").as_deref() != Some("Running") {
+        anyhow::bail!("claimed certification request is not running");
     }
     parse_request(&rows[0])
 }
@@ -1549,12 +1589,70 @@ mod tests {
     }
 
     #[test]
-    fn polling_includes_queued_and_running_claim_candidates() {
-        let sql = claim_candidate_sql(MAX_CERTIFICATION_BATCH_SIZE + 1);
+    fn polling_filters_terminal_rows_before_applying_the_batch_limit() {
+        let row = |id, status| {
+            serde_json::json!({
+                "id":id,"organizationId":1,"companyId":1,"skillId":1,
+                "skillVersionId":1,"fixtureId":1,"status":status,
+            })
+        };
+        let rows = vec![
+            row(1, "Completed"),
+            row(2, "Errored"),
+            row(4, "Running"),
+            row(3, "Queued"),
+        ];
+        let selected = select_claim_candidates(&rows, 2).expect("valid queue rows");
+        assert_eq!(
+            selected.iter().map(|r| r.id).collect::<Vec<_>>(),
+            vec![3, 4]
+        );
+        assert_eq!(
+            select_claim_candidates(&rows, 1).expect("valid queue rows")[0].id,
+            3
+        );
+        assert!(select_claim_candidates(&[row(5, "Unknown")], 1).is_err());
+    }
 
-        assert!(sql.contains("status = 'Queued'"));
-        assert!(sql.contains("status = 'Running'"));
-        assert!(sql.ends_with("LIMIT 100"));
+    #[test]
+    fn polling_decodes_native_sats_queue_status_before_selection() {
+        let mut elements = [
+            "id",
+            "organization_id",
+            "company_id",
+            "skill_id",
+            "skill_version_id",
+            "fixture_id",
+        ]
+        .into_iter()
+        .map(|name| serde_json::json!({"name":{"some":name},"algebraic_type":{"U64":[]}}))
+        .collect::<Vec<_>>();
+        let variants = ["queued", "running", "completed", "errored"]
+            .into_iter()
+            .map(|name| serde_json::json!({"name":{"some":name},"algebraic_type":{"Product":{"elements":[]}}}))
+            .collect::<Vec<_>>();
+        elements.push(serde_json::json!({"name":{"some":"status"},"algebraic_type":{"Sum":{"variants":variants}}}));
+        let response = serde_json::json!([{
+            "schema":{"elements":elements},
+            "rows":[[1,1,1,1,1,1,[2,[]]],[2,1,1,1,1,1,[0,[]]],[3,1,1,1,1,1,[1,[]]]]
+        }]);
+        let rows =
+            stdb_client::parse_sats_sql_response(&response.to_string()).expect("native SATS rows");
+        let selected = select_claim_candidates(&rows, 100).expect("decoded queue rows");
+        assert_eq!(
+            selected.iter().map(|r| r.id).collect::<Vec<_>>(),
+            vec![2, 3]
+        );
+    }
+
+    #[test]
+    fn polling_advances_bounded_id_windows_and_wraps_at_the_tail() {
+        let sql = claim_candidate_sql(100, 200);
+        assert!(sql.contains("id > 100 AND id <= 200 LIMIT 100"));
+        assert!(!sql.contains("status ="));
+        assert_eq!(next_scan_cursor(200, true), 200);
+        assert_eq!(next_scan_cursor(200, false), 0);
+        assert_eq!(next_scan_cursor(u64::MAX, false), 0);
     }
 
     #[test]
