@@ -13,14 +13,18 @@ import { Alert, AlertDescription } from "@lumiere/ui/components/alert"
 import { Badge } from "@lumiere/ui/components/badge"
 import { companyRowsToSelectOptions, type CompanyLookupRow } from "../../../lib/form-lookup"
 import { runStatusLabel } from "./enum-labels"
+import { SavedRunObservation } from "./run-observation-panel"
 
-export function ReportAnalysisPanel({ organizationId, companies }: {
+export function ReportAnalysisPanel({ organizationId, companies, savedRun }: {
   organizationId: bigint
   companies: readonly CompanyLookupRow[]
+  savedRun?: { companyId: number; runId: number }
 }) {
   const { t } = useTranslation()
   const companyOptions = companyRowsToSelectOptions(companies)
-  const [companyId, setCompanyId] = useState(companyOptions[0]?.value ?? "")
+  const [companyId, setCompanyId] = useState(() =>
+    companyOptions.find((company) => company.value === String(savedRun?.companyId))?.value ?? companyOptions[0]?.value ?? "",
+  )
   const [agentId, setAgentId] = useState("")
   const [query, setQuery] = useState("")
   const agents = useAiAgents(Number(organizationId), organizationId > 0n)
@@ -94,8 +98,11 @@ export function ReportAnalysisPanel({ organizationId, companies }: {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <p className="whitespace-pre-wrap">{analysis.data.summary}</p>
-        {run && run.run_id > 0 && <a className="underline" href={`/ai-harness?tab=evidence-reviewer&companyId=${companyId}&runId=${run.run_id}`}>{t("aiHarness.reportAnalysis.inspect")}</a>}
+        {run && run.run_id > 0 && <a className="underline" href={`/ai-harness?tab=report-analysis&companyId=${companyId}&runId=${run.run_id}`}>{t("aiHarness.reportAnalysis.inspect")}</a>}
       </CardContent>
     </Card>}
+    {savedRun && String(savedRun.companyId) === companyId
+      ? <SavedRunObservation key={`${companyId}:${savedRun.runId}`} companyId={savedRun.companyId} runId={savedRun.runId} />
+      : null}
   </div>
 }

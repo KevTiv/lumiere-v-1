@@ -88,7 +88,7 @@ test.describe("GOV-00 governed execution", { tag: ["@gov00", "@ai-live"] }, () =
 
     const runId = body.run?.run_id ?? 0
     await expect(page.getByRole("link", { name: "Inspect saved run and cost", exact: true })).toHaveAttribute(
-      "href", `/ai-harness?tab=evidence-reviewer&companyId=${companyId}&runId=${runId}`,
+      "href", `/ai-harness?tab=report-analysis&companyId=${companyId}&runId=${runId}`,
     )
     await expect
       .poll(
