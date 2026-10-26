@@ -12642,6 +12642,29 @@
       "transcriptTitle": "Governed tool transcript",
       "transcriptUnavailable": "Transcript unavailable",
       "unavailable": "Lifecycle unavailable"
+    },
+    "finance": {
+      "title": "Finance reviews",
+      "description": "Read-only reviews using authorized finance records. Each skill requires a certified release for this company.",
+      "skill": "Review",
+      "reportKey": "Report",
+      "date": "Report date",
+      "baselineDate": "Comparison date",
+      "timezone": "Reporting timezone",
+      "recordId": "Statement, period or record ID",
+      "recordKind": "Record type",
+      "question": "Optional review question",
+      "expense": "Expense",
+      "bill": "Supplier bill",
+      "finance_report_review": "Cash and balance review",
+      "bank_reconciliation_review": "Bank reconciliation review",
+      "period_close_review": "Period close readiness",
+      "expense_evidence_review": "Expense evidence review",
+      "finance_variance_review": "Financial variance review",
+      "cash_mobile_money_v1": "Cash and mobile money",
+      "customer_balances_v1": "Customer balances",
+      "supplier_payables_v1": "Supplier payables",
+      "failed": "The review could not be confirmed. Check the selected skill’s active release and your source access; inspect saved runs before starting again."
     }
   },
   "map": {

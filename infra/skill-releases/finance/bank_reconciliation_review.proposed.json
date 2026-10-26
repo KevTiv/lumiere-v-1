@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "skill_key": "bank_reconciliation_review",
+  "version": "1.0.0",
+  "risk": "green",
+  "limits": {
+    "max_steps": 5,
+    "max_tool_calls": 1
+  },
+  "permissions": [],
+  "resources": [
+    "finance.bank_reconciliation_review.v1"
+  ],
+  "output_types": [
+    "finance.bank_reconciliation_review.result.v1"
+  ],
+  "source_hash": "sha256:c45f27ba65ec14f1cea6e2ab41dcd4f996f3c38a5424553ca5c4ba8a44736da9"
+}

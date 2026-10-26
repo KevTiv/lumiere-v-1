@@ -371,6 +371,14 @@ pub(crate) struct GovernedProgramCatalogEntry {
 }
 
 pub(crate) fn governed_program_for_skill(skill_key: &str) -> Option<GovernedProgramCatalogEntry> {
+    if let Ok(spec) = lumiere_finance_review_core::skill(skill_key) {
+        return Some(GovernedProgramCatalogEntry {
+            program_ref: spec.program,
+            graph: finance_review_graph(),
+            review_independence_key: "RunReviewDisposition",
+            reviewed_calls: vec![named_read_call("finance_review_read", spec.resource)],
+        });
+    }
     match skill_key {
         "report_analysis" => Some(GovernedProgramCatalogEntry {
             program_ref: REPORT_ANALYSIS_PROGRAM_REF,
@@ -435,6 +443,38 @@ fn named_read_call(tool_name: &str, named_resource: &str) -> PlannedToolCall {
         tool_name: tool_name.to_string(),
         capability: Capability::NamedRead,
         named_resource: Some(named_resource.to_string()),
+    }
+}
+
+pub(super) fn finance_review_graph() -> DecisionGraph {
+    DecisionGraph {
+        entry: "finance_read".into(),
+        nodes: vec![
+            GraphNode {
+                id: "finance_read".into(),
+                depends_on: vec![],
+                next: Some("verify_finance".into()),
+                kind: DecisionNode::Capability(CapabilityNode {
+                    capability: "finance_review_read".into(),
+                }),
+            },
+            GraphNode {
+                id: "verify_finance".into(),
+                depends_on: vec!["finance_read".into()],
+                next: Some("finance_summary".into()),
+                kind: DecisionNode::Verify(VerifyNode {
+                    source: "finance_read".into(),
+                }),
+            },
+            GraphNode {
+                id: "finance_summary".into(),
+                depends_on: vec!["finance_read".into(), "verify_finance".into()],
+                next: None,
+                kind: DecisionNode::Generate(GenerateNode {
+                    format: crate::harness::finance_skills::FORMAT.into(),
+                }),
+            },
+        ],
     }
 }
 

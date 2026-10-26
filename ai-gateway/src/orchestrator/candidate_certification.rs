@@ -66,6 +66,8 @@ const FIXTURE_MODEL: &str = "immutable-transcript-v1";
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct ReportFixture {
+    #[serde(default)]
+    finance_source: Option<Value>,
     analytics_arguments: Value,
     analytics_output: ToolOutput,
     decisions: Vec<RecordedDecision>,
@@ -166,6 +168,7 @@ impl PassageCatalog for FixtureCatalog {
 }
 
 struct FixtureAnalytics {
+    capability: String,
     arguments: Value,
     output: ToolOutput,
 }
@@ -174,7 +177,7 @@ struct FixtureAnalytics {
 impl CapabilityExecutor for FixtureAnalytics {
     async fn execute(&self, proposal: &CapabilityProposal) -> Result<ToolOutput> {
         ensure!(
-            proposal.capability == "analytics_summary" && !proposal.poll,
+            proposal.capability == self.capability && !proposal.poll,
             "certification only supports the reviewed analytics read"
         );
         ensure!(
@@ -260,8 +263,34 @@ impl ReasoningProvider for FixtureProviders {
 pub(crate) async fn execute_report_analysis(
     request: CandidateExecutionRequest,
 ) -> Result<CandidateExecution> {
+    execute_review_program(request, None).await
+}
+
+pub(crate) async fn execute_finance(
+    request: CandidateExecutionRequest,
+) -> Result<CandidateExecution> {
+    let spec = lumiere_finance_review_core::skill(&request.version.skill_key)?;
+    execute_review_program(request, Some(spec)).await
+}
+
+async fn execute_review_program(
+    request: CandidateExecutionRequest,
+    finance: Option<lumiere_finance_review_core::Skill>,
+) -> Result<CandidateExecution> {
+    let resource_name = finance.map_or(REPORT_ANALYSIS_RESOURCE, |s| s.resource);
+    let tool_name = if finance.is_some() {
+        "finance_review_read"
+    } else {
+        "analytics_summary"
+    };
+    let program_ref = finance.map_or(REPORT_ANALYSIS_PROGRAM_REF, |s| s.program);
+    let graph = if finance.is_some() {
+        super::governed_programs::finance_review_graph()
+    } else {
+        report_analysis_graph()
+    };
     ensure!(
-        request.version.resources == [REPORT_ANALYSIS_RESOURCE],
+        request.version.resources == [resource_name],
         "report certification requires its exact named resource"
     );
     let input: GovernedLlmSkillInput =
@@ -278,15 +307,68 @@ pub(crate) async fn execute_report_analysis(
         .get("query")
         .and_then(Value::as_str)
         .filter(|query| !query.trim().is_empty() && query.len() <= 5_000)
-        .context("report fixture needs a bounded query")?;
+        .unwrap_or("Review the authorized finance observation");
     let dataset = ImmutableCertificationDataset::parse(
         request.scope,
         &request.version.resources,
         &request.environment,
     )?;
-    let resource = dataset.resource(REPORT_ANALYSIS_RESOURCE)?;
-    let fixture: ReportFixture = serde_json::from_value(resource.value().clone())
+    let resource = dataset.resource(resource_name)?;
+    let mut fixture: ReportFixture = serde_json::from_value(resource.value().clone())
         .context("invalid report certification environment")?;
+    if let Some(spec) = finance {
+        let sources = fixture
+            .finance_source
+            .as_ref()
+            .context("finance fixture needs pinned source inputs")?;
+        let observation = lumiere_finance_review_core::fixture_observation(
+            spec.key,
+            request.scope.organization_id,
+            request.scope.company_id,
+            &input.inputs,
+            sources,
+        )?;
+        let response = json!({"schemaVersion":1,"skillKey":spec.key,"organizationId":request.scope.organization_id,"companyId":request.scope.company_id,"observedAt":chrono::DateTime::from_timestamp_micros(fixture.as_of_micros).context("fixture time invalid")?.to_rfc3339(),"observation":observation});
+        let (output, passage) = crate::tools::finance_review::output(
+            spec.key,
+            request.scope.organization_id,
+            request.scope.company_id,
+            request.fixture_id,
+            &input.inputs,
+            response,
+        )?;
+        fixture.analytics_arguments = input.inputs.clone();
+        fixture.analytics_output = output;
+        // The catalog is derived from actual deterministic output, never from
+        // expected output or a fixture-supplied passage replacement.
+        fixture.passages = vec![FixturePassage {
+            id: 1,
+            kind: "finance_review_snapshot".into(),
+            source_key: passage["id"].as_str().context("source id missing")?.into(),
+            version: passage["source_version"]
+                .as_str()
+                .context("source version missing")?
+                .into(),
+            passage_key: "result".into(),
+            content_hash: {
+                use sha2::{Digest, Sha256};
+                format!(
+                    "{:x}",
+                    Sha256::digest(
+                        passage["text"]
+                            .as_str()
+                            .context("passage missing")?
+                            .as_bytes()
+                    )
+                )
+            },
+            text: passage["text"].as_str().context("passage missing")?.into(),
+            effective_from_micros: None,
+            effective_to_micros: None,
+            applicability: vec![],
+            status: "current".into(),
+        }];
+    }
     ensure!(
         fixture.decisions.len() + fixture.generations.len() + fixture.reasoning.len()
             <= MAX_TRANSCRIPT_ITEMS,
@@ -298,9 +380,9 @@ pub(crate) async fn execute_report_analysis(
     );
     let manifest = candidate_policy_manifest(&request.version).map_err(anyhow::Error::msg)?;
     let call = PlannedToolCall {
-        tool_name: "analytics_summary".to_string(),
+        tool_name: tool_name.to_string(),
         capability: Capability::NamedRead,
-        named_resource: Some(REPORT_ANALYSIS_RESOURCE.to_string()),
+        named_resource: Some(resource_name.to_string()),
     };
     let base = PolicyExecutionRequest {
         skill: manifest.skill.clone(),
@@ -317,7 +399,7 @@ pub(crate) async fn execute_report_analysis(
         },
         input: request.input.clone(),
         plan: ExecutionPlan {
-            named_resources: vec![REPORT_ANALYSIS_RESOURCE.to_string()],
+            named_resources: vec![resource_name.to_string()],
             tool_calls: vec![call.clone()],
             steps: 1,
             expected_rows: fixture.analytics_output.row_count.unwrap_or(0),
@@ -336,14 +418,15 @@ pub(crate) async fn execute_report_analysis(
     let policy = ReviewedInvocationPolicy::new(engine, base, vec![call])?;
     let admission = PolicyBackedCapabilityAdmission::new(&policy);
     let evidence = CapabilityEvidence::new(
-        "analytics_summary",
+        tool_name,
         request.scope,
-        REPORT_ANALYSIS_RESOURCE,
+        resource_name,
         dataset.environment_fingerprint(),
         &fixture.analytics_arguments,
         &serde_json::to_value(&fixture.analytics_output)?,
     );
     let analytics = FixtureAnalytics {
+        capability: tool_name.to_string(),
         arguments: fixture.analytics_arguments,
         output: fixture.analytics_output,
     };
@@ -397,7 +480,7 @@ pub(crate) async fn execute_report_analysis(
         organization_id: request.scope.organization_id,
         company_id: request.scope.company_id,
         run_id: request.fixture_id,
-        program_ref: REPORT_ANALYSIS_PROGRAM_REF.to_string(),
+        program_ref: program_ref.to_string(),
         objective: objective.to_string(),
         bounded_state: input.inputs.clone(),
         evidence: Vec::new(),
@@ -419,7 +502,7 @@ pub(crate) async fn execute_report_analysis(
         recorder: &recorder,
         calibration: &calibration,
     }
-    .run(&report_analysis_graph(), &context)
+    .run(&graph, &context)
     .await?;
     ensure!(
         result.trace.len().saturating_add(1) <= manifest.limits.max_steps as usize
@@ -430,7 +513,9 @@ pub(crate) async fn execute_report_analysis(
         consumed(&providers.decisions)?
             && consumed(&providers.generations)?
             && consumed(&providers.reasoning)?,
-        "runtime did not consume the exact pinned provider transcript"
+        "runtime did not consume the exact pinned provider transcript: stop={:?}, trace={:?}",
+        result.stop,
+        result.trace
     );
     let status = match &result.stop {
         GovernedProgramStop::Completed => "completed",
@@ -449,7 +534,7 @@ pub(crate) async fn execute_report_analysis(
         executor_run_id: None,
         metadata: Some(json!({
             "executionMode": "immutable_fixture_replay", "billableCalls": 0,
-            "programRef": REPORT_ANALYSIS_PROGRAM_REF, "provider": FIXTURE_PROVIDER,
+            "programRef": program_ref, "provider": FIXTURE_PROVIDER,
             "capabilityEvidence": [evidence], "certificationEnvironmentId": request.environment.id,
             "policyEvidence": {"decisionHashes": &decision.hashes, "outcome": decision.outcome},
         })),
@@ -459,6 +544,125 @@ pub(crate) async fn execute_report_analysis(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn finance_request(key: &str, input: Value, sources: Value) -> CandidateExecutionRequest {
+        let mut request = request();
+        let spec = lumiere_finance_review_core::skill(key).unwrap();
+        request.version.skill_key = key.into();
+        request.version.version = lumiere_finance_review_core::VERSION.into();
+        request.version.source_hash = crate::harness::finance_skills::bundle_hash(key);
+        request.version.resources = vec![spec.resource.into()];
+        request.version.output_types = vec![spec.output.into()];
+        request.version.max_steps = 5;
+        request.version.max_tool_calls = 1;
+        request.input = json!({"inputs":input});
+        let observation =
+            lumiere_finance_review_core::fixture_observation(key, 1, 1, &input, &sources).unwrap();
+        let response = json!({"schemaVersion":1,"skillKey":key,"organizationId":1,"companyId":1,"observedAt":chrono::DateTime::from_timestamp_micros(1000).unwrap().to_rfc3339(),"observation":observation});
+        let (_, passage) =
+            crate::tools::finance_review::output(key, 1, 1, request.fixture_id, &input, response)
+                .unwrap();
+        let content = "The snapshot records finance review evidence.";
+        let draft = json!({"content":content,"citations":[],"claims":[{"text":content,"supports":[{"kind":passage["kind"],"id":passage["id"],"source_version":passage["source_version"],"passage_key":"result"}]}],"calculations":[]});
+        request.environment.dataset = json!({spec.resource:{"organizationId":1,"companyId":1,"data":{
+            "financeSource":sources,"analyticsArguments":input,"analyticsOutput":{"summary":"ignored fixture placeholder","data":{},"citations":[],"row_count":0},
+            "decisions":[{"decisionType":{"name":"ClaimEvidenceSupport","version":1},"response":{"kind":"choice","choice":"supported","probability":null,"confidence":1,"score":null,"rationale":"Synthetic review","model":"fixture","provider":"fixture","input_tokens":0,"output_tokens":0}}],
+            "generations":[{"format":crate::harness::finance_skills::FORMAT,"response":{"content":serde_json::to_string(&draft).unwrap(),"provider":"fixture","model":"fixture","input_tokens":0,"output_tokens":0}}],
+            "reasoning":[],"passages":[],"asOfMicros":1000
+        }}});
+        request
+    }
+
+    fn finance_cases() -> Vec<(&'static str, Value, Value)> {
+        let mut preview: Value = serde_json::from_str(include_str!(
+            "../harness/finance_review/fixtures/receivables.json"
+        ))
+        .unwrap();
+        preview["scope"]["organizationId"] = json!(1);
+        preview["scope"]["companyId"] = json!(1);
+        let mut baseline = preview.clone();
+        // Preserve the exact full owner envelope while moving its reporting day.
+        for object in ["scope", "sourceWatermark"] {
+            let text = serde_json::to_string(&baseline[object])
+                .unwrap()
+                .replace("2026-10-25", "2026-10-24")
+                .replace("2026-10-26", "2026-10-25")
+                .replace("2026-10-27", "2026-10-26");
+            baseline[object] = serde_json::from_str(&text).unwrap();
+        }
+        vec![
+            (
+                "finance_report_review",
+                json!({"reportKey":"customer_balances_v1","date":"2026-10-26","timezone":"Africa/Kigali"}),
+                json!({"preview":preview.clone()}),
+            ),
+            (
+                "bank_reconciliation_review",
+                json!({"statementId":1}),
+                json!({"statements":[{"id":1,"organizationId":1,"companyId":1,"currencyId":1,"state":"Open","date":0,"balanceStart":0,"balanceEnd":0}],"lines":[],"candidates":[],"invoices":[],"payments":[]}),
+            ),
+            (
+                "period_close_review",
+                json!({"periodId":1}),
+                json!({"periods":[{"id":1,"organizationId":1,"companyId":1,"state":"Open","dateFrom":0,"dateTo":2000}],"moves":[],"statements":[],"lines":[]}),
+            ),
+            (
+                "expense_evidence_review",
+                json!({"recordKind":"expense","recordId":1}),
+                json!({"record":{"id":1,"organizationId":1,"companyId":1,"totalAmount":10,"currencyId":1,"date":0},"source":{"status":"unavailable_extraction"}}),
+            ),
+            (
+                "finance_variance_review",
+                json!({"reportKey":"customer_balances_v1","actualDate":"2026-10-26","baselineDate":"2026-10-25","timezone":"Africa/Kigali"}),
+                json!({"actual":preview,"baseline":baseline}),
+            ),
+        ]
+    }
+
+    #[tokio::test]
+    async fn all_five_finance_programs_execute_actual_projections_and_release_only_reviewed_claims()
+    {
+        use crate::harness::release_registry::{CandidateCertificationInputs, CandidateFixture};
+        for (key, input, sources) in finance_cases() {
+            let request = finance_request(key, input, sources);
+            let candidate = CandidateCertificationInputs {
+                version: request.version.clone(),
+                fixture: CandidateFixture {
+                    id: request.fixture_id,
+                    organization_id: 1,
+                    skill_id: 11,
+                    fixture_key: request.fixture_key.clone(),
+                    input: request.input.clone(),
+                    expected_output: json!({"summary":"must never be copied"}),
+                },
+            };
+            let result = crate::harness::certification::CandidateAdapterRegistry::production()
+                .execute(candidate, request.environment, 1, 1)
+                .await
+                .unwrap();
+            assert_eq!(
+                result.actual_output["status"], "completed",
+                "{key}: {:?}",
+                result.actual_output
+            );
+            assert_eq!(result.actual_output["capabilityCalls"], 1);
+            assert_eq!(result.actual_output["steps"].as_array().unwrap().len(), 3);
+            assert_eq!(result.metadata.as_ref().unwrap()["billableCalls"], 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn finance_semantic_rejection_withholds_prose_for_every_skill() {
+        for (key, input, sources) in finance_cases() {
+            let mut request = finance_request(key, input, sources);
+            let spec = lumiere_finance_review_core::skill(key).unwrap();
+            request.environment.dataset[spec.resource]["data"]["decisions"][0]["response"]
+                ["choice"] = json!("unsupported");
+            let result = execute_finance(request).await.unwrap();
+            assert_eq!(result.actual_output["status"], "review_required");
+            assert!(result.actual_output["summary"].is_null());
+        }
+    }
     use crate::harness::{
         certification::{
             report_analysis_certification_bundle_hash, REPORT_ANALYSIS_CERTIFICATION_VERSION,

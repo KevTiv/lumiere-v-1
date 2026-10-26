@@ -1,4 +1,9 @@
 export const GOVERNED_SKILL_REPLACEMENTS = {
+  finance_report_review: "/api/ai/skills/finance/finance_report_review",
+  bank_reconciliation_review: "/api/ai/skills/finance/bank_reconciliation_review",
+  period_close_review: "/api/ai/skills/finance/period_close_review",
+  expense_evidence_review: "/api/ai/skills/finance/expense_evidence_review",
+  finance_variance_review: "/api/ai/skills/finance/finance_variance_review",
   report_composer: "/api/ai/report/compose",
   low_stock: "/api/ai/inventory/low-stock",
   import_mapping: "/api/ai/skills/import-mapping",

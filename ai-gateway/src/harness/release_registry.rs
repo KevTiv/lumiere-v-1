@@ -210,6 +210,9 @@ pub async fn load_active_manifest(
         governed_llm_skills::SUPPLIER_DISCOVERY_SKILL_KEY => {
             governed_llm_skills::supplier_discovery_manifest()
         }
+        key if lumiere_finance_review_core::skill(key).is_ok() => {
+            super::finance_skills::manifest(key)?
+        }
         _ => return Err("gateway has no executable adapter for this released skill".to_string()),
     };
     overlay_release_policy(
@@ -242,6 +245,9 @@ pub(crate) fn candidate_policy_manifest(
         governed_llm_skills::PRICE_SEARCH_SKILL_KEY => governed_llm_skills::price_search_manifest(),
         governed_llm_skills::SUPPLIER_DISCOVERY_SKILL_KEY => {
             governed_llm_skills::supplier_discovery_manifest()
+        }
+        key if lumiere_finance_review_core::skill(key).is_ok() => {
+            super::finance_skills::manifest(key)?
         }
         _ => return Err("candidate has no canonical built-in policy manifest".to_string()),
     };
@@ -289,6 +295,12 @@ fn validate_active_adapter_binding(
     source_hash: &str,
 ) -> Result<(), String> {
     let expected_source_hash = match skill_key {
+        key if lumiere_finance_review_core::skill(key).is_ok() => {
+            if release_version != lumiere_finance_review_core::VERSION || expected_version != 1 {
+                return Err("finance skill release must match compiled version 1.0.0".into());
+            }
+            Some(super::finance_skills::bundle_hash(key))
+        }
         low_stock::LOW_STOCK_SKILL_KEY => {
             if release_version != "1.0.0" {
                 return Err(format!(

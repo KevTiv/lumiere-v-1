@@ -77,6 +77,7 @@ dependencies = [
  "dotenvy",
  "futures",
  "lumiere-contracts",
+ "lumiere-finance-review-core",
  "qdrant-client",
  "reqwest",
  "serde",
@@ -160,6 +161,7 @@ dependencies = [
  "hex",
  "jsonwebtoken",
  "lumiere-contracts",
+ "lumiere-finance-review-core",
  "lumiere-presentation-core",
  "openssl",
  "printpdf",
@@ -2144,6 +2146,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "lumiere-finance-review-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "lumiere-policy-core"
 version = "0.1.0"
 
@@ -4088,10 +4101,12 @@ name = "stdb-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "axum",
  "reqwest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
 ]
 
 [[package]]

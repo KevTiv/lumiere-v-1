@@ -2,6 +2,9 @@ pub mod action_draft;
 pub mod analytics;
 pub mod erp_search;
 pub mod erp_snapshot;
+pub mod finance_review;
+#[cfg(test)]
+mod finance_review_tests;
 pub(crate) mod generated;
 pub(crate) mod generated_read;
 pub mod registry;

@@ -2843,8 +2843,21 @@ fn json_fingerprint(value: &Value) -> Result<String> {
     Ok(format!("{:x}", Sha256::digest(encoded)))
 }
 
+fn report_evidence_node(context: &GovernedProgramContext) -> Option<&'static str> {
+    if context.program_ref == super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF {
+        Some("analytics")
+    } else if lumiere_finance_review_core::SKILLS
+        .iter()
+        .any(|s| s.program == context.program_ref)
+    {
+        Some("finance_read")
+    } else {
+        None
+    }
+}
+
 fn report_generation_instructions(context: &GovernedProgramContext) -> Option<String> {
-    if context.program_ref != super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF {
+    if report_evidence_node(context).is_none() {
         return context.generation_instructions.clone();
     }
     let schema = r#"Return only a JSON FinalDraft, without Markdown fences:
@@ -2856,6 +2869,13 @@ by the cited observation. Describe bounded snapshot results, including empty
 results, without asserting that they describe all records or current future state.
 Do not invent causes, trends, currencies, or comparisons. Each stated calculation
 must include its operation, operands, label, and claimed_result."#;
+    let schema = if report_evidence_node(context) == Some("finance_read") {
+        schema
+            .replace("analytics_snapshot", "finance_review_snapshot")
+            .replace("analytics result", "finance result")
+    } else {
+        schema.to_string()
+    };
     Some(match &context.generation_instructions {
         Some(existing) => format!("{existing}\n{schema}"),
         None => schema.to_string(),
@@ -2867,7 +2887,7 @@ fn generated_draft(
     content: &str,
     citations: Vec<EvidenceRef>,
 ) -> Result<FinalDraft> {
-    if context.program_ref != super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF {
+    if report_evidence_node(context).is_none() {
         return Ok(FinalDraft {
             content: content.to_string(),
             citations,
@@ -2899,9 +2919,7 @@ fn validate_report_support(
     draft: &FinalDraft,
     values: &HashMap<String, NodeValue>,
 ) -> Result<()> {
-    if context.program_ref != super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF
-        || draft.claims.is_empty()
-    {
+    if report_evidence_node(context).is_none() || draft.claims.is_empty() {
         return Ok(());
     }
     let normalized_content = draft
@@ -2918,7 +2936,8 @@ fn validate_report_support(
     if draft.claims.len() > 8 || normalized_content != normalized_claims {
         bail!("report claims must cover the complete answer in order, with at most eight claims");
     }
-    let passages = match values.get("analytics") {
+    let passages = match values.get(report_evidence_node(context).context("report source missing")?)
+    {
         Some(NodeValue::Tool(output)) => output.data.get("artifacts").and_then(Value::as_array),
         _ => None,
     };

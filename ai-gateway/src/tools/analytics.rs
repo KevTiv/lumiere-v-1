@@ -246,7 +246,7 @@ fn snapshot_passage(run_id: u64, operation: AnalyticsOperation, rows: &[Value]) 
     }))
 }
 
-async fn record_snapshot(
+pub(crate) async fn record_snapshot(
     writer: &StdbClient,
     org_id: u64,
     company_id: u64,

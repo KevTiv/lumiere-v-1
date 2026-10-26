@@ -1,5 +1,9 @@
 # Finance harness expansion after the first pilot
 
+> Historical foundation plan. All five workflows have since gained executable
+> implementations. Use [the current implementation status](../plan/finance-skill-expansion-status.md)
+> for runtime behavior, release requirements, coverage and remaining external acceptance.
+
 Date: 2026-10-26. Base: `1d92894e` (merged PR #277).
 Branch: `codex/finance-skill-expansion`.
 

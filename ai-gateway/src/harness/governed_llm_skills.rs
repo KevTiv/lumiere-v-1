@@ -97,6 +97,13 @@ fn endpoints(skill_key: &str) -> Result<SkillEndpoints, String> {
             resource: SUPPLIER_DISCOVERY_RESOURCE,
             output_type: SUPPLIER_DISCOVERY_OUTPUT_TYPE,
         },
+        key if lumiere_finance_review_core::skill(key).is_ok() => {
+            let spec = lumiere_finance_review_core::skill(key).map_err(|e| e.to_string())?;
+            SkillEndpoints {
+                resource: spec.resource,
+                output_type: spec.output,
+            }
+        }
         other => return Err(format!("unknown governed LLM skill '{other}'")),
     };
     Ok(endpoints)

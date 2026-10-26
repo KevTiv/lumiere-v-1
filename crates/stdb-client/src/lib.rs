@@ -51,6 +51,7 @@ pub struct StdbClient {
     base_url: String,
     module: String,
     token: String,
+    query_limits: Option<(usize, usize)>,
 }
 
 impl StdbClient {
@@ -61,6 +62,7 @@ impl StdbClient {
             base_url,
             module,
             token,
+            query_limits: None,
         }
     }
 
@@ -71,7 +73,32 @@ impl StdbClient {
             base_url: self.base_url.clone(),
             module: self.module.clone(),
             token: token.into(),
+            query_limits: self.query_limits,
         }
+    }
+
+    /// Narrow server-owned read queries without changing ordinary clients.
+    /// Limits apply before company/field post-filters, so an oversized source
+    /// cannot silently become a small, apparently complete result.
+    pub fn with_query_limits(&self, max_rows: usize, max_bytes: usize) -> Result<Self> {
+        anyhow::ensure!(
+            max_rows > 0 && max_rows < usize::MAX && max_bytes > 0,
+            "invalid query limits"
+        );
+        let mut client = self.clone();
+        client.query_limits = Some(self.query_limits.map_or((max_rows, max_bytes), |(r, b)| {
+            (r.min(max_rows), b.min(max_bytes))
+        }));
+        Ok(client)
+    }
+
+    fn check_query_rows(&self, rows: Vec<Value>) -> Result<Vec<Value>> {
+        anyhow::ensure!(
+            self.query_limits
+                .is_none_or(|(limit, _)| rows.len() <= limit),
+            "query source exceeds row bound"
+        );
+        Ok(rows)
     }
 
     pub fn base_url(&self) -> &str {
@@ -117,7 +144,7 @@ impl StdbClient {
     /// Run SQL and return rows as JSON objects with camelCase keys (SATS Option unwrapped).
     pub async fn query_sql(&self, sql: &str) -> Result<Vec<Value>> {
         let body = self.query_sql_body(sql).await?;
-        parse_sats_sql_response(&body).context("parse SATS-SQL JSON")
+        self.check_query_rows(parse_sats_sql_response(&body).context("parse SATS-SQL JSON")?)
     }
 
     /// Run SQL and retain canonical SATS wrappers with snake_case field names.
@@ -125,7 +152,9 @@ impl StdbClient {
     /// store round trip and later deserialize through `SerdeWrapper<T>`.
     pub async fn query_sql_sats(&self, sql: &str) -> Result<Vec<Value>> {
         let body = self.query_sql_body(sql).await?;
-        parse_sats_sql_response_canonical(&body).context("parse canonical SATS-SQL JSON")
+        self.check_query_rows(
+            parse_sats_sql_response_canonical(&body).context("parse canonical SATS-SQL JSON")?,
+        )
     }
 
     /// Run an authenticated SQL request and return the identity verified by
@@ -151,6 +180,25 @@ impl StdbClient {
     }
 
     async fn query_sql_body(&self, sql: &str) -> Result<String> {
+        if let Some((max_rows, max_bytes)) = self.query_limits {
+            let sql = bounded_read_sql(sql, max_rows)?;
+            let mut response = self.post_sql(&sql).await?;
+            anyhow::ensure!(
+                response
+                    .content_length()
+                    .is_none_or(|n| n <= max_bytes as u64),
+                "query response exceeds byte bound"
+            );
+            let mut bytes = Vec::new();
+            while let Some(chunk) = response.chunk().await? {
+                anyhow::ensure!(
+                    bytes.len() + chunk.len() <= max_bytes,
+                    "query response exceeds byte bound"
+                );
+                bytes.extend_from_slice(&chunk);
+            }
+            return String::from_utf8(bytes).context("SQL body is not UTF-8");
+        }
         self.post_sql(sql)
             .await?
             .text()
@@ -160,18 +208,29 @@ impl StdbClient {
 
     async fn post_sql(&self, sql: &str) -> Result<reqwest::Response> {
         let url = format!("{}/v1/database/{}/sql", self.base_url, self.module);
-        let resp = self
+        let request = self
             .http
             .post(&url)
             .bearer_auth(&self.token)
             .header("Content-Type", "text/plain")
-            .body(sql.to_string())
+            .body(sql.to_string());
+        let request = if self.query_limits.is_some() {
+            request.timeout(std::time::Duration::from_secs(30))
+        } else {
+            request
+        };
+        let resp = request
             .send()
             .await
             .with_context(|| format!("SQL request failed: {sql}"))?;
 
         if !resp.status().is_success() {
             let status = resp.status().to_string();
+            if self.query_limits.is_some() {
+                return Err(
+                    StdbClientError::Http(status, "bounded query source rejected".into()).into(),
+                );
+            }
             let body = resp.text().await.unwrap_or_default();
             return Err(StdbClientError::Http(status, body).into());
         }
@@ -215,6 +274,64 @@ impl StdbClient {
             return Err(StdbClientError::Http(status, body).into());
         }
         Ok(())
+    }
+}
+
+fn bounded_read_sql(sql: &str, max_rows: usize) -> Result<String> {
+    let sql = sql.trim();
+    anyhow::ensure!(
+        sql.to_ascii_uppercase().starts_with("SELECT ") && !sql.contains(';'),
+        "bounded clients accept a single server-owned SELECT"
+    );
+    let uppercase = sql.to_ascii_uppercase();
+    let (base, limit) = if let Some(index) = uppercase.rfind(" LIMIT ") {
+        let requested = sql[index + 7..]
+            .trim()
+            .parse::<usize>()
+            .context("bounded SELECT requires a literal trailing LIMIT")?;
+        (&sql[..index], requested.min(max_rows + 1))
+    } else {
+        (sql, max_rows + 1)
+    };
+    Ok(format!("{base} LIMIT {limit}"))
+}
+
+#[cfg(test)]
+mod bounded_query_tests {
+    use super::*;
+    #[test]
+    fn bounded_reads_narrow_limits_and_reject_mutation_or_multiple_statements() {
+        assert_eq!(
+            bounded_read_sql("SELECT id FROM x", 10).unwrap(),
+            "SELECT id FROM x LIMIT 11"
+        );
+        assert_eq!(
+            bounded_read_sql("SELECT id FROM x LIMIT 100", 10).unwrap(),
+            "SELECT id FROM x LIMIT 11"
+        );
+        assert_eq!(
+            bounded_read_sql("SELECT id FROM x LIMIT 2", 10).unwrap(),
+            "SELECT id FROM x LIMIT 2"
+        );
+        for sql in [
+            "DELETE FROM x",
+            "SELECT id FROM x; SELECT id FROM y",
+            "SELECT id FROM x LIMIT :bound",
+        ] {
+            assert!(bounded_read_sql(sql, 10).is_err());
+        }
+    }
+    #[test]
+    fn bounded_clients_preserve_narrowing_across_credential_changes() {
+        let c = StdbClient::new("http://localhost".into(), "test".into(), "token".into())
+            .with_query_limits(10, 100)
+            .unwrap()
+            .with_token("actor")
+            .with_query_limits(20, 200)
+            .unwrap();
+        assert_eq!(c.query_limits, Some((10, 100)));
+        assert!(c.check_query_rows(vec![Value::Null; 11]).is_err());
+        assert!(c.check_query_rows(vec![]).is_ok());
     }
 }
 

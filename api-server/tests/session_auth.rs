@@ -92,6 +92,31 @@ async fn import_routes_match_real_entity_and_request_paths_before_requiring_auth
     for (method, path, body) in [
         (
             "POST",
+            "/v1/finance-reviews/finance_report_review",
+            r#"{"companyId":1,"inputs":{"reportKey":"customer_balances_v1","date":"2026-10-26","timezone":"UTC"}}"#,
+        ),
+        (
+            "POST",
+            "/v1/finance-reviews/bank_reconciliation_review",
+            r#"{"companyId":1,"inputs":{"statementId":1}}"#,
+        ),
+        (
+            "POST",
+            "/v1/finance-reviews/period_close_review",
+            r#"{"companyId":1,"inputs":{"periodId":1}}"#,
+        ),
+        (
+            "POST",
+            "/v1/finance-reviews/expense_evidence_review",
+            r#"{"companyId":1,"inputs":{"recordId":1,"recordKind":"expense"}}"#,
+        ),
+        (
+            "POST",
+            "/v1/finance-reviews/finance_variance_review",
+            r#"{"companyId":1,"inputs":{"reportKey":"customer_balances_v1","actualDate":"2026-10-26","baselineDate":"2026-10-25","timezone":"UTC"}}"#,
+        ),
+        (
+            "POST",
             "/v1/import/hr_payslip",
             r#"{"csvData":"employee_id,struct_id\n1,2\n"}"#,
         ),

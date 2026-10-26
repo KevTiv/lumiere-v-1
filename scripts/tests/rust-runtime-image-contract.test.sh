@@ -70,7 +70,10 @@ if selected_targets(dependencies, "cargo chef cook ") != selected_targets(applic
 # before compilation, and their changes must rebuild the image on push and PR.
 application_inputs = application.split("RUN cargo build ", 1)[0]
 external_inputs = set()
-for source in [root / "ai-gateway/src/harness/certification.rs"]:
+for source in [
+    root / "ai-gateway/src/harness/certification.rs",
+    root / "ai-gateway/src/harness/finance_skills.rs",
+]:
     for include in re.findall(r'include_(?:bytes|str)!\(\s*"([^"]+)"\s*\)', source.read_text()):
         included = (source.parent / include).resolve()
         if included.is_relative_to(root) and not included.is_relative_to(root / "ai-gateway"):
@@ -78,10 +81,17 @@ for source in [root / "ai-gateway/src/harness/certification.rs"]:
 for path in external_inputs:
     if not (root / path).is_file():
         raise SystemExit(f"gateway compile-time input does not exist: {path}")
-    if f"COPY {path} ./{path}" not in application_inputs:
+    parents = [p.as_posix() for p in Path(path).parents if p.as_posix() != "."]
+    if not any(f"COPY {parent} ./{parent}" in application_inputs for parent in [path, *parents]):
         raise SystemExit(f"runtime application stage omits gateway compile-time input: {path}")
-    if workflow.count(f"      - {path}\n") != 2:
+    patterns = [path, *[parent + "/**" for parent in parents]]
+    if not any(workflow.count(f"      - {pattern}\n") == 2 for pattern in patterns):
         raise SystemExit(f"runtime image must rebuild on push and PR changes to: {path}")
+if (
+    "ENV ERP_SKILLS_DIR=/app/erp-skills" not in runtime_commands
+    or "COPY --from=builder /app/erp-skills/ /app/erp-skills/" not in runtime_commands
+):
+    raise SystemExit("runtime must ship the compiled skill definitions for catalog synchronization")
 builder_sources = {
     source.removeprefix("./").rstrip("/")
     for line in builder_commands.splitlines()

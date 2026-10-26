@@ -7,6 +7,8 @@ pub mod daily_briefing;
 pub mod data_scope_resolver;
 pub mod distributor_controls;
 pub mod entity_registry;
+pub mod finance_review;
+pub mod finance_skills;
 pub mod governed_llm_skills;
 pub mod import_mapping;
 pub mod insights_scan;

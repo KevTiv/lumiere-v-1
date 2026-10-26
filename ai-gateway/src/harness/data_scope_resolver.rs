@@ -68,6 +68,9 @@ pub struct ResourceRegistry {
 impl ResourceRegistry {
     pub fn built_in() -> Self {
         let mut registry = Self::default();
+        for spec in lumiere_finance_review_core::SKILLS {
+            registry.insert(super::finance_skills::resource_contract(spec));
+        }
         registry.insert(distributor_controls::credit_hold_resource_contract());
         registry.insert(distributor_controls::delivery_run_resource_contract());
         registry.insert(low_stock::resource_contract());
