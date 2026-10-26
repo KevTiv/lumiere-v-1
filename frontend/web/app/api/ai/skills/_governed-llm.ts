@@ -11,6 +11,7 @@ import {
 } from "../_lib/route-helpers"
 import { resolveAiPrivacyPolicy } from "../_lib/ai-privacy-policy"
 import { buildTrustedGovernedLlmRequest } from "./_governed-llm-contract"
+import { callReducer } from "@/lib/stdb-reducer"
 
 const GATEWAY_PATHS = {
   "report-analysis": "/v1/skills/report-analysis",
@@ -62,6 +63,16 @@ async function postGovernedLlmSkill(
       return NextResponse.json(
         { error: "Authenticated actor context required" },
         { status: 403 },
+      )
+    }
+    // Admission requires the caller's current server-owned policy generation.
+    // Refresh only that caller's derived snapshot through the session transport.
+    try {
+      await callReducer("refresh_policy_snapshot", [orgId], session.opts)
+    } catch {
+      return NextResponse.json(
+        { error: "Report authorization refresh is unavailable. No analysis was started." },
+        { status: 503 },
       )
     }
     const trusted = buildTrustedGovernedLlmRequest(
