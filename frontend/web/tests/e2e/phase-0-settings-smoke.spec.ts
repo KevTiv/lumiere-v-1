@@ -93,28 +93,26 @@ test("Settings creates a company-scoped setup lease through the member form", { 
     expect(response.ok(), await response.text()).toBe(true)
     created = true
     await expect(dialog).toBeHidden()
-    const readMembers = async () => {
-      const result = await page.request.get("/api/query/user-organization")
-      expect(result.ok()).toBe(true)
-      return (await result.json()).data as Array<{
-        userIdentity?: string | { __identity__: string }
-        user_identity?: string | { __identity__: string }
-        companyId?: unknown
-        company_id?: unknown
-        roleId?: unknown
-        role_id?: unknown
-        metadata?: string
-      }>
-    }
-    const member = (await readMembers()).find(row => {
-      const value = row.userIdentity ?? row.user_identity
-      const hex = typeof value === "string" ? value : String((value as { __identity__?: string })?.__identity__ ?? "")
-      return hex.replace(/^0x/, "").toLowerCase() === identity
+    // The session membership query is intentionally restricted to the caller.
+    // Observe the form's durable effect with the local fixture owner's SQL token.
+    const host = (process.env.E2E_STDB_HOST ?? process.env.STDB_HOST ?? "http://127.0.0.1:3000").replace(/\/$/, "")
+    const moduleName = process.env.STDB_MODULE?.trim()
+    const token = process.env.STDB_SERVER_TOKEN?.trim()
+    if (!moduleName || !token) throw new Error("setup lease observer requires the local fixture owner")
+    const result = await fetch(`${host}/v1/database/${moduleName}/sql`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "text/plain" },
+      body: `SELECT role_id, company_id, metadata FROM user_organization WHERE user_identity = 0x${identity}`,
     })
-    expect(member).toBeDefined()
-    expect(scalarQueryId(member?.companyId ?? member?.company_id)).toBe(companyId)
-    expect(scalarQueryId(member?.roleId ?? member?.role_id)).toBe(roleId)
-    const lease = String(member?.metadata)
+    expect(result.ok()).toBe(true)
+    const tables = await result.json() as Array<{ rows: Array<[number, [number, unknown], [number, unknown]]> }>
+    expect(tables).toHaveLength(1)
+    expect(tables[0].rows).toHaveLength(1)
+    const [savedRole, savedCompany, savedMetadata] = tables[0].rows[0]
+    expect(savedRole).toBe(roleId)
+    expect(savedCompany).toEqual([0, companyId])
+    expect(savedMetadata[0]).toBe(0)
+    const lease = String(savedMetadata[1])
     expect(lease).toMatch(/^lumiere-platform-bootstrap-v1:\d+:\d+$/)
     const [, issued, expires] = lease.split(":")
     expect(BigInt(expires) - BigInt(issued)).toBe(3_600_000_000n)
