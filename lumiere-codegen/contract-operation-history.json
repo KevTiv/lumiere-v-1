@@ -162,21 +162,73 @@
       "name": "ai_action_draft_request_read",
       "shape_fingerprint": "sha256:975aa264f505422c8b4939dd5bfc8b3b6321ea0b3e59cf5483a52ce3e6003d27"
     },
+    "erp.ai_artifact_component_read": {
+      "name": "ai_artifact_component_read",
+      "shape_fingerprint": "sha256:132b8cf8c8b3d5623137ff7e88f83656adf144fd313730a45a1720684f8d8131"
+    },
+    "erp.ai_capability_execution_read": {
+      "name": "ai_capability_execution_read",
+      "shape_fingerprint": "sha256:fe100dffd921db4fa7649b37e263ea44674f76fa597d34f496680848ea1ed77e"
+    },
+    "erp.ai_evidence_claim_read": {
+      "name": "ai_evidence_claim_read",
+      "shape_fingerprint": "sha256:d05db2fe4c7335d5f98bcf1ec4880845d5c3b26d42399a9009034ee4b6ede8ff"
+    },
+    "erp.ai_evidence_contribution_read": {
+      "name": "ai_evidence_contribution_read",
+      "shape_fingerprint": "sha256:58f4d253021844422b76ebe4887d6feed8a63e483a1743bc05695efd1e503700"
+    },
+    "erp.ai_evidence_decision_read": {
+      "name": "ai_evidence_decision_read",
+      "shape_fingerprint": "sha256:bfc23d4668f27c85ba0cbaa582cd757c572c9e0324e73280b73a053636454236"
+    },
+    "erp.ai_evidence_dependency_read": {
+      "name": "ai_evidence_dependency_read",
+      "shape_fingerprint": "sha256:39085b22b83c959455869c92e1681db5d585528cae3c1810cc6507f180fbd61f"
+    },
+    "erp.ai_evidence_passage_read": {
+      "name": "ai_evidence_passage_read",
+      "shape_fingerprint": "sha256:fb9a4b1545d412d6acf1a7481a93b35285ae99924f7fedc6ec46b232ec510304"
+    },
+    "erp.ai_evidence_source_change_read": {
+      "name": "ai_evidence_source_change_read",
+      "shape_fingerprint": "sha256:0d2407f73985a3e305fa4ff46cc7614984c5177fbfa2374e62111100043ad8aa"
+    },
+    "erp.ai_evidence_source_read": {
+      "name": "ai_evidence_source_read",
+      "shape_fingerprint": "sha256:29f55280cc74517677e5b76deef5d600b46911d89b8865f23ff4ffe69f40dbbc"
+    },
+    "erp.ai_evidence_source_version_read": {
+      "name": "ai_evidence_source_version_read",
+      "shape_fingerprint": "sha256:8d410cb6b29c392eec619aefed4d31dabedfe31250d95f830f5047e805bb329b"
+    },
+    "erp.ai_knowledge_entry_read": {
+      "name": "ai_knowledge_entry_read",
+      "shape_fingerprint": "sha256:0f623dce75a2dd6f96b214aca08e56385a8ecd10872d93a62acb749f7f3ae673"
+    },
+    "erp.ai_knowledge_entry_version_read": {
+      "name": "ai_knowledge_entry_version_read",
+      "shape_fingerprint": "sha256:0659bc2ec861792a3cf24941a6fb62cddb84d1ff6bb2766c1c7c15c097f95020"
+    },
+    "erp.ai_knowledge_review_read": {
+      "name": "ai_knowledge_review_read",
+      "shape_fingerprint": "sha256:d4a2365d00592762515fb1e75a8ef12329181bce0c53ed235a3ac7e486cc280b"
+    },
     "erp.ai_provider_attempt_read": {
       "name": "ai_provider_attempt_read",
-      "shape_fingerprint": "sha256:fc2c3b2e62055e5115a05d85187dc74ce77612a7bba148fe8f85ad526ad86e25"
+      "shape_fingerprint": "sha256:f9eae49a0f6b1c454fcd1438a834c27a801730b0fd43a249495c1d31baa6a6da"
     },
     "erp.ai_spend_budget_read": {
       "name": "ai_spend_budget_read",
-      "shape_fingerprint": "sha256:d80d6a4aa5847ba783cc92902f7e2e6c4e634b321527b9ddeaf3e6fd99574531"
+      "shape_fingerprint": "sha256:4bb97664c786654669aab4c63ffd6af0acb0f759bb1c3bc9d1592a09432a1dcc"
     },
     "erp.ai_spend_price_snapshot_read": {
       "name": "ai_spend_price_snapshot_read",
-      "shape_fingerprint": "sha256:5670b74e3deec747ce1d106bb521fc5efcdc02a554d8fb9289415162a5bdeffb"
+      "shape_fingerprint": "sha256:ec3403d533a609d6449b4b6ef76af6876456e5cdd36072f2705fd824ed6260c2"
     },
     "erp.ai_spend_reservation_read": {
       "name": "ai_spend_reservation_read",
-      "shape_fingerprint": "sha256:e71682b5f6e69fb53bac7ac84210539d3c8a2d52371b2c6b8d1114dbe63b7d08"
+      "shape_fingerprint": "sha256:3e0acf2f0a5046b2e0842e4312eae11fe1e50ff6f3f4bfecc2986a8d887d5a09"
     },
     "erp.allocate_payment_transaction": {
       "name": "allocate_payment_transaction",
@@ -2476,7 +2528,7 @@
     },
     "erp.helpdesk_related_record_read": {
       "name": "helpdesk_related_record_read",
-      "shape_fingerprint": "sha256:ddc389bc61f57e2049ad8a2884ea052fb70d46d34fe315a6fae76c6d39a78b32"
+      "shape_fingerprint": "sha256:005f55e62f108f6a69cf5fdb9da89f365b00e040c37235be035997c07a7a71a5"
     },
     "erp.hold_supplier_intake": {
       "name": "hold_supplier_intake",
@@ -6140,6 +6192,14 @@
       "current_operations_fingerprint": "sha256:9f581a9b17c58845cb18d9487da60520a9927caa016ea8f5f5791de1929ec87b",
       "operation_count": 1463,
       "reason": "release on top of v0.3.144: add finalize_embedding_job; change the shape of request_embedding_job"
+    },
+    {
+      "previous_release": "v0.3.148",
+      "previous_ir_sha256": "sha256:f1eaa2d04ef854d76b0967fa2a94a465a87742239388097faf3fd0c97cec2ddc",
+      "previous_operations_fingerprint": "sha256:9f581a9b17c58845cb18d9487da60520a9927caa016ea8f5f5791de1929ec87b",
+      "current_operations_fingerprint": "sha256:ade4f01bbf43ed4ee316a6e036771c6c446797a4e7ca43e3f26ed3d8c622d653",
+      "operation_count": 1476,
+      "reason": "release on top of v0.3.148: add ai_artifact_component_read, ai_capability_execution_read, ai_evidence_claim_read, ai_evidence_contribution_read, ai_evidence_decision_read, ai_evidence_dependency_read, ai_evidence_passage_read, ai_evidence_source_change_read, ai_evidence_source_read, ai_evidence_source_version_read, ai_knowledge_entry_read, ai_knowledge_entry_version_read, ai_knowledge_review_read; change the shape of ai_provider_attempt_read, ai_spend_budget_read, ai_spend_price_snapshot_read, ai_spend_reservation_read, helpdesk_related_record_read"
     }
   ]
 }
