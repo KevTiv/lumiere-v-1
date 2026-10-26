@@ -25,9 +25,27 @@ The current API reads the private hot evidence through the existing server-owned
 
 The implementation includes pure diff/codec tests, native persisted Accounting regressions, API HTTP/SATS authorization and pagination cases, UI/parser/role tests and a real-stack `@p0` Playwright case. The browser case performs the visible line edit, checks the exact before/after result, reloads without redispatch and tests forged-audit exclusion, field redaction and revoked grants. Discovery and fixture tests are distinct from executing that case against a real stack.
 
+Local validation on 2026-10-26 passed the real `run_accounting_post_invoice_test`
+reducer against a disposable SpacetimeDB 2.8.2 instance with development fixture
+admission enabled. Native module/tests typechecking and WASM builds passed. The
+API history suite passed all 12 tests; query-hooks, UI and Web TypeScript passed;
+six parser and 21 focused UI/RBAC tests passed. The Python script suite passed 168
+tests. The 518-table live generation, storage-policy bootstrap and organization
+ownership checks passed, as did 13 storage-policy and 12 tenant-ownership tests.
+These checks validate the first producer and its boundaries; the browser case
+still needs integrated execution with the final published contracts.
+
+Migration 27 is promoted byte-for-byte from live code generation into the frozen
+ledger and API catalog (change set 16, Expand); pending version is 28. Sixteen
+migration unit tests and a real disposable PostgreSQL upgrade/projection test
+passed. That test preserves the version-26 prefix, verifies exact history values
+and tenant-scoped identity, prevents duplicate/replacement history, and verifies
+whole-commit rollback and safe retry after a forced second-insert failure.
+Generated reconstruction dispatch includes the private evidence relation.
+
 Local and hosted results are recorded on the PR for its exact head. Before merge:
 
-1. The normal contracts workflow must generate, publish and repin the new private table and PostgreSQL/reconstruction manifests; published migration history stays immutable.
+1. The normal contracts workflow must publish and repin the new private table and PostgreSQL/reconstruction manifests, including promoted migration 27; published migration history stays immutable.
 2. Native/API and frontend checks must pass against the resulting coherent pin. Newly required CI selectors include the API history tests and inventory check.
 3. The real native Accounting regression and Playwright history path must execute against a disposable integrated stack, alongside the existing financial alpha gates.
 4. Validate the populated schema upgrade and exact durable projection/reconstruction of evidence, audit links and source rows. Static metadata registration alone is not that proof.

@@ -6,6 +6,8 @@ use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+mod business_history;
+
 static DATABASE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 const NEXT_EXPAND_SQL: &str = r#"
