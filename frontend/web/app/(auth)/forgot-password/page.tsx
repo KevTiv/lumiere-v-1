@@ -38,7 +38,7 @@ export default function ForgotPasswordPage() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{t("auth.forgotPassword.title")}</CardTitle>
+          <CardTitle>{t("auth.signIn.title")}</CardTitle>
           <CardDescription>{t("auth.forgotPassword.descriptionWorkOs")}</CardDescription>
         </CardHeader>
 
@@ -49,9 +49,6 @@ export default function ForgotPasswordPage() {
               {t("auth.forgotPassword.openWorkOsReset")}
             </Button>
           </form>
-          <p className="text-xs text-muted-foreground text-center">
-            {t("auth.forgotPassword.workOsResetHint")}
-          </p>
           <Link href="/sign-in" className="block text-center text-sm font-medium hover:underline">
             {t("auth.forgotPassword.backToSignIn")}
           </Link>

@@ -29,7 +29,7 @@ export default function ResetPasswordPage() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>{t("auth.resetPassword.title")}</CardTitle>
+          <CardTitle>{t("auth.signIn.title")}</CardTitle>
           <CardDescription>{t("auth.resetPassword.descriptionWorkOs")}</CardDescription>
         </CardHeader>
 
@@ -40,9 +40,6 @@ export default function ResetPasswordPage() {
               {t("auth.forgotPassword.openWorkOsReset")}
             </Button>
           </form>
-          <p className="text-xs text-muted-foreground text-center">
-            {t("auth.forgotPassword.workOsResetHint")}
-          </p>
           <Link href="/sign-in" className="block text-center text-sm font-medium hover:underline">
             {t("auth.forgotPassword.backToSignIn")}
           </Link>
