@@ -14,7 +14,7 @@ import {
 
 export interface AccountMoveChangesProps {
   organizationId: number;
-  companyId: string | number;
+  companyId: string | number | bigint;
   recordId: string;
 }
 
@@ -33,8 +33,10 @@ export function AccountMoveChanges({
     session.organizationId === organizationId &&
     !!session.identity &&
     !!currentUser;
+  // The record host can resolve an authorized default before a global selection exists.
+  // An explicit different selection still hides the old record immediately.
   const sameCompany =
-    session.activeCompanyId != null &&
+    session.activeCompanyId == null ||
     String(session.activeCompanyId) === String(companyId);
   // Source-read policies support module grants and field-level rules on the server.
   // The local checker cannot reproduce those semantics; it only gates this explicit capability.

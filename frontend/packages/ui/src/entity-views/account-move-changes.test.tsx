@@ -6,7 +6,7 @@ const control = vi.hoisted(() => ({
   session: {
     identity: "ab".repeat(32) as string | null,
     organizationId: 7,
-    activeCompanyId: 11,
+    activeCompanyId: 11 as number | null,
     activeCompanyReady: true,
   },
   ready: true,
@@ -112,6 +112,18 @@ describe("Accounting history authority", () => {
     expect(screen.getByTestId("history-state").getAttribute("data-state")).toBe(
       "ready",
     );
+    expect(screen.getByText("Authorized value")).toBeTruthy();
+  });
+
+  it("uses the resolved operating company when session selection has no value yet", () => {
+    control.session.activeCompanyId = null;
+    render(
+      <AccountMoveChanges organizationId={7} companyId={11n} recordId="99" />,
+    );
+    expect(control.reads.mock.calls.at(-1)?.[1]).toBe(true);
+    expect(control.reads.mock.calls.at(-1)?.[0]).toMatchObject({
+      companyId: "11",
+    });
     expect(screen.getByText("Authorized value")).toBeTruthy();
   });
 

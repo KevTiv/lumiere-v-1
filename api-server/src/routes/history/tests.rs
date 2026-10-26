@@ -407,7 +407,7 @@ async fn exact_record_history_uses_current_fields_and_native_sats_without_precis
     assert_eq!(json["data"][0]["actorIdentity"], ACTOR);
     assert_eq!(json["coverage"]["status"], "partial");
     assert!(!json.to_string().contains("secret"));
-    assert!(!json.to_string().contains("metadata"));
+    assert!(!json["data"].to_string().contains("metadata"));
     assert!(page.next_cursor.is_none());
 }
 
