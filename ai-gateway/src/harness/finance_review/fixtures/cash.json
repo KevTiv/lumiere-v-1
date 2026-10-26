@@ -1,0 +1,140 @@
+{
+  "reportKey": "cash_mobile_money_v1",
+  "schemaVersion": 1,
+  "scope": {
+    "organizationId": 9,
+    "companyId": 7,
+    "localDate": "2026-10-26",
+    "dateFrom": "2026-10-26",
+    "dateToExclusive": "2026-10-27",
+    "timezone": "Africa/Kigali",
+    "windowStartUtc": "2026-10-25T22:00:00Z",
+    "windowEndUtc": "2026-10-26T22:00:00Z",
+    "cutoffLabel": "2026-10-26 Africa/Kigali local day [2026-10-25T22:00:00Z, 2026-10-26T22:00:00Z) UTC"
+  },
+  "generatedAt": "2026-10-26T22:01:00Z",
+  "generatedBy": "fixture-actor",
+  "currency": {
+    "currencyId": 1,
+    "minorUnitScale": 2
+  },
+  "sourceWatermark": {
+    "accountingCutoff": "2026-10-26T22:00:00Z",
+    "windowStartUtc": "2026-10-25T22:00:00Z",
+    "windowEndUtc": "2026-10-26T22:00:00Z",
+    "cutoffLabel": "2026-10-26 Africa/Kigali local day [2026-10-25T22:00:00Z, 2026-10-26T22:00:00Z) UTC",
+    "queriedAt": "2026-10-26T22:01:00Z",
+    "sourceRows": [
+      {
+        "source": "payment_account",
+        "rows": 1
+      },
+      {
+        "source": "account_move_line",
+        "rows": 1
+      },
+      {
+        "source": "payment_transaction",
+        "rows": 2
+      },
+      {
+        "source": "payment_fee",
+        "rows": 1
+      }
+    ]
+  },
+  "caveats": [
+    "Unreconciled payments are investigation candidates, not proof of an erroneous ledger."
+  ],
+  "watermark": "PREVIEW \u2014 NOT AN ACCOUNTING STATEMENT",
+  "report": {
+    "opening": {
+      "minorUnits": 10000,
+      "scale": 2
+    },
+    "receipts": {
+      "minorUnits": 5000,
+      "scale": 2
+    },
+    "disbursements": {
+      "minorUnits": 2000,
+      "scale": 2
+    },
+    "fees": {
+      "minorUnits": 500,
+      "scale": 2
+    },
+    "closing": {
+      "minorUnits": 12500,
+      "scale": 2
+    },
+    "accounts": [
+      {
+        "paymentAccountId": 7,
+        "name": "Fixture payment account",
+        "provider": "momo",
+        "referenceMasked": "***1234",
+        "opening": {
+          "minorUnits": 10000,
+          "scale": 2
+        },
+        "receipts": {
+          "minorUnits": 5000,
+          "scale": 2
+        },
+        "disbursements": {
+          "minorUnits": 2000,
+          "scale": 2
+        },
+        "fees": {
+          "minorUnits": 500,
+          "scale": 2
+        },
+        "closing": {
+          "minorUnits": 12500,
+          "scale": 2
+        },
+        "closingMovement": {
+          "minorUnits": 2500,
+          "scale": 2
+        }
+      }
+    ],
+    "providers": [
+      {
+        "provider": "momo",
+        "receipts": {
+          "minorUnits": 5000,
+          "scale": 2
+        },
+        "disbursements": {
+          "minorUnits": 2000,
+          "scale": 2
+        },
+        "fees": {
+          "minorUnits": 500,
+          "scale": 2
+        },
+        "net": {
+          "minorUnits": 2500,
+          "scale": 2
+        }
+      }
+    ],
+    "unreconciled": {
+      "count": 1,
+      "lines": [
+        {
+          "paymentTransactionId": 701,
+          "paymentAccountId": 7,
+          "referenceMasked": "***5678",
+          "occurredAt": "2026-10-26T08:00:00Z",
+          "amount": {
+            "minorUnits": 5000,
+            "scale": 2
+          }
+        }
+      ]
+    }
+  }
+}
