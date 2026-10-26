@@ -306,11 +306,11 @@ fn validate_active_adapter_binding(
             Some(certification::report_composer_certification_bundle_hash())
         }
         governed_llm_skills::REPORT_ANALYSIS_SKILL_KEY => {
-            if release_version != "1.0.0" {
-                return Err(
-                    "active report analysis version must exactly match gateway adapter 1.0.0"
-                        .to_string(),
-                );
+            if release_version != certification::REPORT_ANALYSIS_CERTIFICATION_VERSION {
+                return Err(format!(
+                    "active report analysis version must exactly match gateway adapter {}",
+                    certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
+                ));
             }
             Some(certification::report_analysis_certification_bundle_hash())
         }
@@ -672,15 +672,19 @@ mod tests {
     #[test]
     fn built_in_dispatch_requires_exact_version_and_bundle_hash() {
         let report_hash = certification::report_analysis_certification_bundle_hash();
+        assert!(validate_active_adapter_binding(
+            "report_analysis",
+            certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
+            1,
+            &report_hash
+        )
+        .is_ok());
         assert!(
-            validate_active_adapter_binding("report_analysis", "1.0.0", 1, &report_hash).is_ok()
-        );
-        assert!(
-            validate_active_adapter_binding("report_analysis", "1.0.1", 1, &report_hash).is_err()
+            validate_active_adapter_binding("report_analysis", "1.0.0", 1, &report_hash).is_err()
         );
         assert!(validate_active_adapter_binding(
             "report_analysis",
-            "1.0.0",
+            certification::REPORT_ANALYSIS_CERTIFICATION_VERSION,
             1,
             &format!("sha256:{}", "f".repeat(64))
         )

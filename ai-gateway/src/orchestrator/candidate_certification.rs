@@ -460,7 +460,9 @@ pub(crate) async fn execute_report_analysis(
 mod tests {
     use super::*;
     use crate::harness::{
-        certification::report_analysis_certification_bundle_hash,
+        certification::{
+            report_analysis_certification_bundle_hash, REPORT_ANALYSIS_CERTIFICATION_VERSION,
+        },
         governed_llm_skills::REPORT_ANALYSIS_OUTPUT_TYPE,
         manifest::RiskClass,
         release_registry::{CandidateCertificationEnvironment, CandidateSkillVersion},
@@ -477,7 +479,7 @@ mod tests {
                 organization_id: 1,
                 skill_id: 11,
                 skill_key: "report_analysis".into(),
-                version: "1.0.0".into(),
+                version: REPORT_ANALYSIS_CERTIFICATION_VERSION.into(),
                 manifest_json: json!({}),
                 source_hash: report_analysis_certification_bundle_hash(),
                 risk: RiskClass::Green,
@@ -515,6 +517,7 @@ mod tests {
         .unwrap();
         let bundle = report_analysis_certification_bundle_hash();
         assert_eq!(manifest["source_hash"], bundle);
+        assert_eq!(manifest["version"], REPORT_ANALYSIS_CERTIFICATION_VERSION);
         let seed = include_str!("../../../spacetimedb/src/seed.rs");
         assert!(seed.contains(&format!("\"{bundle}\".to_string()")));
     }
@@ -573,6 +576,14 @@ mod tests {
             .unwrap();
         assert_ne!(result.actual_output, candidate.fixture.expected_output);
         assert_eq!(result.actual_output["status"], "completed");
+        candidate.version.version = "1.0.0".into();
+        assert!(matches!(
+            registry
+                .execute(candidate.clone(), request.environment.clone(), 1, 1)
+                .await,
+            Err(CertificationExecutionError::UnsupportedSkill { .. })
+        ));
+        candidate.version.version = REPORT_ANALYSIS_CERTIFICATION_VERSION.into();
         candidate.version.source_hash = format!("sha256:{}", "f".repeat(64));
         assert!(matches!(
             registry.execute(candidate, request.environment, 1, 1).await,

@@ -197,6 +197,7 @@ fn execution_request(
 
 const REPORT_PREVIEW_FIXTURE_PATH: &str = "reports/daily_business_summary_v1/preview.json";
 const BUILT_IN_SEMVER: &str = "1.0.0";
+pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.1";
 
 struct LowStockCertificationAdapter;
 
@@ -337,7 +338,7 @@ struct ReportAnalysisCertificationAdapter;
 impl CandidateCertificationAdapter for ReportAnalysisCertificationAdapter {
     fn supports(&self, version: &CandidateSkillVersion) -> bool {
         version.skill_key == super::governed_llm_skills::REPORT_ANALYSIS_SKILL_KEY
-            && version.version == BUILT_IN_SEMVER
+            && version.version == REPORT_ANALYSIS_CERTIFICATION_VERSION
             && version.source_hash == report_analysis_certification_bundle_hash()
     }
 
