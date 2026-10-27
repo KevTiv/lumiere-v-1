@@ -80,6 +80,9 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(trend.locator(".recharts-area").first()).toBeVisible()
       await page.getByRole("button", { name: "Toggle synthetic currency access", exact: true }).click()
       await expect(page.getByTestId("accountant-insights").getByRole("button", { name: /Export/ })).toHaveCount(0)
+      await expect(page.getByLabel("Analysis currency", { exact: true })).toContainText("Currency unavailable")
+      await page.getByRole("button", { name: "Toggle synthetic currency access", exact: true }).click()
+      await expect(trend.locator(".recharts-area").first()).toBeVisible()
     })
 
     test("accessible tables, dark identity and company switching preserve scope without horizontal overflow", async ({ page }) => {

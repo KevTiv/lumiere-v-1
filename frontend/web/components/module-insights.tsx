@@ -72,9 +72,9 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
     <section aria-labelledby={sectionId("overview")} className="space-y-4">
       <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end"><div className="space-y-1"><h2 id={sectionId("overview")} className="flex scroll-mt-24 items-center gap-2 text-lg font-semibold tracking-tight"><ChartNoAxesCombined aria-hidden="true" className="size-5 text-primary" />{label("title")}</h2><p className={workspaceStyles.sectionDescription}>{label("description")}</p></div>
         <div className={`grid min-w-0 gap-3 ${model.monetary ? "sm:grid-cols-2" : "sm:min-w-56"}`}>{model.monetary && <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("moduleInsights.currency")}</span><Select
-          value={String(model.selectedId ?? "")}
+          value={model.selectedId || "__none__"}
           onValueChange={(nextValue) => {
-            setCurrencyId(nextValue)
+            setCurrencyId(nextValue === "__none__" ? undefined : nextValue)
             setQueueKey(undefined)
           }}
         >
@@ -87,7 +87,7 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
           </SelectTrigger>{" "}
           <SelectContent>
             {!model.currency && (
-              <SelectItem value={String(model.selectedId)}>
+              <SelectItem value={model.selectedId || "__none__"}>
                 {t("moduleInsights.unknownCurrency")}
               </SelectItem>
             )}

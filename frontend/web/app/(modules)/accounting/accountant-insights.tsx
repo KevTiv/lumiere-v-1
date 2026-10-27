@@ -96,8 +96,8 @@ export function AccountantInsights({ data, now }: { data: AccountantOverviewData
         <div className="space-y-1"><h2 id="financial-overview-title" className="flex scroll-mt-24 items-center gap-2 text-lg font-semibold tracking-tight"><ChartNoAxesCombined className="size-5 text-primary" aria-hidden="true" />{t("accounting.insights.title")}</h2><p className={workspaceStyles.sectionDescription}>{t("accounting.insights.description")}</p></div>
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("accounting.insights.currency")}</span><Select
-            value={String(model.selectedId ?? "")}
-            onValueChange={(nextValue) => setCurrencyId(nextValue)}
+            value={model.selectedId || "__none__"}
+            onValueChange={(nextValue) => setCurrencyId(nextValue === "__none__" ? undefined : nextValue)}
           >
             <SelectTrigger
               className="h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
@@ -107,7 +107,7 @@ export function AccountantInsights({ data, now }: { data: AccountantOverviewData
             </SelectTrigger>
             <SelectContent>
               {!model.currency && (
-                <SelectItem value={String(model.selectedId)}>
+                <SelectItem value={model.selectedId || "__none__"}>
                   {t("accounting.insights.currencyUnavailable")}
                 </SelectItem>
               )}

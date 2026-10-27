@@ -123,7 +123,7 @@ test.describe("Visual quotation document output", { tag: ["@p0", "@document-stud
       await staffPage.getByTestId("entity-action-quotation-document").click()
       const dialog = staffPage.getByTestId("quotation-document-dialog")
       await chooseSelectOptionByTriggerValue(
-        page,
+        staffPage,
         dialog.getByLabel("Document layout", { exact: true }),
         String(templateId),
       )

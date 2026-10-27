@@ -108,8 +108,12 @@ for (const width of [320, 390, 768, 1440]) {
           await expect(overview).not.toContainText("Synthetic exact u64 record")
         } else await expect(page.getByTestId(`${module}-insights-periodValue`)).toContainText("1")
         await page.getByRole("button", { name: "Toggle synthetic currency access", exact: true }).click()
-        if (module !== "reports") await expect(overview.getByRole("button", { name: /Export/ })).toHaveCount(0)
-        else await expect(trend.locator(".recharts-area").first()).toBeVisible()
+        if (module !== "reports") {
+          await expect(overview.getByRole("button", { name: /Export/ })).toHaveCount(0)
+          await expect(page.getByLabel("Analysis currency", { exact: true })).toBeVisible()
+          await page.getByRole("button", { name: "Toggle synthetic currency access", exact: true }).click()
+          await expect(trend.locator(".recharts-area").first()).toBeVisible()
+        } else await expect(trend.locator(".recharts-area").first()).toBeVisible()
         await page.getByRole("link", { name: "Existing records workspace", exact: true }).click()
         await expect(page.getByText("Original record workspace remains available.")).toBeVisible()
         await expect(overview).toHaveCount(0)
@@ -117,3 +121,20 @@ for (const width of [320, 390, 768, 1440]) {
     })
   }
 }
+
+
+test("empty CRM sources keep the dashboard available and recover when data returns", async ({ page }) => {
+  const runtimeErrors: string[] = []
+  page.on("pageerror", (error) => runtimeErrors.push(error.message))
+  await page.goto("/module-insights")
+  await expect(page.getByTestId("module-insights-disclosure")).toHaveAttribute("data-hydrated", "true")
+  await page.getByLabel("Synthetic module", { exact: true }).selectOption("crm")
+  await page.getByRole("button", { name: "Toggle synthetic empty sources", exact: true }).click()
+  const currency = page.getByLabel("Analysis currency", { exact: true })
+  await expect(currency).toContainText("Unknown currency")
+  await expect(page.getByTestId("module-view-crm")).toBeVisible()
+  await page.getByRole("button", { name: "Toggle synthetic empty sources", exact: true }).click()
+  await expect(currency).toContainText("EUR")
+  await expect(page.getByTestId("crm-insights-trend").locator(".recharts-area").first()).toBeVisible()
+  expect(runtimeErrors).toEqual([])
+})
