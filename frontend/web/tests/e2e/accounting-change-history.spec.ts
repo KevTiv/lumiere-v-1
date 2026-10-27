@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test"
+import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 
 import {
   callReducerBff,
@@ -179,11 +180,11 @@ test.describe("Accounting trusted change history", { tag: ["@p0", "@finance-hist
     expect(lineUpdates, "history reads and reload must not execute another line edit").toBe(1)
 
     // A member-authored raw audit record is never authoritative history evidence.
-    await callReducerBff(page, "log_audit_event", [organizationId, {
+    await callReducerBff(page, "log_audit_event", [organizationId, stdbParamsToJson({
       company_id: companyId, table_name: "account_move_line", record_id: lineId, action: "UPDATE",
       old_values: JSON.stringify({ name: beforeName }), new_values: JSON.stringify({ name: forgedName }),
       changed_fields: ["name"], session_id: null, ip_address: null, user_agent: null, metadata: null,
-    }])
+    }, "LogAuditEventParams")])
     const afterRawAudit = await history(page, moveId, companyId)
     expect(afterRawAudit.data.map((row) => row.id)).toEqual([eventId])
     expect(JSON.stringify(afterRawAudit)).not.toContain(forgedName)

@@ -160,3 +160,23 @@ regeneration verification. This correction is prepared without editing its pin;
 wait for that workflow to finish and retain its resulting branch commits before
 pushing the test correction. CI owns test, typecheck, lint, build and browser
 execution. No local runner or service was started for this correction.
+
+
+Release contracts run `40571568607` completed successfully before this correction
+was integrated with its pin. Its commit
+`ecaa7b09e57a22925065dc17bb59cf9e67393cc3` publishes and pins 0.3.153 from the
+combined `8cb12fc09` sources. Fresh regeneration verification passed in that
+workflow. The local correction was replayed on top of that commit; no pin field
+was manually replaced. Archive inspection confirms Rust/frontend history
+bindings and migration 27 byte-for-byte equal to the pre-release source, with
+SHA-256 `0ee008de8fdcf2e56573af9ada2e2557fd9a0647ae6f029a46050bbac0989736`.
+
+The older E2E run also found a fixture encoding error while inserting the
+member-authored raw audit row. API logs report that `company_id` was an integer
+where the native reducer requires an Option sum. The fixture now passes its
+struct through the existing `stdbParamsToJson(..., "LogAuditEventParams")`
+encoder, which encodes all optional fields. It still uses the authenticated
+compatibility route and requires successful insertion, then requires that the
+raw row cannot mint or change trusted history. No reducer, admission rule,
+source/field authorization assertion or history capture behavior is changed.
+All correction execution remains assigned to CI; no local runner was used.
