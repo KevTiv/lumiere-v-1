@@ -16,7 +16,7 @@ use crate::{
     state::AppState,
 };
 
-const LIFECYCLE_CAPABILITY: &str = "ai.run.lifecycle";
+pub(crate) const LIFECYCLE_CAPABILITY: &str = "ai.run.lifecycle";
 const MAX_LIFECYCLE_ROWS: u64 = 500;
 const MAX_LIFECYCLE_BYTES: u64 = 2 * 1024 * 1024;
 
