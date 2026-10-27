@@ -511,6 +511,7 @@ pub fn report_analysis_certification_bundle_hash() -> String {
         include_bytes!("../orchestrator/governed_program.rs"),
         include_bytes!("../orchestrator/governed_programs.rs"),
         include_bytes!("../orchestrator/intelligence_adapters.rs"),
+        include_bytes!("../orchestrator/run.rs"),
         include_bytes!("../providers/llm.rs"),
         include_bytes!("../orchestrator/governed_services.rs"),
         include_bytes!("../orchestrator/intelligence.rs"),
