@@ -85,7 +85,24 @@ pub struct RunLifecycleResponse {
     pub events: Vec<LifecycleEvent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comparison: Option<LifecycleComparison>,
+    /// Present while a run is, or was, budget parked, so clients can tell it
+    /// from a failed run and show when it is expected to resume.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub park: Option<LifecycleBudgetPark>,
     pub truncated: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifecycleBudgetPark {
+    pub reason: String,
+    pub status: String,
+    pub generation: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window_resets_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_park_until: Option<String>,
+    pub required_units: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -557,6 +574,10 @@ async fn load_response(
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
     let events = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_event WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
+    // The park table exists only in modules that include the budget-park
+    // reducers; a missing table or row simply means the run was never parked.
+    let park = stdb.query_sql(&format!("SELECT * FROM ai_run_budget_park WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} LIMIT 1"))
+        .await.ok().and_then(|rows| rows.into_iter().next()).and_then(|row| park_from_row(&row));
     let checkpoint_hash = text(&state, "checkpointHash")?;
     Ok(RunLifecycleResponse {
         run_id,
@@ -576,7 +597,28 @@ async fn load_response(
             .map(event_from_row)
             .collect::<AppResult<_>>()?,
         comparison,
+        park,
         truncated: false,
+    })
+}
+
+fn timestamp_rfc3339(row: &Value, key: &str) -> Option<String> {
+    let value = row.get(key)?;
+    let micros = value
+        .get("__timestamp_micros_since_unix_epoch__")
+        .unwrap_or(value)
+        .as_i64()?;
+    chrono::DateTime::from_timestamp_micros(micros).map(|time| time.to_rfc3339())
+}
+
+fn park_from_row(row: &Value) -> Option<LifecycleBudgetPark> {
+    Some(LifecycleBudgetPark {
+        reason: text(row, "reason").ok()?,
+        status: text(row, "status").ok()?,
+        generation: number(row, "parkGeneration").ok()?,
+        window_resets_at: timestamp_rfc3339(row, "windowResetsAt"),
+        max_park_until: timestamp_rfc3339(row, "maxParkUntil"),
+        required_units: number(row, "requiredUnits").ok()?,
     })
 }
 
@@ -672,6 +714,24 @@ mod tests {
     }
 
     #[test]
+    fn park_projection_exposes_reason_and_expected_resume_but_nothing_private() {
+        let park = park_from_row(&json!({
+            "reason": "budget_exhausted", "status": "parked", "parkGeneration": 2,
+            "windowResetsAt": {"__timestamp_micros_since_unix_epoch__": 1_790_000_000_000_000i64},
+            "maxParkUntil": 1_792_000_000_000_000i64, "requiredUnits": 40,
+            "provider": "mistral", "agentId": 7
+        }))
+        .expect("park row");
+        let encoded = serde_json::to_value(park).unwrap();
+        assert_eq!(encoded["reason"], "budget_exhausted");
+        assert_eq!(encoded["status"], "parked");
+        assert_eq!(encoded["generation"], 2);
+        assert!(encoded["windowResetsAt"].as_str().unwrap().starts_with("2026-"));
+        assert!(encoded.get("provider").is_none() && encoded.get("agentId").is_none());
+        assert!(park_from_row(&json!({"status": "parked"})).is_none());
+    }
+
+    #[test]
     fn continuation_must_name_the_requested_run() {
         let token = ContinuationToken {
             run_id: 8,
@@ -733,6 +793,7 @@ mod tests {
                 })
                 .collect(),
             comparison: None,
+            park: None,
             truncated: false,
         }
     }
