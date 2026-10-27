@@ -165,6 +165,7 @@ test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, (
     await expect(activeTabEntityTable(page).getByTestId(firstId!)).toBeVisible()
     await gotoModule(page, "/accounting?tab=bills", "accounting")
     const bills = page.locator('[data-testid="finance-money-list"]:visible')
+    await bills.getByRole("button", { name: "View settings", exact: true }).click()
     await bills.getByRole("button", { name: "Compact", exact: true }).click()
     await page.reload()
     await expect(page.locator('[data-testid="finance-money-list"]:visible')).toHaveAttribute("data-density", "compact")

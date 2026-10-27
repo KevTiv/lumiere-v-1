@@ -1449,7 +1449,14 @@
       "columns": "Columns",
       "exportCsv": "Export CSV",
       "actions": "Actions",
-      "previous": "Previous"
+      "previous": "Previous",
+      "viewSettings": "View settings",
+      "documentId": "Document ID",
+      "partner": "Partner",
+      "paymentStatus": "Payment status",
+      "documentType": "Document type",
+      "linkedFilterLabel": "Linked record filters",
+      "clearLinkedFilter": "Clear {{field}} filter"
     },
     "taxes": {
       "title": "Taxes",
@@ -3408,7 +3415,8 @@
       "supplierUnavailable": "Supplier not available",
       "lineCount": "{{count}} journal lines",
       "reviewDetails": "Review source and posting details",
-      "openBill": "Review bill"
+      "openBill": "Review bill",
+      "draftCountLabel": "Draft bills to review"
     },
     "paymentOperations": {
       "returnToAllocationCompany": "Return to company #{{companyId}} to recover the original allocation."
@@ -3519,7 +3527,18 @@
       "unsavedDraft": "Unsaved draft",
       "unsavedPreview": "Unsaved preview",
       "untaxed": "Untaxed amount",
-      "vendor": "Vendor"
+      "vendor": "Vendor",
+      "documentDetails": "Document details",
+      "documentDetailsHint": "Start with the customer or vendor, dates and reference.",
+      "paymentDetails": "Payment details",
+      "accountingDetails": "Accounting details",
+      "accountingSelectionHint": "Review the journal and accounts before saving. The journal sets the currency.",
+      "documentContent": "Document content",
+      "contentCleared": "Cleared for this document",
+      "contentOverride": "Edited for this document",
+      "contentInherited": "Company default",
+      "contentEmpty": "No text",
+      "documentContentHint": "Company defaults prefill this document. Edit a section to override it, or clear it explicitly. Use company default to restore inherited text."
     },
     "assetSchedule": {
       "generateFailed": "The saved schedule could not be confirmed. Refresh before you try again.",
@@ -11302,21 +11321,32 @@
       "fraudCleared": "Fraud hold cleared."
     },
     "forms": {
+      "recovery": {
+        "title": "Expense save status",
+        "reviewRequest": "Review expense save",
+        "scopeChanged": "This request belongs to another company or signed-in account. Switch back to check it.",
+        "retained": "Your entries and the original request are retained. Check the result before starting another expense.",
+        "checkStatus": "Check status",
+        "continue": "Continue save",
+        "receiptRetained": "Receipt: {{fileName}}. If the upload has not completed after a reload, select the original file to continue.",
+        "receiptAttached": "Receipt attached: {{fileName}}.",
+        "receiptUploaded": "Receipt uploaded: {{fileName}}. Its registration will be checked with the original request."
+      },
       "newExpense": {
         "title": "New Expense",
-        "description": "Submit a new expense",
+        "description": "Record an expense and attach its receipt.",
         "sections": {
           "expenseDetails": "Expense Details"
         },
         "fields": {
-          "pricelistId": "Pricelist",
+          "pricelistId": "Price list and currency",
           "pricelistPlaceholder": "Select a pricelist",
           "name": "Description",
           "namePlaceholder": "e.g. Client dinner",
           "description": "Details",
           "descriptionPlaceholder": "Additional details about this expense…",
           "date": "Date",
-          "totalAmount": "Amount",
+          "totalAmount": "Unit amount",
           "quantity": "Quantity",
           "employeeId": "Employee",
           "employeePlaceholder": "Select an employee",
@@ -11332,11 +11362,11 @@
           "receiptFile": "Receipt file",
           "storageKey": "Receipt storage key",
           "storageKeyPlaceholder": "Opaque key (auto-generated if empty when receipt checked)",
-          "hasReceipt": "Receipt attached (required to submit report)",
-          "lineKind": "Line kind",
-          "lineKindStandard": "Standard",
+          "hasReceipt": "Include a receipt",
+          "lineKind": "Expense type",
+          "lineKindStandard": "Purchase",
           "lineKindMileage": "Mileage",
-          "lineKindPerDiem": "Per diem",
+          "lineKindPerDiem": "Daily allowance",
           "projectId": "Project ID",
           "projectIdPlaceholder": "Optional project",
           "mileageDistance": "Mileage distance",
@@ -11346,7 +11376,8 @@
           "rateIdPlaceholder": "Select a rate",
           "noMileageRates": "No mileage rates — upsert or seed statutory rates in Ops",
           "noPerDiemRates": "No per-diem rates — upsert in Ops"
-        }
+        },
+        "submitLabel": "Save expense"
       },
       "newExpenseSheet": {
         "title": "New Expense Report",
@@ -11365,12 +11396,12 @@
       },
       "newExpenseReport": {
         "title": "New Expense Report",
-        "description": "Submit expenses for reimbursement",
+        "description": "Save the report details before requesting approval.",
         "sections": {
           "reportDetails": "Report Details"
         },
         "fields": {
-          "pricelistId": "Pricelist",
+          "pricelistId": "Price list and currency",
           "pricelistPlaceholder": "Select a pricelist",
           "name": "Report Name",
           "namePlaceholder": "e.g. March 2024 Expenses",
@@ -11379,7 +11410,8 @@
           "accountingDate": "Accounting Date",
           "notes": "Notes",
           "notesPlaceholder": "Additional notes…"
-        }
+        },
+        "submitLabel": "Save expense report"
       },
       "editExpense": {
         "title": "Edit expense",
@@ -11529,7 +11561,23 @@
         "receiptRequired": "Choose a receipt file, or clear the receipt checkbox.",
         "noProject": "No project",
         "noProduct": "No expense product",
-        "financeRequired": "Complete the required date, journal, and account fields."
+        "financeRequired": "Complete the required date, journal, and account fields.",
+        "companyRequired": "Select a company before saving this expense.",
+        "employeeUnavailable": "Select an employee available in this company. Your signed-in account does not select an employee automatically.",
+        "pricelistRequired": "Select an available price list. Its currency is used for this expense.",
+        "currencyRequired": "The selected price list has no valid currency. Select another price list or ask an administrator to complete its setup.",
+        "dateRequired": "Enter a valid expense date before saving. Your entries have been retained.",
+        "contextRequired": "Check the employee and price list before saving this report. Your entries have been retained.",
+        "receiptSection": "Receipt and purpose",
+        "amountSection": "Employee and amount",
+        "optionalSection": "Optional references and notes",
+        "currencyHint": "The selected price list supplies the expense currency. Check it before saving.",
+        "employeeHint": "Select the employee who incurred this expense. This is separate from your signed-in account.",
+        "unitAmount": "Unit amount",
+        "unitAmountHint": "Enter the amount for one unit. The saved expense uses this amount and the quantity.",
+        "quantityHint": "Leave empty for one unit. Enter a quantity only when the amount applies to each unit.",
+        "reportContext": "Report owner and currency",
+        "singleUnitHint": "Quick capture records one unit. This amount is the expense amount before any server calculation."
       }
     },
     "operationsTab": "Operations",
@@ -15880,7 +15928,8 @@
         "description": "Open submitted reports and review their receipts and approval history.",
         "action": "Review reports"
       }
-    }
+    },
+    "layout": "Layout"
   },
   "workBoard": {
     "source": "Work type",

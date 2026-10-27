@@ -51,7 +51,9 @@ import {
   type ExpenseCapturePayload,
 } from "../../../lib/expense-capture-outbox"
 import { newExpenseReceiptClientRequestId } from "../../../lib/expenses-create-params"
-import { expenseCompanyLookupRows } from "./expense-capture-input"
+import { expenseCompanyLookupRows, expenseCreateContext } from "./expense-capture-input"
+import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
+import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import { captureFileMatches, syncExpenseCapture } from "./expense-capture-sync"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { CaptureAttachmentPreview } from "./capture-attachment-preview"
@@ -68,6 +70,8 @@ export function ExpensesCapturePanel({
   const createExpense = useCreateExpense(orgId, companyId)
   const { data: employees = [] } = useEmployees(orgId)
   const { data: pricelists = [] } = usePricelists(orgId)
+  const { data: currencies = [] } = useCurrencies()
+  const currencyLabels = currencyCodeMap(currencies)
   const { data: mileageRates = [] } = useExpenseMileageRates(orgId)
   const { data: perDiemRates = [] } = useExpensePerDiemRates(orgId)
   const scopedEmployees = expenseCompanyLookupRows(employees, orgId, companyId)
@@ -97,7 +101,7 @@ export function ExpensesCapturePanel({
     }
   }, [t])
   const queued = useMemo(
-    () => (deviceId ? listQueuedExpenseCaptures(organizationId, deviceId) : []),
+    () => (deviceId ? listQueuedExpenseCaptures(organizationId, deviceId).filter((item) => !item.formOrigin) : []),
     [organizationId, deviceId, tick],
   )
   const [employeeId, setEmployeeId] = useState("")
@@ -234,6 +238,12 @@ export function ExpensesCapturePanel({
   }
 
   const captureDelayedSync = async () => {
+    try {
+      expenseCreateContext({ employeeId, pricelistId }, employees, pricelists, orgId, companyId, t)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : t("expenses.capture.validation"))
+      return
+    }
     const payload = buildPayload()
     if (!payload || !deviceId) {
       setError(t("expenses.capture.validation"))
@@ -400,60 +410,46 @@ export function ExpensesCapturePanel({
           editorLabel={t("financeReview.expenseDetails", { defaultValue: "Expense details" })}
           previewLabel={t("financeReview.receipt", { defaultValue: "Receipt" })}
           editor={<FieldGroup className="grid min-w-0 grid-cols-1 sm:grid-cols-2">
-          <Field className="min-w-0">
-            <FieldLabel htmlFor="capture-employee">
-              {t("expenses.forms.newExpense.fields.employeeId")}
+          <Field orientation="horizontal" className="min-w-0 sm:col-span-2">
+            <Checkbox
+              id="capture-has-receipt"
+              checked={hasReceipt}
+              onCheckedChange={(checked) => {
+                setHasReceipt(checked === true)
+                if (!checked) {
+                  setReceiptFile(null)
+                  if (fileInput.current) fileInput.current.value = ""
+                }
+              }}
+              data-testid="expenses-capture-has-receipt"
+            />
+            <FieldLabel htmlFor="capture-has-receipt">
+              {t("expenses.forms.newExpense.fields.hasReceipt")}
             </FieldLabel>
-            <Select value={employeeId} onValueChange={setEmployeeId}>
-              <SelectTrigger
-                className="min-w-0 max-w-full"
-                id="capture-employee"
-                data-testid="expenses-capture-employee"
-              >
-                <SelectValue
-                  placeholder={t(
-                    "expenses.forms.newExpense.fields.employeePlaceholder",
-                  )}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {scopedEmployees.map((row) => (
-                    <SelectItem key={String(row.id)} value={String(row.id)}>
-                      {String(row.name)}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
           </Field>
-          <Field className="min-w-0">
-            <FieldLabel htmlFor="capture-pricelist">
-              {t("expenses.forms.newExpense.fields.pricelistId")}
-            </FieldLabel>
-            <Select value={pricelistId} onValueChange={setPricelistId}>
-              <SelectTrigger
-                className="min-w-0 max-w-full"
-                id="capture-pricelist"
-                data-testid="expenses-capture-pricelist"
-              >
-                <SelectValue
-                  placeholder={t(
-                    "expenses.forms.newExpense.fields.pricelistPlaceholder",
-                  )}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {pricelists.map((row) => (
-                    <SelectItem key={String(row.id)} value={String(row.id)}>
-                      {String(row.name)}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
+          {hasReceipt ? (
+            <Field className="min-w-0 sm:col-span-2">
+              <FieldLabel htmlFor="capture-file">
+                {t("expenses.forms.newExpense.fields.receiptFile")}
+              </FieldLabel>
+              <Input
+                ref={fileInput}
+                id="capture-file"
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(event) =>
+                  setReceiptFile(event.target.files?.[0] ?? null)
+                }
+                data-testid="expenses-capture-file"
+              />
+              <FieldDescription>
+                {t("expenses.capture.attachments.fileHint", {
+                  defaultValue:
+                    "Attach an image or PDF. A note alone is not a receipt.",
+                })}
+              </FieldDescription>
+            </Field>
+          ) : null}
           <Field className="min-w-0 sm:col-span-2">
             <FieldLabel htmlFor="capture-name">
               {t("expenses.forms.newExpense.fields.name")}
@@ -463,6 +459,16 @@ export function ExpensesCapturePanel({
               value={name}
               onChange={(event) => setName(event.target.value)}
               data-testid="expenses-capture-name"
+            />
+          </Field>
+          <Field className="min-w-0">
+            <FieldLabel htmlFor="capture-date">
+              {t("expenses.forms.newExpense.fields.date")}
+            </FieldLabel>
+            <DatePicker
+              id="capture-date"
+              value={date}
+              onChange={(value) => setDate(value)}
             />
           </Field>
           <Field className="min-w-0">
@@ -498,19 +504,65 @@ export function ExpensesCapturePanel({
             </Select>
           </Field>
           <Field className="min-w-0">
-            <FieldLabel htmlFor="capture-date">
-              {t("expenses.forms.newExpense.fields.date")}
+            <FieldLabel htmlFor="capture-employee">
+              {t("expenses.forms.newExpense.fields.employeeId")}
             </FieldLabel>
-            <DatePicker
-              id="capture-date"
-              value={date}
-              onChange={(value) => setDate(value)}
-            />
+            <Select value={employeeId} onValueChange={setEmployeeId}>
+              <SelectTrigger
+                className="min-w-0 max-w-full"
+                id="capture-employee"
+                data-testid="expenses-capture-employee"
+              >
+                <SelectValue
+                  placeholder={t(
+                    "expenses.forms.newExpense.fields.employeePlaceholder",
+                  )}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {scopedEmployees.map((row) => (
+                    <SelectItem key={String(row.id)} value={String(row.id)}>
+                      {String(row.name)}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <FieldDescription>{t("expenses.forms.capture.employeeHint", { defaultValue: "Select the employee who incurred this expense. This is separate from your signed-in account." })}</FieldDescription>
+          </Field>
+          <Field className="min-w-0">
+            <FieldLabel htmlFor="capture-pricelist">
+              {t("expenses.forms.newExpense.fields.pricelistId")}
+            </FieldLabel>
+            <Select value={pricelistId} onValueChange={setPricelistId}>
+              <SelectTrigger
+                className="min-w-0 max-w-full"
+                id="capture-pricelist"
+                data-testid="expenses-capture-pricelist"
+              >
+                <SelectValue
+                  placeholder={t(
+                    "expenses.forms.newExpense.fields.pricelistPlaceholder",
+                  )}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {pricelists.map((row) => (
+                    <SelectItem key={String(row.id)} value={String(row.id)}>
+                      {String(row.name)}{currencyLabels.get(String(row.currencyId)) ? ` · ${currencyLabels.get(String(row.currencyId))}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <FieldDescription>{t("expenses.forms.capture.currencyHint", { defaultValue: "The selected price list supplies the expense currency. Check it before saving." })}</FieldDescription>
           </Field>
           {lineKind === "Standard" ? (
             <Field className="min-w-0">
               <FieldLabel htmlFor="capture-amount">
-                {t("expenses.forms.newExpense.fields.totalAmount")}
+                {t("expenses.forms.capture.unitAmount", { defaultValue: "Unit amount" })}
               </FieldLabel>
               <Input
                 id="capture-amount"
@@ -521,6 +573,7 @@ export function ExpensesCapturePanel({
                 onChange={(event) => setAmount(event.target.value)}
                 data-testid="expenses-capture-amount"
               />
+              <FieldDescription>{t("expenses.forms.capture.singleUnitHint", { defaultValue: "Quick capture records one unit. This amount is the expense amount before any server calculation." })}</FieldDescription>
             </Field>
           ) : null}
           {lineKind === "Mileage" ? (
@@ -652,46 +705,6 @@ export function ExpensesCapturePanel({
               onChange={(event) => setReceiptNote(event.target.value)}
             />
           </Field>
-          <Field orientation="horizontal" className="min-w-0 sm:col-span-2">
-            <Checkbox
-              id="capture-has-receipt"
-              checked={hasReceipt}
-              onCheckedChange={(checked) => {
-                setHasReceipt(checked === true)
-                if (!checked) {
-                  setReceiptFile(null)
-                  if (fileInput.current) fileInput.current.value = ""
-                }
-              }}
-              data-testid="expenses-capture-has-receipt"
-            />
-            <FieldLabel htmlFor="capture-has-receipt">
-              {t("expenses.forms.newExpense.fields.hasReceipt")}
-            </FieldLabel>
-          </Field>
-          {hasReceipt ? (
-            <Field className="min-w-0 sm:col-span-2">
-              <FieldLabel htmlFor="capture-file">
-                {t("expenses.forms.newExpense.fields.receiptFile")}
-              </FieldLabel>
-              <Input
-                ref={fileInput}
-                id="capture-file"
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(event) =>
-                  setReceiptFile(event.target.files?.[0] ?? null)
-                }
-                data-testid="expenses-capture-file"
-              />
-              <FieldDescription>
-                {t("expenses.capture.attachments.fileHint", {
-                  defaultValue:
-                    "Attach an image or PDF. A note alone is not a receipt.",
-                })}
-              </FieldDescription>
-            </Field>
-          ) : null}
         </FieldGroup>}
           preview={<div className="flex flex-col gap-4">
             <Card>

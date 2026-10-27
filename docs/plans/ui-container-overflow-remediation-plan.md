@@ -1,5 +1,7 @@
 # UI container overflow remediation
 
+Current Alpha follow-up: [Alpha user experience sweep](alpha-paid-user-ux-sweep.md). Packet P01 extends this plan's modal and real-screen evidence; it does not replace the existing integration ledger.
+
 **Status:** IN PROGRESS — shared fixes implemented; evidence and remaining audit tracked below
 
 **Created:** 2026-10-17

@@ -75,9 +75,10 @@ export class CaptureReadbackError extends Error {
     this.name = "CaptureReadbackError"
   }
 }
-interface CaptureScope {
+export interface CaptureScope {
   organizationId: bigint
   companyId: bigint
+  actorIdentity?: string | null
 }
 
 /** Only an exact request key with exact scope can confirm this capture. */
@@ -165,6 +166,7 @@ function assertCapturePayload(
   item: ExpenseCaptureOutboxItem,
 ): void {
   const payload = item.payload
+  if (payload.policyExceptionReason) throw new CaptureReadbackError("unavailable", "The policy exception reason cannot be confirmed from the expense projection")
   const params = capturePayloadToParams(
     payload,
     BigInt(item.companyId!),
@@ -204,12 +206,13 @@ function assertCapturePayload(
     captureEnum(field("paymentMode", "payment_mode")) !==
       (payload.paymentMode ?? "OutOfPocket") ||
     !Array.isArray(taxes) ||
-    taxes.length !== 0 ||
-    !captureOptionalId(field("productId", "product_id"), undefined) ||
-    !captureOptionalId(field("accountId", "account_id"), undefined) ||
+    taxes.length !== (params.taxIds?.length ?? 0) ||
+    taxes.some((tax, index) => parseStrictU64(tax) !== params.taxIds?.[index]) ||
+    !captureOptionalId(field("productId", "product_id"), params.productId) ||
+    !captureOptionalId(field("accountId", "account_id"), params.accountId) ||
     !captureOptionalId(
       field("analyticAccountId", "analytic_account_id"),
-      undefined,
+      params.analyticAccountId,
     ) ||
     !captureOptionalId(field("projectId", "project_id"), params.projectId) ||
     !captureOptionalId(
@@ -331,7 +334,11 @@ export function capturePayloadToParams(
     unitAmount: payload.lineKind === "Standard" ? payload.unitAmount : 0,
     quantity: payload.lineKind === "Standard" ? payload.quantity : 1,
     description: payload.description,
-    taxIds: [],
+    taxIds: (payload.taxIds ?? []).map(BigInt),
+    productId: payload.productId ? BigInt(payload.productId) : undefined,
+    accountId: payload.accountId ? BigInt(payload.accountId) : undefined,
+    analyticAccountId: payload.analyticAccountId ? BigInt(payload.analyticAccountId) : undefined,
+    policyExceptionReason: payload.policyExceptionReason,
     attachmentIds,
     projectId: payload.projectId ? BigInt(payload.projectId) : undefined,
     lineKind: { tag: payload.lineKind },
@@ -352,7 +359,9 @@ export function capturePayloadToParams(
     merchantKey: payload.merchantKey,
   }
 }
-interface CaptureSyncServices {
+export interface CaptureSyncServices {
+  /** Local admission runs before write-start checkpoints; denial is known unsent. */
+  assertWriteAllowed?: () => void
   readExpenses: () => Promise<readonly CaptureEffectRow[]>
   readReceipts: () => Promise<readonly CaptureEffectRow[]>
   upload: (file: File, companyId: bigint) => Promise<DocumentBlobUploadResult>
@@ -386,6 +395,10 @@ export async function syncExpenseCapture(
       "scope",
       "Select the company saved with this queued capture",
     )
+  if (item.formOrigin && (item.formOrigin.actorIdentity !== scope.actorIdentity
+    || item.formOrigin.organizationId !== String(scope.organizationId))) {
+    throw new CaptureReadbackError("scope", "Switch back to the signed-in identity saved with this expense request")
+  }
   let current = item
   const save = (next: ExpenseCaptureOutboxItem) => {
     services.save(next)
@@ -424,6 +437,7 @@ export async function syncExpenseCapture(
           throw new Error(
             "Reattach the original receipt file to continue. File bytes are not stored across reloads.",
           )
+        services.assertWriteAllowed?.()
         receipt = { ...receipt, state: "uploading", lastError: undefined }
         save({ ...current, receipt })
         const upload = await services.upload(file, scope.companyId)
@@ -451,6 +465,7 @@ export async function syncExpenseCapture(
         const upload = receipt.uploaded!
         let registrationError: unknown
         try {
+          services.assertWriteAllowed?.()
           await services.register({
             companyId: scope.companyId,
             employeeId: BigInt(current.payload.employeeId),
@@ -486,6 +501,7 @@ export async function syncExpenseCapture(
       save({ ...current, receipt })
       attachmentIds = [BigInt(receiptId)]
     }
+    services.assertWriteAllowed?.()
     save({ ...current, syncState: "submitting", lastError: undefined })
     submissionCheckpointSaved = true
     let dispatchError: unknown

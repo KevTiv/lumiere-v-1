@@ -385,7 +385,7 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
     const days = modal.getByTestId("form-field-perDiemDays")
     const dailyRate = modal.getByTestId("form-field-perDiemRateId")
 
-    await expect(kind).toContainText("Standard")
+    await expect(kind).toContainText("Purchase")
     await expect(amount).toBeVisible()
     await expect(quantity).toBeVisible()
     await expect(mileage).toHaveCount(0)
@@ -468,7 +468,7 @@ test.describe("Finance authoring previews", { tag: "@dev-fixture" }, () => {
     await selectModuleTab(page, "expenses", "expenses")
     await page.getByTestId("module-create-expenses-expenses").click()
     await expect(modal).toBeVisible()
-    await expect(modal.getByTestId("form-field-lineKind")).toContainText("Standard")
+    await expect(modal.getByTestId("form-field-lineKind")).toContainText("Purchase")
     await expect(modal.getByTestId("form-field-mileageDistance")).toHaveCount(0)
     await expect(modal.getByTestId("form-field-perDiemDays")).toHaveCount(0)
     await expect(modal.getByTestId("form-field-storageKey")).toHaveCount(0)

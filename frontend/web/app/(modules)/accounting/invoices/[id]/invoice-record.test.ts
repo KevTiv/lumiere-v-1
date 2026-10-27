@@ -37,3 +37,16 @@ test('currency comes from the matching catalog row and never from another curren
   assert.deepEqual(invoiceRecordCurrency({ currencyId: 7 }, [{ id: 1, code: 'USD' }, { id: 7, code: 'eur' }]), { id: '7', code: 'EUR' });
   assert.deepEqual(invoiceRecordCurrency({ currency_id: 7 }, [{ id: 1, code: 'USD' }]), { id: '7', code: undefined });
 });
+
+
+test('saved bill paper uses explicit commercial classification and keeps masked fields unavailable', () => {
+  const saved = { id: 26, companyId: 1, moveId: 12, name: 'Vendor bill work', quantity: 2, priceUnit: 37.5 };
+  // The former default query projection had no classification fields. Never infer them from price or account type.
+  assert.deepEqual(invoiceDocumentLines([saved]), []);
+  assert.deepEqual(invoiceDocumentLines([{ ...saved, excludeFromInvoiceTab: false, taxLineId: null, displayType: null, sequence: 10, discount: 0, priceSubtotal: 75 }]), [
+    { id: '26', description: 'Vendor bill work', quantity: 2, unitPrice: 37.5, discount: 0, amount: 75 },
+  ]);
+  const [maskedAmounts] = invoiceDocumentLines([{ ...saved, excludeFromInvoiceTab: false, taxLineId: null, displayType: null }]);
+  assert.equal(maskedAmounts?.amount, null);
+  assert.equal(maskedAmounts?.discount, null);
+});

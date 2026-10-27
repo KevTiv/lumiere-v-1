@@ -46,6 +46,14 @@ function SourcePanel({ files, loading, error, expected = false }: { files: Finan
   const { t } = useTranslation()
   const [selectedId, setSelectedId] = useState("")
   const selected = files.find((file) => file.id === selectedId) ?? files[0]
+  if (!loading && !error && files.length === 0) {
+    return <section data-testid="finance-source-preview" className="flex min-w-0 flex-col gap-1 rounded-lg border p-3" aria-label={t("financeReview.sourceTitle", { defaultValue: "Source document" })}>
+      <p className="text-sm font-medium">{t("financeReview.sourceTitle", { defaultValue: "Source document" })}</p>
+      <p className="break-words text-sm text-muted-foreground">{expected
+        ? t("financeReview.attachedUnavailable", { defaultValue: "The attached receipt is unavailable in the current company or access scope." })
+        : t("financeReview.noSource", { defaultValue: "No source document is available in your current access scope." })}</p>
+    </section>
+  }
   return <Card data-testid="finance-source-preview" className="min-w-0">
     <CardHeader><CardTitle>{t("financeReview.sourceTitle", { defaultValue: "Source document" })}</CardTitle><CardDescription>{t("financeReview.sourceDescription", { defaultValue: "Saved evidence linked to this record." })}</CardDescription></CardHeader>
     <CardContent className="flex min-w-0 flex-col gap-4">
