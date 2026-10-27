@@ -421,7 +421,6 @@ export const accountingModuleConfig = (t: TFunction): ModuleConfig => ({
   description: "Financial overview — P&L, cash position, and budget tracking",
   defaultTab: "dashboard",
   workspaceNav: accountingWorkspaceNavigation(t),
-  tabNavigation: "areas",
   tabGroups: [
     { label: t("accounting.navigation.receivables", { defaultValue: "Receivables" }), tabIds: ["invoices", "credit-control"] },
     { label: t("accounting.navigation.payables", { defaultValue: "Payables" }), tabIds: ["bills"] },

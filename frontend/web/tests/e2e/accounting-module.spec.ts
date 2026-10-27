@@ -174,19 +174,17 @@ async function assertAccountingTabRenders(page: Page, tabId: AccountingTabId) {
 
 test.describe("Accounting module e2e", () => {
   test("renders accounting shell and each tab without errors", { tag: "@p0" }, async ({ page }) => {
-    // Exercise every canonical destination through its task area and scoped reads.
+    // Exercise the shared workspace navigation and every canonical destination's scoped reads.
     test.setTimeout(240_000)
-    await test.step("Open Accounting and validate task-area navigation", async () => {
+    await test.step("Open Accounting and validate shared workspace navigation", async () => {
       await gotoModule(page, "/accounting", "accounting")
-      const areaTrigger = page.getByTestId("module-area-accounting")
-      await expect(areaTrigger).toBeVisible()
-      await expect(areaTrigger).toHaveAttribute("role", "combobox")
-      // The Work destination appears after the asynchronous permission check.
-      // Wait for every canonical destination before testing its business surface.
-      await expect.poll(async () => {
-        const areas = JSON.parse(await areaTrigger.getAttribute("data-tab-areas") ?? "{}") as Record<string, string>
-        return Object.keys(areas).sort()
-      }, { timeout: 30_000 }).toEqual([...ACCOUNTING_TAB_IDS].sort())
+      const module = page.getByTestId("module-view-accounting")
+      await expect(module.getByRole("navigation", { name: "Accounting workspaces", exact: true })).toBeVisible()
+      await expect(module.getByTestId("module-area-accounting")).toHaveCount(0)
+      await expect(module.getByTestId("module-workspace-accounting-overview")).toHaveAttribute("aria-current", "page")
+      await expect(module.getByTestId("module-workspace-accounting-overflow")).toBeVisible()
+      // Work joins the same navigation after the asynchronous permission check.
+      await expect(module.getByTestId("module-workspace-accounting-work")).toBeVisible({ timeout: 30_000 })
     }, { timeout: 30_000 })
     for (const tabId of ACCOUNTING_TAB_IDS) {
       await test.step(`Accounting destination: ${tabId}`, async () => {
