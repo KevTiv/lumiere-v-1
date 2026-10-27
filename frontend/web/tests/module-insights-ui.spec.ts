@@ -131,7 +131,7 @@ test("empty CRM sources keep the dashboard available and recover when data retur
   await page.getByLabel("Synthetic module", { exact: true }).selectOption("crm")
   await page.getByRole("button", { name: "Toggle synthetic empty sources", exact: true }).click()
   const currency = page.getByLabel("Analysis currency", { exact: true })
-  await expect(currency).toContainText("Unknown currency")
+  await expect(currency).toContainText("Currency details unavailable")
   await expect(page.getByTestId("module-view-crm")).toBeVisible()
   await page.getByRole("button", { name: "Toggle synthetic empty sources", exact: true }).click()
   await expect(currency).toContainText("EUR")
