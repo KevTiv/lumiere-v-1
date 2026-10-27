@@ -1089,6 +1089,32 @@ boundary with no dispatched or uncertain effect; resume happens once; provider
 rate limits use the same state with a maximum park duration; parked runs are
 shown separately from failed runs.
 
+**Status of the §7.2 addition — source slice only; not complete.** Implemented
+in source: module tables `ai_run_budget_park` and the scheduled
+`ai_run_budget_resume_job`; reducers `park_ai_run_for_budget` (refuses with a
+dispatched/uncertain effect or a held `reserved` reservation),
+`fire_ai_run_budget_resume` (scheduled, module-identity only, records the
+resume intent and nothing else; duplicate or stale fires are no-ops) and
+`resolve_ai_run_budget_park` (resume | stay_parked | waiting_input | terminate,
+bound to the checked continuation, park generation and idempotency key). Gateway:
+typed `BudgetBlocked` denial from spend admission, `Retry-After` carried on
+`ProviderRejection`, park-on-denial in `run_skill_admitted`, a resume-intent
+reactor that re-prices the allowance at current pricing before asking the
+module to resume, and the park state in the lifecycle inspect projection and
+run-status labels. Verified: decision-logic unit tests (park boundary,
+schedule, idempotent fire, resume once, re-denial, max park, retry-after) and
+the reducers type-checked against the real `run_lifecycle.rs` in an isolated
+crate with stubbed neighbours. NOT verified or still open: the reducers have not
+been compiled inside the full module or run in the SpacetimeDB runtime (the
+full-module build exhausts memory on the dev host); the new reducers are not yet
+in any immutable `lumiere-contracts` release, so operation contracts, reducer
+exposure, operation ids/history and `generated_reducer_contract.rs` are not
+regenerated and the gateway calls them through `ReducerCall::from_name`, which
+fails closed (the run ends as before) until the release is pinned; the reactor
+is not spawned and no production `ContinuationDispatcher` exists, because
+re-entering a governed run needs the actor's credential and a credential policy
+for background resume has not been decided; no live E2E.
+
 ---
 
 ### AIH-25 — Bounded specialist delegation
