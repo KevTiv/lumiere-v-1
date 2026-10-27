@@ -197,7 +197,7 @@ fn execution_request(
 
 const REPORT_PREVIEW_FIXTURE_PATH: &str = "reports/daily_business_summary_v1/preview.json";
 const BUILT_IN_SEMVER: &str = "1.0.0";
-pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.3";
+pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.4";
 
 struct LowStockCertificationAdapter;
 
@@ -510,6 +510,8 @@ pub fn report_analysis_certification_bundle_hash() -> String {
         include_bytes!("../orchestrator/candidate_certification.rs"),
         include_bytes!("../orchestrator/governed_program.rs"),
         include_bytes!("../orchestrator/governed_programs.rs"),
+        include_bytes!("../orchestrator/intelligence_adapters.rs"),
+        include_bytes!("../providers/llm.rs"),
         include_bytes!("../orchestrator/governed_services.rs"),
         include_bytes!("../orchestrator/intelligence.rs"),
         include_bytes!("../orchestrator/decision_type.rs"),

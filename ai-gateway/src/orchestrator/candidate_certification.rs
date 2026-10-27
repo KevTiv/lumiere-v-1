@@ -228,6 +228,10 @@ impl DecisionProvider for FixtureProviders {
 impl GenerationProvider for FixtureProviders {
     async fn generate(&self, request: GenerationRequest) -> Result<GenerationResponse> {
         request.validate()?;
+        ensure!(
+            request.response_format == super::intelligence::GenerationResponseFormat::FinalDraft,
+            "report certification must exercise the structured generation contract"
+        );
         let mut reply = next(&self.generations, "generation")?;
         ensure!(
             reply.format == request.format,
