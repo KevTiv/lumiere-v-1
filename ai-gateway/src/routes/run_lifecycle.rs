@@ -481,12 +481,21 @@ async fn call_lifecycle_reducer(
         "compare_ai_runs_checked" => {
             stdb_client::reducer_call!("compare_ai_runs_checked", arguments)
         }
-        // These reducers are not in the pinned generated reducer contract yet.
-        // `from_name` validates against that contract at call time, so until a
-        // contracts release containing them is pinned the call fails closed
-        // with an unknown-reducer error. Switch to `reducer_call!` (compile-time
-        // checked) after the pin bump and regeneration.
-        name if is_follow_up_reducer(name) => stdb_client::ReducerCall::from_name(name, arguments),
+        "enqueue_ai_run_follow_up" => {
+            stdb_client::reducer_call!("enqueue_ai_run_follow_up", arguments)
+        }
+        "edit_ai_run_follow_up" => {
+            stdb_client::reducer_call!("edit_ai_run_follow_up", arguments)
+        }
+        "reorder_ai_run_follow_up" => {
+            stdb_client::reducer_call!("reorder_ai_run_follow_up", arguments)
+        }
+        "withdraw_ai_run_follow_up" => {
+            stdb_client::reducer_call!("withdraw_ai_run_follow_up", arguments)
+        }
+        "promote_ai_run_follow_up" => {
+            stdb_client::reducer_call!("promote_ai_run_follow_up", arguments)
+        }
         _ => return Err(AppError::Internal("unsupported lifecycle reducer".into())),
     };
     stdb.call_reducer(call)

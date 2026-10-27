@@ -11,11 +11,9 @@
 //! reserves again through the ordinary `SpendAdmittedLlm` path.
 //!
 //! Persistence goes through [`ParkStore`] so the decision logic is tested
-//! without a database. The production store calls the new reducers by name
-//! through `ReducerCall::from_name`: they are rejected as unknown until the
-//! `lumiere-contracts` release that contains them is pinned and
-//! `generated_reducer_contract.rs` is regenerated, which fails the park closed
-//! (the run then ends exactly as it did before this change).
+//! without a database. The production store calls the park reducers through
+//! the compile-time checked `reducer_call!` contract (pinned since v0.3.152).
+//! A failed park leaves the run to end exactly as it did before this change.
 
 // The resume reactor, its admission probe and the Stdb store's read half are
 // exercised by tests but not spawned yet (no production dispatcher; see the
@@ -28,7 +26,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Datelike, TimeZone, Utc};
 use serde_json::{json, Value};
-use stdb_client::{ReducerCall, StdbClient};
+use stdb_client::StdbClient;
 
 use crate::ai_spend::{Allowance, PriceSnapshot};
 use crate::providers::llm::ProviderRejection;
@@ -425,12 +423,13 @@ pub(crate) struct StdbParkStore<'a> {
     pub writer: &'a StdbClient,
 }
 
-async fn call(writer: &StdbClient, name: &str, args: Value) -> Result<()> {
-    // Not `reducer_call!`: these reducers enter the generated contract only
-    // after the contracts release that contains them is pinned. Until then
-    // `from_name` rejects them as unknown and the caller fails closed.
+async fn call(
+    writer: &StdbClient,
+    name: &'static str,
+    call: impl stdb_client::IntoReducerCall,
+) -> Result<()> {
     writer
-        .call_reducer(ReducerCall::from_name(name, args))
+        .call_reducer(call)
         .await
         .with_context(|| format!("{name} reducer failed"))
 }
@@ -495,7 +494,7 @@ impl ParkStore for StdbParkStore<'_> {
         call(
             self.writer,
             "park_ai_run_for_budget",
-            json!([
+            stdb_client::reducer_call!("park_ai_run_for_budget", json!([
                 target.organization_id,
                 target.company_id,
                 target.run_id,
@@ -512,7 +511,7 @@ impl ParkStore for StdbParkStore<'_> {
                     "model": target.model,
                     "idempotency_key": format!("budget-park:{}:{concurrency}", target.run_id),
                 }
-            ]),
+            ])),
         )
         .await
     }
@@ -563,7 +562,7 @@ impl ParkStore for StdbParkStore<'_> {
         call(
             self.writer,
             "resolve_ai_run_budget_park",
-            json!([
+            stdb_client::reducer_call!("resolve_ai_run_budget_park", json!([
                 intent.organization_id,
                 intent.company_id,
                 intent.run_id,
@@ -580,7 +579,7 @@ impl ParkStore for StdbParkStore<'_> {
                         intent.run_id, intent.park_generation, command.outcome()
                     ),
                 }
-            ]),
+            ])),
         )
         .await
     }
