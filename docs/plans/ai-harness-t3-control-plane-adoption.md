@@ -298,6 +298,12 @@ Also do not copy:
 
 ## 7. Integration with the existing harness plan
 
+### 7.0 Implementation status
+
+| Item | Status | Present | Remaining |
+| --- | --- | --- | --- |
+| H5d provider instances + capability truth | Partial (gateway-side library only) | `ai-gateway/src/providers/instance.rs`: `ProviderDriver`, `ProviderInstance`, `CapabilityManifest`, in-memory `ProviderRegistry` (one platform default instance per configured driver from existing env config), selection with org/region/driver/budget-scope policy before cost ordering and a serializable `SelectionRecord` (driver, instance, model, region, policy reason, pricing snapshot ref), authoritative manifest replacement with stale-revision rejection, boundary-denying fallback. `handoff.rs`: pure budgeted handoff (section 7.5). `events.rs`: provider-neutral `ProviderEvent`. Fixtures 4, 5 and 15 plus selection/handoff tests. | The agent loop and `LlmClient` still dispatch through one shared client and do not yet call the registry; instance-to-credential binding (per-instance clients) is not built. `SelectionRecord` and `HandoffRecord` are not persisted (needs a SpacetimeDB table/reducer). No organization-defined instances are loaded (registry holds env defaults only). Pricing snapshots are not yet fed from `ModelProfile`/spend admission. Region/residency policy input is not yet sourced from organization policy. Descriptor route (section 3) not included. |
+
 ### Insert before H6 pilot
 
 **H5c — Durable effect orchestration and reconciliation**
