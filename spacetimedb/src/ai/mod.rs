@@ -11,6 +11,7 @@
 pub mod action_draft_lifecycle;
 pub mod action_drafts;
 pub mod agents;
+pub mod budget_park;
 pub mod calibration_profile;
 pub mod capability_execution;
 pub mod capability_grants;
@@ -38,6 +39,7 @@ pub mod workflow_provenance;
 
 pub use action_drafts::*;
 pub use agents::*;
+pub use budget_park::*;
 pub use calibration_profile::*;
 pub use capability_execution::*;
 pub use capability_grants::*;
