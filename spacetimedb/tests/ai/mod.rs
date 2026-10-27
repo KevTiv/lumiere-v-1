@@ -5,6 +5,7 @@ pub mod decision_events_test;
 pub mod embedding_isolation_test;
 pub mod evidence_provenance_test;
 pub mod relational_integrity_test;
+pub mod runtime_reads_test;
 pub mod spend_recovery_test;
 pub mod workflow_provenance_test;
 
@@ -88,6 +89,7 @@ pub fn run_ai_spend_recovery_tests(ctx: &ReducerContext) -> Result<(), String> {
         .map_err(|e| format!("spend_recovery_atomic_release: {e}"))?;
     spend_recovery_test::test_recovery_requires_reconcile_permission(ctx)
         .map_err(|e| format!("spend_recovery_permission: {e}"))?;
+    runtime_reads_test::test_runtime_reads_scope_and_retirement(ctx)?;
     Ok(())
 }
 

@@ -94,7 +94,7 @@ pub struct AiProviderAttemptRead {
     pub reconciliation_approval_id: Option<String>,
 }
 
-fn authorized_organization_ids(ctx: &ViewContext) -> Vec<u64> {
+pub(super) fn authorized_organization_ids(ctx: &ViewContext) -> Vec<u64> {
     ctx.db
         .cold_tier_service_identity()
         .cold_tier_service_identity_by_identity()

@@ -95,8 +95,8 @@ Plain prose acquires no claims implicitly. Independent semantic rejection
 withholds the answer. A snapshot hash is an identity, not an admission certificate.
 
 Shared executor/registry changes alter the pilot's compiled source binding.
-This branch proposes **`report_analysis` 1.0.3**, with updated proposed manifest
-and local development seed hash. It does not change a deployed 1.0.2 release.
+This branch proposes **`report_analysis` 1.0.6**, with updated proposed manifest
+and local development seed hash. It does not change a deployed 1.0.5 release.
 Integration must certify/promote that new version before deploying this branch
 to a pilot that requires it.
 
@@ -152,3 +152,21 @@ Completed checks:
   immutable contracts release verification passed.
 
 No full container build or deployed browser/live-tenant acceptance was run.
+
+## Integration with current Alpha source — 2026-10-27
+
+Merged current main through `83e8be1f50d758f8bc9e1a9ec9d05993a1bfe8d9`.
+Retained the report question, typed final-draft contract, complete claim coverage,
+and recorded analytics snapshot admission fixes. The proposed report version is
+1.0.6; finance skills remain 1.0.0. The immutable contracts pin is 0.3.149.
+
+Finance generation now requests the same typed final-draft response contract.
+The final citation check admits finance snapshots only from the declared source
+node for the current run. Tests exercise top-level snapshot citations, all five
+programs, rejection by independent review, and foreign-run/wrong-node/wrong-kind
+refusal. Local gateway tests passed: 776 unit tests and 27 owner integration tests;
+eight existing prerequisite tests remain ignored. Six finance BFF/form tests,
+manifest checks, runtime image contract checks, and immutable release verification
+also passed. Hosted final-head CI and browser checks remain pending.
+
+No production deployment or tenant activation is part of this merge.

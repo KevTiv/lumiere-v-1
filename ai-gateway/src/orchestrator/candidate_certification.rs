@@ -231,6 +231,10 @@ impl DecisionProvider for FixtureProviders {
 impl GenerationProvider for FixtureProviders {
     async fn generate(&self, request: GenerationRequest) -> Result<GenerationResponse> {
         request.validate()?;
+        ensure!(
+            request.response_format == super::intelligence::GenerationResponseFormat::FinalDraft,
+            "report certification must exercise the structured generation contract"
+        );
         let mut reply = next(&self.generations, "generation")?;
         ensure!(
             reply.format == request.format,
@@ -563,7 +567,7 @@ mod tests {
             crate::tools::finance_review::output(key, 1, 1, request.fixture_id, &input, response)
                 .unwrap();
         let content = "The snapshot records finance review evidence.";
-        let draft = json!({"content":content,"citations":[],"claims":[{"text":content,"supports":[{"kind":passage["kind"],"id":passage["id"],"source_version":passage["source_version"],"passage_key":"result"}]}],"calculations":[]});
+        let draft = json!({"content":content,"citations":[{"kind":passage["kind"],"id":passage["id"]}],"claims":[{"text":content,"supports":[{"kind":passage["kind"],"id":passage["id"],"source_version":passage["source_version"],"passage_key":"result"}]}],"calculations":[]});
         request.environment.dataset = json!({spec.resource:{"organizationId":1,"companyId":1,"data":{
             "financeSource":sources,"analyticsArguments":input,"analyticsOutput":{"summary":"ignored fixture placeholder","data":{},"citations":[],"row_count":0},
             "decisions":[{"decisionType":{"name":"ClaimEvidenceSupport","version":1},"response":{"kind":"choice","choice":"supported","probability":null,"confidence":1,"score":null,"rationale":"Synthetic review","model":"fixture","provider":"fixture","input_tokens":0,"output_tokens":0}}],
@@ -909,6 +913,41 @@ mod tests {
                 .unwrap()
                 .starts_with('{'));
         }
+    }
+
+    fn generated_snapshot_report(citation_id: &str) -> CandidateExecutionRequest {
+        let mut request = generated_report(0.1);
+        let snapshot_id = format!("run:{}:stock_movement_by_state", request.fixture_id);
+        let fixture = data(&mut request);
+        let passage =
+            &mut fixture["analyticsOutput"]["data"]["artifacts"][0]["artifacts"]["evidencePassage"];
+        passage["kind"] = json!("analytics_snapshot");
+        passage["id"] = json!(snapshot_id);
+        fixture["passages"][0]["kind"] = json!("analytics_snapshot");
+        fixture["passages"][0]["sourceKey"] = json!(snapshot_id);
+        let mut draft: Value = serde_json::from_str(
+            fixture["generations"][0]["response"]["content"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        draft["claims"][0]["supports"][0]["kind"] = json!("analytics_snapshot");
+        draft["claims"][0]["supports"][0]["id"] = json!(snapshot_id);
+        draft["citations"] = json!([{ "kind": "analytics_snapshot", "id": citation_id }]);
+        fixture["generations"][0]["response"]["content"] =
+            json!(serde_json::to_string(&draft).unwrap());
+        request
+    }
+
+    #[tokio::test]
+    async fn recorded_snapshot_citations_reach_independent_claim_review() {
+        let mut request = generated_snapshot_report("run:5:stock_movement_by_state");
+        let execution = execute_report_analysis(request.clone()).await.unwrap();
+        assert_eq!(execution.actual_output["status"], "completed");
+        data(&mut request)["decisions"][1]["response"]["choice"] = json!("unsupported");
+        let execution = execute_report_analysis(request).await.unwrap();
+        assert_ne!(execution.actual_output["status"], "completed");
+        assert!(execution.actual_output["summary"].is_null());
     }
 
     #[tokio::test]
