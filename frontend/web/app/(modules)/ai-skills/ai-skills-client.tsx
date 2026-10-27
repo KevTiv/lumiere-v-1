@@ -197,6 +197,7 @@ function agentRunStatusLabel(t: Translate, status: string): string {
   if (status === "pending") return t("aiSkills.agentRuns.status.pending")
   if (status === "awaiting_approval") return t("aiSkills.agentRuns.status.awaitingApproval")
   if (status === "agent_settled") return t("aiSkills.agentRuns.status.agentSettled")
+  if (status === "budget_parked") return t("aiSkills.agentRuns.status.budgetParked")
   if (status === "completed") return t("aiSkills.agentRuns.status.completed")
   if (status === "cancelled") return t("aiSkills.agentRuns.status.cancelled")
   if (status === "failed") return t("aiSkills.agentRuns.status.failed")
