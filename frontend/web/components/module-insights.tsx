@@ -12,6 +12,7 @@ import { reportExportSourceProvenance } from "@lumiere/ui/lib/report-export-prov
 import { DashboardGrid } from "../../packages/ui/src/pages/dashboard-grid"
 import { DashboardWidgetRenderer } from "../../packages/ui/src/pages/dashboard-widget-renderer"
 import { buildModuleInsights, insightDefinitions, insightRecordHref, type InsightPeriod, type ModuleInsightInput } from "../lib/module-insights-model"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 function SourceNotice({ state }: { state: ModuleDataState }) {
   const { t } = useTranslation()
@@ -70,8 +71,52 @@ function ScopedModuleInsights({ input, sections = [], now, onPeriodRangeChange }
     <nav aria-label={t("moduleInsights.sections")} className="flex flex-wrap gap-2">{["overview", "insights", "actions"].map((key) => <a className={linkClass} key={key} href={`#${sectionId(key)}`}>{t(`moduleInsights.${key}`)}</a>)}</nav>
     <section aria-labelledby={sectionId("overview")} className="space-y-4">
       <div className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end"><div className="space-y-1"><h2 id={sectionId("overview")} className="flex scroll-mt-24 items-center gap-2 text-lg font-semibold tracking-tight"><ChartNoAxesCombined aria-hidden="true" className="size-5 text-primary" />{label("title")}</h2><p className={workspaceStyles.sectionDescription}>{label("description")}</p></div>
-        <div className={`grid min-w-0 gap-3 ${model.monetary ? "sm:grid-cols-2" : "sm:min-w-56"}`}>{model.monetary && <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("moduleInsights.currency")}</span><select aria-label={t("moduleInsights.currency")} className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm" value={model.selectedId} onChange={(event) => { setCurrencyId(event.target.value); setQueueKey(undefined) }}>{!model.currency && <option value={model.selectedId}>{t("moduleInsights.unknownCurrency")}</option>}{model.currencies.map((currency) => <option key={currency.id} value={currency.id}>{currency.label} (#{currency.id})</option>)}</select></label>}
-          <label className="space-y-1 text-xs font-medium"><span>{t("moduleInsights.period")}</span><select aria-label={t("moduleInsights.period")} className="h-11 w-full rounded-md border bg-background px-3 text-sm" value={days} onChange={(event) => setDays(Number(event.target.value) as InsightPeriod)}>{[30, 90, 180].map((value) => <option key={value} value={value}>{t("moduleInsights.lastDays", { count: value })}</option>)}</select></label>
+        <div className={`grid min-w-0 gap-3 ${model.monetary ? "sm:grid-cols-2" : "sm:min-w-56"}`}>{model.monetary && <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("moduleInsights.currency")}</span><Select
+          value={model.selectedId || "__none__"}
+          onValueChange={(nextValue) => {
+            setCurrencyId(nextValue === "__none__" ? undefined : nextValue)
+            setQueueKey(undefined)
+          }}
+        >
+          {" "}
+          <SelectTrigger
+            aria-label={t("moduleInsights.currency")}
+            className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-sm"
+          >
+            <SelectValue />
+          </SelectTrigger>{" "}
+          <SelectContent>
+            {!model.currency && (
+              <SelectItem value={model.selectedId || "__none__"}>
+                {t("moduleInsights.unknownCurrency")}
+              </SelectItem>
+            )}
+            {model.currencies.map((currency) => (
+              <SelectItem key={currency.id} value={String(currency.id)}>
+                {currency.label} (#{currency.id})
+              </SelectItem>
+            ))}
+          </SelectContent>{" "}
+        </Select></label>}
+          <label className="space-y-1 text-xs font-medium"><span>{t("moduleInsights.period")}</span><Select
+            value={String(days ?? "")}
+            onValueChange={(nextValue) => setDays(Number(nextValue) as InsightPeriod)}
+          >
+            {" "}
+            <SelectTrigger
+              aria-label={t("moduleInsights.period")}
+              className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+            >
+              <SelectValue />
+            </SelectTrigger>{" "}
+            <SelectContent>
+              {[30, 90, 180].map((value) => (
+                <SelectItem key={value} value={String(value)}>
+                  {t("moduleInsights.lastDays", { count: value })}
+                </SelectItem>
+              ))}
+            </SelectContent>{" "}
+          </Select></label>
         </div>
       </div>
       <p className="text-xs leading-5 text-muted-foreground">{date(model.startMs)} – {date(model.endMs - 1)} · {t("moduleInsights.comparedWith")} {date(model.previousStartMs)} – {date(model.startMs - 1)}. {t("moduleInsights.utc")}</p>

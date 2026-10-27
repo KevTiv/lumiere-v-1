@@ -55,11 +55,37 @@ function renderForm(onSubmit: (values: Record<string, unknown>) => void) {
 }
 
 describe("searchable select field in a form dialog", () => {
+  it("refreshes linked choices without replacing edited fields or the selected file", async () => {
+    const submit = vi.fn()
+    const configWithOptions = (options: Array<{ value: string; label: string }>): FormConfig => ({
+      ...config,
+      sections: [{ id: "main", fields: [
+        { id: "partnerId", name: "partnerId", label: "Partner", type: "select", required: true, options, searchable: true },
+        { id: "purpose", name: "purpose", label: "Purpose", type: "text" },
+        { id: "receipt", name: "receipt", label: "Receipt", type: "file" },
+      ] }],
+    })
+    const props = { open: true, onOpenChange: vi.fn(), onSubmit: submit, draft: false }
+    const { rerender } = render(<FormModal {...props} config={configWithOptions([])} />)
+    fireEvent.change(screen.getByTestId("form-field-purpose"), { target: { value: "Receipt to retain" } })
+    const receipt = new File(["receipt"], "receipt.pdf", { type: "application/pdf" })
+    const fileInput = screen.getByTestId("form-field-receipt") as HTMLInputElement
+    fireEvent.change(fileInput, { target: { files: [receipt] } })
+
+    rerender(<FormModal {...props} config={configWithOptions([{ value: "7", label: "Available employee" }])} />)
+    expect((screen.getByTestId("form-field-purpose") as HTMLInputElement).value).toBe("Receipt to retain")
+    expect(fileInput.files?.[0]).toBe(receipt)
+    fireEvent.click(screen.getByTestId("form-field-partnerId"))
+    fireEvent.click(await screen.findByRole("option", { name: "Available employee" }))
+    fireEvent.click(screen.getByTestId("form-submit-new-contract"))
+    await waitFor(() => expect(submit).toHaveBeenCalledWith({ partnerId: "7", purpose: "Receipt to retain", receipt: [receipt] }))
+  })
+
   it("lets the user search, pick a record, and submits its id", async () => {
     const onSubmit = vi.fn()
     renderForm(onSubmit)
 
-    fireEvent.click(screen.getByTestId("form-field-partnerId"))
+    fireEvent.click(screen.getByRole("combobox", { name: /Partner/ }))
     fireEvent.change(await screen.findByPlaceholderText("Search..."), { target: { value: "glob" } })
     fireEvent.click(await screen.findByRole("option", { name: /Globex/ }))
     await waitFor(() => expect(screen.getByTestId("form-field-partnerId").textContent).toContain("Globex"))

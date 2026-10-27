@@ -36,6 +36,7 @@ import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { AiActionDraftCard } from "./ai-action-draft-card"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "../components/select"
 
 interface ChatReply {
   content: string
@@ -136,6 +137,7 @@ export function AIChatPanel({
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   const [showCommands, setShowCommands] = useState(false)
   const [commandFilter, setCommandFilter] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -243,6 +245,7 @@ export function AIChatPanel({
     }
 
     setMessages((prev) => [...prev, userMessage])
+    setSendError(null)
     setInput("")
     setIsLoading(true)
 
@@ -363,6 +366,8 @@ export function AIChatPanel({
       setMessages((prev) => [...prev, assistantMessage])
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      setSendError(msg)
+      setInput((current) => current === "" ? userMessage.content : current)
       setMessages((prev) => [
         ...prev,
         {
@@ -486,20 +491,32 @@ export function AIChatPanel({
           {contextOptions && contextOptions.length > 0 && onContextChange ? (
             <label className="min-w-0">
               <span className="sr-only">Assistant context</span>
-              <select
-                data-testid="erp-ai-chat-context"
-                value={selectedContext ?? contextOptions[0]?.value}
-                onChange={(event) => onContextChange(event.target.value)}
-                className="h-9 max-w-[128px] rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[190px]"
+              <Select
+                value={String(selectedContext ?? contextOptions[0]?.value ?? "")}
+                onValueChange={(nextValue) => onContextChange(nextValue)}
               >
-                {Array.from(new Set(contextOptions.map((option) => option.group))).map((group) => (
-                  <optgroup key={group} label={group}>
-                    {contextOptions.filter((option) => option.group === group).map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+                <SelectTrigger
+                  data-testid="erp-ai-chat-context"
+                  className="h-9 max-w-[128px] rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[190px]"
+                  aria-label={"Assistant context"}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from(new Set(contextOptions.map((option) => option.group))).map((group) => (
+                    <SelectGroup key={group}>
+                      <SelectLabel>{group}</SelectLabel>
+                      {contextOptions
+                        .filter((option) => option.group === group)
+                        .map((option) => (
+                          <SelectItem key={option.value} value={String(option.value)}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
           ) : null}
           {onDockToggle ? (
@@ -516,6 +533,7 @@ export function AIChatPanel({
       <div className="relative flex min-h-0 flex-1 flex-col">
         <ScrollArea className="min-h-0 flex-1" ref={scrollRef}>
           <div className={cn("mx-auto w-full max-w-[820px] px-4 py-8 sm:px-8", docked ? "sm:px-4" : "sm:py-12")}>
+          {sendError ? <p role="alert" className="break-words text-sm text-destructive">{t("aiChat.requestFailed", { defaultValue: "The assistant request failed. Review the error and your message before sending again." })}</p> : null}
             {messages.length === 0 ? (
               <div className={cn("flex flex-col justify-center", docked ? "py-8" : "min-h-[48vh] py-12")}>
                 <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">

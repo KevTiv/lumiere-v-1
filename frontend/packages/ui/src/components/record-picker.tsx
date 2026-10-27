@@ -102,7 +102,7 @@ export function RecordPicker({
                   className={cn("mr-2 h-4 w-4", option.value === value ? "opacity-100" : "opacity-0")}
                   aria-hidden="true"
                 />
-                {option.label}
+                <span className="min-w-0 flex-1 whitespace-normal [overflow-wrap:anywhere]">{option.label}</span>
               </CommandItem>
             ))}
           </CommandList>

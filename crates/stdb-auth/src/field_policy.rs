@@ -1936,6 +1936,98 @@ mod tests {
     }
 
     #[test]
+    fn finance_authoring_readback_defaults_are_schema_backed() {
+        for (resource, row_type, required) in [
+            (
+                "account-move-lines",
+                "AccountMoveLine",
+                &[
+                    "exclude_from_invoice_tab",
+                    "tax_line_id",
+                    "display_type",
+                    "sequence",
+                    "discount",
+                    "price_subtotal",
+                ][..],
+            ),
+            ("products", "Product", &["can_be_expensed"][..]),
+            (
+                "account-taxes",
+                "AccountTax",
+                &["company_id", "active", "type_tax_use"][..],
+            ),
+        ] {
+            let schema = sql_column_list_for_generated_type(row_type).expect("released row schema");
+            let member = field_access(&[&format!("{resource}:read")]);
+            let mut superuser = field_access(&[]);
+            superuser.is_superuser = true;
+            for context in [None, Some(&member), Some(&superuser)] {
+                let columns =
+                    resolve_http_sql_columns(resource, context).expect("authoring columns");
+                for field in required {
+                    assert!(
+                        columns.iter().any(|column| column == field),
+                        "{resource}.{field}"
+                    );
+                }
+                assert!(
+                    columns.iter().all(|column| schema.contains(column)),
+                    "{resource} contains a column absent from {row_type}: {columns:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn finance_authoring_readback_respects_explicit_field_masks() {
+        for (resource, fields) in [
+            (
+                "account-move-lines",
+                &[
+                    "exclude_from_invoice_tab",
+                    "tax_line_id",
+                    "display_type",
+                    "sequence",
+                    "discount",
+                    "price_subtotal",
+                ][..],
+            ),
+            ("products", &["can_be_expensed"][..]),
+            ("account-taxes", &["active", "type_tax_use"][..]),
+        ] {
+            let mut access = field_access(&[&format!("{resource}:read")]);
+            select_fields(&mut access, resource, &["id"]);
+            let masked =
+                resolve_http_sql_columns(resource, Some(&access)).expect("masked authoring");
+            for field in fields {
+                assert!(
+                    !masked.iter().any(|column| column == field),
+                    "{resource}.{field}"
+                );
+            }
+            if resource != "products" {
+                assert!(masked.iter().any(|column| column == "company_id"));
+            }
+            for selected in fields {
+                access.field_permissions.clear();
+                select_fields(&mut access, resource, &[selected]);
+                let visible =
+                    resolve_http_sql_columns(resource, Some(&access)).expect("selected authoring");
+                assert!(
+                    visible.iter().any(|column| column == selected),
+                    "{resource}.{selected}"
+                );
+                for omitted in fields.iter().filter(|field| *field != selected) {
+                    assert!(
+                        !visible.iter().any(|column| column == omitted),
+                        "{resource}.{omitted}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn quotation_and_document_readback_defaults_are_schema_backed_for_normal_members() {
         for (resource, row_type, required) in [
             (

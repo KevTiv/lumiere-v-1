@@ -6,11 +6,12 @@ const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> =
 export const newPurchaseOrderForm = (t: TFunction): FormConfig => ({
   id: "new-purchase-order",
   title: t("purchasing.forms.newPurchaseOrder.title"),
-  description: t("purchasing.forms.newPurchaseOrder.description"),
+  description: t("purchasing.forms.refinement.newOrderHelp", { defaultValue: "Choose the vendor and currency, save a draft, then add items and review quantities and costs before confirmation." }),
+  submitLabel: t("purchasing.forms.refinement.saveDraft", { defaultValue: "Save draft" }),
   sections: [
     {
       id: "po-vendor",
-      title: t("purchasing.forms.newPurchaseOrder.sections.vendor"),
+      title: t("purchasing.forms.refinement.vendor", { defaultValue: "Vendor and references" }),
       fields: [
         {
           id: "partnerId",
@@ -20,46 +21,44 @@ export const newPurchaseOrderForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.newPurchaseOrder.fields.partnerPlaceholder"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
-        },
-        {
-          id: "pricelistId",
-          name: "pricelistId",
-          type: "select",
-          label: t("purchasing.forms.newPurchaseOrder.fields.pricelistId"),
-          placeholder: t("purchasing.forms.newPurchaseOrder.fields.pricelistPlaceholder"),
-          required: true,
-          width: "1/2",
-          options: emptySelect,
-        },
-        {
-          id: "origin",
-          name: "origin",
-          type: "text",
-          label: t("purchasing.forms.newPurchaseOrder.fields.origin"),
-          placeholder: t("purchasing.forms.newPurchaseOrder.fields.originPlaceholder"),
-          width: "1/2",
         },
         {
           id: "partnerRef",
           name: "partnerRef",
           type: "text",
-          label: t("purchasing.forms.newPurchaseOrder.fields.partnerRef"),
+          label: t("purchasing.forms.refinement.vendorReference", { defaultValue: "Vendor reference" }),
           placeholder: t("purchasing.forms.newPurchaseOrder.fields.partnerRefPlaceholder"),
+          width: "1/2",
+        },
+        {
+          id: "origin",
+          name: "origin",
+          type: "text",
+          label: t("purchasing.forms.refinement.origin", { defaultValue: "Source document reference" }),
+          placeholder: t("purchasing.forms.newPurchaseOrder.fields.originPlaceholder"),
+          description: t("purchasing.forms.refinement.originHelp", { defaultValue: "Optional reference to the request or source document for this purchase." }),
           width: "1/2",
         },
       ],
     },
     {
-      id: "po-schedule",
-      title: t("purchasing.forms.newPurchaseOrder.sections.schedule"),
+      id: "po-pricing",
+      title: t("purchasing.forms.refinement.pricing", { defaultValue: "Pricing and payment" }),
+      description: t("purchasing.forms.refinement.pricingHelp", { defaultValue: "The selected price list supplies the currency. Saving creates a draft; confirmation is a separate action." }),
       fields: [
         {
-          id: "datePlanned",
-          name: "datePlanned",
-          type: "date",
-          label: t("purchasing.forms.newPurchaseOrder.fields.datePlanned"),
+          id: "pricelistId",
+          name: "pricelistId",
+          type: "select",
+          label: t("purchasing.forms.refinement.pricelist", { defaultValue: "Price list and currency" }),
+          placeholder: t("purchasing.forms.newPurchaseOrder.fields.pricelistPlaceholder"),
+          required: true,
+          description: t("purchasing.forms.refinement.pricelistHelp", { defaultValue: "Required. The price list supplies the currency for this purchase order." }),
           width: "1/2",
+          searchable: true,
+          options: emptySelect,
         },
         {
           id: "paymentTermId",
@@ -72,8 +71,22 @@ export const newPurchaseOrderForm = (t: TFunction): FormConfig => ({
       ],
     },
     {
+      id: "po-schedule",
+      title: t("purchasing.forms.refinement.delivery", { defaultValue: "Expected delivery" }),
+      fields: [
+        {
+          id: "datePlanned",
+          name: "datePlanned",
+          type: "date",
+          label: t("purchasing.forms.newPurchaseOrder.fields.datePlanned"),
+          description: t("purchasing.forms.refinement.datePlannedHelp", { defaultValue: "Expected delivery date for the order." }),
+          width: "1/2",
+        },
+      ],
+    },
+    {
       id: "po-notes",
-      title: t("purchasing.forms.newPurchaseOrder.sections.additionalInfo"),
+      title: t("purchasing.forms.refinement.notes", { defaultValue: "Order notes" }),
       fields: [
         {
           id: "notes",
@@ -99,9 +112,7 @@ export const editPurchaseOrderForm = (t: TFunction): FormConfig => ({
   sections: [
     {
       id: "po-header",
-      title: t("purchasing.forms.editPurchaseOrder.sections.header", {
-        defaultValue: "Header",
-      }),
+      title: t("purchasing.forms.refinement.vendor", { defaultValue: "Vendor and references" }),
       fields: [
         {
           id: "orderId",
@@ -112,6 +123,7 @@ export const editPurchaseOrderForm = (t: TFunction): FormConfig => ({
           }),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -120,14 +132,8 @@ export const editPurchaseOrderForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("purchasing.forms.newPurchaseOrder.fields.partnerId"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
-        },
-        {
-          id: "origin",
-          name: "origin",
-          type: "text",
-          label: t("purchasing.forms.newPurchaseOrder.fields.origin"),
-          width: "1/2",
         },
         {
           id: "partnerRef",
@@ -136,6 +142,19 @@ export const editPurchaseOrderForm = (t: TFunction): FormConfig => ({
           label: t("purchasing.forms.newPurchaseOrder.fields.partnerRef"),
           width: "1/2",
         },
+        {
+          id: "origin",
+          name: "origin",
+          type: "text",
+          label: t("purchasing.forms.newPurchaseOrder.fields.origin"),
+          width: "1/2",
+        },
+      ],
+    },
+    {
+      id: "po-schedule",
+      title: t("purchasing.forms.refinement.deliveryPayment", { defaultValue: "Delivery and payment" }),
+      fields: [
         {
           id: "datePlanned",
           name: "datePlanned",
@@ -151,6 +170,13 @@ export const editPurchaseOrderForm = (t: TFunction): FormConfig => ({
           width: "1/2",
           options: [{ value: "", label: "—" }],
         },
+      ],
+    },
+    {
+      id: "po-notes",
+      title: t("purchasing.forms.refinement.notes", { defaultValue: "Order notes" }),
+      description: t("purchasing.forms.refinement.editHelp", { defaultValue: "Blank fields keep their current values." }),
+      fields: [
         {
           id: "notes",
           name: "notes",
@@ -167,11 +193,20 @@ export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
   id: "new-purchase-requisition",
   title: t("purchasing.forms.newPurchaseRequisition.title"),
   description: t("purchasing.forms.newPurchaseRequisition.description"),
+  submitLabel: t("purchasing.forms.refinement.saveRequest", { defaultValue: "Save purchase request" }),
   sections: [
     {
       id: "req-general",
-      title: t("purchasing.forms.newPurchaseRequisition.sections.general"),
+      title: t("purchasing.forms.refinement.request", { defaultValue: "Purchase request" }),
       fields: [
+        {
+          id: "description",
+          name: "description",
+          type: "textarea",
+          label: t("purchasing.forms.newPurchaseRequisition.fields.description"),
+          placeholder: t("purchasing.forms.newPurchaseRequisition.fields.descriptionPlaceholder"),
+          width: "full",
+        },
         {
           id: "vendorId",
           name: "vendorId",
@@ -179,6 +214,7 @@ export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
           label: t("purchasing.forms.newPurchaseRequisition.fields.vendorId"),
           placeholder: t("purchasing.forms.newPurchaseRequisition.fields.vendorPlaceholder"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -188,6 +224,7 @@ export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
           label: t("purchasing.forms.newPurchaseRequisition.fields.departmentId"),
           placeholder: t("purchasing.forms.newPurchaseRequisition.fields.departmentPlaceholder"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -198,19 +235,58 @@ export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.newPurchaseRequisition.fields.originPlaceholder"),
           width: "1/2",
         },
+      ],
+    },
+    {
+      id: "req-line",
+      title: t("purchasing.forms.refinement.requestedItem", { defaultValue: "Requested item and quantity" }),
+      fields: [
         {
-          id: "description",
-          name: "description",
-          type: "textarea",
-          label: t("purchasing.forms.newPurchaseRequisition.fields.description"),
-          placeholder: t("purchasing.forms.newPurchaseRequisition.fields.descriptionPlaceholder"),
-          width: "full",
+          id: "productId",
+          name: "productId",
+          type: "select",
+          label: t("purchasing.forms.newPurchaseRequisition.fields.productId", {
+            defaultValue: "Product",
+          }),
+          placeholder: t("purchasing.forms.newPurchaseRequisition.fields.productPlaceholder", {
+            defaultValue: "Select product",
+          }),
+          width: "1/2",
+          required: true,
+          searchable: true,
+          options: emptySelect,
+        },
+        {
+          id: "uomId",
+          name: "uomId",
+          type: "select",
+          label: t("purchasing.forms.newPurchaseRequisition.fields.uomId", {
+            defaultValue: "UoM",
+          }),
+          placeholder: t("purchasing.forms.newPurchaseRequisition.fields.uomPlaceholder", {
+            defaultValue: "Select UoM",
+          }),
+          width: "1/4",
+          required: true,
+          searchable: true,
+          options: emptySelect,
+        },
+        {
+          id: "quantity",
+          name: "quantity",
+          type: "quantity",
+          validation: { min: 0.0001 },
+          label: t("purchasing.forms.newPurchaseRequisition.fields.quantity", {
+            defaultValue: "Quantity",
+          }),
+          width: "1/4",
+          required: true,
         },
       ],
     },
     {
       id: "req-dates",
-      title: t("purchasing.forms.newPurchaseRequisition.sections.dates"),
+      title: t("purchasing.forms.refinement.requestDates", { defaultValue: "Request dates" }),
       fields: [
         {
           id: "orderingDate",
@@ -235,53 +311,6 @@ export const newPurchaseRequisitionForm = (t: TFunction): FormConfig => ({
         },
       ],
     },
-    {
-      id: "req-line",
-      title: t("purchasing.forms.newPurchaseRequisition.sections.line", {
-        defaultValue: "Requested line",
-      }),
-      fields: [
-        {
-          id: "productId",
-          name: "productId",
-          type: "select",
-          label: t("purchasing.forms.newPurchaseRequisition.fields.productId", {
-            defaultValue: "Product",
-          }),
-          placeholder: t("purchasing.forms.newPurchaseRequisition.fields.productPlaceholder", {
-            defaultValue: "Select product",
-          }),
-          width: "1/2",
-          required: true,
-          options: emptySelect,
-        },
-        {
-          id: "uomId",
-          name: "uomId",
-          type: "select",
-          label: t("purchasing.forms.newPurchaseRequisition.fields.uomId", {
-            defaultValue: "UoM",
-          }),
-          placeholder: t("purchasing.forms.newPurchaseRequisition.fields.uomPlaceholder", {
-            defaultValue: "Select UoM",
-          }),
-          width: "1/4",
-          required: true,
-          options: emptySelect,
-        },
-        {
-          id: "quantity",
-          name: "quantity",
-          type: "quantity",
-          validation: { min: 0.0001 },
-          label: t("purchasing.forms.newPurchaseRequisition.fields.quantity", {
-            defaultValue: "Quantity",
-          }),
-          width: "1/4",
-          required: true,
-        },
-      ],
-    },
   ],
 })
 
@@ -303,6 +332,7 @@ export const addPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.addPurchaseOrderLine.fields.orderPlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
       ],
@@ -319,6 +349,7 @@ export const addPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.addPurchaseOrderLine.fields.productPlaceholder"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -329,6 +360,7 @@ export const addPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.addPurchaseOrderLine.fields.uomPlaceholder"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -370,6 +402,7 @@ export const receivePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.receivePurchaseOrderLine.fields.linePlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -383,10 +416,10 @@ export const receivePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
         {
           id: "lotId",
           name: "lotId",
-          type: "number",
-          label: t("purchasing.forms.receivePurchaseOrderLine.fields.lotId", {
-            defaultValue: "Lot ID",
-          }),
+          type: "text",
+          inputMode: "numeric",
+          label: t("purchasing.forms.refinement.lotReference", { defaultValue: "Lot / serial record reference" }),
+          description: t("purchasing.forms.refinement.lotHelp", { defaultValue: "For tracked products, enter the existing lot or serial record reference. Leave blank for untracked items." }),
           required: false,
           width: "1/2",
         },
@@ -413,6 +446,7 @@ export const invoicePurchaseOrderLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.invoicePurchaseOrderLine.fields.linePlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -446,6 +480,7 @@ export const editPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.editPurchaseOrderLine.fields.linePlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -455,6 +490,7 @@ export const editPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
           label: t("purchasing.forms.editPurchaseOrderLine.fields.productId"),
           placeholder: t("purchasing.forms.editPurchaseOrderLine.fields.productPlaceholder"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -464,6 +500,7 @@ export const editPurchaseOrderLineForm = (t: TFunction): FormConfig => ({
           label: t("purchasing.forms.editPurchaseOrderLine.fields.uomId"),
           placeholder: t("purchasing.forms.editPurchaseOrderLine.fields.uomPlaceholder"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -504,6 +541,7 @@ export const newPartnerBankForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.newPartnerBank.fields.partnerPlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -527,6 +565,7 @@ export const newPartnerBankForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("purchasing.forms.newPartnerBank.fields.currencyId"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -558,6 +597,7 @@ export const editPartnerBankForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.editPartnerBank.fields.bankPlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -618,6 +658,7 @@ export const newLandedCostForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.newLandedCost.fields.pickingPlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -640,6 +681,7 @@ export const newLandedCostForm = (t: TFunction): FormConfig => ({
           label: t("purchasing.forms.newLandedCost.fields.currencyId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -687,6 +729,7 @@ export const editLandedCostForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.editLandedCost.fields.landedCostPlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -707,6 +750,7 @@ export const editLandedCostForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("purchasing.forms.editLandedCost.fields.currencyId"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -752,6 +796,7 @@ export const addLandedCostLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.landedCostLine.fields.landedCostPlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
       ],
@@ -768,6 +813,7 @@ export const addLandedCostLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.landedCostLine.fields.productPlaceholder"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -777,6 +823,7 @@ export const addLandedCostLineForm = (t: TFunction): FormConfig => ({
           label: t("purchasing.forms.landedCostLine.fields.currencyId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -819,6 +866,7 @@ export const removeLandedCostLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.landedCostLine.fields.lineIdPlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
       ],
@@ -909,6 +957,7 @@ export const reviewSupplierIntakeForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.reviewSupplierIntake.fields.intakePlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -941,6 +990,7 @@ export const editSupplierIntakeForm = (t: TFunction): FormConfig => ({
           placeholder: t("purchasing.forms.editSupplierIntake.fields.intakePlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -987,40 +1037,14 @@ export const createBillFromPurchaseOrderForm = (t: TFunction): FormConfig => ({
   id: "create-bill-from-purchase-order",
   title: t("purchasing.forms.createBillFromOrder.title"),
   description: t("purchasing.forms.createBillFromOrder.description"),
-  submitLabel: t("purchasing.forms.createBillFromOrder.submitLabel"),
+  submitLabel: t("purchasing.forms.refinement.createDraftBill", { defaultValue: "Create draft bill" }),
   cancelLabel: t("common.cancel"),
   sections: [
     {
-      id: "accounting",
-      title: t("purchasing.forms.createBillFromOrder.sections.accounting"),
+      id: "bill-details",
+      title: t("purchasing.forms.refinement.billDetails", { defaultValue: "Bill date and adjustments" }),
+      description: t("purchasing.forms.refinement.billDetailsHelp", { defaultValue: "Creates a draft vendor bill for this purchase order. Review the date, tax and discount before creating it." }),
       fields: [
-        {
-          id: "journalId",
-          name: "journalId",
-          type: "select",
-          label: t("purchasing.forms.createBillFromOrder.fields.journalId"),
-          required: true,
-          width: "1/2",
-          options: [],
-        },
-        {
-          id: "defaultExpenseAccountId",
-          name: "defaultExpenseAccountId",
-          type: "select",
-          label: t("purchasing.forms.createBillFromOrder.fields.defaultExpenseAccountId"),
-          required: true,
-          width: "1/2",
-          options: [],
-        },
-        {
-          id: "payableAccountId",
-          name: "payableAccountId",
-          type: "select",
-          label: t("purchasing.forms.createBillFromOrder.fields.payableAccountId"),
-          required: true,
-          width: "1/2",
-          options: [],
-        },
         {
           id: "invoiceDate",
           name: "invoiceDate",
@@ -1036,6 +1060,7 @@ export const createBillFromPurchaseOrderForm = (t: TFunction): FormConfig => ({
           label: t("purchasing.forms.createBillFromOrder.fields.taxId"),
           description: t("purchasing.forms.createBillFromOrder.fields.taxHint"),
           width: "1/2",
+          searchable: true,
           options: [],
         },
         {
@@ -1048,13 +1073,49 @@ export const createBillFromPurchaseOrderForm = (t: TFunction): FormConfig => ({
           max: 100,
           width: "1/2",
         },
+      ],
+    },
+    {
+      id: "accounting",
+      title: t("purchasing.forms.refinement.billAccounts", { defaultValue: "Purchase journal and accounts" }),
+      description: t("purchasing.forms.refinement.billAccountsHelp", { defaultValue: "Review the journal, expense account and vendor payable account. Required choices stay visible." }),
+      fields: [
         {
-          id: "payableLineName",
-          name: "payableLineName",
-          type: "text",
-          label: t("purchasing.forms.createBillFromOrder.fields.payableLineName"),
-          width: "full",
+          id: "journalId",
+          name: "journalId",
+          type: "select",
+          label: t("purchasing.forms.createBillFromOrder.fields.journalId"),
+          required: true,
+          width: "1/2",
+          searchable: true,
+          options: [],
         },
+        {
+          id: "defaultExpenseAccountId",
+          name: "defaultExpenseAccountId",
+          type: "select",
+          label: t("purchasing.forms.createBillFromOrder.fields.defaultExpenseAccountId"),
+          required: true,
+          width: "1/2",
+          searchable: true,
+          options: [],
+        },
+        {
+          id: "payableAccountId",
+          name: "payableAccountId",
+          type: "select",
+          label: t("purchasing.forms.createBillFromOrder.fields.payableAccountId"),
+          required: true,
+          width: "1/2",
+          searchable: true,
+          options: [],
+        },
+      ],
+    },
+    {
+      id: "bill-notes",
+      title: t("purchasing.forms.refinement.billNotes", { defaultValue: "Bill notes and ledger description" }),
+      fields: [
         {
           id: "narration",
           name: "narration",
@@ -1064,6 +1125,20 @@ export const createBillFromPurchaseOrderForm = (t: TFunction): FormConfig => ({
           width: "full",
           rows: 3,
         },
+        {
+          id: "payableLineName",
+          name: "payableLineName",
+          type: "text",
+          label: t("purchasing.forms.createBillFromOrder.fields.payableLineName"),
+          width: "full",
+        },
+      ],
+    },
+    {
+      id: "ledger-options",
+      title: t("purchasing.forms.refinement.ledgerOptions", { defaultValue: "Specialist ledger line options" }),
+      description: t("purchasing.forms.refinement.ledgerOptionsHelp", { defaultValue: "These settings affect payable line visibility and reconciliation. Keep the existing values unless your accountant requests a change." }),
+      fields: [
         {
           id: "expenseBlocked",
           name: "expenseBlocked",

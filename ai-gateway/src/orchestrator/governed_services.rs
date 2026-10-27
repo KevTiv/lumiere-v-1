@@ -335,7 +335,7 @@ impl StdbExecutionRecovery<'_> {
         let rows = self
             .reader
             .query_sql(&format!(
-                "SELECT * FROM ai_capability_execution WHERE organization_id = {} \
+                "SELECT * FROM ai_capability_execution_read WHERE organization_id = {} \
                  AND recovery_key = '{key}' LIMIT 2",
                 self.organization_id
             ))

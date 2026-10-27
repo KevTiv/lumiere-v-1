@@ -22,7 +22,7 @@ function InsightsFixture() {
     moves: { rows: [...overviewFixture.moves.rows,
       { id: "9007199254740993", organizationId: 1, companyId: 2, name: "SYNTHETIC SECOND COMPANY", moveType: "OutInvoice", state: "Posted", amountTotal: 500, amountResidual: 250, currencyId: 2, invoiceDate: "2026-10-01", invoiceDateDue: "2026-10-30" },
     ], state: state(movesState) },
-    currencies: { rows: overviewFixture.currencies.rows, state: state(currenciesState) },
+    currencies: { rows: currenciesState === "ready" ? overviewFixture.currencies.rows : [], state: state(currenciesState) },
     companies: { rows: [{ id: 1, organizationId: 1, currencyId: 1 }, { id: 2, organizationId: 1, currencyId: 2 }], state: state("ready") },
   }
   return <main className="mx-auto min-w-0 max-w-7xl space-y-5 p-4 sm:p-6">

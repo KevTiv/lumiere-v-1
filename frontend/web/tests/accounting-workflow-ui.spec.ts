@@ -1,3 +1,4 @@
+import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
 import { test, expect, type Locator, type Page } from "@playwright/test"
 
 const unexpectedRequests = new WeakMap<Page, string[]>()
@@ -9,6 +10,10 @@ async function touchTargets(page: Page, width: number, controls: Locator[]) {
   if (width >= 1024) return
   expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true)
   for (const control of controls) expect(await control.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44)
+}
+async function openWorklistSettings(list: Locator) {
+  const disclosure = list.getByRole("button", { name: "View settings", exact: true })
+  if (await disclosure.getAttribute("aria-expanded") !== "true") await disclosure.click()
 }
 async function selectBank(page: Page) {
   await page.getByTestId("reconciliation-candidate-501").getByRole("checkbox").check()
@@ -56,28 +61,42 @@ for (const width of [320, 390, 768, 1440]) {
       await touchTargets(page, width, [list.getByLabel("Search", { exact: true }), list.getByRole("combobox", { name: "Currency", exact: true }), row.getByRole("checkbox").locator("..")])
       const table = list.locator('[data-slot="table-container"]')
       if (width < 768) expect(await table.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
-      await list.getByRole("combobox", { name: "Currency", exact: true }).selectOption("1")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        list.getByRole("combobox", { name: "Currency", exact: true }),
+        "1",
+      )
+      await openWorklistSettings(list)
       await list.getByRole("button", { name: "Columns", exact: true }).click()
       await page.getByRole("menuitemcheckbox", { name: "Due Date", exact: true }).click()
       await page.keyboard.press("Escape")
       await list.getByLabel("View name", { exact: true }).fill("Synthetic EUR review")
       await list.getByRole("button", { name: "Save view", exact: true }).click()
       await page.reload()
-      await expect(list.getByRole("combobox", { name: "Currency", exact: true })).toHaveValue("1")
+      await expect(list.getByRole("combobox", { name: "Currency", exact: true })).toContainText("EUR")
       await expect(list.getByRole("columnheader", { name: /Due Date/ })).toHaveCount(0)
-      await expect(list.getByRole("combobox", { name: "Saved views", exact: true }).locator("option", { hasText: "Synthetic EUR review" })).toHaveCount(1)
+      await openWorklistSettings(list)
+      await list.getByRole("combobox", { name: "Saved views", exact: true }).click()
+      await expect(page.getByRole("option", { name: "Synthetic EUR review", exact: true })).toHaveCount(1)
+      await page.keyboard.press("Escape")
       await page.getByRole("button", { name: "Switch synthetic company", exact: true }).click()
       await expect(list.getByTestId("entity-row-999")).toBeVisible()
-      await expect(list.getByRole("combobox", { name: "Currency", exact: true })).toHaveValue("")
-      await expect(list.getByRole("combobox", { name: "Saved views", exact: true }).locator("option", { hasText: "Synthetic EUR review" })).toHaveCount(0)
+      await expect(list.getByRole("combobox", { name: "Currency", exact: true })).toContainText("All currencies")
+      await openWorklistSettings(list)
+      await list.getByRole("combobox", { name: "Saved views", exact: true }).click()
+      await expect(page.getByRole("option", { name: "Synthetic EUR review", exact: true })).toHaveCount(0)
+      await page.keyboard.press("Escape")
       await page.getByRole("button", { name: "Switch synthetic company", exact: true }).click()
-      await expect(list.getByRole("combobox", { name: "Currency", exact: true })).toHaveValue("1")
+      await expect(list.getByRole("combobox", { name: "Currency", exact: true })).toContainText("EUR")
       await page.getByRole("tab", { name: "Bill worklist", exact: true }).click()
       const bills = page.getByTestId("accounting-bill-worklist")
       await expect(bills.getByTestId("entity-row-201")).toBeVisible()
       await expect(bills.getByTestId("entity-row-299")).toHaveCount(0)
-      await expect(bills.getByRole("combobox", { name: "Currency", exact: true })).toHaveValue("")
-      await expect(bills.getByRole("combobox", { name: "Saved views", exact: true }).locator("option", { hasText: "Synthetic EUR review" })).toHaveCount(0)
+      await expect(bills.getByRole("combobox", { name: "Currency", exact: true })).toContainText("All currencies")
+      await openWorklistSettings(bills)
+      await bills.getByRole("combobox", { name: "Saved views", exact: true }).click()
+      await expect(page.getByRole("option", { name: "Synthetic EUR review", exact: true })).toHaveCount(0)
+      await page.keyboard.press("Escape")
       await noOverflow(page)
     })
 
@@ -93,20 +112,25 @@ for (const width of [320, 390, 768, 1440]) {
       }
       await page.getByRole("button", { name: "Cycle synthetic source state", exact: true }).click()
       await expect(list.getByTestId(`entity-row-${exactInvoice}`)).toBeVisible()
+      await openWorklistSettings(list)
       await list.getByLabel("View name", { exact: true }).fill("All synthetic documents")
       await list.getByRole("button", { name: "Save view", exact: true }).click()
       await page.getByRole("button", { name: "Apply linked overdue filter", exact: true }).click()
-      await list.getByRole("combobox", { name: "Saved views", exact: true }).selectOption("All synthetic documents")
-      await expect(list.getByRole("combobox", { name: "Balance queue", exact: true })).toHaveValue("overdue")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        list.getByRole("combobox", { name: "Saved views", exact: true }),
+        "saved:All synthetic documents",
+      )
+      await expect(list.getByRole("combobox", { name: "Balance queue", exact: true })).toContainText("Overdue")
       await expect(list.getByRole("combobox", { name: "Balance queue", exact: true })).toBeDisabled()
       await expect(list.getByTestId("entity-row-9007199254740992")).toHaveCount(0)
       await expect(list.getByTestId("entity-row-103")).toHaveCount(0)
-      await list.getByRole("button", { name: "Clear queue filter", exact: true }).click()
+      await list.getByRole("button", { name: "Clear Balance queue filter", exact: true }).click()
       await expect(list.getByTestId("entity-row-103")).toBeVisible()
       await noOverflow(page)
     })
 
-    test("bank matching requires exact complete records and explicit review before one scoped link", async ({ page }) => {
+    test("bank matching requires exact complete records and explicit review before one scoped settlement", async ({ page }) => {
       await page.getByRole("tab", { name: "Bank matching", exact: true }).click()
       const desk = page.getByTestId("reconciliation-workbench")
       await expect(desk.getByTestId("reconciliation-candidate-599")).toHaveCount(0)
@@ -127,8 +151,8 @@ for (const width of [320, 390, 768, 1440]) {
       await selectBank(page)
       await expect(desk.getByTestId("reconciliation-confirm")).toBeEnabled()
       await desk.getByTestId("reconciliation-confirm").click()
-      await expect(desk.getByTestId("reconciliation-operation")).toContainText("Bank-line link confirmed")
-      await expect(desk.getByTestId("reconciliation-operation")).toContainText("balances have not been settled")
+      await expect(desk.getByTestId("reconciliation-operation")).toContainText("Bank settlement confirmed")
+      await expect(desk.getByTestId("reconciliation-operation")).toContainText("invoice balances are settled")
       await expect(page.getByTestId("workflow-fixture-state")).toContainText("bank dispatches 1; bank checks 0")
       await noOverflow(page)
     })
@@ -152,7 +176,7 @@ for (const width of [320, 390, 768, 1440]) {
       await page.getByRole("button", { name: "Check original action", exact: true }).click()
       await expect(page.getByTestId("workflow-fixture-state")).toContainText("bank dispatches 2; bank checks 1")
       await page.getByRole("button", { name: "Check original action", exact: true }).click()
-      await expect(page.getByTestId("reconciliation-operation")).toContainText("Bank-line link confirmed")
+      await expect(page.getByTestId("reconciliation-operation")).toContainText("Bank settlement confirmed")
       await expect(page.getByTestId("workflow-fixture-state")).toContainText("bank dispatches 2; bank checks 2")
       await noOverflow(page)
     })
@@ -161,15 +185,17 @@ for (const width of [320, 390, 768, 1440]) {
       await openEmail(page)
       const dialog = page.getByTestId("invoice-email-review")
       const template = dialog.getByTestId("invoice-email-template")
-      await expect(template.locator("option", { hasText: "FOREIGN COMPANY" })).toHaveCount(0)
+      await template.click()
+      await expect(page.getByRole("option", { name: /FOREIGN COMPANY/ })).toHaveCount(0)
+      await page.keyboard.press("Escape")
       await dialog.getByTestId("invoice-email-recipient").fill("not-an-email")
       await expect(dialog.getByTestId("invoice-email-queue")).toBeDisabled()
-      await template.selectOption("103")
-      await expect(dialog.getByRole("alert")).toContainText(/attachment/i)
+      await chooseSelectOptionByTriggerValue(page, template, "103")
+      await expect(dialog.getByRole("checkbox", { name: "Attach the managed invoice PDF", exact: true })).toBeChecked()
       await expect(dialog.getByTestId("invoice-email-queue")).toBeDisabled()
-      await template.selectOption("104")
+      await chooseSelectOptionByTriggerValue(page, template, "104")
       await expect(dialog.getByRole("alert")).toContainText(/placeholder/i)
-      await template.selectOption("101")
+      await chooseSelectOptionByTriggerValue(page, template, "101")
       await expect(dialog.getByTestId("invoice-email-body")).toContainText("<strong>Synthetic literal message</strong>")
       await expect(dialog.getByTestId("invoice-email-body").locator("strong")).toHaveCount(0)
       await approveEmail(page)

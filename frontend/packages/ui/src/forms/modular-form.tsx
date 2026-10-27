@@ -58,6 +58,8 @@ function clearHiddenFileSelections(config: FormConfig, values: FormValues): void
 interface ModularFormProps {
   config: FormConfig
   onSubmit?: (data: Record<string, unknown>) => void | Promise<void>
+  /** Submission feedback stays in the same scroll area as the fields it concerns. */
+  submitError?: string | null
   onCancel?: () => void
   className?: string
   /** Renders at the start of the footer row (e.g. destructive actions beside Cancel / Submit). */
@@ -88,6 +90,7 @@ interface ModularFormProps {
 export function ModularForm({
   config,
   onSubmit,
+  submitError,
   onCancel,
   className,
   leadingActions,
@@ -102,6 +105,15 @@ export function ModularForm({
   draftKey,
 }: ModularFormProps) {
   const { t } = useTranslation()
+  const [submissionError, setSubmissionError] = useState<string | null>(null)
+  const visibleSubmitError = submitError || submissionError
+  const formBodyRef = useRef<HTMLDivElement>(null)
+  const invalidFieldRef = useRef<string | null>(null)
+  useEffect(() => {
+    // Scroll only the field owner; scrolling ancestors can move the dialog header and close control.
+    if (visibleSubmitError && formBodyRef.current) formBodyRef.current.scrollTop = 0
+  }, [visibleSubmitError])
+  useEffect(() => { setSubmissionError(null) }, [config.id])
   const aiSuggest = useAiFormSuggest()
   // Initialize form state with default values
   const getInitialValues = useCallback(() => {
@@ -371,6 +383,26 @@ export function ModularForm({
     return null
   }
 
+  useEffect(() => {
+    const name = invalidFieldRef.current
+    invalidFieldRef.current = null
+    const body = formBodyRef.current
+    if (!name || !body) return
+    const field = Array.from(body.querySelectorAll<HTMLElement>("[data-form-field]"))
+      .find((element) => element.dataset.formField === name)
+    if (!field) return
+    field.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled), input:not(:disabled), textarea:not(:disabled), button:not(:disabled)')?.focus({ preventScroll: true })
+    if (scrollable) {
+      const fieldRect = field.getBoundingClientRect()
+      const bodyRect = body.getBoundingClientRect()
+      if (fieldRect.top < bodyRect.top || fieldRect.bottom > bodyRect.bottom) {
+        body.scrollTop += fieldRect.top - bodyRect.top - 16
+      }
+    } else {
+      field.scrollIntoView?.({ block: "nearest" })
+    }
+  }, [errors, scrollable])
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
@@ -381,6 +413,7 @@ export function ModularForm({
       }
     }
 
+    invalidFieldRef.current = Object.keys(newErrors)[0] ?? null
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -395,6 +428,7 @@ export function ModularForm({
       return
     }
 
+    setSubmissionError(null)
     if (!validateForm()) {
       toast.warning(t("common.formSubmit.validationFailed"))
       return
@@ -417,6 +451,7 @@ export function ModularForm({
         error instanceof Error && error.message.trim() !== ""
           ? error.message
           : t("common.formSubmit.failed")
+      setSubmissionError(message)
       toast.error(message)
     } finally {
       setIsSubmitting(false)
@@ -437,6 +472,7 @@ export function ModularForm({
     setValues(initial)
     onValuesChange?.(initial)
     setErrors({})
+    setSubmissionError(null)
   }
 
   const handleCancel = () => {
@@ -570,13 +606,21 @@ export function ModularForm({
   const formContent = (
     <form noValidate onSubmit={handleSubmit} onKeyDown={handleKeyDown} className={cn("flex flex-col", scrollable ? "min-h-0 flex-1 overflow-hidden" : "gap-6")}>
       <div
+        ref={formBodyRef}
         data-form-body={scrollable ? "" : undefined}
         className={cn(
           scrollable && "min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5",
           hasPreview && "grid items-start gap-6 lg:grid-cols-2",
         )}
       >
-        <div className="flex min-w-0 flex-col gap-6">{fieldsContent}</div>
+        <div className="flex min-w-0 flex-col gap-6">
+          {visibleSubmitError ? (
+            <p tabIndex={-1} className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive [overflow-wrap:anywhere]" role="alert">
+              {visibleSubmitError}
+            </p>
+          ) : null}
+          {fieldsContent}
+        </div>
         {hasPreview ? (
           <aside
             data-form-preview

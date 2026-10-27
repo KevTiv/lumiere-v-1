@@ -32,7 +32,7 @@ export function addOrgMemberForm(t: TFunction, roleOptions: { value: string; lab
             id: "jobTitle",
             name: "jobTitle",
             type: "text",
-            label: t("settings.users.department"),
+            label: t("settings.adminOps.members.jobTitle", { defaultValue: "Job title" }),
             width: "1/2",
           },
           {
@@ -105,7 +105,7 @@ export function addUserToOrganizationForm(
             id: "jobTitle",
             name: "jobTitle",
             type: "text",
-            label: t("settings.users.department"),
+            label: t("settings.adminOps.members.jobTitle", { defaultValue: "Job title" }),
             width: "1/2",
           },
           {
@@ -170,7 +170,7 @@ export function updateOrgMemberDetailsForm(
             id: "jobTitle",
             name: "jobTitle",
             type: "text",
-            label: t("settings.users.department"),
+            label: t("settings.adminOps.members.jobTitle", { defaultValue: "Job title" }),
             width: "1/2",
           },
           {
@@ -236,7 +236,7 @@ export function createCountryForm(t: TFunction): FormConfig {
         fields: [
           { id: "code", name: "code", type: "text", label: t("settings.adminOps.reference.countryCode"), required: true, width: "1/3" },
           { id: "name", name: "name", type: "text", label: t("settings.adminOps.reference.countryName"), required: true, width: "2/3" },
-          { id: "iso3", name: "iso3", type: "text", label: "ISO3", required: true, width: "1/3" },
+          { id: "iso3", name: "iso3", type: "text", label: t("settings.adminOps.reference.iso3", { defaultValue: "Three-letter country code" }), description: t("settings.adminOps.reference.iso3Hint", { defaultValue: "Use the ISO 3166-1 three-letter code, such as USA or FRA." }), required: true, width: "1/3" },
           { id: "numcode", name: "numcode", type: "number", label: t("settings.adminOps.reference.numcode"), defaultValue: 0, width: "1/3" },
           { id: "phoneCode", name: "phoneCode", type: "text", label: t("settings.adminOps.reference.phoneCode"), required: true, width: "1/3" },
           {

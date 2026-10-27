@@ -334,7 +334,7 @@ impl StdbEvidenceRecorder<'_> {
         let rows = self
             .reader
             .query_sql(&format!(
-                "SELECT * FROM ai_evidence_contribution WHERE organization_id = {} \
+                "SELECT * FROM ai_evidence_contribution_read WHERE organization_id = {} \
                  AND session_ref = '{}' LIMIT 1",
                 scope.organization_id, session_ref
             ))
@@ -360,7 +360,7 @@ impl StdbEvidenceRecorder<'_> {
         let rows = self
             .reader
             .query_sql(&format!(
-                "SELECT * FROM ai_evidence_claim WHERE organization_id = {} \
+                "SELECT * FROM ai_evidence_claim_read WHERE organization_id = {} \
                  AND statement = '{literal}'",
                 scope.organization_id
             ))

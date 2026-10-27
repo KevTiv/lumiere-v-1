@@ -7,20 +7,12 @@ export const newFinancialReportForm = (t: TFunction): FormConfig => ({
   id: "new-financial-report",
   title: t("reports.forms.generateReport.title"),
   description: t("reports.forms.generateReport.description"),
+  submitLabel: t("reports.forms.generateReport.submit", { defaultValue: "Generate report" }),
   sections: [
     {
       id: "report-params",
-      title: t("reports.forms.generateReport.sections.reportParameters"),
+      title: t("reports.forms.generateReport.sections.reportParameters", { defaultValue: "Report and period" }),
       fields: [
-        {
-          id: "name",
-          name: "name",
-          type: "text",
-          label: t("reports.forms.generateReport.fields.name"),
-          placeholder: t("reports.forms.generateReport.fields.namePlaceholder"),
-          required: true,
-          width: "full",
-        },
         {
           id: "reportType",
           name: "reportType",
@@ -53,8 +45,67 @@ export const newFinancialReportForm = (t: TFunction): FormConfig => ({
           ],
         },
         {
+          id: "dateFrom",
+          name: "dateFrom",
+          type: "date",
+          label: t("reports.forms.generateReport.fields.dateFrom"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "dateTo",
+          name: "dateTo",
+          type: "date",
+          label: t("reports.forms.generateReport.fields.dateTo"),
+          required: true,
+          width: "1/2",
+        },
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("reports.forms.generateReport.fields.name"),
+          placeholder: t("reports.forms.generateReport.fields.namePlaceholder"),
+          required: true,
+          width: "full",
+        },
+      ],
+    },
+    {
+      id: "report-basis",
+      title: t("reports.forms.generateReport.sections.basis", { defaultValue: "Accounting basis" }),
+      fields: [
+        {
+          id: "targetMove",
+          name: "targetMove",
+          description: t("reports.forms.generateReport.targetMoveHint", { defaultValue: "Choose whether the report includes posted entries only or all entries." }),
+          type: "select",
+          label: t("reports.forms.generateReport.fields.targetMove"),
+          width: "1/2",
+          options: [
+            { value: "posted", label: t("reports.forms.generateReport.fields.options.posted") },
+            { value: "all", label: t("reports.forms.generateReport.fields.options.all") },
+          ],
+        },
+        {
+          id: "currencyId",
+          name: "currencyId",
+          type: "select",
+          label: t("reports.forms.generateReport.fields.currencyId"),
+          placeholder: t("reports.forms.generateReport.fields.currencyIdPlaceholder"),
+          width: "1/2",
+          options: emptySelect,
+        },
+      ],
+    },
+    {
+      id: "report-comparison",
+      title: t("reports.forms.generateReport.sections.comparison", { defaultValue: "Comparison" }),
+      fields: [
+        {
           id: "comparisonMode",
           name: "comparisonMode",
+          description: t("reports.forms.generateReport.comparisonHint", { defaultValue: "Compare this period with the previous period or the same period last year." }),
           type: "select",
           label: t("reports.forms.generateReport.fields.comparisonMode"),
           width: "1/2",
@@ -74,50 +125,21 @@ export const newFinancialReportForm = (t: TFunction): FormConfig => ({
             },
           ],
         },
-        {
-          id: "dateFrom",
-          name: "dateFrom",
-          type: "date",
-          label: t("reports.forms.generateReport.fields.dateFrom"),
-          required: true,
-          width: "1/2",
-        },
-        {
-          id: "dateTo",
-          name: "dateTo",
-          type: "date",
-          label: t("reports.forms.generateReport.fields.dateTo"),
-          required: true,
-          width: "1/2",
-        },
-        {
-          id: "currencyId",
-          name: "currencyId",
-          type: "select",
-          label: t("reports.forms.generateReport.fields.currencyId"),
-          placeholder: t("reports.forms.generateReport.fields.currencyIdPlaceholder"),
-          width: "1/2",
-          options: emptySelect,
-        },
+      ],
+    },
+    {
+      id: "report-display",
+      title: t("reports.forms.generateReport.sections.display", { defaultValue: "Display options" }),
+      fields: [
         {
           id: "hierarchyLevel",
           name: "hierarchyLevel",
+          description: t("reports.forms.generateReport.hierarchyHint", { defaultValue: "Level of account detail shown in the report." }),
           type: "text",
           label: t("reports.forms.generateReport.fields.hierarchyLevel"),
           placeholder: t("reports.forms.generateReport.fields.hierarchyLevelPlaceholder"),
           width: "1/2",
           defaultValue: "2",
-        },
-        {
-          id: "targetMove",
-          name: "targetMove",
-          type: "select",
-          label: t("reports.forms.generateReport.fields.targetMove"),
-          width: "1/2",
-          options: [
-            { value: "posted", label: t("reports.forms.generateReport.fields.options.posted") },
-            { value: "all", label: t("reports.forms.generateReport.fields.options.all") },
-          ],
         },
         {
           id: "showDebitCredit",
@@ -162,7 +184,7 @@ export const newReportTemplateForm = (t: TFunction): FormConfig => ({
   sections: [
     {
       id: "tpl-main",
-      title: t("reports.forms.reportTemplate.sections.main"),
+      title: t("reports.forms.reportTemplate.sections.main", { defaultValue: "Template and source" }),
       fields: [
         {
           id: "name",
@@ -196,6 +218,21 @@ export const newReportTemplateForm = (t: TFunction): FormConfig => ({
           width: "full",
           defaultValue: "account.move",
         },
+        {
+          id: "companyId",
+          name: "companyId",
+          type: "select",
+          label: t("reports.forms.reportSource.company", { defaultValue: "Company (optional)" }),
+          placeholder: t("reports.forms.reportSource.companyPlaceholder", { defaultValue: "Select a company" }),
+          width: "full",
+          options: emptySelect,
+        },
+      ],
+    },
+    {
+      id: "tpl-layout",
+      title: t("reports.forms.reportTemplate.sections.layout", { defaultValue: "File and page layout" }),
+      fields: [
         {
           id: "reportType",
           name: "reportType",
@@ -282,6 +319,20 @@ export const newReportTemplateForm = (t: TFunction): FormConfig => ({
           width: "1/2",
           defaultValue: true,
         },
+      ],
+    },
+    {
+      id: "tpl-options",
+      title: t("reports.forms.reportTemplate.sections.options", { defaultValue: "Availability and attachments" }),
+      fields: [
+        {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: t("reports.forms.reportTemplate.fields.isActive"),
+          width: "1/2",
+          defaultValue: true,
+        },
         {
           id: "attachmentUse",
           name: "attachmentUse",
@@ -295,23 +346,6 @@ export const newReportTemplateForm = (t: TFunction): FormConfig => ({
           type: "checkbox",
           label: t("reports.forms.reportTemplate.fields.multiCompany"),
           width: "1/2",
-        },
-        {
-          id: "isActive",
-          name: "isActive",
-          type: "checkbox",
-          label: t("reports.forms.reportTemplate.fields.isActive"),
-          width: "1/2",
-          defaultValue: true,
-        },
-        {
-          id: "companyId",
-          name: "companyId",
-          type: "select",
-          label: t("reports.forms.reportSource.company", { defaultValue: "Company (optional)" }),
-          placeholder: t("reports.forms.reportSource.companyPlaceholder", { defaultValue: "Select a company" }),
-          width: "full",
-          options: emptySelect,
         },
       ],
     },
@@ -327,7 +361,7 @@ export const newScheduledReportForm = (t: TFunction): FormConfig => ({
   sections: [
     {
       id: "sched-main",
-      title: t("reports.forms.scheduledReport.sections.main"),
+      title: t("reports.forms.scheduledReport.sections.main", { defaultValue: "Report content" }),
       fields: [
         {
           id: "name",
@@ -340,6 +374,7 @@ export const newScheduledReportForm = (t: TFunction): FormConfig => ({
         {
           id: "reportTemplateId",
           name: "reportTemplateId",
+          description: t("reports.forms.scheduledReport.templateHint", { defaultValue: "Select an existing report template. Create one in Report templates if none is available." }),
           type: "select",
           label: t("reports.forms.scheduledReport.fields.reportTemplateId"),
           required: true,
@@ -371,6 +406,22 @@ export const newScheduledReportForm = (t: TFunction): FormConfig => ({
           defaultValue: "account.move",
         },
         {
+          id: "companyId",
+          name: "companyId",
+          type: "select",
+          label: t("reports.forms.reportSource.company", { defaultValue: "Company (optional)" }),
+          placeholder: t("reports.forms.reportSource.companyPlaceholder", { defaultValue: "Select a company" }),
+          width: "full",
+          options: emptySelect,
+        },
+      ],
+    },
+    {
+      id: "sched-timing",
+      title: t("reports.forms.scheduledReport.sections.timing", { defaultValue: "Schedule" }),
+      description: t("reports.forms.scheduledReport.timingHint", { defaultValue: "Set the first run time and how often the schedule repeats." }),
+      fields: [
+        {
           id: "frequency",
           name: "frequency",
           type: "select",
@@ -392,6 +443,30 @@ export const newScheduledReportForm = (t: TFunction): FormConfig => ({
           width: "full",
         },
         {
+          id: "isActive",
+          name: "isActive",
+          type: "checkbox",
+          label: t("reports.forms.scheduledReport.fields.isActive"),
+          width: "1/2",
+          defaultValue: true,
+        },
+      ],
+    },
+    {
+      id: "sched-delivery",
+      title: t("reports.forms.scheduledReport.sections.delivery", { defaultValue: "Recipients and file" }),
+      fields: [
+        {
+          id: "recipients",
+          name: "recipients",
+          description: t("reports.forms.scheduledReport.recipientsHint", { defaultValue: "Separate recipient addresses with commas or new lines." }),
+          type: "textarea",
+          label: t("reports.forms.scheduledReport.fields.recipients"),
+          placeholder: t("reports.forms.scheduledReport.fields.recipientsPlaceholder"),
+          required: true,
+          width: "full",
+        },
+        {
           id: "attachmentFormat",
           name: "attachmentFormat",
           type: "select",
@@ -403,32 +478,6 @@ export const newScheduledReportForm = (t: TFunction): FormConfig => ({
             { value: "Excel", label: "Excel" },
             { value: "CSV", label: "CSV" },
           ],
-        },
-        {
-          id: "recipients",
-          name: "recipients",
-          type: "textarea",
-          label: t("reports.forms.scheduledReport.fields.recipients"),
-          placeholder: t("reports.forms.scheduledReport.fields.recipientsPlaceholder"),
-          required: true,
-          width: "full",
-        },
-        {
-          id: "isActive",
-          name: "isActive",
-          type: "checkbox",
-          label: t("reports.forms.scheduledReport.fields.isActive"),
-          width: "1/2",
-          defaultValue: true,
-        },
-        {
-          id: "companyId",
-          name: "companyId",
-          type: "select",
-          label: t("reports.forms.reportSource.company", { defaultValue: "Company (optional)" }),
-          placeholder: t("reports.forms.reportSource.companyPlaceholder", { defaultValue: "Select a company" }),
-          width: "full",
-          options: emptySelect,
         },
       ],
     },
@@ -594,6 +643,7 @@ export const recordScheduledRunForm = (t: TFunction): FormConfig => ({
   id: "record-scheduled-run",
   title: t("reports.forms.recordScheduledRun.title"),
   description: t("reports.forms.recordScheduledRun.description"),
+  submitLabel: t("reports.forms.recordScheduledRun.submit", { defaultValue: "Record completed run" }),
   sections: [
     {
       id: "next",

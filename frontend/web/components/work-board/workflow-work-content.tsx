@@ -59,9 +59,10 @@ import {
   AmbiguousOperationEffectError,
   UnresolvedOperationEffectError,
 } from "@lumiere/query-hooks/hooks/operation-effect"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 const selectClass =
-  "h-9 max-w-full rounded-md border bg-background px-2 text-sm"
+  "h-9 max-w-full"
 
 type FrozenCommand =
   | { kind: "claim"; input: ClaimHumanTaskInput }
@@ -488,24 +489,29 @@ export function WorkflowWorkContent({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="grid gap-1 text-xs font-medium">
           {t("workBoard.team")}
-          <select
-            className={selectClass}
-            value={scope.team ?? ""}
+          <Select
+            value={String(scope.team ?? "") || "__none__"}
+            onValueChange={(selectValue) => {
+              const nextValue = selectValue === "__none__" ? "" : selectValue
+              onTeamChange(nextValue || null)
+            }}
             disabled={navigationPending}
-            onChange={(event) => onTeamChange(event.target.value || null)}
           >
-            <option value="">{t("workBoard.allTeams")}</option>
-            {scope.team &&
-              !teams.some((team) => workTeamKey(team) === scope.team) && (
-                <option value={scope.team}>{scope.team}</option>
+            <SelectTrigger className={selectClass} aria-label={t("workBoard.team")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={"__none__"}>{t("workBoard.allTeams")}</SelectItem>
+              {scope.team && !teams.some((team) => workTeamKey(team) === scope.team) && (
+                <SelectItem value={String(scope.team)}>{scope.team}</SelectItem>
               )}
-            {teams.map((team) => (
-              <option key={workTeamKey(team)} value={workTeamKey(team)}>
-                {team.label ||
-                  t(`workBoard.teamKind.${team.kind}`, { id: team.id })}
-              </option>
-            ))}
-          </select>
+              {teams.map((team) => (
+                <SelectItem key={workTeamKey(team)} value={String(workTeamKey(team))}>
+                  {team.label || t(`workBoard.teamKind.${team.kind}`, { id: team.id })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <div className="flex items-center gap-3">
           <p className="text-xs text-muted-foreground" role="status">
@@ -697,34 +703,32 @@ export function WorkflowWorkContent({
                 approvalActorOptions(current).length > 0 && (
                   <label className="grid gap-1 text-sm">
                     {t("workBoard.actingAs")}
-                    <select
-                      className={selectClass}
-                      value={actor ?? "select"}
-                      disabled={busy || unresolved != null}
-                      onChange={(event) => {
-                        setActor(
-                          event.target.value === "select"
-                            ? null
-                            : event.target.value,
-                        )
+                    <Select
+                      value={String(actor ?? "select") || "__none__"}
+                      onValueChange={(selectValue) => {
+                        const nextValue = selectValue === "__none__" ? "" : selectValue
+                        setActor(nextValue === "select" ? null : nextValue)
                         setError(null)
                       }}
+                      disabled={busy || unresolved != null}
                     >
-                      <option value="select" disabled>
-                        {t("workBoard.selectActor")}
-                      </option>
-                      {current.directlyEligible && (
-                        <option value="">{t("workBoard.myself")}</option>
-                      )}
-                      {approvalActorOptions(current).map((option) => (
-                        <option
-                          key={option.identityHex}
-                          value={option.identityHex}
-                        >
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className={selectClass} aria-label={t("workBoard.actingAs")}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={"select"} disabled>
+                          {t("workBoard.selectActor")}
+                        </SelectItem>
+                        {current.directlyEligible && (
+                          <SelectItem value={"__none__"}>{t("workBoard.myself")}</SelectItem>
+                        )}
+                        {approvalActorOptions(current).map((option) => (
+                          <SelectItem key={option.identityHex} value={String(option.identityHex)}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </label>
                 )}
               {unresolved ? (

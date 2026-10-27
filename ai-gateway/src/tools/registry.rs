@@ -25,6 +25,7 @@ struct ErpSnapshotTool;
 struct ErpSearchTool;
 struct SaveArtifactTool;
 struct AnalyticsSummaryTool;
+struct FinanceReviewTool;
 struct WebSearchTool;
 struct FetchUrlTool;
 struct ActionDraftTool;
@@ -71,6 +72,19 @@ impl AgentTool for SaveArtifactTool {
 
     async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
         save_artifact::execute(ctx, input).await
+    }
+}
+
+#[async_trait]
+impl AgentTool for FinanceReviewTool {
+    fn name(&self) -> &'static str {
+        "finance_review_read"
+    }
+    fn required_action(&self) -> &'static str {
+        "analytics_read"
+    }
+    async fn execute(&self, ctx: &ToolContext, input: &Value) -> Result<ToolOutput> {
+        super::finance_review::execute(ctx, input).await
     }
 }
 
@@ -186,6 +200,7 @@ impl ToolRegistry {
                 Box::new(ErpSnapshotTool),
                 Box::new(ErpSearchTool),
                 Box::new(AnalyticsSummaryTool),
+                Box::new(FinanceReviewTool),
                 Box::new(WebSearchTool),
                 Box::new(FetchUrlTool),
                 Box::new(ActionDraftTool),
@@ -388,7 +403,7 @@ mod generated_registry_tests {
     #[test]
     fn generated_specs_come_from_the_reviewed_catalog_only() {
         let registry = ToolRegistry::new();
-        assert_eq!(registry.tool_names().len(), 7);
+        assert_eq!(registry.tool_names().len(), 8);
         let specs = registry
             .generated_specs()
             .expect("valid pinned catalog")

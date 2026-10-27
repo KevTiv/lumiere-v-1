@@ -1,3 +1,4 @@
+import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
 import { test, expect, type Page } from "@playwright/test"
 // Exact fixture asset allowlist; all other /api/ requests fail the isolation assertion.
 const syntheticLogoUrl = "/api/documents/blobs/object/7/synthetic/0123456789abcdef0123456789abcdef?sha256=f5438451863fbb1cb2224cbd6a823fa594b429dd3ce2f26c8c0f05bd3f971429"
@@ -19,7 +20,7 @@ for (const width of [320, 390, 768, 1440]) {
       })
       await page.goto("/personalization")
       await expect(page.getByTestId("personalization-fixture-disclosure")).toHaveAttribute("data-hydrated", "true")
-      await expect(page.getByTestId("invoice-profile-notice")).toHaveValue("Company A notice")
+      await expect(page.getByTestId("invoice-profile-notice")).toHaveText("Company A notice")
       await page.evaluate(async () => { await document.fonts.ready })
       await expect(page.locator("body")).toHaveCSS("font-family", /Geist/)
     })
@@ -35,7 +36,7 @@ for (const width of [320, 390, 768, 1440]) {
       await page.getByRole("button", { name: "Reject next synthetic save", exact: true }).click()
       await settings.getByTestId("invoice-profile-save").click()
       await expect(settings.getByRole("alert")).toContainText("Synthetic publication rejected")
-      await expect(settings.getByTestId("invoice-profile-notice")).toHaveValue("Company A revised notice")
+      await expect(settings.getByTestId("invoice-profile-notice")).toHaveText("Company A revised notice")
       await expect(settings.getByTestId("invoice-profile-save")).toBeEnabled()
       await page.getByRole("button", { name: "Lose next synthetic response", exact: true }).click()
       await settings.getByTestId("invoice-profile-save").click()
@@ -44,13 +45,25 @@ for (const width of [320, 390, 768, 1440]) {
       await settings.getByRole("button", { name: "Check saved version", exact: true }).click()
       await expect(settings.getByRole("status")).toContainText("Published version")
       await expect(page.getByTestId("synthetic-publication-state")).toContainText("save callbacks 2; check callbacks 1; last scope 7:11")
-      await settings.getByLabel("Settings scope", { exact: true }).selectOption("organization")
-      await settings.getByLabel("Terms source", { exact: true }).selectOption("custom")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        settings.getByLabel("Settings scope", { exact: true }),
+        "organization",
+      )
+      await chooseSelectOptionByTriggerValue(
+        page,
+        settings.getByLabel("Terms source", { exact: true }),
+        "custom",
+      )
       await settings.getByTestId("invoice-profile-terms").fill("Organization revised terms")
       await settings.getByTestId("invoice-profile-save").click()
       await expect(page.getByTestId("synthetic-publication-state")).toContainText("last scope 7:organization")
-      await settings.getByLabel("Settings scope", { exact: true }).selectOption("company")
-      await expect(settings.getByTestId("invoice-profile-terms")).toHaveValue("Organization revised terms")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        settings.getByLabel("Settings scope", { exact: true }),
+        "company",
+      )
+      await expect(settings.getByTestId("invoice-profile-terms")).toHaveText("Organization revised terms")
       await noOverflow(page)
     })
 
@@ -59,7 +72,7 @@ for (const width of [320, 390, 768, 1440]) {
       await settings.getByTestId("invoice-profile-notice").fill("Unsaved company A edits")
       await page.getByRole("button", { name: "Publish newer synthetic defaults", exact: true }).click()
       await expect(settings).toContainText("Your edits are retained")
-      await expect(settings.getByTestId("invoice-profile-notice")).toHaveValue("Unsaved company A edits")
+      await expect(settings.getByTestId("invoice-profile-notice")).toHaveText("Unsaved company A edits")
       await expect(settings.getByTestId("invoice-profile-save")).toBeDisabled()
       await page.getByRole("button", { name: "Switch synthetic company", exact: true }).click()
       await expect(settings).toContainText("The selected company changed")
@@ -67,7 +80,7 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(page.getByTestId("synthetic-publication-state")).toContainText("save callbacks 0")
       await settings.getByRole("button", { name: "Discard edits and use selected company", exact: true }).click()
       await page.getByRole("button", { name: "Discard edits", exact: true }).click()
-      await expect(settings.getByTestId("invoice-profile-notice")).toHaveValue("Company B notice")
+      await expect(settings.getByTestId("invoice-profile-notice")).toHaveText("Company B notice")
       await settings.getByTestId("invoice-profile-notice").fill("Company B revised notice")
       await settings.getByTestId("invoice-profile-save").click()
       await expect(page.getByTestId("synthetic-publication-state")).toContainText("save callbacks 1; check callbacks 0; last scope 7:22")
@@ -91,15 +104,15 @@ for (const width of [320, 390, 768, 1440]) {
       publisher.on("request", (request) => { const url = new URL(request.url()); if (url.pathname.startsWith("/api/") && `${url.pathname}${url.search}` !== syntheticLogoUrl) publisherRequests.push(request.url()) })
       try {
         await publisher.goto("/personalization")
-        await expect(publisher.getByTestId("invoice-profile-notice")).toHaveValue("Company A notice")
+        await expect(publisher.getByTestId("invoice-profile-notice")).toHaveText("Company A notice")
         await publisher.getByRole("button", { name: "Publish newer synthetic defaults", exact: true }).click()
         await expect(dialog).toContainText("Company invoice settings changed")
         await expect(page.getByTestId("create-invoice-save-draft")).toBeDisabled()
-        await expect(dialog.getByRole("textbox", { name: "Notice", exact: true })).toHaveValue("Company A notice")
-        await expect(dialog.getByRole("textbox", { name: "Terms", exact: true })).toHaveValue("Retained invoice-specific terms")
+        await expect(dialog.getByRole("textbox", { name: "Notice", exact: true })).toHaveText("Company A notice")
+        await expect(dialog.getByRole("textbox", { name: "Terms", exact: true })).toHaveText("Retained invoice-specific terms")
         await dialog.getByRole("button", { name: "Apply current invoice defaults", exact: true }).click()
-        await expect(dialog.getByRole("textbox", { name: "Notice", exact: true })).toHaveValue("Newer company notice")
-        await expect(dialog.getByRole("textbox", { name: "Terms", exact: true })).toHaveValue("Retained invoice-specific terms")
+        await expect(dialog.getByRole("textbox", { name: "Notice", exact: true })).toHaveText("Newer company notice")
+        await expect(dialog.getByRole("textbox", { name: "Terms", exact: true })).toHaveText("Retained invoice-specific terms")
         await expect(page.getByTestId("create-invoice-line-description")).toHaveValue("Synthetic retained line")
         await expect(page.getByTestId("create-invoice-save-draft")).toBeEnabled()
         expect(publisherRequests, "The synthetic publisher must not call ERP APIs").toEqual([])
@@ -110,7 +123,7 @@ for (const width of [320, 390, 768, 1440]) {
     test("long content, managed logo and light paper remain usable and issued snapshots ignore later defaults", async ({ page }, testInfo) => {
       await page.getByRole("button", { name: "Load long synthetic content", exact: true }).click()
       const settings = page.getByTestId("invoice-profile-settings")
-      await expect(settings.getByTestId("invoice-profile-notice")).toHaveValue(/LONG-UNBROKEN-REFERENCE/)
+      await expect(settings.getByTestId("invoice-profile-notice")).toHaveText(/LONG-UNBROKEN-REFERENCE/)
       await noOverflow(page)
       await page.getByRole("button", { name: "Dark workspace", exact: true }).click()
       await expect(page.locator("html")).toHaveClass(/dark/)
@@ -174,14 +187,14 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(issued.getByRole("region", { name: "Footer", exact: true })).toHaveCount(0)
       await expect(page.getByTestId("synthetic-invoice-content")).toContainText('"footer":""')
       await page.getByRole("button", { name: "Publish newer synthetic defaults", exact: true }).click()
-      await expect(settings.getByTestId("invoice-profile-notice")).toHaveValue("Newer company notice")
+      await expect(settings.getByTestId("invoice-profile-notice")).toHaveText("Newer company notice")
       await expect(issued).toContainText("LONG-UNBROKEN-REFERENCE")
       await expect(issued).not.toContainText("Newer company notice")
       await issued.scrollIntoViewIfNeeded()
       await noOverflow(page)
       await page.getByRole("button", { name: "Compose synthetic invoice", exact: true }).click()
-      await expect(dialog.getByRole("textbox", { name: "Notice", exact: true })).toHaveValue("Newer company notice")
-      await expect(dialog.getByRole("textbox", { name: "Footer", exact: true })).toHaveValue("Newer company footer")
+      await expect(dialog.getByRole("textbox", { name: "Notice", exact: true })).toHaveText("Newer company notice")
+      await expect(dialog.getByRole("textbox", { name: "Footer", exact: true })).toHaveText("Newer company footer")
       if (width < 1024) expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true)
       await page.keyboard.press("Escape")
       await expect(dialog).toBeHidden()

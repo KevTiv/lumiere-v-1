@@ -121,6 +121,136 @@
       },
       "evidence": "spacetimedb/src/ai/spend_reads.rs: sender-scoped read-only view for the active ai_spend_reader service identity"
     },
+    "ai_artifact_component_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_capability_execution_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_evidence_claim_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_evidence_contribution_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_evidence_decision_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_evidence_dependency_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_evidence_passage_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_evidence_source_change_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_evidence_source_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_evidence_source_version_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_knowledge_entry_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_knowledge_entry_version_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
+    "ai_knowledge_review_read": {
+      "semantic_kind": "internal",
+      "client_facing": false,
+      "idempotency": "not_applicable",
+      "codec": {
+        "id": "spacetimedb-sats-json",
+        "version": 1
+      },
+      "evidence": "spacetimedb/src/ai/runtime_reads.rs: sender-scoped read-only view for the active ai_spend_reader organization binding"
+    },
     "ai_provider_attempt_read": {
       "semantic_kind": "internal",
       "client_facing": false,

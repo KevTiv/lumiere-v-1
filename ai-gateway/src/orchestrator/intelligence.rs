@@ -212,14 +212,26 @@ pub trait DecisionProvider: Send + Sync {
     async fn decide(&self, request: DecisionRequest) -> Result<DecisionResponse>;
 }
 
-/// `generate()`: prose/code/artifact synthesis. Output remains subject to
-/// the evidence/answer admission gate (§7 of the completion plan); this
-/// contract does not itself admit anything.
+/// Provider response contract selected by the trusted generation caller.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GenerationResponseFormat {
+    #[default]
+    Text,
+    FinalDraft,
+}
+
+/// `generate()` synthesizes a draft. The response format does not admit
+/// its content or replace the evidence and publication gates.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GenerationRequest {
     pub objective: String,
     pub context: Value,
     pub format: String,
+    /// Trusted response contract. Structured drafts use the typed provider
+    /// tool protocol and still pass the normal evidence admission gate.
+    #[serde(default)]
+    pub response_format: GenerationResponseFormat,
     /// Trusted runtime instructions appended to the provider system prompt.
     /// This carries surface-specific schema/grounding rules without allowing
     /// workflow code to select a provider or model.

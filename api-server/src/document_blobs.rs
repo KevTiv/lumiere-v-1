@@ -465,6 +465,50 @@ pub(crate) async fn store_generated_pdf(
 }
 
 /// Apply the current download policy before private bytes reach extraction or OCR.
+/// Read a registered receipt using the same purpose, membership, creator and
+/// field-access checks as the ordinary authenticated download path.
+pub(crate) async fn read_authorized_review_receipt(
+    state: &AppState,
+    session: &ApiSession,
+    company_id: u64,
+    object_key: &str,
+) -> Result<CompletedBlob, ApiError> {
+    let organization_id = require_org(session)?;
+    let (org, residency, object_id) = parse_object_key(object_key)?;
+    if org != organization_id {
+        return Err(ApiError::NotFound("receipt not found".into()));
+    }
+    let store = &state.config.document_blob_store;
+    let (bin_path, meta_path) = object_keys(org, &object_id, &residency);
+    let meta = read_meta(store, &meta_path).await?;
+    if !meta.completed
+        || meta.organization_id != org
+        || meta.company_id != Some(company_id)
+        || meta.object_key != object_key
+        || meta.purpose != BlobPurpose::ExpenseReceipt
+    {
+        return Err(ApiError::NotFound("receipt not found".into()));
+    }
+    require_blob_company(state, session, meta.company_id).await?;
+    let url = managed_blob_url(org, object_key)?;
+    require_blob_read(state, session, &meta, &url, None, None).await?;
+    let bytes = storage::read(store, &bin_path, MAX_UPLOAD_BYTES)
+        .await?
+        .ok_or_else(|| ApiError::NotFound("receipt bytes not found".into()))?;
+    let checksum = meta
+        .actual_checksum
+        .as_deref()
+        .ok_or_else(|| ApiError::Conflict("receipt checksum unavailable".into()))?;
+    verify_pinned_download(&meta, &bytes, org, checksum)?;
+    Ok(CompletedBlob {
+        object_key: meta.object_key,
+        content_type: meta.content_type,
+        checksum: checksum.to_owned(),
+        source_url: meta.source_url,
+        bytes,
+    })
+}
+
 pub(crate) async fn read_authorized_document_blob(
     state: &AppState,
     session: &ApiSession,

@@ -8,22 +8,14 @@ import type {
 } from "@lumiere/stdb/types"
 import type { Timestamp } from "spacetimedb"
 
+import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 import { optionalTrimmedString } from "@lumiere/erp-shared/form-coercion"
 import { normalizeBillingPeriod } from "@lumiere/erp-shared/subscription-billing-periods"
 
 import { stbTimestampFromDate } from "@/lib/stb-timestamp"
 
 function parseU64FromForm(v: unknown): bigint | null {
-  if (v === "" || v == null) return null
-  if (typeof v === "bigint") return v >= 0n ? v : null
-  const n = Number(v)
-  if (Number.isFinite(n) && n >= 0 && Number.isInteger(n)) return BigInt(n)
-  try {
-    const b = BigInt(String(v).trim())
-    return b >= 0n ? b : null
-  } catch {
-    return null
-  }
+  return parseStrictU64(v) ?? null
 }
 
 function requiredTimestampFromFormDate(v: unknown): Timestamp | null {
@@ -48,6 +40,7 @@ export function toCreateSubscriptionFromSaleOrderParams(
 
   const so = saleOrders.find((s) => String(s.id) === String(soRaw))
   if (!so) return null
+  if (companyId != null && (companyId <= 0n || parseU64FromForm(so.companyId ?? so.company_id) !== companyId)) return null
 
   const partnerId = parseU64FromForm(so.partnerId)
   if (partnerId == null) return null

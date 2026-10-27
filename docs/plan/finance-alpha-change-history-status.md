@@ -104,22 +104,40 @@ Earlier foundation results above apply to their recorded revision, not this UI
 follow-up. Real keyboard/mobile/theme/text-enlargement evidence remains a release
 check; no new screenshot or device acceptance is claimed.
 
-### Integration with PR #285
+### Integration with main after PR #285 (2026-10-27)
 
-PR #279's Changes tab/history refresh and read-only capability label can coexist
-with #285's scoped return link, full-width saved-record workspace and pending-safe
-role dialog footer. These edits have no text conflict in the inspected three-way
-source comparison. No unrelated #285 source was copied into this follow-up.
+Merged `main` at `fb7f6687cfa71d91f2c2377a9d32a585f8ade05e` into the
+Finance history branch. The seven text conflicts were contract pin and generated
+metadata selections. The invoice page retains the Changes tab and its existing
+history invalidation alongside scoped list return navigation and the full-width
+Saved details workspace. The role dialog retains the history capability label
+alongside its scrolling body and pending-safe footer. Main's runtime reader,
+operation contracts, shared-select gate, type-debt reductions and bill-source E2E
+correction are retained.
 
-The branch already has contract-pin conflicts against `main`
-`5ada7d0b268bf9fb1f2f8f5c91f58841a2ac5e46` and #285
-`b93e77a0bee52b6f32bcc1a2a2e7cc073d0e4988`. The conflict set is Cargo.lock,
-presentation_dictionary.rs, the presentation-core/query-hooks/stdb package pins,
-pnpm-lock.yaml and release-compatibility-manifest.json. PR #279 is pinned to
-0.3.150; #285 is pinned to 0.3.151. Archive-member inspection confirms that #279's
-0.3.150 frontend package includes generated `business_change_table` files and
-#285's 0.3.151 package does not. A higher version number is not proof that it
-contains the history producer. Preserve the history schema and immutable
-migration 27 through the existing combined-contract release owner before merging
-the two branches. This UI follow-up does not publish contracts, resolve that
-schema/release dependency, grant roles, merge or deploy production.
+The resolution keeps the existing coherent 0.3.150 Rust/frontend pin, archive
+checksums, lockfile entries, presentation dictionary and release metadata as the
+history-bearing generation anchor. Main's 0.3.151 archive is not a combined
+release: it omits `business_change_table` and migration 27. Its unreferenced
+archives are removed from this branch; no archive content, published tag or
+published SQL is edited. The combined sources still need the repository's normal
+Release contracts workflow to generate, publish and repin a matching release.
+That workflow runs on the branch push and chooses the next available version;
+this change does not manually publish or invent a release pin.
+
+Archive/source inspection found no difference in shared published migrations
+between 0.3.150 and 0.3.151. Migration 27 remains byte-for-byte equal to both the
+pre-merge source and its published 0.3.150 SQL, SHA-256
+`0ee008de8fdcf2e56573af9ada2e2557fd9a0647ae6f029a46050bbac0989736`.
+The source capture module, promoted migration ledger/catalog and private history
+storage policy are preserved. The history E2E opens the event summary explicitly,
+so the nested user-identity disclosure cannot make that selector ambiguous; it
+also requires the exact before/after values to be visible after expansion. The Finance source inventory was regenerated for
+the merged operation-contract inputs; only two input hashes changed.
+
+Source and archive inspection are not executed acceptance tests. Per user
+instruction, CI owns all tests, typechecks, lint, builds and browser execution.
+No local test runner, service or seed was started. Until the combined contract
+pin and its same-head CI succeed, this branch remains a draft and is not declared
+merge-ready. No role grant, production data change, merge or deployment is part
+of this update.

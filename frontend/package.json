@@ -9,6 +9,7 @@
     "i18n:normalize-filters": "node scripts/normalize-i18n-filter-options.mjs",
     "type-debt:check": "node scripts/check-opaque-record-ratchet.mjs",
     "type-debt:self-test": "node scripts/check-opaque-record-ratchet.mjs --self-test",
+    "selects:check": "node scripts/check-shared-selects.mjs --self-test && node scripts/check-shared-selects.mjs",
     "operation-transport:check": "node scripts/check-browser-operation-transport.mjs",
     "operation-transport:self-test": "node scripts/check-browser-operation-transport.mjs --self-test",
     "cov-correctness:check": "python3 ../scripts/validate-cov00c-correctness-census.py",

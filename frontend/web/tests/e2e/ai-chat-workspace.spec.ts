@@ -1,3 +1,4 @@
+import { chooseSelectOptionByTriggerValue } from "./helpers-legacy"
 import { expect, test } from "@playwright/test"
 import { expectNoAppError, openErpAiChat } from "./helpers"
 
@@ -16,12 +17,16 @@ test.describe("AI chat workspace", { tag: ["@p0", "@ai-workspace"] }, () => {
       await expect(input).toBeFocused()
       const question = "Preserve this question while changing context. " + "long-token-".repeat(100)
       await input.fill(question)
-      await panel.getByRole("combobox", { name: "Assistant context" }).selectOption("module:inventory")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        panel.getByRole("combobox", { name: "Assistant context" }),
+        "module:inventory",
+      )
       await panel.getByRole("button", { name: "Dock beside ERP" }).click()
       await expect(panel).toHaveAttribute("data-mode", "side")
       await expect(input).toHaveValue(question)
       await expect(input).toBeFocused()
-      await expect(panel.getByRole("combobox", { name: "Assistant context" })).toHaveValue("module:inventory")
+      await expect(panel.getByRole("combobox", { name: "Assistant context" })).toContainText("Inventory")
       const bounds = await panel.boundingBox()
       expect(bounds).not.toBeNull()
       expect(bounds!.x).toBeGreaterThanOrEqual(0)

@@ -50,6 +50,23 @@ describe("ModularForm input quality", () => {
     await waitFor(() => expect(submit).toHaveBeenCalledWith({ email: "jane@example.com", website: "example.com" }))
   })
 
+  it("focuses the first invalid field after each failed submit without clearing entries", () => {
+    const submit = vi.fn()
+    render(<ModularForm scrollable config={config(
+      { id: "name", name: "name", label: "Name", type: "text", required: true },
+      { id: "email", name: "email", label: "Email", type: "email", required: true },
+      notes,
+    )} onSubmit={submit} />)
+    fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Keep this note" } })
+    fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
+    expect(document.activeElement).toBe(screen.getByLabelText(/Name/))
+    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: "Alex" } })
+    fireEvent.click(screen.getByRole("button", { name: "common.submit" }))
+    expect(document.activeElement).toBe(screen.getByLabelText(/Email/))
+    expect((screen.getByLabelText("Notes") as HTMLTextAreaElement).value).toBe("Keep this note")
+    expect(submit).not.toHaveBeenCalled()
+  })
+
   it("does not block an edit over an existing stored value it would reject", async () => {
     const submit = vi.fn()
     render(<ModularForm config={config(

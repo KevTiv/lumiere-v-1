@@ -1,6 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
+import { ChevronDown } from "lucide-react"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../components/collapsible"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "../components/button"
 import { Input } from "../components/input"
@@ -8,6 +14,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuTrigger,
 } from "../components/dropdown-menu"
 import { workspaceStyles } from "../lib/workspace-styles"
@@ -19,6 +26,14 @@ import {
   type AccountingWorklistView,
   type NamedAccountingWorklist,
 } from "./accounting-worklist-model"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/select"
 
 interface AccountingWorklistToolbarProps extends Pick<
   AccountingListDisplayProps,
@@ -32,14 +47,14 @@ interface AccountingWorklistToolbarProps extends Pick<
   columns: EntityColumn[]
   currencies: readonly { value: string; label: string }[]
   statuses: readonly { value: string; label: string }[]
+  viewSettings?: ReactNode
   persistent: boolean
   selectedCount: number
   onExport?: () => void
   onClearSelection: () => void
 }
 
-const selectClass =
-  "h-11 min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+const selectClass = "h-11 min-h-11 w-full min-w-0"
 
 export function AccountingWorklistToolbar({
   value,
@@ -51,6 +66,7 @@ export function AccountingWorklistToolbar({
   currencies,
   statuses,
   persistent,
+  viewSettings,
   initialFilters = {},
   onInitialFilterClear,
   selectedCount,
@@ -64,12 +80,51 @@ export function AccountingWorklistToolbar({
     key: keyof AccountingWorklistView["filters"],
     next: string
   ) => onChange({ ...value, filters: { ...value.filters, [key]: next } })
+  const filterLabels: Record<string, string> = {
+    search: t("common.search", { defaultValue: "Search" }),
+    status: t("accounting.journalEntries.state"),
+    currencyId: t("accounting.worklists.currency", {
+      defaultValue: "Currency",
+    }),
+    queue: t("accounting.worklists.queue", { defaultValue: "Balance queue" }),
+    id: t("accounting.worklists.documentId", { defaultValue: "Document ID" }),
+    partner_id: t("accounting.worklists.partner", { defaultValue: "Partner" }),
+    partnerId: t("accounting.worklists.partner", { defaultValue: "Partner" }),
+    payment_state: t("accounting.worklists.paymentStatus", {
+      defaultValue: "Payment status",
+    }),
+    move_type: t("accounting.worklists.documentType", {
+      defaultValue: "Document type",
+    }),
+  }
+  const filterLabel = (key: string) => filterLabels[key] ?? key
+  const filterValueLabel = (key: string, filterValue: string) => {
+    if (key === "currencyId")
+      return (
+        currencies.find((currency) => currency.value === filterValue)?.label ??
+        filterValue
+      )
+    if (key === "status")
+      return (
+        statuses.find((status) => status.value === filterValue)?.label ??
+        filterValue
+      )
+    if (key === "queue") {
+      if (filterValue === "open")
+        return t("accounting.worklists.open", {
+          defaultValue: "Posted · balance due",
+        })
+      if (filterValue === "overdue") return t("accounting.states.overdue")
+      if (filterValue === "pending") return t("accounting.states.pending")
+    }
+    return filterValue
+  }
   return (
-    <div
-      className="min-w-0 space-y-3"
+    <Collapsible
+      className="flex min-w-0 flex-col gap-3"
       data-testid="accounting-worklist-toolbar"
     >
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto]">
         <label className="min-w-0 space-y-1 text-xs font-medium">
           <span>{t("common.search", { defaultValue: "Search" })}</span>
           <Input
@@ -87,74 +142,143 @@ export function AccountingWorklistToolbar({
         </label>
         <label className="min-w-0 space-y-1 text-xs font-medium">
           <span>{t("accounting.journalEntries.state")}</span>
-          <select
-            className={selectClass}
-            value={initialFilters.status ?? value.filters.status}
+          <Select
+            value={
+              String(initialFilters.status ?? value.filters.status ?? "") ||
+              "__none__"
+            }
+            onValueChange={(selectValue) => {
+              const nextValue = selectValue === "__none__" ? "" : selectValue
+              updateFilter("status", nextValue)
+            }}
             disabled={Boolean(initialFilters.status)}
-            onChange={(event) => updateFilter("status", event.target.value)}
           >
-            <option value="">{t("accounting.invoices.allStatus")}</option>
-            {statuses.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              className={selectClass}
+              aria-label={t("accounting.journalEntries.state")}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={"__none__"}>
+                  {t("accounting.invoices.allStatus")}
+                </SelectItem>
+                {statuses.map((status) => (
+                  <SelectItem key={status.value} value={String(status.value)}>
+                    {status.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </label>
         <label className="min-w-0 space-y-1 text-xs font-medium">
           <span>
             {t("accounting.worklists.currency", { defaultValue: "Currency" })}
           </span>
-          <select
-            className={selectClass}
-            value={initialFilters.currencyId ?? value.filters.currencyId}
+          <Select
+            value={
+              String(
+                initialFilters.currencyId ?? value.filters.currencyId ?? ""
+              ) || "__none__"
+            }
+            onValueChange={(selectValue) => {
+              const nextValue = selectValue === "__none__" ? "" : selectValue
+              updateFilter("currencyId", nextValue)
+            }}
             disabled={Boolean(initialFilters.currencyId)}
-            onChange={(event) => updateFilter("currencyId", event.target.value)}
           >
-            <option value="">
-              {t("accounting.worklists.allCurrencies", {
-                defaultValue: "All currencies",
+            <SelectTrigger
+              className={selectClass}
+              aria-label={t("accounting.worklists.currency", {
+                defaultValue: "Currency",
               })}
-            </option>
-            {currencies.map((currency) => (
-              <option key={currency.value} value={currency.value}>
-                {currency.label}
-              </option>
-            ))}
-          </select>
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={"__none__"}>
+                  {t("accounting.worklists.allCurrencies", {
+                    defaultValue: "All currencies",
+                  })}
+                </SelectItem>
+                {currencies.map((currency) => (
+                  <SelectItem
+                    key={currency.value}
+                    value={String(currency.value)}
+                  >
+                    {currency.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </label>
         <label className="min-w-0 space-y-1 text-xs font-medium">
           <span>
             {t("accounting.worklists.queue", { defaultValue: "Balance queue" })}
           </span>
-          <select
-            className={selectClass}
-            value={initialFilters.queue ?? value.filters.queue}
+          <Select
+            value={
+              String(initialFilters.queue ?? value.filters.queue ?? "") ||
+              "__none__"
+            }
+            onValueChange={(selectValue) => {
+              const nextValue = selectValue === "__none__" ? "" : selectValue
+              updateFilter("queue", nextValue)
+            }}
             disabled={Boolean(initialFilters.queue)}
-            onChange={(event) => updateFilter("queue", event.target.value)}
           >
-            <option value="">
-              {t("accounting.worklists.allBalances", {
-                defaultValue: "All balances",
+            <SelectTrigger
+              className={selectClass}
+              aria-label={t("accounting.worklists.queue", {
+                defaultValue: "Balance queue",
               })}
-            </option>
-            <option value="open">
-              {t("accounting.worklists.open", {
-                defaultValue: "Posted · balance due",
-              })}
-            </option>
-            <option value="overdue">{t("accounting.states.overdue")}</option>
-            {value.filters.queue === "pending" && (
-              <option value="pending">{t("accounting.states.pending")}</option>
-            )}
-          </select>
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={"__none__"}>
+                  {t("accounting.worklists.allBalances", {
+                    defaultValue: "All balances",
+                  })}
+                </SelectItem>
+                <SelectItem value={"open"}>
+                  {t("accounting.worklists.open", {
+                    defaultValue: "Posted · balance due",
+                  })}
+                </SelectItem>
+                <SelectItem value={"overdue"}>
+                  {t("accounting.states.overdue")}
+                </SelectItem>
+                {value.filters.queue === "pending" && (
+                  <SelectItem value={"pending"}>
+                    {t("accounting.states.pending")}
+                  </SelectItem>
+                )}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </label>
+        <CollapsibleTrigger
+          render={<Button variant="outline" className="min-h-11" />}
+        >
+          {t("accounting.worklists.viewSettings", {
+            defaultValue: "View settings",
+          })}
+          <ChevronDown data-icon="inline-end" />
+        </CollapsibleTrigger>
       </div>
       {Object.keys(initialFilters).length > 0 && (
         <div className="space-y-2">
           <div
             className="flex min-w-0 flex-wrap gap-2"
-            aria-label="Linked record filters"
+            aria-label={t("accounting.worklists.linkedFilterLabel", {
+              defaultValue: "Linked record filters",
+            })}
           >
             {Object.entries(initialFilters).map(([key, filterValue]) => (
               <span
@@ -162,13 +286,16 @@ export function AccountingWorklistToolbar({
                 className="inline-flex min-w-0 max-w-full items-center rounded-md border bg-muted/30 pl-3 text-xs"
               >
                 <span className="min-w-0 [overflow-wrap:anywhere]">
-                  {key}: {filterValue}
+                  {filterLabel(key)}: {filterValueLabel(key, filterValue)}
                 </span>
                 {onInitialFilterClear && (
                   <Button
                     className="min-h-11 min-w-11 shrink-0"
                     variant="ghost"
-                    aria-label={`Clear ${key} filter`}
+                    aria-label={t("accounting.worklists.clearLinkedFilter", {
+                      defaultValue: `Clear ${filterLabel(key)} filter`,
+                      field: filterLabel(key),
+                    })}
                     onClick={() => onInitialFilterClear(key)}
                   >
                     ×
@@ -177,177 +304,207 @@ export function AccountingWorklistToolbar({
               </span>
             ))}
           </div>
-          <p className={workspaceStyles.sectionDescription}>
-            {t("accounting.worklists.linkedFilters", {
-              defaultValue:
-                "Linked filters remain active when you apply a saved view. Clear a linked filter to change it.",
-            })}
-          </p>
         </div>
       )}
-      <div className="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-        <label className="min-w-0 space-y-1 text-xs font-medium">
-          <span>
-            {t("accounting.worklists.savedViews", {
-              defaultValue: "Saved views",
-            })}
-          </span>
-          <select
-            className={selectClass}
-            value={chosenView}
-            onChange={(event) => {
-              setChosenView(event.target.value)
-              const view = saved.find(
-                (item) => item.name === event.target.value
-              )
-              if (view)
-                onChange({
-                  search: view.search,
-                  filters: { ...view.filters },
-                  hiddenColumns: [...view.hiddenColumns],
-                })
-            }}
-          >
-            <option value="">
-              {t("accounting.worklists.chooseView", {
-                defaultValue: "Choose a saved view",
+      <CollapsibleContent className="flex min-w-0 flex-col gap-3 rounded-md border p-3">
+        <div className="grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+          <label className="min-w-0 space-y-1 text-xs font-medium">
+            <span>
+              {t("accounting.worklists.savedViews", {
+                defaultValue: "Saved views",
               })}
-            </option>
-            {saved.map((view) => (
-              <option key={view.name} value={view.name}>
-                {view.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="min-w-0 space-y-1 text-xs font-medium">
-          <span>
-            {t("accounting.worklists.viewName", { defaultValue: "View name" })}
-          </span>
-          <Input
-            className="h-11 min-h-11"
-            value={name}
-            maxLength={60}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={t("accounting.worklists.viewNamePlaceholder", {
-              defaultValue: "e.g. Overdue customers",
-            })}
-          />
-        </label>
-        <div className={workspaceStyles.actions}>
-          <Button
-            className="min-h-11"
-            variant="outline"
-            disabled={!name.trim()}
-            onClick={() => {
-              onSave(name)
-              setChosenView(name.trim())
-              setName("")
-            }}
-          >
-            {t("accounting.worklists.saveView", { defaultValue: "Save view" })}
-          </Button>
-          {chosenView && saved.some((view) => view.name === chosenView) && (
-            <Button
-              className="min-h-11"
-              variant="ghost"
-              onClick={() => {
-                onRemove(chosenView)
-                setChosenView("")
+            </span>
+            <Select
+              value={chosenView === "" ? "__none__" : `saved:${chosenView}`}
+              onValueChange={(selectValue) => {
+                const nextValue =
+                  selectValue === "__none__" ? "" : selectValue.slice(6)
+                setChosenView(nextValue)
+                const view = saved.find((item) => item.name === nextValue)
+                if (view)
+                  onChange({
+                    search: view.search,
+                    filters: { ...view.filters },
+                    hiddenColumns: [...view.hiddenColumns],
+                  })
               }}
             >
-              {t("common.delete", { defaultValue: "Delete" })}
-            </Button>
-          )}
-        </div>
-      </div>
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-        <p className={workspaceStyles.sectionDescription}>
-          {persistent
-            ? t("accounting.worklists.savedLocally", {
-                defaultValue:
-                  "Views are saved in this browser for your account and company.",
-              })
-            : t("accounting.worklists.sessionOnly", {
-                defaultValue:
-                  "Views are available for this session only; browser persistence is unavailable.",
+              <SelectTrigger
+                className={selectClass}
+                aria-label={t("accounting.worklists.savedViews", {
+                  defaultValue: "Saved views",
+                })}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={"__none__"}>
+                    {t("accounting.worklists.chooseView", {
+                      defaultValue: "Choose a saved view",
+                    })}
+                  </SelectItem>
+                  {saved.map((view) => (
+                    <SelectItem key={view.name} value={`saved:${view.name}`}>
+                      {view.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="min-w-0 space-y-1 text-xs font-medium">
+            <span>
+              {t("accounting.worklists.viewName", {
+                defaultValue: "View name",
               })}
-        </p>
-        <div className={workspaceStyles.actions}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="min-h-11" variant="outline">
-                {t("accounting.worklists.columns", { defaultValue: "Columns" })}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              className="max-h-[min(70vh,28rem)] overflow-y-auto"
+            </span>
+            <Input
+              className="h-11 min-h-11"
+              value={name}
+              maxLength={60}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={t("accounting.worklists.viewNamePlaceholder", {
+                defaultValue: "e.g. Overdue customers",
+              })}
+            />
+          </label>
+          <div className={workspaceStyles.actions}>
+            <Button
+              className="min-h-11"
+              variant="outline"
+              disabled={!name.trim()}
+              onClick={() => {
+                onSave(name)
+                setChosenView(name.trim())
+                setName("")
+              }}
             >
-              {columns.map((column) => (
-                <DropdownMenuCheckboxItem
-                  className="min-h-11"
-                  key={column.key}
-                  checked={!value.hiddenColumns.includes(column.key)}
-                  disabled={column.key === "name"}
-                  onSelect={(event) => event.preventDefault()}
-                  onCheckedChange={() =>
-                    onChange({
-                      ...value,
-                      hiddenColumns: toggleHiddenColumn(
-                        value.hiddenColumns,
-                        column.key,
-                        WORKLIST_COLUMNS
-                      ),
-                    })
-                  }
-                >
-                  {column.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              {t("accounting.worklists.saveView", {
+                defaultValue: "Save view",
+              })}
+            </Button>
+            {chosenView && saved.some((view) => view.name === chosenView) && (
+              <Button
+                className="min-h-11"
+                variant="ghost"
+                onClick={() => {
+                  onRemove(chosenView)
+                  setChosenView("")
+                }}
+              >
+                {t("common.delete", { defaultValue: "Delete" })}
+              </Button>
+            )}
+          </div>
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+          <p className={workspaceStyles.sectionDescription}>
+            {persistent
+              ? t("accounting.worklists.savedLocally", {
+                  defaultValue:
+                    "Views are saved in this browser for your account and company.",
+                })
+              : t("accounting.worklists.sessionOnly", {
+                  defaultValue:
+                    "Views are available for this session only; browser persistence is unavailable.",
+                })}
+          </p>
+          <div className={workspaceStyles.actions}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="min-h-11" variant="outline">
+                  {t("accounting.worklists.columns", {
+                    defaultValue: "Columns",
+                  })}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="max-h-[min(70vh,28rem)] overflow-y-auto"
+              >
+                <DropdownMenuGroup>
+                  {columns.map((column) => (
+                    <DropdownMenuCheckboxItem
+                      className="min-h-11"
+                      key={column.key}
+                      checked={!value.hiddenColumns.includes(column.key)}
+                      disabled={column.key === "name"}
+                      onSelect={(event) => event.preventDefault()}
+                      onCheckedChange={() =>
+                        onChange({
+                          ...value,
+                          hiddenColumns: toggleHiddenColumn(
+                            value.hiddenColumns,
+                            column.key,
+                            WORKLIST_COLUMNS
+                          ),
+                        })
+                      }
+                    >
+                      {column.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {viewSettings}
+          </div>
+        </div>
+        <p className={workspaceStyles.sectionDescription}>
+          {t("accounting.worklists.linkedFilters", {
+            defaultValue:
+              "Linked filters remain active when you apply a saved view. Clear a linked filter to change it.",
+          })}
+        </p>
+        <p className={workspaceStyles.sectionDescription}>
+          {t("accounting.worklists.statusHint", {
+            defaultValue:
+              "Open is a balance state, not proof of delivery or approval. CSV exports always include currency context.",
+          })}
+        </p>
+      </CollapsibleContent>
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+        <Button
+          className="min-h-11"
+          variant="ghost"
+          onClick={() => {
+            onChange({
+              search: "",
+              filters: { status: "", currencyId: "", queue: "" },
+              hiddenColumns: value.hiddenColumns,
+            })
+            onInitialFilterClear?.("*")
+          }}
+        >
+          {t("common.entityView.noResults.clear", {
+            defaultValue: "Clear filters",
+          })}
+        </Button>
+        {selectedCount > 0 && (
           <Button
             className="min-h-11"
             variant="ghost"
-            onClick={() => {
-              onChange({
-                search: "",
-                filters: { status: "", currencyId: "", queue: "" },
-                hiddenColumns: value.hiddenColumns,
-              })
-              onInitialFilterClear?.("*")
-            }}
+            onClick={onClearSelection}
           >
-            {t("common.entityView.noResults.clear", {
-              defaultValue: "Clear filters",
-            })}
+            {t("accounting.worklists.clearSelection", {
+              defaultValue: "Clear selection",
+            })}{" "}
+            ({selectedCount})
           </Button>
-          {selectedCount > 0 && (
-            <Button
-              className="min-h-11"
-              variant="ghost"
-              onClick={onClearSelection}
-            >
-              {t("accounting.worklists.clearSelection", {
-                defaultValue: "Clear selection",
-              })}{" "}
-              ({selectedCount})
-            </Button>
-          )}
-          {onExport && (
-            <Button className="min-h-11" variant="outline" onClick={onExport}>
-              {selectedCount > 0
-                ? t("accounting.worklists.exportSelected", {
-                    defaultValue: "Export selected",
-                  })
-                : t("accounting.worklists.exportCsv", {
-                    defaultValue: "Export CSV",
-                  })}
-            </Button>
-          )}
-        </div>
+        )}
+        {onExport && (
+          <Button className="min-h-11" variant="outline" onClick={onExport}>
+            {selectedCount > 0
+              ? t("accounting.worklists.exportSelected", {
+                  defaultValue: "Export selected",
+                })
+              : t("accounting.worklists.exportCsv", {
+                  defaultValue: "Export CSV",
+                })}
+          </Button>
+        )}
       </div>
-    </div>
+    </Collapsible>
   )
 }

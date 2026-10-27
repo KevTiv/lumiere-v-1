@@ -11,6 +11,7 @@ path = "src/main.rs"
 phase4-acceptance = []
 
 [dependencies]
+lumiere-finance-review-core.workspace = true
 axum = { workspace = true, features = ["macros", "multipart"] }
 tokio.workspace = true
 tower-http = { workspace = true, features = ["cors", "trace"] }

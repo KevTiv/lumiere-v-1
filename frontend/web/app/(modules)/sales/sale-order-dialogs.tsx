@@ -122,7 +122,7 @@ export function CreateInvoiceFromOrderDialog({
           order.partnerInvoiceId != null ? BigInt(String(order.partnerInvoiceId)) : undefined;
         const params = toCreateInvoiceFromSaleOrderParams(formData, { partnerInvoiceId });
         if (!params) {
-          setError(t('common.validation.required'));
+          setError(t('sales.forms.refinement.requiredInvoiceAccounts', { defaultValue: 'Choose the invoice journal, sales account and customer receivable account. Your entries have been retained.' }));
           return;
         }
         try {

@@ -25,6 +25,8 @@ export function toCreateCalendarEventParams(
   const start = requiredTimestampFromForm(formData.start)
   const stop = requiredTimestampFromForm(formData.stop)
   if (start == null || stop == null) return null
+  // Match the reducer: equal timestamps are valid, including all-day events.
+  if (new Date(String(formData.stop)).getTime() < new Date(String(formData.start)).getTime()) return null
 
   return {
     name,

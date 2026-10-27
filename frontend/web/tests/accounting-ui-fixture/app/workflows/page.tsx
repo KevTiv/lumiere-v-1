@@ -21,7 +21,7 @@ import { capturedBuyerSnapshot, legacyBuyerSnapshot, reconciliationFixture, work
 const templates: InvoiceEmailTemplate[] = [
   { id: 101n, organizationId: 7n, companyId: 11n, name: "Synthetic company invoice notice for international customer operations", model: "account_move", subject: "Synthetic invoice ready for review", bodyHtml: "<strong>Synthetic literal message</strong>\nPlease review the invoice separately. This fixture does not send an email.", attachDocument: false, isDefault: true, isActive: true },
   { id: 102n, organizationId: 7n, companyId: undefined, name: "Synthetic organization notice", model: "account_move", subject: "Synthetic organization subject", bodyHtml: "Synthetic organization body", attachDocument: false, isDefault: false, isActive: true },
-  { id: 103n, organizationId: 7n, companyId: 11n, name: "Unsupported attachment template", model: "account_move", subject: "Synthetic attachment", bodyHtml: "Synthetic attachment body", attachDocument: true, isDefault: false, isActive: true },
+  { id: 103n, organizationId: 7n, companyId: 11n, name: "Managed PDF attachment template", model: "account_move", subject: "Synthetic attachment", bodyHtml: "Synthetic attachment body", attachDocument: true, isDefault: false, isActive: true },
   { id: 104n, organizationId: 7n, companyId: 11n, name: "Unsupported placeholder template", model: "account_move", subject: "Hello {{customer}}", bodyHtml: "Synthetic placeholder body", attachDocument: false, isDefault: false, isActive: true },
   { id: 199n, organizationId: 7n, companyId: 22n, name: "FOREIGN COMPANY EMAIL TEMPLATE", model: "account_move", subject: "Other company", bodyHtml: "Other company body", attachDocument: false, isDefault: true, isActive: true },
 ]

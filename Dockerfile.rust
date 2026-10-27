@@ -25,15 +25,23 @@ COPY ai-gateway ./ai-gateway
 COPY iot-gateway ./iot-gateway
 COPY lumiere-codegen ./lumiere-codegen
 COPY crates ./crates
+COPY erp-skills/report_analysis/SKILL.md ./erp-skills/report_analysis/SKILL.md
+COPY erp-skills/finance_report_review/SKILL.md ./erp-skills/finance_report_review/SKILL.md
+COPY erp-skills/bank_reconciliation_review/SKILL.md ./erp-skills/bank_reconciliation_review/SKILL.md
+COPY erp-skills/period_close_review/SKILL.md ./erp-skills/period_close_review/SKILL.md
+COPY erp-skills/expense_evidence_review/SKILL.md ./erp-skills/expense_evidence_review/SKILL.md
+COPY erp-skills/finance_variance_review/SKILL.md ./erp-skills/finance_variance_review/SKILL.md
 RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" --bin "${BIN}"
 
 FROM debian:bookworm-slim AS runtime
 ARG BIN
 ENV RUST_LOG=info
+ENV ERP_SKILLS_DIR=/app/erp-skills
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=builder "/app/target/release/${BIN}" /usr/local/bin/lumiere-service
+COPY --from=builder /app/erp-skills/ /app/erp-skills/
 COPY --from=doppler /bin/doppler /usr/local/bin/doppler
 COPY infra/doppler/entrypoint.sh /usr/local/bin/lumiere-with-secrets
 RUN chmod 0755 /usr/local/bin/lumiere-with-secrets

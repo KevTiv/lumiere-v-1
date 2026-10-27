@@ -150,36 +150,11 @@
   position: relative;
   min-width: 0;
 }
-.document-template-dialog__select select {
-  appearance: none;
+.document-template-dialog__select [data-slot="select-trigger"] {
   height: 30px;
   max-width: 100%;
-  padding: 0 28px 0 10px;
-  border: 1px solid hsl(var(--border) / 0.75);
-  border-radius: 7px;
-  outline: none;
-  color: hsl(var(--foreground));
-  background: hsl(var(--card));
-  font: inherit;
   font-size: 11px;
   font-weight: 500;
-}
-.document-template-dialog__select select:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
-}
-.document-template-dialog__select select:disabled {
-  cursor: default;
-  opacity: 0.65;
-}
-.document-template-dialog__select svg {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  width: 14px;
-  height: 14px;
-  pointer-events: none;
-  color: hsl(var(--muted-foreground));
 }
 .document-template-dialog__active {
   display: flex;
@@ -312,7 +287,7 @@
   .document-template-dialog__branding > span {
     font-size: 10px;
   }
-  .document-template-dialog__select select {
+  .document-template-dialog__select [data-slot="select-trigger"] {
     max-width: 160px;
   }
 }

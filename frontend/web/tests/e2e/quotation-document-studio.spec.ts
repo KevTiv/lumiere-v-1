@@ -1,3 +1,4 @@
+import { chooseSelectOptionByTriggerValue } from "./helpers-legacy"
 import { createHash } from "node:crypto"
 import { expect, test, type Page } from "@playwright/test"
 import { stdbBffCommandPost } from "@lumiere/stdb/commands"
@@ -85,8 +86,16 @@ test.describe("Visual quotation document output", { tag: ["@p0", "@document-stud
     await selectModuleTab(page, "documents", "document-templates")
     await page.getByTestId("entity-action-design-document-template").click()
     const designer = page.getByRole("dialog", { name: "Design a template", exact: true })
-    await designer.getByLabel("Template type", { exact: true }).selectOption("document")
-    await designer.getByLabel("Start with", { exact: true }).selectOption("quotation")
+    await chooseSelectOptionByTriggerValue(
+      page,
+      designer.getByLabel("Template type", { exact: true }),
+      "document",
+    )
+    await chooseSelectOptionByTriggerValue(
+      page,
+      designer.getByLabel("Start with", { exact: true }),
+      "quotation",
+    )
     await designer.getByLabel("Name", { exact: true }).fill(name)
     await expect(designer.getByRole("button", { name: "Save template", exact: true })).toBeEnabled()
     const [createResponse] = await Promise.all([
@@ -113,7 +122,11 @@ test.describe("Visual quotation document output", { tag: ["@p0", "@document-stud
       await selectEntityRowById(staffPage, orderId)
       await staffPage.getByTestId("entity-action-quotation-document").click()
       const dialog = staffPage.getByTestId("quotation-document-dialog")
-      await dialog.getByLabel("Document layout", { exact: true }).selectOption(String(templateId))
+      await chooseSelectOptionByTriggerValue(
+        staffPage,
+        dialog.getByLabel("Document layout", { exact: true }),
+        String(templateId),
+      )
       const previewPath = `/api/documents/quotations/${orderId}/preview`
       const [previewResponse] = await Promise.all([
         staffPage.waitForResponse((response) => new URL(response.url()).pathname === previewPath),

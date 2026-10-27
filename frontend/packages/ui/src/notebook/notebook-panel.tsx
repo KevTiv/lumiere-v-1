@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -177,6 +178,7 @@ NameError: name 'undefined_var' is not defined`,
 }
 
 export function NotebookPanel({ open, onClose, onAIChat, dataContext }: NotebookPanelProps) {
+  const { t } = useTranslation()
   const [notebook, setNotebook] = useState<Notebook>({
     id: generateId(),
     title: "Untitled Notebook",
@@ -199,15 +201,16 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [activeTab, setActiveTab] = useState<"notebook" | "files" | "variables">("notebook")
   const [isEditingTitle, setIsEditingTitle] = useState(false)
-  const [justSaved, setJustSaved] = useState(false)
+  const [savedNotebook, setSavedNotebook] = useState<Notebook | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const handleSave = () => {
+    setSaveError(null)
     try {
       window.localStorage.setItem(`lumiere.notebook.${notebook.id}`, JSON.stringify({ ...notebook, updatedAt: new Date() }))
-      setJustSaved(true)
-      window.setTimeout(() => setJustSaved(false), 2000)
+      setSavedNotebook(notebook)
     } catch {
-      // storage unavailable (private mode / quota); nothing to persist to
+      setSaveError(t("ui.notebook.saveError", { defaultValue: "Could not save in this browser. Your notebook is still open. Export a copy, or free browser storage and try again." }))
     }
   }
 
@@ -349,22 +352,26 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
 
   return (
     <div
+      role="region"
+      aria-label={t("ui.notebook.title", { defaultValue: "Notebook" })}
+      data-testid="notebook-panel"
       className={cn(
-        "flex flex-col bg-background border-l border-border",
+        "flex min-h-0 min-w-0 flex-col bg-background border-l border-border",
         isFullscreen
           ? "fixed inset-0 z-50"
-          : "h-screen w-[32vw] min-w-[400px] shrink-0"
+          : "fixed inset-0 z-50 h-dvh w-full sm:relative sm:inset-auto sm:h-screen sm:w-[32vw] sm:min-w-[400px] sm:shrink-0"
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
-        <div className="flex items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/30">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
             <BookOpen className="h-3.5 w-3.5 text-white" />
           </div>
           {isEditingTitle ? (
             <Input
               ref={titleInputRef}
+              aria-label={t("ui.notebook.titleField", { defaultValue: "Notebook title" })}
               value={notebook.title}
               onChange={(e) => setNotebook((prev) => ({ ...prev, title: e.target.value }))}
               onBlur={() => setIsEditingTitle(false)}
@@ -373,12 +380,14 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
               autoFocus
             />
           ) : (
-            <span
-              className="text-sm font-medium cursor-pointer hover:text-primary"
+            <button
+              type="button"
+              className="min-w-0 truncate text-left text-sm font-medium hover:text-primary"
+              aria-label={t("ui.notebook.rename", { defaultValue: "Rename notebook" })}
               onClick={() => setIsEditingTitle(true)}
             >
               {notebook.title}
-            </span>
+            </button>
           )}
           <Badge
             variant="outline"
@@ -400,7 +409,7 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearAllOutputs} title="Clear Outputs">
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave} title={justSaved ? "Saved" : "Save"}>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSave} title={t("ui.notebook.save", { defaultValue: "Save notebook in this browser" })} aria-label={t("ui.notebook.save", { defaultValue: "Save notebook in this browser" })}>
             <Save className="h-3.5 w-3.5" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExport} title="Export">
@@ -422,8 +431,10 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
         </div>
       </div>
 
+      <p className="shrink-0 border-b px-3 py-2 text-xs text-muted-foreground">{t("ui.notebook.localHint", { defaultValue: "Notebook contents are saved only in this browser. Code output is a preview." })}</p>
+      {saveError ? <p role="alert" className="shrink-0 break-words px-3 py-2 text-sm text-destructive">{saveError}</p> : null}
       {/* Toolbar */}
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-border bg-muted/20">
+      <div className="flex shrink-0 items-center gap-1 overflow-x-auto px-3 py-1.5 border-b border-border bg-muted/20">
         <Button
           variant="outline"
           size="sm"
@@ -651,14 +662,14 @@ export function NotebookPanel({ open, onClose, onAIChat, dataContext }: Notebook
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <div className={cn("w-1.5 h-1.5 rounded-full", kernel.status === "idle" ? "bg-success" : "bg-info")} />
-            Python 3.11
+            {t("ui.notebook.preview", { defaultValue: "Local preview" })}
           </span>
           <span>{notebook.cells.length} cells</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1">
+          <span role="status" data-testid="notebook-save-status" className="flex items-center gap-1">
             <Clock className="h-2.5 w-2.5" />
-            Last saved: Just now
+            {saveError ? t("ui.notebook.saveFailed", { defaultValue: "Save failed" }) : savedNotebook === notebook ? t("ui.notebook.savedLocally", { defaultValue: "Saved in this browser" }) : savedNotebook ? t("ui.notebook.unsavedChanges", { defaultValue: "Unsaved changes" }) : t("ui.notebook.notSaved", { defaultValue: "Not saved" })}
           </span>
         </div>
       </div>

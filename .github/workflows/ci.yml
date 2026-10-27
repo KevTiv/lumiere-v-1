@@ -292,6 +292,9 @@ jobs:
       - name: Persisted presentation draft revision and isolation proof
         run: spacetime call lumiere-ci-contracts run_presentation_draft_tests --server local -y --no-config
 
+      - name: Runtime reader tenant isolation and retirement proof
+        run: spacetime call lumiere-ci-contracts run_ai_spend_recovery_tests --server local -y --no-config
+
       # Full source/schema/manifest comparison against an isolated database;
       # CI correctness does not depend on a mutable Maincloud deployment.
       - name: Verify standalone STDB matches pinned lumiere-contracts release
@@ -330,6 +333,9 @@ jobs:
 
       - name: Opaque record type-debt ratchet
         run: pnpm type-debt:check
+
+      - name: Enforce shared select controls
+        run: pnpm selects:check
 
       - name: Enforce immutable browser operation transport
         run: pnpm operation-transport:check
@@ -375,7 +381,7 @@ jobs:
         working-directory: frontend/web
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Work-board browser regressions
+      - name: Shared controls and work-board browser regressions
         run: pnpm --dir web test:e2e:work-board
 
       - name: Upload work-board browser diagnostics

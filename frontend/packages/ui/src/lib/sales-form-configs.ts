@@ -6,11 +6,12 @@ const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> =
 export const newSaleOrderForm = (t: TFunction): FormConfig => ({
   id: "new-sale-order",
   title: t("sales.forms.newSaleOrder.title"),
-  description: t("sales.forms.newSaleOrder.description"),
+  description: t("sales.forms.refinement.newOrderHelp", { defaultValue: "Save a draft quotation, then add products, quantities and prices before confirming the order." }),
+  submitLabel: t("sales.forms.refinement.saveQuotation", { defaultValue: "Save draft quotation" }),
   sections: [
     {
       id: "so-customer",
-      title: t("sales.forms.newSaleOrder.sections.customer"),
+      title: t("sales.forms.refinement.customer", { defaultValue: "Customer and reference" }),
       fields: [
         {
           id: "partnerId",
@@ -19,7 +20,9 @@ export const newSaleOrderForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.newSaleOrder.fields.partnerId"),
           placeholder: t("sales.forms.newSaleOrder.fields.partnerPlaceholder"),
           required: true,
+          description: t("sales.forms.refinement.customerHelp", { defaultValue: "Choose the customer for this quotation. Invoice and delivery contacts initially use this customer." }),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -30,30 +33,31 @@ export const newSaleOrderForm = (t: TFunction): FormConfig => ({
           placeholder: t("sales.forms.newSaleOrder.fields.clientOrderRefPlaceholder"),
           width: "1/2",
         },
+        {
+          id: "validityDate",
+          name: "validityDate",
+          type: "date",
+          label: t("sales.forms.newSaleOrder.fields.validityDate"),
+          description: t("sales.forms.refinement.validityHelp", { defaultValue: "Last date the quotation remains valid." }),
+          width: "1/2",
+        },
       ],
     },
     {
       id: "so-order",
-      title: t("sales.forms.newSaleOrder.sections.orderDetails"),
+      title: t("sales.forms.refinement.pricing", { defaultValue: "Pricing and invoicing" }),
+      description: t("sales.forms.refinement.pricingHelp", { defaultValue: "The price list supplies the currency. Review payment terms and the quantities used for invoicing." }),
       fields: [
         {
           id: "pricelistId",
           name: "pricelistId",
           type: "select",
-          label: t("sales.forms.newSaleOrder.fields.pricelistId"),
+          label: t("sales.forms.refinement.pricelist", { defaultValue: "Price list and currency" }),
           placeholder: t("sales.forms.newSaleOrder.fields.pricelistPlaceholder"),
           required: true,
+          description: t("sales.forms.refinement.pricelistHelp", { defaultValue: "Required. Prices and document currency use the selected price list." }),
           width: "1/2",
-          options: emptySelect,
-        },
-        {
-          id: "warehouseId",
-          name: "warehouseId",
-          type: "select",
-          label: t("sales.forms.newSaleOrder.fields.warehouseId"),
-          placeholder: t("sales.forms.newSaleOrder.fields.warehousePlaceholder"),
-          required: true,
-          width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -65,19 +69,74 @@ export const newSaleOrderForm = (t: TFunction): FormConfig => ({
           options: [{ value: "", label: "—" }],
         },
         {
-          id: "validityDate",
-          name: "validityDate",
-          type: "date",
-          label: t("sales.forms.newSaleOrder.fields.validityDate"),
+          id: "invoicePolicy",
+          name: "invoicePolicy",
+          type: "select",
+          label: t("sales.forms.refinement.invoicePolicy", { defaultValue: "Invoice based on" }),
           width: "1/2",
+          options: [
+            { value: "order", label: t("sales.forms.refinement.invoiceOrdered", { defaultValue: "Ordered quantities" }) },
+            { value: "delivery", label: t("sales.forms.refinement.invoiceDelivered", { defaultValue: "Delivered quantities" }) },
+          ],
+        },
+      ],
+    },
+    {
+      id: "so-delivery",
+      title: t("sales.forms.refinement.delivery", { defaultValue: "Delivery" }),
+      description: t("sales.forms.refinement.deliveryHelp", { defaultValue: "Choose the warehouse and the delivery commitment for this order." }),
+      fields: [
+        {
+          id: "warehouseId",
+          name: "warehouseId",
+          type: "select",
+          label: t("sales.forms.newSaleOrder.fields.warehouseId"),
+          placeholder: t("sales.forms.newSaleOrder.fields.warehousePlaceholder"),
+          required: true,
+          description: t("sales.forms.refinement.warehouseHelp", { defaultValue: "Required. Select the warehouse used by the order fulfillment workflow." }),
+          width: "1/2",
+          searchable: true,
+          options: emptySelect,
         },
         {
           id: "commitmentDate",
           name: "commitmentDate",
           type: "date",
           label: t("sales.forms.newSaleOrder.fields.commitmentDate"),
+          description: t("sales.forms.refinement.commitmentHelp", { defaultValue: "Delivery date promised to the customer." }),
           width: "1/2",
         },
+        {
+          id: "isDropship",
+          name: "isDropship",
+          type: "checkbox",
+          label: t("sales.forms.newSaleOrder.fields.isDropship", {
+            defaultValue: "Dropship (vendor ships to customer)",
+          }),
+          width: "1/2",
+        },
+      ],
+    },
+    {
+      id: "so-notes",
+      title: t("sales.forms.refinement.notes", { defaultValue: "Order notes" }),
+      fields: [
+        {
+          id: "note",
+          name: "note",
+          type: "textarea",
+          label: t("sales.forms.newSaleOrder.fields.note"),
+          placeholder: t("sales.forms.newSaleOrder.fields.notePlaceholder"),
+          width: "full",
+          rows: 3,
+        },
+      ],
+    },
+    {
+      id: "so-commission",
+      title: t("sales.forms.refinement.commission", { defaultValue: "Commission" }),
+      description: t("sales.forms.refinement.commissionHelp", { defaultValue: "Optional commission settings for this order. Processing follows the configured commission workflow." }),
+      fields: [
         {
           id: "commissionRatePercent",
           name: "commissionRatePercent",
@@ -93,43 +152,6 @@ export const newSaleOrderForm = (t: TFunction): FormConfig => ({
             },
           ),
           width: "1/2",
-        },
-        {
-          id: "isDropship",
-          name: "isDropship",
-          type: "checkbox",
-          label: t("sales.forms.newSaleOrder.fields.isDropship", {
-            defaultValue: "Dropship (vendor ships to customer)",
-          }),
-          width: "1/2",
-        },
-        {
-          id: "invoicePolicy",
-          name: "invoicePolicy",
-          type: "select",
-          label: t("sales.forms.newSaleOrder.fields.invoicePolicy", {
-            defaultValue: "Invoice policy",
-          }),
-          width: "1/2",
-          options: [
-            { value: "order", label: "On order" },
-            { value: "delivery", label: "On delivery" },
-          ],
-        },
-      ],
-    },
-    {
-      id: "so-notes",
-      title: t("sales.forms.newSaleOrder.sections.notes"),
-      fields: [
-        {
-          id: "note",
-          name: "note",
-          type: "textarea",
-          label: t("sales.forms.newSaleOrder.fields.note"),
-          placeholder: t("sales.forms.newSaleOrder.fields.notePlaceholder"),
-          width: "full",
-          rows: 3,
         },
       ],
     },
@@ -162,6 +184,7 @@ export const newPricelistForm = (t: TFunction): FormConfig => ({
           placeholder: t("sales.forms.newPricelist.fields.currencyPlaceholder"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -196,6 +219,7 @@ export const newPricelistItemForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.newPricelistItem.fields.pricelistId"),
           required: true,
           width: "full",
+          searchable: true,
           options: [],
         },
         {
@@ -232,6 +256,7 @@ export const newPricelistItemForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("sales.forms.newPricelistItem.fields.productId"),
           width: "1/3",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -240,6 +265,7 @@ export const newPricelistItemForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("sales.forms.newPricelistItem.fields.categId"),
           width: "1/3",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -423,6 +449,7 @@ export const newDeliveryCarrierForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.newDeliveryCarrier.fields.productId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -432,6 +459,7 @@ export const newDeliveryCarrierForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.newDeliveryCarrier.fields.currencyId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -603,6 +631,7 @@ export const newShippingMethodForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.newShippingMethod.fields.productId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -731,6 +760,7 @@ export const newPosPaymentMethodForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("sales.forms.newPosPaymentMethod.fields.receivableAccountId"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -739,6 +769,7 @@ export const newPosPaymentMethodForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("sales.forms.newPosPaymentMethod.fields.outstandingAccountId"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -747,6 +778,7 @@ export const newPosPaymentMethodForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("sales.forms.newPosPaymentMethod.fields.journalId"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -755,6 +787,7 @@ export const newPosPaymentMethodForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("sales.forms.newPosPaymentMethod.fields.cashJournalId"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -793,6 +826,7 @@ export const newLoyaltyProgramForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.newLoyaltyProgram.fields.currencyId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -873,6 +907,7 @@ export const newLoyaltyCardForm = (t: TFunction): FormConfig => ({
           placeholder: t("sales.forms.newLoyaltyCard.fields.programPlaceholder"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -897,6 +932,7 @@ export const newLoyaltyCardForm = (t: TFunction): FormConfig => ({
           type: "select",
           label: t("sales.forms.newLoyaltyCard.fields.partnerId"),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
       ],
@@ -908,10 +944,11 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
   id: "add-sale-order-line",
   title: t("sales.forms.addSaleOrderLine.title"),
   description: t("sales.forms.addSaleOrderLine.description"),
+  submitLabel: t("sales.forms.refinement.addLine", { defaultValue: "Add item" }),
   sections: [
     {
       id: "sol-order",
-      title: t("sales.forms.addSaleOrderLine.sections.order"),
+      title: t("sales.forms.refinement.order", { defaultValue: "Quotation or order" }),
       fields: [
         {
           id: "orderId",
@@ -921,13 +958,14 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("sales.forms.addSaleOrderLine.fields.orderPlaceholder"),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
       ],
     },
     {
       id: "sol-product",
-      title: t("sales.forms.addSaleOrderLine.sections.product"),
+      title: t("sales.forms.refinement.item", { defaultValue: "Item and quantity" }),
       fields: [
         {
           id: "productId",
@@ -937,16 +975,28 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
           placeholder: t("sales.forms.addSaleOrderLine.fields.productPlaceholder"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
+        },
+        {
+          id: "name",
+          name: "name",
+          type: "text",
+          label: t("sales.forms.addSaleOrderLine.fields.name"),
+          placeholder: t("sales.forms.addSaleOrderLine.fields.namePlaceholder"),
+          description: t("sales.forms.refinement.lineNameHelp", { defaultValue: "Optional description shown on the order line." }),
+          width: "full",
         },
         {
           id: "uomId",
           name: "uomId",
           type: "select",
-          label: t("sales.forms.addSaleOrderLine.fields.uomId"),
+          label: t("sales.forms.refinement.uom", { defaultValue: "Unit of measure" }),
           placeholder: t("sales.forms.addSaleOrderLine.fields.uomPlaceholder"),
           required: true,
+          description: t("sales.forms.refinement.uomHelp", { defaultValue: "Choose the unit used for the quantity, such as units, hours or boxes." }),
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -968,8 +1018,9 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
       ],
     },
     {
-      id: "sol-details",
-      title: t("sales.forms.addSaleOrderLine.sections.details"),
+      id: "sol-pricing",
+      title: t("sales.forms.refinement.linePricing", { defaultValue: "Discount and taxes" }),
+      description: t("sales.forms.refinement.linePricingHelp", { defaultValue: "Prices use the currency of the selected order." }),
       fields: [
         {
           id: "discount",
@@ -980,22 +1031,6 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
           defaultValue: 0,
         },
         {
-          id: "sequence",
-          name: "sequence",
-          type: "number",
-          label: t("sales.forms.addSaleOrderLine.fields.sequence"),
-          width: "1/3",
-          defaultValue: 10,
-        },
-        {
-          id: "name",
-          name: "name",
-          type: "text",
-          label: t("sales.forms.addSaleOrderLine.fields.name"),
-          placeholder: t("sales.forms.addSaleOrderLine.fields.namePlaceholder"),
-          width: "full",
-        },
-        {
           id: "taxIds",
           name: "taxIds",
           type: "multiselect",
@@ -1004,6 +1039,21 @@ export const addSaleOrderLineForm = (t: TFunction): FormConfig => ({
           description: t("sales.forms.addSaleOrderLine.fields.taxIdsHint"),
           width: "full",
           options: [],
+        },
+      ],
+    },
+    {
+      id: "sol-details",
+      title: t("sales.forms.refinement.lineDisplay", { defaultValue: "Document line order" }),
+      fields: [
+        {
+          id: "sequence",
+          name: "sequence",
+          type: "number",
+          label: t("sales.forms.refinement.sequence", { defaultValue: "Line order" }),
+          description: t("sales.forms.refinement.sequenceHelp", { defaultValue: "Controls where the line appears in the document." }),
+          width: "1/3",
+          defaultValue: 10,
         },
       ],
     },
@@ -1038,6 +1088,7 @@ export const editSaleOrderLineForm = (t: TFunction): FormConfig => ({
           }),
           required: true,
           width: "full",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -1071,12 +1122,13 @@ export const createInvoiceFromSaleOrderForm = (t: TFunction): FormConfig => ({
   id: "create-invoice-from-sale-order",
   title: t("sales.forms.createInvoiceFromOrder.title"),
   description: t("sales.forms.createInvoiceFromOrder.description"),
-  submitLabel: t("sales.forms.createInvoiceFromOrder.submitLabel"),
+  submitLabel: t("sales.forms.refinement.createDraftInvoice", { defaultValue: "Create draft invoice" }),
   cancelLabel: t("common.cancel"),
   sections: [
     {
       id: "accounting",
-      title: t("sales.forms.createInvoiceFromOrder.sections.accounting"),
+      title: t("sales.forms.refinement.invoiceAccounts", { defaultValue: "Invoice journal and accounts" }),
+      description: t("sales.forms.refinement.invoiceAccountsHelp", { defaultValue: "Review the journal, sales account and customer receivable account before creating the draft invoice." }),
       fields: [
         {
           id: "journalId",
@@ -1085,6 +1137,7 @@ export const createInvoiceFromSaleOrderForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.createInvoiceFromOrder.fields.journalId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: [],
         },
         {
@@ -1094,6 +1147,7 @@ export const createInvoiceFromSaleOrderForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.createInvoiceFromOrder.fields.defaultIncomeAccountId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: [],
         },
         {
@@ -1103,15 +1157,15 @@ export const createInvoiceFromSaleOrderForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.createInvoiceFromOrder.fields.receivableAccountId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: [],
         },
-        {
-          id: "receivableLineName",
-          name: "receivableLineName",
-          type: "text",
-          label: t("sales.forms.createInvoiceFromOrder.fields.receivableLineName"),
-          width: "full",
-        },
+      ],
+    },
+    {
+      id: "document",
+      title: t("sales.forms.refinement.invoiceDetails", { defaultValue: "Invoice notes and ledger description" }),
+      fields: [
         {
           id: "narration",
           name: "narration",
@@ -1121,6 +1175,20 @@ export const createInvoiceFromSaleOrderForm = (t: TFunction): FormConfig => ({
           width: "full",
           rows: 3,
         },
+        {
+          id: "receivableLineName",
+          name: "receivableLineName",
+          type: "text",
+          label: t("sales.forms.createInvoiceFromOrder.fields.receivableLineName"),
+          width: "full",
+        },
+      ],
+    },
+    {
+      id: "ledger-options",
+      title: t("sales.forms.refinement.ledgerOptions", { defaultValue: "Specialist ledger line options" }),
+      description: t("sales.forms.refinement.ledgerOptionsHelp", { defaultValue: "These settings affect invoice line visibility and reconciliation. Keep the existing values unless your accountant requests a change." }),
+      fields: [
         {
           id: "incomeExcludeFromInvoiceTab",
           name: "incomeExcludeFromInvoiceTab",
@@ -1170,6 +1238,7 @@ export const addReturnOrderLineForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.addReturnOrderLine.fields.productId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -1179,6 +1248,7 @@ export const addReturnOrderLineForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.addReturnOrderLine.fields.uomId"),
           required: true,
           width: "1/2",
+          searchable: true,
           options: emptySelect,
         },
         {
@@ -1229,7 +1299,8 @@ export const newReturnOrderForm = (t: TFunction): FormConfig => {
             label: t("sales.forms.newReturnOrder.fields.partnerId"),
             required: true,
             width: "1/2",
-            options: emptySelect,
+            searchable: true,
+          options: emptySelect,
           },
           {
             id: "saleOrderId",
@@ -1237,7 +1308,8 @@ export const newReturnOrderForm = (t: TFunction): FormConfig => {
             type: "select",
             label: t("sales.forms.newReturnOrder.fields.saleOrderId"),
             width: "1/2",
-            options: emptySelect,
+            searchable: true,
+          options: emptySelect,
           },
           {
             id: "returnReason",
@@ -1352,7 +1424,7 @@ export const editSaleOrderForm = (t: TFunction): FormConfig => ({
   sections: [
     {
       id: "header",
-      title: t("sales.forms.editSaleOrder.sections.header"),
+      title: t("sales.forms.refinement.reference", { defaultValue: "Customer reference" }),
       fields: [
         {
           id: "clientOrderRef",
@@ -1361,13 +1433,12 @@ export const editSaleOrderForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.newSaleOrder.fields.clientOrderRef"),
           width: "1/2",
         },
-        {
-          id: "note",
-          name: "note",
-          type: "textarea",
-          label: t("sales.forms.editSaleOrder.fields.note"),
-          width: "full",
-        },
+      ],
+    },
+    {
+      id: "delivery",
+      title: t("sales.forms.refinement.deliveryTerms", { defaultValue: "Delivery terms" }),
+      fields: [
         {
           id: "incoterm",
           name: "incoterm",
@@ -1382,6 +1453,26 @@ export const editSaleOrderForm = (t: TFunction): FormConfig => ({
           label: t("sales.forms.editSaleOrder.fields.incotermLocation"),
           width: "1/2",
         },
+      ],
+    },
+    {
+      id: "notes",
+      title: t("sales.forms.refinement.notes", { defaultValue: "Order notes" }),
+      fields: [
+        {
+          id: "note",
+          name: "note",
+          type: "textarea",
+          label: t("sales.forms.editSaleOrder.fields.note"),
+          width: "full",
+        },
+      ],
+    },
+    {
+      id: "commission",
+      title: t("sales.forms.refinement.commission", { defaultValue: "Commission" }),
+      description: t("sales.forms.refinement.commissionHelp", { defaultValue: "Optional commission settings for this order. Processing follows the configured commission workflow." }),
+      fields: [
         {
           id: "commissionRatePercent",
           name: "commissionRatePercent",

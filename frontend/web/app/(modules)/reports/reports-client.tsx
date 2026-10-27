@@ -253,11 +253,16 @@ function ReportsClientLoaded({
   const trialBalancesQuery = useTrialBalances(orgId, initialBalances)
   const { data: trialBalances = [] } = trialBalancesQuery
   const periodsQuery = useAccountPeriods(orgId, { enabled: periodRequested })
-  const { data: reportTemplates = [] } = useReportTemplates(orgId, initialReportTemplates)
-  const { data: scheduledReports = [] } = useScheduledReports(orgId, initialScheduledReports)
-  const { data: analyticsMetrics = [] } = useAnalyticsMetrics(orgId, initialAnalyticsMetrics)
-  const { data: dashboards = [] } = useDashboards(orgId, initialDashboards)
-  const { data: dashboardWidgets = [] } = useDashboardWidgets(orgId, initialDashboardWidgets)
+  const reportTemplatesQuery = useReportTemplates(orgId, initialReportTemplates)
+  const { data: reportTemplates = [] } = reportTemplatesQuery
+  const scheduledReportsQuery = useScheduledReports(orgId, initialScheduledReports)
+  const { data: scheduledReports = [] } = scheduledReportsQuery
+  const analyticsMetricsQuery = useAnalyticsMetrics(orgId, initialAnalyticsMetrics)
+  const { data: analyticsMetrics = [] } = analyticsMetricsQuery
+  const dashboardsQuery = useDashboards(orgId, initialDashboards)
+  const { data: dashboards = [] } = dashboardsQuery
+  const dashboardWidgetsQuery = useDashboardWidgets(orgId, initialDashboardWidgets)
+  const { data: dashboardWidgets = [] } = dashboardWidgetsQuery
   const { data: companies = [] } = useCompanies(organizationId, organizationId > 0)
   const accountAccountsQuery = useAccountAccounts(orgId)
   const { data: accountAccounts = [] } = accountAccountsQuery
@@ -314,7 +319,7 @@ function ReportsClientLoaded({
     () =>
       reportTemplates.map((row) => ({
         value: String(row.id ?? ""),
-        label: `${String(row.name ?? row.id)} (id ${String(row.id)})`,
+        label: String(row.name ?? row.id),
       })),
     [reportTemplates],
   )
@@ -459,7 +464,7 @@ function ReportsClientLoaded({
       })
       if (!validPeriodContext) return form
       const contextual = mergeFieldDefaultValues(form, periodReportFormDefaults(validPeriodContext))
-      return { ...contextual, sections: contextual.sections.map((section) => ({ ...section, fields: section.fields.map((field) => ["dateFrom", "dateTo", "reportType", "targetMove"].includes(field.name) ? { ...field, disabled: true } : field) })) }
+      return { ...contextual, description: t("reports.forms.generateReport.lockedPeriodHint", { defaultValue: "The report type, dates, and posted-entry basis are fixed by the selected accounting period. Return to period close to choose another period." }), sections: contextual.sections.map((section) => ({ ...section, fields: section.fields.map((field) => ["dateFrom", "dateTo", "reportType", "targetMove"].includes(field.name) ? { ...field, disabled: true } : field) })) }
     },
     [t, currencySelectOptions, validPeriodContext],
   )
@@ -1155,12 +1160,19 @@ function ReportsClientLoaded({
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    const source = action === "createReportTemplate" ? reportTemplatesQuery
+      : action === "createScheduledReport" ? scheduledReportsQuery
+      : action === "createAnalyticsMetric" ? analyticsMetricsQuery
+      : action === "createDashboard" ? dashboardsQuery
+      : action === "createDashboardWidget" ? dashboardWidgetsQuery : null
+    if (source && moduleQueryState(source).status !== "ready") throw new Error(t("reports.forms.sourceUnavailable", { defaultValue: "Required report records could not be verified. Retry their source list before saving. Your entries are retained." }))
     if (action === "createReport" || action === "generateReport") {
       if (periodRequested && (!validPeriodContext || validPeriodContext.reportType !== "trial-balance")) throw new Error("The selected period report context is not ready for trial balance generation")
       await createFinancialReportFlow.mutateAsync(toCreateFinancialReportPayload(validPeriodContext ? applyPeriodReportFormContext(formData, validPeriodContext) : formData))
     } else if (action === "createReportTemplate") {
       await createReportTemplate.mutateAsync(toCreateReportTemplatePayload(formData))
     } else if (action === "createScheduledReport") {
+      if (moduleQueryState(reportTemplatesQuery).status !== "ready") throw new Error(t("reports.forms.scheduledReport.sourceUnavailable", { defaultValue: "Report templates could not be verified. Retry Report templates before saving this schedule. Your entries are retained." }))
       await createScheduledReport.mutateAsync(toCreateScheduledReportPayload(formData))
     } else if (action === "createAnalyticsMetric") {
       await createAnalyticsMetric.mutateAsync(toCreateAnalyticsMetricPayload(formData))
@@ -1177,6 +1189,8 @@ function ReportsClientLoaded({
         creationRequestId: globalThis.crypto.randomUUID(),
       })
       setCreateWidgetOpen(false)
+    } else {
+      throw new Error(t("reports.forms.unsupportedAction", { defaultValue: "This form action is unavailable. Close and reopen the form before trying again." }))
     }
   }
 
@@ -1202,6 +1216,17 @@ function ReportsClientLoaded({
     importReportTemplateCsv.isPending ||
     importAnalyticsMetricCsv.isPending
 
+  const quickActionConfig = quickActionForm?.action === "createReport" || quickActionForm?.action === "generateReport" ? financialReportFormConfig
+    : quickActionForm?.action === "createReportTemplate" ? reportTemplateFormConfig
+    : quickActionForm?.action === "createScheduledReport" ? scheduledReportFormConfig
+    : quickActionForm?.action === "createAnalyticsMetric" ? analyticsMetricFormConfig
+    : quickActionForm?.form ?? financialReportFormConfig
+  const quickActionSource = quickActionForm?.action === "createReportTemplate" ? moduleQueryState(reportTemplatesQuery)
+    : quickActionForm?.action === "createScheduledReport" ? mergeModuleStates([moduleQueryState(scheduledReportsQuery), moduleQueryState(reportTemplatesQuery)])
+    : quickActionForm?.action === "createAnalyticsMetric" ? moduleQueryState(analyticsMetricsQuery)
+    : moduleQueryState(reportsQuery)
+  const quickActionBlocked = quickActionForm != null && quickActionSource.status !== "ready"
+
   // The actor is part of ModuleView's scope key. Mounting its interactive state
   // before initial authorization resolves would discard selections and drafts
   // as soon as that key acquires the actor, even though the session did not change.
@@ -1217,7 +1242,7 @@ function ReportsClientLoaded({
         config={config}
         dashboardContent={<ModuleInsights input={{ module: "reports", organizationId, companyId: operatingCompanyId ?? 0n, records: { rows: reportsRaw, state: moduleQueryState(reportsQuery) }, currencies: { rows: currencies, state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
-        dataState={{ reports: moduleQueryState(reportsQuery), "trial-balance": mergeModuleStates([moduleQueryState(reportsQuery), moduleQueryState(trialBalancesQuery)]), "vat-report": moduleQueryState(reportsQuery) }}
+        dataState={{ reports: moduleQueryState(reportsQuery), "trial-balance": mergeModuleStates([moduleQueryState(reportsQuery), moduleQueryState(trialBalancesQuery)]), "vat-report": moduleQueryState(reportsQuery), "report-templates": moduleQueryState(reportTemplatesQuery), "scheduled-reports": moduleQueryState(scheduledReportsQuery), "analytics-metrics": moduleQueryState(analyticsMetricsQuery), dashboards: moduleQueryState(dashboardsQuery), "dashboard-widgets": moduleQueryState(dashboardWidgetsQuery) }}
         onFormSubmit={handleFormSubmit}
         renderCreatePreview={(_tabId, values, formConfig) => renderAuthoringPreview(values, formConfig)}
         isPending={isFormMutationPending}
@@ -1231,8 +1256,11 @@ function ReportsClientLoaded({
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? financialReportFormConfig}
-        renderPreview={(values) => renderAuthoringPreview(values, quickActionForm?.form ?? financialReportFormConfig)}
+        config={quickActionConfig}
+        submissionDisabled={quickActionBlocked}
+        submitError={quickActionBlocked ? t("reports.forms.sourceUnavailable", { defaultValue: "Required report records could not be verified. Retry their source list before saving. Your entries are retained." }) : null}
+        formLeadingActions={quickActionBlocked && "onRetry" in quickActionSource && quickActionSource.onRetry ? <Button type="button" variant="outline" onClick={quickActionSource.onRetry}>{t("common.retry", { defaultValue: "Retry" })}</Button> : undefined}
+        renderPreview={(values) => renderAuthoringPreview(values, quickActionConfig)}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {
@@ -1286,7 +1314,7 @@ function ReportsClientLoaded({
         config={updateMetricValuesForm(t)}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
-          if (metricValuesId == null) return
+          if (metricValuesId == null) throw new Error(t("reports.forms.selectedRecordUnavailable", { defaultValue: "The selected record is unavailable. Close and reopen this form." }))
           const cv = Number(formData.currentValue)
           if (!Number.isFinite(cv)) throw new Error("Invalid current value")
           const pvRaw = formData.previousValue
@@ -1314,7 +1342,7 @@ function ReportsClientLoaded({
         config={recordScheduledRunForm(t)}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
-          if (recordRunScheduledId == null) return
+          if (recordRunScheduledId == null) throw new Error(t("reports.forms.selectedRecordUnavailable", { defaultValue: "The selected record is unavailable. Close and reopen this form." }))
           const raw = formData.nextRun
           if (raw == null || String(raw).trim() === "") {
             throw new Error("Next run is required")

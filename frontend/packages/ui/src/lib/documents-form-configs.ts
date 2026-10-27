@@ -56,6 +56,13 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
           width: "1/2",
           options: emptySelect,
         },
+      ],
+    },
+    {
+      id: "doc-filing",
+      title: t("documents.forms.newDocument.sections.filing", { defaultValue: "Optional links and filing" }),
+      description: t("documents.forms.newDocument.sections.filingHint", { defaultValue: "Link an existing business record or add filing details when your document policy requires them." }),
+      fields: [
         {
           id: "resModel",
           name: "resModel",
@@ -64,11 +71,11 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
           width: "1/2",
           options: [
             { value: "", label: t("documents.forms.newDocument.fields.resModelNone") },
-            { value: "sale_order", label: "sale_order" },
-            { value: "purchase_order", label: "purchase_order" },
-            { value: "account_move", label: "account_move" },
-            { value: "hr_expense", label: "hr_expense" },
-            { value: "contact", label: "contact" },
+            { value: "sale_order", label: t("documents.forms.recordTypes.salesOrder", { defaultValue: "Sales order" }) },
+            { value: "purchase_order", label: t("documents.forms.recordTypes.purchaseOrder", { defaultValue: "Purchase order" }) },
+            { value: "account_move", label: t("documents.forms.recordTypes.accountingDocument", { defaultValue: "Accounting document" }) },
+            { value: "hr_expense", label: t("documents.forms.recordTypes.expense", { defaultValue: "Expense" }) },
+            { value: "contact", label: t("documents.forms.recordTypes.contact", { defaultValue: "Contact" }) },
           ],
         },
         {
@@ -104,13 +111,13 @@ export const newDocumentForm = (t: TFunction): FormConfig => ({
           width: "1/2",
           options: [
             { value: "", label: t("documents.forms.newDocument.fields.fiscalKindNone") },
-            { value: "tax_invoice_pdf", label: "tax_invoice_pdf" },
-            { value: "nfe_xml", label: "nfe_xml" },
-            { value: "nfe_pdf", label: "nfe_pdf" },
-            { value: "danfe_pdf", label: "danfe_pdf" },
-            { value: "myinvois_xml", label: "myinvois_xml" },
-            { value: "efaktur_xml", label: "efaktur_xml" },
-            { value: "efaktur_pdf", label: "efaktur_pdf" },
+            { value: "tax_invoice_pdf", label: t("documents.forms.fiscalKinds.taxInvoicePdf", { defaultValue: "Tax invoice (PDF)" }) },
+            { value: "nfe_xml", label: t("documents.forms.fiscalKinds.nfeXml", { defaultValue: "NF-e (XML)" }) },
+            { value: "nfe_pdf", label: t("documents.forms.fiscalKinds.nfePdf", { defaultValue: "NF-e (PDF)" }) },
+            { value: "danfe_pdf", label: t("documents.forms.fiscalKinds.danfePdf", { defaultValue: "DANFe (PDF)" }) },
+            { value: "myinvois_xml", label: t("documents.forms.fiscalKinds.myInvoisXml", { defaultValue: "MyInvois (XML)" }) },
+            { value: "efaktur_xml", label: t("documents.forms.fiscalKinds.eFakturXml", { defaultValue: "e-Faktur (XML)" }) },
+            { value: "efaktur_pdf", label: t("documents.forms.fiscalKinds.eFakturPdf", { defaultValue: "e-Faktur (PDF)" }) },
           ],
         },
         {

@@ -1,3 +1,4 @@
+import { chooseSelectValue } from "../components/select-test-utils"
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { QuotationDocumentDialog } from "../../../../web/app/(modules)/sales/quotation-document-dialog"
@@ -50,7 +51,7 @@ beforeEach(() => {
 afterEach(cleanup)
 
 async function showPreview() {
-  fireEvent.change(screen.getByLabelText(k("layout")), { target: { value: "31" } })
+  chooseSelectValue(screen.getByLabelText(k("layout")), "31")
   fireEvent.click(screen.getByRole("button", { name: k("preview"), exact: true }))
   await screen.findByTitle(k("previewTitle"))
 }
@@ -98,10 +99,10 @@ describe("quotation document review and save", () => {
     let finish!: (value: typeof preview) => void
     harness.preview.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
     render(<QuotationDocumentDialog {...props} onClose={vi.fn()} />)
-    fireEvent.change(screen.getByLabelText(k("layout")), { target: { value: "31" } })
+    chooseSelectValue(screen.getByLabelText(k("layout")), "31")
     fireEvent.click(screen.getByRole("button", { name: k("preview"), exact: true }))
     const signal = harness.preview.mock.calls[0]![1] as AbortSignal
-    fireEvent.change(screen.getByLabelText(k("layout")), { target: { value: "32" } })
+    chooseSelectValue(screen.getByLabelText(k("layout")), "32")
     expect(signal.aborted).toBe(true)
     await act(async () => { finish(preview) })
     expect(screen.queryByTitle(k("previewTitle"))).toBeNull()

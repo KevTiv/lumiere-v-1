@@ -18,6 +18,7 @@ import {
 } from '@lumiere/query-hooks/hooks/approval-controls'
 import { useOperatingCompanyId } from '@lumiere/query-hooks/hooks/use-operating-company'
 import { Button, formText, useFormDialog } from '@lumiere/ui'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 function rowId(row: Record<string, unknown>): string {
   return String(row.id ?? '')
@@ -256,23 +257,39 @@ export function PurchasingOpsSod({
               {showActorSelection ? (
                 <label className="flex items-center gap-2 text-sm">
                   {t('purchasing.ops.actingAs', { defaultValue: 'Acting as' })}
-                  <select
-                    className="rounded border bg-background px-2 py-1"
-                    data-testid="purchasing-ops-acting-for"
-                    value={selectedActor ?? ''}
-                    onChange={(event) => setActingFor(event.target.value)}
+                  <Select
+                    value={String(selectedActor ?? "") || "__none__"}
+                    onValueChange={(selectValue) => {
+                      const nextValue = selectValue === "__none__" ? "" : selectValue
+                      setActingFor(nextValue)
+                    }}
                     disabled={approveRequest.isPending || rejectRequest.isPending}
                   >
-                    {pendingApprovalForSelected.directlyEligible === true ? (
-                      <option value="">{t('purchasing.ops.myself', { defaultValue: 'Myself' })}</option>
-                    ) : null}
-                    {pendingApprovalForSelected.directlyEligible !== true && needsActorSelection ? (
-                      <option value="">{t('purchasing.ops.selectPrincipal', { defaultValue: 'Select an eligible principal' })}</option>
-                    ) : null}
-                    {actorOptions.map((option) => (
-                      <option key={option.identityHex} value={option.identityHex}>{option.label}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      className="rounded border bg-background px-2 py-1"
+                      data-testid="purchasing-ops-acting-for"
+                      aria-label={t("purchasing.ops.actingAs", { defaultValue: "Acting as" })}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pendingApprovalForSelected.directlyEligible === true ? (
+                        <SelectItem value={"__none__"}>
+                          {t("purchasing.ops.myself", { defaultValue: "Myself" })}
+                        </SelectItem>
+                      ) : null}
+                      {pendingApprovalForSelected.directlyEligible !== true && needsActorSelection ? (
+                        <SelectItem value={"__none__"}>
+                          {t("purchasing.ops.selectPrincipal", { defaultValue: "Select an eligible principal" })}
+                        </SelectItem>
+                      ) : null}
+                      {actorOptions.map((option) => (
+                        <SelectItem key={option.identityHex} value={String(option.identityHex)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </label>
               ) : null}
               <Button

@@ -440,6 +440,17 @@ export function useAiReportAnalysis() {
   return useGovernedLlmSkill("/api/ai/skills/report-analysis")
 }
 
+export type FinanceReviewSkill =
+  | "finance_report_review"
+  | "bank_reconciliation_review"
+  | "period_close_review"
+  | "expense_evidence_review"
+  | "finance_variance_review"
+
+export function useAiFinanceReview(skill: FinanceReviewSkill) {
+  return useGovernedLlmSkill(`/api/ai/skills/finance/${skill}`)
+}
+
 export function useAiProcessResearch() {
   return useGovernedLlmSkill("/api/ai/skills/process-research")
 }

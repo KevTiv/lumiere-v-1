@@ -28,9 +28,10 @@ import { WorkActivitiesContent } from "./work-activities-content"
 import { WorkflowWorkContent } from "./workflow-work-content"
 import { useWorkBoardAuthority } from "./work-board-authority"
 import { resolveWorkBoardSource, workBoardSources } from "./work-board-config"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 const selectClass =
-  "h-9 max-w-full rounded-md border bg-background px-2 text-sm"
+  "h-9 max-w-full"
 
 function useOnline() {
   const [state, setState] = useState({ online: true, reconnect: 0 })
@@ -175,64 +176,66 @@ export function WorkBoardWorkspace({
         {sources.length > 1 && (
           <label className="grid gap-1 text-xs font-medium">
             {t("workBoard.source")}
-            <select
-              className={selectClass}
-              value={source}
+            <Select
+              value={String(source ?? "")}
+              onValueChange={(nextValue) => updateParams({ workSource: nextValue, workTeam: null })}
               disabled={navigationPending}
-              onChange={(event) =>
-                updateParams({ workSource: event.target.value, workTeam: null })
-              }
             >
-              {sources.map((option) => (
-                <option
-                  key={option}
-                  value={option}
-                  disabled={
-                    option === "workflow" ? !workflowRead : !activitiesRead
-                  }
-                >
-                  {t(
-                    option === "workflow"
-                      ? "workBoard.workflowWork"
-                      : "workBoard.followUps",
-                  )}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className={selectClass} aria-label={t("workBoard.source")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sources.map((option) => (
+                  <SelectItem
+                    key={option}
+                    value={String(option)}
+                    disabled={option === "workflow" ? !workflowRead : !activitiesRead}
+                  >
+                    {t(option === "workflow" ? "workBoard.workflowWork" : "workBoard.followUps")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
         )}
         {!fixedScope && (
           <label className="grid gap-1 text-xs font-medium">
             {t("workBoard.scope")}
-            <select
-              className={selectClass}
-              value={scope}
+            <Select
+              value={String(scope ?? "")}
+              onValueChange={(nextValue) => updateParams({ workScope: nextValue, workTeam: null })}
               disabled={navigationPending}
-              onChange={(event) =>
-                updateParams({ workScope: event.target.value, workTeam: null })
-              }
             >
-              <option value="finance">{t("workBoard.finance")}</option>
-              {scopeOptions.map((item) => (
-                <option key={item.href} value={item.href.slice(1)}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className={selectClass} aria-label={t("workBoard.scope")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={"finance"}>{t("workBoard.finance")}</SelectItem>
+                {scopeOptions.map((item) => (
+                  <SelectItem key={item.href} value={String(item.href.slice(1))}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </label>
         )}
         <label className="grid gap-1 text-xs font-medium">
           {t("workBoard.show")}
-          <select
-            className={selectClass}
-            value={view}
+          <Select
+            value={String(view ?? "")}
+            onValueChange={(nextValue) => updateParams({ workView: nextValue })}
             disabled={navigationPending}
-            onChange={(event) => updateParams({ workView: event.target.value })}
           >
-            <option value="eligible">{t("workBoard.eligible")}</option>
-            <option value="mine">{t("workBoard.mine")}</option>
-            <option value="available">{t("workBoard.available")}</option>
-          </select>
+            <SelectTrigger className={selectClass} aria-label={t("workBoard.show")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={"eligible"}>{t("workBoard.eligible")}</SelectItem>
+              <SelectItem value={"mine"}>{t("workBoard.mine")}</SelectItem>
+              <SelectItem value={"available"}>{t("workBoard.available")}</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <div
           className="flex gap-1"

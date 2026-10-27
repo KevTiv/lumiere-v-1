@@ -8,6 +8,7 @@ import { WorkspaceTabsList as TabsList, WorkspaceTabsTrigger as TabsTrigger } fr
 import { DashboardHeader } from "@lumiere/ui"
 
 import { ReportAnalysisPanel } from "./report-analysis-panel"
+import { FinanceReviewPanel } from "./finance-review-panel"
 import { ReportComposerPanel } from "./report-composer-panel"
 import { LowStockPanel } from "./low-stock-panel"
 import { RedActionDraftPanel } from "./red-action-draft-panel"
@@ -32,7 +33,7 @@ export function AiHarnessClient({
     ? { companyId: savedCompanyId, runId: savedRunId } : undefined
   const [tab, setTab] = useState(() => {
     const requested = searchParams.get("tab")
-    if (["report-analysis", "report-composer", "low-stock", "red-action-drafts", "evidence-reviewer", "run-lifecycle"].includes(requested ?? "")) return requested!
+    if (["finance-reviews", "report-analysis", "report-composer", "low-stock", "red-action-drafts", "evidence-reviewer", "run-lifecycle"].includes(requested ?? "")) return requested!
     return searchParams.has("runId") ? "evidence-reviewer" : "report-composer"
   })
 
@@ -41,6 +42,7 @@ export function AiHarnessClient({
     <DashboardHeader title={t("aiHarness.title")} description={t("aiHarness.description")} />
     <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-6">
       <TabsList scrollable>
+        <TabsTrigger value="finance-reviews">{t("aiHarness.finance.title")}</TabsTrigger>
         <TabsTrigger value="report-analysis">{t("aiHarness.reportAnalysis.title")}</TabsTrigger>
         <TabsTrigger value="report-composer">
           {t("aiHarness.tabs.reportComposer")}
@@ -58,6 +60,10 @@ export function AiHarnessClient({
           {t("aiHarness.tabs.runLifecycle")}
         </TabsTrigger>
       </TabsList>
+
+      <TabsContent value="finance-reviews">
+        <FinanceReviewPanel organizationId={organizationId} companies={companies} savedRun={savedRun} />
+      </TabsContent>
 
       <TabsContent value="report-analysis">
         <ReportAnalysisPanel organizationId={organizationId} companies={companies} savedRun={savedRun} />

@@ -1852,6 +1852,11 @@ impl GovernedProgramExecutor<'_> {
                                 &evidence_overlays,
                             ),
                             format: generate.format.clone(),
+                            response_format: if report_evidence_node(context).is_some() {
+                                super::intelligence::GenerationResponseFormat::FinalDraft
+                            } else {
+                                super::intelligence::GenerationResponseFormat::Text
+                            },
                             instructions: report_generation_instructions(context),
                             max_tokens: context.generation_max_tokens,
                         })
@@ -2843,19 +2848,41 @@ fn json_fingerprint(value: &Value) -> Result<String> {
     Ok(format!("{:x}", Sha256::digest(encoded)))
 }
 
+fn report_evidence_node(context: &GovernedProgramContext) -> Option<&'static str> {
+    if context.program_ref == super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF {
+        Some("analytics")
+    } else if lumiere_finance_review_core::SKILLS
+        .iter()
+        .any(|s| s.program == context.program_ref)
+    {
+        Some("finance_read")
+    } else {
+        None
+    }
+}
+
 fn report_generation_instructions(context: &GovernedProgramContext) -> Option<String> {
-    if context.program_ref != super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF {
+    if report_evidence_node(context).is_none() {
         return context.generation_instructions.clone();
     }
-    let schema = r#"Return only a JSON FinalDraft, without Markdown fences:
+    let schema = r#"Submit one FinalDraft through the required typed response contract:
 {"content":"...","citations":[],"claims":[{"text":"...","supports":[{"kind":"analytics_snapshot","id":"copy from evidencePassage","source_version":"copy exactly","passage_key":"result"}]}],"calculations":[]}.
 Use only the server-recorded observations in the analytics result (artifacts[].artifacts.evidencePassage). Copy their
 citation identity exactly. State at most eight claims. Their text, in order,
-must cover all content (apart from whitespace). Every claim must be supported
+must cover all content (apart from whitespace). Build content by joining the exact
+claim text in order with spaces. Include headings, labels and citation markers
+only if they are part of a supported claim; prefer plain factual sentences. Every claim must be supported
 by the cited observation. Describe bounded snapshot results, including empty
 results, without asserting that they describe all records or current future state.
 Do not invent causes, trends, currencies, or comparisons. Each stated calculation
 must include its operation, operands, label, and claimed_result."#;
+    let schema = if report_evidence_node(context) == Some("finance_read") {
+        schema
+            .replace("analytics_snapshot", "finance_review_snapshot")
+            .replace("analytics result", "finance result")
+    } else {
+        schema.to_string()
+    };
     Some(match &context.generation_instructions {
         Some(existing) => format!("{existing}\n{schema}"),
         None => schema.to_string(),
@@ -2867,7 +2894,7 @@ fn generated_draft(
     content: &str,
     citations: Vec<EvidenceRef>,
 ) -> Result<FinalDraft> {
-    if context.program_ref != super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF {
+    if report_evidence_node(context).is_none() {
         return Ok(FinalDraft {
             content: content.to_string(),
             citations,
@@ -2899,9 +2926,7 @@ fn validate_report_support(
     draft: &FinalDraft,
     values: &HashMap<String, NodeValue>,
 ) -> Result<()> {
-    if context.program_ref != super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF
-        || draft.claims.is_empty()
-    {
+    if report_evidence_node(context).is_none() || draft.claims.is_empty() {
         return Ok(());
     }
     let normalized_content = draft
@@ -2918,7 +2943,8 @@ fn validate_report_support(
     if draft.claims.len() > 8 || normalized_content != normalized_claims {
         bail!("report claims must cover the complete answer in order, with at most eight claims");
     }
-    let passages = match values.get("analytics") {
+    let passages = match values.get(report_evidence_node(context).context("report source missing")?)
+    {
         Some(NodeValue::Tool(output)) => output.data.get("artifacts").and_then(Value::as_array),
         _ => None,
     };
@@ -2981,6 +3007,36 @@ fn known_evidence_for_run(
                 kind: "capability_output".to_string(),
                 id: node_id.clone(),
             });
+        }
+    }
+    // Source tools record immutable passages before returning them. Bind only
+    // the declared program's source node and passage kind. Claim supports still
+    // pass exact observation, catalog and semantic checks.
+    if let Some(node) = report_evidence_node(context) {
+        let kind = if node == "finance_read" {
+            "finance_review_snapshot"
+        } else {
+            "analytics_snapshot"
+        };
+        if let Some(NodeValue::Tool(output)) = values.get(node) {
+            if let Some(artifacts) = output.data.get("artifacts").and_then(Value::as_array) {
+                let run_prefix = format!("run:{}:", context.run_id);
+                for passage in artifacts
+                    .iter()
+                    .filter_map(|artifact| artifact.get("artifacts")?.get("evidencePassage"))
+                {
+                    if let Some(id) = passage.get("id").and_then(Value::as_str) {
+                        if passage.get("kind").and_then(Value::as_str) == Some(kind)
+                            && id.starts_with(&run_prefix)
+                        {
+                            known.insert(EvidenceRef {
+                                kind: kind.to_string(),
+                                id: id.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
         }
     }
     known
@@ -3248,6 +3304,82 @@ mod continuation_lineage_tests {
             }],
             generation_instructions: None,
             generation_max_tokens: None,
+        }
+    }
+
+    #[test]
+    fn report_snapshot_refs_require_this_runs_actual_analytics_output() {
+        let mut context = context("baseline");
+        context.program_ref = super::super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF.into();
+        let valid = EvidenceRef {
+            kind: "analytics_snapshot".into(),
+            id: "run:13:stock_movement_by_state".into(),
+        };
+        let foreign = EvidenceRef {
+            id: "run:12:stock_movement_by_state".into(),
+            ..valid.clone()
+        };
+        let absent = EvidenceRef {
+            id: "run:13:missing_operation".into(),
+            ..valid.clone()
+        };
+        let output = ToolOutput {
+            summary: "recorded observations".into(),
+            data: json!({"artifacts": [
+                {"artifacts": {"evidencePassage": {"kind": valid.kind, "id": valid.id}}},
+                {"artifacts": {"evidencePassage": {"kind": foreign.kind, "id": foreign.id}}}
+            ]}),
+            citations: Vec::new(),
+            row_count: Some(0),
+        };
+        let values = HashMap::from([("analytics".into(), NodeValue::Tool(output.clone()))]);
+        let known = known_evidence_for_run(&context, &values);
+        assert!(known.contains(&valid));
+        assert!(!known.contains(&foreign));
+        assert!(!known.contains(&absent));
+        let wrong_node = HashMap::from([("unrelated".into(), NodeValue::Tool(output))]);
+        assert!(!known_evidence_for_run(&context, &wrong_node).contains(&valid));
+        context.program_ref = "other-program".into();
+        assert!(!known_evidence_for_run(&context, &values).contains(&valid));
+    }
+
+    #[test]
+    fn finance_snapshot_refs_require_each_programs_actual_source_output() {
+        for skill in lumiere_finance_review_core::SKILLS {
+            let mut context = context("baseline");
+            context.program_ref = skill.program.into();
+            let valid = EvidenceRef {
+                kind: "finance_review_snapshot".into(),
+                id: format!("run:13:finance_review:{}", skill.key),
+            };
+            let foreign = EvidenceRef {
+                id: format!("run:12:finance_review:{}", skill.key),
+                ..valid.clone()
+            };
+            let wrong_kind = EvidenceRef {
+                kind: "analytics_snapshot".into(),
+                ..valid.clone()
+            };
+            let output = ToolOutput {
+                summary: "recorded finance observations".into(),
+                data: json!({"artifacts": [
+                    {"artifacts": {"evidencePassage": {"kind": valid.kind, "id": valid.id}}},
+                    {"artifacts": {"evidencePassage": {"kind": foreign.kind, "id": foreign.id}}},
+                    {"artifacts": {"evidencePassage": {"kind": wrong_kind.kind, "id": wrong_kind.id}}}
+                ]}),
+                citations: Vec::new(),
+                row_count: Some(1),
+            };
+            let values = HashMap::from([("finance_read".into(), NodeValue::Tool(output.clone()))]);
+            let known = known_evidence_for_run(&context, &values);
+            assert!(known.contains(&valid), "{}", skill.key);
+            assert!(!known.contains(&foreign));
+            assert!(!known.contains(&wrong_kind));
+            let wrong_node = HashMap::from([("analytics".into(), NodeValue::Tool(output))]);
+            assert!(!known_evidence_for_run(&context, &wrong_node).contains(&valid));
+            assert!(!known_evidence_for_run(&context, &HashMap::new()).contains(&valid));
+            context.program_ref = "other-program".into();
+            assert!(!known_evidence_for_run(&context, &values).contains(&valid));
         }
     }
 
