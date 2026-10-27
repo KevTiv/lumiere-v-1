@@ -278,6 +278,15 @@ pub const MIGRATIONS: &[Migration] = &[
         phase: MigrationPhase::Contract,
         sql: include_str!("ai_index_contract.sql"),
     },
+    Migration {
+        version: 27,
+        name: "ai_harness_v2_projection",
+        change_set: 16,
+        phase: MigrationPhase::Expand,
+        sql: include_str!(
+            "../../../lumiere-codegen/pg-migration-ledger/0027_durable_projection_delta.sql"
+        ),
+    },
 ];
 
 /// SQL used to bootstrap the migration history itself.

@@ -90,6 +90,7 @@ pub struct AiRunBudgetPark {
 #[derive(Clone)]
 #[spacetimedb::table(
     accessor = ai_run_budget_resume_job,
+    index(accessor = ai_run_budget_resume_job_by_org, btree(columns = [organization_id])),
     index(accessor = ai_run_budget_resume_job_by_run, btree(columns = [run_id])),
     scheduled(fire_ai_run_budget_resume)
 )]
