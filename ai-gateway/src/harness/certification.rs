@@ -145,6 +145,7 @@ impl CandidateAdapterRegistry {
             Arc::new(LowStockCertificationAdapter),
             Arc::new(ReportComposerCertificationAdapter),
             Arc::new(ReportAnalysisCertificationAdapter),
+            Arc::new(FinanceCertificationAdapter),
         ])
     }
 
@@ -197,7 +198,7 @@ fn execution_request(
 
 const REPORT_PREVIEW_FIXTURE_PATH: &str = "reports/daily_business_summary_v1/preview.json";
 const BUILT_IN_SEMVER: &str = "1.0.0";
-pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.5";
+pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.6";
 
 struct LowStockCertificationAdapter;
 
@@ -333,6 +334,25 @@ impl CandidateCertificationAdapter for ReportComposerCertificationAdapter {
 /// Replayed provider replies are labelled as fixtures and never count as a
 /// live-provider acceptance or spend-settlement result.
 struct ReportAnalysisCertificationAdapter;
+
+struct FinanceCertificationAdapter;
+
+#[async_trait]
+impl CandidateCertificationAdapter for FinanceCertificationAdapter {
+    fn supports(&self, version: &CandidateSkillVersion) -> bool {
+        lumiere_finance_review_core::skill(&version.skill_key).is_ok()
+            && version.version == lumiere_finance_review_core::VERSION
+            && version.source_hash == super::finance_skills::bundle_hash(&version.skill_key)
+    }
+    async fn execute(
+        &self,
+        request: CandidateExecutionRequest,
+    ) -> Result<CandidateExecution, CertificationExecutionError> {
+        crate::orchestrator::candidate_certification::execute_finance(request)
+            .await
+            .map_err(|e| CertificationExecutionError::Adapter(e.to_string()))
+    }
+}
 
 #[async_trait]
 impl CandidateCertificationAdapter for ReportAnalysisCertificationAdapter {

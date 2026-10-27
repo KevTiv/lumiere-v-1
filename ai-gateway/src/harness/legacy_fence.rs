@@ -13,6 +13,26 @@ pub const GOVERNED_SKILL_REPLACEMENTS: &[(&str, &str)] = &[
     ("insights_scan", "/v1/skills/insights-scan"),
     ("daily_briefing", "/v1/skills/daily-briefing"),
     ("report_analysis", "/v1/skills/report-analysis"),
+    (
+        "finance_report_review",
+        "/v1/skills/finance/finance_report_review",
+    ),
+    (
+        "bank_reconciliation_review",
+        "/v1/skills/finance/bank_reconciliation_review",
+    ),
+    (
+        "period_close_review",
+        "/v1/skills/finance/period_close_review",
+    ),
+    (
+        "expense_evidence_review",
+        "/v1/skills/finance/expense_evidence_review",
+    ),
+    (
+        "finance_variance_review",
+        "/v1/skills/finance/finance_variance_review",
+    ),
     ("process_research", "/v1/skills/process-research"),
     ("price_search", "/v1/skills/price-search"),
     ("supplier_discovery", "/v1/skills/supplier-discovery"),
@@ -74,7 +94,7 @@ mod tests {
             assert!(route.starts_with("/v1/"));
             assert_eq!(governed_skill_replacement(skill), Some(*route));
         }
-        assert_eq!(skills.len(), 12);
+        assert_eq!(skills.len(), 17);
     }
 
     #[test]

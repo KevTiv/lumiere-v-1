@@ -1,0 +1,146 @@
+{
+  "reportKey": "customer_balances_v1",
+  "schemaVersion": 1,
+  "scope": {
+    "organizationId": 9,
+    "companyId": 7,
+    "localDate": "2026-10-26",
+    "dateFrom": "2026-10-26",
+    "dateToExclusive": "2026-10-27",
+    "timezone": "Africa/Kigali",
+    "windowStartUtc": "2026-10-25T22:00:00Z",
+    "windowEndUtc": "2026-10-26T22:00:00Z",
+    "cutoffLabel": "2026-10-26 Africa/Kigali local day [2026-10-25T22:00:00Z, 2026-10-26T22:00:00Z) UTC"
+  },
+  "generatedAt": "2026-10-26T22:01:00Z",
+  "generatedBy": "fixture-actor",
+  "currency": {
+    "currencyId": 1,
+    "minorUnitScale": 2
+  },
+  "sourceWatermark": {
+    "accountingCutoff": "2026-10-26T22:00:00Z",
+    "windowStartUtc": "2026-10-25T22:00:00Z",
+    "windowEndUtc": "2026-10-26T22:00:00Z",
+    "cutoffLabel": "2026-10-26 Africa/Kigali local day [2026-10-25T22:00:00Z, 2026-10-26T22:00:00Z) UTC",
+    "queriedAt": "2026-10-26T22:01:00Z",
+    "sourceRows": [
+      {
+        "source": "account_move",
+        "rows": 3
+      },
+      {
+        "source": "account_move_line",
+        "rows": 3
+      },
+      {
+        "source": "payment_reconciliation",
+        "rows": 2
+      }
+    ]
+  },
+  "caveats": [
+    "Missing due dates are classified as current by the owner report; they are not proof of an agreed due date.",
+    "Allocation reversals are reflected in paid amounts; do not subtract payments again."
+  ],
+  "watermark": "PREVIEW \u2014 NOT AN ACCOUNTING STATEMENT",
+  "report": {
+    "totalOpen": {
+      "minorUnits": 16500,
+      "scale": 2
+    },
+    "overdue": {
+      "minorUnits": 4000,
+      "scale": 2
+    },
+    "current": {
+      "minorUnits": 12500,
+      "scale": 2
+    },
+    "dueBuckets": [
+      {
+        "bucket": "current",
+        "label": "Current",
+        "amount": {
+          "minorUnits": 12500,
+          "scale": 2
+        }
+      },
+      {
+        "bucket": "1_30",
+        "label": "1\u201330 days overdue",
+        "amount": {
+          "minorUnits": 4000,
+          "scale": 2
+        }
+      }
+    ],
+    "lines": [
+      {
+        "moveId": 101,
+        "partnerId": 42,
+        "partnerDisplayName": "Fixture party",
+        "dueDate": "2026-10-01",
+        "originalAmount": {
+          "minorUnits": 10000,
+          "scale": 2
+        },
+        "paidAmount": {
+          "minorUnits": 6000,
+          "scale": 2
+        },
+        "residual": {
+          "minorUnits": 4000,
+          "scale": 2
+        },
+        "isPartial": true,
+        "lastPaymentDate": "2026-10-10T12:00:00Z"
+      },
+      {
+        "moveId": 102,
+        "partnerId": 42,
+        "partnerDisplayName": "Fixture party",
+        "dueDate": null,
+        "originalAmount": {
+          "minorUnits": 7500,
+          "scale": 2
+        },
+        "paidAmount": {
+          "minorUnits": 0,
+          "scale": 2
+        },
+        "residual": {
+          "minorUnits": 7500,
+          "scale": 2
+        },
+        "isPartial": false,
+        "lastPaymentDate": null
+      },
+      {
+        "moveId": 103,
+        "partnerId": 42,
+        "partnerDisplayName": "Fixture party",
+        "dueDate": "2026-10-30",
+        "originalAmount": {
+          "minorUnits": 5000,
+          "scale": 2
+        },
+        "paidAmount": {
+          "minorUnits": 0,
+          "scale": 2
+        },
+        "residual": {
+          "minorUnits": 5000,
+          "scale": 2
+        },
+        "isPartial": false,
+        "lastPaymentDate": null
+      }
+    ],
+    "creditStatus": {
+      "withinLimit": 0,
+      "overLimit": 0,
+      "unknown": 3
+    }
+  }
+}

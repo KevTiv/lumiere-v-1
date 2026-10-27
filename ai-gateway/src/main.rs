@@ -207,6 +207,10 @@ async fn main() -> anyhow::Result<()> {
         .allow_headers(Any);
 
     let v1_routes = Router::new()
+        .route(
+            "/v1/skills/finance/:skill",
+            post(routes::harness_skills::post_finance_review),
+        )
         .route("/v1/search", post(routes::search::post_search))
         .route("/v1/rag", post(routes::rag::post_rag))
         .route("/v1/rag/stream", post(routes::rag::post_rag_stream))

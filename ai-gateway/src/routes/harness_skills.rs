@@ -1,6 +1,10 @@
 //! Dedicated harness skill routes (fenced off legacy `/v1/skills/run`).
 
-use axum::{extract::State, http::HeaderMap, Json};
+use axum::{
+    extract::{Path, State},
+    http::HeaderMap,
+    Json,
+};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
@@ -330,6 +334,31 @@ pub async fn post_report_analysis(
     run_llm_with_context(
         &state,
         REPORT_ANALYSIS_SKILL_KEY,
+        actor,
+        GovernedLlmSkillInput {
+            inputs: req.inputs,
+            agent_id: req.agent_id,
+            team_member_id: req.team_member_id,
+            max_steps: req.max_steps,
+            resume_run_id: req.resume_run_id,
+        },
+        req.org_privacy_policy,
+    )
+    .await
+}
+
+pub async fn post_finance_review(
+    State(state): State<AppState>,
+    Path(skill): Path<String>,
+    headers: HeaderMap,
+    Json(req): Json<TrustedGovernedLlmSkillRequest>,
+) -> AppResult<Json<GovernedLlmSkillResult>> {
+    lumiere_finance_review_core::parse_input(&skill, &req.inputs)
+        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+    let actor = TrustedActorContext::from_headers(&headers)?;
+    run_llm_with_context(
+        &state,
+        &skill,
         actor,
         GovernedLlmSkillInput {
             inputs: req.inputs,

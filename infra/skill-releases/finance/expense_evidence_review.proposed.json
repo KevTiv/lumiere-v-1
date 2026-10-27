@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "skill_key": "expense_evidence_review",
+  "version": "1.0.0",
+  "risk": "green",
+  "limits": {
+    "max_steps": 5,
+    "max_tool_calls": 1
+  },
+  "permissions": [],
+  "resources": [
+    "finance.expense_evidence_review.v1"
+  ],
+  "output_types": [
+    "finance.expense_evidence_review.result.v1"
+  ],
+  "source_hash": "sha256:516d8e01a111c6b619f065f6d3d1ece7e4f28242014dae7a18f6b2787f05a8ed"
+}
