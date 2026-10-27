@@ -196,3 +196,13 @@ The workflow gate is retained unchanged.
 This correction was reviewed from source. Test, typecheck, lint and browser
 execution remain assigned to CI; no local runner or service was started. Earlier
 CI results and E2E progress apply to their recorded head, not this correction.
+
+
+The next hosted run at `535a36ddd` passed the type-debt check, query-hooks units
+and Playwright test discovery. UI tests then reported 1,214 passes and two
+Notebook failures. The tests spied on the jsdom Storage instance, which did not
+intercept its native method writes. They now spy on `Storage.prototype`, as
+existing storage tests do, and the success case also checks the actual stored
+snapshot. The failure and retained-entry assertions remain unchanged. This is a
+test interception correction; the production save handler is unchanged. CI must
+execute the corrected tests; no local test runner was used.
