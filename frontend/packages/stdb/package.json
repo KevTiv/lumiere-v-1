@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@lumiere/api-client": "workspace:*",
-    "@lumiere/contracts": "file:../../vendor/lumiere-contracts-0.3.150.tgz",
+    "@lumiere/contracts": "file:../../vendor/lumiere-contracts-0.3.153.tgz",
     "spacetimedb": "2.8.2"
   },
   "peerDependencies": {
