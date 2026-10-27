@@ -711,6 +711,41 @@ mod tests {
         }
     }
 
+    fn generated_snapshot_report(citation_id: &str) -> CandidateExecutionRequest {
+        let mut request = generated_report(0.1);
+        let snapshot_id = format!("run:{}:stock_movement_by_state", request.fixture_id);
+        let fixture = data(&mut request);
+        let passage =
+            &mut fixture["analyticsOutput"]["data"]["artifacts"][0]["artifacts"]["evidencePassage"];
+        passage["kind"] = json!("analytics_snapshot");
+        passage["id"] = json!(snapshot_id);
+        fixture["passages"][0]["kind"] = json!("analytics_snapshot");
+        fixture["passages"][0]["sourceKey"] = json!(snapshot_id);
+        let mut draft: Value = serde_json::from_str(
+            fixture["generations"][0]["response"]["content"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        draft["claims"][0]["supports"][0]["kind"] = json!("analytics_snapshot");
+        draft["claims"][0]["supports"][0]["id"] = json!(snapshot_id);
+        draft["citations"] = json!([{ "kind": "analytics_snapshot", "id": citation_id }]);
+        fixture["generations"][0]["response"]["content"] =
+            json!(serde_json::to_string(&draft).unwrap());
+        request
+    }
+
+    #[tokio::test]
+    async fn recorded_snapshot_citations_reach_independent_claim_review() {
+        let mut request = generated_snapshot_report("run:5:stock_movement_by_state");
+        let execution = execute_report_analysis(request.clone()).await.unwrap();
+        assert_eq!(execution.actual_output["status"], "completed");
+        data(&mut request)["decisions"][1]["response"]["choice"] = json!("unsupported");
+        let execution = execute_report_analysis(request).await.unwrap();
+        assert_ne!(execution.actual_output["status"], "completed");
+        assert!(execution.actual_output["summary"].is_null());
+    }
+
     #[tokio::test]
     async fn generated_claims_still_need_independent_semantic_support() {
         let mut request = generated_report(0.1);
