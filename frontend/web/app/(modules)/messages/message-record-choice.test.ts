@@ -34,7 +34,8 @@ test("named choices use canonical models and exact authorized organization/compa
 
 test("record selection maps to the original model/resId keys without numeric rounding or hidden advanced values", () => {
   const choices = messageRecordChoices(moves, contacts, scope, labels)
-  assert.deepEqual(resolveMessageRecordChoice({ recordLinkMode: "record", recordReference: `account_move:${large}`, model: "stale_model", resId: "99", parentId: "41" }, choices), { model: "account_move", resId: BigInt(large) })
+  const formData = { recordLinkMode: "record", recordReference: `account_move:${large}`, model: "stale_model", resId: "99", parentId: "41" }
+  assert.deepEqual(resolveMessageRecordChoice(formData, choices), { model: "account_move", resId: BigInt(large) })
   assert.deepEqual(resolveMessageRecordChoice({ recordLinkMode: "record", recordReference: `account_move:${next}` }, choices), { model: "account_move", resId: BigInt(next) })
   assert.deepEqual(resolveMessageRecordChoice({ recordLinkMode: "record", recordReference: `contact:${large}` }, choices), { model: "contact", resId: BigInt(large) })
 })

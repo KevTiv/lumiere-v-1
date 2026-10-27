@@ -117,8 +117,8 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
   )
 
   const recordChoices = useMemo(() => messageRecordChoices(
-    moveChoicesRead.rows as unknown as Record<string, unknown>[],
-    contactChoicesRead.rows as unknown as Record<string, unknown>[],
+    moveChoicesRead.rows,
+    contactChoicesRead.rows,
     { organizationId, companyId: activeCompanyId },
     {
       invoice: t("messages.forms.recordChoice.invoice", { defaultValue: "Invoice" }),
@@ -305,7 +305,12 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
     if (action === "createMessage") {
       const body = String(formData.body ?? "").trim()
       if (!body) throw new Error(t("messages.forms.errors.bodyRequired", { defaultValue: "Write a message before saving. Your entries are retained." }))
-      const reference = resolveMessageRecordChoice(formData, recordChoices)
+      const reference = resolveMessageRecordChoice({
+        recordLinkMode: formData.recordLinkMode,
+        recordReference: formData.recordReference,
+        model: formData.model,
+        resId: formData.resId,
+      }, recordChoices)
       if (!reference) throw new Error(t("messages.forms.errors.recordChoiceRequired", { defaultValue: "Choose an available record, or check the advanced custom reference. Your entries are retained." }))
       await postMessage.mutateAsync({
         model: reference.model,

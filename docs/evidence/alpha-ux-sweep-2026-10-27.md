@@ -173,3 +173,26 @@ The existing frontend workflow runs UI discovery, web `test:unit`, accounting mo
 Independent source review of the extension found and corrected unsupported Accounting/commercial action fallthrough and hidden expense errors after source admission closes a pending dialog. P05 and P06/P07 workers also reviewed each other's boundaries. Source review is not an executed test pass. The branch remains a draft release candidate.
 
 Remote integration: the first push was rejected because automation had added `6d3b4cddc0350bc84665b0cbef823dc31f9f98cc` (`chore(contracts): publish and pin v0.3.151`) to the same branch. The UX commit was rebased on that commit without conflicts or a force push. Its package archives, checksums, compatibility manifest and presentation-dictionary pin are preserved. This sweep did not invoke publication. CI must validate the combined revision at 0.3.151; the earlier local 0.3.149 / compatible seeded-module evidence is not a pass for that revision. Ignored local vendor materialization was not used for a new test run.
+
+
+### CI correction after P05-P08
+
+At `b93e77a`, the Frontend job failed its opaque-record type-debt check before
+later frontend validation could run. The message record picker added one broad
+record alias and two broad casts. The correction uses an explicit, finite set of
+record projection fields and form selection fields. Authorized query rows now
+pass directly to the picker; submit passes only its four selection inputs.
+Exact U64 parsing, company/organization checks, missing-field handling and
+canonical model selection remain unchanged. Existing picker regression source
+retains the unrelated form-field case.
+
+The baseline also records two reductions already present in the UX commit:
+Calendar from four to three occurrences and Purchasing create parameters from
+thirteen to ten. No baseline allowance was increased and no source file was
+excluded. The Playwright compile compatibility job failed because it requires a
+successful Frontend job, not because it reported a separate compile defect.
+The workflow gate is retained unchanged.
+
+This correction was reviewed from source. Test, typecheck, lint and browser
+execution remain assigned to CI; no local runner or service was started. Earlier
+CI results and E2E progress apply to their recorded head, not this correction.

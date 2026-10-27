@@ -1,6 +1,31 @@
 import { parseStrictU64 } from "@lumiere/erp-shared/u64"
 
-type Row = Record<string, unknown>
+/** Known fields from the caller's authorized record projections; values are validated below. */
+interface MessageRecordSource {
+  id: unknown
+  organizationId?: unknown
+  organization_id?: unknown
+  companyId?: unknown
+  company_id?: unknown
+  name?: unknown
+  displayName?: unknown
+  display_name?: unknown
+  email?: unknown
+  moveType?: unknown
+  move_type?: unknown
+  ref?: unknown
+  ref_?: unknown
+  invoiceOrigin?: unknown
+  invoice_origin?: unknown
+  partnerId?: unknown
+  partner_id?: unknown
+}
+interface MessageRecordSelection {
+  recordLinkMode?: unknown
+  recordReference?: unknown
+  model?: unknown
+  resId?: unknown
+}
 export interface MessageRecordChoice {
   value: string
   label: string
@@ -16,7 +41,7 @@ export interface MessageRecordLabels {
   accountingDocument: string
   contact: string
 }
-function field(row: Row, camel: string, snake = camel): unknown {
+function field(row: MessageRecordSource, camel: keyof MessageRecordSource, snake = camel): unknown {
   const raw = row[camel] ?? row[snake]
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     if (Object.hasOwn(raw, "some")) return (raw as { some: unknown }).some
@@ -40,7 +65,7 @@ function tag(raw: unknown): string {
 }
 
 /** Named choices use only the caller's existing authorized query rows and exact scope. */
-export function messageRecordChoices(moves: readonly Row[], contacts: readonly Row[], scope: { organizationId: unknown; companyId: unknown }, labels: MessageRecordLabels): MessageRecordChoice[] {
+export function messageRecordChoices(moves: readonly MessageRecordSource[], contacts: readonly MessageRecordSource[], scope: { organizationId: unknown; companyId: unknown }, labels: MessageRecordLabels): MessageRecordChoice[] {
   const organizationId = exactId(scope.organizationId), companyId = exactId(scope.companyId)
   if (!organizationId) return []
   const scopedContacts = contacts.filter((row) => {
@@ -76,7 +101,7 @@ export function messageRecordChoices(moves: readonly Row[], contacts: readonly R
 }
 
 /** Resolve a named selection against current choices; custom references retain the existing wire keys. */
-export function resolveMessageRecordChoice(values: Row, choices: readonly MessageRecordChoice[]): { model: string; resId: bigint } | null {
+export function resolveMessageRecordChoice(values: MessageRecordSelection, choices: readonly MessageRecordChoice[]): { model: string; resId: bigint } | null {
   if (values.recordLinkMode === "record") {
     const matches = choices.filter((choice) => choice.value === values.recordReference)
     if (matches.length !== 1) return null
