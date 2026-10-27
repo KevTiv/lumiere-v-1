@@ -1,6 +1,8 @@
 # AI Harness T3-Inspired Control-Plane Adoption Plan
 
 **Status:** Proposed architecture extension; no implementation completion implied.  
+**Updated:** 2026-10-27 — §7 adds T3 Code Orchestrator V2 (stable v0.1.0,
+2026-10-15; current stable v0.1.1) patterns and a current-state snapshot.  
 **Applies to:** H5 onward, before the H6 `low_stock` pilot where noted.  
 **Authority:** `ai-harness-completion-plan.md` remains the milestone/acceptance authority; `ai-harness-luna-execution-plan.md` owns active sequencing.
 
@@ -25,6 +27,12 @@ Reference material used for the comparison:
   owner, replay cursors, reconnect behavior, and transport-vs-data freshness.
 - `pingdotgg/t3code/docs/internals/providers.md` — provider adapters,
   driver/instance separation, account isolation, and provider capability truth.
+- `pingdotgg/t3code` v0.1.0/v0.1.1 release notes, `docs/user/portable-handoffs.md`,
+  `docs/user/outside-agents.md`, and
+  `apps/server/src/mcp/toolkits/orchestrator/tools.ts` — Orchestrator V2:
+  cross-provider `delegate_task`, server-side steer/queue, usage-limit
+  auto-resume, scheduled/webhook tasks, permission inheritance for delegated
+  children, budgeted provider handoffs, and an MCP surface for outside agents.
 
 ## 1. Adopt: durable intent before external side effects
 
@@ -296,7 +304,199 @@ Also do not copy:
 - Git-style rollback semantics for committed ERP state;
 - client-version assumptions as a security or compatibility boundary.
 
-## 7. Integration with the existing harness plan
+From Orchestrator V2 specifically, also do not copy:
+
+- `Full access` as the default mode for new runs or for delegated children;
+- mid-run provider switching as a user-facing default — T3 itself documents the
+  switch as lossy and steers users to delegation instead (§7.5);
+- agent-initiated thread creation with arbitrary provider/model choice — child
+  runs choose only among authorized provider instances (§2, §7.4);
+- an outside-agent surface that bypasses generated policy (§7.6).
+
+## 7. Adopt from T3 Code Orchestrator V2
+
+Orchestrator V2 (T3 Code v0.1.0, stable 2026-10-15) moves agent coordination
+from the client into the server. The items below are the parts that strengthen
+Lumiere's governed runtime. Each one rides on the H5c accepted-intent pattern
+(§1) and none of them widens authority.
+
+### 7.0 Current-state snapshot (2026-10-27)
+
+Observed in source at `main` 5ada7d0; this is a starting point for the work
+below, not an acceptance claim.
+
+| Concept | State |
+|---|---|
+| `outcome_unknown` effect state (H5c) | Present: spend admission, governed services, restart probe |
+| `agent_settled` vs settled (§1) | Present in `orchestrator/run.rs` |
+| Steer / interrupt / resume / fork / compare (AIH-20, AIH-24) | Partial: reducers + gateway routes with event cursors, concurrency versions and idempotency |
+| Provider driver/instance split (H5d) | Not found; `providers/factory.rs` is a flat `Providers` struct |
+| `HarnessDescriptor` (§3) | Not found |
+| `subscribeRun({ afterSequence })` + shared client runtime (§4) | Not found; lifecycle events carry cursors but no subscription contract |
+| AI proposal workspace aggregate (§5) | Not found (the `proposal-workspace` UI is the tenders feature) |
+| Server-side follow-up queue (§7.1) | Not found |
+| Budget-blocked park/resume (§7.2) | Not found |
+| Scheduled/event-triggered governed runs (§7.3) | Not found as governed runs |
+| Outside-agent MCP surface (§7.6) | Not found |
+
+### 7.1 Server-side follow-up queue next to steer
+
+T3 V2 lets a user either steer the running turn or queue a follow-up, with the
+queue owned by the server so it survives restarts and can be edited and
+reordered.
+
+Lumiere already has durable steering (AIH-20). Add a queue for follow-ups that
+should run after the current objective settles rather than revise it:
+
+```text
+AiRunQueuedInput
+  - queued_input_id
+  - run_id
+  - position / revision
+  - author identity (from ctx.sender, never an argument)
+  - payload (redacted on read)
+  - status: queued | promoted | withdrawn | superseded
+  - idempotency key
+```
+
+Rules:
+
+- Enqueue, edit, reorder and withdraw are reducers with payload-bound
+  idempotency, like the existing steer command.
+- Promotion happens only at a settled boundary (`settled`, not merely
+  `agent_settled`) and starts a new checked continuation. It reacquires scope
+  and budget; it never inherits an approval from the previous turn.
+- A queued item is authored input, not authority: it is re-authorized against
+  the author's current grants when promoted, and denied if those grants lapsed.
+- Steer stays the only way to change the running objective. A queued item never
+  interrupts a turn.
+
+### 7.2 Park and resume on budget limits
+
+T3 V2 resumes threads stopped by a provider usage limit once the limit resets.
+
+Lumiere's equivalent is spend admission. Today a budget denial ends the attempt.
+Add a parked state instead:
+
+```text
+running -> budget_parked(reason, window_resets_at, required_reservation)
+budget_parked -> running        (admission succeeds after reset)
+budget_parked -> waiting_input  (operator must raise budget or choose)
+budget_parked -> terminated     (deadline or operator cancel)
+```
+
+Rules:
+
+- Parking happens only at a step boundary where no effect is `dispatched` or
+  `outcome_unknown`. An in-flight effect reconciles first (§1).
+- The resume trigger is a scheduled reducer at `window_resets_at` that records a
+  resume intent; the gateway reactor then re-runs full spend admission. A
+  schedule firing grants nothing on its own.
+- Provider rate limits (HTTP 429 / retry-after) use the same parked state with a
+  provider-supplied reset time, bounded by a maximum park duration.
+- Parked runs keep their reservation released; resume reserves again at
+  current pricing (pricing snapshot recorded per §2).
+- The UI shows parked runs with the reason and expected resume time, separate
+  from failed runs.
+
+### 7.3 Scheduled and event-triggered governed runs
+
+T3 V2 adds scheduled tasks and webhook triggers that run on the server.
+
+Several harness programs are naturally scheduled or event-driven:
+`daily_briefing`, `low_stock`, `insights_scan`, and finance review. They must
+enter through the same governed run pipeline as an interactive run, not through
+a side path.
+
+```text
+AiRunSchedule
+  - schedule_id
+  - organization/company scope
+  - program / skill reference (generated capability ID)
+  - run-as principal: a dedicated service binding, never the creator's session
+  - mode profile ceiling (Investigate/Design/Draft only; never Review approval)
+  - cadence (SpacetimeDB scheduled table with `ScheduleAt::Time`, re-armed
+    after each run, as existing modules already do)
+  - budget envelope per run and per period
+  - status / last_run_id / next_due
+```
+
+Rules:
+
+- The scheduled reducer only records a run-start intent; provider and tool I/O
+  happen in the gateway reactor after commit (§1). Reducers stay deterministic.
+- Event triggers (record changed, threshold crossed, inbound webhook) are
+  recorded as typed trigger events with their source watermark, then start a run
+  the same way. Inbound webhooks authenticate at the API layer and never carry
+  authority into the run.
+- Scheduled runs can only produce answers, reports and action drafts. Any
+  consequential effect still waits for human approval.
+- Overlap policy is explicit per schedule: skip, queue (§7.1) or coalesce.
+- Disabling a schedule, revoking the service binding, or exhausting the period
+  budget stops new runs; in-flight runs settle normally.
+
+### 7.4 Delegation invariants (extends AIH-25)
+
+T3 V2's `delegate_task` lets an agent start a child on another provider/model
+and wait for the result. Delegated children inherit permission modes unless
+overridden, a thread cannot message another thread with broader permissions,
+and agents cannot approve their own permission requests.
+
+AIH-25 already plans bounded children. Make these invariants explicit and
+testable:
+
+- **Ceiling inheritance:** a child's capability set and mode ceiling are a
+  subset of the parent's at the moment of delegation. An override can only
+  narrow.
+- **No upward messaging:** a run cannot send input to, steer, or promote queued
+  input into a run with a broader capability set, scope, or budget.
+- **No self-approval:** an approval request created by run R (or any descendant
+  of R) can never be satisfied by R, its ancestors, or its descendants. Model
+  review is evidence for a human approver, not approval.
+- **Cross-instance delegation:** a child may run on a different authorized
+  provider instance (§2), for example a cheaper instance drafting and a
+  stronger instance reviewing, provided the instance is allowed for the same
+  organization, region and budget.
+- **Result integration:** child output returns as a typed, evidence-bearing
+  result through the durable event boundary, never as free text merged into the
+  parent transcript.
+
+### 7.5 Budgeted handoff on provider fallback
+
+When T3 V2 switches provider mid-thread, the new provider receives only a
+budgeted selection of messages, not the previous provider's reasoning, tool
+calls or attachments.
+
+Once H5d exists, provider fallback between authorized instances needs the same
+discipline:
+
+- The handoff carries a deterministic, context-budgeted selection: objective,
+  current decision graph state, admitted evidence references and recent turns.
+  Evidence travels by reference and is re-authorized for the new instance.
+- The run records a `handoff` event naming source and target instance, the
+  selection policy, what was dropped, and the token budget used.
+- A handoff never carries pending approvals, uncertain effects, or raw provider
+  reasoning.
+- Fallback that crosses region, organization or policy boundaries is denied
+  (§2, H5d acceptance 4), not degraded into a lossy handoff.
+
+### 7.6 Outside-agent access through MCP (deferred)
+
+T3 V2 exposes an MCP server so agents it did not start (Claude Code, Codex in
+a terminal) can use its environment once the user approves their sign-in.
+
+For Lumiere this would mean external agents calling governed ERP read tools and
+proposing action drafts. It is useful for developers and power users, but it is
+also the largest new attack surface in this section. Defer until P1 and treat it
+as its own admission:
+
+- every MCP tool maps 1:1 to a generated capability and goes through the same
+  policy engine, data-scope resolver, privacy guard and spend admission;
+- sessions are scoped, short-lived, revocable, and bound to a human principal;
+- MCP clients can create action drafts but never approve them;
+- every call is recorded as a run with the external client identified.
+
+## 8. Integration with the existing harness plan
 
 ### Insert before H6 pilot
 
@@ -330,7 +530,15 @@ slice retroactively.
 - **AIH-24:** add proposal-workspace checkpoint/fork/compare semantics while
   explicitly excluding rollback of posted ERP state.
 - **AIH-25:** specialist child work receives bounded child proposal workspaces
-  and parent budget/capability shares; no child inherits approval.
+  and parent budget/capability shares; no child inherits approval. Add the
+  §7.4 invariants (ceiling inheritance, no upward messaging, no self-approval,
+  cross-instance delegation, typed result integration) to its acceptance.
+- **AIH-20:** add the §7.1 server-side follow-up queue beside steering.
+- **AIH-24:** resume also covers §7.2 `budget_parked` runs.
+- **New AIH-27:** scheduled and event-triggered governed runs (§7.3).
+- **New AIH-28:** outside-agent MCP surface (§7.6), deferred until after P1.
+- **H5d:** budgeted handoff on provider fallback (§7.5) is part of the
+  driver/instance work, not a separate milestone.
 
 ### H6 pilot gate additions
 
@@ -343,7 +551,7 @@ The pilot cannot be advertised as fully admitted until its declared path proves:
 - candidate answer completion is distinct from fully settled run completion;
 - descriptor capability claims match the actually admitted path.
 
-## 8. Validation fixtures to add
+## 9. Validation fixtures to add
 
 1. **Crash after intent commit / before dispatch** — restart dispatches once.
 2. **Crash/timeout after dispatch / before result commit** — mark uncertain and
@@ -362,8 +570,25 @@ The pilot cannot be advertised as fully admitted until its declared path proves:
    evidence authorization and action approvals are reacquired.
 9. **Workspace revert** — proposed changes revert; already-posted ERP changes are
    untouched and require explicit correction reducers.
+10. **Queue across restart** — queued follow-ups survive a gateway and module
+    restart, promote once at a settled boundary, and are re-authorized against
+    the author's current grants.
+11. **Queue vs steer** — a queued item never interrupts a running turn; a steer
+    during a queued backlog revises only the running objective.
+12. **Budget park and resume** — a run denied by spend admission parks with an
+    expected reset time and resumes once after reset; an effect in flight at the
+    limit reconciles before parking.
+13. **Schedule fires with revoked binding** — no run starts and the denial is
+    recorded; a schedule overlapping its previous run follows its declared
+    skip/queue/coalesce policy.
+14. **Delegation ceiling** — a child cannot exceed the parent's capabilities,
+    scope or budget share; a child cannot steer its parent; no run in a lineage
+    can satisfy an approval request raised in that lineage.
+15. **Fallback handoff** — fallback to a second authorized instance records a
+    handoff event with dropped items and budget; pending approvals and uncertain
+    effects never cross; a cross-region fallback is denied.
 
-## 9. Implementation order
+## 10. Implementation order
 
 1. Finish H5b generated schema/bindings/storage/projection/reconstruction,
    immutable contract release/pin, gateway budget routing, and live replay gates.
@@ -376,5 +601,10 @@ The pilot cannot be advertised as fully admitted until its declared path proves:
    live transcripts across web/desktop/local environments.
 7. Extend AIH-24 with proposal workspaces before exposing complex multi-draft
    agent workflows.
-8. Keep specialist delegation and lifecycle extensions disabled until their
-   existing M8/M9 gates pass.
+8. Add the §7.1 follow-up queue and §7.2 budget park/resume on top of the
+   existing steer and spend-admission code; both are small once H5c holds.
+9. AIH-27 scheduled/event-triggered runs, starting with `daily_briefing` and
+   `low_stock` after the H6 pilot is admitted.
+10. Keep specialist delegation (with the §7.4 invariants) and lifecycle
+    extensions disabled until their existing M8/M9 gates pass.
+11. AIH-28 outside-agent MCP surface only after P1, as its own admission.
