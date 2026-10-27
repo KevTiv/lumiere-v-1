@@ -71,6 +71,7 @@ These are separate suites, not additive totals. First failures remain in ignored
 | Check | Result and limit |
 | --- | --- |
 | Current-main integration | Based on deployed `5ada7d0b2`. Current shared Select controls and the retired form-notice removal remain intact. |
+| Web unit gate | 595/595 passed with no skips. The four capture/recovery model files are now included in the existing `test:unit` command; local execution used serial file concurrency. Log `/tmp/alpha-ux-final-web-unit-suite.log`. |
 | Integrated UI suite | 1,194/1,194 passed across 173 files, serial workers and unchanged timeouts. Log `/tmp/alpha-ux-final-ui-suite.log`. Later changes affect web recovery and API reads, not these shared UI components. |
 | UI/web TypeScript | Passed with existing configs. Web uses the CI-owned 6 GB heap setting. Logs `/tmp/alpha-ux-final-p041-ui-tsc.log` and `/tmp/alpha-ux-final-web-tsc-complete.log`. Final source and test files preceded that web check. The first default 4 GB heap failure remains recorded. |
 | Changed-file lint | All 55 changed TypeScript files passed; the final recovery/test follow-up also passed. Existing UI ESLint config was used for web because web has no standalone config. Logs `/tmp/alpha-ux-final-all-changed-lint.log` and `/tmp/alpha-ux-final-recovery-lint.log`. |
