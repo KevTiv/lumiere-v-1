@@ -2858,7 +2858,9 @@ fn report_generation_instructions(context: &GovernedProgramContext) -> Option<St
 {"content":"...","citations":[],"claims":[{"text":"...","supports":[{"kind":"analytics_snapshot","id":"copy from evidencePassage","source_version":"copy exactly","passage_key":"result"}]}],"calculations":[]}.
 Use only the server-recorded observations in the analytics result (artifacts[].artifacts.evidencePassage). Copy their
 citation identity exactly. State at most eight claims. Their text, in order,
-must cover all content (apart from whitespace). Every claim must be supported
+must cover all content (apart from whitespace). Build content by joining the exact
+claim text in order with spaces. Include headings, labels and citation markers
+only if they are part of a supported claim; prefer plain factual sentences. Every claim must be supported
 by the cited observation. Describe bounded snapshot results, including empty
 results, without asserting that they describe all records or current future state.
 Do not invent causes, trends, currencies, or comparisons. Each stated calculation
@@ -2988,6 +2990,31 @@ fn known_evidence_for_run(
                 kind: "capability_output".to_string(),
                 id: node_id.clone(),
             });
+        }
+    }
+    // Report analytics records immutable passages before returning them. Bind
+    // their run-level identities as well as the capability envelope. Claim
+    // supports still pass exact observation, catalog and semantic checks.
+    if context.program_ref == super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF {
+        if let Some(NodeValue::Tool(output)) = values.get("analytics") {
+            if let Some(artifacts) = output.data.get("artifacts").and_then(Value::as_array) {
+                let run_prefix = format!("run:{}:", context.run_id);
+                for passage in artifacts
+                    .iter()
+                    .filter_map(|artifact| artifact.get("artifacts")?.get("evidencePassage"))
+                {
+                    if let Some(id) = passage.get("id").and_then(Value::as_str) {
+                        if passage.get("kind").and_then(Value::as_str) == Some("analytics_snapshot")
+                            && id.starts_with(&run_prefix)
+                        {
+                            known.insert(EvidenceRef {
+                                kind: "analytics_snapshot".to_string(),
+                                id: id.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
         }
     }
     known
@@ -3256,6 +3283,42 @@ mod continuation_lineage_tests {
             generation_instructions: None,
             generation_max_tokens: None,
         }
+    }
+
+    #[test]
+    fn report_snapshot_refs_require_this_runs_actual_analytics_output() {
+        let mut context = context("baseline");
+        context.program_ref = super::super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF.into();
+        let valid = EvidenceRef {
+            kind: "analytics_snapshot".into(),
+            id: "run:13:stock_movement_by_state".into(),
+        };
+        let foreign = EvidenceRef {
+            id: "run:12:stock_movement_by_state".into(),
+            ..valid.clone()
+        };
+        let absent = EvidenceRef {
+            id: "run:13:missing_operation".into(),
+            ..valid.clone()
+        };
+        let output = ToolOutput {
+            summary: "recorded observations".into(),
+            data: json!({"artifacts": [
+                {"artifacts": {"evidencePassage": {"kind": valid.kind, "id": valid.id}}},
+                {"artifacts": {"evidencePassage": {"kind": foreign.kind, "id": foreign.id}}}
+            ]}),
+            citations: Vec::new(),
+            row_count: Some(0),
+        };
+        let values = HashMap::from([("analytics".into(), NodeValue::Tool(output.clone()))]);
+        let known = known_evidence_for_run(&context, &values);
+        assert!(known.contains(&valid));
+        assert!(!known.contains(&foreign));
+        assert!(!known.contains(&absent));
+        let wrong_node = HashMap::from([("unrelated".into(), NodeValue::Tool(output))]);
+        assert!(!known_evidence_for_run(&context, &wrong_node).contains(&valid));
+        context.program_ref = "other-program".into();
+        assert!(!known_evidence_for_run(&context, &values).contains(&valid));
     }
 
     fn checkpoint(context: &GovernedProgramContext) -> GovernedProgramCheckpoint {
