@@ -636,6 +636,17 @@ fn audit(
 /// `ai.run.lifecycle` grant. Mirrors the api-server grant resolution:
 /// roles come from the single active membership plus unexpired assignments.
 fn author_holds_capability(ctx: &ReducerContext, organization_id: u64, author: Identity) -> bool {
+    identity_holds_capability(ctx, organization_id, author, FOLLOW_UP_CAPABILITY)
+}
+
+/// Whether `identity` currently holds an active, non-empty grant for exactly
+/// `capability` through its effective roles. Absence is denial.
+pub(crate) fn identity_holds_capability(
+    ctx: &ReducerContext,
+    organization_id: u64,
+    author: Identity,
+    capability: &str,
+) -> bool {
     let active = find_user_profile_for_organization(ctx, author, organization_id)
         .is_some_and(|profile| profile.is_active);
     if !active {
@@ -658,7 +669,7 @@ fn author_holds_capability(ctx: &ReducerContext, organization_id: u64, author: I
             max_bytes: grant.max_bytes,
         })
         .collect();
-    grants_cover_capability(&role_ids, &grants, FOLLOW_UP_CAPABILITY)
+    grants_cover_capability(&role_ids, &grants, capability)
 }
 
 fn require_author_grant(
@@ -1083,5 +1094,33 @@ mod tests {
         assert!(source.contains("state: \"fork_pending_authority\".into()"));
         assert!(source.contains("authority_snapshot_hash: None"));
         assert!(source.contains("requires_revalidation: true"));
+    }
+
+    #[test]
+    fn owner_baseline_covers_descriptor_but_not_budget_resolve() {
+        use crate::ai::capability_grants::{
+            AI_HARNESS_DESCRIPTOR_READ_CAPABILITY, AI_RUN_BUDGET_RESOLVE_CAPABILITY,
+            OWNER_AI_CAPABILITY_GRANTS,
+        };
+        let grants: Vec<GrantView> = OWNER_AI_CAPABILITY_GRANTS
+            .iter()
+            .map(|grant| GrantView {
+                role_id: 1,
+                capability_key: grant.capability_key.into(),
+                is_active: true,
+                max_rows: grant.max_rows,
+                max_bytes: grant.max_bytes,
+            })
+            .collect();
+        assert!(grants_cover_capability(
+            &[1],
+            &grants,
+            AI_HARNESS_DESCRIPTOR_READ_CAPABILITY
+        ));
+        assert!(!grants_cover_capability(
+            &[1],
+            &grants,
+            AI_RUN_BUDGET_RESOLVE_CAPABILITY
+        ));
     }
 }

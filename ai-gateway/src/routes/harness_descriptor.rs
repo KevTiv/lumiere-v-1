@@ -44,9 +44,12 @@ use crate::{
     config::Config,
     error::{AppError, AppResult},
     providers::Providers,
-    routes::{evidence::require_scoped_capability_grant, run_lifecycle::LIFECYCLE_CAPABILITY},
+    routes::evidence::require_scoped_capability_grant,
     state::AppState,
 };
+
+/// Dedicated read-only grant for this route (owner baseline in the module).
+pub(crate) const DESCRIPTOR_CAPABILITY: &str = "ai.harness.descriptor.read";
 
 /// Ordered schema version of the descriptor shape. Bump on any shape change.
 pub const DESCRIPTOR_SCHEMA_VERSION: u32 = 1;
@@ -383,15 +386,15 @@ pub async fn get_descriptor(
     headers: HeaderMap,
 ) -> AppResult<Response> {
     let actor = actor_from_headers(&headers)?;
-    // Reading the descriptor needs the same current grant as using the run
-    // surface it describes. The grant is rechecked on every request.
+    // Reading the descriptor needs its own read-only grant; the run lifecycle
+    // grant does not imply it. The grant is rechecked on every request.
     require_scoped_capability_grant(
         &state,
         &actor.identity,
         &actor.token,
         actor.organization_id,
         actor.company_id,
-        LIFECYCLE_CAPABILITY,
+        DESCRIPTOR_CAPABILITY,
     )
     .await?;
 
@@ -610,6 +613,12 @@ mod tests {
 
         // A grant for a different capability does not authorize the read.
         config.api_server_url = Some(grant_service(Some("ai.evidence.inspect")).await);
+        let state = test_support::state(config.clone()).await;
+        let denied = get_descriptor(State(state), headers()).await;
+        assert!(matches!(denied, Err(AppError::Forbidden(_))));
+
+        // The run lifecycle grant no longer authorizes the descriptor.
+        config.api_server_url = Some(grant_service(Some("ai.run.lifecycle")).await);
         let state = test_support::state(config).await;
         let denied = get_descriptor(State(state), headers()).await;
         assert!(matches!(denied, Err(AppError::Forbidden(_))));
@@ -618,7 +627,7 @@ mod tests {
     #[tokio::test]
     async fn granted_caller_gets_a_stable_descriptor_with_etag() {
         let mut config = test_support::config();
-        config.api_server_url = Some(grant_service(Some(LIFECYCLE_CAPABILITY)).await);
+        config.api_server_url = Some(grant_service(Some(DESCRIPTOR_CAPABILITY)).await);
         let state = test_support::state(config).await;
 
         let first = get_descriptor(State(state.clone()), headers())

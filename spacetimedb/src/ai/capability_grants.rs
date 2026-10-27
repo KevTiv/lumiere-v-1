@@ -52,7 +52,7 @@ pub(crate) struct DefaultAiCapabilityGrant {
 /// These are exact grants, deliberately not a wildcard. They make the
 /// read-only/reversible harness control surfaces usable after tenant bootstrap
 /// while every other role stays default-deny until explicitly provisioned.
-pub(crate) const OWNER_AI_CAPABILITY_GRANTS: [DefaultAiCapabilityGrant; 4] = [
+pub(crate) const OWNER_AI_CAPABILITY_GRANTS: [DefaultAiCapabilityGrant; 5] = [
     DefaultAiCapabilityGrant {
         capability_key: "ai.evidence.retrieve",
         max_rows: 20,
@@ -73,7 +73,22 @@ pub(crate) const OWNER_AI_CAPABILITY_GRANTS: [DefaultAiCapabilityGrant; 4] = [
         max_rows: 100,
         max_bytes: 1024 * 1024,
     },
+    // Read-only capability negotiation (`GET /v1/harness/descriptor`). The
+    // descriptor is a small fixed-shape document; bounds stay tight.
+    DefaultAiCapabilityGrant {
+        capability_key: AI_HARNESS_DESCRIPTOR_READ_CAPABILITY,
+        max_rows: 1,
+        max_bytes: 64 * 1024,
+    },
 ];
+
+/// Read-only harness descriptor access. Part of the owner baseline.
+pub(crate) const AI_HARNESS_DESCRIPTOR_READ_CAPABILITY: &str = "ai.harness.descriptor.read";
+
+/// Resolving a budget park can resume spend. Deliberately NOT in
+/// [`OWNER_AI_CAPABILITY_GRANTS`]: default-deny until an administrator
+/// provisions it through the audited `set_ai_capability_role_grant` reducer.
+pub(crate) const AI_RUN_BUDGET_RESOLVE_CAPABILITY: &str = "ai.run.budget.resolve";
 
 /// Seed or repair the production owner baseline. This is intentionally an
 /// internal bootstrap helper: arbitrary role assignment continues to flow
@@ -254,4 +269,49 @@ pub fn delete_ai_capability_role_grant(
         },
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn owner_baseline_is_the_exact_reviewed_key_set() {
+        let mut keys: Vec<&str> = OWNER_AI_CAPABILITY_GRANTS
+            .iter()
+            .map(|grant| grant.capability_key)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            vec![
+                "ai.evidence.inspect",
+                "ai.evidence.retrieve",
+                "ai.harness.descriptor.read",
+                "ai.knowledge.retrieve",
+                "ai.run.lifecycle",
+            ]
+        );
+        for grant in OWNER_AI_CAPABILITY_GRANTS {
+            assert!(!grant.capability_key.contains('*'), "no wildcard grants");
+            assert!(grant.max_rows > 0 && grant.max_bytes > 0);
+        }
+    }
+
+    #[test]
+    fn budget_resolve_is_not_in_the_owner_baseline() {
+        assert!(OWNER_AI_CAPABILITY_GRANTS
+            .iter()
+            .all(|grant| grant.capability_key != AI_RUN_BUDGET_RESOLVE_CAPABILITY));
+    }
+
+    #[test]
+    fn descriptor_grant_has_small_exact_bounds() {
+        let grant = OWNER_AI_CAPABILITY_GRANTS
+            .iter()
+            .find(|grant| grant.capability_key == AI_HARNESS_DESCRIPTOR_READ_CAPABILITY)
+            .expect("descriptor grant in owner baseline");
+        assert_eq!(grant.max_rows, 1);
+        assert_eq!(grant.max_bytes, 64 * 1024);
+    }
 }

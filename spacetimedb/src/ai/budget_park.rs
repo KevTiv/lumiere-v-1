@@ -21,6 +21,8 @@
 
 use spacetimedb::{reducer, ReducerContext, ScheduleAt, SpacetimeType, Table, Timestamp};
 
+use crate::ai::capability_grants::AI_RUN_BUDGET_RESOLVE_CAPABILITY;
+use crate::ai::run_followup_queue::identity_holds_capability;
 use crate::ai::run_lifecycle::{
     ai_run_effect, ai_run_lifecycle_state, append_event, authorize, checked_state, command_hash,
     event_key, load_run, replayed, transition_state_and_run, validate_key, RunContinuationParams,
@@ -493,6 +495,16 @@ pub fn resolve_ai_run_budget_park(
     params: ResolveAiRunBudgetParkParams,
 ) -> Result<(), String> {
     authorize(ctx, organization_id)?;
+    // Resolving a park can resume spend: the caller (operator or the gateway's
+    // service user) needs the dedicated grant, which is not in any baseline.
+    if !identity_holds_capability(
+        ctx,
+        organization_id,
+        ctx.sender(),
+        AI_RUN_BUDGET_RESOLVE_CAPABILITY,
+    ) {
+        return Err("caller does not hold the ai.run.budget.resolve grant".into());
+    }
     validate_key("idempotency_key", &params.idempotency_key)?;
     let request_hash = command_hash("budget_park_resolved", &params);
     let key = event_key(organization_id, run_id, &params.idempotency_key);
