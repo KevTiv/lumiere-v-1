@@ -1,3 +1,4 @@
+import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
 import { expect, test, type Page, type Route } from "@playwright/test"
 import { stdbBffCallUrl } from "../../packages/stdb/src/commands/stdb-http"
 
@@ -53,12 +54,20 @@ for (const width of [390, 1440]) {
       const totals = collections.getByLabel("Overdue balance by currency")
       await expect(totals).toContainText("EUR")
       await expect(totals).toContainText("USD")
-      await collections.getByRole("combobox", { name: "Days overdue" }).selectOption("61-90")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        collections.getByRole("combobox", { name: "Days overdue" }),
+        "61-90",
+      )
       await expect(collections.getByRole("listitem")).toHaveCount(1)
       await expect(collections).toContainText("INV/USD/OLDER")
       await expect(totals).toContainText("USD")
       await expect(totals).not.toContainText("EUR")
-      await collections.getByRole("combobox", { name: "Days overdue" }).selectOption("1-30")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        collections.getByRole("combobox", { name: "Days overdue" }),
+        "1-30",
+      )
       await expect(collections.getByRole("listitem")).toHaveCount(1)
       await expect(collections).toContainText("INV/EUR/RECENT")
       await noOverflow(page)
@@ -177,7 +186,7 @@ for (const width of [390, 1440]) {
       const dialog = page.getByRole("dialog", { name: "Allocate payment", exact: true })
       await dialog.getByRole("combobox", { name: /Invoice or bill line/ }).click()
       await page.getByRole("option", { name: /Customer invoice INV\/BANK\/91/ }).click()
-      await dialog.getByRole("spinbutton", { name: /Allocation amount/ }).fill("20")
+      await dialog.getByRole("textbox", { name: /Allocation amount/ }).fill("20")
       await dialog.getByRole("button", { name: "Allocate payment", exact: true }).click()
       await expect.poll(() => requests.length).toBe(1)
       await expect(page.getByTestId("operations-state")).toContainText("payment lock true")
@@ -186,7 +195,7 @@ for (const width of [390, 1440]) {
       // original parent remains rendered and the reviewed dialog remains intact.
       await expect(page.locator('section[aria-label="Retained payment allocation"]')).toBeVisible()
       await expect(dialog).toBeVisible()
-      await expect(dialog.getByRole("spinbutton", { name: /Allocation amount/ })).toHaveValue("20")
+      await expect(dialog.getByRole("textbox", { name: /Allocation amount/ })).toHaveValue("20.00")
       await pendingRoute!.fulfill({ status: 504, contentType: "application/json", body: JSON.stringify({ error: "Synthetic allocation response lost" }) })
       await expect(dialog).toContainText("Synthetic allocation response lost")
       await dialog.getByRole("button", { name: "Cancel", exact: true }).click()

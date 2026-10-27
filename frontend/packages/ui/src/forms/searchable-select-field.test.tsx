@@ -59,7 +59,7 @@ describe("searchable select field in a form dialog", () => {
     const onSubmit = vi.fn()
     renderForm(onSubmit)
 
-    fireEvent.click(screen.getByTestId("form-field-partnerId"))
+    fireEvent.click(screen.getByRole("combobox", { name: /Partner/ }))
     fireEvent.change(await screen.findByPlaceholderText("Search..."), { target: { value: "glob" } })
     fireEvent.click(await screen.findByRole("option", { name: /Globex/ }))
     await waitFor(() => expect(screen.getByTestId("form-field-partnerId").textContent).toContain("Globex"))

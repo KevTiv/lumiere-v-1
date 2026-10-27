@@ -1,3 +1,4 @@
+import { chooseSelectValue } from "../components/select-test-utils"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { forwardRef, type ReactNode } from "react"
@@ -48,9 +49,10 @@ describe("AI chat workspace", () => {
     )
 
     expect(screen.getByTestId("erp-ai-chat-panel").getAttribute("data-mode")).toBe("full")
-    fireEvent.change(screen.getByRole("combobox", { name: "Assistant context" }), {
-      target: { value: "module:inventory" },
-    })
+    chooseSelectValue(
+      screen.getByRole("combobox", { name: "Assistant context" }),
+      "module:inventory",
+    )
     expect(onContextChange).toHaveBeenCalledWith("module:inventory")
     fireEvent.click(screen.getByRole("button", { name: "Dock beside ERP" }))
     expect(onDockToggle).toHaveBeenCalledOnce()

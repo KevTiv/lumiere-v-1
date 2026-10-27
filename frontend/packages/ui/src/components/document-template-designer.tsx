@@ -51,6 +51,7 @@ import {
   type DocumentDesignerSnapshot,
   type DocumentDesignerState,
 } from "@lumiere/ui/lib/document-template-designer"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select"
 
 export interface DocumentTemplateDesignerProps {
   kind: DocumentDesignerKind
@@ -1189,23 +1190,28 @@ export function DocumentTemplateDesigner({
           >
             <Minus />
           </Button>
-          <select
-            aria-label={t("documents.studio.canvasZoom", {
-              defaultValue: "Canvas zoom",
-            })}
-            value={zoom}
+          <Select
+            value={String(zoom ?? "")}
+            onValueChange={(nextValue) => changeZoom(Number(nextValue))}
             disabled={unavailable}
-            onChange={(event) => changeZoom(Number(event.target.value))}
           >
-            {!ZOOM_LEVELS.includes(zoom) ? (
-              <option value={zoom}>{zoom}%</option>
-            ) : null}
-            {ZOOM_LEVELS.map((value) => (
-              <option key={value} value={value}>
-                {value}%
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              aria-label={t("documents.studio.canvasZoom", {
+                defaultValue: "Canvas zoom",
+              })}
+              className="h-11 w-full"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {!ZOOM_LEVELS.includes(zoom) ? <SelectItem value={String(zoom)}>{zoom}%</SelectItem> : null}
+              {ZOOM_LEVELS.map((value) => (
+                <SelectItem key={value} value={String(value)}>
+                  {value}%
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             variant="ghost"
@@ -1643,67 +1649,76 @@ export function DocumentTemplateDesigner({
                       {t("documents.studio.textSize", {
                         defaultValue: "Text size",
                       })}
-                      <select
-                        aria-label={t("documents.studio.textSize", {
-                          defaultValue: "Text size",
-                        })}
-                        className={CONTROL_CLASS}
-                        value={selection.fontSize}
-                        onChange={(event) =>
-                          setStyle("font-size", event.target.value)
-                        }
+                      <Select
+                        value={String(selection.fontSize ?? "") || "__none__"}
+                        onValueChange={(selectValue) => {
+                          const nextValue = selectValue === "__none__" ? "" : selectValue
+                          setStyle("font-size", nextValue)
+                        }}
                       >
-                        <option value="">
-                          {t("documents.studio.default", {
-                            defaultValue: "Default",
+                        <SelectTrigger
+                          aria-label={t("documents.studio.textSize", {
+                            defaultValue: "Text size",
                           })}
-                        </option>
-                        {selection.fontSize &&
-                        !TEXT_SIZES.includes(selection.fontSize) ? (
-                          <option value={selection.fontSize}>
-                            {selection.fontSize}
-                          </option>
-                        ) : null}
-                        {TEXT_SIZES.map((size) => (
-                          <option key={size} value={size}>
-                            {size.replace("px", " px")}
-                          </option>
-                        ))}
-                      </select>
+                          className={CONTROL_CLASS}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={"__none__"}>
+                            {t("documents.studio.default", {
+                              defaultValue: "Default",
+                            })}
+                          </SelectItem>
+                          {selection.fontSize && !TEXT_SIZES.includes(selection.fontSize) ? (
+                            <SelectItem value={String(selection.fontSize)}>{selection.fontSize}</SelectItem>
+                          ) : null}
+                          {TEXT_SIZES.map((size) => (
+                            <SelectItem key={size} value={String(size)}>
+                              {size.replace("px", " px")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </label>
                     <label>
                       {t("documents.studio.alignment", {
                         defaultValue: "Alignment",
                       })}
-                      <select
-                        aria-label={t("documents.studio.alignment", {
-                          defaultValue: "Alignment",
-                        })}
-                        className={CONTROL_CLASS}
-                        value={selection.textAlign}
-                        onChange={(event) =>
-                          setStyle("text-align", event.target.value)
-                        }
+                      <Select
+                        value={String(selection.textAlign ?? "") || "__none__"}
+                        onValueChange={(selectValue) => {
+                          const nextValue = selectValue === "__none__" ? "" : selectValue
+                          setStyle("text-align", nextValue)
+                        }}
                       >
-                        <option value="">
-                          {t("documents.studio.default", {
-                            defaultValue: "Default",
+                        <SelectTrigger
+                          aria-label={t("documents.studio.alignment", {
+                            defaultValue: "Alignment",
                           })}
-                        </option>
-                        <option value="left">
-                          {t("documents.studio.left", { defaultValue: "Left" })}
-                        </option>
-                        <option value="center">
-                          {t("documents.studio.center", {
-                            defaultValue: "Center",
-                          })}
-                        </option>
-                        <option value="right">
-                          {t("documents.studio.right", {
-                            defaultValue: "Right",
-                          })}
-                        </option>
-                      </select>
+                          className={CONTROL_CLASS}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={"__none__"}>
+                            {t("documents.studio.default", {
+                              defaultValue: "Default",
+                            })}
+                          </SelectItem>
+                          <SelectItem value={"left"}>{t("documents.studio.left", { defaultValue: "Left" })}</SelectItem>
+                          <SelectItem value={"center"}>
+                            {t("documents.studio.center", {
+                              defaultValue: "Center",
+                            })}
+                          </SelectItem>
+                          <SelectItem value={"right"}>
+                            {t("documents.studio.right", {
+                              defaultValue: "Right",
+                            })}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </label>
                   </section>
                   <section className="template-studio-property-group">
@@ -1755,85 +1770,89 @@ export function DocumentTemplateDesigner({
                       {t("documents.studio.padding", {
                         defaultValue: "Padding",
                       })}
-                      <select
-                        aria-label={t("documents.studio.padding", {
-                          defaultValue: "Padding",
-                        })}
-                        className={CONTROL_CLASS}
-                        value={selection.padding}
-                        onChange={(event) =>
-                          setStyle("padding", event.target.value)
-                        }
+                      <Select
+                        value={String(selection.padding ?? "") || "__none__"}
+                        onValueChange={(selectValue) => {
+                          const nextValue = selectValue === "__none__" ? "" : selectValue
+                          setStyle("padding", nextValue)
+                        }}
                       >
-                        <option value="">
-                          {t("documents.studio.default", {
-                            defaultValue: "Default",
+                        <SelectTrigger
+                          aria-label={t("documents.studio.padding", {
+                            defaultValue: "Padding",
                           })}
-                        </option>
-                        {selection.padding &&
-                        !PADDING_VALUES.includes(selection.padding) ? (
-                          <option
-                            value={selection.padding}
-                            disabled={selection.padding === CUSTOM_SIDES}
-                          >
-                            {selection.padding === CUSTOM_SIDES
-                              ? t("documents.studio.customSides", {
-                                  defaultValue: "Custom sides",
-                                })
-                              : selection.padding}
-                          </option>
-                        ) : null}
-                        {PADDING_VALUES.map((size) => (
-                          <option key={size} value={size}>
-                            {size.replace("px", " px")}
-                          </option>
-                        ))}
-                      </select>
+                          className={CONTROL_CLASS}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={"__none__"}>
+                            {t("documents.studio.default", {
+                              defaultValue: "Default",
+                            })}
+                          </SelectItem>
+                          {selection.padding && !PADDING_VALUES.includes(selection.padding) ? (
+                            <SelectItem value={String(selection.padding)} disabled={selection.padding === CUSTOM_SIDES}>
+                              {selection.padding === CUSTOM_SIDES
+                                ? t("documents.studio.customSides", {
+                                    defaultValue: "Custom sides",
+                                  })
+                                : selection.padding}
+                            </SelectItem>
+                          ) : null}
+                          {PADDING_VALUES.map((size) => (
+                            <SelectItem key={size} value={String(size)}>
+                              {size.replace("px", " px")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </label>
                     <label>
                       {t("documents.studio.border", { defaultValue: "Border" })}
-                      <select
-                        aria-label={t("documents.studio.border", {
-                          defaultValue: "Border",
-                        })}
-                        className={CONTROL_CLASS}
-                        value={selection.border}
-                        onChange={(event) =>
-                          setStyle("border", event.target.value)
-                        }
+                      <Select
+                        value={String(selection.border ?? "") || "__none__"}
+                        onValueChange={(selectValue) => {
+                          const nextValue = selectValue === "__none__" ? "" : selectValue
+                          setStyle("border", nextValue)
+                        }}
                       >
-                        <option value="">
-                          {t("documents.studio.default", {
-                            defaultValue: "Default",
+                        <SelectTrigger
+                          aria-label={t("documents.studio.border", {
+                            defaultValue: "Border",
                           })}
-                        </option>
-                        {selection.border &&
-                        !BORDER_VALUES.includes(selection.border) ? (
-                          <option
-                            value={selection.border}
-                            disabled={selection.border === CUSTOM_SIDES}
-                          >
-                            {selection.border === CUSTOM_SIDES
-                              ? t("documents.studio.customSides", {
-                                  defaultValue: "Custom sides",
-                                })
-                              : selection.border}
-                          </option>
-                        ) : null}
-                        <option value="none">
-                          {t("documents.studio.none", { defaultValue: "None" })}
-                        </option>
-                        <option value="1px solid #d1d5db">
-                          {t("documents.studio.light", {
-                            defaultValue: "Light",
-                          })}
-                        </option>
-                        <option value="2px solid #1f2937">
-                          {t("documents.studio.strong", {
-                            defaultValue: "Strong",
-                          })}
-                        </option>
-                      </select>
+                          className={CONTROL_CLASS}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={"__none__"}>
+                            {t("documents.studio.default", {
+                              defaultValue: "Default",
+                            })}
+                          </SelectItem>
+                          {selection.border && !BORDER_VALUES.includes(selection.border) ? (
+                            <SelectItem value={String(selection.border)} disabled={selection.border === CUSTOM_SIDES}>
+                              {selection.border === CUSTOM_SIDES
+                                ? t("documents.studio.customSides", {
+                                    defaultValue: "Custom sides",
+                                  })
+                                : selection.border}
+                            </SelectItem>
+                          ) : null}
+                          <SelectItem value={"none"}>{t("documents.studio.none", { defaultValue: "None" })}</SelectItem>
+                          <SelectItem value={"1px solid #d1d5db"}>
+                            {t("documents.studio.light", {
+                              defaultValue: "Light",
+                            })}
+                          </SelectItem>
+                          <SelectItem value={"2px solid #1f2937"}>
+                            {t("documents.studio.strong", {
+                              defaultValue: "Strong",
+                            })}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </label>
                   </section>
                 </fieldset>

@@ -1,3 +1,4 @@
+import { chooseSelectValue } from "../components/select-test-utils"
 import {
   act,
   cleanup,
@@ -263,7 +264,7 @@ describe("document template designer dialog", () => {
     )
     expect(screen.queryByLabelText("Model")).toBeNull()
     expect(
-      (screen.getByLabelText("Template type") as HTMLSelectElement).disabled,
+      (screen.getByLabelText("Template type") as HTMLButtonElement).disabled,
     ).toBe(true)
     fireEvent.change(screen.getByLabelText("Name"), {
       target: { value: "Edited name" },
@@ -507,9 +508,7 @@ describe("document template designer dialog", () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true)
-    fireEvent.change(screen.getByLabelText("Start with"), {
-      target: { value: "proposal" },
-    })
+    chooseSelectValue(screen.getByLabelText("Start with"), "proposal")
     await waitFor(() =>
       expect(
         (
@@ -618,12 +617,8 @@ describe("document template designer dialog", () => {
     fireEvent.change(screen.getByLabelText("Name"), {
       target: { value: "Quotation" },
     })
-    fireEvent.change(screen.getByLabelText("Template type"), {
-      target: { value: "document" },
-    })
-    fireEvent.change(screen.getByLabelText("Start with"), {
-      target: { value: "quotation" },
-    })
+    chooseSelectValue(screen.getByLabelText("Template type"), "document")
+    chooseSelectValue(screen.getByLabelText("Start with"), "quotation")
     harness.upload.mockRejectedValueOnce(new Error("Upload unavailable"))
     const file = new File(["raster"], "brand.png", { type: "image/png" })
     fireEvent.change(

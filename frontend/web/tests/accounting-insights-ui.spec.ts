@@ -1,3 +1,4 @@
+import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
 import { expect, test, type Page } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 
@@ -32,11 +33,19 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(page.getByTestId("insight-aging").locator(".recharts-bar")).toHaveCount(2)
       await expect(page.getByTestId("insight-budgets").locator(".recharts-bar")).toHaveCount(2)
       await expect(page.getByRole("link", { name: "Open budgets", exact: true })).toHaveAttribute("href", "/accounting?tab=budgets")
-      await page.getByLabel("Analysis period", { exact: true }).selectOption("30")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        page.getByLabel("Analysis period", { exact: true }),
+        "30",
+      )
       await expect(page.getByTestId("insight-posted-invoices")).toContainText("0.00 EUR")
       await expect(page.getByTestId("insight-posted-invoices")).toContainText("2,400.00 EUR") // Previous period, not current.
       await expect(page.getByTestId("insight-open-invoices")).toContainText("1,200.00 EUR")
-      await page.getByLabel("Analysis currency", { exact: true }).selectOption("2")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        page.getByLabel("Analysis currency", { exact: true }),
+        "2",
+      )
       await expect(page.getByTestId("insight-open-invoices")).toContainText("800.00 USD")
       await expect(page.getByTestId("insight-budgets")).toContainText("Select the company currency (EUR)")
       await expect(page.getByTestId("insight-budgets").getByRole("button", { name: /Export/ })).toHaveCount(0)
@@ -93,9 +102,13 @@ for (const width of [320, 390, 768, 1440]) {
       })
       expect(stroke).toBe(themeStroke)
       expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1)
-      await page.getByLabel("Analysis currency", { exact: true }).selectOption("1")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        page.getByLabel("Analysis currency", { exact: true }),
+        "1",
+      )
       await page.getByRole("button", { name: "Switch synthetic company", exact: true }).click()
-      await expect(page.getByLabel("Analysis currency", { exact: true })).toHaveValue("2")
+      await expect(page.getByLabel("Analysis currency", { exact: true })).toContainText("USD")
       await expect(page.getByTestId("insight-open-invoices")).toContainText("250.00 USD")
       await expect(page.getByTestId("insight-open-invoices")).not.toContainText("1,200.00")
     })

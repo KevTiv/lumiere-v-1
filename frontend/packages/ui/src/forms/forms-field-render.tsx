@@ -173,6 +173,7 @@ export function FormFieldRenderer({
         if (field.searchable) {
           return (
             <RecordPicker
+              id={field.id}
               value={String(value ?? "")}
               onChange={onChange}
               options={field.options}

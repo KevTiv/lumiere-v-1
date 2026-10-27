@@ -19,6 +19,7 @@ import {
   type AccountingWorklistView,
   type NamedAccountingWorklist,
 } from "./accounting-worklist-model"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/select"
 
 interface AccountingWorklistToolbarProps extends Pick<
   AccountingListDisplayProps,
@@ -39,7 +40,7 @@ interface AccountingWorklistToolbarProps extends Pick<
 }
 
 const selectClass =
-  "h-11 min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+  "h-11 min-h-11 w-full min-w-0"
 
 export function AccountingWorklistToolbar({
   value,
@@ -87,67 +88,94 @@ export function AccountingWorklistToolbar({
         </label>
         <label className="min-w-0 space-y-1 text-xs font-medium">
           <span>{t("accounting.journalEntries.state")}</span>
-          <select
-            className={selectClass}
-            value={initialFilters.status ?? value.filters.status}
+          <Select
+            value={String(initialFilters.status ?? value.filters.status ?? "") || "__none__"}
+            onValueChange={(selectValue) => {
+              const nextValue = selectValue === "__none__" ? "" : selectValue
+              updateFilter("status", nextValue)
+            }}
             disabled={Boolean(initialFilters.status)}
-            onChange={(event) => updateFilter("status", event.target.value)}
           >
-            <option value="">{t("accounting.invoices.allStatus")}</option>
-            {statuses.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className={selectClass} aria-label={t("accounting.journalEntries.state")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={"__none__"}>{t("accounting.invoices.allStatus")}</SelectItem>
+              {statuses.map((status) => (
+                <SelectItem key={status.value} value={String(status.value)}>
+                  {status.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <label className="min-w-0 space-y-1 text-xs font-medium">
           <span>
             {t("accounting.worklists.currency", { defaultValue: "Currency" })}
           </span>
-          <select
-            className={selectClass}
-            value={initialFilters.currencyId ?? value.filters.currencyId}
+          <Select
+            value={String(initialFilters.currencyId ?? value.filters.currencyId ?? "") || "__none__"}
+            onValueChange={(selectValue) => {
+              const nextValue = selectValue === "__none__" ? "" : selectValue
+              updateFilter("currencyId", nextValue)
+            }}
             disabled={Boolean(initialFilters.currencyId)}
-            onChange={(event) => updateFilter("currencyId", event.target.value)}
           >
-            <option value="">
-              {t("accounting.worklists.allCurrencies", {
-                defaultValue: "All currencies",
-              })}
-            </option>
-            {currencies.map((currency) => (
-              <option key={currency.value} value={currency.value}>
-                {currency.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              className={selectClass}
+              aria-label={t("accounting.worklists.currency", { defaultValue: "Currency" })}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={"__none__"}>
+                {t("accounting.worklists.allCurrencies", {
+                  defaultValue: "All currencies",
+                })}
+              </SelectItem>
+              {currencies.map((currency) => (
+                <SelectItem key={currency.value} value={String(currency.value)}>
+                  {currency.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <label className="min-w-0 space-y-1 text-xs font-medium">
           <span>
             {t("accounting.worklists.queue", { defaultValue: "Balance queue" })}
           </span>
-          <select
-            className={selectClass}
-            value={initialFilters.queue ?? value.filters.queue}
+          <Select
+            value={String(initialFilters.queue ?? value.filters.queue ?? "") || "__none__"}
+            onValueChange={(selectValue) => {
+              const nextValue = selectValue === "__none__" ? "" : selectValue
+              updateFilter("queue", nextValue)
+            }}
             disabled={Boolean(initialFilters.queue)}
-            onChange={(event) => updateFilter("queue", event.target.value)}
           >
-            <option value="">
-              {t("accounting.worklists.allBalances", {
-                defaultValue: "All balances",
-              })}
-            </option>
-            <option value="open">
-              {t("accounting.worklists.open", {
-                defaultValue: "Posted · balance due",
-              })}
-            </option>
-            <option value="overdue">{t("accounting.states.overdue")}</option>
-            {value.filters.queue === "pending" && (
-              <option value="pending">{t("accounting.states.pending")}</option>
-            )}
-          </select>
+            <SelectTrigger
+              className={selectClass}
+              aria-label={t("accounting.worklists.queue", { defaultValue: "Balance queue" })}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={"__none__"}>
+                {t("accounting.worklists.allBalances", {
+                  defaultValue: "All balances",
+                })}
+              </SelectItem>
+              <SelectItem value={"open"}>
+                {t("accounting.worklists.open", {
+                  defaultValue: "Posted · balance due",
+                })}
+              </SelectItem>
+              <SelectItem value={"overdue"}>{t("accounting.states.overdue")}</SelectItem>
+              {value.filters.queue === "pending" && (
+                <SelectItem value={"pending"}>{t("accounting.states.pending")}</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
         </label>
       </div>
       {Object.keys(initialFilters).length > 0 && (
@@ -192,14 +220,12 @@ export function AccountingWorklistToolbar({
               defaultValue: "Saved views",
             })}
           </span>
-          <select
-            className={selectClass}
-            value={chosenView}
-            onChange={(event) => {
-              setChosenView(event.target.value)
-              const view = saved.find(
-                (item) => item.name === event.target.value
-              )
+          <Select
+            value={chosenView === "" ? "__none__" : `saved:${chosenView}`}
+            onValueChange={(selectValue) => {
+              const nextValue = selectValue === "__none__" ? "" : selectValue.slice(6)
+              setChosenView(nextValue)
+              const view = saved.find((item) => item.name === nextValue)
               if (view)
                 onChange({
                   search: view.search,
@@ -208,17 +234,25 @@ export function AccountingWorklistToolbar({
                 })
             }}
           >
-            <option value="">
-              {t("accounting.worklists.chooseView", {
-                defaultValue: "Choose a saved view",
-              })}
-            </option>
-            {saved.map((view) => (
-              <option key={view.name} value={view.name}>
-                {view.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              className={selectClass}
+              aria-label={t("accounting.worklists.savedViews", { defaultValue: "Saved views" })}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={"__none__"}>
+                {t("accounting.worklists.chooseView", {
+                  defaultValue: "Choose a saved view",
+                })}
+              </SelectItem>
+              {saved.map((view) => (
+                <SelectItem key={view.name} value={`saved:${view.name}`}>
+                  {view.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <label className="min-w-0 space-y-1 text-xs font-medium">
           <span>

@@ -1,3 +1,4 @@
+import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
 import { expect, test, type Page } from "@playwright/test"
 import { readFile } from "node:fs/promises"
 
@@ -40,15 +41,27 @@ for (const width of [320, 390, 768, 1440]) {
         await trend.getByText("View chart data", { exact: true }).click()
         await expect(trend.getByRole("table")).toBeVisible()
         expect(await trend.getByRole("button", { name: /as CSV/ }).evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44)
-        await page.getByLabel("Analysis period", { exact: true }).selectOption("30")
+        await chooseSelectOptionByTriggerValue(
+          page,
+          page.getByLabel("Analysis period", { exact: true }),
+          "30",
+        )
         await expect(page.getByTestId("module-insights-period-callback")).toContainText("2026-09-18T00:00:00.000Z")
         await expect(page.getByTestId("module-insights-period-callback")).toContainText("2026-10-18T00:00:00.000Z")
         await expect(page.getByTestId(`${module}-insights-periodValue`)).toContainText("Previous period")
         if (module !== "reports") {
           await expect(page.getByTestId(`${module}-insights-periodValue`)).toContainText("600.00 EUR")
-          await page.getByLabel("Analysis currency", { exact: true }).selectOption("2")
+          await chooseSelectOptionByTriggerValue(
+            page,
+            page.getByLabel("Analysis currency", { exact: true }),
+            "2",
+          )
           await expect(page.getByTestId(`${module}-insights-periodValue`)).toContainText("250.00 USD")
-          await page.getByLabel("Analysis currency", { exact: true }).selectOption("1")
+          await chooseSelectOptionByTriggerValue(
+            page,
+            page.getByLabel("Analysis currency", { exact: true }),
+            "1",
+          )
         } else await expect(page.getByLabel("Analysis currency", { exact: true })).toHaveCount(0)
         await page.getByTestId(`${module}-insights-queue-${module === "crm" ? "open" : "draft"}`).click()
         await expect(page.getByTestId(`${module}-insights-queue-records`).getByRole("link", { name: /exact u64/ })).toHaveAttribute("href", new RegExp("9007199254740993"))
@@ -89,8 +102,8 @@ for (const width of [320, 390, 768, 1440]) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1)
         await page.getByRole("button", { name: "Switch synthetic company", exact: true }).click()
         if (module !== "reports") {
-          await expect(page.getByLabel("Analysis currency", { exact: true })).toHaveValue("2")
-          await expect(page.getByLabel("Analysis period", { exact: true })).toHaveValue("90")
+          await expect(page.getByLabel("Analysis currency", { exact: true })).toContainText("USD")
+          await expect(page.getByLabel("Analysis period", { exact: true })).toContainText("90")
           await expect(page.getByTestId(`${module}-insights-periodValue`)).toContainText("375.00 USD")
           await expect(overview).not.toContainText("Synthetic exact u64 record")
         } else await expect(page.getByTestId(`${module}-insights-periodValue`)).toContainText("1")

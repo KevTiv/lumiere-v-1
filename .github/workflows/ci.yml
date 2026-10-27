@@ -331,6 +331,9 @@ jobs:
       - name: Opaque record type-debt ratchet
         run: pnpm type-debt:check
 
+      - name: Enforce shared select controls
+        run: pnpm selects:check
+
       - name: Enforce immutable browser operation transport
         run: pnpm operation-transport:check
 
@@ -375,7 +378,7 @@ jobs:
         working-directory: frontend/web
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Work-board browser regressions
+      - name: Shared controls and work-board browser regressions
         run: pnpm --dir web test:e2e:work-board
 
       - name: Upload work-board browser diagnostics

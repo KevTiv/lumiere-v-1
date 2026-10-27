@@ -1,3 +1,4 @@
+import { chooseSelectValue } from "../components/select-test-utils"
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { resolveInvoiceProfile, type InvoiceProfileVersion } from "@lumiere/erp-shared/invoice-personalization"
@@ -25,7 +26,10 @@ function props(overrides: Partial<InvoicePersonalizationEditorProps> = {}): Invo
     canPublishCompany: true, canPublishOrganization: true, onSave: vi.fn(async (input) => saved(input)), onCheck: vi.fn(), ...overrides }
 }
 function customizeTerms(text: string) {
-  fireEvent.change(screen.getByRole("combobox", { name: "Terms source" }), { target: { value: "custom" } })
+  chooseSelectValue(
+    screen.getByRole("combobox", { name: "Terms source" }),
+    "custom",
+  )
   fireEvent.change(screen.getByTestId("invoice-profile-terms"), { target: { value: text } })
 }
 const clickSave = () => fireEvent.click(screen.getByTestId("invoice-profile-save"))

@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@lumiere/
 import { Label } from "@lumiere/ui/components/label"
 import { readDocumentDesignerMetadata } from "@lumiere/ui/lib/document-template-designer"
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 interface QuotationDocumentDialogProps {
   organizationId: number
@@ -141,12 +142,29 @@ export function QuotationDocumentDialog({ organizationId, companyId, identity, o
           <aside className="flex shrink-0 flex-col gap-4 border-b bg-muted/20 p-5 md:w-72 md:overflow-y-auto md:border-r md:border-b-0">
             <div className="space-y-2">
               <Label htmlFor="quotation-document-template">{t("sales.quotationDocument.layout")}</Label>
-              <select id="quotation-document-template" className="h-11 w-full rounded-md border bg-background px-3 text-sm" value={templateId}
+              <Select
+                value={String(templateId ?? "") || "__none__"}
+                onValueChange={(selectValue) => {
+                  const nextValue = selectValue === "__none__" ? "" : selectValue
+                  changeLayout(nextValue)
+                }}
                 disabled={!readable || generating || Boolean(output) || templatesLoading}
-                onChange={(event) => changeLayout(event.target.value)}>
-                <option value="">{t("sales.quotationDocument.chooseLayout")}</option>
-                {layouts.map((row) => <option key={String(row.id)} value={String(row.id)}>{row.name}</option>)}
-              </select>
+              >
+                <SelectTrigger
+                  id="quotation-document-template"
+                  className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={"__none__"}>{t("sales.quotationDocument.chooseLayout")}</SelectItem>
+                  {layouts.map((row) => (
+                    <SelectItem key={String(row.id)} value={String(String(row.id))}>
+                      {row.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             {templatesLoading ? <p role="status" className="text-sm text-muted-foreground">{t("sales.quotationDocument.loading")}</p> : null}
             {templatesQuery.isError ? <div role="alert" className="space-y-2 text-sm">

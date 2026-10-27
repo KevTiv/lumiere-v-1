@@ -28,6 +28,7 @@ import {
 import { useOperatingCompanyId } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { CheckCircle2, ExternalLink, Hand, Loader2, Sparkles, XCircle } from "lucide-react"
 import { approvalInboxTarget, approvalTaskMatchesTarget } from "./approval-inbox-view"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 function hasValidOrganizationId(value?: number): value is number {
   return value != null && value > 0
@@ -243,24 +244,36 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                   {showActorSelection ? (
                     <label className="flex items-center gap-2 text-sm">
                       Acting as
-                      <select
-                        className="rounded border bg-background px-2 py-1"
-                        data-testid={`approval-acting-for-${taskId}`}
-                        value={selectedActor ?? ""}
-                        onChange={(event) => setActingForByTask((current) => ({
-                          ...current,
-                          [taskId]: event.target.value,
-                        }))}
+                      <Select
+                        value={String(selectedActor ?? "") || "__none__"}
+                        onValueChange={(selectValue) => {
+                          const nextValue = selectValue === "__none__" ? "" : selectValue
+                          setActingForByTask((current) => ({
+                            ...current,
+                            [taskId]: nextValue,
+                          }))
+                        }}
                         disabled={busy}
                       >
-                        {row.directlyEligible === true ? <option value="">Myself</option> : null}
-                        {row.directlyEligible !== true && needsActorSelection ? (
-                          <option value="">Select an eligible principal</option>
-                        ) : null}
-                        {actorOptions.map((option) => (
-                          <option key={option.identityHex} value={option.identityHex}>{option.label}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger
+                          className="rounded border bg-background px-2 py-1"
+                          data-testid={`approval-acting-for-${taskId}`}
+                          aria-label={"Acting as"}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {row.directlyEligible === true ? <SelectItem value={"__none__"}>Myself</SelectItem> : null}
+                          {row.directlyEligible !== true && needsActorSelection ? (
+                            <SelectItem value={"__none__"}>Select an eligible principal</SelectItem>
+                          ) : null}
+                          {actorOptions.map((option) => (
+                            <SelectItem key={option.identityHex} value={String(option.identityHex)}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </label>
                   ) : null}
                   {status === "Open" ? (

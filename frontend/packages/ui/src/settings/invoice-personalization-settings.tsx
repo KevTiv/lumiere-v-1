@@ -23,6 +23,7 @@ import { workspaceStyles } from "../lib/workspace-styles"
 import { cn } from "../lib/utils"
 import { ModuleDataNotice } from "../pages/module-data-notice"
 import { useUnsavedChangesGuard } from "../forms/use-unsaved-changes-guard"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/select"
 
 export type UploadInvoiceLogo = (file: File, companyId: string | null) => Promise<string>
 type Company = Parameters<typeof invoiceSellerFromCompany>[0]
@@ -180,7 +181,22 @@ export function InvoicePersonalizationEditor(props: InvoicePersonalizationEditor
   return <Card className={cn(workspaceStyles.surface, "min-w-0")} data-testid="invoice-profile-settings">
     <CardHeader><CardTitle className={workspaceStyles.sectionTitle}>Invoice appearance and content</CardTitle><CardDescription className={workspaceStyles.sectionDescription}>Publish organization defaults or overrides for one company. Omitted fields inherit; an empty customized field clears its content. Issued invoices keep their frozen document.</CardDescription></CardHeader>
     <CardContent className="min-w-0 space-y-5">
-      <div className="grid min-w-0 gap-3 sm:grid-cols-2"><div className="min-w-0 space-y-2"><Label htmlFor={`${formId}-scope`}>Settings scope</Label><select id={`${formId}-scope`} className={controlClass} value={mode} disabled={busy || uncertain !== null} onChange={(event) => void changeMode(event.target.value as "company" | "organization")}><option value="organization">Organization defaults</option>{companyId ? <option value="company">{companyName || `Company #${companyId}`}</option> : null}</select></div><div className="self-end text-xs text-muted-foreground"><p>Editing: {boundScope.name}</p><p>Current version: {baselineVersionId ? `#${baselineVersionId}` : "No published version"}</p></div></div>
+      <div className="grid min-w-0 gap-3 sm:grid-cols-2"><div className="min-w-0 space-y-2"><Label htmlFor={`${formId}-scope`}>Settings scope</Label><Select
+        value={String(mode ?? "")}
+        onValueChange={(nextValue) => void changeMode(nextValue as "company" | "organization")}
+        disabled={busy || uncertain !== null}
+      >
+        {" "}
+        <SelectTrigger id={`${formId}-scope`} className={controlClass}>
+          <SelectValue />
+        </SelectTrigger>{" "}
+        <SelectContent>
+          <SelectItem value={"organization"}>Organization defaults</SelectItem>
+          {companyId ? (
+            <SelectItem value={"company"}>{companyName || `Company #${companyId}`}</SelectItem>
+          ) : null}
+        </SelectContent>{" "}
+      </Select></div><div className="self-end text-xs text-muted-foreground"><p>Editing: {boundScope.name}</p><p>Current version: {baselineVersionId ? `#${baselineVersionId}` : "No published version"}</p></div></div>
       <ModuleDataNotice state={state} />
       {state.status === "loading" ? <p role="status">Loading invoice settings…</p> : null}
       {scopeChanged ? <div role="alert" className="space-y-3 rounded-lg border p-4"><p>The selected company changed. Unpublished edits and any pending result still belong to {boundScope.name}.</p><Button className={actionClass} variant="outline" disabled={busy || uncertain !== null} onClick={async () => { if (!dirty || await confirmDiscard()) adopt(desired, currentVersion) }}>Discard edits and use selected company</Button></div> : null}
@@ -193,13 +209,55 @@ export function InvoicePersonalizationEditor(props: InvoicePersonalizationEditor
             const value = values[key] ?? inherited[key]
             const id = `${formId}-${key}`
             return <section key={key} className="min-w-0 space-y-2 border-b pb-4">
-              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2"><Label htmlFor={id}>{LABELS[key]}</Label><select className="min-h-11 max-w-full rounded-md border border-input bg-background px-2 text-xs" aria-label={`${LABELS[key]} source`} value={overridden ? "custom" : "inherit"} onChange={(event) => {
-                if (!editable) return
-                setValues((previous) => { const next = { ...previous }; if (event.target.value === "inherit") delete next[key]; else Object.assign(next, { [key]: value }); return next })
-                setMessage(null)
-              }}><option value="inherit">{mode === "organization" ? "Use system default" : "Inherit organization default"}</option><option value="custom">Customize</option></select></div>
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2"><Label htmlFor={id}>{LABELS[key]}</Label><Select
+                disabled={!editable}
+                value={overridden ? "custom" : "inherit"}
+                onValueChange={(nextValue) => {
+                  if (!editable) return
+                  setValues((previous) => {
+                    const next = { ...previous }
+                    if (nextValue === "inherit") delete next[key]
+                    else Object.assign(next, { [key]: value })
+                    return next
+                  })
+                  setMessage(null)
+                }}
+              >
+                <SelectTrigger
+                  className="min-h-11 max-w-full rounded-md border border-input bg-background px-2 text-xs"
+                  aria-label={`${LABELS[key]} source`}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={"inherit"}>
+                    {mode === "organization" ? "Use system default" : "Inherit organization default"}
+                  </SelectItem>
+                  <SelectItem value={"custom"}>Customize</SelectItem>
+                </SelectContent>
+              </Select></div>
               {key === "logoUrl" ? <div className="space-y-2"><Input id={id} data-testid="invoice-profile-logoUrl" className={controlClass} type="file" accept="image/png,image/jpeg" disabled={!editable || !uploadInvoiceLogo} onChange={(event) => { void upload(event.target.files?.[0]); event.target.value = "" }} /><p className="text-xs text-muted-foreground">PNG or JPEG, up to 2 MiB, 4096 pixels per side and 4 million pixels. {uploadInvoiceLogo ? "Images use managed organization storage." : "Logo uploads are unavailable in this settings host."}</p>{overridden ? <Button type="button" variant="outline" className={actionClass} onClick={() => update("logoUrl", "")}>Clear logo</Button> : null}</div>
-                : key === "accent" ? <select id={id} data-testid={`invoice-profile-${key}`} className={controlClass} disabled={!editable || !overridden} value={value} onChange={(event) => update(key, event.target.value)}><option value="">No accent (neutral)</option>{["teal", "blue", "slate", "violet"].map((accent) => <option key={accent} value={accent}>{accent[0]!.toUpperCase() + accent.slice(1)}</option>)}</select>
+                : key === "accent" ? <Select
+                  value={String(value ?? "") || "__none__"}
+                  onValueChange={(selectValue) => {
+                    const nextValue = selectValue === "__none__" ? "" : selectValue
+                    update(key, nextValue)
+                  }}
+                  disabled={!editable || !overridden}
+                >
+                  {" "}
+                  <SelectTrigger id={id} data-testid={`invoice-profile-${key}`} className={controlClass}>
+                    <SelectValue />
+                  </SelectTrigger>{" "}
+                  <SelectContent>
+                    <SelectItem value={"__none__"}>No accent (neutral)</SelectItem>
+                    {["teal", "blue", "slate", "violet"].map((accent) => (
+                      <SelectItem key={accent} value={String(accent)}>
+                        {accent[0]!.toUpperCase() + accent.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>{" "}
+                </Select>
                 : MULTILINE.has(key) ? <Textarea id={id} data-testid={`invoice-profile-${key}`} rows={key === "terms" ? 4 : 3} className="min-w-0" disabled={!editable || !overridden} value={value} onChange={(event) => update(key, event.target.value)} />
                 : <Input id={id} data-testid={`invoice-profile-${key}`} className={controlClass} disabled={!editable || !overridden} value={value} onChange={(event) => update(key, event.target.value)} />}
               <p className="text-xs text-muted-foreground">{overridden ? value === "" ? "Explicitly cleared for this scope." : "Customized for this scope." : "Inherited; no override will be stored."} {key !== "logoUrl" ? `${new TextEncoder().encode(value).length}/${INVOICE_PROFILE_LIMITS[key]} UTF-8 bytes` : null}</p>

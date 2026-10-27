@@ -58,6 +58,8 @@ describe("MultiRecordPicker", () => {
     fireEvent.click(await screen.findByRole("option", { name: /Globex/ }))
     fireEvent.click(screen.getByRole("option", { name: /Acme/ }))
 
+    expect(screen.getByRole("option", { name: /Globex/ }).querySelector('[data-slot="option-checkbox"]')?.getAttribute("data-checked")).toBe("true")
+    expect(screen.getByRole("option", { name: /Initech/ }).querySelector('[data-slot="option-checkbox"]')?.getAttribute("data-checked")).toBe("false")
     expect(onChange).toHaveBeenLastCalledWith(["2", "1"])
     expect(chips()).toEqual(["Globex", "Acme Corp"])
     expect(screen.getByRole("option", { name: /Globex/ }).getAttribute("aria-checked")).toBe("true")
