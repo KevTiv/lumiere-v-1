@@ -28,7 +28,18 @@
       "residualCurrency": "Outstanding balance in transaction currency",
       "debitCurrency": "Debit in transaction currency",
       "creditCurrency": "Credit in transaction currency"
-    }
+    },
+    "fieldsChanged": "{{fields}} changed",
+    "lineReference": "Line {{id}}",
+    "user": "User {{identity}}",
+    "userIdentity": "User identity",
+    "beforeThisSave": "Before this save",
+    "afterThisSave": "After this save",
+    "coverageLead": "Partial history: recorded line edits only.",
+    "coverageDetails": "What this history includes",
+    "refreshing": "Refreshing changes…",
+    "loadingMore": "Loading more changes…",
+    "emptyText": "Empty text"
   },
   "moduleInsights": {
     "overview": "Overview",

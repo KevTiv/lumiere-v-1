@@ -56,3 +56,70 @@ Local and hosted results are recorded on the PR for its exact head. Before merge
 FCR-00 has a source inventory and validator; policy/field/runtime acceptance remains open. FCR-01 has the first private capture and source storage contracts, with contract publication and durable-runtime proof pending. FCR-02/FCR-03 have the normal-save Accounting history path and initial shared renderer/API, while proposed-change submission/review/application remains unimplemented. FCR-04 through FCR-11 continue under the original plan.
 
 The next slice completes generated-contract and runtime acceptance for this producer, then adds a typed Accounting draft-update proposal with material base validation and the existing independent workflow approval boundary. Broader module adoption follows that reviewed contract.
+
+
+## Read-only history UX refinement (2026-10-27)
+
+The follow-up refines the existing invoice/bill **Changes** tab. It does not add
+proposed updates, restore, approval or execution controls. It retains native
+capture, source/field policy, company/actor scope, exact values and the existing
+history query owner.
+
+- Event headings name only the authorized changed fields returned for that save.
+  Exact line IDs are secondary. No title, count or relation name is inferred from
+  a current record or an omitted historical field.
+- Comparison values are labelled **Before this save** and **After this save**.
+  One continuous event list replaces repeated outer cards; expanded comparisons
+  stack on narrow screens. Decimal and U64 strings remain exact escaped text.
+  Null and empty strings have distinct labels; zero stays zero.
+- Actor identity has an explicit **User** fallback and an accessible native
+  disclosure for the full authorized identity. No name lookup, guessed actor,
+  historical currency or relation-label enrichment is added. The displayed
+  timestamp includes its local time-zone label; the original ISO timestamp stays
+  in the time element.
+- A short partial-history notice stays visible. Existing coverage limitations
+  remain in a native disclosure. Empty, filtered-empty with continuation,
+  loading, denied and failed reads remain distinct. Failed/denied reads hide
+  cached evidence; no missing history is presented as a confirmed zero.
+- Refresh and pagination reuse the existing read owner, expose progress, and
+  disable duplicate read controls while either request is pending. Read controls
+  do not submit a business change. Native event/identity disclosures remain
+  keyboard controls without custom key interception.
+
+The Mobbin reference pass selected business-readable activity summaries from
+[Xero](https://mobbin.com/screens/002c8c1f-505c-4bbf-a2de-54ac2578e2d7)
+and [Lightfield](https://mobbin.com/screens/201a0769-f061-40af-a5fb-c9670fddeca0).
+[Linear](https://mobbin.com/screens/6c14e085-9ff5-4e61-9a21-b04f1b0a3433)
+provided a document-comparison example for keeping historical changes focused;
+its restore control is outside this producer's scope. The cross-domain screens
+inform structure only. Lumiere's existing semantic colors, typography,
+components, document navigation and default/Ocean theme ownership are retained.
+The exact labels and placement are product decisions, not a formal ERP standard.
+
+The user assigned test execution to CI. This follow-up adds/updates renderer and
+wrapper regression source in the existing automatically discovered UI suite.
+No local tests, typechecks, lint runners, builds, browser stacks, seeds or
+services were run. Source review and whitespace inspection are not test passes.
+Earlier foundation results above apply to their recorded revision, not this UI
+follow-up. Real keyboard/mobile/theme/text-enlargement evidence remains a release
+check; no new screenshot or device acceptance is claimed.
+
+### Integration with PR #285
+
+PR #279's Changes tab/history refresh and read-only capability label can coexist
+with #285's scoped return link, full-width saved-record workspace and pending-safe
+role dialog footer. These edits have no text conflict in the inspected three-way
+source comparison. No unrelated #285 source was copied into this follow-up.
+
+The branch already has contract-pin conflicts against `main`
+`5ada7d0b268bf9fb1f2f8f5c91f58841a2ac5e46` and #285
+`b93e77a0bee52b6f32bcc1a2a2e7cc073d0e4988`. The conflict set is Cargo.lock,
+presentation_dictionary.rs, the presentation-core/query-hooks/stdb package pins,
+pnpm-lock.yaml and release-compatibility-manifest.json. PR #279 is pinned to
+0.3.150; #285 is pinned to 0.3.151. Archive-member inspection confirms that #279's
+0.3.150 frontend package includes generated `business_change_table` files and
+#285's 0.3.151 package does not. A higher version number is not proof that it
+contains the history producer. Preserve the history schema and immutable
+migration 27 through the existing combined-contract release owner before merging
+the two branches. This UI follow-up does not publish contracts, resolve that
+schema/release dependency, grant roles, merge or deploy production.

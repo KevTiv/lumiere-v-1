@@ -79,6 +79,7 @@ export function AccountMoveChanges({
       entries={entries}
       hasMore={query.hasNextPage}
       loadingMore={query.isFetchingNextPage}
+      isRefreshing={Boolean(query.isFetching && !query.isPending && !query.isFetchingNextPage)}
       onLoadMore={() => {
         void query.fetchNextPage();
       }}
