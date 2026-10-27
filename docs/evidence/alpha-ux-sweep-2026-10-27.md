@@ -206,3 +206,24 @@ existing storage tests do, and the success case also checks the actual stored
 snapshot. The failure and retained-entry assertions remain unchanged. This is a
 test interception correction; the production save handler is unchanged. CI must
 execute the corrected tests; no local test runner was used.
+
+
+### Saved bill source E2E correction
+
+Hosted CI at `4e72a6d44` passed main CI and all six companion workflows. The
+targeted E2E run passed 27 tests and failed the PNG/PDF saved-bill source tests.
+Both tests tried to inspect filenames inside the hidden source pane. The saved
+invoice/bill page deliberately starts `FinanceReviewWorkspace` in `edit` mode,
+labelled **Saved details**, to give the financial document the full page width.
+
+The two E2E paths now assert that starting state and select **Source document**
+through the visible tab before inspecting evidence, both after navigation and
+after reload. They verify the selected tab and visible source pane. Exact uploaded
+filename selection, decoded PNG width, PDF blob/type/label, reload visibility and
+unchanged bill total assertions remain. No forced click, hidden-element success,
+wait extension or production layout change is introduced.
+
+This correction changes only E2E source and this evidence record. No local test,
+typecheck, lint, build, browser or service was run. CI must verify the new head;
+the prior successful main CI does not certify this follow-up. The PR remains a
+draft, with no merge or deployment.

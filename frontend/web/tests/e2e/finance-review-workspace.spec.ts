@@ -42,6 +42,18 @@ async function queryRows(page: Page, resource: string): Promise<Array<Record<str
 }
 const workspace = (page: Page) => page.locator('[data-testid="finance-review-workspace"]:visible')
 
+async function openSavedBillSource(page: Page) {
+  const review = workspace(page)
+  // Saved records start with their details. Open the source through its visible tab.
+  await expect(review.getByRole("tab", { name: "Saved details", exact: true })).toHaveAttribute("aria-selected", "true")
+  await expect(review.getByTestId("finance-review-document")).toBeHidden()
+  const sourceTab = review.getByRole("tab", { name: "Source document", exact: true })
+  await sourceTab.click()
+  await expect(sourceTab).toHaveAttribute("aria-selected", "true")
+  await expect(review.getByTestId("finance-review-document")).toBeVisible()
+  return review.getByTestId("finance-source-preview")
+}
+
 test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, () => {
   for (const width of [1440, 390]) {
     test(`bill draft keeps inputs and document review at ${width}px`, async ({ page }) => {
@@ -94,7 +106,7 @@ test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, (
     await attachment.getByRole("button", { name: "Upload", exact: true }).click()
     await expect(attachment.getByText(name, { exact: true })).toBeVisible()
     await page.goto(`/accounting/invoices/${id}`)
-    const source = workspace(page).getByTestId("finance-source-preview")
+    const source = await openSavedBillSource(page)
     // Multiple sources can be attached to this exact bill across test runs.
     await expect(source.getByText(name, { exact: true }).first()).toBeVisible()
     const select = source.getByRole("button", { name, exact: true })
@@ -108,7 +120,7 @@ test.describe("Finance review workspace", { tag: ["@p0", "@finance-review"] }, (
       await expect(preview).toHaveAttribute("type", "application/pdf")
     }
     await page.reload()
-    const saved = workspace(page).getByTestId("finance-source-preview")
+    const saved = await openSavedBillSource(page)
     await expect(saved.getByText(name, { exact: true }).first()).toBeVisible()
     const selectAfterReload = saved.getByRole("button", { name, exact: true })
     if (await selectAfterReload.count()) await selectAfterReload.click()
