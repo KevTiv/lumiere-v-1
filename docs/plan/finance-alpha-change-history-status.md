@@ -141,3 +141,22 @@ No local test runner, service or seed was started. Until the combined contract
 pin and its same-head CI succeed, this branch remains a draft and is not declared
 merge-ready. No role grant, production data change, merge or deployment is part
 of this update.
+
+
+### CI correction after main integration
+
+Main CI at `8cb12fc09` passed Frontend, typecheck, SpacetimeDB and Playwright
+compile checks. Rust failed the frozen migration-13 upgrade test because its
+exact table list omitted the history parent and sixteen partitions added by
+migration 27. The corrected list names `business_change` and
+`business_change_p00` through `business_change_p15` explicitly. It still rejects
+any other table, requires these tables to be absent before upgrade, compares
+prior migration identities/checksums/applied timestamps and checks replay.
+Migration SQL, ledger, catalog and history capture remain unchanged.
+
+The same CI run also rejected the old contract pin's AI reader operation shape.
+The existing Release contracts workflow owns publication, pinning and fresh
+regeneration verification. This correction is prepared without editing its pin;
+wait for that workflow to finish and retain its resulting branch commits before
+pushing the test correction. CI owns test, typecheck, lint, build and browser
+execution. No local runner or service was started for this correction.
