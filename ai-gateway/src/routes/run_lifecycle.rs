@@ -73,6 +73,36 @@ pub enum RunLifecycleIntent {
         right: ContinuationToken,
         idempotency_key: String,
     },
+    /// Queue a follow-up that runs after the objective fully settles. It is
+    /// authored input only and never interrupts a running turn (use `Steer`).
+    EnqueueFollowUp {
+        payload: String,
+        idempotency_key: String,
+    },
+    EditFollowUp {
+        queued_input_id: u64,
+        expected_revision: u64,
+        payload: String,
+        idempotency_key: String,
+    },
+    ReorderFollowUp {
+        queued_input_id: u64,
+        expected_revision: u64,
+        target_position: u32,
+        idempotency_key: String,
+    },
+    WithdrawFollowUp {
+        queued_input_id: u64,
+        expected_revision: u64,
+        idempotency_key: String,
+    },
+    PromoteFollowUp {
+        continuation: ContinuationToken,
+        queued_input_id: u64,
+        expected_revision: u64,
+        child_run_key: String,
+        idempotency_key: String,
+    },
 }
 
 #[derive(Debug, Serialize)]
@@ -82,6 +112,9 @@ pub struct RunLifecycleResponse {
     pub state: String,
     pub continuation: ContinuationToken,
     pub questions: Vec<LifecycleQuestion>,
+    /// Metadata only: the follow-up text and its author are never returned.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub queued_inputs: Vec<LifecycleQueuedInput>,
     pub events: Vec<LifecycleEvent>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comparison: Option<LifecycleComparison>,
@@ -116,6 +149,17 @@ pub struct LifecycleQuestion {
     pub revision: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub answer: Option<Value>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifecycleQueuedInput {
+    pub id: u64,
+    pub position: u32,
+    pub revision: u64,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub promoted_run_id: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -336,12 +380,80 @@ async fn apply_intent(
                 Some(comparison),
             )
         }
+        RunLifecycleIntent::EnqueueFollowUp {
+            payload,
+            idempotency_key,
+        } => (
+            "enqueue_ai_run_follow_up",
+            json!({"payload": payload, "idempotency_key": idempotency_key}),
+            None,
+        ),
+        RunLifecycleIntent::EditFollowUp {
+            queued_input_id,
+            expected_revision,
+            payload,
+            idempotency_key,
+        } => (
+            "edit_ai_run_follow_up",
+            json!({"queued_input_id": queued_input_id, "expected_revision": expected_revision, "payload": payload, "idempotency_key": idempotency_key}),
+            None,
+        ),
+        RunLifecycleIntent::ReorderFollowUp {
+            queued_input_id,
+            expected_revision,
+            target_position,
+            idempotency_key,
+        } => (
+            "reorder_ai_run_follow_up",
+            json!({"queued_input_id": queued_input_id, "expected_revision": expected_revision, "target_position": target_position, "idempotency_key": idempotency_key}),
+            None,
+        ),
+        RunLifecycleIntent::WithdrawFollowUp {
+            queued_input_id,
+            expected_revision,
+            idempotency_key,
+        } => (
+            "withdraw_ai_run_follow_up",
+            json!({"queued_input_id": queued_input_id, "expected_revision": expected_revision, "idempotency_key": idempotency_key}),
+            None,
+        ),
+        RunLifecycleIntent::PromoteFollowUp {
+            continuation,
+            queued_input_id,
+            expected_revision,
+            child_run_key,
+            idempotency_key,
+        } => (
+            "promote_ai_run_follow_up",
+            json!({"continuation": continuation_params(&continuation, run_id)?, "queued_input_id": queued_input_id, "expected_revision": expected_revision, "child_run_key": child_run_key, "idempotency_key": idempotency_key}),
+            None,
+        ),
     };
     let mut arguments = scope.to_vec();
     arguments.push(params);
     let arguments = Value::Array(arguments);
-    call_lifecycle_reducer(stdb, reducer, arguments).await?;
+    if is_follow_up_reducer(reducer) {
+        // The module takes the follow-up author from `ctx.sender()`, so these
+        // commands are issued with the acting user's own STDB token rather than
+        // the gateway service identity. The module independently authorizes
+        // that identity and, on promotion, the author's current grants.
+        let actor_client = stdb.with_token(actor.token.clone());
+        call_lifecycle_reducer(&actor_client, reducer, arguments).await?;
+    } else {
+        call_lifecycle_reducer(stdb, reducer, arguments).await?;
+    }
     Ok(comparison)
+}
+
+fn is_follow_up_reducer(reducer: &str) -> bool {
+    matches!(
+        reducer,
+        "enqueue_ai_run_follow_up"
+            | "edit_ai_run_follow_up"
+            | "reorder_ai_run_follow_up"
+            | "withdraw_ai_run_follow_up"
+            | "promote_ai_run_follow_up"
+    )
 }
 
 /// Dispatch a lifecycle command through the pinned generated reducer contract.
@@ -369,6 +481,12 @@ async fn call_lifecycle_reducer(
         "compare_ai_runs_checked" => {
             stdb_client::reducer_call!("compare_ai_runs_checked", arguments)
         }
+        // These reducers are not in the pinned generated reducer contract yet.
+        // `from_name` validates against that contract at call time, so until a
+        // contracts release containing them is pinned the call fails closed
+        // with an unknown-reducer error. Switch to `reducer_call!` (compile-time
+        // checked) after the pin bump and regeneration.
+        name if is_follow_up_reducer(name) => stdb_client::ReducerCall::from_name(name, arguments),
         _ => return Err(AppError::Internal("unsupported lifecycle reducer".into())),
     };
     stdb.call_reducer(call)
@@ -486,6 +604,11 @@ fn enforce_lifecycle_bounds(
         response.truncated = true;
     }
     remaining = remaining.saturating_sub(response.questions.len());
+    if response.queued_inputs.len() > remaining {
+        response.queued_inputs.truncate(remaining);
+        response.truncated = true;
+    }
+    remaining = remaining.saturating_sub(response.queued_inputs.len());
     if response.events.len() > remaining {
         response.events.truncate(remaining);
         response.truncated = true;
@@ -540,7 +663,10 @@ fn enforce_lifecycle_bounds(
             response.truncated = true;
             continue;
         }
-        if response.events.pop().is_some() || response.questions.pop().is_some() {
+        if response.events.pop().is_some()
+            || response.queued_inputs.pop().is_some()
+            || response.questions.pop().is_some()
+        {
             response.truncated = true;
             continue;
         }
@@ -572,6 +698,15 @@ async fn load_response(
         .ok_or_else(|| AppError::NotFound("run lifecycle not found".into()))?;
     let questions = stdb.query_sql(&format!("SELECT * FROM ai_run_question WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
+    let queued_inputs = stdb
+        .query_sql(&queued_inputs_sql(
+            organization_id,
+            company_id,
+            run_id,
+            row_limit,
+        ))
+        .await
+        .map_err(|error| AppError::Internal(error.to_string()))?;
     let events = stdb.query_sql(&format!("SELECT * FROM ai_run_lifecycle_event WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY id ASC LIMIT {row_limit}"))
         .await.map_err(|error| AppError::Internal(error.to_string()))?;
     // The park table exists only in modules that include the budget-park
@@ -592,6 +727,12 @@ async fn load_response(
             .into_iter()
             .map(question_from_row)
             .collect::<AppResult<_>>()?,
+        queued_inputs: sorted_queue(
+            queued_inputs
+                .into_iter()
+                .map(queued_input_from_row)
+                .collect::<AppResult<Vec<_>>>()?,
+        ),
         events: events
             .into_iter()
             .map(event_from_row)
@@ -640,6 +781,40 @@ fn question_from_row(row: Value) -> AppResult<LifecycleQuestion> {
     })
 }
 
+/// Explicit column list: the follow-up payload and author identity are never
+/// selected, so they cannot reach the gateway process, logs or a response.
+fn queued_inputs_sql(
+    organization_id: u64,
+    company_id: u64,
+    run_id: u64,
+    row_limit: usize,
+) -> String {
+    format!("SELECT queued_input_id, position, revision, status, promoted_run_id FROM ai_run_queued_input WHERE organization_id = {organization_id} AND company_id = {company_id} AND run_id = {run_id} ORDER BY queued_input_id ASC LIMIT {row_limit}")
+}
+
+fn queued_input_from_row(row: Value) -> AppResult<LifecycleQueuedInput> {
+    Ok(LifecycleQueuedInput {
+        id: number(&row, "queuedInputId")?,
+        position: number(&row, "position")? as u32,
+        revision: number(&row, "revision")?,
+        status: text(&row, "status")?,
+        promoted_run_id: optional_number(&row, "promotedRunId"),
+    })
+}
+
+/// Queued items first in promotion order, then settled items by id.
+fn sorted_queue(mut items: Vec<LifecycleQueuedInput>) -> Vec<LifecycleQueuedInput> {
+    items.sort_by_key(|item| (item.status != "queued", item.position, item.id));
+    items
+}
+
+fn optional_number(row: &Value, key: &str) -> Option<u64> {
+    let value = row.get(key)?;
+    value
+        .as_u64()
+        .or_else(|| value.get("some").and_then(Value::as_u64))
+}
+
 fn event_from_row(row: Value) -> AppResult<LifecycleEvent> {
     Ok(LifecycleEvent {
         id: number(&row, "id")?,
@@ -676,6 +851,7 @@ fn lifecycle_error(message: String) -> AppError {
         AppError::BadRequest(message)
     } else if message.contains("does not belong")
         || message.contains("authority")
+        || message.contains("author")
         || message.contains("respondent")
     {
         AppError::Forbidden(message)
@@ -792,6 +968,7 @@ mod tests {
                     created_at: "now".into(),
                 })
                 .collect(),
+            queued_inputs: vec![],
             comparison: None,
             park: None,
             truncated: false,
@@ -810,6 +987,142 @@ mod tests {
         .expect("bounded lifecycle");
         assert_eq!(bounded.questions.len(), 2);
         assert!(bounded.events.is_empty());
+        assert!(bounded.truncated);
+    }
+
+    #[test]
+    fn follow_up_read_never_selects_payload_or_author() {
+        let sql = queued_inputs_sql(7, 9, 42, 10);
+        assert!(sql.contains("FROM ai_run_queued_input"));
+        assert!(!sql.contains('*'));
+        assert!(!sql.contains("payload"));
+        assert!(!sql.contains("author"));
+    }
+
+    #[test]
+    fn follow_up_projection_redacts_payload_and_author() {
+        let item = queued_input_from_row(json!({
+            "queuedInputId": 3, "position": 2, "revision": 5, "status": "queued",
+            "promotedRunId": null, "payload": "secret follow-up text", "author": "private"
+        }))
+        .expect("row");
+        let encoded = serde_json::to_string(&item).unwrap();
+        assert!(!encoded.contains("secret follow-up text"));
+        assert!(!encoded.contains("private"));
+        assert!(!encoded.contains("payload"));
+        assert!(!encoded.contains("author"));
+        assert_eq!(item.id, 3);
+        let promoted = queued_input_from_row(json!({
+            "queuedInputId": 4, "position": 1, "revision": 2, "status": "promoted",
+            "promotedRunId": {"some": 77}
+        }))
+        .expect("row");
+        assert_eq!(promoted.promoted_run_id, Some(77));
+    }
+
+    #[test]
+    fn follow_up_queue_is_listed_in_promotion_order() {
+        let item = |id: u64, position: u32, status: &str| LifecycleQueuedInput {
+            id,
+            position,
+            revision: 1,
+            status: status.into(),
+            promoted_run_id: None,
+        };
+        let sorted = sorted_queue(vec![
+            item(1, 1, "promoted"),
+            item(2, 3, "queued"),
+            item(3, 2, "queued"),
+            item(4, 1, "withdrawn"),
+        ]);
+        let ids: Vec<u64> = sorted.iter().map(|item| item.id).collect();
+        assert_eq!(ids, vec![3, 2, 1, 4]);
+    }
+
+    #[test]
+    fn follow_up_intents_cannot_carry_an_author_or_authority() {
+        let ok: RunLifecycleIntent = serde_json::from_value(json!({
+            "kind": "enqueue_follow_up", "payload": "later", "idempotency_key": "k1"
+        }))
+        .expect("enqueue");
+        assert!(matches!(ok, RunLifecycleIntent::EnqueueFollowUp { .. }));
+        for forged in ["author", "author_identity", "status", "position"] {
+            let result = serde_json::from_value::<RunLifecycleIntent>(json!({
+                "kind": "enqueue_follow_up", "payload": "later", "idempotency_key": "k1",
+                forged: "x"
+            }));
+            assert!(result.is_err(), "{forged} must be rejected");
+        }
+        let promote = serde_json::from_value::<RunLifecycleIntent>(json!({
+            "kind": "promote_follow_up", "queued_input_id": 1, "expected_revision": 1,
+            "child_run_key": "c", "idempotency_key": "k2",
+            "continuation": {"runId": 8, "checkpointHash": "a".repeat(64), "cursor": 1, "concurrencyVersion": 1}
+        }));
+        assert!(matches!(
+            promote,
+            Ok(RunLifecycleIntent::PromoteFollowUp { .. })
+        ));
+    }
+
+    #[test]
+    fn follow_up_commands_use_the_acting_users_token_but_steer_does_not() {
+        for reducer in [
+            "enqueue_ai_run_follow_up",
+            "edit_ai_run_follow_up",
+            "reorder_ai_run_follow_up",
+            "withdraw_ai_run_follow_up",
+            "promote_ai_run_follow_up",
+        ] {
+            assert!(is_follow_up_reducer(reducer), "{reducer}");
+        }
+        for reducer in ["steer_ai_run", "interrupt_ai_run", "resume_ai_run_checked"] {
+            assert!(!is_follow_up_reducer(reducer), "{reducer}");
+        }
+    }
+
+    #[test]
+    fn follow_up_authority_denials_map_to_forbidden() {
+        for message in [
+            "only the author can change a queued follow-up",
+            "author does not hold the ai.run.lifecycle grant",
+            "author authority lapsed; the follow-up cannot be promoted",
+        ] {
+            assert!(matches!(
+                lifecycle_error(message.into()),
+                AppError::Forbidden(_)
+            ));
+        }
+        assert!(matches!(
+            lifecycle_error(
+                "run is only agent_settled; follow-ups promote after it is fully settled".into()
+            ),
+            AppError::BadRequest(_)
+        ));
+    }
+
+    #[test]
+    fn lifecycle_bounds_cover_queued_inputs() {
+        let mut response = lifecycle_response();
+        response.questions.clear();
+        response.events.clear();
+        response.queued_inputs = (1..=4)
+            .map(|id| LifecycleQueuedInput {
+                id,
+                position: id as u32,
+                revision: 1,
+                status: "queued".into(),
+                promoted_run_id: None,
+            })
+            .collect();
+        let bounded = enforce_lifecycle_bounds(
+            response,
+            CapabilityGrantBounds {
+                max_rows: 3,
+                max_bytes: 1_000_000,
+            },
+        )
+        .expect("bounded");
+        assert_eq!(bounded.queued_inputs.len(), 2);
         assert!(bounded.truncated);
     }
 

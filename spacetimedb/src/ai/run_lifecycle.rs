@@ -1072,7 +1072,7 @@ pub(crate) fn append_event(
     });
 }
 
-fn ensure_new_event(ctx: &ReducerContext, key: &str) -> Result<(), String> {
+pub(super) fn ensure_new_event(ctx: &ReducerContext, key: &str) -> Result<(), String> {
     validate_key(
         "idempotency_key",
         key.rsplit(':').next().unwrap_or_default(),
@@ -1147,7 +1147,7 @@ fn validate_optional_json(value: &Option<String>) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_hash(value: &str) -> Result<(), String> {
+pub(super) fn validate_hash(value: &str) -> Result<(), String> {
     if !is_sha256_hex(value) {
         return Err("checkpoint or request hash must be a lowercase SHA-256 hex digest".into());
     }

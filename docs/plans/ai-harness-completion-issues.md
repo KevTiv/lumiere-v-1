@@ -939,6 +939,34 @@ continuation, and re-authorizes the author's current grants. Acceptance: queued
 items survive restart, promote exactly once, never interrupt a running turn, and
 never inherit a previous turn's approval.
 
+**Follow-up queue status (2026-10-27) — source slice implemented; not released,
+not E2E-verified.** The module now has a private durable `ai_run_queued_input`
+record and the reducers `enqueue_ai_run_follow_up`, `edit_ai_run_follow_up`,
+`reorder_ai_run_follow_up`, `withdraw_ai_run_follow_up` and
+`promote_ai_run_follow_up` (`spacetimedb/src/ai/run_followup_queue.rs`). The
+author is `ctx.sender()`; idempotency is payload- and author-bound through the
+lifecycle event table; edit/reorder/withdraw are author-only with revision
+checks. Queue maintenance never writes the run row or the lifecycle state, so a
+queued item cannot interrupt a turn. Promotion is allowed only for the queue head
+of a run whose status is `completed` (not `agent_settled`) with no open required
+question and no unreconciled effect, and only while the author's current
+`ai.run.lifecycle` grant is still present (resolved in the module from the
+author's effective roles, mirroring the api-server). It creates a child
+continuation in the existing `fork_pending_authority` state, so scope, budget and
+approval are reacquired and nothing is inherited. No run status or lifecycle
+state was added. The gateway lifecycle route gained five intents (issued with the
+acting user's own token) and a redacted `queuedInputs` projection that never
+selects the payload or author. Verified by unit tests only (pure decision logic
+plus a structural no-write guard); the full `spacetimedb` crate could not be
+compiled in the build sandbox (out of memory), so the module was type-checked
+and tested in an isolated crate containing the real files. Still open: the
+contracts release containing the new table/reducers, the pin bump and
+regeneration (reducer contract, reducer names, storage policy, reconstruction
+apply, PostgreSQL ledger, operation ids/history), switching the gateway calls
+from `ReducerCall::from_name` to `reducer_call!`, the executor consuming the
+promoted payload when the child run starts, the BFF/UI surface, the `superseded`
+status (defined, not yet produced), and live restart/E2E for fixtures 10 and 11.
+
 ---
 
 ### AIH-21 — Structured diagnostics and bounded repair
