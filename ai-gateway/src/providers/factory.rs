@@ -6,6 +6,7 @@ use crate::config::Config;
 
 use super::{
     embed::{EmbedProvider, GeminiEmbed, MistralEmbed, OllamaEmbed},
+    instance::ProviderRegistry,
     llm::{LlmClient, LlmCompletion},
     parser::{DocumentParser, PlainTextParser, UnstructuredParser},
     vision::{MistralVision, OllamaVision, VisionProvider},
@@ -20,6 +21,8 @@ pub struct Providers {
     pub parser: Arc<dyn DocumentParser>,
     pub llm: Arc<dyn LlmCompletion>,
     pub web_search: Arc<dyn WebSearchProvider>,
+    /// Provider instances (one platform default per configured LLM driver).
+    pub instances: Arc<ProviderRegistry>,
 }
 
 /// Explicitly unavailable capabilities never dispatch or return synthetic data.
@@ -136,5 +139,6 @@ pub fn build(config: &Config, http: reqwest::Client) -> Result<Providers> {
         parser,
         llm,
         web_search,
+        instances: Arc::new(ProviderRegistry::from_config(config)),
     })
 }
