@@ -1,12 +1,12 @@
 # Alpha UX sweep: execution record
 
-Date: 2026-10-27. Status: IMPLEMENTED; LOCAL CHECKS PASSED. Hosted CI, human task review, and deployment remain separate.
+Date: 2026-10-27. Status: P01-P04 LOCAL CHECKS RECORDED; P05-P08 CODE IMPLEMENTED; CI PENDING. The user directed CI to test the extension. Hosted CI, human task review, and deployment remain separate.
 
 Owner plan: [Alpha UX sweep](../plans/alpha-paid-user-ux-sweep.md).
 
 ## Scope and baseline
 
-The user authorized Wave 0, modal/list fixes, and invoice/expense forms (P01-P04). P05-P08 remain later work. This run has not deployed production.
+The user first authorized Wave 0, modal/list fixes, and invoice/expense forms (P01-P04). They then authorized the remaining code sweep (P05-P08), with test execution assigned to CI. This run has not deployed production.
 
 Planning source: `fe4f9c6c62d4f1fdd9a5e07d86ca3ab803bdd5d8`, existing branch `feat/settings-sidebar`. Other chats changed that checkout during this run. The UX changes were copied, integrated, and verified in a dedicated managed checkout on `codex/alpha-ux-sweep`, based on deployed main `5ada7d0b268bf9fb1f2f8f5c91f58841a2ac5e46`. Current-main shared Select controls and the retired notice-renderer removal are retained. An exact backup preceded removal of only this run's frontend edits from the original checkout; unrelated work is preserved.
 
@@ -64,9 +64,9 @@ The inventory identifies active source groups. Role-specific visibility and pers
 - P04 validates company/employee/price-list/currency and form parameters before receipt registration or dispatch. Missing prerequisites throw visible errors instead of resolving without an effect. P04.1 reuses the capture outbox/sync owner for generic form recovery, with immutable complete payload, receipt/request identities and scope checkpoints. Unknown delivery permits readback only; durable dismissal keeps recovery state. Detailed recovery guidance scrolls with the fields, while status actions stay compact.
 - Real saved-result checks exposed missing API projection fields. The read owner now supplies existing document-line classification/amount fields and product expense eligibility; explicit field masks remain in force. The UI still fails closed when those fields are masked or missing.
 
-## Verification on the current-main candidate
+## Prior P01-P04 verification at 4755fecaf39a83aa2a23add6efa19050119ca574
 
-These are separate suites, not additive totals. First failures remain in ignored `.tmp/alpha-ux-run` evidence and `/tmp/alpha-ux-*` logs. The original checkout baseline had 1,163 passing UI tests and three 5-second invoice timeouts; the unchanged focused files passed all 20 cases. That baseline is separate from the final pass below.
+These are historical P01-P04 suites, not passes for the later extension or additive totals. First failures remain in ignored `.tmp/alpha-ux-run` evidence and `/tmp/alpha-ux-*` logs. The original checkout baseline had 1,163 passing UI tests and three 5-second invoice timeouts; the unchanged focused files passed all 20 cases. That baseline is separate from the final pass below.
 
 | Check | Result and limit |
 | --- | --- |
@@ -123,3 +123,53 @@ These images come from the final authenticated local saved-task tests:
 - Same-head hosted CI and a full matching-module E2E run remain required before release acceptance.
 - Non-author human task review, complete theme/text-enlargement coverage and a real mobile keyboard check remain separate. This run does not establish willingness to pay or full domain certification.
 - P05-P08 remain later packets. This run did not deploy production. Railway's final read still reports successful web `5ada7d0b2`, matching the fresh Dia inspection.
+
+## P05-P08 extension: code coverage and CI handoff
+
+The user authorized one remaining code sweep and assigned test execution to CI. Three workers owned separate domain files. The coordinator owned shared validation, specialist Accounting/Expenses corrections, locale integration and the CI test list. This extension changes source and regression test definitions only. No local test suite, typecheck, lint runner, production build, browser stack or runtime seed was executed for these changes. Previous passes above apply to the earlier P01-P04 revision only.
+
+| Packet / surface | Source change or disposition |
+| --- | --- |
+| P05 Sales | Task sections place customer and order context first, explain adding lines after header save, separate delivery/payment/reference options, retain required price list and warehouse, and show price-list currency. Relation options distinguish loading, access denial, source failure and an empty list. Invalid create/line parameters raise an inline error instead of resolving without an effect. |
+| P05 Purchasing | Vendor and order context first; lines, receiving and invoicing retain their existing workflow owners. Required ledger choices remain visible in invoice/bill generation. Currency, product, unit, tax, line and lot identities use exact U64 parsing. Invalid values keep the form open. |
+| P06 CRM | Contact identity, qualification/value and follow-up have named sections. Pipeline stages keep exact IDs and required selection, with setup guidance. Failed quick-form source reads retain entries; denied access retains the existing close gate. Invalid base creates raise useful errors. |
+| P06 Subscriptions | Order/plan first, billing next, reference/notes separate. Draft/Healthy are read-only starting values already fixed by the create mapper. Saves, imports and recognition wait for their existing mutation result. The mapper receives operating company ID, rather than organization ID, and checks the selected sales order company. IDs remain exact. |
+| P07 Reports | Report/period, accounting basis, comparison and display have separate sections. Period-launched type/dates/basis stay locked and are reapplied by the existing submit owner. Schedule/template and auxiliary source states are explicit; action labels describe generation, schedule saving or recording a completed run. |
+| P08 Approvals / My work | Inbox loading/failure is distinct from zero tasks; source retry is available. Decision/comment failures remain visible and retain entries. Task create/edit validators raise inline errors; the assignee dialog has one scrolling field body and reachable actions. Existing task claims, revisions and permissions remain authoritative. |
+| P08 Calendar / Messages | Calendar create/edit/delete wait for results; invalid or reversed ranges do not report success. Equal-time/all-day semantics match the current reducer. Messages let users search named accounting records and contacts from existing authorized queries. Advanced custom references remain explicit text inputs with exact U64 parsing; stale or out-of-scope named selections cannot fall back to hidden values. Missing bodies/record references raise useful errors. Record types and effects remain owned by existing handlers. |
+| P08 Documents / Settings | Invalid article, category and folder creates fail visibly. Domain form descriptions/labels explain record references and company setup rather than database column names. Existing document action gates and member permissions remain in place. |
+| P08 Journal / Notebook | Narrow panel containment, truthful session/browser storage feedback and retained save failures. These remain local utilities; no account persistence or live code runtime was added. |
+| P08 Assistant / Overview links | Assistant transport failure restores the failed message only when there is no newer unsent draft, and shows explicit failure feedback. Existing mobile viewport, action review and record links remain in use. No new assistant operation, navigation store or module admission. |
+| Specialist Accounting | Every existing nullable parameter branch in the generic create handler now rejects invalid entries before mutation rather than closing as saved. Existing accounting validators, operations and required inputs remain authoritative. |
+| Specialist Expenses | Submit/approve/refuse confirmations await replies, prevent user dismissal while pending, retain refusal reason on failure and name their effect. Existing denied/failed-source close gates remain; eventual command failures also appear outside the dialog if a source gate closes it. Timeline failure is distinct from no requests. Posting separates required ledger inputs from taxes/cards/advances; reimbursement labels describe its effect. Required lookup loading, denial and failure are distinct and block submission; retry reuses the existing queries. |
+| Shared correction | Failed validation focuses the first invalid rendered field and scrolls only the existing form body in dialogs. Entries and native files keep their existing owner. No second form renderer or UI theme was introduced. |
+
+### Extended field decisions
+
+All unchanged fields keep their original IDs, payload names, required constraints, defaults, conditional rules and role visibility. Runtime form configuration still owns permitted labels/visibility/custom required fields; the static definitions retain operation field names and task section order.
+
+| Changed field group | Source / required rule / payload treatment |
+| --- | --- |
+| Sales customer, price list, warehouse; Purchasing vendor/price list | Explicit authorized relation choices. Original required rules retained. Currency is read from the selected price list; no first-option default is added. Delivery/invoicing details retain original optionality and keys. |
+| Commercial product/unit/lot/tax/line references | Existing lookup sources and operation owners. Exact U64 values replace lossy Number conversions. Absent optional tax edits remain absent; explicit empty lists still clear. Invalid supplied identities fail rather than silently dropping entries. |
+| CRM identity/state/value/stage | Explicit business inputs, with existing qualified-lead default. Stage is a named required relation where it was required before. Setup hints do not grant setup permission or hide failed sources. |
+| Subscription sales order/plan/start | Original required choices; selected order must belong to the operating company. Existing reducer/mapping owns customer contacts, currency, price list and fixed starting state. Plan currency still comes from its selected price list; journal/product remain required. |
+| Report type/period/basis/comparison/display and schedule fields | Existing definitions and payload owner; required/optional rules preserved. Locked period values are not editable or inferred. Grouping and labels do not change financial meaning. |
+| Expense posting date/journal/accounts; reimbursement date/accounts/amount | Existing query choices and mappers. Required accounts stay visible. Optional adjustment accounts remain optional. Blank reimbursement amount retains the full-amount behavior; zero is not silently substituted for blank. |
+| Supporting task/event/message/document fields | Original scope and parameter owners retained. Named message references map to the existing canonical model/resId keys; org/company ownership and exact IDs are checked against current choices. Advanced references retain the existing explicit model/ID path. Invalid input raises an error before dispatch. Calendar range checks mirror the reducer's strict-less-than rule. Notebook/Journal copy identifies the actual local storage boundary. |
+
+### Explicit capability dependencies
+
+CRM lead/opportunity/contact and Sales/Purchasing header creates previously tried to persist custom-field EAV values by matching a newly queried row by name, partner or reference. Native reducers store ordinary metadata but do not atomically persist the EAV values. Sales/CRM create hooks return no exact created-record identity. Purchasing returns an exact identity, but its current create owner clears the pending checkpoint before a separate EAV write could fail. A second form submit after that partial failure can create another header.
+
+These create paths now fail **before dispatch** when actual top-level `custom:*` entries require that unsupported follow-up. Ordinary metadata and base creates are retained. The form explains the limit and retains entries. No newest-row inference, separate retry owner, contract publication or fake success is used. Enabling this capability requires an atomic custom-field write in the existing create owner, or a canonical durable continuation in that owner. It is an explicit excluded capability, not a passed save path.
+
+Verified company defaults are still required before removing journals, accounts, expense price lists, sales warehouses or other required setup choices. Journal account persistence, Notebook account sync and a live code execution backend remain separate capabilities. Human task review, real-device keyboard checks, themes/text enlargement and deployed smoke proof remain release work.
+
+### CI coverage
+
+The existing frontend workflow runs UI discovery, web `test:unit`, accounting models and TypeScript gates. New/extended regression source covers retained validation focus, commercial field/required-rule invariants, exact purchasing U64s and tax omission/clearing, unsupported custom-field create admission, subscription company/currency provenance, locked report inputs, and Calendar date ranges, Notebook storage failure and Assistant draft retention. The explicit web unit list includes the new commercial and Calendar files, the existing subscription parameter file, the CRM admission file, and the named-message-record selection file. CI results for this extension are pending; no local pass is claimed.
+
+Independent source review of the extension found and corrected unsupported Accounting/commercial action fallthrough and hidden expense errors after source admission closes a pending dialog. P05 and P06/P07 workers also reviewed each other's boundaries. Source review is not an executed test pass. The branch remains a draft release candidate.
+
+Remote integration: the first push was rejected because automation had added `6d3b4cddc0350bc84665b0cbef823dc31f9f98cc` (`chore(contracts): publish and pin v0.3.151`) to the same branch. The UX commit was rebased on that commit without conflicts or a force push. Its package archives, checksums, compatibility manifest and presentation-dictionary pin are preserved. This sweep did not invoke publication. CI must validate the combined revision at 0.3.151; the earlier local 0.3.149 / compatible seeded-module evidence is not a pass for that revision. Ignored local vendor materialization was not used for a new test run.

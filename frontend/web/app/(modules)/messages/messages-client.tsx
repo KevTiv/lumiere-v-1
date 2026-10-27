@@ -33,6 +33,7 @@ import { useAccountMoves } from "@lumiere/query-hooks/hooks/accounting"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { mailMessageRowsToSelectOptions } from "@/lib/form-lookup"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
+import { messageRecordChoices, resolveMessageRecordChoice } from "./message-record-choice"
 
 interface MessagesClientProps {
   initialMessages?: MailMessage[]
@@ -99,9 +100,13 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
   const messages = messagesRead.rows
   const followersRead = moduleCollection(useMailFollowers(orgId, initialFollowers))
   const followers = followersRead.rows
-  const { data: contacts = [] } = useContacts(orgId)
+  const contactsQuery = useContacts(orgId)
+  const { data: contacts = [] } = contactsQuery
   const { data: users = [] } = useUsers(orgId)
-  const { data: accountMoves = [] } = useAccountMoves(orgId)
+  const accountMovesQuery = useAccountMoves(orgId)
+  const { data: accountMoves = [] } = accountMovesQuery
+  const contactChoicesRead = moduleCollection(contactsQuery)
+  const moveChoicesRead = moduleCollection(accountMovesQuery)
   const postMessage = usePostMessage(orgId)
   const subscribeToRecord = useSubscribeToRecord(orgId)
   const unsubscribeFromRecord = useUnsubscribeFromRecord(orgId)
@@ -111,12 +116,33 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
     [messages],
   )
 
+  const recordChoices = useMemo(() => messageRecordChoices(
+    moveChoicesRead.rows as unknown as Record<string, unknown>[],
+    contactChoicesRead.rows as unknown as Record<string, unknown>[],
+    { organizationId, companyId: activeCompanyId },
+    {
+      invoice: t("messages.forms.recordChoice.invoice", { defaultValue: "Invoice" }),
+      bill: t("messages.forms.recordChoice.bill", { defaultValue: "Vendor bill" }),
+      creditNote: t("messages.forms.recordChoice.creditNote", { defaultValue: "Credit note" }),
+      vendorCredit: t("messages.forms.recordChoice.vendorCredit", { defaultValue: "Vendor credit" }),
+      journalEntry: t("messages.forms.recordChoice.journalEntry", { defaultValue: "Journal entry" }),
+      accountingDocument: t("messages.forms.recordChoice.accountingDocument", { defaultValue: "Accounting document" }),
+      contact: t("messages.forms.recordChoice.contact", { defaultValue: "Contact" }),
+    },
+  ), [moveChoicesRead.rows, contactChoicesRead.rows, organizationId, activeCompanyId, t])
+  const recordChoicesLoading = contactChoicesRead.state.status === "loading" || moveChoicesRead.state.status === "loading"
+  const recordHint = recordChoicesLoading
+    ? t("messages.forms.recordChoice.loading", { defaultValue: "Loading available records. Your message can stay open while the choices load." })
+    : !canUseModuleData(contactChoicesRead.state) || !canUseModuleData(moveChoicesRead.state)
+      ? t("messages.forms.recordChoice.unavailable", { defaultValue: "Some record choices could not be loaded. Refresh the page to reload the available records." })
+      : undefined
+
   const mailMessageFormConfig = useMemo(
     () =>
-      mergeSelectOptionsForFields(newMailMessageForm(t), {
+      mergeSelectOptionsForFields(newMailMessageForm(t, recordChoices, recordHint), {
         parentId: parentMessageOptions,
       }),
-    [t, parentMessageOptions],
+    [t, parentMessageOptions, recordChoices, recordHint],
   )
 
   const myNotifications = useMemo(() => {
@@ -206,6 +232,7 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
           return {
             ...tab,
             ...withAuthor,
+            ...(tab.id === "messages" ? { createForm: mailMessageFormConfig } : {}),
             recordSheet: {
               titleKey: "body",
               openHref: messageRecordHref,
@@ -277,14 +304,12 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
     if (!actionUsable(action)) throw new Error("Required data is unavailable. Refresh and try again.")
     if (action === "createMessage") {
       const body = String(formData.body ?? "").trim()
-      if (!body) return
-      const resRaw = formData.resId
-      if (resRaw === "" || resRaw == null) return
-      const resNum = Number(resRaw)
-      if (!Number.isFinite(resNum) || resNum <= 0) return
+      if (!body) throw new Error(t("messages.forms.errors.bodyRequired", { defaultValue: "Write a message before saving. Your entries are retained." }))
+      const reference = resolveMessageRecordChoice(formData, recordChoices)
+      if (!reference) throw new Error(t("messages.forms.errors.recordChoiceRequired", { defaultValue: "Choose an available record, or check the advanced custom reference. Your entries are retained." }))
       await postMessage.mutateAsync({
-        model: formData.model ? String(formData.model) : "mail.message",
-        resId: BigInt(Math.floor(resNum)),
+        model: reference.model,
+        resId: reference.resId,
         body,
         messageType: formData.messageType ? String(formData.messageType) : "comment",
         subtype: formData.subtype ? String(formData.subtype) : null,
@@ -296,13 +321,11 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
 
     if (action === "subscribeToRecord") {
       const resModel = String(formData.resModel ?? "").trim()
-      const resRaw = formData.resId
-      if (!resModel || resRaw === "" || resRaw == null) return
-      const resNum = Number(resRaw)
-      if (!Number.isFinite(resNum) || resNum <= 0) return
+      const resId = optionalBigIntU64(formData.resId)
+      if (!resModel || !resId) throw new Error(t("messages.forms.errors.recordTypeRequired", { defaultValue: "Enter a record type and an existing record number. Your entries are retained." }))
       await subscribeToRecord.mutateAsync({
         resModel,
-        resId: BigInt(Math.floor(resNum)),
+        resId,
         subtypes: csvList(formData.subtypes),
       })
       return
@@ -310,15 +333,15 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
 
     if (action === "unsubscribeFromRecord") {
       const resModel = String(formData.resModel ?? "").trim()
-      const resRaw = formData.resId
-      if (!resModel || resRaw === "" || resRaw == null) return
-      const resNum = Number(resRaw)
-      if (!Number.isFinite(resNum) || resNum <= 0) return
+      const resId = optionalBigIntU64(formData.resId)
+      if (!resModel || !resId) throw new Error(t("messages.forms.errors.recordTypeRequired", { defaultValue: "Enter a record type and an existing record number. Your entries are retained." }))
       await unsubscribeFromRecord.mutateAsync({
         resModel,
-        resId: BigInt(Math.floor(resNum)),
+        resId,
       })
+      return
     }
+    throw new Error(t("messages.forms.errors.unsupportedAction", { defaultValue: "This message action is unavailable. Close and reopen the form before trying again." }))
   }
 
   const isFormMutationPending =
@@ -336,7 +359,7 @@ function MessagesClientLoaded({ initialMessages, initialFollowers, organizationI
       <FormModal
         open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? mailMessageFormConfig}
+        config={quickActionForm?.action === "createMessage" ? mailMessageFormConfig : quickActionForm?.form ?? mailMessageFormConfig}
         isPending={isFormMutationPending}
         onSubmit={async (formData) => {
           if (quickActionForm) {

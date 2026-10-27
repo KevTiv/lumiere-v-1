@@ -4,6 +4,8 @@
 
 import type {
   AddAccountMoveLineParams,
+  AddPurchaseOrderLineParams,
+  UpdatePurchaseOrderLineParams,
   AddLandedCostLineParams,
   CreateBillFromPurchaseOrderParams,
   CreateLandedCostParams,
@@ -133,11 +135,12 @@ export function toCreatePurchaseOrderParams(
 ): CreatePurchaseOrderParams | null {
   const partnerId = nullableBigIntU64(formData.partnerId)
   const pricelistId = nullableBigIntU64(formData.pricelistId)
-  if (partnerId == null || pricelistId == null) return null
+  if (partnerId == null || partnerId <= 0n || pricelistId == null || pricelistId <= 0n) return null
 
   const pl = pricelists.find((p) => String(p.id) === String(pricelistId))
   if (pl == null || pl.currencyId == null || pl.currencyId === undefined) return null
-  const currencyId = BigInt(Number(pl.currencyId))
+  const currencyId = nullableBigIntU64(pl.currencyId)
+  if (currencyId == null || currencyId <= 0n) return null
 
   const datePlannedRaw = formData.datePlanned
   const hasDatePlanned = datePlannedRaw != null && String(datePlannedRaw).trim() !== ""
@@ -216,19 +219,19 @@ export function toCreatePurchaseRequisitionParams(
 
 export function toAddPurchaseOrderLineParams(
   formData: Record<string, unknown>,
-): Record<string, unknown> | null {
-  const orderId = formData.orderId
-  const productId = formData.productId
-  const uomId = formData.uomId
+): Partial<AddPurchaseOrderLineParams> | null {
+  const orderId = nullableBigIntU64(formData.orderId)
+  const productId = nullableBigIntU64(formData.productId)
+  const uomId = nullableBigIntU64(formData.uomId)
+  const lotRaw = formData.lotId
+  const lotId = lotRaw == null || String(lotRaw).trim() === "" ? undefined : nullableBigIntU64(lotRaw)
   const quantity = Number(formData.quantity)
   const priceUnit = Number(formData.priceUnit)
   if (
-    orderId === "" ||
-    orderId == null ||
-    productId === "" ||
-    productId == null ||
-    uomId === "" ||
-    uomId == null ||
+    orderId == null || orderId <= 0n ||
+    productId == null || productId <= 0n ||
+    uomId == null || uomId <= 0n ||
+    lotId === null || (lotId !== undefined && lotId <= 0n) ||
     !Number.isFinite(quantity) ||
     quantity <= 0 ||
     !Number.isFinite(priceUnit) ||
@@ -237,36 +240,33 @@ export function toAddPurchaseOrderLineParams(
     return null
   }
   return {
-    productId: Number(productId),
+    productId,
     quantity,
-    uomId: Number(uomId),
+    uomId,
     priceUnit,
-    lotId:
-      formData.lotId == null || String(formData.lotId).trim() === ""
-        ? undefined
-        : Number(formData.lotId),
+    lotId,
   }
 }
 
 export function toReceivePoLineArgs(formData: Record<string, unknown>): {
-  lineId: number
+  lineId: bigint
   qty: number
-  lotId?: number
+  lotId?: bigint
 } | null {
-  const lineId = Number(formData.lineId)
+  const lineId = nullableBigIntU64(formData.lineId)
   const qty = Number(formData.qty)
-  if (!Number.isFinite(lineId) || lineId <= 0 || !Number.isFinite(qty) || qty <= 0) return null
+  if (lineId == null || lineId <= 0n || !Number.isFinite(qty) || qty <= 0) return null
   const lotRaw = formData.lotId
   const lotId =
     lotRaw == null || String(lotRaw).trim() === ""
       ? undefined
-      : Number(lotRaw)
-  if (lotId !== undefined && (!Number.isFinite(lotId) || lotId <= 0)) return null
+      : nullableBigIntU64(lotRaw)
+  if (lotId === null || (lotId !== undefined && lotId <= 0n)) return null
   return lotId === undefined ? { lineId, qty } : { lineId, qty, lotId }
 }
 
 export function toInvoicePoLineArgs(formData: Record<string, unknown>): {
-  lineId: number
+  lineId: bigint
   qty: number
 } | null {
   const args = toReceivePoLineArgs(formData)
@@ -277,9 +277,9 @@ export function toInvoicePoLineArgs(formData: Record<string, unknown>): {
 /** Params for `update_purchase_order_line` (optional fields — only sent when set). */
 export function toUpdatePurchaseOrderLineParams(
   formData: Record<string, unknown>,
-): Record<string, unknown> | null {
-  const lineId = formData.lineId
-  if (lineId === "" || lineId == null) return null
+): Partial<UpdatePurchaseOrderLineParams> | null {
+  const lineId = nullableBigIntU64(formData.lineId)
+  if (lineId == null || lineId <= 0n) return null
 
   const quantity = Number(formData.quantity)
   const priceUnit = Number(formData.priceUnit)
@@ -288,10 +288,11 @@ export function toUpdatePurchaseOrderLineParams(
 
   const productId = formData.productId
   const uomId = formData.uomId
-  const productIdValue = productId !== "" && productId != null ? Number(productId) : undefined
-  const uomIdValue = uomId !== "" && uomId != null ? Number(uomId) : undefined
+  const productIdValue = productId !== "" && productId != null ? nullableBigIntU64(productId) : undefined
+  const uomIdValue = uomId !== "" && uomId != null ? nullableBigIntU64(uomId) : undefined
 
-  const params: Record<string, unknown> = {
+  if (productIdValue === null || uomIdValue === null || (productIdValue !== undefined && productIdValue <= 0n) || (uomIdValue !== undefined && uomIdValue <= 0n)) return null
+  const params: Partial<UpdatePurchaseOrderLineParams> = {
     quantity,
     priceUnit,
     productId: productIdValue,
@@ -301,15 +302,10 @@ export function toUpdatePurchaseOrderLineParams(
   // Only send taxIds when the caller provided them — never force [] (wipes PO line tax).
   if (formData.taxIds != null) {
     const raw = formData.taxIds
-    const taxIds = Array.isArray(raw)
-      ? raw.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)
-      : String(raw)
-          .split(/[,\s]+/)
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .map((s) => Number(s))
-          .filter((n) => Number.isFinite(n) && n > 0)
-    params.taxIds = taxIds
+    const selected = Array.isArray(raw) ? raw : String(raw).split(/[,\s]+/).map((value) => value.trim()).filter(Boolean)
+    const taxIds = selected.map((value) => nullableBigIntU64(value))
+    if (taxIds.some((value) => value === null || value <= 0n)) return null
+    params.taxIds = taxIds.filter((value): value is bigint => value !== null)
   }
 
   return params
@@ -318,10 +314,10 @@ export function toUpdatePurchaseOrderLineParams(
 export function toCreateLandedCostParams(
   formData: Record<string, unknown>,
 ): CreateLandedCostParams | null {
-  const pickingRaw = formData.pickingId
+  const pickingId = nullableBigIntU64(formData.pickingId)
   const currencyId = nullableBigIntU64(formData.currencyId)
   const amountTotal = Number(formData.amountTotal)
-  if (pickingRaw == null || pickingRaw === "" || currencyId == null) return null
+  if (pickingId == null || pickingId <= 0n || currencyId == null || currencyId <= 0n) return null
   if (!Number.isFinite(amountTotal) || amountTotal < 0) return null
   const date = requiredTimestampFromForm(formData.date)
   if (date == null) return null
@@ -331,7 +327,7 @@ export function toCreateLandedCostParams(
     targetMove: formData.targetMove ? String(formData.targetMove) : "receipt",
     currencyId,
     amountTotal,
-    pickingIds: [BigInt(Number(pickingRaw))],
+    pickingIds: [pickingId],
     costLines: [],
     valuationAdjustmentLines: [],
     accountMoveId: undefined,

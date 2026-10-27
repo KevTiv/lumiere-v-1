@@ -1431,16 +1431,16 @@ function DocumentsClientLoaded({
       await uploadAndRegisterDocument(file, formData)
     } else if (action === "createArticle") {
       const params = toCreateKnowledgeArticleParams(formData, operatingCompanyId)
-      if (!params) return
+      if (!params) throw new Error(t("documents.forms.errors.articleIncomplete", { defaultValue: "Enter an article title and check the article details. Your entries are retained." }))
       await createKnowledgeArticle.mutateAsync(params)
     } else if (action === "createKnowledgeCategory") {
       const params = toCreateKnowledgeCategoryParams(formData, operatingCompanyId)
-      if (!params) return
+      if (!params) throw new Error(t("documents.forms.errors.categoryIncomplete", { defaultValue: "Enter a category name before saving. Your entries are retained." }))
       await createKnowledgeCategory.mutateAsync(params)
     } else if (action === "createDocumentFolder") {
       assertBrowserAction("createFolder")
       const params = toCreateDocumentFolderParams(formData, operatingCompanyId)
-      if (!params) return
+      if (!params) throw new Error(t("documents.forms.errors.folderIncomplete", { defaultValue: "Enter a folder name and check the folder details. Your entries are retained." }))
       await createDocumentFolder.mutateAsync({
         companyId: operatingCompanyId,
         ...params,

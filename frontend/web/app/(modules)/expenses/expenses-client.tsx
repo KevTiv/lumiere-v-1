@@ -21,7 +21,7 @@ import {
   requiredInlineText,
 } from "@/lib/inline-edit-params"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   EntityDetail,
@@ -206,6 +206,10 @@ function ExpensesClientLoaded({
     { kind: "approve" | "refuse" | "submit"; row: Record<string, unknown> } | null
   >(null)
   const [refuseReason, setRefuseReason] = useState("")
+  const [confirmationError, setConfirmationError] = useState<string | null>(null)
+  const confirmationInFlight = useRef(false)
+  const [confirmationPending, setConfirmationPending] = useState(false)
+  useEffect(() => { setConfirmationError(null) }, [confirmDialog])
   const [csvKind, setCsvKind] = useState<ExpensesCsvImportKind | null>(null)
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [timelineSheet, setTimelineSheet] = useState<Record<string, unknown> | null>(null)
@@ -814,6 +818,35 @@ function ExpensesClientLoaded({
     csvImports.importExpense.isPending ||
     csvImports.importExpenseSheet.isPending
 
+  const confirmSheetAction = async () => {
+    if (!confirmDialog || confirmationInFlight.current || !sheetsUsable) return
+    const reason = refuseReason.trim()
+    if (confirmDialog.kind === "refuse" && !reason) {
+      setConfirmationError(t("expenses.workflow.refuseReasonRequired", { defaultValue: "Enter a reason before refusing this report." }))
+      return
+    }
+    confirmationInFlight.current = true
+    setConfirmationPending(true)
+    setConfirmationError(null)
+    setToolbarError(null)
+    try {
+      const sheetId = rowId(confirmDialog.row)
+      if (confirmDialog.kind === "submit") await submitExpenseSheet.mutateAsync(sheetId)
+      else if (confirmDialog.kind === "approve") await approveExpenseSheet.mutateAsync(sheetId)
+      else await refuseExpenseSheet.mutateAsync({ sheetId, params: { reason } })
+      setConfirmDialog(null)
+      setRefuseReason("")
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : t("expenses.workflow.financeFailed")
+      setConfirmationError(message)
+      // Source admission can close this dialog while a command is pending. Keep the result visible.
+      setToolbarError(message)
+    } finally {
+      confirmationInFlight.current = false
+      setConfirmationPending(false)
+    }
+  }
+
   const addToReportFormForRow = useCallback(
     (row: Record<string, unknown>) => {
       const emp = String(row.employeeId ?? "")
@@ -1323,10 +1356,18 @@ function ExpensesClientLoaded({
             {timelineQuery.isLoading && (
               <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
             )}
-            {!timelineQuery.isLoading && timelineQuery.rows.length === 0 && (
+            {timelineQuery.isError && (
+              <div role="alert" className="space-y-2 text-sm text-destructive">
+                <p>{t("expenses.workflow.timelineUnavailable", { defaultValue: "Approval history could not be loaded." })}</p>
+                <Button variant="outline" size="sm" onClick={() => { void timelineQuery.refetch() }} disabled={timelineQuery.isFetching}>
+                  {t("common.retry")}
+                </Button>
+              </div>
+            )}
+            {!timelineQuery.isLoading && !timelineQuery.isError && timelineQuery.rows.length === 0 && (
               <p className="text-sm text-muted-foreground">{t("expenses.workflow.noApprovalRequests")}</p>
             )}
-            {timelineQuery.rows.map((row) => (
+            {!timelineQuery.isError && timelineQuery.rows.map((row) => (
               <div key={String(row.id)} className="rounded-md border p-3 text-sm space-y-1">
                 <div className="font-medium">{String(row.summary ?? row.action ?? "Approval")}</div>
                 <div className="text-muted-foreground">
@@ -1359,7 +1400,7 @@ function ExpensesClientLoaded({
       <Dialog
         open={confirmDialog !== null && sheetsUsable}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !confirmationInFlight.current) {
             setConfirmDialog(null)
             setRefuseReason("")
           }
@@ -1375,6 +1416,10 @@ function ExpensesClientLoaded({
                   : t("expenses.workflow.confirmRefuse")}
             </DialogTitle>
           </DialogHeader>
+          <DialogDescription className="[overflow-wrap:anywhere]">
+            {String(confirmDialog?.row.name ?? confirmDialog?.row.id ?? "")}
+          </DialogDescription>
+          {confirmationError ? <p id="expense-confirmation-error" role="alert" className="text-sm text-destructive [overflow-wrap:anywhere]">{confirmationError}</p> : null}
           {confirmDialog?.kind === "refuse" && (
             <div className="space-y-2 py-2">
               <label className="text-sm font-medium" htmlFor="refuse-reason">
@@ -1385,62 +1430,29 @@ function ExpensesClientLoaded({
                 className="min-h-[80px]"
                 value={refuseReason}
                 onChange={(e) => setRefuseReason(e.target.value)}
+                disabled={confirmationPending}
+                required
+                aria-invalid={Boolean(confirmationError) && !refuseReason.trim()}
+                aria-describedby={confirmationError ? "expense-confirmation-error" : undefined}
                 placeholder={t("expenses.workflow.refuseReasonPlaceholder")}
               />
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setConfirmDialog(null)}>
+            <Button variant="outline" disabled={confirmationPending} onClick={() => { setConfirmDialog(null); setRefuseReason("") }}>
               {t("common.cancel")}
             </Button>
-            {confirmDialog?.kind === "submit" && (
-              <Button
-                onClick={() => {
-                  if (!sheetsUsable) return
-                  const row = confirmDialog.row
-                  setConfirmDialog(null)
-                  void submitExpenseSheet.mutateAsync(rowId(row)).catch((e) =>
-                    setToolbarError(e instanceof Error ? e.message : String(e)),
-                  )
-                }}
-              >
-                {t("common.confirm")}
-              </Button>
-            )}
-            {confirmDialog?.kind === "approve" && (
-              <Button
-                onClick={() => {
-                  if (!sheetsUsable) return
-                  const row = confirmDialog.row
-                  setConfirmDialog(null)
-                  void approveExpenseSheet.mutateAsync(rowId(row)).catch((e) =>
-                    setToolbarError(e instanceof Error ? e.message : String(e)),
-                  )
-                }}
-              >
-                {t("common.confirm")}
-              </Button>
-            )}
-            {confirmDialog?.kind === "refuse" && (
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (!sheetsUsable) return
-                  const row = confirmDialog.row
-                  const reason = refuseReason.trim()
-                  setConfirmDialog(null)
-                  setRefuseReason("")
-                  void refuseExpenseSheet
-                    .mutateAsync({
-                      sheetId: rowId(row),
-                      params: { reason: reason || undefined },
-                    })
-                    .catch((e) => setToolbarError(e instanceof Error ? e.message : String(e)))
-                }}
-              >
-                {t("common.confirm")}
-              </Button>
-            )}
+            <Button
+              variant={confirmDialog?.kind === "refuse" ? "destructive" : "default"}
+              disabled={confirmationPending || !sheetsUsable}
+              onClick={() => { void confirmSheetAction() }}
+            >
+              {confirmationPending ? t("common.loading") : confirmDialog?.kind === "approve"
+                ? t("expenses.workflow.approveReport", { defaultValue: "Approve report" })
+                : confirmDialog?.kind === "submit"
+                  ? t("expenses.workflow.submitReport", { defaultValue: "Submit report" })
+                  : t("expenses.workflow.refuseReport", { defaultValue: "Refuse report" })}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

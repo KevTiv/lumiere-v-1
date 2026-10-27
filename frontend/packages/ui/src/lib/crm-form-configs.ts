@@ -7,10 +7,11 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
   id: "new-lead",
   title: t("crm.forms.newLead.title"),
   description: t("crm.forms.newLead.description"),
+  submitLabel: t("crm.forms.newLead.save", { defaultValue: "Save lead" }),
   sections: [
     {
       id: "lead-contact",
-      title: t("crm.forms.newLead.sections.contact"),
+      title: t("crm.forms.newLead.sections.contact", { defaultValue: "Contact and company" }),
       fields: [
         {
           id: "contactName",
@@ -49,8 +50,23 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
     },
     {
       id: "lead-details",
-      title: t("crm.forms.newLead.sections.details"),
+      title: t("crm.forms.newLead.sections.details", { defaultValue: "Qualification and value" }),
+      description: t("crm.forms.newLead.qualificationHint", { defaultValue: "Use the current qualification state and your estimate of the potential sale." }),
       fields: [
+        {
+          id: "state",
+          name: "state",
+          type: "select",
+          label: t("crm.forms.newLead.fields.state"),
+          defaultValue: "qualified",
+          options: [
+            { value: "new", label: t("crm.leads.states.New") },
+            { value: "qualified", label: t("crm.leads.states.Qualified") },
+            { value: "won", label: t("crm.leads.states.Won") },
+            { value: "lost", label: t("crm.leads.states.Lost") },
+          ],
+          width: "full",
+        },
         {
           id: "expectedRevenue",
           name: "expectedRevenue",
@@ -67,20 +83,12 @@ export const newLeadForm = (t: TFunction): FormConfig => ({
           placeholder: t("crm.forms.newLead.fields.probabilityPlaceholder"),
           // width: "1/2",
         },
-        {
-          id: "state",
-          name: "state",
-          type: "select",
-          label: t("crm.forms.newLead.fields.state"),
-          defaultValue: "qualified",
-          options: [
-            { value: "new", label: t("crm.leads.states.New") },
-            { value: "qualified", label: t("crm.leads.states.Qualified") },
-            { value: "won", label: t("crm.leads.states.Won") },
-            { value: "lost", label: t("crm.leads.states.Lost") },
-          ],
-          width: "full",
-        },
+      ],
+    },
+    {
+      id: "lead-notes",
+      title: t("crm.forms.newLead.sections.notes", { defaultValue: "Notes" }),
+      fields: [
         {
           id: "description",
           name: "description",
@@ -102,6 +110,7 @@ export const newOpportunityForm = (
   id: "new-opportunity",
   title: t("crm.forms.newOpportunity.title"),
   description: t("crm.forms.newOpportunity.description"),
+  submitLabel: t("crm.forms.newOpportunity.save", { defaultValue: "Save opportunity" }),
   sections: [
     {
       id: "opp-info",
@@ -133,13 +142,20 @@ export const newOpportunityForm = (
                 id: "stageId",
                 name: "stageId",
                 type: "select",
-                label: t("crm.forms.newOpportunity.fields.stageId"),
-                placeholder: t("crm.forms.newOpportunity.fields.stageIdPlaceholder"),
+                label: t("crm.forms.newOpportunity.fields.stage"),
+                placeholder: t("crm.forms.stagePlaceholder", { defaultValue: "Choose a pipeline stage" }),
                 required: true,
                 width: "full",
-                options: [{ value: "", label: "—", disabled: true }],
+                options: [{ value: "", label: t("crm.forms.noStages", { defaultValue: "No pipeline stages available" }), disabled: true }],
+                description: t("crm.forms.stageSetupHint", { defaultValue: "If the list is empty, open Pipeline setup to create a stage. If stages could not load, refresh and try again." }),
               },
             ] as const satisfies readonly FormField[])),
+      ],
+    },
+    {
+      id: "opp-value",
+      title: t("crm.forms.newOpportunity.sections.value", { defaultValue: "Value and expected close" }),
+      fields: [
         {
           id: "expectedRevenue",
           name: "expectedRevenue",
@@ -163,6 +179,12 @@ export const newOpportunityForm = (
           label: t("crm.forms.newOpportunity.fields.dateDeadline"),
           // width: "1/2",
         },
+      ],
+    },
+    {
+      id: "opp-follow-up",
+      title: t("crm.forms.newOpportunity.sections.followUp", { defaultValue: "Follow-up and notes" }),
+      fields: [
         {
           id: "priority",
           name: "priority",
@@ -227,11 +249,12 @@ export const changeOpportunityStageForm = (
                 id: "stageId",
                 name: "stageId",
                 type: "select",
-                label: t("crm.forms.changeStage.fields.stageId"),
-                placeholder: t("crm.forms.changeStage.fields.stageIdPlaceholder"),
+                label: t("crm.forms.changeStage.fields.stage"),
+                placeholder: t("crm.forms.stagePlaceholder", { defaultValue: "Choose a pipeline stage" }),
                 required: true,
                 width: "full",
-                options: [{ value: "", label: "—", disabled: true }],
+                options: [{ value: "", label: t("crm.forms.noStages", { defaultValue: "No pipeline stages available" }), disabled: true }],
+                description: t("crm.forms.stageSetupHint", { defaultValue: "If the list is empty, open Pipeline setup to create a stage. If stages could not load, refresh and try again." }),
               },
             ] as const satisfies readonly FormField[])),
       ],
@@ -328,10 +351,11 @@ export const newContactForm = (t: TFunction): FormConfig => ({
   id: "new-contact",
   title: t("crm.forms.newContact.title"),
   description: t("crm.forms.newContact.description"),
+  submitLabel: t("crm.forms.newContact.save", { defaultValue: "Save contact" }),
   sections: [
     {
       id: "contact-identity",
-      title: t("crm.forms.newContact.sections.identity"),
+      title: t("crm.forms.newContact.sections.identity", { defaultValue: "Contact identity" }),
       fields: [
         {
           id: "name",
@@ -353,7 +377,7 @@ export const newContactForm = (t: TFunction): FormConfig => ({
     },
     {
       id: "contact-details",
-      title: t("crm.forms.newContact.sections.details"),
+      title: t("crm.forms.newContact.sections.details", { defaultValue: "Email and phone" }),
       fields: [
         {
           id: "email",
@@ -371,6 +395,12 @@ export const newContactForm = (t: TFunction): FormConfig => ({
           placeholder: t("crm.forms.newContact.fields.phonePlaceholder"),
           // width: "1/2",
         },
+      ],
+    },
+    {
+      id: "contact-address",
+      title: t("crm.forms.newContact.sections.address", { defaultValue: "Address" }),
+      fields: [
         {
           id: "city",
           name: "city",
@@ -385,14 +415,12 @@ export const newContactForm = (t: TFunction): FormConfig => ({
           label: t("crm.forms.newContact.fields.zip"),
           // width: "1/2",
         },
-        {
-          id: "color",
-          name: "color",
-          type: "text",
-          label: t("crm.forms.newContact.fields.color"),
-          placeholder: t("crm.forms.newContact.fields.colorPlaceholder"),
-          width: "1/2",
-        },
+      ],
+    },
+    {
+      id: "contact-notes",
+      title: t("crm.forms.newContact.sections.notes", { defaultValue: "Notes and appearance" }),
+      fields: [
         {
           id: "description",
           name: "description",
@@ -401,6 +429,14 @@ export const newContactForm = (t: TFunction): FormConfig => ({
           placeholder: t("crm.forms.newContact.fields.descriptionPlaceholder"),
           width: "full",
           rows: 3,
+        },
+        {
+          id: "color",
+          name: "color",
+          type: "text",
+          label: t("crm.forms.newContact.fields.color"),
+          placeholder: t("crm.forms.newContact.fields.colorPlaceholder"),
+          width: "1/2",
         },
       ],
     },
@@ -426,8 +462,8 @@ export const convertLeadForm = (
           id: "opportunityStageId",
           name: "opportunityStageId",
           type: "select",
-          label: t("crm.forms.convertLead.fields.opportunityStageId"),
-          placeholder: t("crm.forms.convertLead.fields.opportunityStageIdPlaceholder"),
+          label: t("crm.forms.convertLead.fields.opportunityStage"),
+          placeholder: t("crm.forms.stagePlaceholder", { defaultValue: "Choose a pipeline stage" }),
           width: "full",
           options: [{ value: "", label: "—", disabled: true }],
         }
@@ -436,6 +472,7 @@ export const convertLeadForm = (
     id: "convert-lead",
     title: t("crm.forms.convertLead.title"),
     description: t("crm.forms.convertLead.description"),
+    submitLabel: t("crm.forms.convertLead.submit", { defaultValue: "Convert lead" }),
     sections: [
       {
         id: "convert-options",
@@ -467,6 +504,7 @@ export const convertOpportunityToOrderForm = (t: TFunction): FormConfig => ({
   id: "convert-opportunity-order",
   title: t("crm.forms.convertToSaleOrder.title"),
   description: t("crm.forms.convertToSaleOrder.description"),
+  submitLabel: t("crm.forms.convertToSaleOrder.submit", { defaultValue: "Create sales order" }),
   sections: [
     {
       id: "fulfillment",
@@ -545,6 +583,7 @@ export const newActivityForm = (t: TFunction): FormConfig => ({
   id: "new-activity",
   title: t("crm.forms.newActivity.title"),
   description: t("crm.forms.newActivity.description"),
+  submitLabel: t("crm.forms.newActivity.submit", { defaultValue: "Schedule activity" }),
   sections: [
     {
       id: "activity-details",

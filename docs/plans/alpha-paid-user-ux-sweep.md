@@ -1,6 +1,6 @@
 # Alpha user experience sweep
 
-Status: IMPLEMENTED; LOCAL CHECKS PASSED. Wave 0 and packets P01-P04 were executed on 2026-10-27 at the user's request. P04.1 adds durable expense recovery through the existing owner; real saved-result checks also required a bounded existing-field API projection repair. See the [execution record](../evidence/alpha-ux-sweep-2026-10-27.md) for results and limits. Hosted CI, human task review and deployment remain separate. P05-P08 are later packets.
+Status: CODE SWEEP IMPLEMENTED; CI VALIDATION PENDING. Wave 0 and P01-P04 passed the recorded local checks at `4755fecaf39a83aa2a23add6efa19050119ca574`. The user then authorized the remaining code sweep (P05-P08) and directed that CI execute testing. P05-P08 are implemented in the same draft PR. The extension preserves the existing operation owners and visual style. Unsupported custom-field create continuations are blocked before dispatch and are listed as capability dependencies in the execution record. See the [execution record](../evidence/alpha-ux-sweep-2026-10-27.md) for packet coverage and evidence limits. No new local test run, deployment, or human acceptance is implied.
 
 ## 1. Goal
 
@@ -208,7 +208,7 @@ pnpm --dir frontend/web build
 git diff --check
 ```
 
-Run changed-file lint as configured in the existing packages. Do not increase debt baselines or weaken assertions to obtain a pass.
+For the P05-P08 extension, the user directed that CI run tests. Do not start local suites, typechecks, builds or browser stacks for that extension. Add focused regression source to the existing CI gates and review the source/diff. The earlier P01-P04 results remain historical evidence at their recorded revision. Do not increase debt baselines or weaken assertions to obtain a pass.
 
 The coordinator must check service ownership, unused ports, storage isolation, and the Makefile before setup. Proposed isolated module: `lumiere-v1-alpha-ux-e2e`; proposed web/API ports: 3120/8092. These are unreserved proposals, not a running stack. Confirm all database/blob targets are isolated before invoking the harness.
 

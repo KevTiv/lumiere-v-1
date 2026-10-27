@@ -13,6 +13,7 @@ import { phCapture } from '@/lib/posthog-browser';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { canUseModuleData, mergeModuleStates, moduleCollection } from '@lumiere/ui/lib/module-data-state';
 import { useRouter } from 'next/navigation';
+import { nullableBigIntU64 } from '@lumiere/erp-shared/form-coercion';
 import { useTranslation } from '@lumiere/i18n';
 import { useErpSession } from '@lumiere/erp-session';
 import { QuotationDocumentDialog } from './quotation-document-dialog';
@@ -196,12 +197,7 @@ import { useWarehouses, useProducts, useUoms, useProductCategories } from '@lumi
 import { hasValidOrganizationId, orgBigInts } from '@/lib/org-scoped';
 import { useRuntimeListConfig } from '@lumiere/ui/forms';
 import { showWorkflowToast } from '@lumiere/ui/lib/workflow-toast';
-import {
-  customFieldEntriesFromMetadata,
-  findNewestRowByField,
-  findNewestRowByPartnerId,
-  persistCustomFieldsToEav,
-} from '@/lib/persist-record-custom-fields';
+import { orderNeedsCustomFieldSave } from '@/lib/commercial-order-form-params';
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useCurrencies } from '@lumiere/query-hooks/hooks/settings';
 import { currencyCodeMap, type KpiTileDef } from '@lumiere/ui/lib/kpi-tiles';
@@ -448,12 +444,16 @@ function SalesClientLoaded({
   const loyaltyPrograms = loyaltyProgramsRead.rows;
   const loyaltyCardsRead = moduleCollection(usePosLoyaltyCards(orgId, initialLoyaltyCards));
   const loyaltyCards = loyaltyCardsRead.rows;
-  const { data: contacts = [] } = useContacts(orgId, initialContacts);
+  const contactsRead = moduleCollection(useContacts(orgId, initialContacts));
+  const contacts = contactsRead.rows;
   const { data: users = [] } = useUsers(orgId);
-  const { data: warehouses = [] } = useWarehouses(orgId, initialWarehouses);
-  const { data: products = [] } = useProducts(orgId);
+  const warehousesRead = moduleCollection(useWarehouses(orgId, initialWarehouses));
+  const warehouses = warehousesRead.rows;
+  const productsRead = moduleCollection(useProducts(orgId));
+  const products = productsRead.rows;
   const { data: productCategories = [] } = useProductCategories(orgId);
-  const { data: uoms = [] } = useUoms(orgId);
+  const uomsRead = moduleCollection(useUoms(orgId));
+  const uoms = uomsRead.rows;
   const accountMovesRead = moduleCollection(useAccountMoves(orgId));
   const accountMoves = accountMovesRead.rows;
   const { data: accountPayments = [] } = useAccountPayments(orgId);
@@ -853,28 +853,57 @@ function SalesClientLoaded({
   );
 
   const partnerFieldOptions = useMemo(() => {
+    if (contactsRead.state.status === "loading" || contactsRead.state.status === "denied" || contactsRead.state.status === "error") {
+      const label = contactsRead.state.status === "loading"
+        ? t("sales.forms.refinement.lookupLoading", { defaultValue: "Loading choices…" })
+        : contactsRead.state.status === "denied"
+          ? t("sales.forms.refinement.lookupDenied", { defaultValue: "You do not have access to these choices." })
+          : t("sales.forms.refinement.lookupFailed", { defaultValue: "Choices could not be loaded. Refresh to try again." });
+      return [{ value: "", label, disabled: true }];
+    }
     const fromApi = contactRowsToPartnerSelectOptions(contacts);
     if (fromApi.length > 0) return fromApi;
     return [
       { value: '', label: t('common.lookup.noPartners'), disabled: true },
     ];
-  }, [contacts, t]);
+  }, [contacts, t, contactsRead.state.status]);
 
   const pricelistFieldOptions = useMemo(() => {
-    const fromApi = pricelistRowsToSelectOptions(pricelists);
+    if (pricelistsRead.state.status === "loading" || pricelistsRead.state.status === "denied" || pricelistsRead.state.status === "error") {
+      const label = pricelistsRead.state.status === "loading"
+        ? t("sales.forms.refinement.lookupLoading", { defaultValue: "Loading choices…" })
+        : pricelistsRead.state.status === "denied"
+          ? t("sales.forms.refinement.lookupDenied", { defaultValue: "You do not have access to these choices." })
+          : t("sales.forms.refinement.lookupFailed", { defaultValue: "Choices could not be loaded. Refresh to try again." });
+      return [{ value: "", label, disabled: true }];
+    }
+    const currencyCodes = currencyCodeMap(currencies)
+    const fromApi = pricelistRowsToSelectOptions(pricelists).map((option) => {
+      const row = pricelists.find((candidate) => String(candidate.id) === option.value)
+      const code = currencyCodes.get(String(row?.currencyId))
+      return { ...option, label: code ? `${option.label} · ${code}` : option.label }
+    });
     if (fromApi.length > 0) return fromApi;
     return [
       { value: '', label: t('common.lookup.noPricelists'), disabled: true },
     ];
-  }, [pricelists, t]);
+  }, [pricelists, t, pricelistsRead.state.status, currencies]);
 
   const warehouseFieldOptions = useMemo(() => {
+    if (warehousesRead.state.status === "loading" || warehousesRead.state.status === "denied" || warehousesRead.state.status === "error") {
+      const label = warehousesRead.state.status === "loading"
+        ? t("sales.forms.refinement.lookupLoading", { defaultValue: "Loading choices…" })
+        : warehousesRead.state.status === "denied"
+          ? t("sales.forms.refinement.lookupDenied", { defaultValue: "You do not have access to these choices." })
+          : t("sales.forms.refinement.lookupFailed", { defaultValue: "Choices could not be loaded. Refresh to try again." });
+      return [{ value: "", label, disabled: true }];
+    }
     const fromApi = warehouseRowsToSelectOptions(warehouses);
     if (fromApi.length > 0) return fromApi;
     return [
       { value: '', label: t('common.lookup.noWarehouses'), disabled: true },
     ];
-  }, [warehouses, t]);
+  }, [warehouses, t, warehousesRead.state.status]);
 
   const paymentTermFieldOptions = useMemo(() => {
     const fromApi = paymentTermRowsToSelectOptions(paymentTerms as Record<string, unknown>[]);
@@ -883,16 +912,32 @@ function SalesClientLoaded({
   }, [paymentTerms]);
 
   const productFieldOptions = useMemo(() => {
+    if (productsRead.state.status === "loading" || productsRead.state.status === "denied" || productsRead.state.status === "error") {
+      const label = productsRead.state.status === "loading"
+        ? t("sales.forms.refinement.lookupLoading", { defaultValue: "Loading choices…" })
+        : productsRead.state.status === "denied"
+          ? t("sales.forms.refinement.lookupDenied", { defaultValue: "You do not have access to these choices." })
+          : t("sales.forms.refinement.lookupFailed", { defaultValue: "Choices could not be loaded. Refresh to try again." });
+      return [{ value: "", label, disabled: true }];
+    }
     const fromApi = productRowsToSelectOptions(products);
     if (fromApi.length > 0) return fromApi;
     return [{ value: '', label: t('common.lookup.noProducts'), disabled: true }];
-  }, [products, t]);
+  }, [products, t, productsRead.state.status]);
 
   const uomFieldOptions = useMemo(() => {
+    if (uomsRead.state.status === "loading" || uomsRead.state.status === "denied" || uomsRead.state.status === "error") {
+      const label = uomsRead.state.status === "loading"
+        ? t("sales.forms.refinement.lookupLoading", { defaultValue: "Loading choices…" })
+        : uomsRead.state.status === "denied"
+          ? t("sales.forms.refinement.lookupDenied", { defaultValue: "You do not have access to these choices." })
+          : t("sales.forms.refinement.lookupFailed", { defaultValue: "Choices could not be loaded. Refresh to try again." });
+      return [{ value: "", label, disabled: true }];
+    }
     const fromApi = uomRowsToSelectOptions(uoms);
     if (fromApi.length > 0) return fromApi;
     return [{ value: '', label: t('common.lookup.noUoms'), disabled: true }];
-  }, [uoms, t]);
+  }, [uoms, t, uomsRead.state.status]);
 
   const currencyFieldOptions = useMemo(() => {
     const fromApi = currencyOptionsFromRows(currencies);
@@ -2492,50 +2537,38 @@ function SalesClientLoaded({
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    const invalidInput = () => new Error(t('sales.forms.refinement.invalidInput', { defaultValue: 'Check the required choices and entered values. Your entries have been retained.' }));
     if (!tabUsable(actionTabs[action])) throw new Error('Required data is unavailable. Refresh and try again.');
     if (action === 'createSaleOrder') {
+      if ([contactsRead.state, pricelistsRead.state, warehousesRead.state].some((state) => state.status !== "ready")) throw new Error(t("sales.forms.refinement.requiredChoicesUnavailable", { defaultValue: "Required choices are not available. Wait for loading to finish or refresh to try again. Your entries have been retained." }));
       const p = toCreateSaleOrderParams(formData, pricelists, operatingCompanyId);
-      if (p) {
-        await createSaleOrder.mutateAsync(p);
-        phCapture('sale_order_created', { organization_id: organizationId });
-        if (p.metadata && operatingCompanyId !== 0n) {
-          const entries = customFieldEntriesFromMetadata(p.metadata);
-          if (entries.length > 0) {
-            const rows = await fetchQueryList('/api/query/sale-orders', 'Failed to fetch sale orders');
-            const row =
-              p.clientOrderRef != null && String(p.clientOrderRef).trim() !== ''
-                ? findNewestRowByField(rows, 'clientOrderRef', String(p.clientOrderRef))
-                : findNewestRowByPartnerId(rows, p.partnerId);
-            if (row?.id) {
-              await persistCustomFieldsToEav({
-                organizationId,
-                companyId: operatingCompanyId,
-                model: 'sale_order',
-                recordId: BigInt(String(row.id)),
-                metadata: p.metadata,
-              });
-            }
-          }
-        }
+      if (!p) throw new Error(t('sales.forms.refinement.requiredOrderContext', { defaultValue: 'Choose a customer, an available price list with a currency, and a warehouse. Your entries have been retained.' }));
+      if (orderNeedsCustomFieldSave(p.metadata)) {
+        throw new Error(t('sales.forms.refinement.customFieldsBlocked', { defaultValue: 'Custom fields cannot be saved together with this quotation yet. No quotation was created. Your entries have been retained.' }));
       }
+      await createSaleOrder.mutateAsync(p);
+      phCapture('sale_order_created', { organization_id: organizationId });
     } else if (action === 'createPricelist') {
       const p = toCreatePricelistParams(formData, operatingCompanyId);
-      if (p) await createPricelist.mutateAsync(p);
+      if (!p) throw invalidInput();
+      await createPricelist.mutateAsync(p);
     } else if (action === 'createPricelistItem') {
       const p = toCreatePricelistItemParams(formData);
-      if (p) await createPricelistItem.mutateAsync(p);
+      if (!p) throw invalidInput();
+      await createPricelistItem.mutateAsync(p);
     } else if (action === 'createSaleOrderLine') {
       const params = toCreateSaleOrderLineParams(formData);
       const orderId = formData.orderId;
-      if (params == null || orderId === '' || orderId == null) return;
+      if (params == null || orderId === '' || orderId == null) throw new Error(t('sales.forms.refinement.requiredLineContext', { defaultValue: 'Choose the order, product and unit of measure, then check quantity and price. Your entries have been retained.' }));
       await saleOrderLineWorkflow.create.execute({ orderId: String(orderId), params });
     } else if (action === 'updateSaleOrderLine') {
       const lineId = formData.lineId;
       const params = toUpdateSaleOrderLineParams(formData);
-      if (params == null || lineId === '' || lineId == null) return;
+      if (params == null || lineId === '' || lineId == null) throw new Error(t('sales.forms.refinement.requiredLineContext', { defaultValue: 'Choose the order, product and unit of measure, then check quantity and price. Your entries have been retained.' }));
       await saleOrderLineWorkflow.update.execute({ lineId: String(lineId), params });
     } else if (action === 'createReturnOrder') {
       const params = toCreateReturnOrderParams(formData);
+      if (!params) throw invalidInput();
       if (params) {
         await returnOrderWorkflow.create.execute(
           { saleOrderId: params.saleOrderId != null ? String(params.saleOrderId) : undefined, params },
@@ -2544,35 +2577,44 @@ function SalesClientLoaded({
       }
     } else if (action === 'createPickingBatch') {
       const p = toCreatePickingBatchParams(formData);
-      if (p) await createPickingBatch.mutateAsync(p);
+      if (!p) throw invalidInput();
+      await createPickingBatch.mutateAsync(p);
     } else if (action === 'createDeliveryPriceRule') {
       const p = toCreateDeliveryPriceRuleParams(formData);
-      if (p) await createDeliveryPriceRule.mutateAsync(p);
+      if (!p) throw invalidInput();
+      await createDeliveryPriceRule.mutateAsync(p);
     } else if (action === 'createDeliveryCarrier') {
       const p = toCreateDeliveryCarrierParams(formData);
-      if (p) await createDeliveryCarrier.mutateAsync(p);
+      if (!p) throw invalidInput();
+      await createDeliveryCarrier.mutateAsync(p);
     } else if (action === 'createShippingMethod') {
       const p = toCreateShippingMethodParams(formData);
-      if (p) await createShippingMethod.mutateAsync(p);
+      if (!p) throw invalidInput();
+      await createShippingMethod.mutateAsync(p);
     } else if (action === 'createPaymentMethod') {
       const p = toCreatePaymentMethodParams(formData);
-      if (p) await createPaymentMethod.mutateAsync(p);
+      if (!p) throw invalidInput();
+      await createPaymentMethod.mutateAsync(p);
     } else if (action === 'createLoyaltyProgram') {
       const p = toCreateLoyaltyProgramParams(formData);
-      if (p) await createLoyaltyProgram.mutateAsync(p);
+      if (!p) throw invalidInput();
+      await createLoyaltyProgram.mutateAsync(p);
     } else if (action === 'createLoyaltyCard') {
-      const programIdNum = Number(formData.programId);
+      const programId = nullableBigIntU64(formData.programId);
       const code = String(formData.code ?? '').trim();
       const points = Number(formData.points);
-      if (!Number.isFinite(programIdNum) || programIdNum <= 0 || !code || !Number.isFinite(points)) return;
+      if (programId == null || !code || !Number.isFinite(points)) throw invalidInput();
       const partnerRaw = formData.partnerId;
+      const partnerId = partnerRaw === '' || partnerRaw == null ? null : nullableBigIntU64(partnerRaw);
+      if (partnerRaw !== '' && partnerRaw != null && partnerId == null) throw invalidInput();
       await createLoyaltyCard.mutateAsync({
-        partnerId:
-          partnerRaw === '' || partnerRaw == null ? null : Number(partnerRaw),
-        programId: programIdNum,
+        partnerId,
+        programId,
         code,
         points,
       });
+    } else {
+      throw new Error(t('sales.forms.refinement.unsupportedAction'));
     }
   };
 

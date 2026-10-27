@@ -1,4 +1,6 @@
 "use client"
+import { Button } from "@lumiere/ui/components/button"
+import { assertCrmCreateCustomFieldsSupported } from "./crm-create-custom-fields"
 
 import { crmContactListRow, crmLeadListRow } from "@/lib/crm-list-rows"
 import { crmContactListFieldAliases, crmLeadListFieldAliases, crmOpportunityListFieldAliases } from "@lumiere/ui/lib/crm-entity-configs"
@@ -30,7 +32,6 @@ import { useCrmModuleSubscription } from "@/lib/module-subscription-hooks"
 import { phCapture } from "@/lib/posthog-browser"
 import {
   customFieldEntriesFromMetadata,
-  findNewestRowByField,
   persistCustomFieldsToEav,
 } from "@/lib/persist-record-custom-fields"
 import { fetchQueryList } from "@lumiere/query-hooks/http"
@@ -418,23 +419,6 @@ function CrmClientLoaded({
     })
   }
 
-  async function persistCrmCustomFieldsAfterCreate(args: {
-    model: keyof typeof crmCustomFieldModel
-    metadata: unknown
-    queryPath: string
-    matchField: string
-    matchValue: string
-  }) {
-    if (customFieldEntriesFromMetadata(args.metadata).length === 0) return
-    const rows = await fetchQueryList(args.queryPath, "Failed to fetch records")
-    const row = findNewestRowByField(rows, args.matchField, args.matchValue)
-    if (!row?.id) return
-    await persistCrmCustomFields({
-      model: args.model,
-      recordId: BigInt(String(row.id)),
-      metadata: args.metadata,
-    })
-  }
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
   const [workflowModal, setWorkflowModal] = useState<WorkflowModal>(null)
   const [workflowSubmitError, setWorkflowSubmitError] = useState<string | null>(null)
@@ -462,7 +446,8 @@ function CrmClientLoaded({
   const contactSegments = contactSegmentsRead.rows
   const activitiesRead = moduleCollection(useActivities(orgId))
   const activities = activitiesRead.rows
-  const { data: opportunityStages = [] } = useOpportunityStages(orgId)
+  const opportunityStagesQuery = useOpportunityStages(orgId)
+  const { rows: opportunityStages } = moduleCollection(opportunityStagesQuery)
   const { data: leadLostReasons = [] } = useLeadLostReasons(orgId)
   const { data: pricelists = [] } = usePricelists(orgId)
   const { data: warehouses = [] } = useWarehouses(orgId)
@@ -2255,6 +2240,7 @@ function CrmClientLoaded({
   }
   const csvTabs: Record<CrmCsvImportKind, CrmTab> = { contact: "contacts", lead: "leads", opportunity: "opportunities" }
   const quickActionUsable = quickActionForm == null || tabUsable(actionTabs[quickActionForm.action])
+  const quickActionDenied = quickActionForm != null && dataState[actionTabs[quickActionForm.action]]?.status === "denied"
   const workflowUsable = workflowModal == null || tabUsable(
     "leadId" in workflowModal ? "leads" : "opportunityId" in workflowModal ? "opportunities" : "contacts",
   )
@@ -2262,72 +2248,56 @@ function CrmClientLoaded({
   // Prompted category dialogs act on selected contacts and their categories.
   const promptsUsable = tabUsable("contacts") && tabUsable("contact-categories")
   useEffect(() => {
-    // Dialogs close when the collection their rows came from is denied or fails.
-    if (!quickActionUsable) setQuickActionForm(null)
+    // Creation drafts stay mounted on a source error; denied access closes them.
+    if (quickActionDenied) setQuickActionForm(null)
     if (!workflowUsable) setWorkflowModal(null)
     if (!promptsUsable) cancelForm()
-  }, [quickActionUsable, workflowUsable, promptsUsable, cancelForm])
+  }, [quickActionDenied, workflowUsable, promptsUsable, cancelForm])
 
   const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (!tabUsable(actionTabs[action])) throw new Error("Required data is unavailable. Refresh and try again.")
+    if (!tabUsable(actionTabs[action])) throw new Error(t("crm.forms.sourceUnavailable", { defaultValue: "Required records could not be verified. Retry the source list before saving. Your entries are retained." }))
     if (action === "createLead") {
       const p = toCreateLeadParams(formData)
+      if (!p) throw new Error(t("crm.forms.validation.createLead", { defaultValue: "Enter the lead contact name before saving." }))
       if (p) {
+        assertCrmCreateCustomFieldsSupported(p.metadata, t("crm.forms.customFieldsCreateUnavailable", { defaultValue: "Saving custom fields during creation is not available yet. Your entries are retained and no record was created." }))
         await createLead.mutateAsync(p)
         phCapture("lead_created", { organization_id: organizationId })
-        if (p.metadata && p.name) {
-          await persistCrmCustomFieldsAfterCreate({
-            model: "lead",
-            metadata: p.metadata,
-            queryPath: "/api/query/leads",
-            matchField: "name",
-            matchValue: p.name,
-          })
-        }
       }
     } else if (action === "createOpportunity") {
+      if (moduleQueryState(opportunityStagesQuery).status !== "ready") throw new Error(t("crm.forms.pipelineSourceUnavailable", { defaultValue: "Pipeline stages could not be verified. Retry Pipeline setup before saving. Your entries are retained." }))
       const p = toCreateOpportunityParams(formData)
+      if (!p) throw new Error(t("crm.forms.validation.createOpportunity", { defaultValue: "Enter an opportunity name and select a pipeline stage." }))
       if (p) {
+        assertCrmCreateCustomFieldsSupported(p.metadata, t("crm.forms.customFieldsCreateUnavailable", { defaultValue: "Saving custom fields during creation is not available yet. Your entries are retained and no record was created." }))
         await createOpportunity.mutateAsync(p)
-        if (p.metadata && p.name) {
-          await persistCrmCustomFieldsAfterCreate({
-            model: "opportunity",
-            metadata: p.metadata,
-            queryPath: "/api/query/opportunities",
-            matchField: "name",
-            matchValue: p.name,
-          })
-        }
       }
     } else if (action === "createContact") {
       const p = toCreateContactParams(formData)
+      if (!p) throw new Error(t("crm.forms.validation.createContact", { defaultValue: "Enter a contact name before saving." }))
       if (p) {
+        assertCrmCreateCustomFieldsSupported(p.metadata, t("crm.forms.customFieldsCreateUnavailable", { defaultValue: "Saving custom fields during creation is not available yet. Your entries are retained and no record was created." }))
         await createContact.mutateAsync(p)
-        if (p.metadata && p.name) {
-          await persistCrmCustomFieldsAfterCreate({
-            model: "contact",
-            metadata: p.metadata,
-            queryPath: "/api/query/contacts",
-            matchField: "name",
-            matchValue: p.name,
-          })
-        }
       }
     } else if (action === "createActivity") {
       const p = toCreateActivityParams(formData)
+      if (!p) throw new Error(t("crm.forms.validation.createActivity", { defaultValue: "Enter an activity summary and a valid due date." }))
       if (p) await createActivity.mutateAsync(p)
     } else if (action === "createContactCategory") {
       const p = toCreateContactCategoryParamsFromForm(formData)
+      if (!p) throw new Error(t("crm.forms.validation.createContactCategory", { defaultValue: "Enter a category name before saving." }))
       if (p) await createContactCategory.mutateAsync(p)
     } else if (action === "createContactTag") {
       const p = toCreateContactTagParamsFromForm(formData)
+      if (!p) throw new Error(t("crm.forms.validation.createContactTag", { defaultValue: "Enter a tag name before saving." }))
       if (p) await createContactTag.mutateAsync(p)
     } else if (action === "createContactSegment") {
       const p = toCreateContactSegmentParamsFromForm(formData)
+      if (!p) throw new Error(t("crm.forms.validation.createContactSegment", { defaultValue: "Enter a segment name before saving." }))
       if (p) await createContactSegment.mutateAsync(p)
     } else if (action === "createOpportunityLine") {
       const opportunityId = formData.opportunityId
@@ -2344,6 +2314,8 @@ function CrmClientLoaded({
         params,
         companyId: operatingCompanyId ?? undefined,
       })
+    } else {
+      throw new Error(t("crm.forms.unsupportedAction", { defaultValue: "This form action is unavailable. Close and reopen the form before trying again." }))
     }
   }
 
@@ -2648,9 +2620,20 @@ function CrmClientLoaded({
         }}
       />
       <RuntimeFormModal
-        open={quickActionForm !== null && quickActionUsable}
+        open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        staticConfig={quickActionForm?.form ?? newLeadForm(t)}
+        staticConfig={quickActionForm?.action === "createOpportunity" ? newOpportunityForm(t, opportunityStageOptions) : quickActionForm?.form ?? newLeadForm(t)}
+        submissionDisabled={!quickActionUsable || (quickActionForm?.action === "createOpportunity" && moduleQueryState(opportunityStagesQuery).status !== "ready")}
+        formLeadingActions={!quickActionUsable || quickActionForm?.action === "createOpportunity" ? <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="outline" onClick={() => {
+            const tab = quickActionForm ? actionTabs[quickActionForm.action] : undefined
+            const state = tab ? dataState[tab] : undefined
+            if (state && "onRetry" in state) state.onRetry?.()
+            if (quickActionForm?.action === "createOpportunity") void opportunityStagesQuery.refetch()
+          }}>{t("common.retry", { defaultValue: "Retry" })}</Button>
+          {quickActionForm?.action === "createOpportunity" ? <a className="text-sm text-primary underline" href="/crm?tab=pipeline-admin">{t("crm.forms.openPipelineSetup", { defaultValue: "Open Pipeline setup" })}</a> : null}
+        </div> : undefined}
+        submitError={!quickActionUsable ? t("crm.forms.sourceUnavailable", { defaultValue: "Required records could not be verified. Retry the source list before saving. Your entries are retained." }) : quickActionForm?.action === "createOpportunity" && moduleQueryState(opportunityStagesQuery).status !== "ready" ? t("crm.forms.pipelineSourceUnavailable", { defaultValue: "Pipeline stages could not be verified. Retry Pipeline setup before saving. Your entries are retained." }) : null}
         moduleId="crm"
         organizationId={organizationId}
         roleId={runtimeRoleId}

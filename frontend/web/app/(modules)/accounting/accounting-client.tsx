@@ -5057,10 +5057,12 @@ function AccountingClientReady({
         companyId: operatingCompanyId,
         accountTypes,
       })
-      if (p) await createAccount.mutateAsync(p)
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createAccount.mutateAsync(p)
     } else if (action === "createMove") {
       const p = toCreateAccountMoveParams(formData, operatingCompanyId)
-      if (p) await createMove.mutateAsync(p)
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createMove.mutateAsync(p)
     } else if (action === "createTax") {
       await createTax.mutateAsync({
         companyId: operatingCompanyId,
@@ -5074,69 +5076,79 @@ function AccountingClientReady({
         fd.currencyId = defaultCurrencyId.toString()
       }
       const p = toCreateAnalyticAccountParams(fd, defaultCurrencyId, operatingCompanyId)
-      if (p) await createAnalyticAccount.mutateAsync(analyticParamsToJson(p, "CreateAnalyticAccountParams"))
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createAnalyticAccount.mutateAsync(analyticParamsToJson(p, "CreateAnalyticAccountParams"))
     } else if (action === "createAnalyticLine") {
       const p = toCreateAnalyticLineParams(formData, defaultCurrencyId)
-      if (p) await createAnalyticLine.mutateAsync(analyticParamsToJson(p, "CreateAnalyticLineParams"))
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createAnalyticLine.mutateAsync(analyticParamsToJson(p, "CreateAnalyticLineParams"))
     } else if (action === "createAnalyticDistributionModel") {
       const p = toCreateAnalyticDistributionModelParams(formData, operatingCompanyId)
-      if (p) await createAnalyticDistributionModel.mutateAsync(analyticParamsToJson(p, "CreateAnalyticDistributionModelParams"))
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createAnalyticDistributionModel.mutateAsync(analyticParamsToJson(p, "CreateAnalyticDistributionModelParams"))
     } else if (action === "createReconciliationWidget") {
       const issue = reconciliationSelectionIssue(formData, reconciliationSelectionContext)
       if (issue) throw new Error(reconciliationSelectionMessage(issue))
       const p = toCreateAccountReconciliationWidgetParams(formData)
-      if (p) await createReconciliationWidget.mutateAsync(reconciliationWidgetParamsToJson(p))
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createReconciliationWidget.mutateAsync(reconciliationWidgetParamsToJson(p))
     } else if (action === "createFiscalYear") {
       if (operatingCompanyId <= 0n) {
         throw new Error("No operating company is available for this organization")
       }
       const p = toCreateFiscalYearParams(formData)
-      if (p) await createFiscalYear.mutateAsync(accountingParamsToJson(p, "CreateFiscalYearParams"))
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createFiscalYear.mutateAsync(accountingParamsToJson(p, "CreateFiscalYearParams"))
     } else if (action === "createAccountPeriod") {
       const p = toCreateAccountPeriodParams(formData)
-      if (p) await createAccountPeriod.mutateAsync(accountingParamsToJson(p, "CreateAccountPeriodParams"))
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createAccountPeriod.mutateAsync(accountingParamsToJson(p, "CreateAccountPeriodParams"))
     } else if (action === "createAccountPayment") {
       const p = toCreatePaymentParamsFromManualForm(formData, operatingCompanyId)
-      if (p) await createAccountPayment.mutateAsync(p)
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createAccountPayment.mutateAsync(p)
     } else if (action === "createPaymentTerm") {
       const p = toCreatePaymentTermParamsFromForm(formData)
-      if (p) await createPaymentTerm.mutateAsync(stdbParamsToJson(p, "CreatePaymentTermParams"))
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createPaymentTerm.mutateAsync(stdbParamsToJson(p, "CreatePaymentTermParams"))
     } else if (action === "createPaymentTermLine") {
       const p = toCreatePaymentTermLineParamsFromForm(formData)
-      if (p) await createPaymentTermLine.mutateAsync(stdbParamsToJson(p, "CreatePaymentTermLineParams"))
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createPaymentTermLine.mutateAsync(stdbParamsToJson(p, "CreatePaymentTermLineParams"))
     } else if (action === "createAccountJournal") {
       const params = toCreateAccountJournalParams(formData, operatingCompanyId)
       await createAccountJournal.mutateAsync(params)
     } else if (action === "addAccountMoveLine") {
       const parsed = toAddAccountMoveLineParamsFromForm(formData)
-      if (parsed) {
-        await addAccountMoveLine.mutateAsync({ moveId: parsed.moveId, params: parsed.params })
-      }
+      if (!parsed) throw new Error(t("accounting.forms.invalidEntries"))
+      await addAccountMoveLine.mutateAsync({ moveId: parsed.moveId, params: parsed.params })
     } else if (action === "createCurrencyRate") {
       const p = toCreateCurrencyRateParamsFromForm(formData)
-      if (p) await createCurrencyRate.mutateAsync(p)
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createCurrencyRate.mutateAsync(p)
     } else if (action === "createDepreciationLine") {
       const p = toCreateDepreciationLineParams(formData)
-      if (p) await createDepreciationLine.mutateAsync(depreciationLineParamsToJson(p))
+      if (!p) throw new Error(t("accounting.forms.invalidEntries", { defaultValue: "Check the required fields and selected records. No save was sent; your entries are retained." }))
+      await createDepreciationLine.mutateAsync(depreciationLineParamsToJson(p))
     } else if (action === "createIntercompanyRule") {
       const sourceCompanyId = optionalBigIntU64(formData.sourceCompanyId)
       const destinationCompanyId = optionalBigIntU64(formData.destinationCompanyId)
       const p = toCreateIntercompanyRuleParams(formData)
-      if (p && sourceCompanyId != null && destinationCompanyId != null) {
-        await createIntercompanyRule.mutateAsync({
-          sourceCompanyId,
-          destinationCompanyId,
-          params: intercompanyRuleParamsToJson(p),
-        })
-      }
+      if (!p || sourceCompanyId == null || destinationCompanyId == null) throw new Error(t("accounting.forms.invalidEntries"))
+      await createIntercompanyRule.mutateAsync({
+        sourceCompanyId,
+        destinationCompanyId,
+        params: intercompanyRuleParamsToJson(p),
+      })
     } else if (action === "createIntercompanyTransaction") {
       const p = toCreateIntercompanyTransactionParams(formData)
-      if (p && operatingCompanyId > 0n) {
-        await createIntercompanyTransaction.mutateAsync({
-          originCompanyId: operatingCompanyId,
-          params: intercompanyTransactionParamsToJson(p),
-        })
-      }
+      if (!p || operatingCompanyId <= 0n) throw new Error(t("accounting.forms.invalidEntries"))
+      await createIntercompanyTransaction.mutateAsync({
+        originCompanyId: operatingCompanyId,
+        params: intercompanyTransactionParamsToJson(p),
+      })
+    } else {
+      throw new Error(t("accounting.forms.unsupportedAction", { defaultValue: "This form action is unavailable. Close and reopen the form before trying again." }))
     }
   }
 

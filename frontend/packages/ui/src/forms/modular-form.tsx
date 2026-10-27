@@ -108,6 +108,7 @@ export function ModularForm({
   const [submissionError, setSubmissionError] = useState<string | null>(null)
   const visibleSubmitError = submitError || submissionError
   const formBodyRef = useRef<HTMLDivElement>(null)
+  const invalidFieldRef = useRef<string | null>(null)
   useEffect(() => {
     // Scroll only the field owner; scrolling ancestors can move the dialog header and close control.
     if (visibleSubmitError && formBodyRef.current) formBodyRef.current.scrollTop = 0
@@ -382,6 +383,26 @@ export function ModularForm({
     return null
   }
 
+  useEffect(() => {
+    const name = invalidFieldRef.current
+    invalidFieldRef.current = null
+    const body = formBodyRef.current
+    if (!name || !body) return
+    const field = Array.from(body.querySelectorAll<HTMLElement>("[data-form-field]"))
+      .find((element) => element.dataset.formField === name)
+    if (!field) return
+    field.querySelector<HTMLElement>('[aria-invalid="true"]:not(:disabled), input:not(:disabled), textarea:not(:disabled), button:not(:disabled)')?.focus({ preventScroll: true })
+    if (scrollable) {
+      const fieldRect = field.getBoundingClientRect()
+      const bodyRect = body.getBoundingClientRect()
+      if (fieldRect.top < bodyRect.top || fieldRect.bottom > bodyRect.bottom) {
+        body.scrollTop += fieldRect.top - bodyRect.top - 16
+      }
+    } else {
+      field.scrollIntoView?.({ block: "nearest" })
+    }
+  }, [errors, scrollable])
+
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {}
 
@@ -392,6 +413,7 @@ export function ModularForm({
       }
     }
 
+    invalidFieldRef.current = Object.keys(newErrors)[0] ?? null
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
