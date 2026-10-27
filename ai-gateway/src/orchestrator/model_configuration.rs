@@ -999,6 +999,8 @@ mod tests {
                             objective: "test".into(),
                             context: json!({}),
                             format: "text".into(),
+                            response_format:
+                                crate::orchestrator::intelligence::GenerationResponseFormat::Text,
                             instructions: None,
                             max_tokens: None,
                         })

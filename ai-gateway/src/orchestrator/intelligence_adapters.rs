@@ -27,10 +27,10 @@ use serde_json::{json, Value};
 use super::intelligence::{
     CapabilityProposal, ClarificationRequest, DecisionKind, DecisionProposal, DecisionProvider,
     DecisionRequest, DecisionResponse, DecisionTypeRef, FinalDraft, GenerationProvider,
-    GenerationRequest, GenerationResponse, ProgramPatchProposal, ReasoningOutcome,
-    ReasoningProvider, ReasoningRequest, UnableToProgress, PROPOSAL_KIND_CAPABILITY,
-    PROPOSAL_KIND_CLARIFICATION, PROPOSAL_KIND_DECISION, PROPOSAL_KIND_FINAL_DRAFT,
-    PROPOSAL_KIND_PROGRAM_PATCH,
+    GenerationRequest, GenerationResponse, GenerationResponseFormat, ProgramPatchProposal,
+    ReasoningOutcome, ReasoningProvider, ReasoningRequest, UnableToProgress,
+    PROPOSAL_KIND_CAPABILITY, PROPOSAL_KIND_CLARIFICATION, PROPOSAL_KIND_DECISION,
+    PROPOSAL_KIND_FINAL_DRAFT, PROPOSAL_KIND_PROGRAM_PATCH,
 };
 use super::model_configuration::ModelProfile;
 use crate::providers::llm::{
@@ -279,6 +279,12 @@ impl GenerationProvider for LlmGenerationAdapter<'_> {
             as approved.{trusted_instructions}\nobjective: {}\ncontext: {}",
             request.format, request.objective, request.context,
         );
+        let structured = request.response_format == GenerationResponseFormat::FinalDraft;
+        let system = if structured {
+            format!("{system}\nSubmit the draft by calling `{TOOL_SUBMIT_FINAL_DRAFT}` exactly once. Include every material claim and its exact passage supports. Do not return prose outside the tool call.")
+        } else {
+            system
+        };
         let llm_request = LlmRequest {
             provider: self.provider.clone(),
             model: self.model.clone(),
@@ -290,20 +296,49 @@ impl GenerationProvider for LlmGenerationAdapter<'_> {
                 .min(self.max_tokens),
             temperature: self.temperature,
             top_p: self.top_p,
-            tools: Vec::new(),
-            single_shot_tool: false,
+            tools: if structured {
+                vec![final_draft_tool_spec()]
+            } else {
+                Vec::new()
+            },
+            single_shot_tool: structured,
             thinking: ThinkingMode::ProviderDefault,
         };
         let response = self.transport.complete(llm_request).await?;
         ensure_complete_response(&response, "generation")?;
-        if !response.tool_calls.is_empty() {
-            bail!("generation response must not include tool calls");
-        }
-        if response.text.trim().is_empty() {
-            bail!("generation response content must be nonempty");
-        }
+        let content = if structured {
+            let call = single_call(&response.tool_calls, TOOL_SUBMIT_FINAL_DRAFT)?;
+            let args = object_arguments(call)?;
+            if ["content", "citations", "claims", "calculations"]
+                .iter()
+                .any(|key| !args.contains_key(*key))
+                || args.keys().any(|key| {
+                    !matches!(
+                        key.as_str(),
+                        "content" | "citations" | "claims" | "calculations"
+                    )
+                })
+            {
+                bail!("generation final draft fields do not match its response contract");
+            }
+            let draft: FinalDraft = serde_json::from_value(call.arguments.clone())
+                .context("generation final draft is malformed")?;
+            draft.validate()?;
+            if draft.claims.is_empty() {
+                bail!("generation final draft must identify its material claims");
+            }
+            serde_json::to_string(&draft)?
+        } else {
+            if !response.tool_calls.is_empty() {
+                bail!("generation response must not include tool calls");
+            }
+            if response.text.trim().is_empty() {
+                bail!("generation response content must be nonempty");
+            }
+            response.text
+        };
         Ok(GenerationResponse {
-            content: response.text,
+            content,
             model: response.model,
             provider: response.provider,
             input_tokens: response.input_tokens,
@@ -558,6 +593,85 @@ fn parse_decision_proposal(args: &serde_json::Map<String, Value>) -> Result<Deci
     })
 }
 
+fn final_draft_tool_spec() -> ToolSpec {
+    ToolSpec {
+        name: TOOL_SUBMIT_FINAL_DRAFT.to_string(),
+        description: "Submit a candidate final answer. Still subject to the \
+            evidence/answer admission gate before it may be presented as \
+            complete."
+            .to_string(),
+        parameters: json!({
+            "type": "object",
+            "properties": {
+                "content": {"type": "string"},
+                "citations": {
+                    "type": "array",
+                    "description": "Run-level evidence refs the answer relies on.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "kind": {"type": "string"},
+                            "id": {"type": "string"},
+                        },
+                        "required": ["kind", "id"],
+                        "additionalProperties": false,
+                    },
+                },
+                "claims": {
+                    "type": "array",
+                    "description": "Each material factual claim and its exact source passages.",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "text": {"type": "string"},
+                            "supports": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "kind": {"type": "string"},
+                                        "id": {"type": "string"},
+                                        "source_version": {"type": "string"},
+                                        "passage_key": {"type": "string"},
+                                    },
+                                    "required": [
+                                        "kind", "id", "source_version", "passage_key"
+                                    ],
+                                    "additionalProperties": false,
+                                },
+                            },
+                        },
+                        "required": ["text", "supports"],
+                        "additionalProperties": false,
+                    },
+                },
+                "calculations": {
+                    "type": "array",
+                    "description": "Calculations stated in the answer. The gate \
+                        recomputes them; the claimed result is not trusted.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string"},
+                            "op": {
+                                "type": "string",
+                                "enum": ["sum", "difference", "product", "ratio"],
+                            },
+                            "operands": {"type": "array", "items": {"type": "number"}},
+                            "claimed_result": {"type": "number"},
+                        },
+                        "required": ["label", "op", "operands", "claimed_result"],
+                        "additionalProperties": false,
+                    },
+                },
+            },
+            "required": ["content", "citations", "claims", "calculations"],
+            "additionalProperties": false,
+        }),
+    }
+}
+
 fn reasoning_tool_specs(request: &ReasoningRequest) -> Vec<ToolSpec> {
     let mut specs = Vec::with_capacity(request.allowed_proposal_kinds.len() + 1);
     for kind in &request.allowed_proposal_kinds {
@@ -635,83 +749,7 @@ fn reasoning_tool_specs(request: &ReasoningRequest) -> Vec<ToolSpec> {
                     "additionalProperties": false,
                 }),
             },
-            PROPOSAL_KIND_FINAL_DRAFT => ToolSpec {
-                name: TOOL_SUBMIT_FINAL_DRAFT.to_string(),
-                description: "Submit a candidate final answer. Still subject to the \
-                    evidence/answer admission gate before it may be presented as \
-                    complete."
-                    .to_string(),
-                parameters: json!({
-                    "type": "object",
-                    "properties": {
-                        "content": {"type": "string"},
-                        "citations": {
-                            "type": "array",
-                            "description": "Run-level evidence refs the answer relies on.",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "kind": {"type": "string"},
-                                    "id": {"type": "string"},
-                                },
-                                "required": ["kind", "id"],
-                                "additionalProperties": false,
-                            },
-                        },
-                        "claims": {
-                            "type": "array",
-                            "description": "Each material factual claim and the source \
-                                passages it relies on. A claim with no supports is \
-                                treated as unsupported.",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "text": {"type": "string"},
-                                    "supports": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "kind": {"type": "string"},
-                                                "id": {"type": "string"},
-                                                "source_version": {"type": "string"},
-                                                "passage_key": {"type": "string"},
-                                            },
-                                            "required": [
-                                                "kind", "id", "source_version", "passage_key"
-                                            ],
-                                            "additionalProperties": false,
-                                        },
-                                    },
-                                },
-                                "required": ["text"],
-                                "additionalProperties": false,
-                            },
-                        },
-                        "calculations": {
-                            "type": "array",
-                            "description": "Calculations stated in the answer. The gate \
-                                recomputes them; the claimed result is not trusted.",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "label": {"type": "string"},
-                                    "op": {
-                                        "type": "string",
-                                        "enum": ["sum", "difference", "product", "ratio"],
-                                    },
-                                    "operands": {"type": "array", "items": {"type": "number"}},
-                                    "claimed_result": {"type": "number"},
-                                },
-                                "required": ["label", "op", "operands", "claimed_result"],
-                                "additionalProperties": false,
-                            },
-                        },
-                    },
-                    "required": ["content"],
-                    "additionalProperties": false,
-                }),
-            },
+            PROPOSAL_KIND_FINAL_DRAFT => final_draft_tool_spec(),
             _ => continue,
         };
         specs.push(spec);
@@ -1486,12 +1524,16 @@ mod tests {
                 objective: "summarize Q3 sales".to_string(),
                 context: json!({"quarter": "Q3"}),
                 format: "prose".to_string(),
+                response_format: crate::orchestrator::intelligence::GenerationResponseFormat::Text,
                 instructions: None,
                 max_tokens: None,
             })
             .await
             .unwrap();
         assert_eq!(result.content, "Draft summary of the quarter.");
+        let requests = transport.requests();
+        assert!(requests[0].tools.is_empty());
+        assert!(!requests[0].single_shot_tool);
     }
 
     #[tokio::test]
@@ -1508,6 +1550,7 @@ mod tests {
                 objective: "summarize Q3 sales".to_string(),
                 context: json!({}),
                 format: "prose".to_string(),
+                response_format: crate::orchestrator::intelligence::GenerationResponseFormat::Text,
                 instructions: None,
                 max_tokens: None,
             })
@@ -1532,11 +1575,106 @@ mod tests {
                 objective: "summarize Q3 sales".to_string(),
                 context: json!({}),
                 format: "prose".to_string(),
+                response_format: crate::orchestrator::intelligence::GenerationResponseFormat::Text,
                 instructions: None,
                 max_tokens: None,
             })
             .await;
         assert!(result.is_err());
+    }
+
+    fn structured_generation_request() -> GenerationRequest {
+        GenerationRequest {
+            objective: "Summarize the bounded analytics observation.".into(),
+            context: json!({"evidencePassage": {"kind": "analytics_snapshot", "id": "run:2:sales", "source_version": "sha256:abc", "passage_key": "result"}}),
+            format: "concise factual analytics summary".into(),
+            response_format: GenerationResponseFormat::FinalDraft,
+            instructions: Some("Each claim must cite the supplied observation.".into()),
+            max_tokens: Some(2048),
+        }
+    }
+
+    fn structured_draft() -> Value {
+        json!({
+            "content": "The bounded snapshot contains one sales row.",
+            "citations": [],
+            "claims": [{"text": "The bounded snapshot contains one sales row.", "supports": [{"kind": "analytics_snapshot", "id": "run:2:sales", "source_version": "sha256:abc", "passage_key": "result"}]}],
+            "calculations": [],
+        })
+    }
+
+    #[tokio::test]
+    async fn report_generation_uses_one_typed_draft_with_claims_and_preserves_usage() {
+        let mut response = base_response();
+        response.tool_calls = vec![tool_call(TOOL_SUBMIT_FINAL_DRAFT, structured_draft())];
+        response.input_tokens = 1077;
+        response.output_tokens = 560;
+        let transport = ScriptedLlm::new(vec![response]);
+        let adapter = LlmGenerationAdapter::new(
+            &transport,
+            "mistral".into(),
+            "mistral-small-2603".into(),
+            2048,
+        );
+        let response = adapter
+            .generate(structured_generation_request())
+            .await
+            .unwrap();
+        let draft: FinalDraft = serde_json::from_str(&response.content).unwrap();
+        assert_eq!(draft.claims.len(), 1);
+        assert_eq!(draft.claims[0].supports[0].id, "run:2:sales");
+        assert_eq!((response.input_tokens, response.output_tokens), (1077, 560));
+        let requests = transport.requests();
+        assert_eq!(requests.len(), 1);
+        assert!(requests[0].single_shot_tool);
+        assert_eq!(requests[0].tools.len(), 1);
+        assert_eq!(requests[0].tools[0].name, TOOL_SUBMIT_FINAL_DRAFT);
+        assert_eq!(
+            requests[0].tools[0].parameters["properties"]["claims"]["minItems"],
+            1
+        );
+        assert!(requests[0].system.contains("exact passage supports"));
+    }
+
+    #[tokio::test]
+    async fn report_generation_rejects_unstructured_or_malformed_drafts_without_retry() {
+        let valid = tool_call(TOOL_SUBMIT_FINAL_DRAFT, structured_draft());
+        let mut claimless = structured_draft();
+        claimless["claims"] = json!([]);
+        let mut missing = structured_draft();
+        missing.as_object_mut().unwrap().remove("claims");
+        let mut malformed = structured_draft();
+        malformed["claims"][0]["supports"] = json!("untyped");
+        let mut unknown = structured_draft();
+        unknown["organization_id"] = json!(99);
+        let mut truncated = valid.clone();
+        truncated.arguments_error = Some("truncated JSON".into());
+        for calls in [
+            vec![],
+            vec![tool_call("unoffered", structured_draft())],
+            vec![valid.clone(), valid],
+            vec![tool_call(TOOL_SUBMIT_FINAL_DRAFT, claimless)],
+            vec![tool_call(TOOL_SUBMIT_FINAL_DRAFT, missing)],
+            vec![tool_call(TOOL_SUBMIT_FINAL_DRAFT, malformed)],
+            vec![tool_call(TOOL_SUBMIT_FINAL_DRAFT, unknown)],
+            vec![truncated],
+        ] {
+            let mut response = base_response();
+            response.text = "A plausible but unstructured report.".into();
+            response.tool_calls = calls;
+            let transport = ScriptedLlm::new(vec![response]);
+            let adapter = LlmGenerationAdapter::new(
+                &transport,
+                "mistral".into(),
+                "mistral-small-2603".into(),
+                2048,
+            );
+            assert!(adapter
+                .generate(structured_generation_request())
+                .await
+                .is_err());
+            assert_eq!(transport.requests().len(), 1);
+        }
     }
 
     #[tokio::test]

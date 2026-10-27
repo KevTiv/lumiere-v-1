@@ -1951,6 +1951,7 @@ async fn synthesize_summary(
             objective: user,
             context: json!({"tool_results": tool_payloads}),
             format: "concise grounded ERP skill summary".to_string(),
+            response_format: crate::orchestrator::intelligence::GenerationResponseFormat::Text,
             instructions: Some(system),
             max_tokens: Some(agent.max_tokens.min(2048)),
         },

@@ -1852,6 +1852,13 @@ impl GovernedProgramExecutor<'_> {
                                 &evidence_overlays,
                             ),
                             format: generate.format.clone(),
+                            response_format: if context.program_ref
+                                == super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF
+                            {
+                                super::intelligence::GenerationResponseFormat::FinalDraft
+                            } else {
+                                super::intelligence::GenerationResponseFormat::Text
+                            },
                             instructions: report_generation_instructions(context),
                             max_tokens: context.generation_max_tokens,
                         })
@@ -2847,7 +2854,7 @@ fn report_generation_instructions(context: &GovernedProgramContext) -> Option<St
     if context.program_ref != super::governed_programs::REPORT_ANALYSIS_PROGRAM_REF {
         return context.generation_instructions.clone();
     }
-    let schema = r#"Return only a JSON FinalDraft, without Markdown fences:
+    let schema = r#"Submit one FinalDraft through the required typed response contract:
 {"content":"...","citations":[],"claims":[{"text":"...","supports":[{"kind":"analytics_snapshot","id":"copy from evidencePassage","source_version":"copy exactly","passage_key":"result"}]}],"calculations":[]}.
 Use only the server-recorded observations in the analytics result (artifacts[].artifacts.evidencePassage). Copy their
 citation identity exactly. State at most eight claims. Their text, in order,
