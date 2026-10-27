@@ -1,3 +1,4 @@
+import { chooseSelectValue } from "./select-test-utils"
 import * as React from "react"
 import {
   act,
@@ -140,9 +141,7 @@ describe("DocumentTemplateDesigner", () => {
     fireEvent.change(screen.getByLabelText("Text color"), {
       target: { value: "#172554" },
     })
-    fireEvent.change(screen.getByLabelText("Text size"), {
-      target: { value: "24px" },
-    })
+    chooseSelectValue(screen.getByLabelText("Text size"), "24px")
     await waitFor(() =>
       expect(changed.mock.lastCall?.[0].bodyHtml).toContain("font-size:24px"),
     )
@@ -230,9 +229,10 @@ describe("DocumentTemplateDesigner", () => {
       screen.queryByRole("button", { name: "Table", exact: true }),
     ).toBeNull()
 
-    fireEvent.change(screen.getByRole("combobox", { name: "Canvas zoom" }), {
-      target: { value: "50" },
-    })
+    chooseSelectValue(
+      screen.getByRole("combobox", { name: "Canvas zoom" }),
+      "50",
+    )
     expect(editors[0]!.Canvas.getZoom()).toBe(50)
     fireEvent.click(screen.getByRole("button", { name: "Zoom in" }))
     expect(editors[0]!.Canvas.getZoom()).toBe(60)

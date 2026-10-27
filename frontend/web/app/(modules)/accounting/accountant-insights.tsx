@@ -12,6 +12,7 @@ import type { ModuleDataState } from "@lumiere/ui/lib/module-data-state"
 import { DashboardWidgetRenderer } from "../../../../packages/ui/src/pages/dashboard-widget-renderer"
 import { buildAccountantInsights, type InsightComparison, type InsightDays } from "./accountant-insights-model"
 import type { AccountantOverviewData } from "./accountant-overview-model"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 type ChartWidget = BarChartWidget | AreaChartWidget
 function ReadNotice({ state }: { state: ModuleDataState }) {
@@ -94,12 +95,47 @@ export function AccountantInsights({ data, now }: { data: AccountantOverviewData
       <div className="flex min-w-0 flex-col justify-between gap-4 xl:flex-row xl:items-end">
         <div className="space-y-1"><h2 id="financial-overview-title" className="flex scroll-mt-24 items-center gap-2 text-lg font-semibold tracking-tight"><ChartNoAxesCombined className="size-5 text-primary" aria-hidden="true" />{t("accounting.insights.title")}</h2><p className={workspaceStyles.sectionDescription}>{t("accounting.insights.description")}</p></div>
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-          <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("accounting.insights.currency")}</span><select className="h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm" value={model.selectedId} onChange={(event) => setCurrencyId(event.target.value)} aria-label={t("accounting.insights.currency")}>
-            {!model.currency && <option value={model.selectedId}>{t("accounting.insights.currencyUnavailable")}</option>}{model.currencies.map((item) => <option key={item.id} value={item.id}>{item.label} (#{item.id})</option>)}
-          </select></label>
-          <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("accounting.insights.period")}</span><select className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm" value={days} onChange={(event) => setDays(Number(event.target.value) as InsightDays)} aria-label={t("accounting.insights.period")}>
-            {[30, 90, 180].map((value) => <option key={value} value={value}>{t("accounting.insights.lastDays", { count: value })}</option>)}
-          </select></label>
+          <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("accounting.insights.currency")}</span><Select
+            value={model.selectedId || "__none__"}
+            onValueChange={(nextValue) => setCurrencyId(nextValue === "__none__" ? undefined : nextValue)}
+          >
+            <SelectTrigger
+              className="h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
+              aria-label={t("accounting.insights.currency")}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {!model.currency && (
+                <SelectItem value={model.selectedId || "__none__"}>
+                  {t("accounting.insights.currencyUnavailable")}
+                </SelectItem>
+              )}
+              {model.currencies.map((item) => (
+                <SelectItem key={item.id} value={String(item.id)}>
+                  {item.label} (#{item.id})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select></label>
+          <label className="min-w-0 space-y-1 text-xs font-medium"><span>{t("accounting.insights.period")}</span><Select
+            value={String(days ?? "")}
+            onValueChange={(nextValue) => setDays(Number(nextValue) as InsightDays)}
+          >
+            <SelectTrigger
+              className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+              aria-label={t("accounting.insights.period")}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {[30, 90, 180].map((value) => (
+                <SelectItem key={value} value={String(value)}>
+                  {t("accounting.insights.lastDays", { count: value })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select></label>
         </div>
       </div>
       <p className="text-xs leading-5 text-muted-foreground" data-testid="insights-period-label">{periodLabel} · {t("accounting.insights.comparedWith")} {previousLabel}. {t("accounting.insights.utcHint")}</p>

@@ -50,14 +50,14 @@ const bankSource: ReconciliationSource = {
   moveLines: [{ ...scope, id: "501", moveId: "91", accountId: "401", partnerId: "601", parentState: "Posted", name: "Open customer invoice", companyCurrencyId: "1", currencyId: "1", balance: 100, debit: 100, credit: 0, amountResidual: 100, blocked: false }],
 }
 const paymentRows: Record<string, Record<string, unknown>[]> = {
-  "payment-accounts": [{ ...scope, id: "1", name: "Synthetic EUR bank", active: true, currencyId: "1", providerCode: "Bank", accountJournalId: "5" }],
-  "payment-transactions": [{ ...scope, id: "301", paymentAccountId: "1", accountPaymentId: "1", partnerId: "601", status: "Posted", direction: "Inbound", currencyId: "1", settlementAmount: 100, externalReference: "SYNTHETIC-PAYMENT-301" }],
+  "payment-accounts": [{ ...scope, id: "1", name: "Synthetic EUR bank", active: true, archivedAt: null, currencyId: "1", providerCode: "Bank", accountJournalId: "5" }],
+  "payment-transactions": [{ ...scope, id: "301", paymentAccountId: "1", accountPaymentId: "1", partnerId: "601", partnerType: "Customer", status: "Posted", direction: "Inbound", currencyId: "1", settlementAmount: 100, externalReference: "SYNTHETIC-PAYMENT-301" }],
   "account-payments": [{ ...scope, id: "1", moveId: "101", partnerId: "601", state: "Paid", paymentType: "Inbound", currencyId: "1", amount: 100 }],
   "account-moves": [{ ...scope, id: "101", state: "Posted", currencyId: "1" }],
   "account-move-lines": [{ ...scope, id: "201", moveId: "101", paymentId: "1", partnerId: "601", parentState: "Posted", accountInternalType: "receivable", companyCurrencyId: "1", currencyId: "1", balance: -100, amountResidual: 60 }],
-  "payment-reconciliations": [], "payment-reversals": [], "payment-fees": [],
+  "payment-reconciliations": [{ ...scope, id: "701", paymentTransactionId: "301", currencyId: "1", allocatedMoveLineId: "502", allocatedAmount: 40, isReversal: false }], "payment-reversals": [], "payment-fees": [],
 }
-const openInvoiceLines = [{ ...scope, id: "501", moveId: "91", partnerId: "601", currencyId: "1", accountInternalType: "receivable", parentState: "Posted", name: "Customer invoice INV/BANK/91", amountResidual: 100 }]
+const openInvoiceLines = [{ ...scope, id: "501", moveId: "91", accountId: "401", journalId: "5", partnerId: "601", currencyId: "1", accountInternalType: "receivable", parentState: "Posted", name: "Customer invoice INV/BANK/91", amountResidual: 100 }]
 function queryClient() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } })
   for (const company of [11, 22]) {
@@ -129,7 +129,10 @@ function Operations() {
     </section> : null}
     {stage === "payments" || paymentLocked ? <section className="space-y-3" aria-label="Retained payment allocation">
       {stage !== "payments" ? <p role="status">Original payment allocation remains mounted while its result is pending or unknown.</p> : null}
-      <PaymentOperationsPanel organizationId={7} companyId={BigInt(companyId)} defaultCurrencyId={1n} currencyOptions={currencies} journalOptions={[{ value: "5", label: "EUR bank" }]} glAccountOptions={[{ value: "401", label: "Receivables" }]} partnerOptions={[{ value: "601", label: "Canonical customer" }]} moveLines={openInvoiceLines} onRecoveryLockChange={setPaymentLocked} />
+      <PaymentOperationsPanel organizationId={7} companyId={BigInt(companyId)} defaultCurrencyId={1n} currencyOptions={currencies} journalOptions={[{ value: "5", label: "EUR bank" }]} glAccountOptions={[{ value: "401", label: "Receivables" }]} partnerOptions={[{ value: "601", label: "Canonical customer" }]} moveLines={openInvoiceLines} lookupDataReady
+        moves={[{ ...scope, id: "91", name: "INV/BANK/91", state: "Posted", moveType: "OutInvoice", partnerId: "601", currencyId: "1", journalId: "5" }]}
+        glAccounts={[{ ...scope, id: "401", internalType: "Receivable", internalGroup: "Asset", deprecated: false }]}
+        onRecoveryLockChange={setPaymentLocked} />
     </section> : null}
     {stage === "bank-lifecycle" || lifecycleLocked ? <section className="space-y-3" aria-label="Retained bank lifecycle recovery">
       {stage !== "bank-lifecycle" ? <p role="status">Original bank approval recovery remains mounted while pending or awaiting approval.</p> : null}

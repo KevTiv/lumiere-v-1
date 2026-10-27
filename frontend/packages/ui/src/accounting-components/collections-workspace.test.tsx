@@ -1,3 +1,4 @@
+import { chooseSelectValue } from "../components/select-test-utils"
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AccountMove } from '../lib/accounting-types';
@@ -28,7 +29,7 @@ describe('collections', () => {
     render(<CollectionsWorkspace invoices={rows} scope={scope} now={now} currencyOptions={[{ value: '7', code: 'USD' }, { value: '8', code: 'EUR' }]} dataState={{ status: 'ready' }} canReview onReviewReminder={onReviewReminder} />);
     expect(screen.getByLabelText('Overdue balance by currency').textContent).toContain('USD');
     expect(screen.getByLabelText('Overdue balance by currency').textContent).toContain('EUR');
-    fireEvent.change(screen.getByLabelText('Days overdue'), { target: { value: '61-90' } });
+    chooseSelectValue(screen.getByLabelText("Days overdue"), "61-90");
     expect(screen.queryByText('INV/1')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /Review reminder for INV\/2/ }));
     expect(onReviewReminder).toHaveBeenCalledWith(rows[1]);

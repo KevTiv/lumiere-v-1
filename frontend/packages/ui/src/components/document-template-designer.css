@@ -83,7 +83,7 @@
   height: 13px;
 }
 
-.template-studio-zoom select {
+.template-studio-zoom [data-slot="select-trigger"] {
   width: 70px;
   height: 30px;
   border: 0;
@@ -919,7 +919,7 @@
     margin: 0 3px;
   }
 
-  .template-studio-zoom select {
+  .template-studio-zoom [data-slot="select-trigger"] {
     width: 61px;
   }
 

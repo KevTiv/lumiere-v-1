@@ -16,6 +16,7 @@ import {
   invoiceEmailContent, invoiceEmailContentProblem, invoiceEmailTemplateProblem, invoiceEmailTemplates,
   type InvoiceEmailDocument, type InvoiceEmailQueueOutcome, type InvoiceEmailSubmission, type InvoiceEmailTemplate,
 } from './invoice-email-review';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/select"
 
 export interface InvoiceEmailReviewDialogProps {
   open: boolean;
@@ -163,7 +164,31 @@ export function InvoiceEmailReviewDialog(props: InvoiceEmailReviewDialogProps) {
             </section> : <>
               {outcome?.status === 'rejected' ? <p role="alert" className="rounded-lg border p-3 text-sm text-destructive">{outcome.message}</p> : null}
               <div className="space-y-2"><Label htmlFor="invoice-email-recipient">Recipient email</Label><Input id="invoice-email-recipient" data-testid="invoice-email-recipient" type="email" autoComplete="email" className="min-h-11" value={recipient} disabled={locked} onChange={(event) => setRecipient(event.target.value)} aria-invalid={Boolean(recipientProblem)} />{recipientProblem ? <p className="text-sm text-destructive">{recipientProblem}</p> : null}</div>
-              <div className="space-y-2"><Label htmlFor="invoice-email-template">Email template</Label><select id="invoice-email-template" data-testid="invoice-email-template" className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm" value={selectedId} disabled={locked || templates.length === 0} onChange={(event) => setTemplateId(event.target.value)}><option value="">Choose a template</option>{templates.map((row) => <option key={String(row.id)} value={String(row.id)}>{row.name} · {row.companyId === undefined ? 'Organization' : 'Company'}</option>)}</select>{templates.length === 0 ? <p className="text-sm text-muted-foreground">No active account-move email template is available for this company or organization.</p> : null}</div>
+              <div className="space-y-2"><Label htmlFor="invoice-email-template">Email template</Label><Select
+                value={String(selectedId ?? "") || "__none__"}
+                onValueChange={(selectValue) => {
+                  const nextValue = selectValue === "__none__" ? "" : selectValue
+                  setTemplateId(nextValue)
+                }}
+                disabled={locked || templates.length === 0}
+              >
+                {" "}
+                <SelectTrigger
+                  id="invoice-email-template"
+                  data-testid="invoice-email-template"
+                  className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <SelectValue />
+                </SelectTrigger>{" "}
+                <SelectContent>
+                  <SelectItem value={"__none__"}>Choose a template</SelectItem>
+                  {templates.map((row) => (
+                    <SelectItem key={String(row.id)} value={String(String(row.id))}>
+                      {row.name} · {row.companyId === undefined ? "Organization" : "Company"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>{" "}
+              </Select>{templates.length === 0 ? <p className="text-sm text-muted-foreground">No active account-move email template is available for this company or organization.</p> : null}</div>
               {templateProblem ? <p role="alert" className="rounded-lg border p-3 text-sm text-destructive">{templateProblem}</p> : null}
             </>}
             {(submitted?.template ?? template) ? <section className="min-w-0 space-y-3" aria-label="Plain text email preview">

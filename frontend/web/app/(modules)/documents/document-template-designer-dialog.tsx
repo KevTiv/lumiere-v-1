@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react"
 import {
   ArrowLeft,
   Check,
-  ChevronDown,
   FileText,
   LoaderCircle,
   Upload,
@@ -50,6 +49,7 @@ import {
 import { useRBAC } from "@lumiere/ui/lib/rbac-context"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
 import "./document-template-designer-dialog.css"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 export interface DocumentTemplateDesignSource {
   row: DocumentTemplateRow
@@ -673,30 +673,29 @@ export function DocumentTemplateDesignerDialog({
                 })}
               </Label>
               <div className="document-template-dialog__select">
-                <select
-                  id="document-designer-kind"
-                  value={kind}
-                  disabled={Boolean(template) || pending || !canSave}
-                  onChange={(event) => {
-                    if (
-                      event.target.value === "rich-text" ||
-                      event.target.value === "document"
-                    )
-                      void changeKind(event.target.value)
+                <Select
+                  value={String(kind ?? "")}
+                  onValueChange={(nextValue) => {
+                    if (nextValue === "rich-text" || nextValue === "document") void changeKind(nextValue)
                   }}
+                  disabled={Boolean(template) || pending || !canSave}
                 >
-                  <option value="rich-text">
-                    {t("documents.designer.richText", {
-                      defaultValue: "Text for editor fields",
-                    })}
-                  </option>
-                  <option value="document">
-                    {t("documents.designer.document", {
-                      defaultValue: "Document layout",
-                    })}
-                  </option>
-                </select>
-                <ChevronDown aria-hidden="true" />
+                  <SelectTrigger id="document-designer-kind" className="h-11 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={"rich-text"}>
+                      {t("documents.designer.richText", {
+                        defaultValue: "Text for editor fields",
+                      })}
+                    </SelectItem>
+                    <SelectItem value={"document"}>
+                      {t("documents.designer.document", {
+                        defaultValue: "Document layout",
+                      })}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             {!template && kind === "rich-text" ? (
@@ -707,38 +706,39 @@ export function DocumentTemplateDesignerDialog({
                   })}
                 </Label>
                 <div className="document-template-dialog__select">
-                  <select
-                    id="document-designer-starter"
-                    value={starter}
-                    disabled={pending || !canSave}
-                    onChange={(event) => {
-                      void changeStarter(
-                        event.target.value as TextTemplateStarter,
-                      )
+                  <Select
+                    value={String(starter ?? "")}
+                    onValueChange={(nextValue) => {
+                      void changeStarter(nextValue as TextTemplateStarter)
                     }}
+                    disabled={pending || !canSave}
                   >
-                    <option value="blank">
-                      {t("documents.designer.starters.blank", {
-                        defaultValue: "Blank text",
-                      })}
-                    </option>
-                    <option value="proposal">
-                      {t("documents.designer.starters.proposal", {
-                        defaultValue: "Proposal introduction",
-                      })}
-                    </option>
-                    <option value="scope">
-                      {t("documents.designer.starters.scope", {
-                        defaultValue: "Scope of work",
-                      })}
-                    </option>
-                    <option value="terms">
-                      {t("documents.designer.starters.terms", {
-                        defaultValue: "Working terms",
-                      })}
-                    </option>
-                  </select>
-                  <ChevronDown aria-hidden="true" />
+                    <SelectTrigger id="document-designer-starter" className="h-11 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={"blank"}>
+                        {t("documents.designer.starters.blank", {
+                          defaultValue: "Blank text",
+                        })}
+                      </SelectItem>
+                      <SelectItem value={"proposal"}>
+                        {t("documents.designer.starters.proposal", {
+                          defaultValue: "Proposal introduction",
+                        })}
+                      </SelectItem>
+                      <SelectItem value={"scope"}>
+                        {t("documents.designer.starters.scope", {
+                          defaultValue: "Scope of work",
+                        })}
+                      </SelectItem>
+                      <SelectItem value={"terms"}>
+                        {t("documents.designer.starters.terms", {
+                          defaultValue: "Working terms",
+                        })}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             ) : null}
@@ -750,30 +750,29 @@ export function DocumentTemplateDesignerDialog({
                   })}
                 </Label>
                 <div className="document-template-dialog__select">
-                  <select
-                    id="document-designer-document-starter"
-                    value={documentStarter}
-                    disabled={pending || !canSave}
-                    onChange={(event) => {
-                      if (
-                        event.target.value === "blank" ||
-                        event.target.value === "quotation"
-                      )
-                        void changeDocumentStarter(event.target.value)
+                  <Select
+                    value={String(documentStarter ?? "")}
+                    onValueChange={(nextValue) => {
+                      if (nextValue === "blank" || nextValue === "quotation") void changeDocumentStarter(nextValue)
                     }}
+                    disabled={pending || !canSave}
                   >
-                    <option value="blank">
-                      {t("documents.designer.starters.blankDocument", {
-                        defaultValue: "Blank document",
-                      })}
-                    </option>
-                    <option value="quotation">
-                      {t("documents.designer.starters.quotation", {
-                        defaultValue: "Quotation",
-                      })}
-                    </option>
-                  </select>
-                  <ChevronDown aria-hidden="true" />
+                    <SelectTrigger id="document-designer-document-starter" className="h-11 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={"blank"}>
+                        {t("documents.designer.starters.blankDocument", {
+                          defaultValue: "Blank document",
+                        })}
+                      </SelectItem>
+                      <SelectItem value={"quotation"}>
+                        {t("documents.designer.starters.quotation", {
+                          defaultValue: "Quotation",
+                        })}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             ) : null}

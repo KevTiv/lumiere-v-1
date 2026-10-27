@@ -36,6 +36,7 @@ import { defaultAtCommands } from "@/lib/ai-chat-types"
 import { AiActionDraftCard } from "./ai-action-draft-card"
 import { aiChatCategoryPillClass } from "@/lib/theme-colors"
 import { useTranslation } from "@lumiere/i18n"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "../components/select"
 
 interface ChatReply {
   content: string
@@ -486,20 +487,32 @@ export function AIChatPanel({
           {contextOptions && contextOptions.length > 0 && onContextChange ? (
             <label className="min-w-0">
               <span className="sr-only">Assistant context</span>
-              <select
-                data-testid="erp-ai-chat-context"
-                value={selectedContext ?? contextOptions[0]?.value}
-                onChange={(event) => onContextChange(event.target.value)}
-                className="h-9 max-w-[128px] rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[190px]"
+              <Select
+                value={String(selectedContext ?? contextOptions[0]?.value ?? "")}
+                onValueChange={(nextValue) => onContextChange(nextValue)}
               >
-                {Array.from(new Set(contextOptions.map((option) => option.group))).map((group) => (
-                  <optgroup key={group} label={group}>
-                    {contextOptions.filter((option) => option.group === group).map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+                <SelectTrigger
+                  data-testid="erp-ai-chat-context"
+                  className="h-9 max-w-[128px] rounded-md border border-border bg-card px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[190px]"
+                  aria-label={"Assistant context"}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from(new Set(contextOptions.map((option) => option.group))).map((group) => (
+                    <SelectGroup key={group}>
+                      <SelectLabel>{group}</SelectLabel>
+                      {contextOptions
+                        .filter((option) => option.group === group)
+                        .map((option) => (
+                          <SelectItem key={option.value} value={String(option.value)}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
           ) : null}
           {onDockToggle ? (

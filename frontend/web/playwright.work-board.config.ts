@@ -3,7 +3,7 @@ import { defineConfig } from "@playwright/test"
 /** Real work board UI and transport, synthetic HTTP/session boundary; no live ERP claims. */
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "work-board-ui.spec.ts",
+  testMatch: ["work-board-ui.spec.ts", "select-controls-ui.spec.ts"],
   workers: 1,
   timeout: 45_000,
   expect: { timeout: 10_000 },

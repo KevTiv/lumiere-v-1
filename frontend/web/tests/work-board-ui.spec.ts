@@ -1,3 +1,4 @@
+import { chooseSelectOptionByTriggerValue } from "./e2e/helpers-legacy"
 import {
   expect,
   test,
@@ -701,21 +702,27 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     await expect(page.getByTestId("kanban-card-61")).toHaveCount(0)
     await page.getByLabel("Synthetic module scope").selectOption("purchasing")
     await expect(page.getByTestId("kanban-card-51")).toHaveCount(0)
-    await page
-      .getByRole("combobox", { name: "Show", exact: true })
-      .selectOption("mine")
+    await chooseSelectOptionByTriggerValue(
+      page,
+      page.getByRole("combobox", { name: "Show", exact: true }),
+      "mine",
+    )
     await expect(page).toHaveURL(/workView=mine/)
     await expect(page.getByTestId("kanban-card-42")).toBeVisible()
     await expect(page.getByTestId("kanban-card-41")).toHaveCount(0)
-    await page
-      .getByRole("combobox", { name: "Show", exact: true })
-      .selectOption("available")
+    await chooseSelectOptionByTriggerValue(
+      page,
+      page.getByRole("combobox", { name: "Show", exact: true }),
+      "available",
+    )
     await expect(page.getByTestId("kanban-card-41")).toBeVisible()
     await expect(page.getByTestId("kanban-card-42")).toHaveCount(0)
     await expect(page.getByTestId("kanban-card-44")).toHaveCount(0)
-    await page
-      .getByRole("combobox", { name: "Team", exact: true })
-      .selectOption("workflow-group:5")
+    await chooseSelectOptionByTriggerValue(
+      page,
+      page.getByRole("combobox", { name: "Team", exact: true }),
+      "workflow-group:5",
+    )
     await expect(page).toHaveURL(/workTeam=workflow-group%3A5/)
     expect(state.writes).toHaveLength(0)
   })
@@ -882,18 +889,22 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     await expect(
       review.getByRole("button", { name: "Approve", exact: true }),
     ).toHaveCount(0)
-    await review
-      .getByRole("combobox", { name: "Acting as", exact: true })
-      .selectOption(delegate)
+    await chooseSelectOptionByTriggerValue(
+      page,
+      review.getByRole("combobox", { name: "Acting as", exact: true }),
+      delegate,
+    )
     await expect(
       review.getByRole("button", { name: "Approve", exact: true }),
     ).toBeEnabled()
     await expect(
       review.getByRole("button", { name: "Complete", exact: true }),
     ).toHaveCount(0)
-    await review
-      .getByRole("combobox", { name: "Acting as", exact: true })
-      .selectOption(secondDelegate)
+    await chooseSelectOptionByTriggerValue(
+      page,
+      review.getByRole("combobox", { name: "Acting as", exact: true }),
+      secondDelegate,
+    )
     await expect(
       review.getByRole("button", { name: "Complete", exact: true }),
     ).toBeEnabled()
@@ -1008,9 +1019,13 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
   }) => {
     state.rows = [task(41)]
     await openFixture(page)
-    await page
-      .getByRole("combobox", { name: "Show", exact: true })
-      .selectOption("available")
+    await chooseSelectOptionByTriggerValue(
+      page,
+      page.getByRole("combobox", { name: "Show", exact: true }),
+      "available",
+    )
+    await expect(page).toHaveURL(/workView=available/)
+    await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeEnabled()
     await page.getByTestId("kanban-card-41").click()
     const review = page.getByRole("dialog", { name: "Purchase review 41" })
     state.hideCommandEvidence = true
@@ -1161,13 +1176,17 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     page,
   }) => {
     await openFixture(page)
-    await page
-      .getByRole("combobox", { name: "Team", exact: true })
-      .selectOption("workflow-group:5")
+    await chooseSelectOptionByTriggerValue(
+      page,
+      page.getByRole("combobox", { name: "Team", exact: true }),
+      "workflow-group:5",
+    )
     await expect(page).toHaveURL(/workTeam=workflow-group%3A5/)
-    await page
-      .getByRole("combobox", { name: "Work type", exact: true })
-      .selectOption("activities")
+    await chooseSelectOptionByTriggerValue(
+      page,
+      page.getByRole("combobox", { name: "Work type", exact: true }),
+      "activities",
+    )
     await expect(page).toHaveURL(/workSource=activities/)
     await expect(page).not.toHaveURL(/workTeam=/)
     await expect(page.getByTestId("kanban-card-71")).toBeVisible()
@@ -1184,9 +1203,11 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     ).toBeEnabled()
     expect(state.writes).toHaveLength(0)
     await review.getByRole("button", { name: "Close", exact: true }).click()
-    await page
-      .getByRole("combobox", { name: "Work type", exact: true })
-      .selectOption("workflow")
+    await chooseSelectOptionByTriggerValue(
+      page,
+      page.getByRole("combobox", { name: "Work type", exact: true }),
+      "workflow",
+    )
     await expect(page.getByTestId("kanban-card-41")).toBeVisible()
     await expect(page.getByTestId("kanban-card-71")).toHaveCount(0)
   })
@@ -1197,9 +1218,11 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     }) => {
       await openFixture(page)
       if (source === "activities")
-        await page
-          .getByRole("combobox", { name: "Work type", exact: true })
-          .selectOption("activities")
+        await chooseSelectOptionByTriggerValue(
+          page,
+          page.getByRole("combobox", { name: "Work type", exact: true }),
+          "activities",
+        )
       const id = source === "workflow" ? 42 : 71
       const resource =
         source === "workflow" ? "workflow-human-tasks" : "activities"
@@ -1254,9 +1277,11 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     }) => {
       await openFixture(page)
       if (source === "activities")
-        await page
-          .getByRole("combobox", { name: "Work type", exact: true })
-          .selectOption("activities")
+        await chooseSelectOptionByTriggerValue(
+          page,
+          page.getByRole("combobox", { name: "Work type", exact: true }),
+          "activities",
+        )
       const id = source === "workflow" ? 42 : 71
       const card = page.getByTestId(`kanban-card-${id}`)
       await card.click()
@@ -1298,9 +1323,11 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     }) => {
       await openFixture(page)
       if (source === "activities")
-        await page
-          .getByRole("combobox", { name: "Work type", exact: true })
-          .selectOption("activities")
+        await chooseSelectOptionByTriggerValue(
+          page,
+          page.getByRole("combobox", { name: "Work type", exact: true }),
+          "activities",
+        )
       const card = page.getByTestId(
         `kanban-card-${source === "workflow" ? 42 : 71}`,
       )
@@ -1359,9 +1386,11 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     await openFixture(page)
     await page.getByTestId("kanban-card-43").click()
     const review = page.getByRole("dialog")
-    await review
-      .getByRole("combobox", { name: "Acting as", exact: true })
-      .selectOption(delegate)
+    await chooseSelectOptionByTriggerValue(
+      page,
+      review.getByRole("combobox", { name: "Acting as", exact: true }),
+      delegate,
+    )
     await review.getByRole("textbox").fill("A review for the former principal")
     row.actingForOptions = [
       {
@@ -1375,9 +1404,12 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     await expect(page.getByTestId("kanban-card-43")).toBeVisible()
     await page.getByTestId("kanban-card-43").click()
     await expect(review).toBeVisible()
-    await expect(
-      review.getByRole("option", { name: "Delegated approver", exact: true }),
-    ).toHaveCount(0)
+    const actingAs = review.getByRole("combobox", { name: "Acting as", exact: true })
+    if (await actingAs.count()) {
+      await actingAs.click()
+      await expect(page.getByRole("option", { name: "Delegated approver", exact: true })).toHaveCount(0)
+      await page.keyboard.press("Escape")
+    }
     await expect(
       review.getByRole("button", { name: "Approve", exact: true }),
     ).toHaveCount(0)
@@ -1531,12 +1563,19 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     page,
   }) => {
     await openFixture(page)
-    await page
-      .getByRole("combobox", { name: "Work type", exact: true })
-      .selectOption("activities")
-    await page
-      .getByRole("combobox", { name: "Show", exact: true })
-      .selectOption("available")
+    await chooseSelectOptionByTriggerValue(
+      page,
+      page.getByRole("combobox", { name: "Work type", exact: true }),
+      "activities",
+    )
+    await expect(page).toHaveURL(/workSource=activities/)
+    await chooseSelectOptionByTriggerValue(
+      page,
+      page.getByRole("combobox", { name: "Show", exact: true }),
+      "available",
+    )
+    await expect(page).toHaveURL(/workView=available/)
+    await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeEnabled()
     await expect(page.getByTestId("kanban-card-71")).toHaveAttribute(
       "data-draggable",
       "true",
@@ -1564,9 +1603,11 @@ test.describe("module work boards with production UI and synthetic HTTP", () => 
     })
     await expect(review).toHaveCount(0)
     await expect(page.getByTestId("kanban-card-71")).toHaveCount(0)
-    await page
-      .getByRole("combobox", { name: "Show", exact: true })
-      .selectOption("eligible")
+    await chooseSelectOptionByTriggerValue(
+      page,
+      page.getByRole("combobox", { name: "Show", exact: true }),
+      "eligible",
+    )
     await expect(
       page.getByTestId("kanban-column-done").getByTestId("kanban-card-71"),
     ).toBeVisible()

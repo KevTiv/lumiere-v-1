@@ -1,3 +1,4 @@
+import { chooseSelectValue } from "../components/select-test-utils"
 import {
   cleanup,
   fireEvent,
@@ -124,7 +125,7 @@ describe("scoped accounting worklists", () => {
     )
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" })
     fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
-      target: { value: "My receivables" },
+      target: { value: "__none__" },
     })
     fireEvent.click(screen.getByRole("button", { name: "Save view" }))
     const stored = JSON.parse(
@@ -137,9 +138,10 @@ describe("scoped accounting worklists", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Search" }), {
       target: { value: "" },
     })
-    fireEvent.change(screen.getByRole("combobox", { name: "Saved views" }), {
-      target: { value: "My receivables" },
-    })
+    chooseSelectValue(
+      screen.getByRole("combobox", { name: "Saved views" }),
+      "saved:__none__",
+    )
     expect(screen.getByTestId("entity-row-9007199254740992")).toBeTruthy()
     expect(screen.queryByTestId("entity-row-9007199254740993")).toBeNull()
     expect(clear).not.toHaveBeenCalled()
@@ -294,7 +296,10 @@ describe("scoped accounting worklists", () => {
       target: { value: "Session view" },
     })
     fireEvent.click(screen.getByRole("button", { name: "Save view" }))
-    expect(screen.getByRole("option", { name: "Session view" })).toBeTruthy()
+    chooseSelectValue(
+      screen.getByRole("combobox", { name: "Saved views" }),
+      "saved:Session view",
+    )
     expect(write).not.toHaveBeenCalled()
     cleanup()
     vi.restoreAllMocks()

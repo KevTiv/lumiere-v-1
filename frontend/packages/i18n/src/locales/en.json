@@ -169,6 +169,11 @@
     "search": "Search modules and records"
   },
   "common": {
+    "select": {
+      "search": "Search options…",
+      "options": "Options",
+      "noMatches": "No matching options"
+    },
     "save": "Save",
     "cancel": "Cancel",
     "edit": "Edit",

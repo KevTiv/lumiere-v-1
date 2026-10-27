@@ -1,3 +1,4 @@
+import { chooseSelectOptionByTriggerValue } from "./helpers-legacy"
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { stdbParamsToJson } from "@lumiere/erp-shared/stdb-params-json"
 import type { DocumentTemplateRow } from "@lumiere/query-hooks/hooks/templates"
@@ -196,7 +197,11 @@ test.describe("Document template studio", { tag: ["@p0", "@document-templates"] 
       let dialog = page.getByRole("dialog", { name: "Design a template", exact: true })
       await expect(dialog.getByTestId("document-template-designer")).toBeVisible()
       await dialog.getByLabel("Name", { exact: true }).fill(name)
-      await dialog.getByLabel("Start with", { exact: true }).selectOption("scope")
+      await chooseSelectOptionByTriggerValue(
+        page,
+        dialog.getByLabel("Start with", { exact: true }),
+        "scope",
+      )
       const canvas = page.frameLocator('iframe[title="Template design canvas"]')
       await expect(canvas.locator("h2")).toHaveText("Scope of work")
       await expect(canvas.locator("ul li")).toHaveCount(3)

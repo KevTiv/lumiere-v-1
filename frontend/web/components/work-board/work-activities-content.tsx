@@ -24,6 +24,7 @@ import {
   useWorkActivities,
   type WorkActivityRow,
 } from "@lumiere/query-hooks/hooks/work-activities"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@lumiere/ui/components/select"
 
 export function WorkActivitiesContent({
   scope,
@@ -152,24 +153,32 @@ export function WorkActivitiesContent({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="grid gap-1 text-xs font-medium">
           {t("workBoard.team")}
-          <select
-            className="h-9 max-w-full rounded-md border bg-background px-2 text-sm"
-            value={scope.team ?? ""}
+          <Select
+            value={String(scope.team ?? "") || "__none__"}
+            onValueChange={(selectValue) => {
+              const nextValue = selectValue === "__none__" ? "" : selectValue
+              onTeamChange(nextValue || null)
+            }}
             disabled={navigationPending}
-            onChange={(event) => onTeamChange(event.target.value || null)}
           >
-            <option value="">{t("workBoard.allTeams")}</option>
-            {scope.team &&
-              !teams.some((team) => workTeamKey(team) === scope.team) && (
-                <option value={scope.team}>{scope.team}</option>
+            <SelectTrigger
+              className="h-9 max-w-full rounded-md border bg-background px-2 text-sm"
+              aria-label={t("workBoard.team")}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={"__none__"}>{t("workBoard.allTeams")}</SelectItem>
+              {scope.team && !teams.some((team) => workTeamKey(team) === scope.team) && (
+                <SelectItem value={String(scope.team)}>{scope.team}</SelectItem>
               )}
-            {teams.map((team) => (
-              <option key={workTeamKey(team)} value={workTeamKey(team)}>
-                {team.label ||
-                  t("workBoard.teamKind.department", { id: team.id })}
-              </option>
-            ))}
-          </select>
+              {teams.map((team) => (
+                <SelectItem key={workTeamKey(team)} value={String(workTeamKey(team))}>
+                  {team.label || t("workBoard.teamKind.department", { id: team.id })}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </label>
         <div className="flex items-center gap-3">
           <p role="status" className="text-xs text-muted-foreground">

@@ -9,6 +9,7 @@ import { Input } from '../components/input';
 import { ModuleDataNotice } from '../pages/module-data-notice';
 import { formatInvoiceMoney } from './invoice-document';
 import { accountingCurrencySummaries, accountingListMoney, type AccountingListCurrencyOption } from './accounting-list-display';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/select"
 
 export type CollectionsAge = 'all' | '1-30' | '31-60' | '61-90' | '90+';
 export interface CollectionInvoice { invoice: AccountMove; daysOverdue: number; dueDate: string; age: Exclude<CollectionsAge, 'all'> }
@@ -58,7 +59,25 @@ export function CollectionsWorkspace({ invoices, scope, currencyOptions = [], da
     <ModuleDataNotice state={dataState} />
     {dataState.status === 'loading' ? <p role="status">Loading overdue invoices…</p> : null}
     {ready ? <>
-      <div className="flex flex-wrap gap-3"><Input aria-label="Search collections" placeholder="Search invoice or customer" className="min-h-11 sm:max-w-sm" value={search} onChange={(event) => setSearch(event.target.value)} /><select aria-label="Days overdue" className="min-h-11 rounded-md border bg-background px-3 text-sm" value={age} onChange={(event) => setAge(event.target.value as CollectionsAge)}><option value="all">All overdue</option><option value="1-30">1–30 days</option><option value="31-60">31–60 days</option><option value="61-90">61–90 days</option><option value="90+">Over 90 days</option></select></div>
+      <div className="flex flex-wrap gap-3"><Input aria-label="Search collections" placeholder="Search invoice or customer" className="min-h-11 sm:max-w-sm" value={search} onChange={(event) => setSearch(event.target.value)} /><Select
+        value={String(age ?? "")}
+        onValueChange={(nextValue) => setAge(nextValue as CollectionsAge)}
+      >
+        {" "}
+        <SelectTrigger
+          aria-label="Days overdue"
+          className="min-h-11 rounded-md border bg-background px-3 text-sm"
+        >
+          <SelectValue />
+        </SelectTrigger>{" "}
+        <SelectContent>
+          <SelectItem value={"all"}>All overdue</SelectItem>
+          <SelectItem value={"1-30"}>1–30 days</SelectItem>
+          <SelectItem value={"31-60"}>31–60 days</SelectItem>
+          <SelectItem value={"61-90"}>61–90 days</SelectItem>
+          <SelectItem value={"90+"}>Over 90 days</SelectItem>
+        </SelectContent>{" "}
+      </Select></div>
       <div className="flex flex-wrap gap-3" aria-label="Overdue balance by currency">{summaries.map((group) => <div key={group.key} className="rounded-lg border p-3 text-sm"><p className="text-muted-foreground">{group.label}</p><p className="mt-1 font-medium">{group.residual === null ? 'Balance unavailable' : formatInvoiceMoney(group.residual, group.currency)} outstanding</p></div>)}</div>
       <p className="text-sm text-muted-foreground">{visible.length} overdue invoice{visible.length === 1 ? '' : 's'}. Balances remain separate by currency.</p>
       {!canReview ? <p role="status" className="text-sm">Invoice and email review access is required to prepare reminders.</p> : null}

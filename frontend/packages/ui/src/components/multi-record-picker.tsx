@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, type KeyboardEvent } from "react"
-import { ChevronsUpDown, X } from "lucide-react"
+import { Check, ChevronsUpDown, X } from "lucide-react"
 
 import { cn } from "../lib/utils"
 import {
@@ -163,8 +163,19 @@ export function MultiRecordPicker({
                   data-checked={selected.has(option.value)}
                   aria-checked={selected.has(option.value)}
                   onSelect={() => toggle(option.value)}
-                  className="pointer-coarse:min-h-11"
+                  className="pointer-coarse:min-h-11 [&>svg:last-child]:hidden"
                 >
+                  <span
+                    aria-hidden="true"
+                    data-slot="option-checkbox"
+                    data-checked={selected.has(option.value)}
+                    className={cn(
+                      "flex size-4 shrink-0 items-center justify-center rounded-sm border border-input",
+                      selected.has(option.value) && "border-primary bg-primary text-primary-foreground",
+                    )}
+                  >
+                    {selected.has(option.value) && <Check className="size-3.5" />}
+                  </span>
                   {option.label}
                 </CommandItem>
               ))}
