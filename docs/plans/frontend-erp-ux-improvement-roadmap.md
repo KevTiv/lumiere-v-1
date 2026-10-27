@@ -1,5 +1,7 @@
 # Lumière ERP UX Improvement Roadmap
 
+Current execution plan: [Alpha user experience sweep](alpha-paid-user-ux-sweep.md), prepared on 2026-10-27. It defines agent ownership, business-form decisions, reference conventions, and acceptance for the currently exposed Alpha paths.
+
 ## Summary
 
 The frontend has strong functional coverage and a reusable shadcn-based component layer, but its information architecture mirrors backend entities more than user goals. The clearest example is horizontal tab overload: Accounting and Inventory expose roughly 20 entity tabs each, while Sales exposes about 15. Users must remember where data lives instead of following recognizable workflows.

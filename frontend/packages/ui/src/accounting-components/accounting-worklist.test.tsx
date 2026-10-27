@@ -10,6 +10,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { AccountMove } from "../lib/accounting-types"
 import { accountingWorklistKey } from "./accounting-worklist-model"
+import { readRecordListContext, readRecordListReturnContext } from "../lib/record-list-context"
 
 const permission = vi.hoisted(() => ({ allowed: true }))
 vi.mock("../lib/rbac-context", () => ({
@@ -67,12 +68,150 @@ const rows: AccountMove[] = [
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
+  window.sessionStorage.clear()
+  window.history.replaceState({}, "", "/")
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   permission.allowed = true
 })
 
 describe("scoped accounting worklists", () => {
+  it("returns to the captured scoped sort, page, scroll and row focus after preferences load", async () => {
+    window.history.replaceState({}, "", "/accounting?tab=invoices&filter=currencyId%3A7&keep=alpha")
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0))
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id))
+    const many = Array.from({ length: 60 }, (_, index) => ({
+      ...rows[0]!, id: String(index + 1), name: `Return ${String(index + 1).padStart(3, "0")}`,
+    }))
+    const view = () => <main data-slot="sidebar-inset" data-testid="return-scroll"><InvoiceListView invoices={many} worklistScope={scope} currencyOptions={currencies} initialFilters={{ currencyId: "7" }} /></main>
+    const first = render(view())
+    await screen.findByTestId("entity-row-60")
+    fireEvent.change(screen.getByRole("textbox", { name: "Search" }), { target: { value: "Return" } })
+    fireEvent.click(within(screen.getByRole("table")).getByRole("button", { name: "accounting.invoices.title" }))
+    fireEvent.click(screen.getByRole("button", { name: "Next", exact: true }))
+    const link = within(screen.getByTestId("entity-row-26")).getByRole("link")
+    link.addEventListener("click", (event) => event.preventDefault())
+    screen.getByTestId("return-scroll").scrollTop = 240
+    screen.getByRole("table").parentElement!.scrollLeft = 120
+    fireEvent.click(link)
+    const key = accountingWorklistKey(scope, "invoice")!
+    expect(readRecordListReturnContext("/accounting/invoices", { key, recordId: "26" })).toMatchObject({
+      page: 2, rowId: "26", sorting: [{ id: "name", desc: false }], scrollTop: 240, scrollLeft: 120,
+    })
+    first.unmount()
+
+    const returned = render(view())
+    const restored = await screen.findByTestId("entity-row-26")
+    await waitFor(() => expect(document.activeElement).toBe(within(restored).getByRole("link")))
+    expect(screen.getByTestId("return-scroll").scrollTop).toBe(240)
+    expect(screen.getByRole("table").parentElement!.scrollLeft).toBe(120)
+    expect(screen.getByRole("textbox", { name: "Search" }).getAttribute("value")).toBe("Return")
+    expect(readRecordListReturnContext("/accounting/invoices", { key })).toBeUndefined()
+    expect(readRecordListContext("/accounting/invoices")?.slice(0, 3)).toEqual(["1", "2", "3"])
+    returned.unmount()
+
+    render(view())
+    await screen.findByTestId("entity-row-60")
+    expect(screen.queryByTestId("entity-row-26")).toBeNull()
+  })
+
+  it("keeps filters and records visible while disclosing view setup and row density", async () => {
+    render(
+      <InvoiceListView
+        invoices={rows}
+        worklistScope={scope}
+        currencyOptions={currencies}
+      />
+    )
+    await screen.findByTestId("entity-row-9007199254740993")
+    expect(screen.getByRole("textbox", { name: "Search" })).toBeTruthy()
+    expect(screen.getByRole("combobox", { name: "Balance queue" })).toBeTruthy()
+    expect(screen.queryByRole("textbox", { name: "View name" })).toBeNull()
+    expect(screen.queryByRole("combobox", { name: "Saved views" })).toBeNull()
+    expect(screen.queryByTestId("table-density")).toBeNull()
+    const disclosure = screen.getByRole("button", { name: "View settings" })
+    expect(disclosure.getAttribute("aria-expanded")).toBe("false")
+    fireEvent.click(disclosure)
+    expect(disclosure.getAttribute("aria-expanded")).toBe("true")
+    fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
+      target: { value: "Unfinished view" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Compact" }))
+    expect(
+      screen.getByTestId("finance-money-list").getAttribute("data-density")
+    ).toBe("compact")
+    fireEvent.click(disclosure)
+    expect(screen.queryByRole("textbox", { name: "View name" })).toBeNull()
+    expect(screen.getByTestId("entity-row-9007199254740993")).toBeTruthy()
+    fireEvent.click(disclosure)
+    expect(
+      (screen.getByRole("textbox", { name: "View name" }) as HTMLInputElement)
+        .value
+    ).toBe("Unfinished view")
+    const table = screen.getByRole("table")
+    const totals = screen.getByLabelText("Totals by currency")
+    expect(
+      table.compareDocumentPosition(totals) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+
+  it("filters through shared status and currency options and clears them without changing scope", async () => {
+    render(
+      <InvoiceListView
+        invoices={rows}
+        worklistScope={scope}
+        currencyOptions={currencies}
+      />
+    )
+    await screen.findByTestId("entity-row-9007199254740993")
+    chooseSelectValue(screen.getByRole("combobox", { name: "Currency" }), "7")
+    expect(screen.getByTestId("entity-row-9007199254740992")).toBeTruthy()
+    expect(screen.queryByTestId("entity-row-9007199254740993")).toBeNull()
+    chooseSelectValue(
+      screen.getByRole("combobox", { name: "Currency" }),
+      "__none__"
+    )
+    chooseSelectValue(
+      screen.getByRole("combobox", { name: "accounting.journalEntries.state" }),
+      "draft"
+    )
+    expect(screen.getByTestId("entity-row-9007199254740993")).toBeTruthy()
+    expect(screen.queryByTestId("entity-row-9007199254740992")).toBeNull()
+    chooseSelectValue(
+      screen.getByRole("combobox", { name: "accounting.journalEntries.state" }),
+      "__none__"
+    )
+    expect(screen.getAllByTestId(/^entity-row-/)).toHaveLength(2)
+    expect(screen.queryByText("OTHER-COMPANY")).toBeNull()
+  })
+
+  it("labels linked currency filters while retaining unknown exact filters and clear keys", async () => {
+    const clear = vi.fn()
+    render(
+      <InvoiceListView
+        invoices={rows}
+        worklistScope={scope}
+        currencyOptions={currencies}
+        initialFilters={{ currencyId: "7", external_exact: "9007199254740993" }}
+        onInitialFilterClear={clear}
+      />
+    )
+    const filters = await screen.findByLabelText("Linked record filters")
+    expect(filters.textContent).toContain("Currency: Euro")
+    expect(filters.textContent).toContain("external_exact: 9007199254740993")
+    expect(filters.textContent).not.toContain("currencyId:")
+    fireEvent.click(
+      within(filters).getByRole("button", { name: "Clear Currency filter" })
+    )
+    expect(clear).toHaveBeenCalledWith("currencyId")
+    fireEvent.click(
+      within(filters).getByRole("button", {
+        name: "Clear external_exact filter",
+      })
+    )
+    expect(clear).toHaveBeenCalledWith("external_exact")
+  })
+
   it("uses the shared engine's exact u64 order and canonical links with original quick-preview callbacks", async () => {
     const preview = vi.fn()
     render(
@@ -115,6 +254,7 @@ describe("scoped accounting worklists", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Search" }), {
       target: { value: "Acme" },
     })
+    fireEvent.click(screen.getByRole("button", { name: "View settings" }))
     fireEvent.keyDown(screen.getByRole("button", { name: "Columns" }), {
       key: "Enter",
     })
@@ -140,7 +280,7 @@ describe("scoped accounting worklists", () => {
     })
     chooseSelectValue(
       screen.getByRole("combobox", { name: "Saved views" }),
-      "saved:__none__",
+      "saved:__none__"
     )
     expect(screen.getByTestId("entity-row-9007199254740992")).toBeTruthy()
     expect(screen.queryByTestId("entity-row-9007199254740993")).toBeNull()
@@ -150,7 +290,11 @@ describe("scoped accounting worklists", () => {
         .getByRole("combobox", { name: "accounting.journalEntries.state" })
         .hasAttribute("disabled")
     ).toBe(true)
-    fireEvent.click(screen.getByRole("button", { name: "Clear status filter" }))
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Clear accounting.journalEntries.state filter",
+      })
+    )
     expect(clear).toHaveBeenCalledWith("status")
     rerender(
       <InvoiceListView
@@ -291,6 +435,7 @@ describe("scoped accounting worklists", () => {
       />
     )
     await screen.findByTestId("entity-row-9007199254740993")
+    fireEvent.click(screen.getByRole("button", { name: "View settings" }))
     expect(screen.getByText(/session only/)).toBeTruthy()
     fireEvent.change(screen.getByRole("textbox", { name: "View name" }), {
       target: { value: "Session view" },
@@ -298,7 +443,7 @@ describe("scoped accounting worklists", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save view" }))
     chooseSelectValue(
       screen.getByRole("combobox", { name: "Saved views" }),
-      "saved:Session view",
+      "saved:Session view"
     )
     expect(write).not.toHaveBeenCalled()
     cleanup()
@@ -335,7 +480,7 @@ describe("scoped accounting worklists", () => {
       />
     )
     await screen.findByTestId("entity-row-11")
-    expect(screen.getByTestId("kpi-tile-invoiced-value").textContent).toBe(
+    expect(screen.getByLabelText("Totals by currency").textContent).toContain(
       "Currency not available"
     )
     const unknown = screen.getByTestId("entity-row-11")
@@ -369,6 +514,7 @@ describe("scoped accounting worklists", () => {
       />
     )
     await screen.findByTestId("entity-row-9007199254740993")
+    fireEvent.click(screen.getByRole("button", { name: "View settings" }))
     fireEvent.keyDown(screen.getByRole("button", { name: "Columns" }), {
       key: "Enter",
     })

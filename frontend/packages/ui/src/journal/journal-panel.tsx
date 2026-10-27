@@ -61,7 +61,6 @@ import {
   noteTypeConfig,
   notePriorityConfig,
   noteStatusConfig,
-  sampleWorkNotes,
   type WorkNote,
   type NoteType,
   type NotePriority,
@@ -130,7 +129,7 @@ function formatTimeAgo(
 export function JournalPanel({ open, onClose }: JournalPanelProps) {
   const { t, i18n } = useTranslation()
   const { currentUser } = useRBAC()
-  const [notes, setNotes] = useState<WorkNote[]>(sampleWorkNotes)
+  const [notes, setNotes] = useState<WorkNote[]>([])
   const [isComposing, setIsComposing] = useState(false)
   const [selectedType, setSelectedType] = useState<NoteType>("observation")
   const [content, setContent] = useState("")
@@ -237,15 +236,23 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
     return true
   })
 
-  // Initialize position on first open
+  // Keep this domain panel inside the viewport on open, resize, and restore.
   useEffect(() => {
-    if (open && position.x === -1) {
-      setPosition({
-        x: window.innerWidth - DEFAULT_WIDTH - 24,
-        y: 80,
+    if (!open) return
+    const fit = () => {
+      const width = Math.min(size.width, Math.max(0, window.innerWidth - 16))
+      const height = Math.min(size.height, Math.max(0, window.innerHeight - 16))
+      setSize((current) => current.width === width && current.height === height ? current : { width, height })
+      setPosition((current) => {
+        const x = Math.max(8, Math.min(current.x < 0 ? window.innerWidth - width - 24 : current.x, window.innerWidth - (isMinimized ? Math.min(320, width) : width) - 8))
+        const y = Math.max(8, Math.min(current.y < 0 ? 80 : current.y, window.innerHeight - (isMinimized ? 44 : height) - 8))
+        return current.x === x && current.y === y ? current : { x, y }
       })
     }
-  }, [open, position.x])
+    fit()
+    window.addEventListener("resize", fit)
+    return () => window.removeEventListener("resize", fit)
+  }, [open, size.width, size.height, isMinimized])
 
   // Drag handlers
   const handleDragStart = useCallback((e: React.MouseEvent) => {
@@ -457,6 +464,9 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
   return (
     <div
       ref={panelRef}
+      role="region"
+      aria-label={t("ui.journal.title")}
+      data-testid="journal-panel"
       className={cn(
         "fixed bg-background/95 backdrop-blur-xl border border-border rounded-xl shadow-2xl z-50 flex flex-col overflow-hidden",
         "transition-shadow duration-200",
@@ -464,8 +474,10 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
         isMinimized && "!h-auto"
       )}
       style={{
-        left: position.x,
-        top: position.y,
+        left: Math.max(8, position.x),
+        top: Math.max(8, position.y),
+        maxWidth: "calc(100vw - 16px)",
+        maxHeight: "calc(100dvh - 16px)",
         width: isMinimized ? 320 : size.width,
         height: isMinimized ? "auto" : size.height,
       }}
@@ -491,7 +503,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
           isMinimized && "border-b-0"
         )}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-1.5">
           {/* Drag handle */}
           <button
             title={t("ui.journal.actions.dragToMove")}
@@ -531,6 +543,7 @@ export function JournalPanel({ open, onClose }: JournalPanelProps) {
       {/* Panel body — hidden when minimized */}
       {!isMinimized && (
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <p className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground">{t("ui.journal.sessionHint", { defaultValue: "Notes stay in this page session. They are not saved to your account." })}</p>
           {/* Quick action bar */}
           <div className="px-4 py-3 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2 mb-3">

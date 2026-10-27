@@ -1,5 +1,5 @@
 import { chooseSelectValue } from "../components/select-test-utils"
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { forwardRef, type ReactNode } from "react"
 
@@ -26,6 +26,29 @@ import { AIChatPanel } from "./ai-chat-panel"
 afterEach(cleanup)
 
 describe("AI chat workspace", () => {
+  it("retains a failed request in the editor and shows the transport failure", async () => {
+    const onStreamMessage = vi.fn(async () => { throw new Error("Service unavailable") })
+    render(<AIChatPanel open onClose={vi.fn()} onStreamMessage={onStreamMessage} />)
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "Review my current stock" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("aiChat.requestFailed"))
+    expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("Review my current stock")
+    expect(screen.getByText("Service unavailable")).toBeTruthy()
+    expect(onStreamMessage).toHaveBeenCalledOnce()
+  })
+
+  it("preserves a newer unsent draft when the previous request fails", async () => {
+    let fail!: (reason: Error) => void
+    const onStreamMessage = vi.fn(() => new Promise<never>((_resolve, reject) => { fail = reject }))
+    render(<AIChatPanel open onClose={vi.fn()} onStreamMessage={onStreamMessage} />)
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "First request" } })
+    fireEvent.click(screen.getByTestId("erp-ai-chat-send"))
+    await waitFor(() => expect(onStreamMessage).toHaveBeenCalledOnce())
+    fireEvent.change(screen.getByTestId("erp-ai-chat-input"), { target: { value: "New unsent draft" } })
+    await act(async () => { fail(new Error("Network unavailable")) })
+    expect((screen.getByTestId("erp-ai-chat-input") as HTMLTextAreaElement).value).toBe("New unsent draft")
+    expect(onStreamMessage).toHaveBeenCalledOnce()
+  })
   it("opens full-screen with a context selector and uses the existing message transport", async () => {
     const onStreamMessage = vi.fn(async (_text: string, handlers: { onDelta: (text: string) => void }) => {
       handlers.onDelta("Current results")

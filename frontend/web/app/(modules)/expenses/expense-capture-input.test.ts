@@ -8,6 +8,7 @@ import { toCreateExpenseParams } from "@/lib/expenses-create-params"
 import {
   expenseCompanyLookupRows, expenseInputsForLineKind, expenseProductLookupRows,
   expenseReceiptFromUpload, expenseTaxLookupRows, createExpenseReceiptAttemptCache, preserveExpenseEditSelections,
+  expenseCreateContext,
 } from "./expense-capture-input"
 
 const t = ((_key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? _key) as TFunction
@@ -15,6 +16,47 @@ const entered = {
   employeeId: "1", date: "2026-10-20", name: "Trip", totalAmount: 9999, quantity: 777,
   mileageDistance: 20, mileageRateId: "2", perDiemDays: 3, perDiemRateId: "4", taxIds: ["7"],
 }
+
+test("expense prerequisites reject unavailable employee, price list and currency before an upload or create", () => {
+  const employees = [{ id: 1n, organizationId: 9n, companyId: 2n }]
+  const pricelists = [{ id: 4n, currencyId: 5n }]
+  const values = { ...entered, pricelistId: "4" }
+  for (const employeeId of ["", "invalid", "7", "0"]) {
+    assert.throws(() => expenseCreateContext({ ...values, employeeId }, employees, pricelists, 9n, 2n, t), /Select an employee available/)
+  }
+  assert.throws(() => expenseCreateContext(values, employees, pricelists, 9n, 3n, t), /Select an employee available/)
+  assert.throws(() => expenseCreateContext(values, employees, pricelists, 9n, 0n, t), /Select a company/)
+  for (const pricelistId of ["", "invalid", "8", "0"]) {
+    assert.throws(() => expenseCreateContext({ ...values, pricelistId }, employees, pricelists, 9n, 2n, t), /Select an available price list/)
+  }
+  for (const currencyId of [undefined, null, "invalid", 0n]) {
+    assert.throws(() => expenseCreateContext(values, employees, [{ id: 4n, currencyId }], 9n, 2n, t), /no valid currency/)
+  }
+  assert.deepEqual(values, { ...entered, pricelistId: "4" })
+})
+
+test("validated expense context preserves exact chosen employee, currency, quantity and receipt payload", () => {
+  const values = { ...entered, pricelistId: "4", clientRequestId: "same-command" }
+  const context = expenseCreateContext(values, [{ id: 1n, organizationId: 9n, companyId: 2n }], [{ id: 4n, currencyId: 5n }], 9n, 2n, t)
+  const params = toCreateExpenseParams(expenseInputsForLineKind(values), context.currencyId, [31n])
+  assert.equal(params?.employeeId, 1n)
+  assert.equal(params?.currencyId, 5n)
+  assert.equal(params?.unitAmount, 9999)
+  assert.equal(params?.quantity, 777)
+  assert.deepEqual(params?.attachmentIds, [31n])
+  assert.equal(params?.clientRequestId, "same-command")
+})
+
+test("capture entry groups evidence and purpose before pricing and preserves all operation fields", () => {
+  const form = newExpenseForm(t)
+  assert.deepEqual(form.sections.map((section) => section.id), ["expense-details", "expense-amounts", "expense-optional"])
+  const fields = form.sections.flatMap((section) => section.fields)
+  assert.ok(fields.findIndex((field) => field.name === "receiptFile") < fields.findIndex((field) => field.name === "pricelistId"))
+  assert.equal(fields.find((field) => field.name === "totalAmount")?.label, "Unit amount")
+  assert.match(fields.find((field) => field.name === "quantity")?.description ?? "", /empty for one unit/)
+  assert.equal(fields.find((field) => field.name === "pricelistId")?.required, true)
+  assert.equal(fields.find((field) => field.name === "employeeId")?.required, true)
+})
 
 test("switching back to Standard strips stale distance, day and rate values from the create payload", () => {
   const params = toCreateExpenseParams(expenseInputsForLineKind({ ...entered, lineKind: "Standard" }), 5n)
@@ -57,9 +99,17 @@ test("company-owned lookups reject missing scope and foreign organization/compan
   assert.deepEqual(expenseCompanyLookupRows(rows, 9n, 0n), [])
 })
 
-test("catalog selection does not infer expense eligibility from fields absent in the product projection", () => {
-  const candidate = { id: 1, organizationId: 9, name: "Travel product", active: true }
-  assert.deepEqual(expenseProductLookupRows([candidate, { id: 2, organizationId: 8, name: "Other org" }, { id: 3, organizationId: 9, name: "Inactive", active: false }], 9n), [candidate])
+test("catalog selection requires explicit expense eligibility in the current organization", () => {
+  const candidate = { id: 1, organizationId: 9, name: "Travel product", active: true, canBeExpensed: true }
+  const snake = { id: 2, organization_id: 9, name: "Mileage product", active: true, can_be_expensed: true }
+  const rows = [candidate, snake,
+    { ...candidate, id: 3, organizationId: 8 },
+    { ...candidate, id: 4, active: false },
+    { ...candidate, id: 5, canBeExpensed: false },
+    { ...candidate, id: 6, canBeExpensed: undefined },
+    { ...candidate, id: 7, canBeExpensed: null },
+  ]
+  assert.deepEqual(expenseProductLookupRows(rows, 9n), [candidate, snake])
 })
 
 test("tax choices contain active current-company purchase or unrestricted-use taxes only", () => {

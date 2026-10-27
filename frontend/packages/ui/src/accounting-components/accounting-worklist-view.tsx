@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { MoreHorizontal } from "lucide-react"
 import { Card, CardContent, CardHeader } from "../components/card"
@@ -36,8 +36,12 @@ import {
   stbEnumTag,
 } from "../lib/accounting-move-utils"
 import {
+  accountingListReturnHref,
   commitRecordListFor,
+  consumeRecordListReturnContext,
+  readRecordListReturnContext,
   rememberRecordList,
+  type RecordListReturnContext,
 } from "../lib/record-list-context"
 import { ModuleDataNotice } from "../pages/module-data-notice"
 import { formatInvoiceMoney } from "./invoice-document"
@@ -45,7 +49,6 @@ import {
   accountingCurrencySummaries,
   accountingDocumentHref,
   accountingListMoney,
-  accountingSummaryValue,
   matchesAccountingListFilters,
   type AccountingListDisplayProps,
 } from "./accounting-list-display"
@@ -69,6 +72,7 @@ export interface AccountingWorklistProps extends AccountingListDisplayProps {
   sourceState?: ModuleDataState
 }
 interface AccountingWorklistViewProps extends AccountingWorklistProps {
+  viewSettings?: ReactNode
   kind: "invoice" | "bill"
   rows: AccountMove[]
   onSelect?: (move: AccountMove) => void
@@ -166,8 +170,18 @@ function useWorklistPreferences(key: string | null) {
   return { preferences, update, persistent }
 }
 
-function ReadyAccountingWorklist({
+function ReadyAccountingWorklist(props: AccountingWorklistViewProps) {
+  const { t } = useTranslation()
+  const storageKey = accountingWorklistKey(props.worklistScope, props.kind)
+  const { preferences, update, persistent } = useWorklistPreferences(storageKey)
+  // Mount the table owner only after its effective saved filters are known.
+  if (!preferences) return <p role="status" className="p-4 text-sm text-muted-foreground">{t("common.loading", { defaultValue: "Loading…" })}</p>
+  return <AccountingWorklistTable {...props} preferences={preferences} update={update} persistent={persistent} storageKey={storageKey} />
+}
+
+function AccountingWorklistTable({
   kind,
+  viewSettings,
   rows,
   worklistScope,
   currencyOptions = [],
@@ -179,12 +193,21 @@ function ReadyAccountingWorklist({
   onSend,
   onDownload,
   onRecalculateTotals,
-}: AccountingWorklistViewProps) {
+  preferences,
+  update,
+  persistent,
+  storageKey,
+}: AccountingWorklistViewProps & {
+  preferences: AccountingWorklistPreferences
+  update: (next: AccountingWorklistPreferences) => void
+  persistent: boolean
+  storageKey: string | null
+}) {
   const { t } = useTranslation()
   const { checkPermission } = useRBAC()
-  const storageKey = accountingWorklistKey(worklistScope, kind)
-  const { preferences, update, persistent } = useWorklistPreferences(storageKey)
-  const current = preferences?.current ?? EMPTY_WORKLIST
+  const current = preferences.current
+  const worklistRef = useRef<HTMLDivElement>(null)
+  const restoredOnce = useRef(false)
   const isBill = kind === "bill"
   const canCreate = checkPermission("account_move", "create").allowed
   const canWrite = checkPermission("account_move", "write").allowed
@@ -329,6 +352,10 @@ function ReadyAccountingWorklist({
     if (effective.queue === "overdue" && row.status !== "overdue") return false
     return true
   })
+  const filterKey = JSON.stringify([initialFilters.search ?? current.search, Object.entries({ ...linked, ...effective }).sort(([a], [b]) => a.localeCompare(b))])
+  const [restored] = useState(() => storageKey && typeof window !== "undefined"
+    ? readRecordListReturnContext("/accounting/invoices", { key: storageKey, href: window.location.pathname + window.location.search, filterKey })
+    : undefined)
   const engine = useEntityTable({
     columns,
     data: matching,
@@ -337,6 +364,8 @@ function ReadyAccountingWorklist({
     searchKeys: ["name", "partner"],
     search: initialFilters.search ?? current.search,
     filters: { status: effective.status, currencyId: effective.currencyId },
+    initialSorting: restored?.sorting,
+    initialPage: restored?.page,
   })
   const visibleColumns = columns.filter(
     (column) => !current.hiddenColumns.includes(column.key)
@@ -353,6 +382,36 @@ function ReadyAccountingWorklist({
     selectedRows: engine.selectedRows,
     listViewKey: `accounting-${kind}s`,
   })
+  useEffect(() => {
+    if (!restored || restoredOnce.current) return
+    const frame = requestAnimationFrame(() => {
+      const owner = worklistRef.current
+      if (!owner) return
+      restoredOnce.current = true
+      const scroller = owner.closest<HTMLElement>('[data-slot="sidebar-inset"]') ?? document.scrollingElement
+      if (scroller) scroller.scrollTop = restored.scrollTop
+      const table = owner.querySelector<HTMLElement>('[data-slot="table-container"]')
+      if (table) table.scrollLeft = restored.scrollLeft
+      const row = [...owner.querySelectorAll<HTMLElement>("[data-record-return-id]")].find((element) => element.dataset.recordReturnId === restored.rowId)
+      const target = restored.focus === "row" && row?.tabIndex === 0 ? row : row?.querySelector<HTMLElement>("a[href]")
+      target?.focus({ preventScroll: true })
+      consumeRecordListReturnContext("/accounting/invoices", restored.key)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [restored])
+  const rememberSelection = (rowId: string, focus: "link" | "row") => {
+    const ids = (engine.sortedRows as AccountingWorklistRow[]).map((row) => row.id)
+    const owner = worklistRef.current
+    const href = storageKey ? accountingListReturnHref(window.location.pathname + window.location.search, storageKey) : undefined
+    const scroller = owner?.closest<HTMLElement>('[data-slot="sidebar-inset"]') ?? document.scrollingElement
+    const table = owner?.querySelector<HTMLElement>('[data-slot="table-container"]')
+    const snapshot: RecordListReturnContext | undefined = storageKey && href ? {
+      key: storageKey, href, filterKey, sorting: engine.sorting.map((sort) => ({ ...sort })),
+      page: engine.currentPage, rowId, focus, scrollTop: scroller?.scrollTop ?? 0, scrollLeft: table?.scrollLeft ?? 0,
+    } : undefined
+    rememberRecordList(ids, snapshot)
+    return { ids, snapshot }
+  }
   const filtered = engine.sortedRows as AccountingWorklistRow[]
   const summaries = accountingCurrencySummaries(
     filtered.map((row) => row.source),
@@ -396,15 +455,10 @@ function ReadyAccountingWorklist({
         queue: current.filters.queue === queue ? "" : queue,
       },
     })
-  if (!preferences)
-    return (
-      <p role="status" className="p-4 text-sm text-muted-foreground">
-        {t("common.loading", { defaultValue: "Loading…" })}
-      </p>
-    )
   return (
     <div
       className="min-w-0 space-y-5"
+      ref={worklistRef}
       data-testid={`accounting-${kind}-worklist`}
     >
       <KpiStrip
@@ -443,22 +497,6 @@ function ReadyAccountingWorklist({
                   })
                 : selectQueue(key),
           })),
-          {
-            key: isBill ? "billed" : "invoiced",
-            label: isBill
-              ? t("accounting.bills.totalBilled")
-              : t("accounting.invoices.totalInvoiced"),
-            value: accountingSummaryValue(summaries, "total"),
-            active: false,
-          },
-          {
-            key: isBill ? "owed" : "outstanding",
-            label: isBill
-              ? t("accounting.bills.amountOwed")
-              : t("accounting.invoices.outstandingBalance"),
-            value: accountingSummaryValue(summaries, "residual"),
-            active: false,
-          },
         ]}
       />
       <Card className="min-w-0">
@@ -491,55 +529,15 @@ function ReadyAccountingWorklist({
             currencies={currencies}
             statuses={statuses}
             persistent={persistent}
+            viewSettings={viewSettings}
             initialFilters={initialFilters}
             onInitialFilterClear={onInitialFilterClear}
             selectedCount={engine.selectedRows.length}
             onClearSelection={engine.clearSelection}
             onExport={canRead && filtered.length > 0 ? exportCsv : undefined}
           />
-          <p className={workspaceStyles.sectionDescription}>
-            {t("accounting.worklists.statusHint", {
-              defaultValue:
-                "Open is a balance state, not proof of delivery or approval. CSV exports always include currency context.",
-            })}
-          </p>
         </CardHeader>
         <CardContent className="min-w-0 space-y-4">
-          <section
-            aria-label="Totals by currency"
-            className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3"
-          >
-            {summaries.map((group) => (
-              <dl
-                key={group.key}
-                className={`${workspaceStyles.surface} min-w-0 space-y-2 p-3 text-sm`}
-              >
-                <dt className="font-medium [overflow-wrap:anywhere]">
-                  {group.label}
-                </dt>
-                <div className="flex flex-wrap justify-between gap-2">
-                  <dt className="text-xs text-muted-foreground">
-                    {t("accounting.invoices.total", { defaultValue: "Total" })}
-                  </dt>
-                  <dd className={workspaceStyles.metricValue}>
-                    {group.total === null
-                      ? "—"
-                      : formatInvoiceMoney(group.total, group.currency)}
-                  </dd>
-                </div>
-                <div className="flex flex-wrap justify-between gap-2">
-                  <dt className="text-xs text-muted-foreground">
-                    {t("accounting.invoices.balanceDue")}
-                  </dt>
-                  <dd className={workspaceStyles.metricValue}>
-                    {group.residual === null
-                      ? "—"
-                      : formatInvoiceMoney(group.residual, group.currency)}
-                  </dd>
-                </div>
-              </dl>
-            ))}
-          </section>
           <p className={workspaceStyles.sectionDescription}>
             {filtered.length}{" "}
             {t("accounting.worklists.matchingRecords", {
@@ -587,16 +585,12 @@ function ReadyAccountingWorklist({
             <div
               className="min-w-0 max-w-full"
               onClickCapture={(event) => {
-                const ids = filtered.map((row) => row.id)
-                rememberRecordList(ids)
-                const anchor =
-                  event.target instanceof Element
-                    ? event.target.closest("a[href]")
-                    : null
-                commitRecordListFor(
-                  anchor?.getAttribute("href") ?? undefined,
-                  ids
-                )
+                if (!(event.target instanceof Element)) return
+                const row = event.target.closest<HTMLElement>("[data-record-return-id]")
+                if (!row?.dataset.recordReturnId) return
+                const anchor = event.target.closest("a[href]")
+                const { ids, snapshot } = rememberSelection(row.dataset.recordReturnId, anchor ? "link" : "row")
+                if (anchor) commitRecordListFor(anchor.getAttribute("href") ?? undefined, ids, snapshot)
               }}
             >
               <Table className="min-w-[860px]">
@@ -665,6 +659,7 @@ function ReadyAccountingWorklist({
                       <TableRow
                         key={row.id}
                         data-testid={`entity-row-${row.id}`}
+                        data-record-return-id={row.id}
                         data-state={
                           tableRow.getIsSelected() ? "selected" : undefined
                         }
@@ -677,6 +672,7 @@ function ReadyAccountingWorklist({
                             (event.key === "Enter" || event.key === " ")
                           ) {
                             event.preventDefault()
+                            rememberSelection(row.id, "row")
                             onSelect(move)
                           }
                         }}
@@ -752,7 +748,10 @@ function ReadyAccountingWorklist({
                           </TableCell>
                         ))}
                         <TableCell>
-                          {(onSelect || canRecalculate || canPay || (canRead && (onSend || onDownload))) && (
+                          {(onSelect ||
+                            canRecalculate ||
+                            canPay ||
+                            (canRead && (onSend || onDownload))) && (
                             <DropdownMenu>
                               <DropdownMenuTrigger
                                 asChild
@@ -773,6 +772,7 @@ function ReadyAccountingWorklist({
                                     className="min-h-11"
                                     onClick={(event) => {
                                       event.stopPropagation()
+                                      rememberSelection(row.id, "row")
                                       onSelect(move)
                                     }}
                                   >
@@ -782,13 +782,29 @@ function ReadyAccountingWorklist({
                                   </DropdownMenuItem>
                                 )}
                                 {canRead && onSend && !isBill && (
-                                  <DropdownMenuItem className="min-h-11" onClick={(event) => { event.stopPropagation(); onSend(move) }}>
-                                    {t("accounting.invoices.invoiceActions.send")}
+                                  <DropdownMenuItem
+                                    className="min-h-11"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      onSend(move)
+                                    }}
+                                  >
+                                    {t(
+                                      "accounting.invoices.invoiceActions.send"
+                                    )}
                                   </DropdownMenuItem>
                                 )}
                                 {canRead && onDownload && (
-                                  <DropdownMenuItem className="min-h-11" onClick={(event) => { event.stopPropagation(); onDownload(move) }}>
-                                    {t("accounting.invoices.invoiceActions.downloadPDF")}
+                                  <DropdownMenuItem
+                                    className="min-h-11"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      onDownload(move)
+                                    }}
+                                  >
+                                    {t(
+                                      "accounting.invoices.invoiceActions.downloadPDF"
+                                    )}
                                   </DropdownMenuItem>
                                 )}
                                 {canRecalculate && (
@@ -860,6 +876,41 @@ function ReadyAccountingWorklist({
               </Button>
             </nav>
           )}
+          <section
+            aria-label="Totals by currency"
+            className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-3"
+          >
+            {summaries.map((group) => (
+              <dl
+                key={group.key}
+                className={`${workspaceStyles.surface} min-w-0 space-y-2 p-3 text-sm`}
+              >
+                <dt className="font-medium [overflow-wrap:anywhere]">
+                  {group.label}
+                </dt>
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt className="text-xs text-muted-foreground">
+                    {t("accounting.invoices.total", { defaultValue: "Total" })}
+                  </dt>
+                  <dd className={workspaceStyles.metricValue}>
+                    {group.total === null
+                      ? "—"
+                      : formatInvoiceMoney(group.total, group.currency)}
+                  </dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt className="text-xs text-muted-foreground">
+                    {t("accounting.invoices.balanceDue")}
+                  </dt>
+                  <dd className={workspaceStyles.metricValue}>
+                    {group.residual === null
+                      ? "—"
+                      : formatInvoiceMoney(group.residual, group.currency)}
+                  </dd>
+                </div>
+              </dl>
+            ))}
+          </section>
         </CardContent>
       </Card>
     </div>

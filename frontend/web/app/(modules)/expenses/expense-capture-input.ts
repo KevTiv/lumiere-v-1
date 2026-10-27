@@ -1,4 +1,6 @@
 import type { FormConfig, FormValues } from "@lumiere/ui/lib/form-types"
+import type { TFunction } from "i18next"
+import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import type { DocumentBlobUploadResult } from "@/lib/document-blob-upload"
 import { expenseVariantTag } from "@/lib/expense-state"
 
@@ -11,8 +13,32 @@ export interface ExpenseLookupRow {
   name?: unknown
   displayName?: unknown
   active?: unknown
+  canBeExpensed?: unknown
+  can_be_expensed?: unknown
   typeTaxUse?: unknown
   type_tax_use?: unknown
+  currencyId?: unknown
+}
+
+/** Validate required relations before uploading a receipt or dispatching a create command. */
+export function expenseCreateContext(values: FormValues, employees: readonly ExpenseLookupRow[], pricelists: readonly ExpenseLookupRow[], organizationId: bigint, companyId: bigint, t: TFunction) {
+  if (organizationId <= 0n || companyId <= 0n) {
+    throw new Error(t("expenses.forms.capture.companyRequired", { defaultValue: "Select a company before saving this expense." }))
+  }
+  const employeeId = optionalBigIntU64(values.employeeId)
+  if (!employeeId || !expenseCompanyLookupRows(employees, organizationId, companyId).some((row) => String(row.id) === String(employeeId))) {
+    throw new Error(t("expenses.forms.capture.employeeUnavailable", { defaultValue: "Select an employee available in this company. Your signed-in account does not select an employee automatically." }))
+  }
+  const pricelistId = optionalBigIntU64(values.pricelistId)
+  const pricelist = pricelists.find((row) => pricelistId && String(row.id) === String(pricelistId))
+  if (!pricelist) {
+    throw new Error(t("expenses.forms.capture.pricelistRequired", { defaultValue: "Select an available price list. Its currency is used for this expense." }))
+  }
+  const currencyId = optionalBigIntU64(pricelist.currencyId)
+  if (!currencyId) {
+    throw new Error(t("expenses.forms.capture.currencyRequired", { defaultValue: "The selected price list has no valid currency. Select another price list or ask an administrator to complete its setup." }))
+  }
+  return { employeeId, currencyId }
 }
 
 /** Company-owned lookup rows need explicit matching organization and company scope. */
@@ -24,12 +50,13 @@ export function expenseCompanyLookupRows<T extends ExpenseLookupRow>(rows: reado
   )
 }
 
-/** Products are organization-owned. Eligibility remains the expense reducer's decision. */
+/** Offer only declared expense-capable products; the reducer enforces the remaining expense policy. */
 export function expenseProductLookupRows<T extends ExpenseLookupRow>(rows: readonly T[], organizationId: bigint): T[] {
   if (organizationId <= 0n) return []
   return rows.filter((row) =>
     String(row.organizationId ?? row.organization_id ?? "") === String(organizationId)
     && row.active !== false && row.active !== 0
+    && (row.canBeExpensed ?? row.can_be_expensed) === true
     && String(row.displayName ?? row.name ?? "").trim() !== "",
   )
 }

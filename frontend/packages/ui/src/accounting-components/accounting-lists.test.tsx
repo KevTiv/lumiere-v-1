@@ -57,6 +57,49 @@ const currencies = [
 ]
 
 describe("accounting document lists", () => {
+  it("keeps draft intake compact, scoped and reachable without losing a selected receipt", () => {
+    const billRows = rows.map((row) => ({ ...row, moveType: "InInvoice" }))
+    const otherCompanyBill = { ...billRows[1]!, id: 99, companyId: 2, name: "OTHER-COMPANY-BILL" }
+    const onOpen = vi.fn()
+    render(<BillsListView worklistScope={scope} bills={[...billRows, otherCompanyBill]} currencyOptions={currencies}
+      onSelectBill={onOpen} intake={{ lines: [], sourceState: { status: "ready" }, renderDocuments: () => <input type="file" aria-label="Supplier receipt" /> }} />)
+    const disclosure = screen.getByRole("button", { name: "Bill intake review" })
+    expect(disclosure.getAttribute("aria-expanded")).toBe("false")
+    expect(screen.getByTestId("bill-intake-summary").textContent).toBe("Draft bills to review: 1")
+    expect(screen.queryByRole("button", { name: "Review bill" })).toBeNull()
+    expect(screen.getByTestId("entity-row-10")).toBeTruthy()
+    fireEvent.click(disclosure)
+    expect(disclosure.getAttribute("aria-expanded")).toBe("true")
+    fireEvent.click(screen.getByRole("button", { name: "Review bill" }))
+    expect(onOpen).toHaveBeenCalledWith(billRows[1])
+    fireEvent.click(screen.getByRole("button", { name: "Supplier documents and receipts" }))
+    const receipt = screen.getByLabelText("Supplier receipt") as HTMLInputElement
+    const file = new File(["supplier receipt"], "receipt.pdf", { type: "application/pdf" })
+    fireEvent.change(receipt, { target: { files: [file] } })
+    fireEvent.click(disclosure)
+    expect(screen.queryByRole("button", { name: "Review bill" })).toBeNull()
+    fireEvent.click(disclosure)
+    expect(screen.getByLabelText("Supplier receipt")).toBe(receipt)
+    expect(receipt.files?.[0]).toBe(file)
+    expect(screen.queryByText("OTHER-COMPANY-BILL")).toBeNull()
+  })
+
+  it("shows unavailable intake status instead of a zero count and preserves source recovery", () => {
+    const retry = vi.fn()
+    const billRows = rows.map((row) => ({ ...row, moveType: "InInvoice" }))
+    const { rerender } = render(<BillsListView worklistScope={scope} bills={billRows} currencyOptions={currencies}
+      intake={{ lines: [], sourceState: { status: "error", onRetry: retry } }} />)
+    expect(screen.getByTestId("bill-intake-summary").textContent).toBe("Records could not be loaded.")
+    expect(screen.getByTestId("bill-intake-summary").textContent).not.toContain("0")
+    fireEvent.click(screen.getByRole("button", { name: "Bill intake review" }))
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }))
+    expect(retry).toHaveBeenCalledOnce()
+    rerender(<BillsListView worklistScope={scope} bills={billRows} currencyOptions={currencies}
+      intake={{ lines: [{ id: 100, moveId: 10 }], sourceState: { status: "ready" } }} />)
+    expect(screen.getByTestId("bill-intake-summary").textContent).toContain("ownership is incomplete")
+    expect(screen.queryByRole("button", { name: "Review bill" })).toBeNull()
+  })
+
   it("applies controlled exact-ID filters and updates on browser navigation", () => {
     const { rerender } = render(
       <InvoiceListView
@@ -127,9 +170,13 @@ describe("accounting document lists", () => {
         currencyOptions={currencies}
       />
     )
-    expect(screen.getByTestId("kpi-tile-billed-value").textContent).toBe(
-      "2 currencies"
-    )
+    const totals = screen.getByLabelText("Totals by currency")
+    const euro = within(totals).getByText("Euro").closest("dl")!
+    const dollars = within(totals).getByText("US Dollar").closest("dl")!
+    expect(euro.textContent).toMatch(/EUR\s100\.00/)
+    expect(euro.textContent).toMatch(/EUR\s50\.00/)
+    expect(dollars.textContent).toMatch(/USD\s30\.00/)
+    expect(screen.getByRole("table").compareDocumentPosition(totals) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByLabelText("Totals by currency").textContent).toContain(
       "EUR"
     )
@@ -170,7 +217,7 @@ describe("accounting document lists", () => {
         onInitialFilterClear={clear}
       />
     )
-    fireEvent.click(screen.getByRole("button", { name: "Clear queue filter" }))
+    fireEvent.click(screen.getByRole("button", { name: "Clear Balance queue filter" }))
     expect(clear).toHaveBeenCalledWith("queue")
     expect(screen.getByTestId("entity-row-1")).toBeTruthy()
     expect(screen.queryByTestId("entity-row-10")).toBeNull()

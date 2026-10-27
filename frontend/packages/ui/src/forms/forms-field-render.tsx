@@ -421,6 +421,7 @@ export function FormFieldRenderer({
 
   return (
     <div
+      data-form-field={field.name}
       className={cn(
         fieldWidthClasses[width] ?? "col-span-12",
         "space-y-1.5 rounded-md",

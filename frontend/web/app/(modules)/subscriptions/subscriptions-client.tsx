@@ -1,8 +1,9 @@
 "use client"
+import { Button } from "@lumiere/ui/components/button"
 import { useCurrencyFormat } from "@lumiere/ui"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { canUseModuleData, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { canUseModuleData, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
@@ -199,10 +200,6 @@ function SubscriptionsClientLoaded({
 }: SubscriptionsClientLoadedProps) {
   useSubscriptionsModuleSubscription()
   const { t } = useTranslation()
-  const mutationErrorOptions = {
-    onError: (error: Error) =>
-      showWorkflowToast({ kind: "error", title: t("common.error.title"), description: error.message }),
-  }
   const moduleConfig = useMemo(() => subscriptionsModuleConfig(t), [t])
   const { activeTab, setActiveTab } = useModuleTab(
     moduleConfig.defaultTab ?? "dashboard",
@@ -213,7 +210,8 @@ function SubscriptionsClientLoaded({
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
     null,
   )
-  const [recognizeLineId, setRecognizeLineId] = useState<number | null>(null)
+  useEffect(() => { setQuickActionForm(null) }, [orgId, operatingCompanyId])
+  const [recognizeLineId, setRecognizeLineId] = useState<string | null>(null)
   const [recognizeMoveId, setRecognizeMoveId] = useState("")
 
   const subscriptionsQuery = useSubscriptions(orgId, initialSubscriptions)
@@ -257,11 +255,15 @@ function SubscriptionsClientLoaded({
   const deferredLines = canUseModuleData(moduleQueryState(deferredLinesQuery)) ? deferredLinesQuery.data ?? [] : []
   const recognitionRulesQuery = useRevenueRecognitionRules(orgId, initialRecognitionRules)
   const recognitionRules = canUseModuleData(moduleQueryState(recognitionRulesQuery)) ? recognitionRulesQuery.data ?? [] : []
-  const { data: saleOrders = [] } = useSaleOrders(orgId, initialSaleOrders)
-  const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
-  const { data: products = [] } = useProducts(orgId, initialProducts)
+  const saleOrdersQuery = useSaleOrders(orgId, initialSaleOrders)
+  const { rows: saleOrders } = moduleCollection(saleOrdersQuery)
+  const pricelistsQuery = usePricelists(orgId, initialPricelists)
+  const { rows: pricelists } = moduleCollection(pricelistsQuery)
+  const productsQuery = useProducts(orgId, initialProducts)
+  const { rows: products } = moduleCollection(productsQuery)
   const { data: productCategories = [] } = useProductCategories(orgId)
-  const { data: journals = [] } = useAccountJournals(orgId)
+  const journalsQuery = useAccountJournals(orgId)
+  const { rows: journals } = moduleCollection(journalsQuery)
   const { data: accounts = [] } = useAccountAccounts(orgId)
   const { data: accountMoves = [], isLoading: accountMovesLoading, isError: accountMovesError, error: accountMovesFailure, refetch: refetchAccountMoves } = useAccountMoves(orgId)
   const { data: accountPayments = [], isLoading: accountPaymentsLoading, isError: accountPaymentsError } = useAccountPayments(orgId)
@@ -305,10 +307,10 @@ function SubscriptionsClientLoaded({
     importSubscriptionCsv.isPending
 
   const saleOrderOptions = useMemo(() => {
-    const fromApi = saleOrderRowsToSelectOptions(saleOrders)
+    const fromApi = saleOrderRowsToSelectOptions(saleOrders.filter((row) => String(row.companyId) === String(operatingCompanyId)))
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noSaleOrders"), disabled: true }]
-  }, [saleOrders, t])
+  }, [saleOrders, operatingCompanyId, t])
 
   const planFieldOptions = useMemo(() => {
     const fromApi = subscriptionPlanRowsToSelectOptions(plans)
@@ -498,7 +500,7 @@ function SubscriptionsClientLoaded({
           const r = rows[0]
           if (!r) return
           if (r.recognized === true || r.recognized === 1) return
-          setRecognizeLineId(Number(r.id))
+          setRecognizeLineId(String(r.id))
         },
       },
     ]
@@ -1002,40 +1004,44 @@ function SubscriptionsClientLoaded({
   }
   const actionUsable = (action: string) => {
     const tab = actionTabs[action]
-    return tab != null && canUseModuleData(dataState[tab])
+    if (tab == null || !canUseModuleData(dataState[tab])) return false
+    const lookups = action === "createSubscription" ? [saleOrdersQuery, plansQuery]
+      : action === "createPlan" ? [pricelistsQuery, journalsQuery, productsQuery] : []
+    return lookups.every((query) => moduleQueryState(query).status === "ready")
   }
   const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  const quickActionDenied = quickActionForm != null && dataState[actionTabs[quickActionForm.action]]?.status === "denied"
   const plansUsable = canUseModuleData(dataState.plans)
   const recognizeUsable = canUseModuleData(dataState["deferred-lines"])
   useEffect(() => {
     if (!plansUsable) cancelForm()
-    if (quickActionForm && !quickActionUsable) setQuickActionForm(null)
+    if (quickActionDenied) setQuickActionForm(null)
     if (!recognizeUsable) {
       setRecognizeLineId(null)
       setRecognizeMoveId("")
     }
-  }, [plansUsable, recognizeUsable, quickActionForm, quickActionUsable, cancelForm])
+  }, [plansUsable, recognizeUsable, quickActionDenied, cancelForm])
 
-  const handleFormSubmit = (
+  const handleFormSubmit = async (
     _tabId: string,
     action: string,
     formData: Record<string, unknown>,
   ) => {
-    if (!actionUsable(action)) return
+    if (!actionUsable(action)) throw new Error(t("subscriptions.forms.sourceUnavailable", { defaultValue: "Required records could not be verified. Retry the source list before saving. Your entries are retained." }))
     if (action === "createSubscription") {
-      const params = toCreateSubscriptionFromSaleOrderParams(formData, saleOrders, orgId)
-      if (!params) return
-      createSubscription.mutate(params, mutationErrorOptions)
+      const params = toCreateSubscriptionFromSaleOrderParams(formData, saleOrders, operatingCompanyId)
+      if (!params) throw new Error(t("subscriptions.forms.newSubscription.invalidSelection", { defaultValue: "Select a sales order from the active company, a plan, and a valid start date. Your entries are retained." }))
+      await createSubscription.mutateAsync(params)
     } else if (action === "createPlan") {
-      const params = toCreateSubscriptionPlanParams(formData, pricelists, orgId)
-      if (!params) return
-      createPlan.mutate(params, mutationErrorOptions)
+      const params = toCreateSubscriptionPlanParams(formData, pricelists, operatingCompanyId)
+      if (!params) throw new Error(t("subscriptions.forms.newPlan.invalidSelection", { defaultValue: "Enter a plan name and select a price list with a currency, an invoice journal, and a product." }))
+      await createPlan.mutateAsync(params)
     } else if (action === "createPriceTier") {
       const params = buildCreateSubscriptionPriceTierParams(formData)
-      createPriceTier.mutate(params, mutationErrorOptions)
+      await createPriceTier.mutateAsync(params)
     } else if (action === "createDeferredSchedule") {
       const params = buildCreateDeferredRevenueScheduleParams(formData)
-      createDeferredSchedule.mutate(params, mutationErrorOptions)
+      await createDeferredSchedule.mutateAsync(params)
     } else if (action === "createRecognitionRule") {
       const raw = { ...formData }
       if (raw.expenseAccountId != null && String(raw.expenseAccountId).trim() !== "") {
@@ -1044,15 +1050,17 @@ function SubscriptionsClientLoaded({
         delete raw.expenseAccountId
       }
       const params = buildCreateRevenueRecognitionRuleParams(raw)
-      createRecognitionRule.mutate(params, mutationErrorOptions)
+      await createRecognitionRule.mutateAsync(params)
     } else if (action === "importPlanCsv") {
       const raw = formData.csvData
-      if (raw == null || String(raw).trim() === "") return
-      importPlanCsv.mutate({ csvData: String(raw) }, mutationErrorOptions)
+      if (raw == null || String(raw).trim() === "") throw new Error(t("subscriptions.forms.csvRequired", { defaultValue: "Choose or paste the CSV data before importing." }))
+      await importPlanCsv.mutateAsync({ csvData: String(raw) })
     } else if (action === "importSubscriptionCsv") {
       const raw = formData.csvData
-      if (raw == null || String(raw).trim() === "") return
-      importSubscriptionCsv.mutate({ csvData: String(raw) }, mutationErrorOptions)
+      if (raw == null || String(raw).trim() === "") throw new Error(t("subscriptions.forms.csvRequired", { defaultValue: "Choose or paste the CSV data before importing." }))
+      await importSubscriptionCsv.mutateAsync({ csvData: String(raw) })
+    } else {
+      throw new Error(t("subscriptions.forms.unsupportedAction", { defaultValue: "This form action is unavailable. Close and reopen the form before trying again." }))
     }
   }
 
@@ -1069,12 +1077,25 @@ function SubscriptionsClientLoaded({
     <EntityLabelsProvider value={entityLabels}>
       <ModuleView config={config} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
       <FormModal
-        open={quickActionForm !== null && actionUsable(quickActionForm.action)}
+        open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? subscriptionFormConfig}
-        onSubmit={(formData) => {
+        config={quickActionForm?.action === "createSubscription" ? subscriptionFormConfig
+          : quickActionForm?.action === "createPlan" ? planFormConfig
+          : quickActionForm?.form ?? subscriptionFormConfig}
+        isPending={isFormMutationPending}
+        submissionDisabled={!quickActionUsable}
+        formLeadingActions={!quickActionUsable ? <Button type="button" variant="outline" onClick={() => {
+          const tab = quickActionForm ? actionTabs[quickActionForm.action] : undefined
+          const state = tab ? dataState[tab] : undefined
+          if (state && "onRetry" in state) state.onRetry?.()
+          const lookups = quickActionForm?.action === "createSubscription" ? [saleOrdersQuery, plansQuery]
+            : quickActionForm?.action === "createPlan" ? [pricelistsQuery, journalsQuery, productsQuery] : []
+          lookups.forEach((query) => { void query.refetch() })
+        }}>{t("common.retry", { defaultValue: "Retry" })}</Button> : undefined}
+        submitError={!quickActionUsable ? t("subscriptions.forms.sourceUnavailable", { defaultValue: "Required records could not be verified. Retry the source list before saving. Your entries are retained." }) : null}
+        onSubmit={async (formData) => {
           if (quickActionForm) {
-            handleFormSubmit("dashboard", quickActionForm.action, formData)
+            await handleFormSubmit("dashboard", quickActionForm.action, formData)
             setQuickActionForm(null)
           }
         }}
@@ -1095,15 +1116,16 @@ function SubscriptionsClientLoaded({
           const moveId = String(values.moveId ?? "")
           if (moveId !== recognizeMoveId) setRecognizeMoveId(moveId)
         }}
-        onSubmit={(formData) => {
-          if (recognizeLineId == null || !recognizeUsable) return
+        isPending={isFormMutationPending}
+        onSubmit={async (formData) => {
+          if (recognizeLineId == null || !recognizeUsable) throw new Error(t("subscriptions.forms.sourceUnavailable", { defaultValue: "Required records could not be verified. Retry the source list before saving. Your entries are retained." }))
           const moveId = formData.moveId
           const moveLineId = formData.moveLineId
           const params = buildRecognizeDeferredRevenueParams({ moveId, moveLineId })
-          recognizeDeferred.mutate({
+          await recognizeDeferred.mutateAsync({
             lineId: BigInt(recognizeLineId),
             params,
-          }, mutationErrorOptions)
+          })
           setRecognizeLineId(null)
         }}
       />

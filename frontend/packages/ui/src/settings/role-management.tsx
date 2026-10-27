@@ -411,9 +411,9 @@ export function RoleManagement() {
         </Card>
       ) : null}
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!isSaving) setIsDialogOpen(open) }}>
+        <DialogContent className="flex max-h-[86dvh] min-h-0 flex-col overflow-hidden sm:max-w-2xl" showCloseButton={!isSaving}>
+          <DialogHeader className="shrink-0">
             <DialogTitle>
               {editingRole ? t("settings.roles.editTitle", { name: editingRole.name }) : t("settings.roles.createTitle")}
             </DialogTitle>
@@ -426,8 +426,10 @@ export function RoleManagement() {
               event.preventDefault()
               void handleSaveRole(new FormData(event.currentTarget))
             }}
-            className="space-y-6"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
           >
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+            <fieldset disabled={isSaving} className="flex min-w-0 flex-col gap-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">{t("settings.roles.roleName")}</Label>
@@ -536,9 +538,11 @@ export function RoleManagement() {
               />
             ) : null}
 
-            {roleError && <p role="alert" className="text-sm text-destructive">{roleError}</p>}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+            {roleError && <p role="alert" className="break-words text-sm text-destructive">{roleError}</p>}
+            </fieldset>
+            </div>
+            <DialogFooter className="shrink-0 pt-4">
+              <Button type="button" variant="outline" disabled={isSaving} onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}
               </Button>
               <Button type="submit" disabled={isSaving || !orgReady}>

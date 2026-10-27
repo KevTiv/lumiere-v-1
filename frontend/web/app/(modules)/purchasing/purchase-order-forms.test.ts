@@ -119,3 +119,8 @@ test('RFQ bids derive currency from the selected RFQ', () => {
   assert.equal(selectedRfqCurrencyId(rfqs, 'missing'), null);
   assert.equal(selectedRfqCurrencyId([{ value: '12', currencyId: '' }], '12'), null);
 });
+
+
+test('receipt handoff preserves u64 identities above Number precision', () => {
+  assert.deepEqual(toReceiveLineInput({ lineId: 9007199254740993n, qty: 2, lotId: 9007199254740995n }), { lineId: '9007199254740993', qty: 2, lotId: '9007199254740995' });
+});

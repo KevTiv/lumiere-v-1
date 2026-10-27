@@ -279,15 +279,15 @@ function TasksClientLoaded({
   const handleFormSubmit = async (action: string, formData: Record<string, unknown>) => {
     if (action === "createTask") {
       const p = toCreateTaskParams(formData, operatingCompanyId)
-      if (p) await createTask.mutateAsync(projectsParamsToJson(p))
+      if (!p) throw new Error(t("tasks.errors.incomplete", { defaultValue: "Enter a task title and check the task details before saving. Your entries are retained." }))
+      await createTask.mutateAsync(projectsParamsToJson(p))
     } else if (action === "updateTask" && modal.type === "edit") {
       const p = toUpdateTaskParams(formData)
-      if (p) {
-        await updateTask.mutateAsync({
-          taskId: modal.entityId,
-          params: projectsParamsToJson(p),
-        })
-      }
+      if (!p) throw new Error(t("tasks.errors.incomplete", { defaultValue: "Enter a task title and check the task details before saving. Your entries are retained." }))
+      await updateTask.mutateAsync({
+        taskId: modal.entityId,
+        params: projectsParamsToJson(p),
+      })
     }
   }
 

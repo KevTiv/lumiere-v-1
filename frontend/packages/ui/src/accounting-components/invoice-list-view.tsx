@@ -27,17 +27,23 @@ export function InvoiceListView({
 }: InvoiceListViewProps) {
   const [density, setDensity] = useTableDensity("accounting-invoices-list")
   return (
-    <div className="space-y-4 data-[density=compact]:[&_tbody_td]:py-1 data-[density=comfortable]:[&_tbody_td]:py-3 [&_td]:tabular-nums" data-density={density} data-testid="finance-money-list">
-      <TableDensityControl value={density} onChange={setDensity} />
-    <AccountingWorklistView
-      {...props}
-      kind="invoice"
-      rows={invoices}
-      onSelect={onSelectInvoice}
-      onCreate={onCreateInvoice}
-      onSend={onSendInvoice}
-      onDownload={onDownloadPdf}
-    />
+    <div
+      className="space-y-4 data-[density=compact]:[&_tbody_td]:py-1 data-[density=comfortable]:[&_tbody_td]:py-3 [&_td]:tabular-nums"
+      data-density={density}
+      data-testid="finance-money-list"
+    >
+      <AccountingWorklistView
+        viewSettings={
+          <TableDensityControl value={density} onChange={setDensity} />
+        }
+        {...props}
+        kind="invoice"
+        rows={invoices}
+        onSelect={onSelectInvoice}
+        onCreate={onCreateInvoice}
+        onSend={onSendInvoice}
+        onDownload={onDownloadPdf}
+      />
     </div>
   )
 }

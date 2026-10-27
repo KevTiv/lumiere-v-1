@@ -124,6 +124,44 @@ describe("FormModal unsaved-changes guard", () => {
     expect(screen.queryByTestId("discard-changes-dialog")).toBeNull()
   })
 
+  it("closes an edited form without a discard warning after durable recovery is available", async () => {
+    const onOpenChange = vi.fn()
+    const add = vi.spyOn(window, "addEventListener")
+    const remove = vi.spyOn(window, "removeEventListener")
+    const props = { open: true, onOpenChange, config, onSubmit: vi.fn(), draft: false }
+    const { rerender } = render(<FormModal {...props} />)
+    edit("Retained expense")
+    const handler = add.mock.calls.filter(([type]) => type === "beforeunload").at(-1)![1]
+
+    rerender(<FormModal {...props} hasDurableRecovery />)
+    await waitFor(() => expect(remove.mock.calls.some(([type, listener]) => type === "beforeunload" && listener === handler)).toBe(true))
+    cancel()
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(screen.queryByTestId("discard-changes-dialog")).toBeNull()
+  })
+
+  it("keeps the close lock during a save even when durable recovery is available", async () => {
+    let resolve!: () => void
+    const onOpenChange = vi.fn()
+    const onSubmit = vi.fn(() => new Promise<void>((done) => { resolve = done }))
+    const props = { open: true, onOpenChange, config, onSubmit, draft: false, hasDurableRecovery: true, closeOnSubmit: false }
+    const { rerender } = render(<FormModal {...props} />)
+    edit("Retained expense")
+    fireEvent.click(screen.getByTestId("form-submit-new-note"))
+    fireEvent.click(screen.getByRole("button", { name: "Close" }))
+    expect(onOpenChange).not.toHaveBeenCalled()
+    expect(screen.queryByTestId("discard-changes-dialog")).toBeNull()
+
+    await act(async () => { resolve() })
+    rerender(<FormModal {...props} isPending />)
+    fireEvent.click(screen.getByRole("button", { name: "Close" }))
+    expect(onOpenChange).not.toHaveBeenCalled()
+    rerender(<FormModal {...props} isPending={false} />)
+    cancel()
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+    expect(screen.queryByTestId("discard-changes-dialog")).toBeNull()
+  })
+
   it("registers beforeunload only while dirty and removes it when clean", async () => {
     const add = vi.spyOn(window, "addEventListener")
     const remove = vi.spyOn(window, "removeEventListener")
@@ -145,6 +183,60 @@ describe("FormModal unsaved-changes guard", () => {
 })
 
 describe("FormModal authoring preview", () => {
+  it("shows a rejected save inline and retains the draft and selected receipt without closing", async () => {
+    const onOpenChange = vi.fn()
+    const onSubmit = vi.fn(async (_values: Record<string, unknown>) => { throw new Error("Select an employee available in this company.") })
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    const receiptConfig: FormConfig = { ...config, showReset: true, sections: [{ id: "main", fields: [
+      ...config.sections[0]!.fields,
+      { id: "receipt", name: "receipt", type: "file", label: "Receipt" },
+    ] }] }
+    const props = { open: true, onOpenChange, config: receiptConfig, onSubmit, draft: false }
+    const { rerender } = render(<FormModal {...props} />)
+    edit("Expense to correct")
+    const receipt = new File(["receipt"], "receipt.pdf", { type: "application/pdf" })
+    const fileInput = screen.getByTestId("form-field-receipt") as HTMLInputElement
+    fireEvent.change(fileInput, { target: { files: [receipt] } })
+    fireEvent.click(screen.getByTestId("form-submit-new-note"))
+
+    const alert = await screen.findByRole("alert")
+    expect(alert.textContent).toBe("Select an employee available in this company.")
+    expect(alert.closest("[data-form-body]")).not.toBeNull()
+    expect(alert.getAttribute("tabindex")).toBe("-1")
+    expect(onOpenChange).not.toHaveBeenCalled()
+    expect((screen.getByTestId("form-field-title") as HTMLInputElement).value).toBe("Expense to correct")
+    expect(fileInput.files?.[0]).toBe(receipt)
+    expect(onSubmit.mock.calls[0]?.[0].receipt).toEqual([receipt])
+
+    rerender(<FormModal {...props} config={{ ...receiptConfig }} />)
+    expect(screen.getByRole("alert").textContent).toBe("Select an employee available in this company.")
+    rerender(<FormModal {...props} submitError="The selected company is unavailable." />)
+    expect(screen.getByRole("alert").textContent).toBe("The selected company is unavailable.")
+    rerender(<FormModal {...props} />)
+    fireEvent.click(screen.getByRole("button", { name: /reset/i }))
+    expect(screen.queryByRole("alert")).toBeNull()
+    consoleError.mockRestore()
+  })
+
+  it("keeps submission feedback beside the fields without replacing an edited draft", () => {
+    const onOpenChange = vi.fn()
+    const props = { open: true, onOpenChange, config, onSubmit: vi.fn() }
+    const { rerender } = render(<FormModal {...props} />)
+    edit("Entry to correct")
+
+    rerender(<FormModal {...props} submitError="The selected account is unavailable. Choose another account." />)
+    const error = screen.getByRole("alert")
+    expect(error.closest("[data-form-body]")).not.toBeNull()
+    expect((screen.getByTestId("form-field-title") as HTMLInputElement).value).toBe("Entry to correct")
+
+    rerender(<FormModal {...props} submitError={null} />)
+    expect(screen.queryByRole("alert")).toBeNull()
+    expect((screen.getByTestId("form-field-title") as HTMLInputElement).value).toBe("Entry to correct")
+    cancel()
+    expect(screen.getByTestId("discard-changes-dialog")).toBeTruthy()
+    expect(onOpenChange).not.toHaveBeenCalled()
+  })
+
   it("prevents example inputs from implicitly submitting the record", () => {
     const onSubmit = vi.fn()
     render(

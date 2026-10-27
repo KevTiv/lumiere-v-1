@@ -74,11 +74,13 @@ export function TaskAssigneesDialog({
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open && !assign.isPending) onClose() }}>
-      <DialogContent className="sm:max-w-lg" showCloseButton={!assign.isPending}>
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col overflow-hidden sm:max-w-lg" showCloseButton={!assign.isPending}>
+        <DialogHeader className="shrink-0">
           <DialogTitle>Assign task</DialogTitle>
-          <DialogDescription>{task.name}. Select active members of this company. Clear the selection to leave the task unassigned.</DialogDescription>
+          <DialogDescription>Select active members of this company. Clear the selection to leave the task unassigned.</DialogDescription>
         </DialogHeader>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain" data-testid="task-assignees-body">
+        <p className="break-words text-sm font-medium">{task.name}</p>
         <Input aria-label="Find an assignee" placeholder="Find a person" value={search} onChange={(event) => setSearch(event.target.value)} />
         {canAssign && online && !ready && !directory.isError ? <p role="status">Loading eligible people…</p> : null}
         {!online ? <p role="status">Connect to the network to change assignments.</p> : null}
@@ -88,7 +90,7 @@ export function TaskAssigneesDialog({
             <Button variant="outline" disabled={!canAssign || !online || directory.isFetching || assign.isPending} onClick={() => { void directory.refetch() }}>Retry</Button>
           </div>
         ) : null}
-        <div className="max-h-64 space-y-1 overflow-y-auto" aria-label="Eligible assignees">
+        <div className="flex flex-col gap-1" aria-label="Eligible assignees">
           {filtered.map((option) => (
             <label key={option.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-2 hover:bg-muted">
               <Checkbox
@@ -111,8 +113,9 @@ export function TaskAssigneesDialog({
         ) : null}
         {invalidAssignment ? <p role="alert" className="text-sm text-destructive">The current assignment could not be read. Clear the selection to replace it explicitly.</p> : null}
         {!canAssign ? <p role="status" className="text-sm text-muted-foreground">You do not have permission to change task assignments.</p> : null}
-        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-        <DialogFooter>
+        {error ? <p role="alert" className="break-words text-sm text-destructive">{error}</p> : null}
+        </div>
+        <DialogFooter className="shrink-0">
           <Button variant="ghost" disabled={!canAssign || assign.isPending} onClick={() => { setSelected(new Set()); setInvalidAssignment(false) }}>Clear selection</Button>
           <Button variant="outline" disabled={assign.isPending} onClick={onClose}>Cancel</Button>
           <Button disabled={!canAssign || !ready || unavailable.length > 0 || invalidAssignment || assign.isPending} onClick={() => void save()}>

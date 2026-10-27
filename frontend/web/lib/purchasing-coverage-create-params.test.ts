@@ -99,18 +99,18 @@ describe("tax/FX vendor-bill form parameters", () => {
 
 describe("toReceivePoLineArgs — lot_id plumbing", () => {
   it("omits lotId when absent (backend enforces lot-tracked products)", () => {
-    assert.deepEqual(toReceivePoLineArgs({ lineId: 10, qty: 2 }), { lineId: 10, qty: 2 })
+    assert.deepEqual(toReceivePoLineArgs({ lineId: 10n, qty: 2 }), { lineId: 10n, qty: 2 })
     assert.deepEqual(toReceivePoLineArgs({ lineId: 10, qty: 2, lotId: "" }), {
-      lineId: 10,
+      lineId: 10n,
       qty: 2,
     })
   })
 
   it("includes lotId when provided", () => {
     assert.deepEqual(toReceivePoLineArgs({ lineId: 10, qty: 2, lotId: 99 }), {
-      lineId: 10,
+      lineId: 10n,
       qty: 2,
-      lotId: 99,
+      lotId: 99n,
     })
   })
 

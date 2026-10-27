@@ -11,6 +11,10 @@ async function touchTargets(page: Page, width: number, controls: Locator[]) {
   expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true)
   for (const control of controls) expect(await control.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44)
 }
+async function openWorklistSettings(list: Locator) {
+  const disclosure = list.getByRole("button", { name: "View settings", exact: true })
+  if (await disclosure.getAttribute("aria-expanded") !== "true") await disclosure.click()
+}
 async function selectBank(page: Page) {
   await page.getByTestId("reconciliation-candidate-501").getByRole("checkbox").check()
   await expect(page.getByTestId("reconciliation-confirm")).toBeDisabled()
@@ -62,6 +66,7 @@ for (const width of [320, 390, 768, 1440]) {
         list.getByRole("combobox", { name: "Currency", exact: true }),
         "1",
       )
+      await openWorklistSettings(list)
       await list.getByRole("button", { name: "Columns", exact: true }).click()
       await page.getByRole("menuitemcheckbox", { name: "Due Date", exact: true }).click()
       await page.keyboard.press("Escape")
@@ -70,12 +75,14 @@ for (const width of [320, 390, 768, 1440]) {
       await page.reload()
       await expect(list.getByRole("combobox", { name: "Currency", exact: true })).toContainText("EUR")
       await expect(list.getByRole("columnheader", { name: /Due Date/ })).toHaveCount(0)
+      await openWorklistSettings(list)
       await list.getByRole("combobox", { name: "Saved views", exact: true }).click()
       await expect(page.getByRole("option", { name: "Synthetic EUR review", exact: true })).toHaveCount(1)
       await page.keyboard.press("Escape")
       await page.getByRole("button", { name: "Switch synthetic company", exact: true }).click()
       await expect(list.getByTestId("entity-row-999")).toBeVisible()
       await expect(list.getByRole("combobox", { name: "Currency", exact: true })).toContainText("All currencies")
+      await openWorklistSettings(list)
       await list.getByRole("combobox", { name: "Saved views", exact: true }).click()
       await expect(page.getByRole("option", { name: "Synthetic EUR review", exact: true })).toHaveCount(0)
       await page.keyboard.press("Escape")
@@ -86,6 +93,7 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(bills.getByTestId("entity-row-201")).toBeVisible()
       await expect(bills.getByTestId("entity-row-299")).toHaveCount(0)
       await expect(bills.getByRole("combobox", { name: "Currency", exact: true })).toContainText("All currencies")
+      await openWorklistSettings(bills)
       await bills.getByRole("combobox", { name: "Saved views", exact: true }).click()
       await expect(page.getByRole("option", { name: "Synthetic EUR review", exact: true })).toHaveCount(0)
       await page.keyboard.press("Escape")
@@ -104,6 +112,7 @@ for (const width of [320, 390, 768, 1440]) {
       }
       await page.getByRole("button", { name: "Cycle synthetic source state", exact: true }).click()
       await expect(list.getByTestId(`entity-row-${exactInvoice}`)).toBeVisible()
+      await openWorklistSettings(list)
       await list.getByLabel("View name", { exact: true }).fill("All synthetic documents")
       await list.getByRole("button", { name: "Save view", exact: true }).click()
       await page.getByRole("button", { name: "Apply linked overdue filter", exact: true }).click()
@@ -116,7 +125,7 @@ for (const width of [320, 390, 768, 1440]) {
       await expect(list.getByRole("combobox", { name: "Balance queue", exact: true })).toBeDisabled()
       await expect(list.getByTestId("entity-row-9007199254740992")).toHaveCount(0)
       await expect(list.getByTestId("entity-row-103")).toHaveCount(0)
-      await list.getByRole("button", { name: "Clear queue filter", exact: true }).click()
+      await list.getByRole("button", { name: "Clear Balance queue filter", exact: true }).click()
       await expect(list.getByTestId("entity-row-103")).toBeVisible()
       await noOverflow(page)
     })

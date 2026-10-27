@@ -140,7 +140,13 @@
       "payment_id",
       "account_internal_type",
       "matching_number",
-      "journal_id"
+      "journal_id",
+      "exclude_from_invoice_tab",
+      "tax_line_id",
+      "display_type",
+      "sequence",
+      "discount",
+      "price_subtotal"
     ],
     "mandatory": [
       "id",
@@ -4627,7 +4633,8 @@
       "type",
       "barcode",
       "purchase_ok",
-      "tracking"
+      "tracking",
+      "can_be_expensed"
     ],
     "mandatory": [
       "id",

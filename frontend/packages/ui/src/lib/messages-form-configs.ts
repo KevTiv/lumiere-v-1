@@ -3,20 +3,32 @@ import type { FormConfig } from "./form-types"
 
 const emptySelect: Array<{ value: string; label: string; disabled?: boolean }> = []
 
-export const newMailMessageForm = (t: TFunction): FormConfig => ({
+export const newMailMessageForm = (t: TFunction, recordOptions: ReadonlyArray<{ value: string; label: string }> = [], recordHint?: string): FormConfig => ({
   id: "new-mail-message",
   title: t("messages.forms.newMessage.title"),
   description: t("messages.forms.newMessage.description"),
+  submitLabel: t("messages.forms.newMessage.save", { defaultValue: "Save message" }),
   sections: [
     {
       id: "message-details",
       title: t("messages.forms.newMessage.sections.message"),
       fields: [
         {
+          id: "body",
+          name: "body",
+          type: "textarea",
+          label: t("messages.forms.newMessage.fields.body"),
+          placeholder: t("messages.forms.newMessage.fields.bodyPlaceholder"),
+          required: true,
+          width: "full",
+          rows: 4,
+        },
+        {
           id: "messageType",
           name: "messageType",
           type: "select",
           label: t("messages.forms.newMessage.fields.messageType"),
+          description: t("messages.forms.newMessage.fields.messageTypeHint", { defaultValue: "Classifies the saved message. This form does not select recipients or send an email." }),
           width: "1/2",
           options: [
             { value: "comment", label: t("messages.forms.newMessage.fields.options.comment") },
@@ -25,18 +37,41 @@ export const newMailMessageForm = (t: TFunction): FormConfig => ({
           ],
         },
         {
+          id: "recordLinkMode", name: "recordLinkMode", type: "select",
+          label: t("messages.forms.recordChoice.link", { defaultValue: "Link message to" }),
+          defaultValue: "record", width: "full",
+          options: [
+            { value: "record", label: t("messages.forms.recordChoice.choose", { defaultValue: "Choose a record" }) },
+            { value: "custom", label: t("messages.forms.recordChoice.custom", { defaultValue: "Advanced custom reference" }) },
+          ],
+        },
+        {
+          id: "recordReference", name: "recordReference", type: "select", searchable: true,
+          visibleWhen: { field: "recordLinkMode", equals: "record" }, required: true, width: "full",
+          label: t("messages.forms.recordChoice.record", { defaultValue: "Record" }),
+          placeholder: t("messages.forms.recordChoice.placeholder", { defaultValue: "Find an invoice, bill, journal entry, or contact" }),
+          description: recordHint ?? t("messages.forms.recordChoice.hint", { defaultValue: "Search by name or document number. The message is filed on the record you choose." }),
+          options: recordOptions.length > 0 ? [...recordOptions] : [{ value: "", label: t("messages.forms.recordChoice.empty", { defaultValue: "No available records" }), disabled: true }],
+        },
+        {
           id: "model",
           name: "model",
           type: "text",
+          visibleWhen: { field: "recordLinkMode", equals: "custom" },
           label: t("messages.forms.newMessage.fields.model"),
+          description: t("messages.forms.newMessage.fields.modelHint", { defaultValue: "Use the existing record type, such as account_move for an accounting document." }),
           placeholder: t("messages.forms.newMessage.fields.modelPlaceholder"),
           width: "1/2",
         },
         {
           id: "resId",
           name: "resId",
-          type: "number",
+          type: "text",
+          inputMode: "numeric",
+          visibleWhen: { field: "recordLinkMode", equals: "custom" },
           label: t("messages.forms.newMessage.fields.resId"),
+          description: t("messages.forms.newMessage.fields.recordHint", { defaultValue: "Enter the existing record number from its page address." }),
+          required: true,
           placeholder: "1",
           width: "1/2",
         },
@@ -56,16 +91,6 @@ export const newMailMessageForm = (t: TFunction): FormConfig => ({
           label: t("messages.forms.newMessage.fields.subtype"),
           placeholder: t("messages.forms.newMessage.fields.subtypePlaceholder"),
           width: "1/2",
-        },
-        {
-          id: "body",
-          name: "body",
-          type: "textarea",
-          label: t("messages.forms.newMessage.fields.body"),
-          placeholder: t("messages.forms.newMessage.fields.bodyPlaceholder"),
-          required: true,
-          width: "full",
-          rows: 4,
         },
       ],
     },

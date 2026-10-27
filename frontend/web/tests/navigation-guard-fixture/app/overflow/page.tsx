@@ -1,11 +1,14 @@
 "use client"
 
-import { useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { I18nProvider, i18n } from "@lumiere/i18n"
 import { createLumiereApiClient, LumiereApiProvider } from "@lumiere/api-client"
 import { RBACProvider } from "../../../../../packages/ui/src/lib/rbac-context"
 import { Button } from "../../../../../packages/ui/src/components/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../../../../packages/ui/src/components/dialog"
+import { FormModal } from "../../../../../packages/ui/src/forms/form-modal"
+import type { FormConfig } from "../../../../../packages/ui/src/lib/form-types"
 import { EntityTable } from "../../../../../packages/ui/src/entity-views/entity-table"
 import { EntityRecordSheet } from "../../../../../packages/ui/src/entity-views/entity-record-sheet"
 import { EntityDetail } from "../../../../../packages/ui/src/entity-views/entity-detail"
@@ -52,6 +55,25 @@ const detail: EntityDetailConfig = {
   ],
 }
 
+const modalError = `The example save was rejected. Your entries are still available. ${"Check the selected company, supporting document and commercial reference before trying again. ".repeat(8)}Reference: ${"unbroken".repeat(26)}`
+const stressForm: FormConfig = {
+  id: "overflow-stress",
+  title: "Review a commercial document with a long business reference and translated title",
+  description: "Complete the business information and review the selected customer before saving this synthetic draft.",
+  submitLabel: "Save this document as a draft for later review",
+  cancelLabel: "Cancel and return to the document list",
+  sections: [{ id: "details", fields: [
+    { id: "customer", name: "customer", label: "Customer or organisation responsible for this commercial document", type: "select", searchable: true, defaultValue: "1", options: [
+      { value: "1", label: "Acme trading company" },
+      { value: "2", label: `International customer with a long registered business name ${"unbroken".repeat(12)}` },
+    ] },
+    ...Array.from({ length: 20 }, (_, index) => ({
+      id: `reference-${index}`, name: `reference-${index}`, type: "text" as const,
+      label: `Business reference ${index + 1} with a longer translated description`, defaultValue: `Original value ${index + 1}`,
+    })),
+  ] }],
+}
+
 function Sample({ id, children }: { id: string; children: ReactNode }) {
   return (
     <section data-testid={id} className="min-w-0 space-y-2 border p-3">
@@ -62,6 +84,8 @@ function Sample({ id, children }: { id: string; children: ReactNode }) {
 }
 
 export default function OverflowFixture() {
+  const [hydrated, setHydrated] = useState(false)
+  useEffect(() => setHydrated(true), [])
   const [queryClient] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
   )
@@ -69,6 +93,9 @@ export default function OverflowFixture() {
   const [expanded, setExpanded] = useState(false)
   const [readOnly, setReadOnly] = useState(false)
   const [sheet, setSheet] = useState(false)
+  const [plainDialog, setPlainDialog] = useState(false)
+  const [formDialog, setFormDialog] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const [chat, setChat] = useState<"closed" | "floating" | "docked">("closed")
   const [lastAction, setLastAction] = useState("")
   const table: EntityTableConfig = {
@@ -117,6 +144,7 @@ export default function OverflowFixture() {
                 </button>
               </aside>
               <main className="min-w-0 flex-1 overflow-auto p-4">
+                <span data-testid="overflow-fixture-ready" data-hydrated={hydrated} className="sr-only">Synthetic overflow fixture</span>
                 <div className="flex flex-wrap gap-2 pb-4">
                   <label>
                     Panel width{" "}
@@ -132,6 +160,8 @@ export default function OverflowFixture() {
                   </label>
                   <Button onClick={() => setReadOnly(!readOnly)}>Toggle read-only</Button>
                   <Button onClick={() => setSheet(true)}>Open record sheet</Button>
+                  <Button onClick={() => setPlainDialog(true)}>Open stressed plain dialog</Button>
+                  <Button onClick={() => { setFormError(null); setFormDialog(true) }}>Open stressed form dialog</Button>
                   <Button onClick={() => setChat("floating")}>Open floating chat</Button>
                   <Button onClick={() => setChat("docked")}>Open docked chat</Button>
                 </div>
@@ -216,6 +246,29 @@ export default function OverflowFixture() {
                   </Sample>
                 </div>
               </main>
+              <Dialog open={plainDialog} onOpenChange={setPlainDialog}>
+                <DialogContent data-testid="plain-stress-dialog">
+                  <DialogHeader>
+                    <DialogTitle>Review a document with a long translated confirmation title</DialogTitle>
+                    <DialogDescription>Inspect every entry before confirming this synthetic action.</DialogDescription>
+                  </DialogHeader>
+                  <div data-testid="plain-stress-body" className="space-y-4">
+                    {Array.from({ length: 20 }, (_, index) => <p key={index} data-testid={`plain-stress-row-${index}`}>Document entry {index + 1}: {longValue}</p>)}
+                  </div>
+                  <DialogFooter>
+                    <Button data-testid="plain-stress-confirm" onClick={() => setPlainDialog(false)}>Confirm document review</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <FormModal
+                open={formDialog}
+                onOpenChange={setFormDialog}
+                config={stressForm}
+                submitError={formError}
+                draft={false}
+                showSubmitSuccessToast={false}
+                onSubmit={async () => { setFormError(modalError); throw new Error("Synthetic save rejected") }}
+              />
               <EntityRecordSheet
                 open={sheet}
                 onOpenChange={setSheet}

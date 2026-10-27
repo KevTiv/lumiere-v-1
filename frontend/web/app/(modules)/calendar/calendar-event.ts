@@ -31,7 +31,7 @@ export function updateCalendarEventParams(formData: Row, state = 'confirmed'): R
   const name = String(formData.name ?? '').trim();
   const start = new Date(String(formData.start ?? ''));
   const stop = new Date(String(formData.stop ?? ''));
-  if (!name || Number.isNaN(start.getTime()) || Number.isNaN(stop.getTime())) return null;
+  if (!name || Number.isNaN(start.getTime()) || Number.isNaN(stop.getTime()) || stop.getTime() < start.getTime()) return null;
   return {
     name,
     start: BigInt(start.getTime() * 1000),
