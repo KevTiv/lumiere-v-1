@@ -16,10 +16,30 @@ export interface FinanceReviewFields {
   query: string
 }
 
+const financeReportKeys = [
+  "cash_mobile_money_v1",
+  "customer_balances_v1",
+  "supplier_payables_v1",
+] as const
+
+type FinanceReportKey = (typeof financeReportKeys)[number]
+export type FinanceReviewInput = { query?: string } & (
+  | { reportKey: FinanceReportKey; date: string; timezone: string }
+  | {
+      reportKey: FinanceReportKey
+      actualDate: string
+      baselineDate: string
+      timezone: string
+    }
+  | { statementId: number }
+  | { periodId: number }
+  | { recordId: number; recordKind: "expense" | "bill" }
+)
+
 export function financeReviewInput(
   skill: FinanceReviewSkill,
   fields: FinanceReviewFields,
-): Record<string, unknown> | null {
+): FinanceReviewInput | null {
   const query = fields.query.trim()
   if (query.length > 4000) return null
   const common = query ? { query } : {}
@@ -31,12 +51,9 @@ export function financeReviewInput(
       /^\d{4}-\d{2}-\d{2}$/.test(value) &&
       Number.isFinite(Date.parse(value)) &&
       new Date(value).toISOString().slice(0, 10) === value
+    const reportKey = financeReportKeys.find((key) => key === fields.reportKey)
     if (
-      ![
-        "cash_mobile_money_v1",
-        "customer_balances_v1",
-        "supplier_payables_v1",
-      ].includes(fields.reportKey) ||
+      !reportKey ||
       !validDate(fields.date) ||
       !fields.timezone.trim()
     )
@@ -49,7 +66,7 @@ export function financeReviewInput(
     if (skill === "finance_report_review")
       return {
         ...common,
-        reportKey: fields.reportKey,
+        reportKey,
         date: fields.date,
         timezone: fields.timezone,
       }
@@ -57,7 +74,7 @@ export function financeReviewInput(
       return null
     return {
       ...common,
-      reportKey: fields.reportKey,
+      reportKey,
       actualDate: fields.date,
       baselineDate: fields.baselineDate,
       timezone: fields.timezone,
@@ -69,6 +86,6 @@ export function financeReviewInput(
   if (skill === "bank_reconciliation_review")
     return { ...common, statementId: id }
   if (skill === "period_close_review") return { ...common, periodId: id }
-  if (!["expense", "bill"].includes(fields.recordKind)) return null
+  if (fields.recordKind !== "expense" && fields.recordKind !== "bill") return null
   return { ...common, recordId: id, recordKind: fields.recordKind }
 }
