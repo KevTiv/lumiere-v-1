@@ -61,18 +61,13 @@ RUN scripts/prepare-vendored-contracts-rust.sh
 COPY Cargo.toml Cargo.lock ./
 COPY api-server ./api-server
 COPY ai-gateway ./ai-gateway
+COPY erp-skills ./erp-skills
 COPY iot-gateway ./iot-gateway
 COPY lumiere-codegen ./lumiere-codegen
 COPY crates ./crates
 
 # Build the production runtime set once. Keep the package builds separate because
 # Cargo's --bin filters apply to each selected package.
-COPY erp-skills/report_analysis/SKILL.md ./erp-skills/report_analysis/SKILL.md
-COPY erp-skills/finance_report_review/SKILL.md ./erp-skills/finance_report_review/SKILL.md
-COPY erp-skills/bank_reconciliation_review/SKILL.md ./erp-skills/bank_reconciliation_review/SKILL.md
-COPY erp-skills/period_close_review/SKILL.md ./erp-skills/period_close_review/SKILL.md
-COPY erp-skills/expense_evidence_review/SKILL.md ./erp-skills/expense_evidence_review/SKILL.md
-COPY erp-skills/finance_variance_review/SKILL.md ./erp-skills/finance_variance_review/SKILL.md
 RUN cargo build --locked --release --jobs "${CARGO_BUILD_JOBS}" \
       -p api-server \
       --bin api-server \
