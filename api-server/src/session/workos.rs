@@ -40,10 +40,12 @@ impl std::fmt::Debug for WorkosAuthConfig {
     }
 }
 impl WorkosAuthConfig {
-    pub fn from_env(client_id: Option<&str>) -> anyhow::Result<Option<Self>> {
-        let Some(client_id) = client_id else {
+    pub fn from_env() -> anyhow::Result<Option<Self>> {
+        let client_id = std::env::var("WORKOS_CLIENT_ID").unwrap_or_default();
+        let client_id = client_id.trim();
+        if client_id.is_empty() {
             return Ok(None);
-        };
+        }
         anyhow::ensure!(safe_id(client_id, "client_"), "invalid WORKOS_CLIENT_ID");
         let api_key = std::env::var("WORKOS_API_KEY")?;
         anyhow::ensure!(!api_key.trim().is_empty(), "WORKOS_API_KEY is required");
@@ -698,10 +700,33 @@ mod tests {
         );
     }
     #[tokio::test]
+    async fn configured_workos_authority_disables_native_password_signin() {
+        use axum::{body::Body, http::Request};
+        use tower::ServiceExt;
+
+        let mut config = super::super::test_support::test_config(Some("master-token"));
+        config.workos_auth = Some(self::config());
+        let app = crate::routes::auth::router()
+            .with_state(std::sync::Arc::new(AppState::new(config)))
+            .layer(tower_cookies::CookieManagerLayer::new());
+        let response = app
+            .oneshot(
+                Request::post("/auth/signin")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"email":"approved@example.test","password":"native-password"}"#,
+                    ))
+                    .expect("valid request"),
+            )
+            .await
+            .expect("route response");
+        assert_eq!(response.status(), axum::http::StatusCode::GONE);
+    }
+
+    #[tokio::test]
     async fn workos_mode_rejects_native_bearer_and_cookie_without_mock_fallback() {
         let mut config = super::super::test_support::test_config(Some("master-token"));
         config.dev_mock_org_id = Some(1);
-        config.workos_client_id = Some("client_test".into());
         config.workos_auth = Some(self::config());
         let state = AppState::new(config);
         for (auth, cookie) in [

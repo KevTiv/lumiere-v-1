@@ -5,6 +5,7 @@
 //! before reading or mutating lifecycle state.
 
 use axum::{extract::State, http::HeaderMap, Json};
+use lumiere_auth_context::ActorContext;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use stdb_client::StdbClient;
@@ -198,13 +199,6 @@ pub struct LifecycleComparisonDetails {
     pub tool_diff_truncated: bool,
 }
 
-struct ActorContext {
-    organization_id: u64,
-    company_id: u64,
-    identity: String,
-    token: String,
-}
-
 pub async fn post_run_lifecycle(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -252,35 +246,9 @@ pub async fn post_run_lifecycle(
 }
 
 fn actor_context(headers: &HeaderMap, requested_company_id: u64) -> AppResult<ActorContext> {
-    let required = |name: &str| {
-        headers
-            .get(name)
-            .and_then(|value| value.to_str().ok())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| AppError::Forbidden("acting-user context is required".into()))
-    };
-    let organization_id = required("x-lumiere-organization-id")?
-        .parse::<u64>()
-        .ok()
-        .filter(|value| *value > 0)
-        .ok_or_else(|| AppError::Forbidden("acting-user context is invalid".into()))?;
-    let company_id = required("x-lumiere-company-id")?
-        .parse::<u64>()
-        .ok()
-        .filter(|value| *value > 0)
-        .ok_or_else(|| AppError::Forbidden("acting-user context is invalid".into()))?;
-    if company_id != requested_company_id {
-        return Err(AppError::Forbidden(
-            "requested company does not match the acting-user scope".into(),
-        ));
-    }
-    Ok(ActorContext {
-        organization_id,
-        company_id,
-        identity: required("x-lumiere-actor-identity")?.to_string(),
-        token: required("x-lumiere-actor-token")?.to_string(),
-    })
+    let actor = ActorContext::from_headers(headers)?;
+    actor.require_company(requested_company_id)?;
+    Ok(actor)
 }
 
 async fn apply_intent(

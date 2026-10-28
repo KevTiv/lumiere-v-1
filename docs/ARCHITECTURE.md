@@ -20,8 +20,41 @@ flowchart LR
 
 1. React app uses `@lumiere/api-client` (`apiFetch`) for `/api/query/*` and `/api/call/*`.
 2. Next.js route handlers under [`frontend/web/app/api/`](../frontend/web/app/api/) forward most ERP paths to the Rust api-server via [`frontend/web/lib/api-server-forward.ts`](../frontend/web/lib/api-server-forward.ts) (`LUMIERE_API_SERVER_URL`).
-3. api-server resolves the session (cookie `stdb_token` or `Authorization: Bearer`), scopes queries by organization, and calls SpacetimeDB HTTP SQL or reducers.
-4. Optional direct gateway: set `NEXT_PUBLIC_API_GATEWAY_URL` to api-server origin (used by Kong in Docker compose) — see [`frontend/web/lib/api-url.ts`](../frontend/web/lib/api-url.ts).
+3. In hosted mode, AuthKit verifies/refreshes the sealed browser session and the BFF forwards its WorkOS access token. api-server verifies the provider identity and live session, resolves tenant membership and policy, then calls SpacetimeDB using a server-held credential.
+4. Native development/self-hosted mode accepts a `stdb_token` cookie or bearer token. Optional direct gateway routing through `NEXT_PUBLIC_API_GATEWAY_URL` applies only to native mode; hosted mode requires same-origin routing.
+
+### Authentication authority
+
+| Concern | Source of truth | Implementation |
+|---------|-----------------|----------------|
+| Identity, verified email, authentication and provider-session revocation | WorkOS | AuthKit browser integration; API-side verification in [`session/workos.rs`](../api-server/src/session/workos.rs) |
+| Hosted API mode and provider setup | Validated `Config.workos_auth` | `WorkosAuthConfig::from_env`; session resolution, native-route guards and realtime all use this same configuration |
+| Browser transport mode | Server-owned `WORKOS_CLIENT_ID`, matching the API deployment | [`auth-mode.ts`](../frontend/web/lib/auth-mode.ts); never selected from public browser configuration |
+| Callback URL | Runtime `WORKOS_REDIRECT_URI`, with legacy public fallback | [`workos-config.ts`](../frontend/web/lib/workos-config.ts); production requires HTTPS and the exact callback path |
+| Request credential selection | Explicit authorization first, otherwise the configured browser session | [`auth-credentials.ts`](../frontend/web/lib/auth-credentials.ts), shared by BFF and SSR; hosted sessions never fall back to native cookies or development credentials |
+| WorkOS subject to platform/STDB identity binding | PostgreSQL platform control plane | [`platform_control/workos.rs`](../api-server/src/platform_control/workos.rs); exact operator-approved linking, never email-only linking |
+| Tenant membership, roles, business permissions and invitation acceptance | Lumière's organization authority in SpacetimeDB | API resolves current access; reducers enforce mutations; shared Rust policy evaluation in `crates/stdb-auth` and `crates/policy-core` |
+| Editable application profile | PostgreSQL profile with durable tenant projection | `routes/auth/profile.rs`; WorkOS owns the verified email |
+
+WorkOS authentication establishes who the caller is. Provider roles or display
+names do not grant ERP access. The alpha admissions list is an operator-owned
+release restriction checked by the API in addition to provider verification;
+it is not a separate password or session system. Its pinned email and
+organization must be updated deliberately when provider details change.
+
+Next.js contains no credential database, password hashing, identity provisioning
+or native-token saving action. Cookie cleanup lives in the server-only
+[`auth-cookies.ts`](../frontend/web/lib/auth-cookies.ts) library. Native password
+support remains in the Rust API for development/self-hosting and is disabled
+whenever WorkOS is configured. Service and device credentials remain separate
+from interactive user authentication.
+
+Web and API processes must receive the same WorkOS client ID. Invalid configured
+provider settings stop API startup; missing configuration still selects native
+mode, so deployment checks must ensure both processes receive hosted settings.
+See [production setup](./PRODUCTION_DEPLOY.md#workos-alpha-admission) and
+[hosted lifecycle](./plans/workos-lifecycle-completion.md) for admission, migration
+and live validation requirements.
 
 ### Frontend contracts compatibility
 
@@ -52,7 +85,11 @@ flowchart LR
 ### AI
 
 - Next.js `/api/ai/*` routes proxy to **ai-gateway** (RAG, action drafts, skills).
-- ai-gateway reads tenant context from SpacetimeDB using service tokens; user session is validated at the Next BFF layer.
+- The BFF resolves the browser session through the API authority. The AI gateway authenticates the sending service separately using its internal gateway secret.
+- [`lumiere-auth-context`](../crates/auth-context/src/lib.rs) is the shared Rust contract between api-server and ai-gateway: actor headers, company/organization scope, capability-grant envelopes and the API authority client. API forwarding and gateway evidence, descriptor, lifecycle and header-based governed-skill parsing use the same actor contract. Header parsing validates shape; it does not authenticate a user.
+- Evidence and generated-tool grant resolution use the same shared client to recheck the caller through `/v1/ai/capability-grants`. Requests carry the original API credential, which may be a WorkOS access token. Each response must match the exact identity, organization and company. Missing, malformed, denied or unavailable authority fails closed; grants are not cached across requests. Generated execution also requires the server-owned placement and policy-generation fields.
+- WorkOS verification and identity binding stay in api-server. The AI gateway has no independent WorkOS configuration, JWKS cache or password flow. Dedicated AI runtime, certification and spend-read credentials serve their existing machine roles; they do not replace the acting user's authority.
+- Native SpacetimeDB writes remain distinct from API calls: a hosted WorkOS token must never be passed to `StdbClient::with_token`. The shared actor token is an API credential. Existing legacy STDB-token transports are compatibility paths, not another identity authority; moving them to the API transport is a separate migration.
 
 ### Analytics
 
@@ -63,8 +100,8 @@ flowchart LR
 
 | Service | Path | Owns |
 |---------|------|------|
-| **Next.js web** | `frontend/web/` | App shell, SSR, BFF forward, `/api/ai/*`, auth signup/signin forward |
-| **api-server** | `api-server/` | Session, `/v1/query`, `/v1/call`, typed REST (CRM, sales, …), realtime WS |
+| **Next.js web** | `frontend/web/` | App shell, SSR, BFF forward, `/api/ai/*`, WorkOS browser-session transport and login/logout redirects |
+| **api-server** | `api-server/` | Verified API session, identity binding, tenant access resolution, `/v1/query`, `/v1/call`, typed REST (CRM, sales, …), realtime WS |
 | **SpacetimeDB module** | `spacetimedb/` | Tables, reducers, permissions, audit, domain logic |
 | **ai-gateway** | `ai-gateway/` | LLM, RAG, embeddings, action draft orchestration |
 | **Kong** | `infra/kong/` | Production path routing (`/api/query`, `/api/call`, web, ai-gateway) |

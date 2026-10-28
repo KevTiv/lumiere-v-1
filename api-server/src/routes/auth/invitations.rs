@@ -105,7 +105,7 @@ pub(super) async fn invite(
         let from = state.config.resend_from_email.clone();
         let app = state.config.app_url.clone();
         let to = email.clone();
-        let path = if state.config.workos_client_id.is_some() {
+        let path = if state.config.workos_auth.is_some() {
             "/auth/invite/prepare"
         } else {
             "/accept-invite"
@@ -149,7 +149,7 @@ pub(super) async fn accept_invite(
     cookies: Cookies,
     Json(body): Json<AcceptInviteBody>,
 ) -> Result<impl IntoResponse, ApiError> {
-    if state.config.workos_client_id.is_some() {
+    if state.config.workos_auth.is_some() {
         return Ok(Json(
             accept_workos_invite(&state, &headers, &body.token).await?,
         ));

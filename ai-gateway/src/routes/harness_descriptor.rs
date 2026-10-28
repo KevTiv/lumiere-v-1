@@ -350,35 +350,8 @@ pub fn build_descriptor(
     descriptor
 }
 
-struct Actor {
-    organization_id: u64,
-    company_id: u64,
-    identity: String,
-    token: String,
-}
-
-fn actor_from_headers(headers: &HeaderMap) -> AppResult<Actor> {
-    let required = |name: &str| {
-        headers
-            .get(name)
-            .and_then(|value| value.to_str().ok())
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| AppError::Forbidden("acting-user context is required".into()))
-    };
-    let id = |name: &str| {
-        required(name)?
-            .parse::<u64>()
-            .ok()
-            .filter(|value| *value > 0)
-            .ok_or_else(|| AppError::Forbidden("acting-user context is invalid".into()))
-    };
-    Ok(Actor {
-        organization_id: id("x-lumiere-organization-id")?,
-        company_id: id("x-lumiere-company-id")?,
-        identity: required("x-lumiere-actor-identity")?.to_string(),
-        token: required("x-lumiere-actor-token")?.to_string(),
-    })
+fn actor_from_headers(headers: &HeaderMap) -> AppResult<lumiere_auth_context::ActorContext> {
+    Ok(lumiere_auth_context::ActorContext::from_headers(headers)?)
 }
 
 pub async fn get_descriptor(

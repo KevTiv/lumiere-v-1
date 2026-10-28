@@ -19,6 +19,14 @@ function loadSource(file: string, dependencies: Record<string, unknown>, globals
     module, exports: module.exports, Headers, URL, console,
     process: { env: { WORKOS_CLIENT_ID: 'client', LUMIERE_API_SERVER_URL: 'http://api.test' } },
     require: (name: string) => {
+      if (name === './auth-credentials' || name === '@/lib/auth-credentials') {
+        return loadSource('./auth-credentials.ts', {
+          ...dependencies,
+          'server-only': {},
+          './auth-mode': dependencies['./auth-mode'] ?? dependencies['@/lib/auth-mode'],
+          'next/headers': dependencies['next/headers'] ?? { cookies: () => { throw new Error('unexpected native cookie lookup') } },
+        }, globals)
+      }
       assert.ok(name in dependencies, `Unexpected dependency ${name}`)
       return dependencies[name]
     }, ...globals,
@@ -66,6 +74,28 @@ test('BFF preserves explicit invalid bearer and rejects cross-origin cookie writ
   assert.equal(calls.length, 1)
 })
 
+test('hosted BFF never replaces explicit empty credentials or missing provider sessions with native cookies', async () => {
+  for (const authorization of [null, '', 'Basic invalid', 'Bearer ']) {
+    let providerReads = 0
+    let forwarded: Headers | undefined
+    const api = loadSource('./api-server-forward.ts', {
+      './auth-mode': { isWorkOsEnabled: () => true }, 'next/server': { NextResponse },
+      '@workos-inc/authkit-nextjs': { withAuth: async () => { providerReads++; return {} } },
+    }, { fetch: async (_url: string, init: RequestInit) => {
+      forwarded = new Headers(init.headers)
+      return new Response('{}', { status: 401 })
+    } })
+    const headers = new Headers({ cookie: 'stdb_token=native-owner' })
+    if (authorization !== null) headers.set('authorization', authorization)
+    const response = await api.forwardToApiServerRequired(new NextRequest('https://web.test/api/query/companies', { headers }))
+    assert.equal(response.status, 401)
+    // The Headers API trims surrounding whitespace on explicit header values.
+    assert.equal(forwarded?.get('authorization'), headers.get('authorization'))
+    assert.equal(forwarded?.get('cookie'), null)
+    assert.equal(providerReads, authorization === null ? 1 : 0)
+  }
+})
+
 test('callback rejects legacy invite state and clears sealed session on rejection', async () => {
   let options: any; let admitted = 0; let cleared = 0
   const deleted: Array<{ name: string; value: string }> = []
@@ -73,7 +103,7 @@ test('callback rejects legacy invite state and clears sealed session on rejectio
     '@workos-inc/authkit-nextjs': { handleAuth: (value: unknown) => { options = value; return () => {} } },
     'next/headers': { cookies: async () => ({ set: (name: string, value: string) => deleted.push({ name, value }) }) },
     'next/server': { NextRequest, NextResponse }, '@/lib/auth-mode': { isWorkOsEnabled: () => true },
-    '@/app/actions/save-stdb-token': { clearStdbSession: async () => { cleared++ } },
+    '@/lib/auth-cookies': { clearStdbSession: async () => { cleared++ } },
     '@/lib/workos-stdb-bridge': { bridgeWorkOsUserToStdbSession: async () => { admitted++ } },
   })
   await assert.rejects(options.onSuccess({ accessToken: 'provider', state: 'legacy-invite' }))
@@ -81,6 +111,27 @@ test('callback rejects legacy invite state and clears sealed session on rejectio
   const result = await options.onError({ request: new NextRequest('https://web.test/auth/callback') })
   assert.equal(result.headers.get('location'), 'https://web.test/sign-in?error=admission_denied')
   assert.equal(deleted[0].name, 'wos-session'); assert.equal(deleted[0].value, ''); assert.equal(cleared, 1)
+})
+
+test('internal cookie cleanup expires native and realtime credentials without exposing a saving action', async () => {
+  const deleted: string[] = []
+  const written: Array<{ name: string; value: string; options: any }> = []
+  const cleanup = loadSource('./auth-cookies.ts', {
+    'server-only': {},
+    'next/headers': { cookies: async () => ({
+      delete: (name: string) => deleted.push(name),
+      set: (name: string, value: string, options: any) => written.push({ name, value, options }),
+    }) },
+  }, { process: { env: { NODE_ENV: 'production' } } })
+  await cleanup.clearStdbSession()
+  assert.deepEqual(deleted, ['stdb_token', 'stdb_identity'])
+  assert.equal(written[0].name, 'stdb_token')
+  assert.equal(written[0].value, '')
+  assert.equal(written[0].options.path, '/v1/realtime')
+  assert.equal(written[0].options.maxAge, 0)
+  assert.equal(written[0].options.httpOnly, true)
+  assert.equal(written[0].options.secure, true)
+  assert.deepEqual(Object.keys(cleanup), ['clearStdbSession'])
 })
 
 

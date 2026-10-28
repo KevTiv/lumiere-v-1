@@ -1,4 +1,4 @@
-//! Password auth + credential helpers (port of `frontend/web/lib/stdb-auth-server.ts`).
+//! Server-owned native password support and platform credential helpers.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -113,7 +113,7 @@ fn value_as_str(v: &Value) -> Option<String> {
     v.as_str().map(|s| s.to_string())
 }
 
-/// Match SpacetimeDB 2.x SATS-SQL shapes (see `stdb-auth-server.ts` `normalizeIdentitySqlValue`).
+/// Match SpacetimeDB 2.x SATS-SQL identity shapes.
 pub fn identity_cell_to_hex(v: &Value) -> Option<String> {
     if let Some(s) = v.as_str() {
         let s = s

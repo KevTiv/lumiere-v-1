@@ -1,4 +1,5 @@
-//! Session resolution from an authenticated SpacetimeDB token and membership.
+//! Session authority: verified WorkOS identity in hosted mode, native STDB
+//! credentials otherwise, with application membership and policy in both modes.
 
 pub mod workos;
 
@@ -445,7 +446,7 @@ pub async fn resolve_api_session(
     cookie_token: Option<&str>,
     x_std_identity: Option<&str>,
 ) -> Result<Option<ApiSession>, ApiError> {
-    if state.config.workos_client_id.is_some() {
+    if state.config.workos_auth.is_some() {
         return workos::resolve_session(state, authorization, cookie_token).await;
     }
     // A supplied credential always identifies the interactive actor, even in

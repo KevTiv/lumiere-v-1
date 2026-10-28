@@ -246,7 +246,6 @@ fn dispatch_allowlist_fail_closed_with_webhook() {
         dev_mock_org_id: None,
         ai_gateway_url: String::new(),
         projection_lag_budget_secs: 300,
-        workos_client_id: None,
         workos_auth: None,
         stdb_credential_encryption_key: None,
         resend_api_key: None,

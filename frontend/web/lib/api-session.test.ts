@@ -10,6 +10,10 @@ const source = readFileSync(new URL("./api-session.ts", import.meta.url), "utf8"
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText
+const credentialsSource = readFileSync(new URL('./auth-credentials.ts', import.meta.url), 'utf8')
+const credentialsCompiled = ts.transpileModule(credentialsSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
 const verifiedIdentity = (token: string) => (token === "approver" ? "b" : "a").repeat(64)
 
 function resolver(options: {
@@ -21,13 +25,18 @@ function resolver(options: {
   rejectedToken?: string
   unavailable?: boolean
   response?: unknown
+  sessionLookupFails?: boolean
 } = {}) {
   const fieldTokens: string[] = []
   const jar = options.cookies ?? {}
   const module = { exports: {} as { resolveApiSession: (req?: Request) => Promise<ApiSession | null> } }
   const dependencies: Record<string, unknown> = {
+    'server-only': {},
     "@/lib/auth-mode": { isWorkOsEnabled: () => Boolean(options.workOs) },
-    "@workos-inc/authkit-nextjs": { withAuth: async () => ({ accessToken: options.workOsToken }) },
+    "@workos-inc/authkit-nextjs": { withAuth: async () => {
+      if (options.sessionLookupFails) throw new Error('session lookup failed')
+      return { accessToken: options.workOsToken }
+    } },
     "next/headers": {
       cookies: async () => ({
         get: (name: string) => name in jar ? { value: jar[name] } : undefined,
@@ -39,6 +48,16 @@ function resolver(options: {
       callReducer: () => { throw new Error("session resolution must not provision a caller") },
     },
   }
+  dependencies['./auth-mode'] = dependencies['@/lib/auth-mode']
+  const credentialsModule = { exports: {} }
+  runInNewContext(credentialsCompiled, {
+    module: credentialsModule, exports: credentialsModule.exports,
+    require: (id: string) => {
+      assert.ok(id in dependencies, `unexpected credential dependency: ${id}`)
+      return dependencies[id]
+    },
+  })
+  dependencies['@/lib/auth-credentials'] = credentialsModule.exports
   runInNewContext(compiled, {
     module,
     exports: module.exports,
@@ -143,6 +162,12 @@ test("WorkOS sessions use the provider token and ignore legacy cookies", async (
 
 test("anonymous WorkOS callers cannot fall back to native cookies or development admin", async () => {
   const { resolve, fieldTokens } = resolver({ workOs: true, cookies: { stdb_token: 'owner' } })
+  assert.equal(await resolve(), null)
+  assert.deepEqual(fieldTokens, [])
+})
+
+test('hosted session lookup failures cannot inherit native cookies or development admin', async () => {
+  const { resolve, fieldTokens } = resolver({ workOs: true, sessionLookupFails: true, cookies: { stdb_token: 'owner' } })
   assert.equal(await resolve(), null)
   assert.deepEqual(fieldTokens, [])
 })

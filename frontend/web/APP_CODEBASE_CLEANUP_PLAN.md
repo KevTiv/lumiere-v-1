@@ -162,7 +162,7 @@ These items are correctness prerequisites, not optional cleanup. The page audit 
 
 - [ ] Remove `stdbToken` from root-layout/client-provider props and the direct browser STDB connection. Delete legacy STDB tokens from browser storage on migration/sign-out and rotate credentials that may already have been exposed.
 - [ ] Add a regression test proving bearer values never occur in rendered HTML, Flight data, client props, logs, analytics, or `localStorage`/`sessionStorage`.
-- [ ] Move `saveStdbSession`/`clearStdbSession` out of a `'use server'` action module into a `server-only` internal library. No client-callable action may accept a bearer token as an argument.
+- [x] Remove the unused `saveStdbSession` server action and move cookie cleanup into the `server-only` `lib/auth-cookies.ts` library. No client-callable action accepts a bearer token as an argument.
 - [ ] Redact telemetry globally: pageviews use pathname plus an allowlist of harmless parameters, not raw `searchParams`; auth tokens, callbacks, and error text never enter analytics events.
 - [ ] Consume reset/invite secrets server-side and immediately transition to token-free URLs. Use an opaque, short-lived, single-use WorkOS state handle rather than putting the plaintext invite token in OAuth state.
 - [ ] Make WorkOS invite completion idempotent/atomic and route failures to a visible token-free retry/error state; do not log an error and continue as if membership succeeded.
