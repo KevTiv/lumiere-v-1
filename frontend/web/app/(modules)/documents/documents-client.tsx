@@ -3,7 +3,7 @@ import { recordOptions, withLinkedPickers } from "@/lib/linked-options"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useErpSession } from "@lumiere/erp-session"
 import { useTranslation } from "@lumiere/i18n"
 import {
@@ -44,7 +44,7 @@ import {
   useKnowledgeArticles,
   useKnowledgeCategories,
   useDocumentFolders,
-  useCreateDocument,
+  useCreateDocumentWithRef,
   useUpdateDocument,
   useDeleteDocument,
   useRestoreDocument,
@@ -112,6 +112,7 @@ import {
 } from "@/lib/documents-create-params"
 import { documentRecordHref, formatFileSize } from "./document-record"
 import { documentNameFromFile, toBrowserFiles, toBrowserFolders } from "./file-browser-rows"
+import { documentBrowserHref, documentBrowserRecordHref, documentBrowserState } from "./document-browser-navigation"
 import { FileBrowser } from "@lumiere/ui"
 import { useIdentityLabelMap } from "@lumiere/ui/hooks/use-identity-label-map"
 import { documentFolderCanBeDeleted } from "./document-folder-gates"
@@ -302,6 +303,12 @@ function DocumentsClientLoaded({
   const [ackSubmitError, setAckSubmitError] = useState<string | null>(null)
   const openErpAiChat = useOpenErpAiChat()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const browserQuery = searchParams.toString()
+  const [browserViewState, setBrowserViewState] = useState(() => documentBrowserState(searchParams))
+  useEffect(() => {
+    setBrowserViewState(documentBrowserState(new URLSearchParams(browserQuery)))
+  }, [browserQuery])
   const identityLabels = useIdentityLabelMap(orgId)
 
   const documentsRead = moduleCollection(useDocuments(orgId, initialDocuments))
@@ -353,7 +360,9 @@ function DocumentsClientLoaded({
   const mailTemplatesRead = moduleCollection(useMailTemplates(organizationId))
   const mailTemplates = mailTemplatesRead.rows
   const { data: aiAgents = [] } = useAiAgents(organizationId, organizationId > 0)
-  const createDocument = useCreateDocument(orgId, operatingCompanyId)
+  const createDocument = useCreateDocumentWithRef(orgId, operatingCompanyId, {
+    mayDispatch: () => browserActionScope.current.key === templateScopeKey && browserActionScope.current.upload,
+  })
   const updateDocument = useUpdateDocument(orgId)
   const deleteDocument = useDeleteDocument(orgId)
   const restoreDocument = useRestoreDocument(orgId)
@@ -877,6 +886,16 @@ function DocumentsClientLoaded({
         if (tab.id === "knowledge-base" && tab.entityConfig) {
           return {
             ...tab,
+            recordSheet: {
+              titleKey: "name",
+              detailConfig: {
+                mode: "detail" as const,
+                sections: [{ id: "article", fields: [
+                  { key: "description", type: "markdown" as const, label: t("documents.knowledgeBase.columns.content", { defaultValue: "Article" }) },
+                  { key: "isPublished", type: "boolean" as const, label: t("documents.knowledgeBase.columns.published", { defaultValue: "Published" }) },
+                ] }],
+              },
+            },
             createForm: knowledgeArticleFormConfig,
             entityConfig: withTableActions(
               tab.entityConfig,
@@ -1403,12 +1422,13 @@ function DocumentsClientLoaded({
     if (!params) {
       throw new Error("Document registration params incomplete after upload")
     }
-    await createDocument.mutateAsync(params)
+    const created = await createDocument.mutateAsync(params)
     assertBrowserAction("upload")
     await ingestDocumentEvidence.mutateAsync({
       companyId: operatingCompanyId,
       objectKey: uploaded.objectKey,
     })
+    return created.id
   }
 
   const browserFiles = useMemo(
@@ -1528,9 +1548,17 @@ function DocumentsClientLoaded({
                       <FileBrowser
                         key={templateScopeKey}
                         folders={browserFolders}
+                        folderState={foldersRead.state}
                         files={browserFiles}
                         storageKey="lumiere:documents-browser-layout"
-                        onOpenFile={(id) => router.push(`/documents/${id}`)}
+                        state={browserViewState}
+                        onStateChange={(state) => {
+                          setBrowserViewState(state)
+                          // Presentation-only changes use Next's patched history API;
+                          // typing in search must not wait for a server navigation.
+                          window.history.replaceState(null, "", documentBrowserHref(state, browserQuery))
+                        }}
+                        onOpenFile={(id) => router.push(documentBrowserRecordHref(id, browserViewState, browserQuery))}
                         onCreateFolder={canCreateDocumentFolder ? (parentId) => {
                           const current = browserActionScope.current
                           if (current.key !== templateScopeKey || !current.createFolder) return
@@ -1540,16 +1568,14 @@ function DocumentsClientLoaded({
                           })
                         } : undefined}
                         onUpload={canUploadDocument ? async (picked, folderId) => {
+                          let createdId: string | undefined
                           for (const file of picked) {
-                            await uploadAndRegisterDocument(file, {
+                            createdId = await uploadAndRegisterDocument(file, {
                               name: documentNameFromFile(file.name),
                               folderId: folderId ?? undefined,
                             })
                           }
-                          showWorkflowToast({
-                            kind: "success",
-                            title: t("common.actionCompleted", { action: t("documents.browser.upload") }),
-                          })
+                          return createdId
                         } : undefined}
                       />
                     ),

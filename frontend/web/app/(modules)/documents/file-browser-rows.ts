@@ -30,6 +30,11 @@ export interface BrowserFolderRow {
 }
 
 const epochMs = (value: unknown): number | null => formatTimestampLike(value)?.getTime() ?? null;
+const knownSize = (value: unknown): number | null => {
+  if (value == null || value === '' || !['number', 'bigint', 'string'].includes(typeof value)) return null;
+  const bytes = Number(value);
+  return Number.isFinite(bytes) && bytes >= 0 ? bytes : null;
+};
 
 export function toBrowserFiles(
   documents: readonly BrowserDocumentRow[],
@@ -39,10 +44,10 @@ export function toBrowserFiles(
     .filter((doc) => !doc.isDeleted)
     .map((doc) => ({
       id: String(doc.id),
-      name: doc.name || doc.fileName,
-      fileName: doc.fileName,
-      mimetype: doc.mimetype,
-      size: Number(doc.fileSize) || 0,
+      name: doc.name || doc.fileName || '—',
+      fileName: doc.fileName || '',
+      mimetype: doc.mimetype || '',
+      size: knownSize(doc.fileSize),
       folderId: doc.folderId == null ? null : String(doc.folderId),
       updatedAt: epochMs(doc.writeDate),
       modifiedBy: doc.writeUid == null ? '—' : resolveIdentityLabel(doc.writeUid, identityLabels),
@@ -61,7 +66,7 @@ export function toBrowserFolders(
   const visibleIds = new Set(visibleFolders.map((folder) => String(folder.id)));
   return visibleFolders
     .slice()
-    .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0) || a.name.localeCompare(b.name))
+    .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0) || String(a.name ?? '').localeCompare(String(b.name ?? '')))
     .map((folder) => {
       const id = String(folder.id);
       const parentId = folder.parentId == null ? null : String(folder.parentId);
@@ -69,11 +74,11 @@ export function toBrowserFolders(
       const latest = Math.max(epochMs(folder.writeDate) ?? 0, ...own.map((file) => file.updatedAt ?? 0));
       return {
         id,
-        name: folder.name,
+        name: folder.name || '—',
         // Never project an ancestor that this actor's folder collection does not expose.
         parentId: parentId !== id && parentId !== null && visibleIds.has(parentId) ? parentId : null,
         fileCount: own.length,
-        totalSize: own.reduce((sum, file) => sum + file.size, 0),
+        totalSize: own.every((file) => file.size != null) ? own.reduce((sum, file) => sum + (file.size ?? 0), 0) : null,
         updatedAt: latest > 0 ? latest : null,
         isFavorite: folder.isFavorite === true,
       };

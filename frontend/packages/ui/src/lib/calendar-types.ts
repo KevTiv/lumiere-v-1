@@ -1,6 +1,6 @@
 // Calendar event types for ERP system
 export type EventType = "meeting" | "task" | "deadline" | "reminder" | "system" | "shared"
-export type ViewMode = "month" | "week" | "day"
+export type ViewMode = "agenda" | "month" | "week" | "day"
 export type EventStatus = "scheduled" | "confirmed" | "cancelled" | "completed"
 
 export interface CalendarEvent {
@@ -9,6 +9,8 @@ export interface CalendarEvent {
   description?: string
   startTime: Date
   endTime: Date
+  /** An all-day calendar interval; its label omits clock times. */
+  allDay?: boolean
   type: EventType
   status: EventStatus
   createdBy: string

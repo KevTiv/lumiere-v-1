@@ -9934,6 +9934,20 @@
       "activityIncomplete": "Complete the activity details before saving. Your entries are retained.",
       "deleteFailed": "The event could not be deleted. It is still selected.",
       "eventIncomplete": "Enter an event title and valid times. The end must not be before the start. Your entries are retained."
+    },
+    "workspace": {
+      "agenda": "Agenda",
+      "month": "Month",
+      "week": "Week",
+      "day": "Day",
+      "allDay": "All day",
+      "cancelled": "Cancelled",
+      "timezone": "Times shown in {{timezone}}",
+      "view": "Calendar view",
+      "previous": "Previous period",
+      "next": "Next period",
+      "agendaRange": "{{start}} to {{end}}",
+      "eventDetails": "Event details"
     }
   },
   "documents": {
@@ -10065,7 +10079,9 @@
         "isPublished": "Published",
         "articleItemCount": "Items",
         "articleMemberCount": "Members",
-        "createDate": "Created"
+        "createDate": "Created",
+        "content": "Article",
+        "published": "Published"
       },
       "filters": {
         "isPublished": {
@@ -10492,7 +10508,14 @@
       "modified": "Modified",
       "viewFiles": "Files",
       "viewTable": "Table",
-      "uploadFailed": "Upload failed"
+      "uploadFailed": "Upload failed",
+      "uploaded": "Uploaded",
+      "openUploaded": "Open file",
+      "checkUploadOutcome": "Some uploads could not be confirmed. Check the files list before selecting those files again.",
+      "filesLoaded": "{{count}} loaded files",
+      "foldersLoading": "Loading folders. Upload and new-folder actions will be available when the folders are ready.",
+      "foldersDenied": "You do not have access to folders. You can still inspect the available files.",
+      "foldersUnavailable": "Folders could not be loaded. You can still inspect the available files. Retry folders to restore upload and new-folder actions."
     },
     "studio": {
       "templateDesignActions": "Template design actions",
@@ -12702,6 +12725,35 @@
       "replies": "Replies",
       "reply": "Reply",
       "thread": "Replies"
+    },
+    "workspace": {
+      "loading": "Loading conversations and current access…",
+      "openConversation": "Open conversation",
+      "markReadFailed": "The notification could not be marked read.",
+      "markRead": "Mark notification read",
+      "parentMismatch": "Choose a parent message on the same record. Your entries are retained.",
+      "linkedRecord": "Linked record #{{id}}",
+      "sourceUnavailable": "Source unavailable",
+      "unconfirmed": "The message outcome is still unconfirmed. Check again without posting another message.",
+      "replyFailed": "The reply could not be posted. Your draft is retained.",
+      "title": "Conversations",
+      "description": "Open a record conversation and reply with its context beside you.",
+      "newMessage": "New message",
+      "list": "Conversation list",
+      "search": "Search loaded conversations",
+      "loaded": "{{count}} loaded conversations",
+      "empty": "No conversations match this view.",
+      "unavailable": "This conversation is unavailable in the current view.",
+      "select": "Select a conversation to read and reply.",
+      "back": "Back to conversations",
+      "openMessage": "Open message",
+      "openRecord": "Open record",
+      "contentUnavailable": "Message content unavailable.",
+      "reply": "Reply to this conversation",
+      "postedNote": "Messages are posted as comments on the linked record.",
+      "checkOutcome": "Check outcome",
+      "postReply": "Post reply",
+      "replyUnavailable": "Replying is unavailable for this source or your current access."
     }
   },
   "pos": {
@@ -16667,7 +16719,21 @@
       "newTask": "New task",
       "upload": "Upload file",
       "logTime": "Log time",
-      "newEvent": "New event"
+      "newEvent": "New event",
+      "openMyWork": "Open my work"
+    },
+    "dailyWork": {
+      "description": "Review assigned Finance workflow work, or switch to record follow-ups. Completing a follow-up does not approve its business record.",
+      "viewsHint": "Mine shows your assignments. Eligible includes work available to your role; Available shows unclaimed workflow work or unassigned follow-ups. Counts describe only loaded records.",
+      "otherWork": "Other workspaces",
+      "crmWork": "CRM daily work",
+      "overdue": "Overdue",
+      "today": "Today",
+      "upcoming": "Upcoming",
+      "undated": "No due date",
+      "completed": "Completed",
+      "due": "Due",
+      "deadlineUnavailable": "Due date unavailable"
     }
   },
   "financeReview": {
@@ -16831,6 +16897,36 @@
       "loadFailed": "Approval tasks could not be loaded. Retry before making a decision."
     },
     "inboxDescription": "Review requests for the selected company. Open a record before you approve or reject it.",
-    "loading": "Loading approval tasks…"
+    "loading": "Loading approval tasks…",
+    "review": {
+      "title": "Approval inbox",
+      "kinds": {
+        "purchaseOrder": "Purchase order",
+        "salesOrder": "Sales order",
+        "accountingDocument": "Accounting document",
+        "payment": "Payment",
+        "expenseReport": "Expense report",
+        "aiDraft": "AI draft",
+        "record": "Business record"
+      },
+      "open": "Review assignment",
+      "sourceHint": "Open the source record to check its current details before deciding. A decision may execute the business action requested by this workflow.",
+      "sourceUnavailable": "A source record link is unavailable for this request. Review the request in its owning workspace before deciding.",
+      "openHint": "This assignment is open. Claim it before deciding if the workflow requires a claimant.",
+      "claimedHint": "This assignment has been claimed. Check the source record and your selected acting principal before deciding."
+    }
+  },
+  "productivity": {
+    "navigation": {
+      "files": "Files",
+      "knowledge": "Knowledge",
+      "templates": "Templates",
+      "manage": "Manage",
+      "schedule": "Schedule",
+      "conversations": "Conversations",
+      "notifications": "Notifications",
+      "following": "Following",
+      "messageBatches": "Message batches"
+    }
   }
 }

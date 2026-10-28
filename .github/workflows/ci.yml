@@ -384,6 +384,9 @@ jobs:
       - name: Unit tests (accounting and cross-module overview models)
         run: pnpm --dir web test:accounting-ui:models
 
+      - name: Unit tests (productivity workspace models)
+        run: pnpm --dir web test:productivity:models
+
       - name: Install Playwright Chromium
         working-directory: frontend/web
         run: pnpm exec playwright install --with-deps chromium
@@ -406,6 +409,9 @@ jobs:
 
       - name: Reports workflow browser regressions
         run: pnpm --dir web test:e2e:reports-ui
+
+      - name: Productivity workspace browser regressions
+        run: pnpm --dir web test:e2e:productivity-ui
 
       - name: Accounting next-action and authoring browser regressions
         working-directory: frontend/web

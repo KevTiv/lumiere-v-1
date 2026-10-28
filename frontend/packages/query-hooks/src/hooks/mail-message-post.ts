@@ -18,6 +18,14 @@ export type PostedMessageExpectation = {
   readonly resId: bigint
 }
 
+/** A dispatch may have committed; callers must reconcile this attempt by reading. */
+export class UnconfirmedPostedMessageError extends Error {
+  constructor() {
+    super("The message outcome is not confirmed. Check its outcome before posting again.")
+    this.name = "UnconfirmedPostedMessageError"
+  }
+}
+
 /** The idempotency key `post_message` stored in a row's `metadata` JSON, if any. */
 function storedIdempotencyKey(metadata: unknown): string | null {
   if (typeof metadata !== "string") return null

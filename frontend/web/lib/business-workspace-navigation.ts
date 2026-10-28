@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next"
 import type { ModuleWorkspaceNav } from "@lumiere/ui/lib/module-types"
 
-export type BusinessWorkspaceModule = "sales" | "crm" | "purchasing" | "reports" | "expenses"
+export type BusinessWorkspaceModule = "sales" | "crm" | "purchasing" | "reports" | "expenses" | "documents" | "calendar" | "messages"
 type Group = readonly [id: string, tabIds: readonly string[]]
 
 // Navigation metadata only. Runtime clients keep their canonical tabs, permissions,
@@ -51,13 +51,56 @@ const definitions: Record<BusinessWorkspaceModule, { workspaces: readonly Group[
       ["operations", ["operations", "inbox"]],
     ],
   },
+  documents: {
+    workspaces: [
+      ["files", ["documents"]],
+      ["knowledge", ["knowledge-base"]],
+      ["templates", ["document-templates", "mail-templates"]],
+    ],
+    overflow: [
+      ["manage", ["document-folders", "knowledge-categories", "document-processing", "document-insights", "documents-recycle-bin"]],
+      ["overview", ["dashboard"]],
+    ],
+  },
+  calendar: {
+    workspaces: [
+      ["schedule", ["calendar", "events"]],
+      ["activities", ["activities"]],
+    ],
+    overflow: [["overview", ["dashboard"]]],
+  },
+  messages: {
+    workspaces: [
+      ["conversations", ["messages"]],
+      ["notifications", ["notifications"]],
+    ],
+    overflow: [
+      ["following", ["followers"]],
+      ["messageBatches", ["message-batches"]],
+      ["overview", ["dashboard"]],
+    ],
+  },
+}
+
+const productivityLabels: Record<string, string> = {
+  files: "Files",
+  knowledge: "Knowledge",
+  templates: "Templates",
+  manage: "Manage",
+  schedule: "Schedule",
+  conversations: "Conversations",
+  notifications: "Notifications",
+  following: "Following",
+  messageBatches: "Message batches",
 }
 
 export function businessWorkspaceNavigation(module: BusinessWorkspaceModule, t: TFunction): ModuleWorkspaceNav {
   const groups = (items: readonly Group[]) => items.map(([id, tabIds]) => ({
-    id, label: module === "reports" && ["overview", "financial", "analytics", "schedules", "configuration", "analysis"].includes(id)
-      ? t(`reports.workspace.${({ overview: "run", financial: "saved", analytics: "dashboards", schedules: "schedules", configuration: "authoring", analysis: "analysis" } as Record<string, string>)[id]}`)
-      : t(`modules.workspaces.${id}`), tabIds,
+    id, label: productivityLabels[id]
+      ? t(`productivity.navigation.${id}`, { defaultValue: productivityLabels[id] })
+      : module === "reports" && ["overview", "financial", "analytics", "schedules", "configuration", "analysis"].includes(id)
+        ? t(`reports.workspace.${({ overview: "run", financial: "saved", analytics: "dashboards", schedules: "schedules", configuration: "authoring", analysis: "analysis" } as Record<string, string>)[id]}`)
+        : t(`modules.workspaces.${id}`), tabIds,
   }))
   return {
     label: t("modules.workspaces.label"),

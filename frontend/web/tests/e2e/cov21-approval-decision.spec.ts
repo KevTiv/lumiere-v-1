@@ -185,6 +185,7 @@ test.describe("COV-21 exact human-task decision", { tag: ["@dev-fixture", "@cov2
 
         await gotoApprovals(approver.page)
         await expect(approver.page.getByTestId(`approval-card-${taskId}`)).toBeVisible({ timeout: 30_000 })
+        await approver.page.getByTestId(`approval-review-${taskId}`).click()
         const [decided] = await Promise.all([
           approver.page.waitForResponse(
             (response) => matchesOperationResponse(response, "decide_workflow_human_task"),

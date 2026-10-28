@@ -71,6 +71,18 @@ test('folder counts and size use only the actor-visible file projection', () => 
   assert.equal(folder!.updatedAt, 2_000_000);
 });
 
+test('missing or invalid file sizes stay unavailable and do not become zero totals', () => {
+  const files = toBrowserFiles([
+    { ...documents[0]!, fileSize: null },
+    { ...documents[1]!, fileSize: 'not-a-size' },
+    { ...documents[2]!, fileSize: 0 },
+  ], labels);
+  assert.deepEqual(files.map((file) => file.size), [null, null, 0]);
+  const [folder] = toBrowserFolders([{ id: 5n, name: 'Finance' }], files);
+  assert.equal(folder!.totalSize, null);
+  assert.equal(folder!.fileCount, 2);
+});
+
 test('an uploaded file is named after its file name', () => {
   assert.equal(documentNameFromFile('Q3 report.final.pdf'), 'Q3 report.final');
   assert.equal(documentNameFromFile('.env'), '.env');

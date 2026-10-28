@@ -2,7 +2,7 @@ import { matchesOperationResponse } from "./operation-response"
 /**
  * Gate UI — workflows + approvals product surface.
  *
- * Covers publish/simulate, task inbox, company switcher, migrations/ops tabs,
+ * Covers publish/simulate, approval inbox, company switcher, migrations/ops tabs,
  * and dead-letter recovery controls.
  */
 import { expect, test } from "@playwright/test"
@@ -221,8 +221,9 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
 
   test("approvals inbox loads with company scope and company switcher", async ({ page }) => {
     await gotoModule(page, "/approvals")
-    await expect(page.getByTestId("module-view-approvals")).toBeVisible()
-    await expect(page.getByRole("heading", { name: /task inbox/i })).toBeVisible()
+    const inbox = page.getByTestId("module-view-approvals")
+    await expect(inbox).toBeVisible()
+    await expect(inbox.getByRole("heading", { name: "Approval inbox", exact: true })).toBeVisible()
 
     await expect(page.getByTestId("company-switcher-loading")).toHaveCount(0, {
       timeout: 30_000,
@@ -238,11 +239,27 @@ test.describe("Gate UI — workflows and approvals", { tag: ["@gate-ui", "@p0"] 
       await option.click()
     }
 
-    await expect(page.getByTestId("approvals-inbox-count")).toBeVisible({ timeout: 30_000 })
-    await expect(
-      page.getByTestId("approvals-inbox-empty").or(page.getByRole("button", { name: /^claim$/i }).first()),
-    ).toBeVisible()
-    await expect(page.getByRole("link", { name: /workflow definitions/i })).toBeVisible()
+    await expect(inbox.getByTestId("approvals-inbox-count")).toBeVisible({ timeout: 30_000 })
+    const emptyInbox = inbox.getByTestId("approvals-inbox-empty")
+    const firstAssignment = inbox.locator("[data-testid^='approval-card-']").first()
+    await expect(emptyInbox.or(firstAssignment)).toBeVisible({ timeout: 30_000 })
+    if (await firstAssignment.isVisible()) {
+      const assignmentTestId = await firstAssignment.getAttribute("data-testid")
+      expect(assignmentTestId).toMatch(/^approval-card-[1-9]\d*$/)
+      const assignment = inbox.getByTestId(assignmentTestId!)
+      await expect(assignment.getByText(/^(Open|Claimed)$/, { exact: true })).toBeVisible()
+      const sourceLink = assignment.getByRole("link", { name: "Open record", exact: true })
+      if (await sourceLink.count()) {
+        await expect(sourceLink).toBeVisible()
+        await expect(sourceLink).toHaveAttribute("href", /^\/(?!\/)/)
+      }
+      await assignment.locator("summary").filter({ hasText: "Review assignment" }).click()
+      await expect(assignment.locator("details")).toHaveAttribute("open", "")
+      await expect(assignment.getByRole("button", { name: "Approve", exact: true })).toBeVisible()
+      await expect(assignment.getByRole("button", { name: "Reject", exact: true })).toBeVisible()
+      await expect(assignment.getByRole("button", { name: "Comment", exact: true })).toBeVisible()
+    }
+    await expect(inbox.getByRole("link", { name: /workflow definitions/i })).toBeVisible()
     await expectNoAppError(page)
   })
 

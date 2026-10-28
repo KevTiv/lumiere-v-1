@@ -16,7 +16,7 @@ import { businessWorkspaceNavigation, type BusinessWorkspaceModule } from "../..
 import { accountingWorkspaceNavigation } from "../../../../lib/accounting-workspace-navigation"
 import { useModuleTab } from "../../../../hooks/use-module-tab"
 
-const modules = ["accounting", "sales", "crm", "purchasing", "reports", "expenses", "uncurated"] as const
+const modules = ["accounting", "sales", "crm", "purchasing", "reports", "expenses", "documents", "calendar", "messages", "uncurated"] as const
 function Preview() {
   const { t } = useTranslation()
   const router = useRouter()
@@ -31,7 +31,7 @@ function Preview() {
   const nav: ModuleWorkspaceNav | undefined = module === "uncurated" ? undefined : module === "accounting"
     ? accountingWorkspaceNavigation(t) : businessWorkspaceNavigation(module as BusinessWorkspaceModule, t)
   const ids = nav ? [...nav.workspaces, ...(nav.overflow ?? [])].flatMap((group) => group.tabIds) : ["dashboard", ...Array.from({ length: 9 }, (_, index) => `records-${index}`)]
-  const defaultTab = params.get("defaultTab") === "orders" ? "orders" : "dashboard"
+  const defaultTab = params.get("defaultTab") === "orders" ? "orders" : module === "documents" ? "documents" : module === "calendar" ? "calendar" : module === "messages" ? "messages" : "dashboard"
   const config: ModuleConfig = {
     id: module, title: module, defaultTab,
     workspaceNav: nav && { ...nav, workspaces: nav.workspaces.map((group) => ({ ...group, label: longNames ? `${group.label} ${"InternationalWorkspace".repeat(8)}` : group.label })) },

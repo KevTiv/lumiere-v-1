@@ -1,24 +1,15 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Calendar as CalendarIcon,
-  Grid3x3,
-  List,
-  Clock,
-  MapPin,
-  Users,
-} from "lucide-react"
+import { Skeleton } from "../components/skeleton"
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CalendarEvent, ViewMode } from "../lib/calendar-types"
-import { eventTypeConfig } from "../lib/calendar-types"
+import { calendarDayKey, calendarEventsForDay, calendarPeriodDays } from "../lib/calendar-dates"
 import { EventDetailPanel } from "./event-detail-panel"
 
 const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
@@ -41,251 +32,110 @@ interface CalendarViewProps {
   onCreateEvent?: () => void
   onEditEvent?: (eventId: string) => void
   onDeleteEvent?: (eventId: string) => void
-  /** Where an event has a page of its own: the detail panel then offers an "Open" link. */
   eventHref?: (eventId: string) => string | undefined
 }
 
 export function CalendarView({
-  events,
-  viewMode,
-  currentDate,
-  selectedDate,
-  searchTerm,
-  selectedEventId,
-  className,
-  onViewModeChange,
-  onPrevMonth,
-  onNextMonth,
-  onToday,
-  onSelectDate,
-  onSearchChange,
-  onSelectEvent,
-  onCreateEvent,
-  onEditEvent,
-  onDeleteEvent,
-  eventHref,
+  events, viewMode, currentDate, selectedDate, searchTerm, selectedEventId, className,
+  onViewModeChange, onPrevMonth, onNextMonth, onToday, onSelectDate, onSearchChange,
+  onSelectEvent, onCreateEvent, onEditEvent, onDeleteEvent, eventHref,
 }: CalendarViewProps) {
   const { t, i18n } = useTranslation()
-  const filteredEvents = useMemo(
-    () =>
-      events?.filter(
-        (event) =>
-          event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          event.description?.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
-    [events, searchTerm],
+  const [browserReady, setBrowserReady] = useState(false)
+  useEffect(() => { setBrowserReady(true) }, [])
+  const locale = i18n.language
+  const filteredEvents = useMemo(() => {
+    const term = searchTerm.trim().toLocaleLowerCase(locale)
+    return events.filter((event) => !term || `${event.title} ${event.description ?? ""} ${event.location ?? ""}`.toLocaleLowerCase(locale).includes(term))
+  }, [events, searchTerm, locale])
+  // Date grouping and display use the browser's local timezone. Server and
+  // first-client render must agree before those browser-specific values exist.
+  if (!browserReady) return <div className={cn("min-w-0 space-y-4", className)} aria-busy="true" aria-label={t("common.loading", { defaultValue: "Loading" })} data-testid="calendar-workspace-loading"><Skeleton className="h-16 w-full" /><Skeleton className="h-64 w-full" /></div>
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const days = calendarPeriodDays(viewMode, currentDate)
+  const selectedEvent = events.find((event) => event.id === selectedEventId)
+  const labelDate = (date: Date) => date.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric" })
+  const monthYear = currentDate.toLocaleDateString(locale, { month: "long", year: "numeric" })
+  const modes: Array<{ mode: ViewMode; label: string }> = [
+    { mode: "agenda", label: t("calendar.workspace.agenda", { defaultValue: "Agenda" }) },
+    { mode: "month", label: t("calendar.workspace.month", { defaultValue: "Month" }) },
+    { mode: "week", label: t("calendar.workspace.week", { defaultValue: "Week" }) },
+    { mode: "day", label: t("calendar.workspace.day", { defaultValue: "Day" }) },
+  ]
+  const timeLabel = (event: CalendarEvent) => {
+    if (event.allDay) return t("calendar.workspace.allDay", { defaultValue: "All day" })
+    const multiDay = calendarDayKey(event.startTime) !== calendarDayKey(event.endTime)
+    const options: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit", ...(multiDay ? { month: "short", day: "numeric" } : {}) }
+    return `${event.startTime.toLocaleString(locale, options)} - ${event.endTime.toLocaleString(locale, options)}`
+  }
+  const eventButton = (event: CalendarEvent) => (
+    <button
+      type="button"
+      key={event.id}
+      onClick={() => onSelectEvent(event.id)}
+      aria-pressed={event.id === selectedEventId}
+      className={cn("flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border bg-card p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring", event.id === selectedEventId && "border-primary", event.status === "cancelled" && "text-muted-foreground")}
+      data-testid={`calendar-agenda-event-${event.id}`}
+    >
+      <span className="min-w-0 space-y-1">
+        <span className={cn("block break-words text-sm font-medium", event.status === "cancelled" && "line-through")}>{event.title}</span>
+        <span className="block text-xs text-muted-foreground">{timeLabel(event)}</span>
+        {event.location && <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="size-3 shrink-0" />{event.location}</span>}
+      </span>
+      {event.status === "cancelled" && <Badge variant="secondary">{t("calendar.workspace.cancelled", { defaultValue: "Cancelled" })}</Badge>}
+    </button>
   )
-
-  const getEventsForDate = (date: Date) =>
-    filteredEvents.filter(
-      (event) => new Date(event.startTime).toDateString() === date.toDateString(),
-    )
-
-  const renderMonthView = () => {
-    const daysInMonth = new Date(currentDate?.getFullYear(), currentDate?.getMonth() + 1, 0)?.getDate()
-    const firstDay = new Date(currentDate?.getFullYear(), currentDate?.getMonth(), 1)?.getDay()
-    const days = []
-
-    for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="bg-muted/30 min-h-24 p-2" />)
-    }
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
-      const dayEvents = getEventsForDate(date)
-      const isSelected = selectedDate?.toDateString() === date.toDateString()
-      const isToday = new Date().toDateString() === date.toDateString()
-
-      days.push(
-        <button
-          type="button"
-          key={day}
-          onClick={() => onSelectDate(date)}
-          onKeyDown={() => onSelectDate(date)}
-          className={cn(
-            "min-h-24 p-2 border rounded-lg cursor-pointer transition-colors",
-            isSelected && "bg-primary/10 border-primary",
-            isToday && !isSelected && "border-primary/50 bg-primary/5",
-            !isSelected && !isToday && "border-border hover:bg-muted/50",
-          )}
-        >
-          <div className="font-semibold text-sm mb-1">{day}</div>
-          <div className="space-y-1">
-            {dayEvents.slice(0, 2).map((event) => {
-              const conf = eventTypeConfig[event.type]
-              return (
-                <button
-                  type="button"
-                  key={event.id}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSelectEvent(event.id)
-                  }}
-                  onKeyDown={(e) => {
-                    e.stopPropagation()
-                    onSelectEvent(event.id)
-                  }}
-                  className={cn(
-                    "text-xs p-1 rounded text-white truncate cursor-pointer hover:opacity-80 transition-opacity",
-                    conf.color,
-                  )}
-                >
-                  {event.title}
-                </button>
-              )
-            })}
-            {dayEvents.length > 2 && (
-              <div className="text-xs text-muted-foreground px-1">
-                {t("calendar.view.moreEvents", { count: dayEvents.length - 2 })}
-              </div>
-            )}
-          </div>
-        </button>,
-      )
-    }
-
-    return (
-      <div className="grid grid-cols-7 gap-2 mb-6">
-        {WEEKDAY_KEYS.map((key) => (
-          <div key={key} className="text-center font-semibold text-sm py-2">
-            {t(`calendar.view.weekdaysShort.${key}`)}
-          </div>
-        ))}
-        {days}
-      </div>
-    )
-  }
-
-  const renderEventsList = () => {
-    const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : []
-
-    return (
-      <div className="space-y-3">
-        <div className="text-sm font-semibold text-muted-foreground">
-          {selectedDate?.toLocaleDateString(i18n.language, {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </div>
-        {selectedDateEvents.length > 0 ? (
-          selectedDateEvents.map((event) => {
-            const conf = eventTypeConfig[event.type]
-            return (
-              <button
-                type="button"
-                key={event.id}
-                onClick={() => onSelectEvent(event.id)}
-                className="border rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors"
-              >
-                <div className="flex items-start gap-3">
-                  <div className={cn("w-2 h-2 rounded-full mt-2", conf.color)} />
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-sm">{event.title}</h4>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                      <Clock className="w-3 h-3" />
-                      {event.startTime.toLocaleTimeString(i18n.language, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </div>
-                    {event.location && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                        <MapPin className="w-3 h-3" />
-                        {event.location}
-                      </div>
-                    )}
-                    {event.attendees.length > 0 && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                        <Users className="w-3 h-3" />
-                        {t("calendar.view.attendeesCount", { count: event.attendees.length })}
-                      </div>
-                    )}
-                  </div>
-                  <Badge variant="outline" className="text-xs whitespace-nowrap">
-                    {conf.label}
-                  </Badge>
-                </div>
-              </button>
-            )
-          })
-        ) : (
-          <div className="text-center py-6 text-muted-foreground">
-            <CalendarIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">{t("calendar.view.noEventsScheduled")}</p>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  const monthYear = currentDate?.toLocaleDateString(i18n.language, {
-    month: "long",
-    year: "numeric",
-  })
+  const agendaDays = days.map((day) => ({ day, events: calendarEventsForDay(filteredEvents, day) })).filter((entry) => viewMode !== "agenda" || entry.events.length > 0)
 
   return (
-    <div className={cn("space-y-6", className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">{monthYear}</h2>
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder={t("calendar.events.searchPlaceholder")}
-            value={searchTerm}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="w-48"
-          />
-          <div className="flex gap-1 border rounded-lg p-1">
-            <Button size="sm" variant={viewMode === "month" ? "default" : "ghost"} onClick={() => onViewModeChange("month")}>
-              <Grid3x3 className="w-4 h-4" />
-            </Button>
-            <Button size="sm" variant={viewMode === "week" ? "default" : "ghost"} onClick={() => onViewModeChange("week")}>
-              <CalendarIcon className="w-4 h-4" />
-            </Button>
-            <Button size="sm" variant={viewMode === "day" ? "default" : "ghost"} onClick={() => onViewModeChange("day")}>
-              <List className="w-4 h-4" />
-            </Button>
+    <div className={cn("min-w-0 space-y-4", className)} data-testid="calendar-workspace">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">{monthYear}</h2>
+          <p className="mt-1 text-xs text-muted-foreground">{t("calendar.workspace.timezone", { defaultValue: "Times shown in {{timezone}}", timezone })}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" className="min-h-11" variant="outline" onClick={onToday}>{t("calendar.view.today")}</Button>
+          {onCreateEvent && <Button size="sm" className="min-h-11" onClick={onCreateEvent}><Plus className="size-4" />{t("calendar.view.newEvent")}</Button>}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-1" role="group" aria-label={t("calendar.workspace.view", { defaultValue: "Calendar view" })}>
+            {modes.map(({ mode, label }) => <Button key={mode} size="sm" className="min-h-11" variant={viewMode === mode ? "default" : "outline"} aria-pressed={viewMode === mode} onClick={() => onViewModeChange(mode)}>{label}</Button>)}
           </div>
-          <Button size="sm" variant="outline" onClick={onToday}>{t("calendar.view.today")}</Button>
-          <Button size="sm" className="gap-2" onClick={onCreateEvent}>
-            <Plus className="w-4 h-4" />
-            {t("calendar.view.newEvent")}
-          </Button>
+          <div className="flex gap-1">
+            <Button size="icon" variant="outline" className="size-11" onClick={onPrevMonth} aria-label={t("calendar.workspace.previous", { defaultValue: "Previous period" })}><ChevronLeft className="size-4" /></Button>
+            <Button size="icon" variant="outline" className="size-11" onClick={onNextMonth} aria-label={t("calendar.workspace.next", { defaultValue: "Next period" })}><ChevronRight className="size-4" /></Button>
+          </div>
         </div>
+        <Input aria-label={t("calendar.events.searchPlaceholder")} placeholder={t("calendar.events.searchPlaceholder")} value={searchTerm} onChange={(event) => onSearchChange(event.target.value)} className="w-full sm:max-w-64" />
       </div>
-
-      {/* Navigation */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={onPrevMonth}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          <Button size="sm" variant="outline" onClick={onNextMonth}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+      {viewMode === "agenda" && <p className="text-sm text-muted-foreground">{t("calendar.workspace.agendaRange", { defaultValue: "{{start}} to {{end}}", start: labelDate(days[0]!), end: labelDate(days[days.length - 1]!) })}</p>}
+      {viewMode === "month" ? (
+        <div className="overflow-x-auto rounded-lg border bg-card p-3">
+          <div className="grid min-w-[42rem] grid-cols-7 gap-2">
+            {WEEKDAY_KEYS.map((key) => <div key={key} className="py-2 text-center text-xs font-medium text-muted-foreground">{t(`calendar.view.weekdaysShort.${key}`)}</div>)}
+            {Array.from({ length: days[0]!.getDay() }, (_, index) => <div key={`blank-${index}`} aria-hidden />)}
+            {days.map((date) => {
+              const dayEvents = calendarEventsForDay(filteredEvents, date)
+              return (
+                <div key={calendarDayKey(date)} className={cn("min-h-28 min-w-0 space-y-1 rounded-md border p-2", selectedDate && calendarDayKey(selectedDate) === calendarDayKey(date) && "border-primary")}>
+                  <button type="button" className="flex size-11 items-center justify-center rounded-md text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring" aria-label={labelDate(date)} aria-pressed={selectedDate != null && calendarDayKey(selectedDate) === calendarDayKey(date)} onClick={() => onSelectDate(date)}>{date.getDate()}</button>
+                  {dayEvents.slice(0, 2).map((event) => <button key={event.id} type="button" onClick={() => onSelectEvent(event.id)} className={cn("block min-h-11 w-full truncate rounded bg-muted p-1 text-left text-xs hover:bg-muted/70 focus-visible:outline-2 focus-visible:outline-ring", event.status === "cancelled" && "line-through text-muted-foreground")}>{event.title}</button>)}
+                  {dayEvents.length > 2 && <button type="button" className="min-h-11 text-xs text-primary underline" onClick={() => onSelectDate(date)}>{t("calendar.view.moreEvents", { count: dayEvents.length - 2 })}</button>}
+                </div>
+              )
+            })}
+          </div>
+          {selectedDate && <section className="mt-4 space-y-2 border-t pt-4" aria-label={labelDate(selectedDate)}><h3 className="text-sm font-semibold">{labelDate(selectedDate)}</h3>{calendarEventsForDay(filteredEvents, selectedDate).map(eventButton)}</section>}
         </div>
-        <div className="text-sm font-semibold">{monthYear}</div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2 border rounded-lg p-4 bg-card">
-          {renderMonthView()}
+      ) : agendaDays.some((entry) => entry.events.length) ? (
+        <div className="space-y-5" data-testid="calendar-agenda">
+          {agendaDays.map(({ day, events: dayEvents }) => <section key={calendarDayKey(day)} className="space-y-2" aria-label={labelDate(day)}><h3 className="text-sm font-semibold">{labelDate(day)}</h3>{dayEvents.length ? dayEvents.map(eventButton) : <p className="text-sm text-muted-foreground">{t("calendar.view.noEventsScheduled")}</p>}</section>)}
         </div>
-        <div className="border rounded-lg p-4 bg-card max-h-[calc(100vh-14rem)] overflow-y-auto">
-          {renderEventsList()}
-        </div>
-      </div>
-
-      {selectedEventId && (
-        <EventDetailPanel
-          event={events.find((e) => e.id === selectedEventId)!}
-          onClose={() => onSelectEvent(null)}
-          onEdit={onEditEvent ? () => onEditEvent(selectedEventId) : undefined}
-          onDelete={onDeleteEvent ? () => onDeleteEvent(selectedEventId) : undefined}
-          openHref={eventHref?.(selectedEventId)}
-        />
-      )}
+      ) : <div className="flex min-h-48 flex-col items-center justify-center gap-2 rounded-lg border bg-card p-4 text-center text-muted-foreground"><CalendarIcon className="size-6" /><p className="text-sm">{t("calendar.view.noEventsScheduled")}</p></div>}
+      {selectedEvent && <EventDetailPanel event={selectedEvent} onClose={() => onSelectEvent(null)} onEdit={onEditEvent ? () => onEditEvent(selectedEvent.id) : undefined} onDelete={onDeleteEvent ? () => onDeleteEvent(selectedEvent.id) : undefined} openHref={eventHref?.(selectedEvent.id)} />}
     </div>
   )
 }

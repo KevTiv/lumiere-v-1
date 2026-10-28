@@ -25,6 +25,23 @@ function hasKey(keys: readonly unknown[], expected: unknown[]): boolean {
   return keys.some((key) => JSON.stringify(key) === JSON.stringify(expected))
 }
 
+test("calendar HTTP projection prefixes invalidate independently of direct subscription rows", () => {
+  const qc = new QueryClient()
+  setSubscriptionReady(true)
+  try {
+    const keys = ['calendar-events', 'activities', 'contacts'].map((resource) => [resource, '7', 'calendar-workspace', 'actor/company/policy'])
+    const other = ['calendar-events', '8', 'calendar-workspace', 'actor/company/policy']
+    for (const key of [...keys, other]) qc.setQueryData(key, [])
+    invalidateStdbQueryResources(qc, 7, ['calendar-events', 'activities', 'contacts'])
+    for (const key of keys) assert.equal(qc.getQueryState(key)?.isInvalidated, true)
+    assert.equal(qc.getQueryState(other)?.isInvalidated, false)
+    for (const key of keys) assert.equal(hasKey(realtimeQueryKeysForResource('auth', 7), key.slice(0, 3)), true)
+  } finally {
+    setSubscriptionReady(false)
+    qc.clear()
+  }
+})
+
 test("auth bundle invalidates concrete resources and settings views", () => {
   const keys = realtimeQueryKeysForResource("auth", 7)
 
