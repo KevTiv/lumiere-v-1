@@ -10835,23 +10835,23 @@
     },
     "actions": {
       "activate": "Activate",
-      "close": "Close",
+      "close": "Close without credit",
       "generateInvoice": "Generate invoice",
       "recognizeLine": "Post recognition",
       "activateRule": "Activate rule",
       "deactivateRule": "Deactivate rule",
-      "advanceDunning": "Advance dunning",
-      "amend": "Amend",
-      "cancel": "Cancel + credit",
-      "ingestUsage": "Ingest usage",
-      "pause": "Pause",
-      "payInvoice": "Apply payment",
-      "rateUsage": "Rate usage",
-      "recordFailure": "Record payment fail",
-      "refreshFlags": "Refresh exception flags",
+      "advanceDunning": "Process overdue collection",
+      "amend": "Change subscription",
+      "cancel": "Cancel subscription",
+      "ingestUsage": "Record usage",
+      "pause": "Pause billing",
+      "payInvoice": "Record payment",
+      "rateUsage": "Calculate usage charges",
+      "recordFailure": "Record failed payment",
+      "refreshFlags": "Refresh billing checks",
       "renew": "Renew",
-      "resume": "Resume",
-      "setCommitment": "Set commitment"
+      "resume": "Resume billing",
+      "setCommitment": "Set minimum spend"
     },
     "forms": {
       "newSubscription": {
@@ -11021,7 +11021,7 @@
       },
       "closeSubscription": {
         "title": "Close subscription",
-        "description": "Mark this subscription as closed",
+        "description": "Close this subscription immediately and revoke its service access. No credit note is created.",
         "sections": {
           "main": "Details"
         },
@@ -11099,10 +11099,10 @@
         "title": "Amend subscription"
       },
       "cancel": {
-        "description": "Close the contract and optionally issue an OutRefund credit note.",
+        "description": "Close this subscription immediately and revoke service access. You can also create a credit note for a selected posted invoice.",
         "fields": {
-          "createCreditNote": "Create credit note from last posted invoice",
-          "invoiceMoveId": "Invoice (optional)",
+          "createCreditNote": "Create credit note for the selected posted invoice",
+          "invoiceMoveId": "Invoice to credit",
           "notes": "Notes"
         },
         "sections": {
@@ -11135,7 +11135,7 @@
         "title": "Ingest usage event"
       },
       "payInvoice": {
-        "description": "Post the subscription invoice (if draft) and clear AR residual.",
+        "description": "Record a payment already received. A draft invoice will be posted first. The payment reduces the invoice balance; this action does not charge the customer.",
         "fields": {
           "amount": "Amount (blank = residual)",
           "bankAccountId": "Bank account",
@@ -11148,7 +11148,7 @@
         "sections": {
           "main": "Payment"
         },
-        "title": "Apply payment"
+        "title": "Record payment"
       },
       "priceTier": {
         "description": "Progressive volume band for usage rating.",
@@ -11292,6 +11292,176 @@
       "emptyMessage": "No bundles yet. Use New bundle on the Plans tab.",
       "tabLabel": "Bundles",
       "title": "Bundles"
+    },
+    "workflow": {
+      "overview": "Overview",
+      "contracts": "Subscriptions & plans",
+      "billing": "Billing & collections",
+      "advanced": "Advanced tools",
+      "contractDetails": "Contract details",
+      "usage": "Usage & pricing",
+      "revenue": "Revenue recognition",
+      "needsAttention": "Needs attention",
+      "newSubscription": "New subscription",
+      "selectCompany": "Select a company to review its subscriptions.",
+      "reviewQueue": "Review subscriptions",
+      "managePlans": "Manage plans",
+      "reviewRenewals": "Review active subscriptions for renewal",
+      "imports": "Import subscriptions and plans",
+      "queues": {
+        "drafts": {
+          "title": "Drafts to activate",
+          "hint": "Review contract lines before activation."
+        },
+        "due": {
+          "title": "Due to invoice",
+          "hint": "Review subscriptions flagged for billing."
+        },
+        "overdue": {
+          "title": "Overdue payments",
+          "hint": "Review unpaid balances and collections."
+        },
+        "paused": {
+          "title": "Paused billing",
+          "hint": "Review subscriptions before resuming billing."
+        }
+      },
+      "source": {
+        "ready": "Select a company to continue.",
+        "loading": "Loading the required records…",
+        "denied": "You do not have access to the required records.",
+        "error": "The required records could not be loaded. Retry to continue.",
+        "partial": "Some records could not be verified. Retry before continuing."
+      },
+      "steps": {
+        "order": "Sales order",
+        "plan": "Plan",
+        "billing": "Billing schedule",
+        "review": "Review & create"
+      },
+      "stepsLabel": "Subscription setup steps",
+      "stepProgress": "Step {{current}} of {{total}}: {{step}}",
+      "createDraft": "Create draft subscription",
+      "continue": "Continue",
+      "back": "Back",
+      "review": "Subscription summary",
+      "notSelected": "Not selected",
+      "customer": "Customer from order",
+      "orderTotal": "Sales order total",
+      "checkOrder": "Review the sales order for pricing and currency.",
+      "starts": "Start date",
+      "schedule": "{{interval}} × {{period}} billing period",
+      "draftExplanation": "Creates a draft using the confirmed order’s customer, contacts, currency and price list. Review its lines, then activate it. No payment is collected at creation.",
+      "inspectOrder": "Inspect sales order (opens a new tab)",
+      "setupNeeded": "Complete subscription setup",
+      "missingOrder": "A confirmed sales order is required for this company. Create or confirm the customer’s order in Sales, then refresh here.",
+      "missingPlan": "An active subscription plan is required for this company. Create a plan, then continue with your current entries.",
+      "createPlan": "Create a plan",
+      "openSales": "Open Sales (new tab)",
+      "refreshSetup": "Refresh setup records",
+      "selectionChanged": "The selected records or permissions have changed. Refresh and review them before saving. Your entries are retained.",
+      "draftCreated": "Draft subscription created",
+      "viewSubscriptions": "View draft subscriptions",
+      "viewSubscription": "View subscription",
+      "actionReview": "Review this action",
+      "contract": "Subscription",
+      "effective": "Effective",
+      "onConfirmation": "On confirmation",
+      "currentNextInvoice": "Current next invoice date",
+      "recurringAmount": "Recurring amount before usage and tax adjustments",
+      "unavailableAmount": "Amount unavailable",
+      "amountCurrencyUnknown": "{{amount}} (currency unavailable)",
+      "invoice": "Invoice",
+      "outstanding": "Outstanding amount",
+      "paymentAmount": "Payment to record",
+      "credit": "Credit note",
+      "chooseCreditInvoice": "Choose a posted subscription invoice to credit.",
+      "noCredit": "No credit note will be created.",
+      "currentPrice": "Current unit price",
+      "newPrice": "New unit price",
+      "newQuantity": "New quantity",
+      "unchanged": "Unchanged",
+      "renewalPeriods": "Billing periods to add",
+      "closeVsCancel": "Both actions end the contract and revoke service access immediately. Cancel can also issue a credit note; Close does not. Existing unpaid invoices remain due unless credited or paid. A credit note does not send a cash refund.",
+      "prorationCalculated": "The prorated adjustment is calculated when saved. The final charge or credit is available in the amendment and its linked accounting entry.",
+      "failureReason": "Reason for failed payment",
+      "pastDueDays": "Days overdue",
+      "noLines": "This draft needs contract lines before it can be activated. Inspect the source sales order and the subscription’s Lines tab.",
+      "noUnpaidInvoices": "No unpaid subscription invoices are available. Review Invoices & payments before recording a payment.",
+      "invalidPayment": "Select an unpaid invoice and enter an amount above zero that does not exceed its outstanding balance.",
+      "requestPayment": "Request payment",
+      "requestExplanation": "Create a payment request for processing. This does not confirm that money was received. Use Record payment after receipt.",
+      "requestCreated": "Payment request created",
+      "manageSubscription": "Manage subscription",
+      "nextStep": "Next step",
+      "reviewBilling": "Review invoices & payments",
+      "next": {
+        "activate": "Review the contract lines, then activate this draft using the action above.",
+        "resume": "Review the next invoice date, then resume billing using the action above.",
+        "pay-invoice": "An invoice has an outstanding balance. Record a payment already received, or request payment from the customer.",
+        "generate-invoice": "The next billing date has arrived. Generate an invoice, then review it before payment.",
+        "closed": "This subscription is closed. Review its billing history for any remaining balances.",
+        "verify": "Required records are still loading or could not be verified. Review the linked billing records and retry.",
+        "scheduled": "Review the current billing schedule and linked invoices. Other lifecycle actions are under Manage subscription."
+      },
+      "labels": {
+        "activate": "Activate subscription",
+        "pause": "Pause billing",
+        "resume": "Resume billing",
+        "close": "Close without credit",
+        "generate-invoice": "Generate invoice",
+        "pay-invoice": "Record payment",
+        "amend": "Change subscription",
+        "renew": "Renew subscription",
+        "cancel": "Cancel subscription",
+        "ingest-usage": "Record usage",
+        "rate-usage": "Calculate usage charges",
+        "set-commitment": "Set minimum spend",
+        "record-failure": "Record failed payment",
+        "advance-dunning": "Process overdue collection",
+        "refresh-flags": "Refresh billing checks"
+      },
+      "effects": {
+        "activate": "Start this subscription and grant its configured service access. This action does not generate an invoice or collect payment.",
+        "pause": "Pause recurring billing immediately. Existing invoices remain due. Service access is not revoked by pausing billing.",
+        "resume": "Resume recurring billing using the current next invoice date. Review that date before confirming.",
+        "close": "Close this subscription immediately and revoke its service access. No credit note is created.",
+        "generate-invoice": "Create a draft invoice for the next billing period. Usage, taxes and other adjustments are calculated when saved. This action does not collect payment.",
+        "pay-invoice": "Record a payment already received. A draft invoice will be posted first. The payment reduces the invoice balance; this action does not charge the customer.",
+        "amend": "Change the selected contract line immediately. Review the new price and quantity before confirming.",
+        "renew": "Extend the subscription term by the selected number of billing periods. Renewal does not collect payment.",
+        "cancel": "Close this subscription immediately and revoke service access. You can also create a credit note for a selected posted invoice.",
+        "ingest-usage": "Record a usage event for this subscription. Charges are calculated separately.",
+        "rate-usage": "Calculate charges for up to 100 pending usage events. This action does not create an invoice.",
+        "set-commitment": "Update the minimum spend used when usage is billed.",
+        "record-failure": "Record a failed payment and update the overdue collection status.",
+        "advance-dunning": "Process the next overdue collection step. Depending on the plan rules, this may close the subscription and revoke service access.",
+        "refresh-flags": "Refresh the billing and collection checks for this subscription."
+      },
+      "completed": {
+        "activate": "Subscription activated",
+        "pause": "Billing paused",
+        "resume": "Billing resumed",
+        "close": "Subscription closed",
+        "generate-invoice": "Invoice ready for review",
+        "pay-invoice": "Payment recorded",
+        "amend": "Subscription changed",
+        "renew": "Subscription renewed",
+        "cancel": "Subscription cancelled",
+        "ingest-usage": "Usage recorded",
+        "rate-usage": "Usage charges calculated",
+        "set-commitment": "Minimum spend updated",
+        "record-failure": "Failed payment recorded",
+        "advance-dunning": "Overdue collection processed",
+        "refresh-flags": "Billing checks refreshed"
+      },
+      "accountingSetup": "Accounting setup is incomplete for this company. Configure active journals and accounts, then retry this action. Your entries are retained.",
+      "openAccounting": "Open accounting setup (new tab)",
+      "wholeNumber": "Enter a whole number.",
+      "operatorNeeded": "An authorized operator is needed for the next action. You can review the subscription and its billing records.",
+      "openCatalog": "Open sales catalog (new tab)",
+      "planSetup": "A plan needs a product, a price list and an active invoice journal. Complete the missing setup in the catalog and accounting, then refresh. Your entries are retained.",
+      "inheritedCustomer": "Inherited from the selected sales order"
     }
   },
   "expenses": {

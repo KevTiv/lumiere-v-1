@@ -1,9 +1,14 @@
 "use client"
 import { Button } from "@lumiere/ui/components/button"
-import { useCurrencyFormat } from "@lumiere/ui"
+import { useCurrencyFormat, useRBAC, DashboardGrid } from "@lumiere/ui"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { SubscriptionOverview } from "./subscription-overview"
+import { SubscriptionCreateDialog } from "./subscription-create-dialog"
+import { eligibleSubscriptionOrders, eligibleSubscriptionPlans, inSubscriptionScope, subscriptionInvoices, invoiceOutstanding, subscriptionActionPermissions } from "./subscription-workflow"
 import { mapDashboardWidgets, withDashboardSections } from "@lumiere/ui/lib/dashboard-sections"
 
-import { canUseModuleData, moduleCollection, moduleQueryState } from "@lumiere/ui/lib/module-data-state"
+import { canUseModuleData, moduleCollection, moduleQueryState, mergeModuleStates } from "@lumiere/ui/lib/module-data-state"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import { showWorkflowToast } from "@lumiere/ui/lib/workflow-toast"
@@ -120,6 +125,7 @@ import { useSubscriptionActions, type SubscriptionDialogAction } from "./use-sub
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useSaleOrders, usePricelists, type SaleOrder, type ProductPricelist } from "@lumiere/query-hooks/hooks/sales"
 import { useProductCategories, useProducts } from "@lumiere/query-hooks/hooks/inventory"
+import { useContacts } from "@lumiere/query-hooks/hooks/crm"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
 import { currencyCodeMap } from "@lumiere/ui/lib/kpi-tiles"
 import type { ChartValueFormat } from "@lumiere/ui/lib/chart-format"
@@ -152,16 +158,6 @@ function subscriptionState(row: unknown): string {
     if (keys.length === 1) return keys[0]!.toLowerCase()
   }
   return ""
-}
-
-function isSubscriptionActiveForMetrics(row: Record<string, unknown>): boolean {
-  const state = subscriptionState(row)
-  if (state === "closed") return false
-  return state === "active" || state === "open"
-}
-
-function isTrialSubscriptionRow(row: Record<string, unknown>): boolean {
-  return row.isTrial === true || row.isTrial === 1 || row.is_trial === true || row.is_trial === 1
 }
 
 interface SubscriptionsClientProps {
@@ -200,6 +196,9 @@ function SubscriptionsClientLoaded({
 }: SubscriptionsClientLoadedProps) {
   useSubscriptionsModuleSubscription()
   const { t } = useTranslation()
+  const router = useRouter()
+  const { checkPermission, permissionsReady } = useRBAC()
+  const [createOpen, setCreateOpen] = useState(false)
   const moduleConfig = useMemo(() => subscriptionsModuleConfig(t), [t])
   const { activeTab, setActiveTab } = useModuleTab(
     moduleConfig.defaultTab ?? "dashboard",
@@ -210,7 +209,7 @@ function SubscriptionsClientLoaded({
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(
     null,
   )
-  useEffect(() => { setQuickActionForm(null) }, [orgId, operatingCompanyId])
+  useEffect(() => { setQuickActionForm(null); setCreateOpen(false) }, [orgId, operatingCompanyId])
   const [recognizeLineId, setRecognizeLineId] = useState<string | null>(null)
   const [recognizeMoveId, setRecognizeMoveId] = useState("")
 
@@ -265,10 +264,11 @@ function SubscriptionsClientLoaded({
   const journalsQuery = useAccountJournals(orgId)
   const { rows: journals } = moduleCollection(journalsQuery)
   const { data: accounts = [] } = useAccountAccounts(orgId)
-  const { data: accountMoves = [], isLoading: accountMovesLoading, isError: accountMovesError, error: accountMovesFailure, refetch: refetchAccountMoves } = useAccountMoves(orgId)
+  const { data: accountMoves = [], isLoading: accountMovesLoading, isError: accountMovesError, error: _accountMovesFailure, refetch: _refetchAccountMoves } = useAccountMoves(orgId)
   const { data: accountPayments = [], isLoading: accountPaymentsLoading, isError: accountPaymentsError } = useAccountPayments(orgId)
   const { data: accountMoveLines = [] } = useAccountMoveLines(orgId)
   const { data: currencies = [] } = useCurrencies()
+  const contactsQuery = useContacts(orgId)
 
   const createSubscription = useCreateSubscription(orgId, operatingCompanyId)
   const createPlan = useCreateSubscriptionPlan(orgId, operatingCompanyId)
@@ -307,16 +307,16 @@ function SubscriptionsClientLoaded({
     importSubscriptionCsv.isPending
 
   const saleOrderOptions = useMemo(() => {
-    const fromApi = saleOrderRowsToSelectOptions(saleOrders.filter((row) => String(row.companyId) === String(operatingCompanyId)))
+    const fromApi = saleOrderRowsToSelectOptions(eligibleSubscriptionOrders(saleOrders, { organizationId: orgId, companyId: operatingCompanyId }))
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noSaleOrders"), disabled: true }]
-  }, [saleOrders, operatingCompanyId, t])
+  }, [saleOrders, orgId, operatingCompanyId, t])
 
   const planFieldOptions = useMemo(() => {
-    const fromApi = subscriptionPlanRowsToSelectOptions(plans)
+    const fromApi = subscriptionPlanRowsToSelectOptions(eligibleSubscriptionPlans(plans, { organizationId: orgId, companyId: operatingCompanyId }))
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noSubscriptionPlans"), disabled: true }]
-  }, [plans, t])
+  }, [plans, orgId, operatingCompanyId, t])
 
   const pricelistFieldOptions = useMemo(() => {
     const fromApi = pricelistRowsToSelectOptions(pricelists)
@@ -429,25 +429,28 @@ function SubscriptionsClientLoaded({
 
   const subscriptionRowActions = useMemo((): EntityAction[] => {
     const gate = (id: SubscriptionActionId) => (rows: Record<string, unknown>[]) =>
-      rows.every((row) => isSubscriptionActionApplicable(id, subscriptionState(row)))
+      rows.length === 1 && rows.every((row) => inSubscriptionScope(row, { organizationId: orgId, companyId: operatingCompanyId })
+        && subscriptionActionPermissions(id).every(([resource, action]) => checkPermission(resource, action).allowed)
+        && isSubscriptionActionApplicable(id, subscriptionState(row))
+        && (id !== "pay-invoice" || (!billingRunsLoading && !billingRunsError && !accountMovesLoading && !accountMovesError
+          && subscriptionInvoices(row, billingRuns, accountMoves, { organizationId: orgId, companyId: operatingCompanyId }).some((invoice) => (invoiceOutstanding(invoice) ?? 0) > 0))))
     const direct = (
       id: string,
-      action: Exclude<SubscriptionActionId, SubscriptionDialogAction>,
+      action: SubscriptionActionId,
       label: string,
       icon: EntityAction["icon"],
-      opts: { gated?: boolean; toast?: boolean } = {},
+      _opts: { gated?: boolean; toast?: boolean } = {},
     ): EntityAction => ({
       id,
       label,
       icon,
       variant: "outline",
       requiresSelection: true,
-      ...(opts.gated === false ? {} : { isApplicable: gate(action) }),
-      ...(opts.toast === false ? {} : { successMessage: t("common.actionCompleted", { action: label }) }),
+      isApplicable: gate(action),
       onClick: async (rows) => {
         const r = rows[0]
-        if (!r || (opts.gated !== false && !isSubscriptionActionApplicable(action, subscriptionState(r)))) return
-        await subscriptionActions.runDirect(action, BigInt(String(r.id)))
+        if (!r || !gate(action)(rows)) return
+        subscriptionActions.openDialog(action, BigInt(String(r.id)))
       },
     })
     const dialog = (
@@ -464,8 +467,8 @@ function SubscriptionsClientLoaded({
       isApplicable: gate(action),
       onClick: (rows) => {
         const r = rows[0]
-        if (!r || !isSubscriptionActionApplicable(action, subscriptionState(r))) return
-        subscriptionActions.openDialog(action, Number(r.id))
+        if (!r || !gate(action)(rows)) return
+        subscriptionActions.openDialog(action, BigInt(String(r.id)))
       },
     })
     return [
@@ -485,7 +488,7 @@ function SubscriptionsClientLoaded({
       direct("advance-dunning", "advance-dunning", t("subscriptions.actions.advanceDunning", { defaultValue: "Advance dunning" }), Shield, { gated: false }),
       direct("refresh-flags", "refresh-flags", t("subscriptions.actions.refreshFlags", { defaultValue: "Refresh exception flags" }), RefreshCw, { gated: false }),
     ]
-  }, [t, subscriptionActions])
+  }, [t, subscriptionActions, orgId, operatingCompanyId, checkPermission, billingRuns, billingRunsLoading, billingRunsError, accountMoves, accountMovesLoading, accountMovesError])
 
   const deferredLineActions = useMemo((): EntityAction[] => {
     return [
@@ -724,29 +727,6 @@ function SubscriptionsClientLoaded({
 
   const { locale } = useCurrencyFormat()
   const liveSections = useMemo(() => {
-    const rows = subscriptions as Record<string, unknown>[]
-    const activeRows = rows.filter(isSubscriptionActiveForMetrics)
-    const active = activeRows.length
-    const trials = rows.filter(isTrialSubscriptionRow).length
-    // Prefer server-derived local MRR (FX snapshot); fall back to contract MRR / monthly.
-    const mrr = activeRows.reduce((sum, s) => {
-      const local = Number(s.recurringMrrLocal ?? s.recurring_mrr_local ?? 0)
-      if (local > 0) return sum + local
-      const contract = Number(s.recurringMrr ?? s.recurring_mrr ?? 0)
-      if (contract > 0) return sum + contract
-      return sum + Number(s.recurringMonthly ?? s.recurring_monthly ?? 0)
-    }, 0)
-    const deferredRemaining = (deferredSchedules as Record<string, unknown>[]).reduce(
-      (sum, s) => sum + Number(s.deferredAmount ?? s.deferred_amount ?? 0),
-      0,
-    )
-    const invoicedUntaxed = (accountMoves as Record<string, unknown>[])
-      .filter((m) => {
-        const origin = String(m.invoiceOrigin ?? m.invoice_origin ?? "")
-        return origin.startsWith("SUB")
-      })
-      .reduce((sum, m) => sum + Number(m.amountUntaxed ?? m.amount_untaxed ?? 0), 0)
-
     const now = new Date()
     const currencyCodeById = currencyCodeMap(currencies)
     const chartSubscriptions = subscriptions.filter((subscription) => subscription.companyId === operatingCompanyId)
@@ -765,61 +745,9 @@ function SubscriptionsClientLoaded({
         if (w.type === "share-bar" && w.id === "sub-plan-mix") {
           return { ...w, data: { ...w.data, ...planMix(chartSubscriptions, plans, now), valueFormat: money } }
         }
-        if (w.type === "stat-cards") {
-          return {
-            ...w,
-            data: {
-              stats: [
-                { label: "Active", value: String(active), icon: "CheckCircle" },
-                { label: "MRR (local)", value: `$${mrr.toLocaleString()}`, icon: "TrendingUp" },
-                {
-                  label: "Invoiced untaxed",
-                  value: `$${invoicedUntaxed.toLocaleString()}`,
-                  icon: "FileText",
-                },
-                {
-                  label: "Deferred remaining",
-                  value: `$${deferredRemaining.toLocaleString()}`,
-                  icon: "Clock",
-                },
-                { label: "Trials", value: String(trials), icon: "Package" },
-              ],
-            },
-          }
-        }
-        if (w.type === "quick-actions") {
-          const handlers: Record<string, () => void> = {
-            new_subscription: () =>
-              setQuickActionForm({ form: subscriptionFormConfig, action: "createSubscription" }),
-            new_plan: () => setQuickActionForm({ form: planFormConfig, action: "createPlan" }),
-            import_plan_csv: () =>
-              setQuickActionForm({ form: importPlanCsvFormConfig, action: "importPlanCsv" }),
-            import_subscription_csv: () =>
-              setQuickActionForm({ form: importSubscriptionCsvFormConfig, action: "importSubscriptionCsv" }),
-          }
-          return {
-            ...w,
-            data: {
-              ...w.data,
-              actions: w.data.actions.map((a) => ({ ...a, onClick: handlers[a.id] })),
-            },
-          }
-        }
         return w
           })
-  }, [
-    locale,
-    subscriptions,
-    plans,
-    currencies,
-    deferredSchedules,
-    accountMoves,
-    moduleConfig,
-    subscriptionFormConfig,
-    planFormConfig,
-    importPlanCsvFormConfig,
-    importSubscriptionCsvFormConfig,
-  ])
+  }, [locale, subscriptions, plans, currencies, moduleConfig, operatingCompanyId])
 
   const config = useMemo(
     () =>
@@ -967,18 +895,8 @@ function SubscriptionsClientLoaded({
     ],
   )
 
-  const dashboardQueries = [subscriptionsQuery, deferredSchedulesQuery]
-  const dashboardStatuses = [moduleQueryState(subscriptionsQuery), moduleQueryState(deferredSchedulesQuery),
-    moduleQueryState({ isLoading: accountMovesLoading, isError: accountMovesError, error: accountMovesFailure, data: accountMoves, refetch: refetchAccountMoves })]
   const dataState = {
-    dashboard: dashboardStatuses.find((state) => state.status === "denied") ??
-      (dashboardStatuses.some((state) => state.status === "error" || state.status === "partial")
-        ? { status: "error" as const, onRetry: () => {
-            void subscriptionsQuery.refetch()
-            void deferredSchedulesQuery.refetch()
-            void refetchAccountMoves()
-          } }
-        : { status: dashboardQueries.some((query) => query.isLoading) || accountMovesLoading ? "loading" as const : "ready" as const }),
+    dashboard: { status: "ready" as const },
     "subscriptions": moduleQueryState(subscriptionsQuery),
     "plans": moduleQueryState(plansQuery),
     "lines": moduleQueryState(subscriptionLinesQuery),
@@ -1009,7 +927,9 @@ function SubscriptionsClientLoaded({
       : action === "createPlan" ? [pricelistsQuery, journalsQuery, productsQuery] : []
     return lookups.every((query) => moduleQueryState(query).status === "ready")
   }
-  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  const planSetupMissing = quickActionForm?.action === "createPlan" && actionUsable("createPlan")
+    && (pricelists.length === 0 || journals.length === 0 || products.length === 0)
+  const quickActionUsable = !planSetupMissing && (quickActionForm == null || actionUsable(quickActionForm.action))
   const quickActionDenied = quickActionForm != null && dataState[actionTabs[quickActionForm.action]]?.status === "denied"
   const plansUsable = canUseModuleData(dataState.plans)
   const recognizeUsable = canUseModuleData(dataState["deferred-lines"])
@@ -1032,6 +952,7 @@ function SubscriptionsClientLoaded({
       const params = toCreateSubscriptionFromSaleOrderParams(formData, saleOrders, operatingCompanyId)
       if (!params) throw new Error(t("subscriptions.forms.newSubscription.invalidSelection", { defaultValue: "Select a sales order from the active company, a plan, and a valid start date. Your entries are retained." }))
       await createSubscription.mutateAsync(params)
+      showWorkflowToast({ kind: "success", title: t("subscriptions.workflow.draftCreated"), description: t("subscriptions.workflow.draftExplanation"), action: { label: t("subscriptions.workflow.viewSubscriptions"), onClick: () => router.push("/subscriptions?tab=subscriptions&filter=state:draft") } })
     } else if (action === "createPlan") {
       const params = toCreateSubscriptionPlanParams(formData, pricelists, operatingCompanyId)
       if (!params) throw new Error(t("subscriptions.forms.newPlan.invalidSelection", { defaultValue: "Enter a plan name and select a price list with a currency, an invoice journal, and a product." }))
@@ -1075,7 +996,29 @@ function SubscriptionsClientLoaded({
 
   return (
     <EntityLabelsProvider value={entityLabels}>
-      <ModuleView config={config} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending} />
+      <ModuleView config={config} data={data} dataState={dataState} activeTab={activeTab} onActiveTabChange={setActiveTab} onFormSubmit={handleFormSubmit} isPending={isFormMutationPending}
+        onOpenCreateForm={(tabId) => {
+          if (tabId === "subscriptions") setCreateOpen(true)
+          else { const tab = config.tabs.find((candidate) => candidate.id === tabId); if (tab?.createForm && tab.createAction) setQuickActionForm({ form: tab.createForm, action: tab.createAction }) }
+        }}
+        dashboardContent={<div className="space-y-6">
+          <SubscriptionOverview scope={{ organizationId: orgId, companyId: operatingCompanyId }} subscriptions={{ rows: subscriptions, state: dataState.subscriptions }} dueToBill={{ rows: dueToBill, state: dataState["due-to-bill"] }} pastDue={{ rows: pastDue, state: dataState["past-due"] }} canCreate={permissionsReady !== false && checkPermission("subscription", "create").allowed && dataState.subscriptions.status === "ready"} onCreate={() => setCreateOpen(true)} />
+          {dataState.subscriptions.status === "ready" && <DashboardGrid sections={liveSections.filter((section) => section.id === "sub-charts")} />}
+          <details><summary className="flex min-h-11 w-fit cursor-pointer items-center text-sm font-medium">{t("subscriptions.workflow.imports")}</summary><div className="flex flex-wrap gap-3 pt-3">
+            {checkPermission("subscription_plan", "create").allowed && <Button variant="outline" onClick={() => setQuickActionForm({ form: importPlanCsvFormConfig, action: "importPlanCsv" })}>{t("subscriptions.dashboard.importPlanCsv")}</Button>}
+            {checkPermission("subscription", "create").allowed && <Button variant="outline" onClick={() => setQuickActionForm({ form: importSubscriptionCsvFormConfig, action: "importSubscriptionCsv" })}>{t("subscriptions.dashboard.importSubscriptionCsv")}</Button>}
+          </div></details>
+        </div>} />
+      {createOpen && <SubscriptionCreateDialog key={`${orgId}:${operatingCompanyId}`} open={quickActionForm === null} onClose={() => setCreateOpen(false)} scope={{ organizationId: orgId, companyId: operatingCompanyId }} orders={saleOrders} plans={plans} currencies={currencies} customers={moduleQueryState(contactsQuery).status === "ready" ? contactsQuery.data ?? [] : []}
+        sourceState={mergeModuleStates([dataState.subscriptions, moduleQueryState(saleOrdersQuery), dataState.plans])}
+        onRetry={() => { void saleOrdersQuery.refetch(); void plansQuery.refetch(); void subscriptionsQuery.refetch() }}
+        onCreatePlan={checkPermission("subscription_plan", "create").allowed ? () => setQuickActionForm({ form: planFormConfig, action: "createPlan" }) : undefined}
+        pending={createSubscription.isPending}
+        onSubmit={async (values) => {
+          if (!checkPermission("subscription", "create").allowed) throw new Error(t("subscriptions.workflow.source.denied"))
+          await handleFormSubmit("subscriptions", "createSubscription", values)
+        }} />}
+
       <FormModal
         open={quickActionForm !== null}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
@@ -1084,7 +1027,11 @@ function SubscriptionsClientLoaded({
           : quickActionForm?.form ?? subscriptionFormConfig}
         isPending={isFormMutationPending}
         submissionDisabled={!quickActionUsable}
-        formLeadingActions={!quickActionUsable ? <Button type="button" variant="outline" onClick={() => {
+        formLeadingActions={planSetupMissing ? <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" render={<Link href="/accounting?tab=journals" target="_blank" rel="noopener noreferrer" />} nativeButton={false}>{t("subscriptions.workflow.openAccounting")}</Button>
+          <Button type="button" variant="outline" render={<Link href="/sales?tab=pricelists" target="_blank" rel="noopener noreferrer" />} nativeButton={false}>{t("subscriptions.workflow.openCatalog")}</Button>
+          <Button type="button" variant="outline" onClick={() => { void pricelistsQuery.refetch(); void productsQuery.refetch(); void journalsQuery.refetch() }}>{t("subscriptions.workflow.refreshSetup")}</Button>
+        </div> : !quickActionUsable ? <Button type="button" variant="outline" onClick={() => {
           const tab = quickActionForm ? actionTabs[quickActionForm.action] : undefined
           const state = tab ? dataState[tab] : undefined
           if (state && "onRetry" in state) state.onRetry?.()
@@ -1092,7 +1039,7 @@ function SubscriptionsClientLoaded({
             : quickActionForm?.action === "createPlan" ? [pricelistsQuery, journalsQuery, productsQuery] : []
           lookups.forEach((query) => { void query.refetch() })
         }}>{t("common.retry", { defaultValue: "Retry" })}</Button> : undefined}
-        submitError={!quickActionUsable ? t("subscriptions.forms.sourceUnavailable", { defaultValue: "Required records could not be verified. Retry the source list before saving. Your entries are retained." }) : null}
+        submitError={planSetupMissing ? t("subscriptions.workflow.planSetup") : !quickActionUsable ? t("subscriptions.forms.sourceUnavailable", { defaultValue: "Required records could not be verified. Retry the source list before saving. Your entries are retained." }) : null}
         onSubmit={async (formData) => {
           if (quickActionForm) {
             await handleFormSubmit("dashboard", quickActionForm.action, formData)
