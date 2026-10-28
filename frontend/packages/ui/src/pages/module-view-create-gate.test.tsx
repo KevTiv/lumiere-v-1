@@ -3,6 +3,8 @@ import type { ReactNode } from "react"
 import type { FormModalProps } from "../forms/form-modal"
 import type { RuntimeFormModalProps } from "../forms/runtime-form-modal"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
+import type { EntityViewConfig } from "../lib/entity-view-types"
+import { useRBAC } from "../lib/rbac-context"
 import type { ModuleConfig } from "../lib/module-types"
 import type { PolicyRule, Role, User } from "../lib/rbac-types"
 import { RBACProvider } from "../lib/rbac-context"
@@ -27,7 +29,12 @@ vi.mock("../lib/module-url-filters", () => ({
   useClearModuleUrlFilter: () => vi.fn(),
 }))
 vi.mock("../entity-views/entity-view", () => ({
-  EntityView: ({ headerAction, isLoading }: { headerAction?: ReactNode; isLoading?: boolean }) => <div data-testid="entity-view" data-loading={String(isLoading)}>{headerAction}</div>,
+  EntityView: ({ headerAction, isLoading, config }: { headerAction?: ReactNode; isLoading?: boolean; config: EntityViewConfig }) => {
+    const { checkPermission } = useRBAC()
+    const empty = config.view.mode === "table" ? config.view.emptyState : undefined
+    const allowed = !empty?.permission || checkPermission(empty.permission.resource, empty.permission.action).allowed
+    return <div data-testid="entity-view" data-loading={String(isLoading)}>{headerAction}{empty?.onAction && allowed ? <button data-testid="empty-create" onClick={empty.onAction}>{empty.actionLabel}</button> : null}</div>
+  },
 }))
 vi.mock("../entity-views/entity-record-sheet", () => ({ EntityRecordSheet: () => null }))
 vi.mock("../forms/form-modal", () => ({
@@ -289,5 +296,36 @@ describe("ModuleView opt-in create form retention", () => {
     expect(screen.getByTestId("create-form")).toBeTruthy()
     rerender(view("other"))
     expect(screen.queryByTestId("create-form")).toBeNull()
+  })
+})
+
+
+describe("ModuleView domain-owned static create form", () => {
+  const withEmpty: ModuleConfig = { ...config, tabs: config.tabs.map((tab) => ({ ...tab, entityConfig: { view: { mode: "table", rowKey: "id", columns: [], emptyState: { title: "No orders" } } } as never })) }
+  function view(opts: { allowed?: boolean; state?: ModuleDataState; runtime?: boolean; open?: (tabId: string) => void } = {}) {
+    return <RBACProvider initialUser={user} initialRoles={[role([rule("sale_order", opts.allowed === false ? "read" : "create")])]} initialPolicies={[]}>
+      <ModuleView config={withEmpty} data={{ orders: [] }} dataState={opts.state ? { orders: opts.state } : undefined} runtimeForms={opts.runtime ? { organizationId: 1 } : undefined} onOpenCreateForm={opts.open} />
+    </RBACProvider>
+  }
+  it.each(["module-create-sales-orders", "empty-create"])("delegates %s once without mounting a second form", (testId) => {
+    const open = vi.fn(); render(view({ open }))
+    fireEvent.click(screen.getByTestId(testId))
+    expect(open).toHaveBeenCalledExactlyOnceWith("orders")
+    expect(screen.queryByTestId("create-form")).toBeNull()
+  })
+  it("preserves permission and collection gates for delegated controls", () => {
+    const open = vi.fn(); const { rerender } = render(view({ open, allowed: false }))
+    expect(screen.queryByTestId("module-create-sales-orders")).toBeNull()
+    expect(screen.queryByTestId("empty-create")).toBeNull()
+    rerender(view({ open, state: { status: "denied" } }))
+    expect(screen.queryByTestId("entity-view")).toBeNull()
+    expect(open).not.toHaveBeenCalled()
+  })
+  it.each([false, true])("preserves existing static/runtime form ownership without a static override (runtime=%s)", (runtime) => {
+    const open = runtime ? vi.fn() : undefined
+    render(view({ runtime, open }))
+    fireEvent.click(screen.getByTestId("module-create-sales-orders"))
+    expect(screen.getByTestId("create-form")).toBeTruthy()
+    if (open) expect(open).not.toHaveBeenCalled()
   })
 })

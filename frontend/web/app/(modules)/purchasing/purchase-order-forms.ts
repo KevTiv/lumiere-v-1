@@ -103,7 +103,7 @@ export function toUpdatePurchaseOrderHeaderArgs(
 
 /** Workflow input of the receive-goods form (ids as strings, as the workflow expects). */
 export function toReceiveLineInput(
-  args: { lineId: number; qty: number; lotId?: number } | null,
+  args: { lineId: bigint | number | string; qty: number; lotId?: bigint | number | string } | null,
 ): { lineId: string; qty: number; lotId?: string } | null {
   if (!args) return null;
   return {

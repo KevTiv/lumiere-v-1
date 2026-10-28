@@ -2,7 +2,7 @@ import { createInstance } from "i18next"
 import { describe, expect, it } from "vitest"
 import { toCreateReportTemplateParams } from "@lumiere/erp-shared/reports-template-params"
 import type { FormConfig, FormValues } from "./form-types"
-import { newReportTemplateForm, newScheduledReportForm } from "./reports-form-configs"
+import { newFinancialReportForm, newReportTemplateForm, newScheduledReportForm, recordScheduledRunForm } from "./reports-form-configs"
 
 const i18n = createInstance()
 void i18n.init({ lng: "en", resources: { en: { translation: {} } }, initImmediate: false })
@@ -65,5 +65,27 @@ describe("Finance report form inputs", () => {
       expect(company.required).not.toBe(true)
       expect("options" in company && company.options).toEqual([])
     }
+  })
+})
+
+
+describe("Report task sections", () => {
+  it("starts with report type and dates, keeps comparison and display separate, and retains defaults", () => {
+    const form = newFinancialReportForm(i18n.t)
+    expect(form.sections[0]?.fields.map((field) => field.name)).toEqual(["reportType", "dateFrom", "dateTo", "name"])
+    expect(form.sections.find((section) => section.id === "report-comparison")?.fields.map((field) => field.name)).toEqual(["comparisonMode"])
+    expect(fields(form).find((field) => field.name === "reportType")?.defaultValue).toBe("trialBalance")
+    expect(fields(form).find((field) => field.name === "comparisonMode")?.defaultValue).toBe("none")
+    expect(fields(form).find((field) => field.name === "targetMove")?.defaultValue).toBeUndefined()
+    expect(fields(form).filter((field) => field.required).map((field) => field.name).sort()).toEqual(["dateFrom", "dateTo", "name", "reportType"])
+    expect(form.submitLabel).toBe("Generate report")
+  })
+
+  it("keeps schedule delivery explicit and distinguishes recording a completed run", () => {
+    const schedule = newScheduledReportForm(i18n.t)
+    expect(schedule.sections.at(-1)?.fields.map((field) => field.name)).toEqual(["recipients", "attachmentFormat"])
+    expect(fields(schedule).find((field) => field.name === "recipients")?.description).toContain("commas or new lines")
+    expect(fields(schedule).filter((field) => field.required).map((field) => field.name).sort()).toEqual(["model", "name", "nextRun", "recipients", "reportSource", "reportTemplateId"])
+    expect(recordScheduledRunForm(i18n.t).submitLabel).toBe("Record completed run")
   })
 })

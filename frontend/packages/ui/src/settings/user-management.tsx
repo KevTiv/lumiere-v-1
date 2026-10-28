@@ -396,9 +396,9 @@ export function UserManagement() {
       </Card>
       )}
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!isSaving) setIsDialogOpen(open) }}>
+        <DialogContent className="flex max-h-[86dvh] min-h-0 flex-col overflow-hidden sm:max-w-lg" showCloseButton={!isSaving}>
+          <DialogHeader className="shrink-0">
             <DialogTitle>
               {editingUser ? t("settings.users.editUser") : t("settings.users.createUser")}
             </DialogTitle>
@@ -414,8 +414,10 @@ export function UserManagement() {
               event.preventDefault()
               void handleSaveUser(new FormData(event.currentTarget))
             }}
-            className="space-y-4"
+            className="flex min-h-0 flex-1 flex-col overflow-hidden"
           >
+            <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+            <fieldset disabled={isSaving} className="flex min-w-0 flex-col gap-4">
             {editingUser && <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="name">{t("settings.users.fullName")}</Label>
@@ -466,7 +468,7 @@ export function UserManagement() {
             {editingUser && <div className="space-y-2"><Label>Primary role</Label><Select value={primaryRoleId} onValueChange={setPrimaryRoleId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map(role => <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>)}</SelectContent></Select></div>}
             <div className="space-y-2">
               <Label>{editingUser ? "Additional roles" : "Initial role"}</Label>
-              <div className="grid max-h-64 gap-2 overflow-y-auto rounded-md border p-3 sm:grid-cols-2">
+              <div className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
                 {roles.filter(role => !editingUser || role.id !== primaryRoleId).map((role) => (
                   <div key={role.id} className="flex items-center gap-2">
                     <Checkbox
@@ -488,9 +490,11 @@ export function UserManagement() {
                 ))}
               </div>
             </div>
-            {memberError && <p role="alert" className="text-sm text-destructive">{memberError}</p>}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+            {memberError && <p role="alert" className="break-words text-sm text-destructive">{memberError}</p>}
+            </fieldset>
+            </div>
+            <DialogFooter className="shrink-0 pt-4">
+              <Button type="button" variant="outline" disabled={isSaving} onClick={() => setIsDialogOpen(false)}>
                 {t("common.cancel")}
               </Button>
               <Button type="submit" data-testid="settings-user-save" disabled={isSaving || !orgReady}>

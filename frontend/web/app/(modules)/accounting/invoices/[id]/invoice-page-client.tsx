@@ -96,6 +96,8 @@ import {
 import { useDefaultOperatingCompanyBigInt } from '@lumiere/query-hooks/hooks/use-operating-company';
 import { useWorkflowSurface } from '@/hooks/use-workflow-surface';
 import { useRecordNavigation } from '@/hooks/use-record-navigation';
+import { accountingWorklistKey } from '../../../../../../packages/ui/src/accounting-components/accounting-worklist-model';
+import { readRecordListReturnContext, type RecordListReturnContext } from '@lumiere/ui/lib/record-list-context';
 import { toUpdateAccountMoveLineParams, updateAccountMoveLineParamsToJson } from '@lumiere/erp-shared/accounting-create-params';
 import { toCreateCreditNoteParams } from '@/lib/accounting-create-params';
 import { resolveDefaultCogsInventoryAccountIds } from '@/lib/accounting-post-draft';
@@ -174,7 +176,7 @@ function InvoicePageLoaded({
   const searchParams = useSearchParams();
   const { askForm, formDialog } = useFormDialog();
   const { orgId } = orgBigInts(organizationId);
-  const { checkPermission } = useRBAC();
+  const { checkPermission, currentUser } = useRBAC();
   const queryClient = useQueryClient();
   const [emailReview, setEmailReview] = useState<{ key: string; document: InvoiceEmailDocument; purpose: 'invoice' | 'reminder' } | null>(null);
   const [emailOpen, setEmailOpen] = useState(false);
@@ -355,6 +357,14 @@ function InvoicePageLoaded({
 
   // Previous / next follow the list the document was opened from, else its own kind, newest first.
   const kind = move ? invoiceKind(move) : 'entry';
+  const returnKey = companyAvailable && (kind === 'invoice' || kind === 'bill')
+    ? accountingWorklistKey({ organizationId, companyId: operatingCompanyId, userId: currentUser?.id }, kind)
+    : null;
+  const [listReturn, setListReturn] = useState<RecordListReturnContext | undefined>();
+  useEffect(() => {
+    setListReturn(returnKey ? readRecordListReturnContext('/accounting/invoices', { key: returnKey, recordId: moveId }) : undefined);
+  }, [returnKey, moveId]);
+  const returnHref = listReturn?.key === returnKey ? listReturn.href : undefined;
   const siblings = useMemo(
     () => (move ? (moves as unknown as Row[]).filter((row) => sameCompany(row, operatingCompanyId) && invoiceKind(row) === kind) : []),
     [moves, move, kind, operatingCompanyId],
@@ -437,6 +447,8 @@ function InvoicePageLoaded({
       fields: section.fields.map((field) => ({
         ...field,
         width: 'full' as const,
+        ...(field.key === 'moveType' ? { render: () => documentTitle } : {}),
+        ...(field.key === 'amountResidual' ? { label: t('accounting.invoices.amountDue', { defaultValue: 'Amount due' }) } : {}),
         ...(field.type === 'currency' ? { render: (value: unknown) => money(value) } : {}),
       })),
     })),
@@ -709,7 +721,7 @@ function InvoicePageLoaded({
         testIdPrefix="invoice"
         breadcrumbs={[
           { label: t('nav.accounting', { defaultValue: 'Accounting' }), href: '/accounting' },
-          { label: t(listTab.titleKey, { defaultValue: listTab.title }), href: buildModuleTabHref('accounting', listTab.tab) },
+          { label: t(listTab.titleKey, { defaultValue: listTab.title }), href: returnHref ?? buildModuleTabHref('accounting', listTab.tab) },
           { label },
         ]}
         title={label}
@@ -833,6 +845,7 @@ function InvoicePageLoaded({
                 <ModuleDataNotice state={companiesRead.state} />
                 {outgoingDraft ? <><ModuleDataNotice state={draftReviewState} /><p className="text-xs text-muted-foreground">Customer billing details were captured when this draft was created; posting refreshes them from the linked customer. Posting also captures the latest company invoice settings shown in this review.</p></> : null}
                 <FinanceReviewWorkspace
+                  initialView="edit"
                   editorLabel={t('financeReview.savedDetails', { defaultValue: 'Saved details' })}
                   previewLabel={t('financeReview.sourceTitle', { defaultValue: 'Source document' })}
                   editor={<div className="min-w-0 space-y-6">

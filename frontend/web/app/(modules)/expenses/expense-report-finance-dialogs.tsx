@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Button,
   FormModal,
   mergeFieldDefaultValues,
   mergeSelectOptionsForFields,
@@ -11,6 +12,7 @@ import {
 } from '@lumiere/ui';
 import type { FormConfig } from '@lumiere/ui';
 import type { FormValues } from '@lumiere/ui/lib/form-types';
+import { moduleQueryState } from '@lumiere/ui/lib/module-data-state';
 import { useTranslation } from '@lumiere/i18n';
 import {
   useCreateExpenseProjectRebill,
@@ -42,8 +44,19 @@ export function useExpenseReportFinance(orgId: bigint, operatingCompanyId: bigin
   }, [enabled]);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { data: accountJournals = [] } = useAccountJournals(orgId);
-  const { data: accountAccounts = [] } = useAccountAccounts(orgId);
+  const journalQuery = useAccountJournals(orgId);
+  const accountQuery = useAccountAccounts(orgId);
+  const journalState = moduleQueryState(journalQuery);
+  const accountState = moduleQueryState(accountQuery);
+  const lookupsReady = journalState.status === 'ready' && accountState.status === 'ready';
+  const accountJournals = useMemo(() => journalState.status === 'ready' ? journalQuery.data ?? [] : [], [journalState.status, journalQuery.data]);
+  const accountAccounts = useMemo(() => accountState.status === 'ready' ? accountQuery.data ?? [] : [], [accountState.status, accountQuery.data]);
+  const lookupDenied = journalState.status === 'denied' || accountState.status === 'denied';
+  const lookupLoading = journalState.status === 'loading' || accountState.status === 'loading';
+  const lookupError = lookupsReady ? null : lookupDenied
+    ? t('expenses.forms.capture.financeSourcesDenied', { defaultValue: 'You do not have access to the journals or accounts needed for this action. Ask your administrator to check your access.' })
+    : lookupLoading ? t('expenses.forms.capture.financeSourcesLoading', { defaultValue: 'Loading journals and accounts. Your entries are retained.' })
+      : t('expenses.forms.capture.financeSourcesRequired', { defaultValue: 'Journals or accounts could not be loaded. Retry the lookup before continuing. Your entries are retained.' });
   const post = usePostExpenseSheet(orgId, operatingCompanyId);
   const reimburse = useCreateExpenseReimbursementPayment(orgId, operatingCompanyId);
   const rebill = useCreateExpenseProjectRebill(orgId);
@@ -97,8 +110,9 @@ export function useExpenseReportFinance(orgId: bigint, operatingCompanyId: bigin
   const isPending = post.isPending || reimburse.isPending || rebill.isPending;
 
   const submit = async (formData: FormValues) => {
-    if (!active) return;
+    if (!active) throw new Error(t('common.recordsUnavailable'));
     if (!enabled) throw new Error(t('common.recordsUnavailable', { defaultValue: 'Records could not be loaded.' }));
+    if (!lookupsReady) throw new Error(lookupError!);
     setSubmitError(null);
     const sheetId = sheetIdOf(active.row);
     try {
@@ -139,7 +153,13 @@ export function useExpenseReportFinance(orgId: bigint, operatingCompanyId: bigin
         isPending={isPending}
         closeOnSubmit={false}
         showSubmitSuccessToast={false}
-        submitError={submitError}
+        submissionDisabled={!lookupsReady}
+        submitError={lookupError ?? submitError}
+        formLeadingActions={!lookupsReady && !lookupDenied ? (
+          <Button type="button" variant="outline" disabled={journalQuery.isFetching || accountQuery.isFetching} onClick={() => { void journalQuery.refetch(); void accountQuery.refetch(); }}>
+            {t('common.retry')}
+          </Button>
+        ) : undefined}
         onSubmit={submit}
       />
     ) : null;

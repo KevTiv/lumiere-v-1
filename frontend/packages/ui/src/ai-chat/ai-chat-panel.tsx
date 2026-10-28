@@ -137,6 +137,7 @@ export function AIChatPanel({
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   const [showCommands, setShowCommands] = useState(false)
   const [commandFilter, setCommandFilter] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -244,6 +245,7 @@ export function AIChatPanel({
     }
 
     setMessages((prev) => [...prev, userMessage])
+    setSendError(null)
     setInput("")
     setIsLoading(true)
 
@@ -364,6 +366,8 @@ export function AIChatPanel({
       setMessages((prev) => [...prev, assistantMessage])
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      setSendError(msg)
+      setInput((current) => current === "" ? userMessage.content : current)
       setMessages((prev) => [
         ...prev,
         {
@@ -529,6 +533,7 @@ export function AIChatPanel({
       <div className="relative flex min-h-0 flex-1 flex-col">
         <ScrollArea className="min-h-0 flex-1" ref={scrollRef}>
           <div className={cn("mx-auto w-full max-w-[820px] px-4 py-8 sm:px-8", docked ? "sm:px-4" : "sm:py-12")}>
+          {sendError ? <p role="alert" className="break-words text-sm text-destructive">{t("aiChat.requestFailed", { defaultValue: "The assistant request failed. Review the error and your message before sending again." })}</p> : null}
             {messages.length === 0 ? (
               <div className={cn("flex flex-col justify-center", docked ? "py-8" : "min-h-[48vh] py-12")}>
                 <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">

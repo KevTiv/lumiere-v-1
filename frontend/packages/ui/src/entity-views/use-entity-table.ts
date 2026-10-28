@@ -32,6 +32,10 @@ export interface UseEntityTableOptions {
   filters: Readonly<Record<string, string>>
   /** Order shown until the user picks a column. Defaults to newest first (descending row key). */
   defaultSorting?: SortingState
+  /** Validated return state, applied only when this table owner mounts. */
+  initialSorting?: SortingState
+  /** One-based return page. Other callers retain the first-page default. */
+  initialPage?: number
   /**
    * Row key whose values rows are kept together by, ahead of the chosen order, across every page.
    * Groups run in the key's own order.
@@ -62,10 +66,15 @@ export function useEntityTable({
   search,
   filters,
   defaultSorting,
+  initialSorting,
+  initialPage = 1,
   groupBy = null,
 }: UseEntityTableOptions) {
-  const [userSorting, setUserSorting] = useState<SortingState>([])
-  const [pageIndex, setPageIndex] = useState(0)
+  const [userSorting, setUserSorting] = useState<SortingState>(() => {
+    const keys = new Set([rowKey, ...columns.map((column) => column.key)])
+    return (initialSorting ?? []).filter((sort) => keys.has(sort.id) && typeof sort.desc === "boolean")
+  })
+  const [pageIndex, setPageIndex] = useState(() => Number.isSafeInteger(initialPage) && initialPage > 0 ? initialPage - 1 : 0)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const activeFilters = useMemo(
@@ -107,7 +116,8 @@ export function useEntityTable({
   // longer exists is never drawn.
   const resetKey = JSON.stringify([globalFilter, activeFilters, userSorting, data.length, groupBy])
   const [previousResetKey, setPreviousResetKey] = useState(resetKey)
-  if (previousResetKey !== resetKey) {
+  const resettingPage = previousResetKey !== resetKey
+  if (resettingPage) {
     setPreviousResetKey(resetKey)
     setPageIndex(0)
   }
@@ -158,10 +168,15 @@ export function useEntityTable({
   const sortedRows = table.getPrePaginatedRowModel().rows.map((row) => row.original)
   const pageRows = table.getRowModel().rows
   const pageCount = Math.max(1, Math.ceil(sortedRows.length / pageSize))
+  // Returned data may have fewer pages than the captured list. Clamp the engine itself,
+  // rather than showing a clamped label above an empty out-of-range page.
+  if (!resettingPage && pageIndex >= pageCount) setPageIndex(pageCount - 1)
   const currentPage = Math.min(pageIndex, pageCount - 1) + 1
 
   return {
     table,
+    /** Effective order owned by this table, including its default/group order. */
+    sorting: tableSorting,
     /** Rows after filtering and sorting, before paging (what an export should contain). */
     sortedRows,
     /** Rows on the current page. */
@@ -172,7 +187,7 @@ export function useEntityTable({
     /** 1-based. */
     currentPage,
     pageCount,
-    setPage: (page: number) => setPageIndex(Math.max(0, page - 1)),
+    setPage: (page: number) => setPageIndex(Number.isSafeInteger(page) ? Math.max(0, Math.min(page - 1, pageCount - 1)) : 0),
     /** The column the user sorted by, if they chose one. */
     sortedBy: userSorting[0],
     toggleSort: (key: string) => table.getColumn(key)?.toggleSorting(),

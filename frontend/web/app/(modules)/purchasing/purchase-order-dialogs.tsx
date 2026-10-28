@@ -158,7 +158,7 @@ export function CreateBillFromPurchaseOrderDialog({
         const partnerId = order.partnerId != null ? BigInt(String(order.partnerId)) : undefined;
         const params = toCreateBillFromPurchaseOrderParams(formData, { partnerId });
         if (!params) {
-          setError(t('common.validation.required'));
+          setError(t('purchasing.forms.refinement.requiredBillContext', { defaultValue: 'Choose the purchase journal, expense account and vendor payable account, then check the bill date and adjustments. Your entries have been retained.' }));
           return;
         }
         try {

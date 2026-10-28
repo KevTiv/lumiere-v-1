@@ -1,5 +1,9 @@
 "use client"
 import { ModuleWorkView } from "../../../components/work-board/module-work-view"
+import { useErpSession } from "@lumiere/erp-session"
+import { useRBAC } from "@lumiere/ui/lib/rbac-context"
+import { useGenericExpenseCreate } from "./use-generic-expense-create"
+import { retainedExpenseForm } from "./generic-expense-attempt"
 import { useCurrencyFormat } from "@lumiere/ui"
 import { FinanceReviewWorkspace } from "@lumiere/ui/composed/finance-review-workspace"
 import { expensesTableConfig } from "@lumiere/ui/lib/expenses-entity-configs"
@@ -17,7 +21,7 @@ import {
   requiredInlineText,
 } from "@/lib/inline-edit-params"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "@lumiere/i18n"
 import {
   EntityDetail,
@@ -70,7 +74,6 @@ import {
 } from "@lumiere/query-hooks/hooks/expenses"
 import { optionalBigIntU64 } from "@lumiere/erp-shared/form-coercion"
 import { ExpensesCapturePanel } from "./expenses-capture-panel"
-import { ExpensesInboxPanel } from "./expenses-inbox-panel"
 import { ExpensesOpsPanel } from "./expenses-ops-panel"
 import { ExpensesAdminPanel } from "./expenses-admin-panel"
 import { useExpenseSheetApprovalTimeline } from "@lumiere/query-hooks/hooks/approvals"
@@ -87,10 +90,9 @@ import { approvalBacklog, monthlySpend, spendByCategory } from "./expenses-dashb
 import { useProjects } from "@lumiere/query-hooks/hooks/projects"
 import { useAccountTaxes } from "@lumiere/query-hooks/hooks/accounting"
 import { expenseVariantTag } from "@/lib/expense-state"
-import { createExpenseReceiptAttemptCache, expenseCompanyLookupRows, expenseInputsForLineKind, expenseProductLookupRows, expenseTaxLookupRows, preserveExpenseEditSelections } from "./expense-capture-input"
+import { createExpenseReceiptAttemptCache, expenseCreateContext, expenseCompanyLookupRows, expenseInputsForLineKind, expenseProductLookupRows, expenseTaxLookupRows, preserveExpenseEditSelections } from "./expense-capture-input"
 import {
   expenseQuantity,
-  newExpenseClientRequestId,
   newExpenseReceiptClientRequestId,
   parseAttachmentIds,
   toCreateExpenseParams,
@@ -190,10 +192,12 @@ function ExpensesClientLoaded({
 }: ExpensesClientLoadedProps) {
   useExpensesModuleSubscription()
   const { t } = useTranslation()
+  const { identity } = useErpSession()
+  const { checkPermission, permissionsReady } = useRBAC()
   const moduleConfig = useMemo(() => expensesModuleConfig(t), [t])
   const { orgId } = orgBigInts(organizationId)
   const operatingCompanyId = useDefaultOperatingCompanyBigInt(organizationId) ?? 0n
-  const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string } | null>(null)
+  const [quickActionForm, setQuickActionForm] = useState<{ action: "createExpense" | "createSheet" } | null>(null)
   const [rowAction, setRowAction] = useState<
     { tabId: "expenses" | "expense-sheets"; row: Record<string, unknown> } | null
   >(null)
@@ -202,10 +206,15 @@ function ExpensesClientLoaded({
     { kind: "approve" | "refuse" | "submit"; row: Record<string, unknown> } | null
   >(null)
   const [refuseReason, setRefuseReason] = useState("")
+  const [confirmationError, setConfirmationError] = useState<string | null>(null)
+  const confirmationInFlight = useRef(false)
+  const [confirmationPending, setConfirmationPending] = useState(false)
+  useEffect(() => { setConfirmationError(null) }, [confirmDialog])
   const [csvKind, setCsvKind] = useState<ExpensesCsvImportKind | null>(null)
   const [toolbarError, setToolbarError] = useState<string | null>(null)
   const [timelineSheet, setTimelineSheet] = useState<Record<string, unknown> | null>(null)
   const [resolveReceiptAttempt] = useState(createExpenseReceiptAttemptCache)
+  useEffect(() => { setQuickActionForm(null) }, [identity, orgId])
 
   const expensesRead = moduleCollection(useExpenses(orgId, initialExpenses))
   const expensesRaw = expensesRead.rows
@@ -220,7 +229,6 @@ function ExpensesClientLoaded({
   const expensesUsable = canUseModuleData(expensesRead.state)
   const sheetsUsable = canUseModuleData(sheetsRead.state)
   const currenciesQuery = useCurrencies()
-  const expensesState = expensesRead.state
   const sheetsState = sheetsRead.state
   const timelineQuery = useExpenseSheetApprovalTimeline(
     organizationId,
@@ -249,6 +257,19 @@ function ExpensesClientLoaded({
   const createExpenseReceipt = useCreateExpenseReceipt(orgId, operatingCompanyId)
   const createExpenseSheet = useCreateExpenseSheet(orgId, operatingCompanyId)
   const updateExpense = useUpdateExpense(orgId, operatingCompanyId)
+  const expenseCreate = useGenericExpenseCreate({
+    organizationId: orgId, companyId: operatingCompanyId, actorIdentity: identity,
+    create: (params) => createExpense.mutateAsync(params),
+    onConfirmed: () => setQuickActionForm(null),
+    canWrite: () => expensesUsable && permissionsReady !== false && checkPermission("hr_expense", "create").allowed,
+  })
+  const openExpenseCreate = useCallback(() => {
+    if (!expensesUsable || permissionsReady === false || !checkPermission("hr_expense", "create").allowed) return
+    setToolbarError(null)
+    try {
+      if (expenseCreate.open()) setQuickActionForm({ action: "createExpense" })
+    } catch (cause) { setToolbarError(cause instanceof Error ? cause.message : String(cause)) }
+  }, [expensesUsable, permissionsReady, checkPermission, expenseCreate.open])
 
   const resolveAttachmentIds = useCallback(
     async (formData: Record<string, unknown>, employeeIdRaw: unknown): Promise<bigint[]> => {
@@ -323,16 +344,21 @@ function ExpensesClientLoaded({
   }, [csvKind, t])
 
   const pricelistFieldOptions = useMemo(() => {
-    const fromApi = pricelistRowsToSelectOptions(pricelists)
+    const codes = currencyCodeMap(currencies)
+    const fromApi = pricelistRowsToSelectOptions(pricelists).map((option) => {
+      const row = pricelists.find((candidate) => String(candidate.id) === option.value)
+      const code = codes.get(String(row?.currencyId))
+      return { ...option, label: code ? `${option.label} · ${code}` : option.label }
+    })
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
-  }, [pricelists, t])
+  }, [pricelists, currencies, t])
 
   const employeeFieldOptions = useMemo(() => {
-    const fromApi = employeeRowsToSelectOptions(employees)
+    const fromApi = employeeRowsToSelectOptions(expenseCompanyLookupRows(employees, orgId, operatingCompanyId))
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noEmployees"), disabled: true }]
-  }, [employees, t])
+  }, [employees, orgId, operatingCompanyId, t])
 
   const mileageRateFieldOptions = useMemo(() => {
     const fromApi = expenseRateRowsToSelectOptions(expenseCompanyLookupRows(mileageRates, orgId, operatingCompanyId))
@@ -497,8 +523,8 @@ function ExpensesClientLoaded({
         }
         if (w.type === "quick-actions") {
           const handlers: Record<string, () => void> = {
-            new_expense: () => setQuickActionForm({ form: expenseFormConfig, action: "createExpense" }),
-            new_expense_sheet: () => setQuickActionForm({ form: expenseSheetFormConfig, action: "createSheet" }),
+            new_expense: openExpenseCreate,
+            new_expense_sheet: () => setQuickActionForm({ action: "createSheet" }),
           }
           return {
             ...w,
@@ -526,6 +552,7 @@ function ExpensesClientLoaded({
     t,
     expenseFormConfig,
     expenseSheetFormConfig,
+    openExpenseCreate,
   ])
 
   const config = useMemo(
@@ -742,7 +769,7 @@ function ExpensesClientLoaded({
   const actionUsable = (action: string) =>
     action === "createExpense" ? expensesUsable
       : action === "createExpenseSheet" || action === "createSheet" ? sheetsUsable : true
-  const quickActionUsable = quickActionForm == null || actionUsable(quickActionForm.action)
+  const quickActionUsable = quickActionForm == null || (quickActionForm.action === "createExpense" && expenseCreate.attempt !== null) || actionUsable(quickActionForm.action)
   const csvUsable = csvKind == null || (csvKind === "expense" ? expensesUsable : sheetsUsable)
   const rowActionUsable = rowAction == null || (rowAction.tabId === "expenses" ? expensesUsable : sheetsUsable)
   useEffect(() => {
@@ -764,36 +791,15 @@ function ExpensesClientLoaded({
   ) => {
     if (!actionUsable(action)) throw new Error(t("common.recordsUnavailable", { defaultValue: "Records could not be loaded." }))
     if (action === "createExpense") {
-      const plRaw = formData.pricelistId
-      const empRaw = formData.employeeId
-      if (plRaw === "" || plRaw == null || empRaw === "" || empRaw == null) return
-      const pl = pricelists.find((p) => String(p.id) === String(plRaw))
-      if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      const attachmentIds = await resolveAttachmentIds(formData, empRaw)
-      const params = toCreateExpenseParams(
-        {
-          ...expenseInputsForLineKind(formData),
-          clientRequestId: formData.clientRequestId ?? newExpenseClientRequestId(),
-        },
-        {
-          currencyId: pl.currencyId,
-          pricelistId: plRaw,
-        },
-        attachmentIds,
-      )
-      if (params === null) return
-      await createExpense.mutateAsync(params)
+      if (permissionsReady === false || !checkPermission("hr_expense", "create").allowed) throw new Error(t("common.recordsUnavailable"))
+      const context = expenseCreateContext(formData, employees, pricelists, orgId, operatingCompanyId, t)
+      const params = toCreateExpenseParams(expenseInputsForLineKind(formData), context.currencyId)
+      if (params === null) throw new Error(t("expenses.forms.capture.dateRequired", { defaultValue: "Enter a valid expense date before saving. Your entries have been retained." }))
+      await expenseCreate.submit(params, formData)
     } else if (action === "createExpenseSheet" || action === "createSheet") {
-      const plRaw = formData.pricelistId
-      const empRaw = formData.employeeId
-      if (plRaw === "" || plRaw == null || empRaw === "" || empRaw == null) return
-      const pl = pricelists.find((p) => String(p.id) === String(plRaw))
-      if (pl == null || pl.currencyId === undefined || pl.currencyId === null) return
-      const params = toCreateExpenseSheetParams(formData, {
-        currencyId: pl.currencyId,
-        pricelistId: plRaw,
-      })
-      if (params === null) return
+      const context = expenseCreateContext(formData, employees, pricelists, orgId, operatingCompanyId, t)
+      const params = toCreateExpenseSheetParams(formData, context.currencyId)
+      if (params === null) throw new Error(t("expenses.forms.capture.contextRequired", { defaultValue: "Check the employee and price list before saving this report. Your entries have been retained." }))
       await createExpenseSheet.mutateAsync(params)
     }
   }
@@ -811,6 +817,35 @@ function ExpensesClientLoaded({
     setExpenseAllocations.isPending ||
     csvImports.importExpense.isPending ||
     csvImports.importExpenseSheet.isPending
+
+  const confirmSheetAction = async () => {
+    if (!confirmDialog || confirmationInFlight.current || !sheetsUsable) return
+    const reason = refuseReason.trim()
+    if (confirmDialog.kind === "refuse" && !reason) {
+      setConfirmationError(t("expenses.workflow.refuseReasonRequired", { defaultValue: "Enter a reason before refusing this report." }))
+      return
+    }
+    confirmationInFlight.current = true
+    setConfirmationPending(true)
+    setConfirmationError(null)
+    setToolbarError(null)
+    try {
+      const sheetId = rowId(confirmDialog.row)
+      if (confirmDialog.kind === "submit") await submitExpenseSheet.mutateAsync(sheetId)
+      else if (confirmDialog.kind === "approve") await approveExpenseSheet.mutateAsync(sheetId)
+      else await refuseExpenseSheet.mutateAsync({ sheetId, params: { reason } })
+      setConfirmDialog(null)
+      setRefuseReason("")
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : t("expenses.workflow.financeFailed")
+      setConfirmationError(message)
+      // Source admission can close this dialog while a command is pending. Keep the result visible.
+      setToolbarError(message)
+    } finally {
+      confirmationInFlight.current = false
+      setConfirmationPending(false)
+    }
+  }
 
   const addToReportFormForRow = useCallback(
     (row: Record<string, unknown>) => {
@@ -1170,12 +1205,37 @@ function ExpensesClientLoaded({
           </div>
   )
 
+  const visibleToolbarError = toolbarError || (quickActionForm === null ? expenseCreate.error : null)
+
+  const retainedExpenseMessage = quickActionForm?.action === "createExpense" ? [
+    expenseCreate.error,
+    expenseCreate.attempt ? expenseCreate.attempt.companyId !== String(operatingCompanyId)
+      ? t("expenses.forms.recovery.scopeChanged", { defaultValue: "Switch back to the company saved with this request to check its status." })
+      : t("expenses.forms.recovery.retained", { defaultValue: "Your entries and the original request are retained. Check the result before starting another expense." }) : null,
+    expenseCreate.attempt?.receipt ? expenseCreate.attempt.receipt.receiptId
+      ? t("expenses.forms.recovery.receiptAttached", { defaultValue: "Receipt attached: {{fileName}}.", fileName: expenseCreate.attempt.receipt.fileName })
+      : expenseCreate.attempt.receipt.uploaded
+        ? t("expenses.forms.recovery.receiptUploaded", { defaultValue: "Receipt uploaded: {{fileName}}. Its registration will be checked with the original request.", fileName: expenseCreate.attempt.receipt.fileName })
+        : t("expenses.forms.recovery.receiptRetained", { defaultValue: "Receipt: {{fileName}}. If the upload has not completed after a reload, select the original file to continue.", fileName: expenseCreate.attempt.receipt.fileName }) : null,
+  ].filter(Boolean).join(" ") || null : null
+
   return (
     <>
-      {toolbarError ? (
+      {visibleToolbarError ? (
         <p className="text-sm text-destructive mb-2" role="alert">
-          {toolbarError}
+          {visibleToolbarError}
         </p>
+      ) : null}
+      {expenseCreate.attempt ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Button variant="outline" data-testid="expense-create-resume" disabled={expenseCreate.busy} onClick={() => {
+            setToolbarError(null)
+            try { expenseCreate.resume(); setQuickActionForm({ action: "createExpense" }) }
+            catch (cause) { setToolbarError(cause instanceof Error ? cause.message : String(cause)) }
+          }}>
+            {t("expenses.forms.recovery.reviewRequest", { defaultValue: "Review retained expense" })}
+          </Button>
+        </div>
       ) : null}
       <ModuleWorkView
         organizationId={organizationId}
@@ -1183,6 +1243,10 @@ function ExpensesClientLoaded({
         dashboardContent={<ModuleInsights input={{ module: "expenses", organizationId, companyId: operatingCompanyId, records: { rows: sheetsRaw, state: sheetsState }, currencies: { rows: currenciesQuery.data ?? [], state: moduleQueryState(currenciesQuery) } }} sections={liveSections} />}
         data={data}
         dataState={dataState}
+        onOpenCreateForm={(tabId) => {
+          if (tabId === "expenses") openExpenseCreate()
+          else if (tabId === "expense-sheets") setQuickActionForm({ action: "createSheet" })
+        }}
         onFormSubmit={handleFormSubmit}
         onRowClick={handleRowClick}
         isPending={isFormMutationPending}
@@ -1190,12 +1254,29 @@ function ExpensesClientLoaded({
       <FormModal
         open={quickActionForm !== null && quickActionUsable}
         onOpenChange={(open) => !open && setQuickActionForm(null)}
-        config={quickActionForm?.form ?? expenseFormConfig}
-        isPending={isFormMutationPending}
+        config={quickActionForm?.action === "createSheet" ? expenseSheetFormConfig : { ...retainedExpenseForm(expenseFormConfig, expenseCreate.attempt, expenseCreate.attempt?.companyId === String(operatingCompanyId)), ...(expenseCreate.attempt ? { cancelLabel: t("common.close") } : {}) }}
+        hasDurableRecovery={quickActionForm?.action === "createExpense" && expenseCreate.attempt !== null}
+        isPending={isFormMutationPending || expenseCreate.busy}
+        closeOnSubmit={quickActionForm?.action === "createSheet"}
+        showSubmitSuccessToast={quickActionForm?.action === "createSheet"}
+        draft={quickActionForm?.action === "createSheet"}
+        submissionDisabled={quickActionForm?.action === "createExpense" && expenseCreate.attempt !== null}
+        submitError={retainedExpenseMessage}
+        onValuesChange={quickActionForm?.action === "createExpense" ? expenseCreate.reattach : undefined}
+        formLeadingActions={quickActionForm?.action === "createExpense" && expenseCreate.attempt ? (
+          <div role="status" data-testid="expense-create-attempt" data-client-request-id={expenseCreate.attempt.clientRequestId} data-company-id={expenseCreate.attempt.companyId} data-sync-state={expenseCreate.attempt.syncState} className="flex min-w-0 flex-wrap items-center gap-2 text-sm [overflow-wrap:anywhere]">
+            <span className="font-medium">{t("expenses.forms.recovery.title", { defaultValue: "Expense save status" })}</span>
+            <Button type="button" variant="outline" data-testid="expense-create-check-status" disabled={expenseCreate.busy || expenseCreate.attempt.companyId !== String(operatingCompanyId)} onClick={() => { void expenseCreate.checkStatus().catch(() => undefined) }}>
+              {expenseCreate.attempt.syncState === "unknown" || expenseCreate.attempt.syncState === "submitting"
+                ? t("expenses.forms.recovery.checkStatus", { defaultValue: "Check status" })
+                : t("expenses.forms.recovery.continue", { defaultValue: "Continue retained request" })}
+            </Button>
+          </div>
+        ) : undefined}
         onSubmit={async (formData) => {
           if (quickActionForm) {
             await handleFormSubmit("dashboard", quickActionForm.action, formData)
-            setQuickActionForm(null)
+            if (quickActionForm.action === "createSheet") setQuickActionForm(null)
           }
         }}
       />
@@ -1275,10 +1356,18 @@ function ExpensesClientLoaded({
             {timelineQuery.isLoading && (
               <p className="text-sm text-muted-foreground">{t("common.loading")}</p>
             )}
-            {!timelineQuery.isLoading && timelineQuery.rows.length === 0 && (
+            {timelineQuery.isError && (
+              <div role="alert" className="space-y-2 text-sm text-destructive">
+                <p>{t("expenses.workflow.timelineUnavailable", { defaultValue: "Approval history could not be loaded." })}</p>
+                <Button variant="outline" size="sm" onClick={() => { void timelineQuery.refetch() }} disabled={timelineQuery.isFetching}>
+                  {t("common.retry")}
+                </Button>
+              </div>
+            )}
+            {!timelineQuery.isLoading && !timelineQuery.isError && timelineQuery.rows.length === 0 && (
               <p className="text-sm text-muted-foreground">{t("expenses.workflow.noApprovalRequests")}</p>
             )}
-            {timelineQuery.rows.map((row) => (
+            {!timelineQuery.isError && timelineQuery.rows.map((row) => (
               <div key={String(row.id)} className="rounded-md border p-3 text-sm space-y-1">
                 <div className="font-medium">{String(row.summary ?? row.action ?? "Approval")}</div>
                 <div className="text-muted-foreground">
@@ -1311,7 +1400,7 @@ function ExpensesClientLoaded({
       <Dialog
         open={confirmDialog !== null && sheetsUsable}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !confirmationInFlight.current) {
             setConfirmDialog(null)
             setRefuseReason("")
           }
@@ -1327,6 +1416,10 @@ function ExpensesClientLoaded({
                   : t("expenses.workflow.confirmRefuse")}
             </DialogTitle>
           </DialogHeader>
+          <DialogDescription className="[overflow-wrap:anywhere]">
+            {String(confirmDialog?.row.name ?? confirmDialog?.row.id ?? "")}
+          </DialogDescription>
+          {confirmationError ? <p id="expense-confirmation-error" role="alert" className="text-sm text-destructive [overflow-wrap:anywhere]">{confirmationError}</p> : null}
           {confirmDialog?.kind === "refuse" && (
             <div className="space-y-2 py-2">
               <label className="text-sm font-medium" htmlFor="refuse-reason">
@@ -1337,62 +1430,29 @@ function ExpensesClientLoaded({
                 className="min-h-[80px]"
                 value={refuseReason}
                 onChange={(e) => setRefuseReason(e.target.value)}
+                disabled={confirmationPending}
+                required
+                aria-invalid={Boolean(confirmationError) && !refuseReason.trim()}
+                aria-describedby={confirmationError ? "expense-confirmation-error" : undefined}
                 placeholder={t("expenses.workflow.refuseReasonPlaceholder")}
               />
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setConfirmDialog(null)}>
+            <Button variant="outline" disabled={confirmationPending} onClick={() => { setConfirmDialog(null); setRefuseReason("") }}>
               {t("common.cancel")}
             </Button>
-            {confirmDialog?.kind === "submit" && (
-              <Button
-                onClick={() => {
-                  if (!sheetsUsable) return
-                  const row = confirmDialog.row
-                  setConfirmDialog(null)
-                  void submitExpenseSheet.mutateAsync(rowId(row)).catch((e) =>
-                    setToolbarError(e instanceof Error ? e.message : String(e)),
-                  )
-                }}
-              >
-                {t("common.confirm")}
-              </Button>
-            )}
-            {confirmDialog?.kind === "approve" && (
-              <Button
-                onClick={() => {
-                  if (!sheetsUsable) return
-                  const row = confirmDialog.row
-                  setConfirmDialog(null)
-                  void approveExpenseSheet.mutateAsync(rowId(row)).catch((e) =>
-                    setToolbarError(e instanceof Error ? e.message : String(e)),
-                  )
-                }}
-              >
-                {t("common.confirm")}
-              </Button>
-            )}
-            {confirmDialog?.kind === "refuse" && (
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (!sheetsUsable) return
-                  const row = confirmDialog.row
-                  const reason = refuseReason.trim()
-                  setConfirmDialog(null)
-                  setRefuseReason("")
-                  void refuseExpenseSheet
-                    .mutateAsync({
-                      sheetId: rowId(row),
-                      params: { reason: reason || undefined },
-                    })
-                    .catch((e) => setToolbarError(e instanceof Error ? e.message : String(e)))
-                }}
-              >
-                {t("common.confirm")}
-              </Button>
-            )}
+            <Button
+              variant={confirmDialog?.kind === "refuse" ? "destructive" : "default"}
+              disabled={confirmationPending || !sheetsUsable}
+              onClick={() => { void confirmSheetAction() }}
+            >
+              {confirmationPending ? t("common.loading") : confirmDialog?.kind === "approve"
+                ? t("expenses.workflow.approveReport", { defaultValue: "Approve report" })
+                : confirmDialog?.kind === "submit"
+                  ? t("expenses.workflow.submitReport", { defaultValue: "Submit report" })
+                  : t("expenses.workflow.refuseReport", { defaultValue: "Refuse report" })}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

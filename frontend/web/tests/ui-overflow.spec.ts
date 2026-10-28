@@ -30,7 +30,8 @@ async function openFixture(page: Page, width: number) {
       json: { data: [{ id: 1, name: "X".repeat(220), state: "open", amount: 10 }] },
     })
   })
-  await page.goto("/overflow")
+  await page.goto("/overflow", { waitUntil: "domcontentloaded" })
+  await expect(page.getByTestId("overflow-fixture-ready")).toHaveAttribute("data-hydrated", "true", { timeout: test.info().timeout })
   await expect(page.getByTestId("entity-action-Create")).toBeVisible()
 }
 
@@ -170,3 +171,118 @@ for (const mode of ["floating", "docked"] as const) {
     ).toBe("pre-wrap")
   })
 }
+
+async function expectInViewport(page: Page, locator: Locator) {
+  await expect(locator).toBeVisible()
+  const viewport = page.viewportSize()!
+  await expect.poll(async () => {
+    const box = await locator.boundingBox()
+    return !!box && box.x >= -1 && box.y >= -1
+      && box.x + box.width <= viewport.width + 1
+      && box.y + box.height <= viewport.height + 1
+  }, { message: `${locator.toString()} must fit in the viewport` }).toBe(true)
+}
+
+for (const viewport of [
+  { width: 390, height: 600 },
+  { width: 390, height: 844 },
+  { width: 1440, height: 720 },
+  { width: 1440, height: 900 },
+]) {
+  test(`plain dialog stress keeps content and confirmation reachable at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    await openFixture(page, viewport.width)
+    await page.setViewportSize(viewport)
+    const opener = page.getByRole("button", { name: "Open stressed plain dialog", exact: true })
+    await opener.click()
+    const dialog = page.getByTestId("plain-stress-dialog")
+    await page.screenshot({ path: test.info().outputPath("plain-dialog-initial.png") })
+    await expectInViewport(page, dialog)
+    await expectContained(dialog)
+    await expectInViewport(page, dialog.getByRole("button", { name: "Close", exact: true }))
+    const lastRow = dialog.getByTestId("plain-stress-row-19")
+    await lastRow.scrollIntoViewIfNeeded()
+    await expectInViewport(page, lastRow)
+    const confirm = dialog.getByTestId("plain-stress-confirm")
+    await confirm.scrollIntoViewIfNeeded()
+    await expectInViewport(page, confirm)
+    await confirm.focus()
+    await page.keyboard.press("Enter")
+    await expect(dialog).toBeHidden()
+    await expect(opener).toBeFocused()
+  })
+
+  test(`form dialog stress retains edits and reachable actions after failed save at ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    await openFixture(page, viewport.width)
+    await page.setViewportSize(viewport)
+    const opener = page.getByRole("button", { name: "Open stressed form dialog", exact: true })
+    await opener.click()
+    const dialog = page.getByTestId("form-modal-overflow-stress")
+    const save = dialog.getByTestId("form-submit-overflow-stress")
+    const close = dialog.getByRole("button", { name: "Close", exact: true })
+    const body = dialog.locator("[data-form-body]")
+    await page.screenshot({ path: test.info().outputPath("form-dialog-initial.png") })
+    await expectInViewport(page, dialog)
+    await expectContained(dialog)
+    await expectInViewport(page, save)
+    await expectInViewport(page, close)
+
+    const first = dialog.getByTestId("form-field-reference-0")
+    await first.fill("Unsaved commercial reference")
+    const last = dialog.getByTestId("form-field-reference-19")
+    await last.scrollIntoViewIfNeeded()
+    await last.fill("Last field remains reachable")
+    await expectInViewport(page, last)
+    expect(await body.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
+    await expectInViewport(page, save)
+    await save.click()
+    await expect(dialog.getByRole("alert")).toContainText("The example save was rejected")
+    await page.screenshot({ path: test.info().outputPath("form-dialog-rejected-save.png") })
+    await expectInViewport(page, dialog)
+    await expectContained(dialog)
+    await expectInViewport(page, save)
+    await expectInViewport(page, close)
+    await expect(save).toBeEnabled()
+    await expect(first).toHaveValue("Unsaved commercial reference")
+    await expect(last).toHaveValue("Last field remains reachable")
+    await expect.poll(() => body.evaluate((element) => element.clientHeight)).toBeGreaterThan(40)
+    await last.scrollIntoViewIfNeeded()
+    await expectInViewport(page, last)
+    await close.click()
+    const discard = page.getByTestId("discard-changes-dialog")
+    await expectInViewport(page, discard)
+    await discard.getByTestId("discard-changes-keep").click()
+    await expect(discard).toBeHidden()
+    await expect(last).toHaveValue("Last field remains reachable")
+    await close.click()
+    await page.getByTestId("discard-changes-confirm").click()
+    await expect(dialog).toBeHidden()
+    await expect(opener).toBeFocused()
+  })
+}
+
+test("form picker stays in its own Escape layer and keeps the edited draft", async ({ page }) => {
+  await openFixture(page, 390)
+  await page.setViewportSize({ width: 390, height: 600 })
+  await page.getByRole("button", { name: "Open stressed form dialog", exact: true }).click()
+  const dialog = page.getByTestId("form-modal-overflow-stress")
+  const customer = dialog.getByTestId("form-field-customer")
+  await customer.scrollIntoViewIfNeeded()
+  await customer.click()
+  const search = page.getByPlaceholder("Search...", { exact: true })
+  await search.fill("International")
+  const option = page.getByRole("option", { name: /International customer/ })
+  await expectInViewport(page, option)
+  await expectContained(page.getByRole("listbox"))
+  await page.keyboard.press("Escape")
+  await expect(search).toBeHidden()
+  await expect(dialog).toBeVisible()
+  await expect(customer).toBeFocused()
+  await customer.click()
+  await page.getByPlaceholder("Search...", { exact: true }).fill("International")
+  await page.getByRole("option", { name: /International customer/ }).click()
+  await expect(customer).toContainText("International customer")
+  await page.keyboard.press("Escape")
+  await expect(page.getByTestId("discard-changes-dialog")).toBeVisible()
+  await page.getByTestId("discard-changes-keep").click()
+  await expect(customer).toContainText("International customer")
+})

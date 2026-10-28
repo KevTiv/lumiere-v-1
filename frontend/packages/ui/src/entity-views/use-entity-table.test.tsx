@@ -151,6 +151,22 @@ describe("useEntityTable filtering", () => {
 })
 
 describe("useEntityTable paging", () => {
+  it("initializes validated return sorting and page in the same table owner", () => {
+    const { result } = setup({ pageSize: 2, initialPage: 2, initialSorting: [{ id: "name", desc: false }] })
+    expect(result.current.currentPage).toBe(2)
+    expect(result.current.sortedBy).toEqual({ id: "name", desc: false })
+    expect(result.current.pageRows.map((row) => row.original.id)).toEqual([3, 4])
+  })
+
+  it("clamps a returned page to current data and ignores unknown sort columns", () => {
+    const { result } = setup({ pageSize: 2, initialPage: 99, initialSorting: [{ id: "untrusted", desc: false }] })
+    expect(result.current.currentPage).toBe(2)
+    expect(result.current.pageRows.map((row) => row.original.id)).toEqual([2, 1])
+    expect(result.current.sortedBy).toBeUndefined()
+    act(() => result.current.setPage(-10))
+    expect(result.current.currentPage).toBe(1)
+  })
+
   const many: EntityRow[] = Array.from({ length: 5 }, (_, index) => ({ id: index + 1, name: `n${index}`, state: { tag: "Draft" }, total: index }))
 
   it("slices pages and reports the position", () => {

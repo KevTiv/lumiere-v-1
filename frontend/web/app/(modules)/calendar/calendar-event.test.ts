@@ -68,3 +68,11 @@ test('recurrenceParams leaves empty rule text out', () => {
   assert.deepEqual(recurrenceParams({ recurrency: true, rrule: ' FREQ=DAILY ', rruleType: '' }), { recurrency: true, rrule: 'FREQ=DAILY' });
   assert.deepEqual(recurrenceParams({ recurrency: false }), { recurrency: false });
 });
+
+
+test('event edits reject a reversed range and keep the accepted equal-time all-day case', () => {
+  assert.equal(updateCalendarEventParams({ name: 'Review', start: '2026-10-06T10:00', stop: '2026-10-06T09:00' }), null);
+  const allDay = updateCalendarEventParams({ name: 'Company day', start: '2026-10-06T00:00', stop: '2026-10-06T00:00', allday: true });
+  assert.equal(allDay?.allday, true);
+  assert.equal(allDay?.start, allDay?.stop);
+});

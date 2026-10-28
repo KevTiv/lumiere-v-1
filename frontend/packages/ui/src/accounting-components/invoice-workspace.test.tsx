@@ -6,7 +6,7 @@ import { InvoiceDetailModal } from "./invoice-detail-modal"
 import { formatInvoiceMoney, InvoiceDocument, readInvoiceDocumentContent, resolveDraftInvoiceDocument } from "./invoice-document"
 import { resolveInvoiceProfile, type InvoiceDocumentSnapshot } from "@lumiere/erp-shared/invoice-personalization"
 
-vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock("@lumiere/i18n", () => ({ useTranslation: () => ({ t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key }) }))
 const configuredFields = vi.hoisted(() => ({ fields: [] as { fieldId: string; label: string; isEnabled: boolean; validation: { required: boolean } }[] }))
 vi.mock("../forms/hooks/use-form-config", () => ({ useFormConfiguration: () => ({ config: configuredFields }) }))
 
@@ -47,6 +47,83 @@ const seller = { name: "Alpha Legal Company", address: ["123 Main Street", "Pari
 const snapshot: InvoiceDocumentSnapshot = { schemaVersion: 1, profileVersionIds: { organization: "1", company: "2" }, seller, profile, notes: "Saved invoice notes" }
 
 describe("invoice workspace", () => {
+  it("keeps required custom fields enforced and contains a long rejected-save error without losing entries", async () => {
+    configuredFields.fields = [{ fieldId: "custom:approval_reference", label: "Approval reference", isEnabled: true, validation: { required: true } }]
+    const rejection = "Review the selected account.\n" + "LongServerExplanation".repeat(400)
+    const onSave = vi.fn().mockResolvedValue({ kind: "rejected", error: { message: rejection } })
+    render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} />)
+    fillInvoice()
+    const editor = screen.getByTestId("finance-review-editor")
+    const body = screen.getByTestId("create-invoice-scroll-body")
+    const dialog = screen.getByTestId("create-invoice-modal")
+    body.scrollTop = 600
+    dialog.scrollTop = 250
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByTestId("create-invoice-custom-custom:approval_reference"), { target: { value: "APPROVAL-42" } })
+    expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(screen.getByTestId("create-invoice-save-draft"))
+    await screen.findByRole("alert")
+    expect(screen.getByRole("alert").textContent).toBe(rejection)
+    expect(body.contains(screen.getByRole("alert"))).toBe(true)
+    expect(body.scrollTop).toBe(0)
+    expect(dialog.scrollTop).toBe(250)
+    expect(screen.getByTestId("finance-review-editor")).toBe(editor)
+    expect(body.contains(screen.getByTestId("create-invoice-save-draft"))).toBe(false)
+    body.scrollTop = 180
+    fireEvent.change(screen.getByTestId("create-invoice-line-description"), { target: { value: "Alpha services, corrected" } })
+    expect(body.scrollTop).toBe(180)
+    expect((screen.getByTestId("create-invoice-line-description") as HTMLInputElement).value).toBe("Alpha services, corrected")
+    expect((screen.getByTestId("create-invoice-custom-custom:approval_reference") as HTMLInputElement).value).toBe("APPROVAL-42")
+    expect(JSON.parse(onSave.mock.calls[0]![0].metadata)["custom:approval_reference"]).toBe("APPROVAL-42")
+  })
+
+  it.each(["invoice", "bill"] as const)("puts %s business entry before visible accounting choices", (kind) => {
+    render(<CreateInvoiceModal {...options} kind={kind} open onClose={vi.fn()} onSave={vi.fn()} onCheckStatus={vi.fn()} />)
+    const editor = screen.getByTestId("finance-review-editor")
+    const details = within(editor).getByRole("region", { name: "Document details" })
+    const payment = within(editor).getByRole("region", { name: "Payment details" })
+    const accounting = within(editor).getByRole("region", { name: "Accounting details" })
+    expect(details.compareDocumentPosition(screen.getByTestId("create-invoice-line-description")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByTestId("create-invoice-line-description").compareDocumentPosition(payment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(payment.compareDocumentPosition(accounting) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(accounting).getByLabelText(`accounting.forms.${kind === "bill" ? "newBill" : "newInvoice"}.fields.journal`)).toBeTruthy()
+    expect(within(accounting).getByLabelText(kind === "bill" ? "Payable account" : "Receivable account")).toBeTruthy()
+    expect(within(accounting).getByText(/Review the journal and accounts before saving/)).toBeTruthy()
+    expect((within(details).getByLabelText("Currency") as HTMLInputElement).value).toBe("Euro")
+  })
+
+  it("summarizes inherited content, retains edits while collapsed, and restores inheritance explicitly", async () => {
+    const onSave = vi.fn().mockResolvedValue({ kind: "outcome-unknown" })
+    render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} profile={profile} />)
+    const toggle = screen.getByTestId("create-invoice-content-toggle")
+    const summary = screen.getByTestId("create-invoice-content-summary")
+    expect(toggle.getAttribute("aria-expanded")).toBe("false")
+    expect(screen.queryByRole("textbox", { name: "Terms" })).toBeNull()
+    expect(summary.textContent).toContain("Company default")
+    expect(summary.textContent).toContain("Net 30")
+    fireEvent.click(toggle)
+    fireEvent.change(screen.getByRole("textbox", { name: "Terms" }), { target: { value: "Special terms" } })
+    fireEvent.click(screen.getByText("Use company default"))
+    expect((screen.getByRole("textbox", { name: "Terms" }) as HTMLTextAreaElement).value).toBe("Net 30")
+    fireEvent.change(screen.getByRole("textbox", { name: "Terms" }), { target: { value: "" } })
+    fireEvent.change(screen.getByRole("textbox", { name: "Notice" }), { target: { value: "Invoice-only notice" } })
+    fireEvent.click(toggle)
+    expect(summary.textContent).toContain("Cleared for this document")
+    expect(summary.textContent).toContain("Edited for this document")
+    expect(summary.textContent).toContain("Invoice-only notice")
+    expect(screen.queryByRole("textbox", { name: "Terms" })).toBeNull()
+    fireEvent.click(toggle)
+    expect((screen.getByRole("textbox", { name: "Terms" }) as HTMLTextAreaElement).value).toBe("")
+    expect((screen.getByRole("textbox", { name: "Notice" }) as HTMLTextAreaElement).value).toBe("Invoice-only notice")
+    fireEvent.click(toggle)
+    fillInvoice()
+    fireEvent.click(screen.getByTestId("create-invoice-save-draft"))
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    expect(onSave.mock.calls[0]![0]).toMatchObject({ companyId: 1n, journalId: 10n, partnerId: 20n, counterpartAccountId: 30n, currencyId: 7n,
+      lines: [{ accountId: 40n, name: "Alpha services", quantity: 1, priceUnit: 120, discount: 0, taxIds: [] }] })
+    expect(JSON.parse(onSave.mock.calls[0]![0].metadata)).toEqual({ notes: "", invoiceContent: { schemaVersion: 1, terms: "", notice: "Invoice-only notice" } })
+  })
+
   it.each(["invoice", "bill"] as const)("mounts the %s review workspace and preserves real draft fields across views", (kind) => {
     const onSave = vi.fn()
     render(<CreateInvoiceModal {...options} kind={kind} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} />)
@@ -57,7 +134,7 @@ describe("invoice workspace", () => {
     expect(preview.hidden).toBe(false)
     fillInvoice()
     const description = screen.getByTestId("create-invoice-line-description") as HTMLInputElement
-    for (const name of ["accounting.authoring.documentPreview", "accounting.authoring.editDocument", "financeReview.sideBySide"]) {
+    for (const name of ["Document preview", "Edit document", "Side by side"]) {
       fireEvent.click(within(review).getByRole("tab", { name }))
       expect(document.querySelector('[data-testid="create-invoice-line-description"]')).toBe(description)
       expect(description.value).toBe("Alpha services")
@@ -72,6 +149,7 @@ describe("invoice workspace", () => {
     configuredFields.fields = [{ fieldId: "custom:purchase_reference", label: "Purchase reference", isEnabled: true, validation: { required: false } }]
     const onSave = vi.fn().mockResolvedValue({ kind: "outcome-unknown" })
     render(<CreateInvoiceModal {...options} open onClose={vi.fn()} onSave={onSave} onCheckStatus={vi.fn()} profile={profile} seller={seller} profileVersionIds={snapshot.profileVersionIds} personalizationState={{ status: "ready" }} />)
+    fireEvent.click(screen.getByTestId("create-invoice-content-toggle"))
     expect((screen.getByRole("textbox", { name: "Terms" }) as HTMLTextAreaElement).value).toBe("Net 30")
     fillInvoice()
     fireEvent.change(screen.getByTestId("create-invoice-custom-custom:purchase_reference"), { target: { value: "PO-42" } })
@@ -86,15 +164,17 @@ describe("invoice workspace", () => {
   it("keeps dirty edits through close, company changes and refreshed defaults until explicitly reviewed", () => {
     const props = { ...options, onClose: vi.fn(), onSave: vi.fn(), onCheckStatus: vi.fn(), profile, seller, personalizationState: { status: "ready" as const } }
     const { rerender } = render(<CreateInvoiceModal {...props} open />)
+    fireEvent.click(screen.getByTestId("create-invoice-content-toggle"))
     fillInvoice()
     fireEvent.change(screen.getByRole("textbox", { name: "Notice" }), { target: { value: "Private edit" } })
     fireEvent.click(screen.getByText("common.cancel"))
     rerender(<CreateInvoiceModal {...props} open={false} />)
     rerender(<CreateInvoiceModal {...props} open companyId={2n} profile={{ ...profile, terms: "Company B terms" }} />)
     expect(screen.getByText(/This draft belongs to company #1/)).toBeTruthy()
-    expect((screen.getByRole("textbox", { name: "Notice" }) as HTMLTextAreaElement).value).toBe("Private edit")
+    expect(screen.getByTestId("create-invoice-content-summary").textContent).toContain("Private edit")
     expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(true)
     rerender(<CreateInvoiceModal {...props} open profile={{ ...profile, terms: "Current company A terms" }} />)
+    fireEvent.click(screen.getByTestId("create-invoice-content-toggle"))
     expect((screen.getByRole("textbox", { name: "Terms" }) as HTMLTextAreaElement).value).toBe("Net 30")
     expect((screen.getByTestId("create-invoice-save-draft") as HTMLButtonElement).disabled).toBe(true)
     fireEvent.click(screen.getByText("Apply current invoice defaults"))
@@ -187,6 +267,7 @@ describe("invoice workspace", () => {
     const onClose = vi.fn()
     const props = { ...options, onSave, onCheckStatus, onResolved, onClose, profile, seller, profileVersionIds: snapshot.profileVersionIds }
     const { rerender } = render(<CreateInvoiceModal {...props} open />)
+    fireEvent.click(screen.getByTestId("create-invoice-content-toggle"))
     fillInvoice()
     fireEvent.change(screen.getByRole("textbox", { name: "Terms" }), { target: { value: "Frozen explicit terms" } })
     fireEvent.click(screen.getByTestId("create-invoice-save-draft"))
@@ -216,7 +297,7 @@ describe("invoice workspace", () => {
     fireEvent.click(screen.getByTestId("create-invoice-preview-toggle"))
     expect(screen.getByTestId("create-invoice-preview-toggle").getAttribute("aria-selected")).toBe("true")
     expect(within(screen.getByRole("article", { name: "Document preview" })).getByText("Alpha services")).toBeTruthy()
-    fireEvent.click(screen.getByRole("tab", { name: "accounting.authoring.editDocument" }))
+    fireEvent.click(screen.getByRole("tab", { name: "Edit document" }))
     expect((screen.getByTestId("create-invoice-line-unit-price") as HTMLInputElement).value).toBe("120")
   })
 

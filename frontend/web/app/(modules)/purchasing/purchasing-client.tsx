@@ -175,15 +175,10 @@ import { useDepartments, type HrDepartment } from "@lumiere/query-hooks/hooks/hr
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
 import { useRuntimeListConfig } from "@lumiere/ui/forms"
 import { purchaseOrderListFieldAliases } from "@lumiere/ui/lib/purchasing-entity-configs"
-import {
-  customFieldEntriesFromMetadata,
-  findNewestRowByPartnerId,
-  persistCustomFieldsToEav,
-} from "@/lib/persist-record-custom-fields"
-import { fetchQueryList } from "@lumiere/query-hooks/http"
+import { orderNeedsCustomFieldSave } from "@/lib/commercial-order-form-params"
 import { useDefaultOperatingCompanyBigInt } from "@lumiere/query-hooks/hooks/use-operating-company"
 import { useCurrencies } from "@lumiere/query-hooks/hooks/settings"
-import type { KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
+import { currencyCodeMap, type KpiTileDef } from "@lumiere/ui/lib/kpi-tiles"
 import { purchaseOrderKpis } from "./purchase-order-kpis"
 import {
   contactRowsToVendorSelectOptions,
@@ -495,9 +490,12 @@ function PurchasingClientLoaded({
       : contactsQuery.status === "error" || initialContactsState?.status === "unavailable"
         ? "Unavailable"
         : "Loading"
-  const { data: pricelists = [] } = usePricelists(orgId, initialPricelists)
-  const { data: products = [] } = useProducts(orgId, initialProducts)
-  const { data: uoms = [] } = useUoms(orgId, initialUoms)
+  const pricelistsRead = moduleCollection(usePricelists(orgId, initialPricelists))
+  const pricelists = pricelistsRead.rows
+  const productsRead = moduleCollection(useProducts(orgId, initialProducts))
+  const products = productsRead.rows
+  const uomsRead = moduleCollection(useUoms(orgId, initialUoms))
+  const uoms = uomsRead.rows
   const receiptQuery = useStockPickings(orgId)
   const { data: stockPickings = [] } = receiptQuery
   const billQuery = useAccountMoves(orgId)
@@ -966,10 +964,23 @@ function PurchasingClientLoaded({
   }, [departments, t])
 
   const pricelistFieldOptions = useMemo(() => {
-    const fromApi = pricelistRowsToSelectOptions(pricelists)
+    if (pricelistsRead.state.status === "loading" || pricelistsRead.state.status === "denied" || pricelistsRead.state.status === "error") {
+      const label = pricelistsRead.state.status === "loading"
+        ? t("purchasing.forms.refinement.lookupLoading", { defaultValue: "Loading choices…" })
+        : pricelistsRead.state.status === "denied"
+          ? t("purchasing.forms.refinement.lookupDenied", { defaultValue: "You do not have access to these choices." })
+          : t("purchasing.forms.refinement.lookupFailed", { defaultValue: "Choices could not be loaded. Refresh to try again." })
+      return [{ value: "", label, disabled: true }]
+    }
+    const currencyCodes = currencyCodeMap(currencies)
+    const fromApi = pricelistRowsToSelectOptions(pricelists).map((option) => {
+      const row = pricelists.find((candidate) => String(candidate.id) === option.value)
+      const code = currencyCodes.get(String(row?.currencyId))
+      return { ...option, label: code ? `${option.label} · ${code}` : option.label }
+    })
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noPricelists"), disabled: true }]
-  }, [pricelists, t])
+  }, [pricelists, t, pricelistsRead.state.status, currencies])
 
   const warehouseSelectOptions = useMemo(() => {
     const fromApi = warehouseRowsToSelectOptions(warehouses as Record<string, unknown>[])
@@ -978,10 +989,18 @@ function PurchasingClientLoaded({
   }, [warehouses, t])
 
   const productFieldOptions = useMemo(() => {
+    if (productsRead.state.status === "loading" || productsRead.state.status === "denied" || productsRead.state.status === "error") {
+      const label = productsRead.state.status === "loading"
+        ? t("purchasing.forms.refinement.lookupLoading", { defaultValue: "Loading choices…" })
+        : productsRead.state.status === "denied"
+          ? t("purchasing.forms.refinement.lookupDenied", { defaultValue: "You do not have access to these choices." })
+          : t("purchasing.forms.refinement.lookupFailed", { defaultValue: "Choices could not be loaded. Refresh to try again." })
+      return [{ value: "", label, disabled: true }]
+    }
     const fromApi = productRowsToSelectOptions(products)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noProducts"), disabled: true }]
-  }, [products, t])
+  }, [products, t, productsRead.state.status])
 
   const {
     journalOptions: purchaseJournalFieldOptions,
@@ -993,10 +1012,18 @@ function PurchasingClientLoaded({
   )
 
   const uomFieldOptions = useMemo(() => {
+    if (uomsRead.state.status === "loading" || uomsRead.state.status === "denied" || uomsRead.state.status === "error") {
+      const label = uomsRead.state.status === "loading"
+        ? t("purchasing.forms.refinement.lookupLoading", { defaultValue: "Loading choices…" })
+        : uomsRead.state.status === "denied"
+          ? t("purchasing.forms.refinement.lookupDenied", { defaultValue: "You do not have access to these choices." })
+          : t("purchasing.forms.refinement.lookupFailed", { defaultValue: "Choices could not be loaded. Refresh to try again." })
+      return [{ value: "", label, disabled: true }]
+    }
     const fromApi = uomRowsToSelectOptions(uoms)
     if (fromApi.length > 0) return fromApi
     return [{ value: "", label: t("common.lookup.noUoms"), disabled: true }]
-  }, [uoms, t])
+  }, [uoms, t, uomsRead.state.status])
 
   const paymentTermFieldOptions = useMemo(() => {
     const fromApi = paymentTermRowsToSelectOptions(paymentTerms as Record<string, unknown>[])
@@ -2542,43 +2569,31 @@ function PurchasingClientLoaded({
     action: string,
     formData: Record<string, unknown>,
   ) => {
+    const invalidInput = () => new Error(t("purchasing.forms.refinement.invalidInput", { defaultValue: "Check the required choices and entered values. Your entries have been retained." }))
     if (!tabUsable(actionTabs[action])) throw new Error("Required data is unavailable. Refresh and try again.")
     if (action === "updatePurchaseOrder") {
       const args = toUpdatePurchaseOrderHeaderArgs(formData)
-      if (args == null) return
+      if (args == null) throw invalidInput()
       await updatePurchaseOrder.mutateAsync(args)
     } else if (action === "createPurchaseOrder") {
+      if ([contactsRead.state, pricelistsRead.state].some((state) => state.status !== "ready")) throw new Error(t("purchasing.forms.refinement.requiredChoicesUnavailable", { defaultValue: "Required choices are not available. Wait for loading to finish or refresh to try again. Your entries have been retained." }))
       const params = toCreatePurchaseOrderParams(
         formData,
         pricelists as Array<{ id: unknown; currencyId?: unknown }>,
       )
-      if (params == null) return
-      await createPurchaseOrder.mutateAsync(params)
-      if (params.metadata && operatingCompanyId !== 0n) {
-        const entries = customFieldEntriesFromMetadata(params.metadata)
-        if (entries.length > 0) {
-          const rows = await fetchQueryList(
-            "/api/query/purchase-orders",
-            "Failed to fetch purchase orders",
-          )
-          const row = findNewestRowByPartnerId(rows, params.partnerId)
-          if (row?.id) {
-            await persistCustomFieldsToEav({
-              organizationId,
-              companyId: operatingCompanyId,
-              model: "purchase_order",
-              recordId: BigInt(String(row.id)),
-              metadata: params.metadata,
-            })
-          }
-        }
+      if (params == null) throw new Error(t("purchasing.forms.refinement.requiredOrderContext", { defaultValue: "Choose a vendor and an available price list with a currency, then check the expected delivery date. Your entries have been retained." }))
+      if (orderNeedsCustomFieldSave(params.metadata)) {
+        throw new Error(t("purchasing.forms.refinement.customFieldsBlocked", { defaultValue: "Custom fields cannot be saved together with this purchase order yet. No purchase order was created. Your entries have been retained." }))
       }
+      await createPurchaseOrder.mutateAsync(params)
     } else if (action === "createPurchaseRequisition") {
-      await createPurchaseRequisition.mutateAsync(toCreatePurchaseRequisitionParams(formData))
+      const params = toCreatePurchaseRequisitionParams(formData)
+      if (params.lines.length === 0) throw invalidInput()
+      await createPurchaseRequisition.mutateAsync(params)
     } else if (action === "addPurchaseOrderLine") {
       const params = toAddPurchaseOrderLineParams(formData)
       const orderId = formData.orderId
-      if (params == null || orderId === "" || orderId == null) return
+      if (params == null || orderId === "" || orderId == null) throw new Error(t("purchasing.forms.refinement.requiredLineContext", { defaultValue: "Choose the order, product and unit of measure, then check quantity and unit cost. Your entries have been retained." }))
       await addPurchaseOrderLine.mutateAsync({
         orderId: orderId as string | number | bigint,
         params,
@@ -2586,53 +2601,55 @@ function PurchasingClientLoaded({
     } else if (action === "updatePurchaseOrderLine") {
       const lineId = formData.lineId
       const params = toUpdatePurchaseOrderLineParams(formData)
-      if (params == null || lineId === "" || lineId == null) return
+      if (params == null || lineId === "" || lineId == null) throw new Error(t("purchasing.forms.refinement.requiredLineContext", { defaultValue: "Choose the order, product and unit of measure, then check quantity and unit cost. Your entries have been retained." }))
       await updatePurchaseOrderLine.mutateAsync({
         lineId: lineId as string | number | bigint,
         params,
       })
     } else if (action === "receivePurchaseOrderLine") {
       const input = toReceiveLineInput(toReceivePoLineArgs(formData))
-      if (input == null) return
+      if (input == null) throw new Error(t("purchasing.forms.refinement.requiredReceiptContext", { defaultValue: "Choose a purchase line and enter a positive quantity. Check the lot or serial reference if supplied. Your entries have been retained." }))
       await purchasingWorkflow.receiveLine.execute(input, { navigateToNext: true })
     } else if (action === "invoicePurchaseOrderLine") {
       const args = toInvoicePoLineArgs(formData)
-      if (args == null) return
+      if (args == null) throw new Error(t("purchasing.forms.refinement.requiredInvoiceContext", { defaultValue: "Choose a received purchase line and enter a positive invoiced quantity. Your entries have been retained." }))
       await invoicePurchaseOrderLine.mutateAsync(args)
     } else if (action === "createPartnerBank") {
       const bankParams = toCreatePartnerBankParams(formData)
-      if (bankParams) await createPartnerBank.mutateAsync(bankParams)
+      if (!bankParams) throw invalidInput()
+      await createPartnerBank.mutateAsync(bankParams)
     } else if (action === "updatePartnerBank") {
       const u = toUpdatePartnerBankParams(formData)
-      if (u) await updatePartnerBank.mutateAsync(u)
+      if (!u) throw invalidInput()
+      await updatePartnerBank.mutateAsync(u)
     } else if (action === "createLandedCost") {
       const params = toCreateLandedCostParams(formData)
-      if (!params) return
+      if (!params) throw invalidInput()
       await createLandedCost.mutateAsync(params)
     } else if (action === "updateLandedCost") {
       const landedCostId = formData.landedCostId
-      if (landedCostId === "" || landedCostId == null) return
+      if (landedCostId === "" || landedCostId == null) throw invalidInput()
       const params = toUpdateLandedCostParams(formData)
-      if (!params) return
+      if (!params) throw invalidInput()
       await updateLandedCost.mutateAsync({
         landedCostId: landedCostId as string | number | bigint,
         params,
       })
     } else if (action === "addLandedCostLine") {
       const landedCostId = formData.landedCostId
-      if (landedCostId === "" || landedCostId == null) return
+      if (landedCostId === "" || landedCostId == null) throw invalidInput()
       const params = toAddLandedCostLineParams(formData)
-      if (!params) return
+      if (!params) throw invalidInput()
       await addLandedCostLine.mutateAsync({
         landedCostId: landedCostId as string | number | bigint,
         params,
       })
     } else if (action === "removeLandedCostLine") {
       const lineId = formData.lineId
-      if (lineId === "" || lineId == null) return
+      if (lineId === "" || lineId == null) throw invalidInput()
       const line = landedCostLines.find((row) => String(row.id) === String(lineId))
       const landedCostId = line?.landedCostId
-      if (landedCostId == null || String(landedCostId) === "") return
+      if (landedCostId == null || String(landedCostId) === "") throw invalidInput()
       await removeLandedCostLine.mutateAsync({
         landedCostId: landedCostId as string | number | bigint,
         lineId: lineId as string | number | bigint,
@@ -2641,7 +2658,7 @@ function PurchasingClientLoaded({
       const companyName = formData.companyName
       const contactName = formData.contactName
       const email = formData.email
-      if (!companyName || !contactName || !email) return
+      if (!companyName || !contactName || !email) throw invalidInput()
       await submitSupplierIntake.mutateAsync({
         companyName: String(companyName),
         contactName: String(contactName),
@@ -2656,14 +2673,14 @@ function PurchasingClientLoaded({
       })
     } else if (action === "reviewSupplierIntake") {
       const intakeId = formData.intakeId
-      if (intakeId === "" || intakeId == null) return
+      if (intakeId === "" || intakeId == null) throw invalidInput()
       await purchasingWorkflow.reviewIntake.execute({
         intakeId: String(intakeId),
         notes: optionalFormString(formData.reviewerNotes),
       })
     } else if (action === "updateSupplierIntake") {
       const intakeId = formData.intakeId
-      if (intakeId === "" || intakeId == null) return
+      if (intakeId === "" || intakeId == null) throw invalidInput()
       const params: Record<string, unknown> = {}
       const companyName = optionalFormString(formData.companyName)
       if (companyName != null) params.companyName = companyName
@@ -2675,11 +2692,13 @@ function PurchasingClientLoaded({
       if (phone != null) params.phone = phone
       const notes = optionalFormString(formData.notes)
       if (notes != null) params.notes = notes
-      if (Object.keys(params).length === 0) return
+      if (Object.keys(params).length === 0) throw invalidInput()
       await updateSupplierIntake.mutateAsync({
         intakeId: intakeId as string | number | bigint,
         params,
       })
+    } else {
+      throw new Error(t("purchasing.forms.refinement.unsupportedAction"))
     }
   }
 

@@ -5,7 +5,7 @@ import type { CreateManualAccountInvoiceParams } from "@lumiere/query-hooks/hook
 import type { CanonicalRecordRef, OperationEffectOutcome } from "@lumiere/query-hooks/hooks/operation-effect"
 import { toCreateManualAccountInvoiceParams } from "@lumiere/erp-shared/accounting-create-params"
 import { useTranslation } from "@lumiere/i18n"
-import { Eye, Plus, Trash2 } from "lucide-react"
+import { ChevronDown, Eye, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -22,6 +22,7 @@ import type { ModuleDataState } from "../lib/module-data-state"
 import { ModuleDataNotice } from "../pages/module-data-notice"
 import { useConfirmDialog } from "../hooks/use-confirm-dialog"
 import { DatePicker } from "@/components/ui/date-picker"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../components/collapsible"
 
 const emptyProfile: InvoicePersonalizationProfile = { logoUrl: "", accent: "teal", email: "", phone: "", website: "", notice: "", terms: "", paymentInstructions: "", footer: "" }
 const emptySeller: InvoiceDocumentSnapshot["seller"] = { name: "", address: [], taxId: "", registrationNumber: "", email: "", phone: "", website: "" }
@@ -158,6 +159,10 @@ function ReleasedCreateInvoiceModal({
   const [requestId, setRequestId] = useState<string | null>(null)
   const [unknownParams, setUnknownParams] = useState<CreateManualAccountInvoiceParams | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const scrollBodyRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (error && scrollBodyRef.current) scrollBodyRef.current.scrollTop = 0
+  }, [error])
   const [saving, setSaving] = useState(false)
   const [draftCompanyId, setDraftCompanyId] = useState(companyId)
   const [formEdited, setFormEdited] = useState(false)
@@ -337,24 +342,21 @@ function ReleasedCreateInvoiceModal({
   return <Dialog open={open} onOpenChange={(next) => !next && close()}>
     <DialogContent data-testid="create-invoice-modal" className="flex h-[min(94dvh,960px)] max-w-[calc(100%-1rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1480px,calc(100%-3rem))]">
       <DialogHeader className="shrink-0 border-b px-5 py-5 pr-12 sm:px-6"><DialogTitle className="text-xl font-semibold tracking-tight">{t(`accounting.forms.${copyKey}.createTitle`)}</DialogTitle><DialogDescription>Prepare the details and review the document before saving a draft.</DialogDescription></DialogHeader>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+      <div ref={scrollBodyRef} data-testid="create-invoice-scroll-body" className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">
+      {error ? <p role="alert" className="mb-4 rounded-md border bg-destructive/5 p-3 text-sm text-destructive [overflow-wrap:anywhere]">{error}</p> : null}
       <FinanceReviewWorkspace previewTabTestId="create-invoice-preview-toggle" editor={
       <div className="min-w-0">
       {companyMismatch ? <p role="alert" className="mb-4 rounded-md border p-3 text-sm">This draft belongs to company #{String(draftCompanyId)}. Switch back to continue. Your entries and any previous action are preserved.</p> : null}
       {kind === "invoice" ? <ModuleDataNotice state={personalizationState} /> : null}
       {defaultsChanged ? <div role="status" className="mb-4 space-y-2 rounded-md border p-3 text-sm"><p>Company invoice settings changed. Review the latest defaults before saving. Your explicit changes and notes will be kept.</p><Button variant="outline" disabled={locked || saving} onClick={() => setDocumentDefaults(currentDefaults())}>Apply current invoice defaults</Button></div> : null}
-      <fieldset disabled={locked || saving || companyMismatch || !personalizationReady} className="space-y-6" onChangeCapture={() => setFormEdited(true)}>
-        <section className="space-y-4"><div><h3 className="font-semibold">Document details</h3><p className="mt-1 text-xs text-muted-foreground">Partner, journal and payment schedule</p></div>
+      <fieldset disabled={locked || saving || companyMismatch || !personalizationReady} className="min-w-0 space-y-6" onChangeCapture={() => setFormEdited(true)}>
+        <section className="space-y-4" aria-label={t("accounting.authoring.documentDetails", { defaultValue: "Document details" })}><div><h3 className="font-semibold">{t("accounting.authoring.documentDetails", { defaultValue: "Document details" })}</h3><p className="mt-1 text-xs text-muted-foreground">{t("accounting.authoring.documentDetailsHint", { defaultValue: "Start with the customer or vendor, dates and reference." })}</p></div>
         <div className="grid gap-4 sm:grid-cols-2">
           <FieldSelect label={t(`accounting.forms.${copyKey}.fields.partner`)} testId="create-invoice-partner" value={partnerId} onChange={setPartnerId} options={partnerOptions} />
-          <FieldSelect label={t(`accounting.forms.${copyKey}.fields.journal`)} value={journalId} onChange={(value) => { setFormEdited(true); setJournalId(value) }} options={journalOptions} />
-          <FieldSelect label={kind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={(value) => { setFormEdited(true); setCounterpartAccountId(value) }} options={counterpartOptions} />
-          <div className="space-y-2"><Label>Currency</Label><Input aria-label="Currency" value={currencyOption?.label ?? (journal ? `Currency #${journal.currencyId}` : "Select a journal")} readOnly /></div>
           <div className="space-y-2"><Label htmlFor="create-invoice-date">{kind === "bill" ? "Bill date" : "Invoice Date"}</Label><DatePicker id="create-invoice-date" value={invoiceDate} onChange={(value) => setInvoiceDate(value)} /></div>
           <div className="space-y-2"><Label htmlFor="create-invoice-due-date">{t(`accounting.forms.${copyKey}.fields.dueDate`)}</Label><DatePicker id="create-invoice-due-date" min={invoiceDate} value={dueDate} onChange={(value) => setDueDate(value)} /></div>
-          <FieldSelect label="Payment term (optional)" value={paymentTermId || NONE} onChange={(value) => setPaymentTermId(value === NONE ? "" : value)} options={[{ value: NONE, label: "None" }, ...paymentTermOptions]} />
           <div className="space-y-2"><Label>Reference</Label><Input aria-label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} /></div>
-          <div className="space-y-2"><Label>Payment reference</Label><Input aria-label="Payment reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div>
+          <div className="space-y-2"><Label>Currency</Label><Input aria-label="Currency" value={currencyOption?.label ?? (journal ? `Currency #${journal.currencyId}` : "Select a journal")} readOnly /></div>
         </div></section>
         {journalOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Configure an active purchase journal before recording a bill." : "Configure an active sales journal before creating an invoice."}</ReadinessMessage> : null}
         {partnerOptions.length === 0 ? <ReadinessMessage>{kind === "bill" ? "Add an active vendor before recording a bill." : "Add an active customer before creating an invoice."}</ReadinessMessage> : null}
@@ -369,17 +371,46 @@ function ReleasedCreateInvoiceModal({
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <FieldSelect label="Product" value={line.productId || NONE} onChange={(value) => chooseProduct(line, value)} options={[{ value: NONE, label: "No product" }, ...productOptions]} />
             <div className="space-y-2 xl:col-span-2"><Label>Description</Label><Input aria-label={`Item ${index + 1} description`} data-testid={index === 0 ? "create-invoice-line-description" : undefined} value={line.description} onChange={(event) => updateLine(line.id, { description: event.target.value })} /></div>
-            <FieldSelect label={kind === "bill" ? "Expense account" : "Income account"} value={line.accountId} onChange={(value) => updateLine(line.id, { accountId: value })} options={commercialOptions} />
             <div className="space-y-2"><Label htmlFor={`invoice-line-quantity-${line.id}`}>Qty</Label><Input id={`invoice-line-quantity-${line.id}`} aria-label={`Item ${index + 1} quantity`} type="number" min={0.000001} step="any" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: Number(event.target.value) })} /></div>
             <div className="space-y-2"><Label>Unit price</Label><Input aria-label={`Item ${index + 1} unit price`} data-testid={index === 0 ? "create-invoice-line-unit-price" : undefined} type="number" min={0} step="0.01" value={line.unitPrice} onChange={(event) => updateLine(line.id, { unitPrice: Number(event.target.value) })} /></div>
             <FieldSelect label="Tax" value={line.taxId || NONE} onChange={(value) => updateLine(line.id, { taxId: value === NONE ? "" : value })} options={[{ value: NONE, label: "No tax" }, ...taxOptions]} />
             <div className="space-y-2"><Label>Discount %</Label><Input aria-label={`Item ${index + 1} discount percent`} type="number" min={0} max={100} value={line.discount} onChange={(event) => updateLine(line.id, { discount: Number(event.target.value) })} /></div>
+            <FieldSelect label={kind === "bill" ? "Expense account" : "Income account"} value={line.accountId} onChange={(value) => updateLine(line.id, { accountId: value })} options={commercialOptions} />
           </div><div className="mt-4 flex justify-between border-t pt-3 text-sm"><span className="text-muted-foreground">Line amount</span><span className="font-medium tabular-nums">{money(line.quantity * line.unitPrice * (1 - line.discount / 100))}</span></div></div>)}
         </div>
-        <section className="min-w-0 space-y-4 border-t pt-5" aria-label={kind === "invoice" ? "Invoice content" : "Bill notes"}>
-          {kind === "invoice" ? <><h3 className="font-semibold">Invoice content</h3><p className="text-xs text-muted-foreground">Company defaults prefill this document. Edit a section to override it, or clear it explicitly. Notes belong only to this invoice.</p>
-          {contentFields.map(({ key, label, limit }) => <div key={key} className="min-w-0 space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><Label htmlFor={`invoice-content-${key}`}>{label}</Label>{Object.hasOwn(contentOverrides, key) ? <Button variant="ghost" size="sm" onClick={() => setContentOverrides((previous) => { const next = { ...previous }; delete next[key]; return next })}>Use company default</Button> : null}</div><Textarea id={`invoice-content-${key}`} aria-label={label} value={effectiveProfile[key]} maxLength={limit} onChange={(event) => setContentOverrides((previous) => ({ ...previous, [key]: event.target.value }))} rows={key === "terms" ? 4 : 3} /></div>)}</> : null}
-          <div className="space-y-2"><Label>{t("accounting.forms.newInvoice.notesOptional")}</Label><Textarea aria-label={t("accounting.forms.newInvoice.notesOptional")} value={notes} maxLength={8000} onChange={(event) => setNotes(event.target.value)} rows={3} /></div>
+        <section className="space-y-4 border-t pt-5" aria-label={t("accounting.authoring.paymentDetails", { defaultValue: "Payment details" })}>
+          <h3 className="font-semibold">{t("accounting.authoring.paymentDetails", { defaultValue: "Payment details" })}</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+          <FieldSelect label="Payment term (optional)" value={paymentTermId || NONE} onChange={(value) => setPaymentTermId(value === NONE ? "" : value)} options={[{ value: NONE, label: "None" }, ...paymentTermOptions]} />
+          <div className="space-y-2"><Label>Payment reference</Label><Input aria-label="Payment reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} /></div>
+          </div>
+        </section>
+        <section className="space-y-4 border-t pt-5" aria-label={t("accounting.authoring.accountingDetails", { defaultValue: "Accounting details" })}>
+          <div><h3 className="font-semibold">{t("accounting.authoring.accountingDetails", { defaultValue: "Accounting details" })}</h3><p className="mt-1 text-xs text-muted-foreground">{t("accounting.authoring.accountingSelectionHint", { defaultValue: "Review the journal and accounts before saving. The journal sets the currency." })}</p></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+          <FieldSelect label={t(`accounting.forms.${copyKey}.fields.journal`)} value={journalId} onChange={(value) => { setFormEdited(true); setJournalId(value) }} options={journalOptions} />
+          <FieldSelect label={kind === "bill" ? "Payable account" : "Receivable account"} value={counterpartAccountId} onChange={(value) => { setFormEdited(true); setCounterpartAccountId(value) }} options={counterpartOptions} />
+          </div>
+        </section>
+        {kind === "invoice" ? <Collapsible className="flex min-w-0 flex-col gap-3 border-t pt-5">
+          <CollapsibleTrigger render={<Button variant="ghost" className="h-auto min-h-11 justify-between whitespace-normal px-0 text-left" />} data-testid="create-invoice-content-toggle">
+            {t("accounting.authoring.documentContent", { defaultValue: "Document content" })}<ChevronDown data-icon="inline-end" />
+          </CollapsibleTrigger>
+          <dl className="grid min-w-0 gap-3 sm:grid-cols-2" data-testid="create-invoice-content-summary">
+            {contentFields.map(({ key, label }) => <div key={key} className="min-w-0 text-xs">
+              <dt className="font-medium">{label} · <span className="text-muted-foreground">{Object.hasOwn(contentOverrides, key)
+                ? effectiveProfile[key] === "" ? t("accounting.authoring.contentCleared", { defaultValue: "Cleared for this document" }) : t("accounting.authoring.contentOverride", { defaultValue: "Edited for this document" })
+                : t("accounting.authoring.contentInherited", { defaultValue: "Company default" })}</span></dt>
+              <dd className="line-clamp-2 whitespace-pre-wrap break-words text-muted-foreground">{effectiveProfile[key] || t("accounting.authoring.contentEmpty", { defaultValue: "No text" })}</dd>
+            </div>)}
+          </dl>
+          <CollapsibleContent className="flex min-w-0 flex-col gap-4">
+            <p className="text-xs text-muted-foreground">{t("accounting.authoring.documentContentHint", { defaultValue: "Company defaults prefill this document. Edit a section to override it, or clear it explicitly. Use company default to restore inherited text." })}</p>
+            {contentFields.map(({ key, label, limit }) => <div key={key} className="min-w-0 space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><Label htmlFor={`invoice-content-${key}`}>{label}</Label>{Object.hasOwn(contentOverrides, key) ? <Button variant="ghost" size="sm" onClick={() => setContentOverrides((previous) => { const next = { ...previous }; delete next[key]; return next })}>Use company default</Button> : null}</div><Textarea id={`invoice-content-${key}`} aria-label={label} value={effectiveProfile[key]} maxLength={limit} onChange={(event) => setContentOverrides((previous) => ({ ...previous, [key]: event.target.value }))} rows={key === "terms" ? 4 : 3} /></div>)}
+          </CollapsibleContent>
+        </Collapsible> : null}
+        <section className="space-y-2 border-t pt-5">
+          <Label>{t("accounting.forms.newInvoice.notesOptional")}</Label><Textarea aria-label={t("accounting.forms.newInvoice.notesOptional")} value={notes} maxLength={8000} onChange={(event) => setNotes(event.target.value)} rows={3} />
         </section>
       </fieldset>
       </div>
@@ -387,7 +418,6 @@ function ReleasedCreateInvoiceModal({
       <div className="min-w-0 rounded-xl bg-muted/40 p-4 sm:p-6"><div className="mb-4 flex items-center gap-2 text-sm font-medium"><Eye className="size-4 text-muted-foreground" />Live preview</div><InvoiceDocument title={kind === "bill" ? "Vendor bill" : "Invoice"} reference={reference} partnerLabel={kind === "bill" ? "Vendor" : "Bill to"} partner={partnerOptions.find((option) => option.value === partnerId)?.label} date={invoiceDate} dueDate={dueDate} currency={currency} lines={lineItems} subtotal={subtotal} tax={totalTax} total={subtotal + totalTax} personalization={kind === "invoice" ? previewPersonalization : undefined} notes={notes} draft /></div>
       } />
       </div>
-      {error ? <p role="alert" className="shrink-0 border-t bg-destructive/5 px-5 py-3 text-sm text-destructive">{error}</p> : null}
       <DialogFooter className="m-0 shrink-0 flex-row flex-wrap items-center justify-between gap-3 rounded-none bg-background px-5 sm:justify-between sm:px-6"><div className="mr-auto min-w-0 text-sm"><span className="text-muted-foreground">Total</span><p className="font-semibold tabular-nums [overflow-wrap:anywhere]">{money(subtotal + totalTax)}</p></div>{dirty && !locked ? <Button variant="ghost" onClick={() => void discard()} disabled={saving}>Discard draft</Button> : null}<Button variant="outline" onClick={close} disabled={saving}>{locked ? "Close and keep draft" : t("common.cancel")}</Button>{locked
         ? <Button onClick={() => void checkStatus()} disabled={saving}>Check previous action</Button>
         : <Button data-testid="create-invoice-save-draft" onClick={() => void save()} disabled={!canSave}>Save as Draft</Button>}</DialogFooter>

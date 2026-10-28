@@ -1449,7 +1449,14 @@
       "columns": "Columns",
       "exportCsv": "Export CSV",
       "actions": "Actions",
-      "previous": "Previous"
+      "previous": "Previous",
+      "viewSettings": "View settings",
+      "documentId": "Document ID",
+      "partner": "Partner",
+      "paymentStatus": "Payment status",
+      "documentType": "Document type",
+      "linkedFilterLabel": "Linked record filters",
+      "clearLinkedFilter": "Clear {{field}} filter"
     },
     "taxes": {
       "title": "Taxes",
@@ -3217,7 +3224,9 @@
           "invalidMode": "Choose a listed reconciliation mode.",
           "staleWidget": "This reconciliation widget is no longer available in the current company. Close the form and refresh the list."
         }
-      }
+      },
+      "invalidEntries": "Check the required fields and selected records. No save was sent; your entries are retained.",
+      "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again."
     },
     "bankStatementDetail": {
       "title": "Bank statement",
@@ -3408,7 +3417,8 @@
       "supplierUnavailable": "Supplier not available",
       "lineCount": "{{count}} journal lines",
       "reviewDetails": "Review source and posting details",
-      "openBill": "Review bill"
+      "openBill": "Review bill",
+      "draftCountLabel": "Draft bills to review"
     },
     "paymentOperations": {
       "returnToAllocationCompany": "Return to company #{{companyId}} to recover the original allocation."
@@ -3519,7 +3529,18 @@
       "unsavedDraft": "Unsaved draft",
       "unsavedPreview": "Unsaved preview",
       "untaxed": "Untaxed amount",
-      "vendor": "Vendor"
+      "vendor": "Vendor",
+      "documentDetails": "Document details",
+      "documentDetailsHint": "Start with the customer or vendor, dates and reference.",
+      "paymentDetails": "Payment details",
+      "accountingDetails": "Accounting details",
+      "accountingSelectionHint": "Review the journal and accounts before saving. The journal sets the currency.",
+      "documentContent": "Document content",
+      "contentCleared": "Cleared for this document",
+      "contentOverride": "Edited for this document",
+      "contentInherited": "Company default",
+      "contentEmpty": "No text",
+      "documentContentHint": "Company defaults prefill this document. Edit a section to override it, or clear it explicitly. Use company default to restore inherited text."
     },
     "assetSchedule": {
       "generateFailed": "The saved schedule could not be confirmed. Refresh before you try again.",
@@ -3906,8 +3927,9 @@
         "title": "New Lead",
         "description": "Capture a new incoming lead",
         "sections": {
-          "contact": "Contact",
-          "details": "Details"
+          "contact": "Contact and company",
+          "details": "Qualification and value",
+          "notes": "Notes"
         },
         "fields": {
           "contactName": "Contact Name",
@@ -3924,13 +3946,17 @@
           "state": "Status",
           "description": "Notes",
           "descriptionPlaceholder": "Lead context and background…"
-        }
+        },
+        "qualificationHint": "Use the current qualification state and your estimate of the potential sale.",
+        "save": "Save lead"
       },
       "newOpportunity": {
         "title": "New Opportunity",
         "description": "Create a new sales opportunity",
         "sections": {
-          "opportunity": "Opportunity"
+          "opportunity": "Opportunity",
+          "value": "Value and expected close",
+          "followUp": "Follow-up and notes"
         },
         "fields": {
           "name": "Opportunity Name",
@@ -3952,7 +3978,8 @@
           "colorPlaceholder": "e.g. blue",
           "description": "Notes",
           "descriptionPlaceholder": "Deal context and next steps…"
-        }
+        },
+        "save": "Save opportunity"
       },
       "changeStage": {
         "title": "Change pipeline stage",
@@ -4008,8 +4035,10 @@
         "title": "New Contact",
         "description": "Add a customer, vendor, or partner",
         "sections": {
-          "identity": "Identity",
-          "details": "Details"
+          "identity": "Contact identity",
+          "details": "Email and phone",
+          "address": "Address",
+          "notes": "Notes and appearance"
         },
         "fields": {
           "name": "Full Name / Company Name",
@@ -4025,7 +4054,8 @@
           "colorPlaceholder": "e.g. blue",
           "description": "Notes",
           "descriptionPlaceholder": "Internal notes about this contact…"
-        }
+        },
+        "save": "Save contact"
       },
       "newContactCategory": {
         "title": "New contact category",
@@ -4127,7 +4157,8 @@
           "dateDeadline": "Due Date",
           "note": "Notes",
           "notePlaceholder": "Additional details…"
-        }
+        },
+        "submit": "Schedule activity"
       },
       "convertLead": {
         "title": "Convert lead",
@@ -4144,7 +4175,8 @@
         },
         "validation": {
           "stageRequired": "When creating an opportunity, choose a pipeline stage (or enter a valid stage ID)."
-        }
+        },
+        "submit": "Convert lead"
       },
       "convertToSaleOrder": {
         "title": "Convert to sale order",
@@ -4158,7 +4190,8 @@
         },
         "validation": {
           "pricelistWarehouse": "Select both a pricelist and a warehouse."
-        }
+        },
+        "submit": "Create sales order"
       },
       "addOpportunityLine": {
         "title": "Add opportunity line",
@@ -4391,7 +4424,24 @@
         "validation": {
           "noChanges": "Update at least one field before saving."
         }
-      }
+      },
+      "stagePlaceholder": "Choose a pipeline stage",
+      "noStages": "No pipeline stages available",
+      "stageSetupHint": "If the list is empty, open Pipeline setup to create a stage. If stages could not load, refresh and try again.",
+      "sourceUnavailable": "Required records could not be verified. Retry the source list before saving. Your entries are retained.",
+      "validation": {
+        "createLead": "Enter the lead contact name before saving.",
+        "createOpportunity": "Enter an opportunity name and select a pipeline stage.",
+        "createContact": "Enter a contact name before saving.",
+        "createActivity": "Enter an activity summary and a valid due date.",
+        "createContactCategory": "Enter a category name before saving.",
+        "createContactTag": "Enter a tag name before saving.",
+        "createContactSegment": "Enter a segment name before saving."
+      },
+      "pipelineSourceUnavailable": "Pipeline stages could not be verified. Retry Pipeline setup before saving. Your entries are retained.",
+      "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again.",
+      "openPipelineSetup": "Open Pipeline setup",
+      "customFieldsCreateUnavailable": "Saving custom fields during creation is not available yet. Your entries are retained and no record was created."
     },
     "consent": {
       "tabLabel": "Consent",
@@ -7472,6 +7522,49 @@
         "title": "Approve supplier intake",
         "description": "Select the vendor to link to this supplier request. Approval requires a different person from the submitter.",
         "submit": "Approve supplier"
+      },
+      "refinement": {
+        "newOrderHelp": "Choose the vendor and currency, save a draft, then add items and review quantities and costs before confirmation.",
+        "saveDraft": "Save draft",
+        "vendor": "Vendor and references",
+        "vendorReference": "Vendor reference",
+        "origin": "Source document reference",
+        "originHelp": "Optional reference to the request or source document for this purchase.",
+        "pricing": "Pricing and payment",
+        "pricingHelp": "The selected price list supplies the currency. Saving creates a draft; confirmation is a separate action.",
+        "pricelist": "Price list and currency",
+        "pricelistHelp": "Required. The price list supplies the currency for this purchase order.",
+        "delivery": "Expected delivery",
+        "datePlannedHelp": "Expected delivery date for the order.",
+        "notes": "Order notes",
+        "deliveryPayment": "Delivery and payment",
+        "editHelp": "Blank fields keep their current values.",
+        "saveRequest": "Save purchase request",
+        "request": "Purchase request",
+        "requestedItem": "Requested item and quantity",
+        "requestDates": "Request dates",
+        "lotReference": "Lot / serial record reference",
+        "lotHelp": "For tracked products, enter the existing lot or serial record reference. Leave blank for untracked items.",
+        "createDraftBill": "Create draft bill",
+        "billDetails": "Bill date and adjustments",
+        "billDetailsHelp": "Creates a draft vendor bill for this purchase order. Review the date, tax and discount before creating it.",
+        "billAccounts": "Purchase journal and accounts",
+        "billAccountsHelp": "Review the journal, expense account and vendor payable account. Required choices stay visible.",
+        "billNotes": "Bill notes and ledger description",
+        "ledgerOptions": "Specialist ledger line options",
+        "ledgerOptionsHelp": "These settings affect payable line visibility and reconciliation. Keep the existing values unless your accountant requests a change.",
+        "lookupLoading": "Loading choices…",
+        "lookupDenied": "You do not have access to these choices.",
+        "lookupFailed": "Choices could not be loaded. Refresh to try again.",
+        "invalidInput": "Check the required choices and entered values. Your entries have been retained.",
+        "requiredChoicesUnavailable": "Required choices are not available. Wait for loading to finish or refresh to try again. Your entries have been retained.",
+        "requiredOrderContext": "Choose a vendor and an available price list with a currency, then check the expected delivery date. Your entries have been retained.",
+        "customFieldsBlocked": "Custom fields cannot be saved together with this purchase order yet. No purchase order was created. Your entries have been retained.",
+        "requiredLineContext": "Choose the order, product and unit of measure, then check quantity and unit cost. Your entries have been retained.",
+        "requiredReceiptContext": "Choose a purchase line and enter a positive quantity. Check the lot or serial reference if supplied. Your entries have been retained.",
+        "requiredInvoiceContext": "Choose a received purchase line and enter a positive invoiced quantity. Your entries have been retained.",
+        "requiredBillContext": "Choose the purchase journal, expense account and vendor payable account, then check the bill date and adjustments. Your entries have been retained.",
+        "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again."
       }
     },
     "ops": {
@@ -8628,6 +8721,56 @@
           "incotermLocation": "Incoterm location",
           "commissionRatePercent": "Commission rate %"
         }
+      },
+      "refinement": {
+        "newOrderHelp": "Save a draft quotation, then add products, quantities and prices before confirming the order.",
+        "saveQuotation": "Save draft quotation",
+        "customer": "Customer and reference",
+        "customerHelp": "Choose the customer for this quotation. Invoice and delivery contacts initially use this customer.",
+        "validityHelp": "Last date the quotation remains valid.",
+        "pricing": "Pricing and invoicing",
+        "pricingHelp": "The price list supplies the currency. Review payment terms and the quantities used for invoicing.",
+        "pricelist": "Price list and currency",
+        "pricelistHelp": "Required. Prices and document currency use the selected price list.",
+        "invoicePolicy": "Invoice based on",
+        "invoiceOrdered": "Ordered quantities",
+        "invoiceDelivered": "Delivered quantities",
+        "delivery": "Delivery",
+        "deliveryHelp": "Choose the warehouse and the delivery commitment for this order.",
+        "warehouseHelp": "Required. Select the warehouse used by the order fulfillment workflow.",
+        "commitmentHelp": "Delivery date promised to the customer.",
+        "notes": "Order notes",
+        "commission": "Commission",
+        "commissionHelp": "Optional commission settings for this order. Processing follows the configured commission workflow.",
+        "addLine": "Add item",
+        "order": "Quotation or order",
+        "item": "Item and quantity",
+        "lineNameHelp": "Optional description shown on the order line.",
+        "uom": "Unit of measure",
+        "uomHelp": "Choose the unit used for the quantity, such as units, hours or boxes.",
+        "linePricing": "Discount and taxes",
+        "linePricingHelp": "Prices use the currency of the selected order.",
+        "lineDisplay": "Document line order",
+        "sequence": "Line order",
+        "sequenceHelp": "Controls where the line appears in the document.",
+        "createDraftInvoice": "Create draft invoice",
+        "invoiceAccounts": "Invoice journal and accounts",
+        "invoiceAccountsHelp": "Review the journal, sales account and customer receivable account before creating the draft invoice.",
+        "invoiceDetails": "Invoice notes and ledger description",
+        "ledgerOptions": "Specialist ledger line options",
+        "ledgerOptionsHelp": "These settings affect invoice line visibility and reconciliation. Keep the existing values unless your accountant requests a change.",
+        "reference": "Customer reference",
+        "deliveryTerms": "Delivery terms",
+        "lookupLoading": "Loading choices…",
+        "lookupDenied": "You do not have access to these choices.",
+        "lookupFailed": "Choices could not be loaded. Refresh to try again.",
+        "invalidInput": "Check the required choices and entered values. Your entries have been retained.",
+        "requiredChoicesUnavailable": "Required choices are not available. Wait for loading to finish or refresh to try again. Your entries have been retained.",
+        "requiredOrderContext": "Choose a customer, an available price list with a currency, and a warehouse. Your entries have been retained.",
+        "customFieldsBlocked": "Custom fields cannot be saved together with this quotation yet. No quotation was created. Your entries have been retained.",
+        "requiredLineContext": "Choose the order, product and unit of measure, then check quantity and price. Your entries have been retained.",
+        "requiredInvoiceAccounts": "Choose the invoice journal, sales account and customer receivable account. Your entries have been retained.",
+        "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again."
       }
     },
     "actions": {
@@ -9474,11 +9617,13 @@
             "private": "Private",
             "confidential": "Confidential"
           }
-        }
+        },
+        "submit": "Create event"
       },
       "editEvent": {
         "title": "Edit Event",
-        "description": "Update the event details"
+        "description": "Update the event details",
+        "submit": "Save event changes"
       }
     },
     "eventDetail": {
@@ -9523,6 +9668,11 @@
     },
     "inlineEdit": {
       "nameRequired": "An event needs a title"
+    },
+    "errors": {
+      "activityIncomplete": "Complete the activity details before saving. Your entries are retained.",
+      "deleteFailed": "The event could not be deleted. It is still selected.",
+      "eventIncomplete": "Enter an event title and valid times. The end must not be before the start. Your entries are retained."
     }
   },
   "documents": {
@@ -9784,7 +9934,9 @@
         "title": "Upload Document",
         "description": "Add a new document to the repository",
         "sections": {
-          "documentDetails": "Document Details"
+          "documentDetails": "Document Details",
+          "filing": "Optional links and filing",
+          "filingHint": "Link an existing business record or add filing details when your document policy requires them."
         },
         "fields": {
           "name": "Document Name",
@@ -9958,6 +10110,27 @@
           "classificationId": "Classification ID",
           "classificationIdHint": "Optional data_classification row id"
         }
+      },
+      "errors": {
+        "articleIncomplete": "Enter an article title and check the article details. Your entries are retained.",
+        "categoryIncomplete": "Enter a category name before saving. Your entries are retained.",
+        "folderIncomplete": "Enter a folder name and check the folder details. Your entries are retained."
+      },
+      "fiscalKinds": {
+        "danfePdf": "DANFe (PDF)",
+        "eFakturPdf": "e-Faktur (PDF)",
+        "eFakturXml": "e-Faktur (XML)",
+        "myInvoisXml": "MyInvois (XML)",
+        "nfePdf": "NF-e (PDF)",
+        "nfeXml": "NF-e (XML)",
+        "taxInvoicePdf": "Tax invoice (PDF)"
+      },
+      "recordTypes": {
+        "accountingDocument": "Accounting document",
+        "contact": "Contact",
+        "expense": "Expense",
+        "purchaseOrder": "Purchase order",
+        "salesOrder": "Sales order"
       }
     },
     "backToDocuments": "Back to documents",
@@ -10643,17 +10816,19 @@
         "title": "New Subscription",
         "description": "Create a customer subscription",
         "sections": {
-          "subscriptionDetails": "Subscription Details",
-          "billing": "Billing & recurrence"
+          "subscriptionDetails": "Order and plan",
+          "billing": "Start and billing",
+          "reference": "Reference and notes",
+          "startingState": "Starting state"
         },
         "fields": {
           "recurringInvoiceDay": "Invoice day of month",
           "isTrial": "Trial subscription",
-          "recurringRuleType": "Recurrence",
-          "recurringInterval": "Every (interval)",
+          "recurringRuleType": "Billing period",
+          "recurringInterval": "Every (number of periods)",
           "state": "Status",
           "health": "Health",
-          "saleOrderId": "Sale order",
+          "saleOrderId": "Sales order",
           "saleOrderPlaceholder": "Select a sale order",
           "partnerId": "Customer",
           "partnerPlaceholder": "Customer ID",
@@ -10667,10 +10842,10 @@
           "descriptionPlaceholder": "Describe this subscription…",
           "dateStart": "Start Date",
           "dateEnd": "End Date (optional)",
-          "paymentMode": "Payment Mode",
+          "paymentMode": "Invoice handling",
           "options": {
-            "automatic": "Automatic",
-            "manual": "Manual",
+            "automatic": "Automatic payment",
+            "manual": "Draft invoice",
             "recurring": {
               "daily": "Daily",
               "weekly": "Weekly",
@@ -10688,17 +10863,32 @@
               "bad": "At risk"
             }
           }
+        },
+        "saleOrderHint": "The selected order supplies the customer, billing and delivery contacts, currency, and price list.",
+        "paymentModeHint": "Choose how invoices will be handled when this subscription is billed.",
+        "invoiceDayHint": "Day of the month used for recurring invoices.",
+        "intervalHint": "Number of the selected billing periods between invoices.",
+        "orderHint": "Choose the confirmed sales order for this customer, then choose a subscription plan.",
+        "startingStateHint": "New subscriptions start as drafts with healthy status. Manage their status after creation.",
+        "save": "Create draft subscription",
+        "invalidSelection": "Select a sales order from the active company, a plan, and a valid start date. Your entries are retained.",
+        "startingValues": {
+          "draft": "Draft",
+          "healthy": "Healthy"
         }
       },
       "newPlan": {
         "title": "New Subscription Plan",
         "description": "Create a new recurring plan",
         "sections": {
-          "planDetails": "Plan Details"
+          "planDetails": "Plan name and reference",
+          "billing": "Billing and trial",
+          "invoicing": "Product and invoicing setup",
+          "options": "Default plan and notes"
         },
         "fields": {
-          "pricelistId": "Pricelist",
-          "pricelistPlaceholder": "Select a pricelist",
+          "pricelistId": "Price list and currency",
+          "pricelistPlaceholder": "Select a price list",
           "journalId": "Invoice journal",
           "journalPlaceholder": "Select a journal",
           "name": "Plan Name",
@@ -10708,9 +10898,9 @@
           "description": "Description",
           "descriptionPlaceholder": "Describe this plan…",
           "billingPeriod": "Billing Period",
-          "billingPeriodUnit": "Period Unit",
+          "billingPeriodUnit": "Every (number of periods)",
           "isDefault": "Default Plan",
-          "trialDuration": "Trial Duration",
+          "trialDuration": "Trial duration (days)",
           "trialDurationPlaceholder": "e.g. 14",
           "trialPeriod": "Trial Period Unit",
           "productId": "Product",
@@ -10725,7 +10915,13 @@
             "monthly": "Monthly",
             "yearly": "Yearly"
           }
-        }
+        },
+        "pricelistHint": "The selected price list supplies the plan currency.",
+        "billingPeriodUnitHint": "Number of billing periods in each billing cycle.",
+        "trialDurationHint": "Trial length in days. Applies when a trial period is enabled.",
+        "setupHint": "Choose the product to bill, the price list that supplies its currency, and the accounting journal.",
+        "save": "Create plan",
+        "invalidSelection": "Enter a plan name and select a price list with a currency, an invoice journal, and a product."
       },
       "deferredSchedule": {
         "title": "New deferred revenue schedule",
@@ -10936,7 +11132,10 @@
           "main": "Renewal"
         },
         "title": "Renew / extend term"
-      }
+      },
+      "sourceUnavailable": "Required records could not be verified. Retry the source list before saving. Your entries are retained.",
+      "csvRequired": "Choose or paste the CSV data before importing.",
+      "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again."
     },
     "dashboard": {
       "importPlanCsv": "Import plans (CSV)",
@@ -11173,7 +11372,9 @@
       "setAllocations": "Split allocations",
       "projectRebill": "Project rebill invoice",
       "accountingMoves": "Accounting moves",
-      "financeFailed": "Expense report action failed"
+      "financeFailed": "Expense report action failed",
+      "refuseReasonRequired": "Enter a reason before refusing this report.",
+      "timelineUnavailable": "Approval history could not be loaded."
     },
     "capture": {
       "title": "Receipt capture",
@@ -11302,21 +11503,32 @@
       "fraudCleared": "Fraud hold cleared."
     },
     "forms": {
+      "recovery": {
+        "title": "Expense save status",
+        "reviewRequest": "Review expense save",
+        "scopeChanged": "This request belongs to another company or signed-in account. Switch back to check it.",
+        "retained": "Your entries and the original request are retained. Check the result before starting another expense.",
+        "checkStatus": "Check status",
+        "continue": "Continue save",
+        "receiptRetained": "Receipt: {{fileName}}. If the upload has not completed after a reload, select the original file to continue.",
+        "receiptAttached": "Receipt attached: {{fileName}}.",
+        "receiptUploaded": "Receipt uploaded: {{fileName}}. Its registration will be checked with the original request."
+      },
       "newExpense": {
         "title": "New Expense",
-        "description": "Submit a new expense",
+        "description": "Record an expense and attach its receipt.",
         "sections": {
           "expenseDetails": "Expense Details"
         },
         "fields": {
-          "pricelistId": "Pricelist",
+          "pricelistId": "Price list and currency",
           "pricelistPlaceholder": "Select a pricelist",
           "name": "Description",
           "namePlaceholder": "e.g. Client dinner",
           "description": "Details",
           "descriptionPlaceholder": "Additional details about this expense…",
           "date": "Date",
-          "totalAmount": "Amount",
+          "totalAmount": "Unit amount",
           "quantity": "Quantity",
           "employeeId": "Employee",
           "employeePlaceholder": "Select an employee",
@@ -11332,11 +11544,11 @@
           "receiptFile": "Receipt file",
           "storageKey": "Receipt storage key",
           "storageKeyPlaceholder": "Opaque key (auto-generated if empty when receipt checked)",
-          "hasReceipt": "Receipt attached (required to submit report)",
-          "lineKind": "Line kind",
-          "lineKindStandard": "Standard",
+          "hasReceipt": "Include a receipt",
+          "lineKind": "Expense type",
+          "lineKindStandard": "Purchase",
           "lineKindMileage": "Mileage",
-          "lineKindPerDiem": "Per diem",
+          "lineKindPerDiem": "Daily allowance",
           "projectId": "Project ID",
           "projectIdPlaceholder": "Optional project",
           "mileageDistance": "Mileage distance",
@@ -11346,7 +11558,8 @@
           "rateIdPlaceholder": "Select a rate",
           "noMileageRates": "No mileage rates — upsert or seed statutory rates in Ops",
           "noPerDiemRates": "No per-diem rates — upsert in Ops"
-        }
+        },
+        "submitLabel": "Save expense"
       },
       "newExpenseSheet": {
         "title": "New Expense Report",
@@ -11365,12 +11578,12 @@
       },
       "newExpenseReport": {
         "title": "New Expense Report",
-        "description": "Submit expenses for reimbursement",
+        "description": "Save the report details before requesting approval.",
         "sections": {
           "reportDetails": "Report Details"
         },
         "fields": {
-          "pricelistId": "Pricelist",
+          "pricelistId": "Price list and currency",
           "pricelistPlaceholder": "Select a pricelist",
           "name": "Report Name",
           "namePlaceholder": "e.g. March 2024 Expenses",
@@ -11379,7 +11592,8 @@
           "accountingDate": "Accounting Date",
           "notes": "Notes",
           "notesPlaceholder": "Additional notes…"
-        }
+        },
+        "submitLabel": "Save expense report"
       },
       "editExpense": {
         "title": "Edit expense",
@@ -11416,7 +11630,8 @@
         "title": "Post expense report",
         "description": "Create the journal entry (expense / employee payable) for this approved report.",
         "sections": {
-          "accounts": "Accounting"
+          "accounts": "Accounting",
+          "adjustments": "Taxes, cards and advances"
         },
         "fields": {
           "accountingDate": "Accounting date",
@@ -11428,11 +11643,14 @@
           "advanceAccountId": "Advance clearing account (if advances applied)",
           "fxFeeAccountId": "Card FX fee expense account",
           "fxFeeAmount": "FX fee amount override (optional)"
-        }
+        },
+        "submitLabel": "Post to ledger",
+        "accountsHint": "Choose the journal and accounts for this report. Posting creates ledger entries; it does not pay the employee.",
+        "adjustmentsHint": "Use these accounts only when this report includes tax, company card charges, an advance or an exchange fee."
       },
       "reimburseReport": {
         "title": "Reimburse expense report",
-        "description": "Clear employee payable and credit liquidity for this posted report.",
+        "description": "Record a reimbursement payment for this posted report.",
         "sections": {
           "accounts": "Payment"
         },
@@ -11441,9 +11659,11 @@
           "journalId": "Journal",
           "payableAccountId": "Employee payable account",
           "liquidityAccountId": "Cash / bank account",
-          "amount": "Amount (optional partial)",
-          "amountHint": "Leave empty to pay the full residual. Partial leaves the report Posted."
-        }
+          "amount": "Amount to reimburse (optional)",
+          "amountHint": "Leave empty to reimburse the full amount due. A partial payment keeps the report in Posted status."
+        },
+        "submitLabel": "Record reimbursement",
+        "accountsHint": "Record a reimbursement payment against the posted report. Select the payment journal, employee payable account and bank or cash account."
       },
       "setAllocations": {
         "title": "Split expense allocations",
@@ -11529,7 +11749,26 @@
         "receiptRequired": "Choose a receipt file, or clear the receipt checkbox.",
         "noProject": "No project",
         "noProduct": "No expense product",
-        "financeRequired": "Complete the required date, journal, and account fields."
+        "financeRequired": "Complete the required date, journal, and account fields.",
+        "companyRequired": "Select a company before saving this expense.",
+        "employeeUnavailable": "Select an employee available in this company. Your signed-in account does not select an employee automatically.",
+        "pricelistRequired": "Select an available price list. Its currency is used for this expense.",
+        "currencyRequired": "The selected price list has no valid currency. Select another price list or ask an administrator to complete its setup.",
+        "dateRequired": "Enter a valid expense date before saving. Your entries have been retained.",
+        "contextRequired": "Check the employee and price list before saving this report. Your entries have been retained.",
+        "receiptSection": "Receipt and purpose",
+        "amountSection": "Employee and amount",
+        "optionalSection": "Optional references and notes",
+        "currencyHint": "The selected price list supplies the expense currency. Check it before saving.",
+        "employeeHint": "Select the employee who incurred this expense. This is separate from your signed-in account.",
+        "unitAmount": "Unit amount",
+        "unitAmountHint": "Enter the amount for one unit. The saved expense uses this amount and the quantity.",
+        "quantityHint": "Leave empty for one unit. Enter a quantity only when the amount applies to each unit.",
+        "reportContext": "Report owner and currency",
+        "singleUnitHint": "Quick capture records one unit. This amount is the expense amount before any server calculation.",
+        "financeSourcesRequired": "Journals or accounts could not be loaded. Retry the lookup before continuing. Your entries are retained.",
+        "financeSourcesDenied": "You do not have access to the journals or accounts needed for this action. Ask your administrator to check your access.",
+        "financeSourcesLoading": "Loading journals and accounts. Your entries are retained."
       }
     },
     "operationsTab": "Operations",
@@ -11925,9 +12164,9 @@
           "message": "Message"
         },
         "fields": {
-          "model": "Related Model",
-          "modelPlaceholder": "e.g. sale.order",
-          "resId": "Record ID",
+          "model": "Linked record type",
+          "modelPlaceholder": "account_move",
+          "resId": "Linked record number",
           "parentId": "Parent message ID",
           "parentIdHint": "Optional — reply thread",
           "messageType": "Message Type",
@@ -11939,8 +12178,12 @@
             "comment": "Comment",
             "email": "Email",
             "notification": "Notification"
-          }
-        }
+          },
+          "messageTypeHint": "Classifies the saved message. This form does not select recipients or send an email.",
+          "modelHint": "Use the existing record type, such as account_move for an accounting document.",
+          "recordHint": "Enter the existing record number from its page address."
+        },
+        "save": "Save message"
       },
       "subscribe": {
         "title": "Subscribe to Record",
@@ -11983,6 +12226,31 @@
         "channel": "Channel",
         "invoices": "Invoices",
         "invoicesHint": "Select one or more outstanding customer invoices."
+      },
+      "errors": {
+        "bodyRequired": "Write a message before saving. Your entries are retained.",
+        "recordRequired": "Enter the existing record number for this message. Your entries are retained.",
+        "recordTypeRequired": "Enter a record type and an existing record number. Your entries are retained.",
+        "recordChoiceRequired": "Choose an available record, or check the advanced custom reference. Your entries are retained.",
+        "unsupportedAction": "This message action is unavailable. Close and reopen the form before trying again."
+      },
+      "recordChoice": {
+        "link": "Link message to",
+        "choose": "Choose a record",
+        "custom": "Advanced custom reference",
+        "record": "Record",
+        "placeholder": "Find an invoice, bill, journal entry, or contact",
+        "hint": "Search by name or document number. The message is filed on the record you choose.",
+        "empty": "No available records",
+        "invoice": "Invoice",
+        "bill": "Vendor bill",
+        "creditNote": "Credit note",
+        "vendorCredit": "Vendor credit",
+        "journalEntry": "Journal entry",
+        "accountingDocument": "Accounting document",
+        "contact": "Contact",
+        "loading": "Loading available records. Your message can stay open while the choices load.",
+        "unavailable": "Some record choices could not be loaded. Refresh the page to reload the available records."
       }
     },
     "notifications": {
@@ -12223,7 +12491,8 @@
     "hints": {
       "cmds": "cmds",
       "send": "send"
-    }
+    },
+    "requestFailed": "The assistant request failed. Review the error and your message before sending again."
   },
   "aiHarness": {
     "reportAnalysis": {
@@ -12953,6 +13222,9 @@
       "feature": "Feature",
       "story": "Story",
       "task": "Task"
+    },
+    "errors": {
+      "incomplete": "Enter a task title and check the task details before saving. Your entries are retained."
     }
   },
   "trackers": {
@@ -13446,7 +13718,8 @@
         "temporarySetupAccess": "Temporary setup access (one hour)",
         "isDefault": "Default organization",
         "updateDetailsTitle": "Update org member details",
-        "updateRoleTitle": "Update org member role"
+        "updateRoleTitle": "Update org member role",
+        "jobTitle": "Job title"
       },
       "reference": {
         "cardTitle": "Reference masters",
@@ -13468,7 +13741,9 @@
         "decimalPlaces": "Decimal places",
         "position": "Symbol position",
         "positionBefore": "Before amount",
-        "positionAfter": "After amount"
+        "positionAfter": "After amount",
+        "iso3": "Three-letter country code",
+        "iso3Hint": "Use the ISO 3166-1 three-letter code, such as USA or FRA."
       },
       "audit": {
         "logEventButton": "Log audit event",
@@ -14223,7 +14498,10 @@
         "title": "Generate Report",
         "description": "Configure and generate a financial report",
         "sections": {
-          "reportParameters": "Report Parameters"
+          "reportParameters": "Report and period",
+          "basis": "Accounting basis",
+          "comparison": "Comparison",
+          "display": "Display options"
         },
         "fields": {
           "name": "Report Name",
@@ -14257,13 +14535,20 @@
             "all": "All Entries",
             "posted": "Posted Only"
           }
-        }
+        },
+        "comparisonHint": "Compare this period with the previous period or the same period last year.",
+        "hierarchyHint": "Level of account detail shown in the report.",
+        "targetMoveHint": "Choose whether the report includes posted entries only or all entries.",
+        "submit": "Generate report",
+        "lockedPeriodHint": "The report type, dates, and posted-entry basis are fixed by the selected accounting period. Return to period close to choose another period."
       },
       "reportTemplate": {
         "title": "New report template",
         "description": "Define a reusable layout for scheduled or generated reports",
         "sections": {
-          "main": "Template"
+          "main": "Template and source",
+          "layout": "File and page layout",
+          "options": "Availability and attachments"
         },
         "fields": {
           "name": "Name",
@@ -14294,7 +14579,9 @@
         "title": "Schedule report",
         "description": "Deliver a template on a recurring schedule",
         "sections": {
-          "main": "Schedule"
+          "main": "Report content",
+          "timing": "Schedule",
+          "delivery": "Recipients and file"
         },
         "fields": {
           "name": "Schedule name",
@@ -14313,7 +14600,11 @@
           "monthly": "Monthly",
           "quarterly": "Quarterly"
         },
-        "save": "Save schedule"
+        "save": "Save schedule",
+        "templateHint": "Select an existing report template. Create one in Report templates if none is available.",
+        "recipientsHint": "Separate recipient addresses with commas or new lines.",
+        "timingHint": "Set the first run time and how often the schedule repeats.",
+        "sourceUnavailable": "Report templates could not be verified. Retry Report templates before saving this schedule. Your entries are retained."
       },
       "analyticsMetric": {
         "title": "New metric",
@@ -14358,13 +14649,14 @@
       },
       "recordScheduledRun": {
         "title": "Record scheduled run",
-        "description": "Mark a run as completed and set the next scheduled time.",
+        "description": "Use after a report run has completed. Record the run and set its next scheduled time.",
         "sections": {
           "next": "Next run"
         },
         "fields": {
           "nextRun": "Next run at"
-        }
+        },
+        "submit": "Record completed run"
       },
       "trialBalanceEntry": {
         "title": "Add trial balance entry",
@@ -14493,7 +14785,10 @@
         "customHint": "Enter an ERP source identifier supported by your report integration.",
         "company": "Company (optional)",
         "companyPlaceholder": "Select a company"
-      }
+      },
+      "sourceUnavailable": "Required report records could not be verified. Retry their source list before saving. Your entries are retained.",
+      "unsupportedAction": "This form action is unavailable. Close and reopen the form before trying again.",
+      "selectedRecordUnavailable": "The selected record is unavailable. Close and reopen this form."
     },
     "pivot": {
       "title": "Pivot explorer",
@@ -15702,7 +15997,8 @@
         "minutesAgo_other": "{{count}}m ago"
       },
       "title": "Work Notes",
-      "type": "Type"
+      "type": "Type",
+      "sessionHint": "Notes stay in this page session. They are not saved to your account."
     },
     "stock3d": {
       "categories": {
@@ -15778,6 +16074,19 @@
         "rack": "Rack",
         "shelf": "Shelf"
       }
+    },
+    "notebook": {
+      "localHint": "Notebook contents are saved only in this browser. Code output is a preview.",
+      "notSaved": "Not saved",
+      "preview": "Local preview",
+      "rename": "Rename notebook",
+      "save": "Save notebook in this browser",
+      "saveError": "Could not save in this browser. Your notebook is still open. Export a copy, or free browser storage and try again.",
+      "saveFailed": "Save failed",
+      "savedLocally": "Saved in this browser",
+      "title": "Notebook",
+      "titleField": "Notebook title",
+      "unsavedChanges": "Unsaved changes"
     }
   },
   "workspace": {
@@ -15882,7 +16191,8 @@
         "description": "Open submitted reports and review their receipts and approval history.",
         "action": "Review reports"
       }
-    }
+    },
+    "layout": "Layout"
   },
   "workBoard": {
     "source": "Work type",
@@ -15973,5 +16283,14 @@
       "workflow-group": "Workflow group #{{id}}",
       "department": "Department #{{id}}"
     }
+  },
+  "approvals": {
+    "errors": {
+      "actionFailed": "The request could not be completed. Your comment or reason is retained.",
+      "countUnavailable": "Task count unavailable",
+      "loadFailed": "Approval tasks could not be loaded. Retry before making a decision."
+    },
+    "inboxDescription": "Review requests for the selected company. Open a record before you approve or reject it.",
+    "loading": "Loading approval tasks…"
   }
 }

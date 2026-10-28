@@ -111,3 +111,23 @@ test("checkpoint writes fail on missing or duplicate capture identity", () =>
       /unavailable or ambiguous/,
     )
   }))
+
+test("generic request rejects corrupt recovery storage instead of replacing its identity", () => local((values) => {
+  values.set("lumiere.expense-capture-outbox.9.device", "{broken")
+  assert.throws(() => readExpenseCaptureOutbox(9, "device", true))
+  assert.throws(() => enqueueExpenseCapture(9, { ...seed, formOrigin: { actorIdentity: "actor", organizationId: "9", pricelistId: "4" } }))
+  assert.equal(values.get("lumiere.expense-capture-outbox.9.device"), "{broken")
+}))
+
+test("generic request keeps payload, actor, company and receipt identity immutable", () => local(() => {
+  const item = enqueueExpenseCapture(9, { ...seed, formOrigin: { actorIdentity: "actor", organizationId: "9", pricelistId: "4" } })
+  assert.throws(() => saveExpenseCaptureCheckpoint(9, "device", { ...item, payload: { ...item.payload, unitAmount: 999 } }), /immutable/)
+  assert.throws(() => saveExpenseCaptureCheckpoint(9, "device", { ...item, companyId: "3" }), /immutable/)
+  assert.throws(() => saveExpenseCaptureCheckpoint(9, "device", { ...item, formOrigin: { ...item.formOrigin!, actorIdentity: "another" } }), /immutable/)
+  assert.throws(() => saveExpenseCaptureCheckpoint(9, "device", { ...item, receipt: { ...item.receipt!, clientRequestId: "new-receipt" } }), /immutable/)
+  saveExpenseCaptureCheckpoint(9, "device", { ...item, syncState: "unknown" })
+  const [restored] = readExpenseCaptureOutbox(9, "device", true)
+  assert.equal(restored?.clientRequestId, item.clientRequestId)
+  assert.equal(restored?.receipt?.clientRequestId, item.receipt?.clientRequestId)
+  assert.equal(restored?.syncState, "unknown")
+}))

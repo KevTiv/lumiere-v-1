@@ -45,6 +45,19 @@ function Harness({ initial = "", onChange = vi.fn() }: { initial?: string; onCha
 const open = () => fireEvent.click(screen.getByTestId("partner"))
 
 describe("RecordPicker", () => {
+  it("keeps the full long record label searchable and returns its exact id", async () => {
+    const onChange = vi.fn()
+    const label = `International customer ${"unbroken".repeat(30)}`
+    const id = "90071992547409931"
+    render(<RecordPicker value="" onChange={onChange} options={[{ value: id, label }]} data-testid="partner" />)
+    open()
+    fireEvent.change(await screen.findByPlaceholderText("Search..."), { target: { value: "International" } })
+    const option = await screen.findByRole("option", { name: label })
+    expect(option.textContent).toContain(label)
+    fireEvent.click(option)
+    expect(onChange).toHaveBeenCalledWith(id)
+  })
+
   it("shows the placeholder until a record is chosen, then its name", async () => {
     render(<Harness />)
     expect(screen.getByTestId("partner").textContent).toContain("Pick a partner")

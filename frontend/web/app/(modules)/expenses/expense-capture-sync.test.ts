@@ -568,3 +568,45 @@ test("a payload collision after dispatch remains unresolved and cannot become su
   )
   assert.equal(h.calls.create, 1)
 })
+
+test("generic retained actor mismatch stops before any remote read or write", async () => {
+  const item = { ...queued(), formOrigin: { actorIdentity: "original", organizationId: "9", pricelistId: "4" } }
+  let effects = 0
+  await assert.rejects(syncExpenseCapture(item, { ...scope, actorIdentity: "other" }, file, {
+    readExpenses: async () => { effects++; return [] }, readReceipts: async () => { effects++; return [] },
+    upload: async () => { effects++; return upload }, register: async () => { effects++; return 1n }, create: async () => { effects++ }, save: () => { effects++ },
+  }), /signed-in identity/)
+  assert.equal(effects, 0)
+})
+
+test("full generic readback requires exact product, tax, account and analytic values", () => {
+  const item = queued()
+  item.payload = { ...item.payload, hasReceipt: false, productId: "10", taxIds: ["11", "12"], accountId: "13", analyticAccountId: "14" }
+  const row = { ...canonicalExpenseRow(item.payload), hasReceipt: false, attachmentIds: [], productId: 10n, taxIds: [11n, 12n], accountId: 13n, analyticAccountId: 14n }
+  assert.equal(resolveCapturedExpense([row], scope, item), "9007199254740995")
+  for (const mismatch of [{ productId: 99n }, { taxIds: [11n] }, { accountId: null }, { analyticAccountId: 15n }]) {
+    assert.throws(() => resolveCapturedExpense([{ ...row, ...mismatch }], scope, item), /submitted capture values/)
+  }
+})
+
+test("local admission denial stays known unsent and resumes the original request after access returns", async () => {
+  const item = queued()
+  item.payload.hasReceipt = false
+  let allowed = false, creates = 0
+  let saved = item
+  const services = {
+    assertWriteAllowed: () => { if (!allowed) throw new Error("Local create permission is unavailable") },
+    readExpenses: async () => creates ? [{ ...canonicalExpenseRow(item.payload), hasReceipt: false, attachmentIds: [] }] : [],
+    readReceipts: async () => [], upload: async () => upload, register: async () => 1n,
+    create: async () => { creates++ }, save: (next: ExpenseCaptureOutboxItem) => { saved = next },
+  }
+  await assert.rejects(syncExpenseCapture(item, scope, undefined, services), /Local create permission/)
+  assert.equal(creates, 0)
+  assert.equal(saved.syncState, "error")
+  assert.equal(saved.clientRequestId, item.clientRequestId)
+  allowed = true
+  const result = await syncExpenseCapture(JSON.parse(JSON.stringify(saved)) as ExpenseCaptureOutboxItem, scope, undefined, services)
+  assert.equal(creates, 1)
+  assert.equal(result.syncState, "synced")
+  assert.equal(result.clientRequestId, item.clientRequestId)
+})

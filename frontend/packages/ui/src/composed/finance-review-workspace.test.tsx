@@ -9,6 +9,16 @@ function Editor() {
   return <><input aria-label="Description" value={value} onChange={(event) => setValue(event.target.value)} /><input type="file" aria-label="Receipt file" /></>
 }
 describe("Finance review workspace", () => {
+  it("starts saved details at full width while keeping the source reachable", () => {
+    render(<FinanceReviewWorkspace initialView="edit" editor={<Editor />} preview={<p>Source preview</p>} />)
+    const source = screen.getByTestId("finance-review-document")
+    expect(source.hidden).toBe(true)
+    expect(screen.getByText("Layout")).toBeTruthy()
+    fireEvent.click(screen.getByRole("tab", { name: "Document preview" }))
+    expect(source.hidden).toBe(false)
+    fireEvent.click(screen.getByRole("tab", { name: "Edit document" }))
+    expect(source.hidden).toBe(true)
+  })
   it("keeps one editor and selected file mounted through view changes", () => {
     render(<FinanceReviewWorkspace editor={<Editor />} preview={<p>Source preview</p>} />)
     const input = screen.getByLabelText("Description") as HTMLInputElement

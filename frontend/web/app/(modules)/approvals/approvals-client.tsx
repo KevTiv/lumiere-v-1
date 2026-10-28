@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { useTranslation } from "@lumiere/i18n"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { DashboardHeader, MissingOrganization, Button } from "@lumiere/ui"
@@ -50,6 +51,7 @@ export function ApprovalsClient({ organizationId }: { organizationId?: number })
 }
 
 function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
+  const { t } = useTranslation()
   const searchParams = useSearchParams()
   const operatingCompanyId = useOperatingCompanyId(organizationId)
   const inboxQuery = useHumanTaskInbox(
@@ -61,6 +63,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   const decideTask = useDecideHumanTask(organizationId)
   const commentTask = useCommentHumanTask(organizationId)
 
+  const [actionError, setActionError] = useState<string | null>(null)
   const [rejectingId, setRejectingId] = useState<number | null>(null)
   const [rejectReason, setRejectReason] = useState("")
   const [commentingId, setCommentingId] = useState<number | null>(null)
@@ -91,6 +94,14 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
   )
 
   const busy = claimTask.isPending || decideTask.isPending || commentTask.isPending
+
+  const runAction = async (action: () => Promise<void>) => {
+    setActionError(null)
+    try { await action() }
+    catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : t("approvals.errors.actionFailed", { defaultValue: "The request could not be completed. Your comment or reason is retained." }))
+    }
+  }
 
   const handleClaim = async (row: HumanTaskRow) => {
     if (operatingCompanyId == null) return
@@ -148,14 +159,14 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
     <div className="space-y-6" data-testid="module-view-approvals">
       <DashboardHeader
         title="Task inbox"
-        description="Company-scoped human tasks for guarded actions. Claim, comment, then approve or reject with revision checks."
+        description={t("approvals.inboxDescription", { defaultValue: "Review requests for the selected company. Open a record before you approve or reject it." })}
       />
 
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span data-testid="approvals-inbox-count">
-          {pendingTasks.length} open task{pendingTasks.length === 1 ? "" : "s"}
+          {inboxQuery.isError ? t("approvals.errors.countUnavailable", { defaultValue: "Task count unavailable" }) : inboxQuery.isPending ? t("approvals.loading", { defaultValue: "Loading approval tasks…" }) : `${pendingTasks.length} open task${pendingTasks.length === 1 ? "" : "s"}`}
         </span>
-        {aiDraftCount > 0 ? (
+        {!inboxQuery.isError && !inboxQuery.isPending && aiDraftCount > 0 ? (
           <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs">
             <Sparkles className="h-3.5 w-3.5" />
             {aiDraftCount} AI draft{aiDraftCount === 1 ? "" : "s"}
@@ -167,6 +178,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
         </Link>
       </div>
 
+      {actionError ? <p role="alert" className="break-words text-sm text-destructive">{actionError}</p> : null}
       {operatingCompanyId == null ? (
         <div
           className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
@@ -174,6 +186,13 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
         >
           Select an operating company to load your authorized task inbox.
         </div>
+      ) : inboxQuery.isError ? (
+        <div role="alert" className="flex flex-col gap-3 rounded-lg border bg-card p-6 text-sm" data-testid="approvals-inbox-error">
+          <p>{t("approvals.errors.loadFailed", { defaultValue: "Approval tasks could not be loaded. Retry before making a decision." })}</p>
+          <Button variant="outline" className="self-start" disabled={inboxQuery.isFetching || busy} onClick={() => { void inboxQuery.refetch() }}>{t("common.retry", { defaultValue: "Retry" })}</Button>
+        </div>
+      ) : inboxQuery.isPending ? (
+        <p role="status">{t("approvals.loading", { defaultValue: "Loading approval tasks…" })}</p>
       ) : visibleTasks.length === 0 ? (
         <div
           className="rounded-lg border bg-card p-6 text-sm text-muted-foreground"
@@ -281,7 +300,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       size="sm"
                       variant="outline"
                       data-testid={`approval-claim-${taskId}`}
-                      onClick={() => void handleClaim(row)}
+                      onClick={() => void runAction(() => handleClaim(row))}
                       disabled={busy || needsActorSelection}
                     >
                       <Hand className="mr-1.5 h-4 w-4" />
@@ -291,7 +310,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                   <Button
                     size="sm"
                     data-testid={`approval-approve-${taskId}`}
-                    onClick={() => void handleDecide(row, "Approve")}
+                    onClick={() => void runAction(() => handleDecide(row, "Approve"))}
                     disabled={busy || needsActorSelection}
                   >
                     <CheckCircle2 className="mr-1.5 h-4 w-4" />
@@ -345,7 +364,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       size="sm"
                       disabled={!commentText.trim() || busy}
                       data-testid={`approval-comment-confirm-${taskId}`}
-                      onClick={() => void handleComment(row)}
+                      onClick={() => void runAction(() => handleComment(row))}
                     >
                       Save comment
                     </Button>
@@ -370,7 +389,7 @@ function ApprovalsLoaded({ organizationId }: { organizationId: number }) {
                       variant="destructive"
                       disabled={(requireComment && !rejectReason.trim()) || busy}
                       data-testid={`approval-reject-confirm-${taskId}`}
-                      onClick={() => void handleReject(row)}
+                      onClick={() => void runAction(() => handleReject(row))}
                     >
                       Confirm rejection
                     </Button>

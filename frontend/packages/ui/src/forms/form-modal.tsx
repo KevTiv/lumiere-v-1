@@ -65,6 +65,8 @@ export interface FormModalProps {
   isPending?: boolean
   /** Blocks submission while leaving cancel and inspection available. */
   submissionDisabled?: boolean
+  /** A durable domain checkpoint protects these values after the dialog closes. */
+  hasDurableRecovery?: boolean
   /** Forwarded to {@link ModularForm} to enable advisory AI form fill. */
   aiAssist?: AiFormAssistConfig
   /** Forwarded to {@link ModularForm} — e.g. swap dependent select options when a field changes. */
@@ -90,6 +92,7 @@ export function FormModal({
   formLeadingActions,
   isPending,
   submissionDisabled,
+  hasDurableRecovery = false,
   aiAssist,
   onValuesChange,
   renderPreview,
@@ -103,7 +106,7 @@ export function FormModal({
   const draftStorageKey = useFormDraftStorageKey(config.id, draftKey)
   const [submitting, setSubmitting] = React.useState(false)
 
-  // Nothing survives a closed dialog, so nothing is left to protect.
+  // Clear local dirty and discard state when the dialog closes.
   React.useEffect(() => {
     if (!open) {
       setDirty(false)
@@ -111,13 +114,17 @@ export function FormModal({
     }
   }, [open])
 
-  const navigationDialog = useUnsavedChangesGuard(open && dirty, open && (submitting || !!isPending))
+  React.useEffect(() => {
+    if (hasDurableRecovery) setConfirmingDiscard(false)
+  }, [hasDurableRecovery])
 
-  /** Dismissals (Cancel, Escape, overlay, X) ask first when fields were edited. */
+  const navigationDialog = useUnsavedChangesGuard(open && dirty && !hasDurableRecovery, open && (submitting || !!isPending))
+
+  /** Ask before dismissal when edits have no durable recovery checkpoint. */
   const requestOpenChange = (next: boolean) => {
     // Closing during a save loses the form and its eventual failure feedback.
     if (!next && (submittingRef.current || isPending)) return
-    if (!next && dirty) {
+    if (!next && dirty && !hasDurableRecovery) {
       setConfirmingDiscard(true)
       return
     }
@@ -215,15 +222,11 @@ export function FormModal({
         </DialogHeader>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {submitError ? (
-            <p className="mx-6 mt-4 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-              {submitError}
-            </p>
-          ) : null}
           <ModularForm
             config={{ ...config, title: "", description: "", layout: "default" }}
             scrollable
             onSubmit={handleSubmit}
+            submitError={submitError}
             onCancel={handleCancel}
             leadingActions={formLeadingActions}
             isPending={isPending}

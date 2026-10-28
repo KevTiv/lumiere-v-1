@@ -8,7 +8,7 @@ import { toCreateActivityParams } from "@/lib/crm-create-params"
 import { useTranslation } from "@lumiere/i18n"
 import { useConfirmDialog } from "@lumiere/ui/hooks/use-confirm-dialog"
 import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, useDeleteCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
-import type { UpdateCalendarEventParams, CalendarEvent as StdbCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
+import type { CalendarEvent as StdbCalendarEvent } from "@lumiere/query-hooks/hooks/calendar"
 import { useActivities, useCreateActivity } from "@lumiere/query-hooks/hooks/crm"
 import type { FormConfig, CalendarEvent as UICalendarEvent, ViewMode } from "@lumiere/ui"
 import { FormModal, ModuleView, newCalendarEventForm, newActivityForm, MissingOrganization } from "@lumiere/ui"
@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from "react"
 import { canUseModuleData, moduleCollection } from "@lumiere/ui/lib/module-data-state"
 import { CalendarView } from "../../../../packages/ui/src/calendar-components/calendar-view"
 import { hasValidOrganizationId, orgBigInts } from "@/lib/org-scoped"
-import { calendarEventHref } from "./calendar-event"
+import { calendarEventHref, updateCalendarEventParams } from "./calendar-event"
 import { withInlineEdits } from "@lumiere/ui/lib/with-inline-edits"
 import { requiredInlineText } from "@/lib/inline-edit-params"
 
@@ -27,10 +27,6 @@ interface CalendarClientProps {
 
 type CalendarClientLoadedProps = Omit<CalendarClientProps, "organizationId"> & {
   organizationId: number
-}
-
-function calendarTimestampMicros(_raw: unknown, date: Date): bigint {
-  return BigInt(date.getTime() * 1000)
 }
 
 export function CalendarClient(props: CalendarClientProps) {
@@ -48,6 +44,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
   const { orgId } = orgBigInts(organizationId)
   const [quickActionForm, setQuickActionForm] = useState<{ form: FormConfig; action: string; eventId?: string } | null>(null)
   const [formModalKey, setFormModalKey] = useState(0)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     if (quickActionForm != null) {
@@ -207,9 +204,13 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
                 eventHref={(eventId) => calendarEventHref({ id: eventId })}
                 onDeleteEvent={async (eventId) => {
                   if (await confirmDialog({ description: t("calendar.confirmDelete") })) {
-                    deleteCalendarEvent.mutate(eventId, {
-                      onSuccess: () => setSelectedEventId(null),
-                    })
+                    setActionError(null)
+                    try {
+                      await deleteCalendarEvent.mutateAsync(eventId)
+                      setSelectedEventId(null)
+                    } catch (cause) {
+                      setActionError(cause instanceof Error ? cause.message : t("calendar.errors.deleteFailed", { defaultValue: "The event could not be deleted. It is still selected." }))
+                    }
                   }
                 }}
               />
@@ -219,7 +220,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
         return tab
       }),
     }),
-    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, liveSections, moduleConfig, t, updateCalendarEvent, confirmDialog],
+    [viewMode, selectedEventId, selectedDate, searchTerm, events, currentDate, liveSections, moduleConfig, t, updateCalendarEvent, deleteCalendarEvent, confirmDialog],
   )
 
   const data = useMemo(
@@ -254,33 +255,18 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
     if (!actionUsable(action)) throw new Error("Required data is unavailable. Refresh and try again.")
     if (action === "createActivity") {
       const p = toCreateActivityParams(formData)
-      if (p) await createActivity.mutateAsync(p)
+      if (!p) throw new Error(t("calendar.errors.activityIncomplete", { defaultValue: "Complete the activity details before saving. Your entries are retained." }))
+      await createActivity.mutateAsync(p)
       return
     }
     if (action === "createEvent") {
       const params = toCreateCalendarEventParams(formData)
-      if (!params) return
-      createCalendarEvent.mutate(params)
+      if (!params) throw new Error(t("calendar.errors.eventIncomplete", { defaultValue: "Enter an event title and valid times. The end must not be before the start. Your entries are retained." }))
+      await createCalendarEvent.mutateAsync(params)
     } else if (action === "editEvent" && quickActionForm?.eventId) {
-      const title = String(formData.name ?? "").trim()
-      if (!title) return
-      const start = new Date(String(formData.start ?? ""))
-      const stop = new Date(String(formData.stop ?? ""))
-      if (Number.isNaN(start.getTime()) || Number.isNaN(stop.getTime())) return
-      updateCalendarEvent.mutate({
-        eventId: quickActionForm.eventId,
-        params: ({
-          name: title,
-          start: calendarTimestampMicros(formData.start, start),
-          stop: calendarTimestampMicros(formData.stop, stop),
-          allday: Boolean(formData.allday),
-          privacy: (formData.privacy as string) ?? "public",
-          show_as: "busy",
-          state: "confirmed",
-          location: formData.location ? String(formData.location) : undefined,
-          description: formData.description ? String(formData.description) : undefined,
-        } satisfies UpdateCalendarEventParams) as Record<string, unknown>,
-      })
+      const params = updateCalendarEventParams(formData)
+      if (!params) throw new Error(t("calendar.errors.eventIncomplete", { defaultValue: "Enter an event title and valid times. The end must not be before the start. Your entries are retained." }))
+      await updateCalendarEvent.mutateAsync({ eventId: quickActionForm.eventId, params })
     }
   }
 
@@ -292,6 +278,7 @@ function CalendarClientLoaded({ initialEvents, organizationId }: CalendarClientL
 
   return (
     <>
+      {actionError ? <p role="alert" className="mb-3 break-words text-sm text-destructive">{actionError}</p> : null}
       <ModuleView
         config={config}
         data={data}

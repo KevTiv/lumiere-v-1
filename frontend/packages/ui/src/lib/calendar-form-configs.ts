@@ -15,6 +15,7 @@ export const newCalendarEventForm = (t: TFunction, defaults?: CalendarEventDefau
   id: defaults ? "edit-calendar-event" : "new-calendar-event",
   title: defaults ? t("calendar.forms.editEvent.title") : t("calendar.forms.newEvent.title"),
   description: defaults ? t("calendar.forms.editEvent.description") : t("calendar.forms.newEvent.description"),
+  submitLabel: defaults ? t("calendar.forms.editEvent.submit", { defaultValue: "Save event changes" }) : t("calendar.forms.newEvent.submit", { defaultValue: "Create event" }),
   sections: [
     {
       id: "event-details",

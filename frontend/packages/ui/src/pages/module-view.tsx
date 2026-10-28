@@ -69,6 +69,8 @@ interface ModuleViewProps {
   onActiveTabChange?: (tab: string) => void
   /** Opt in to retaining an open create form and its source workspace across tab changes. */
   onOpenFormChange?: (tab: string | null) => void
+  /** Route existing gated create controls to a domain-owned instance of FormModal. */
+  onOpenCreateForm?: (tabId: string) => void
   /** Runtime kanban columns + move handlers keyed by entity tab id */
   entityBoardContext?: Record<string, EntityBoardRuntimeContext>
   /** Per-tab loading flags keyed by tab id — forwarded to EntityTable as skeleton rows. */
@@ -119,6 +121,7 @@ export function ModuleView({
   activeTab: activeTabProp,
   onActiveTabChange,
   onOpenFormChange,
+  onOpenCreateForm,
   isPending,
   renderCreatePreview,
   entityBoardContext,
@@ -207,6 +210,10 @@ export function ModuleView({
     overview: t("modules.workspaces.overview"), more: t("modules.workspaces.more"),
   })
   const [openForm, setOpenForm] = useState<string | null>(null)
+  const openCreateForm = (tabId: string) => {
+    if (onOpenCreateForm && !useRuntimeCreate) onOpenCreateForm(tabId)
+    else setOpenForm(tabId)
+  }
   useEffect(() => { onOpenFormChange?.(openForm) }, [openForm, onOpenFormChange])
   const [kpiSelection, setKpiSelection] = useState<Record<string, string | null>>({})
   const [selectedRecord, setSelectedRecord] = useState<Record<string, unknown> | null>(null)
@@ -391,7 +398,7 @@ export function ModuleView({
                   headerAction={
                     tab.createForm && createGate(tab.createPermission) !== "denied" ? (
                       <Button
-                        onClick={() => setOpenForm(tab.id)}
+                        onClick={() => openCreateForm(tab.id)}
                         data-testid={`module-create-${config.id}-${tab.id}`}
                       >
                         <Plus className="h-4 w-4" />
@@ -405,7 +412,7 @@ export function ModuleView({
                           ...tab.entityConfig,
                           view: withTabCreateCta(tab.entityConfig.view, {
                             label: tab.createLabel ?? "New",
-                            onClick: () => setOpenForm(tab.id),
+                            onClick: () => openCreateForm(tab.id),
                             // Not gated until permissions load, so the empty state never flashes read-only.
                             permission: createGate(tab.createPermission) === "loading" ? undefined : tab.createPermission,
                           }),
