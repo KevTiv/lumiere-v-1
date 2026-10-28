@@ -467,7 +467,7 @@ function CrmClientLoaded({
     staleTime: 60_000,
   })
   const activityTypeOptions = useMemo(() => moduleCollection(activityTypesQuery).rows
-    .filter((row) => row.isActive === true || row.is_active === true)
+    .filter((row) => row.isActive === true)
     .map((row) => ({ value: String(row.id), label: String(row.name) })), [activityTypesQuery.data, activityTypesQuery.isError, activityTypesQuery.isLoading])
   const activityForm = useMemo(() => newActivityForm(t, activityTypeOptions), [t, activityTypeOptions])
   const { data: products = [] } = useProducts(orgId)
