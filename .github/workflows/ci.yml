@@ -216,6 +216,9 @@ jobs:
       - name: SpacetimeDB Rust generator recovery test
         run: bash scripts/test-generate-spacetimedb-rust-sdk.sh
 
+      - name: SDK generation preserves unchanged outputs and failed snapshots
+        run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p '*sdk_generation.py'
+
       - name: Verify pinned generated contracts and source policy
         run: make check-codegen-pinned
 
@@ -327,6 +330,9 @@ jobs:
 
       - name: Validate frontend build-cache graph
         run: node ../scripts/test-frontend-build-cache.mjs
+
+      - name: Check compact browser operation contracts
+        run: pnpm contracts:check-browser-operations
 
       - name: Check accounting double-cast rationales
         run: bash ../scripts/lint-accounting-as-unknown-as.sh

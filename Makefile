@@ -114,6 +114,7 @@ E2E_DOMAIN_TEST_REDUCERS := \
 	setup check check-env check-env-prod build validate-subscriptions \
 	start stop publish publish-clear test call-tests logs seed-test-user seed-first-org-personas \
 	generate-stdb-ts-sdk generate-stdb-rust-sdk schema-snapshot \
+	generate-browser-operation-ids dx-check dx-check-rust dx-check-frontend \
 	e2e-smoke e2e-smoke-setup e2e-smoke-test e2e-playwright-only \
 	e2e-wipe-local-stdb e2e-single e2e-single-test e2e-p2p e2e-mvp-golden \
 	e2e-crm-isolation e2e-dx-test e2e-web-dev e2e-single-running e2e-single-remote e2e-docker \
@@ -219,6 +220,10 @@ help:
 	$(call print-command,module-generate-rust,Regenerate Rust API-server bindings and apply keyword fixes.)
 	$(call print-command,codegen-all,Regenerate query registry and SQL metadata.)
 	$(call print-command,codegen-check,Fail when generated artifacts have drifted.)
+	$(call print-command,generate-browser-operation-ids,Refresh browser operation IDs from the installed pinned contracts.)
+	$(call print-command,dx-check,Check Rust generation and frontend contracts without a live database.)
+	$(call print-command,dx-check-rust,Test Rust codegen and SDK generation wrappers.)
+	$(call print-command,dx-check-frontend,Check browser operation IDs and run frontend transport tests.)
 	@printf "\nDocker / OrbStack\n"
 	$(call print-command,stack-init,Create .env.docker then publish local SpacetimeDB and configure tokens.)
 	$(call print-command,stack-up,Start the development stack.)
@@ -643,6 +648,24 @@ e2e-single: e2e-smoke-setup e2e-single-test
 # Focused, dependency-free validation of local DX helpers.
 e2e-dx-test:
 	bash scripts/test-e2e-dx.sh
+
+# Focused generation checks; require Rust/Python and installed frontend packages.
+# Keep the lanes sequential so the aggregate is safe on constrained machines.
+dx-check:
+	$(MAKE) dx-check-rust
+	$(MAKE) dx-check-frontend
+
+dx-check-rust:
+	cargo test --locked -p lumiere-codegen
+	PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p '*sdk_generation.py'
+	bash scripts/test-generate-spacetimedb-rust-sdk.sh
+
+dx-check-frontend:
+	cd frontend && pnpm contracts:check-browser-operations
+	cd frontend && pnpm --dir packages/stdb test
+
+generate-browser-operation-ids:
+	cd frontend && pnpm contracts:generate-browser-operations
 
 # Phase 2 CRM authorization gate: ephemeral tenants, persisted rows, HTTP reads, and WS subscriptions.
 e2e-crm-isolation:
