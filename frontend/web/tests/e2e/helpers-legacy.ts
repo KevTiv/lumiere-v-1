@@ -508,7 +508,7 @@ async function openSelectListbox(page: Page, trigger: Locator) {
 }
 
 async function selectOption(trigger: Locator, listbox: Locator, option: Locator) {
-  await option.click()
+  await option.click({ timeout: 15_000 })
   await expect(trigger).toHaveAttribute("aria-expanded", "false")
   await expect(listbox).toBeHidden()
 }
