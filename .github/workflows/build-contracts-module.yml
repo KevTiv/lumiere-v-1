@@ -3,6 +3,11 @@ name: Build contracts module
 on:
   workflow_call:
     inputs:
+      source_ref:
+        description: Exact source revision to compile; defaults to the branch head for artifact publishing
+        required: false
+        default: ''
+        type: string
       production:
         description: Exclude developer seed and test reducers from the artifact
         required: false
@@ -31,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ inputs.source_ref || github.event.pull_request.head.sha || github.sha }}
 
       - uses: dtolnay/rust-toolchain@stable
         with:

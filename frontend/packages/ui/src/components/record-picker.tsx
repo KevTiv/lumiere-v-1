@@ -90,7 +90,8 @@ export function RecordPicker({
             {options.map((option) => (
               <CommandItem
                 key={option.value}
-                value={option.value}
+                // cmdk excludes empty values from search, even when their keywords match.
+                value={option.value || `__lumiere_empty__:${option.label}`}
                 keywords={[option.label, `#${option.value}`]}
                 disabled={option.disabled}
                 onSelect={() => {

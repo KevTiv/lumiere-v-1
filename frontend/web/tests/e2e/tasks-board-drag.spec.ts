@@ -173,7 +173,7 @@ async function dragTo(page: Page, source: Locator, target: Locator) {
 test.describe("Tasks board drag and drop @tasks", () => {
   test("dragging a card to another column changes the task state and persists", async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 1000 })
-    await gotoModule(page, "/tasks")
+    await gotoModule(page, "/tasks?source=projects")
     const organizationId = await fetchSessionOrganizationId(page)
     const companyId = Number((await queryRows(page, "/api/query/companies"))[0]?.id)
     expect(companyId).toBeGreaterThan(0)
