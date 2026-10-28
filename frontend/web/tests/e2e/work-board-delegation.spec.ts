@@ -242,7 +242,10 @@ test.describe("Finance work board live delegation revocation", { tag: ["@dev-fix
       await expect(review.getByRole("textbox")).toHaveValue("")
       await expect(actingAs).toBeVisible()
       await expect(actingAs).toBeEnabled()
-      await expect(actingAs).toHaveValue(principal.identityHex)
+      await actingAs.press("Enter")
+      await expect(selectedPrincipal).toHaveAttribute("data-state", "checked")
+      await selectedPrincipal.press("Escape")
+      await expect(actingAs).toHaveAttribute("aria-expanded", "false")
       await expect(review.getByRole("button", { name: "Approve", exact: true })).toBeEnabled()
       const freshComment = "A fresh review after delegation was restored"
       await review.getByRole("textbox").fill(freshComment)
