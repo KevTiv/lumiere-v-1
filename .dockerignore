@@ -20,3 +20,6 @@
 .vscode
 /.contracts-staging/
 /vendor/lumiere-contracts/
+
+# Evaluation expectations are development-only, never runtime model context.
+erp-skills/evals/

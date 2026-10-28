@@ -55,7 +55,7 @@ export function FinanceReviewPanel({
     reportKey: "customer_balances_v1",
     date: "",
     baselineDate: "",
-    timezone: "UTC",
+    timezone: "",
     recordId: "",
     recordKind: "expense",
     query: "",
@@ -125,10 +125,25 @@ export function FinanceReviewPanel({
       </Select>
     </Field>
   )
+  const recordLabel =
+    skill === "bank_reconciliation_review"
+      ? "statementId"
+      : skill === "period_close_review"
+        ? "periodId"
+        : "expenseRecordId"
+  const dateLabel = skill === "finance_variance_review" ? "actualDate" : "date"
+  const requiredLabels = report
+    ? [
+        "reportKey",
+        dateLabel,
+        ...(skill === "finance_variance_review" ? ["baselineDate"] : []),
+        "timezone",
+      ]
+    : [recordLabel, ...(skill === "expense_evidence_review" ? ["recordKind"] : [])]
   const textField = (key: keyof FinanceReviewFields, type = "text") => (
     <Field>
       <FieldLabel htmlFor={`finance-${key}`}>
-        {t(`aiHarness.finance.${key}`)}
+        {t(`aiHarness.finance.${key === "recordId" ? recordLabel : key === "date" ? dateLabel : key}`)}
       </FieldLabel>
       <Input
         id={`finance-${key}`}
@@ -236,6 +251,15 @@ export function FinanceReviewPanel({
                   onChange={(event) => setField("query", event.target.value)}
                 />
               </Field>
+              {!inputs && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  {t("aiHarness.finance.requiredInputs", {
+                    fields: requiredLabels
+                      .map((label) => t(`aiHarness.finance.${label}`))
+                      .join(", "),
+                  })}
+                </p>
+              )}
               <p className="text-sm text-muted-foreground">
                 {t("aiHarness.reportAnalysis.spendNotice")}
               </p>

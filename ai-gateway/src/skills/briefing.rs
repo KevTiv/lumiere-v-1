@@ -132,7 +132,7 @@ fn build_summary_md(sections: &[BriefingSection], retrieval_degraded: bool) -> S
         if retrieval_degraded {
             return "Semantic activity retrieval is temporarily unavailable. No unverified activity content was included.".to_string();
         }
-        return "No recent activity was found for the requested scope. Nothing needs attention from the available read-only context.".to_string();
+        return "No activity was retrieved for the requested scope. This bounded search does not establish that no work needs attention.".to_string();
     }
 
     let total_items = sections
@@ -261,8 +261,10 @@ mod tests {
     }
 
     #[test]
-    fn healthy_empty_briefing_reports_no_activity() {
+    fn empty_briefing_distinguishes_retrieval_coverage_from_work_needing_attention() {
         let summary = build_summary_md(&[], false);
-        assert!(summary.contains("No recent activity was found"));
+        assert!(summary.contains("No activity was retrieved for the requested scope"));
+        assert!(summary.contains("does not establish that no work needs attention"));
+        assert!(!summary.contains("Nothing needs attention"));
     }
 }

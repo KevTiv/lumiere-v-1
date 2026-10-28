@@ -198,7 +198,7 @@ fn execution_request(
 
 const REPORT_PREVIEW_FIXTURE_PATH: &str = "reports/daily_business_summary_v1/preview.json";
 const BUILT_IN_SEMVER: &str = "1.0.0";
-pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.6";
+pub const REPORT_ANALYSIS_CERTIFICATION_VERSION: &str = "1.0.7";
 
 struct LowStockCertificationAdapter;
 
@@ -544,7 +544,36 @@ pub fn report_analysis_certification_bundle_hash() -> String {
         include_bytes!("../orchestrator/invocation_policy.rs"),
         include_bytes!("../orchestrator/answer_gate.rs"),
         include_bytes!("../tools/analytics.rs"),
+        include_bytes!("../skills/md_loader.rs"),
+        include_bytes!("../skills/briefing.rs"),
+        include_bytes!("../orchestrator/skill_loader.rs"),
+        // BEGIN GENERATED ERP PROMPT INPUTS
+        include_bytes!("../../../erp-skills/action_draft_generation/SKILL.md"),
+        include_bytes!("../../../erp-skills/bank_reconciliation_review/SKILL.md"),
+        include_bytes!("../../../erp-skills/daily_briefing/SKILL.md"),
+        include_bytes!("../../../erp-skills/daily_briefing/references/briefing-format.md"),
+        include_bytes!("../../../erp-skills/expense_evidence_review/SKILL.md"),
+        include_bytes!("../../../erp-skills/finance_report_review/SKILL.md"),
+        include_bytes!("../../../erp-skills/finance_report_review/references/response-example.md"),
+        include_bytes!("../../../erp-skills/finance_variance_review/SKILL.md"),
+        include_bytes!("../../../erp-skills/form_suggestion/SKILL.md"),
+        include_bytes!("../../../erp-skills/import_mapping/SKILL.md"),
+        include_bytes!("../../../erp-skills/import_mapping/references/csv-safety.md"),
+        include_bytes!("../../../erp-skills/import_mapping/references/mapping-heuristics.md"),
+        include_bytes!(
+            "../../../erp-skills/import_mapping/references/spacetimedb-import-targets.md"
+        ),
+        include_bytes!("../../../erp-skills/insights_scan/SKILL.md"),
+        include_bytes!("../../../erp-skills/period_close_review/SKILL.md"),
+        include_bytes!("../../../erp-skills/price_search/SKILL.md"),
+        include_bytes!("../../../erp-skills/price_search/references/procurement-policy.md"),
+        include_bytes!("../../../erp-skills/process_research/SKILL.md"),
+        include_bytes!("../../../erp-skills/rag_generation/SKILL.md"),
         include_bytes!("../../../erp-skills/report_analysis/SKILL.md"),
+        include_bytes!("../../../erp-skills/report_analysis/references/analytics-rules.md"),
+        include_bytes!("../../../erp-skills/report_analysis/references/response-example.md"),
+        include_bytes!("../../../erp-skills/supplier_discovery/SKILL.md"),
+        // END GENERATED ERP PROMPT INPUTS
     ])
 }
 
