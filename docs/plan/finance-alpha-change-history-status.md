@@ -180,3 +180,20 @@ compatibility route and requires successful insertion, then requires that the
 raw row cannot mint or change trusted history. No reducer, admission rule,
 source/field authorization assertion or history capture behavior is changed.
 All correction execution remains assigned to CI; no local runner was used.
+
+
+### Released-ledger regression correction
+
+At `50379608a`, hosted E2E and contracts drift passed against the preserved
+0.3.153 pin. The earlier PostgreSQL upgrade and raw-audit fixture corrections
+passed. Rust reached the codegen unit suite and found one remaining stale
+expectation: the checked-in ledger test still required eleven released files
+and pending migration 27.
+
+The existing regression now requires twelve released migrations, version 27 at
+the final released position, its exact published SQL checksum
+`sha256:0ee008de8fdcf2e56573af9ada2e2557fd9a0647ae6f029a46050bbac0989736`,
+and pending migration 28 with its canonical name. All older checksum assertions
+remain. No ledger, SQL, history schema, storage policy or 0.3.153 pin is changed.
+Source and whitespace review only; CI must execute the correction. No local
+test, typecheck, lint, build, browser or service was run.
