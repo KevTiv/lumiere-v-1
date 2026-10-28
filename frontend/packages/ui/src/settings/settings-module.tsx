@@ -123,21 +123,22 @@ export function SettingsModule({
       return {
         id: section.id,
         groupId: group?.id ?? "platform",
-        title: section.title,
-        description: section.description,
+        title: t(`settings.sections.${section.id}.title`, { defaultValue: section.title }),
+        description: t(`settings.sections.${section.id}.description`, { defaultValue: section.description }),
         Icon: iconMap[section.icon] || User,
       }
     })
-  // Users without dashboard:settings lose the gated Profile section but can still edit their own profile.
+  // Personal language preferences remain available in the alpha profile and
+  // without dashboard:settings; organization administration stays gated above.
   const ownProfile: NavSection[] =
-    firstOrgProfile || builtIn.some((section) => section.id === "profile")
+    builtIn.some((section) => section.id === "profile")
       ? []
       : [
           {
             id: "my-profile",
             groupId: "account",
-            title: "My profile",
-            description: "Your name, language and time zone.",
+            title: t("settings.sections.my-profile.title"),
+            description: t("settings.sections.my-profile.description"),
             Icon: User,
           },
         ]
@@ -220,7 +221,7 @@ export function SettingsModule({
           {groups.map((group) => (
             <div key={group.id} className="flex shrink-0 gap-1 lg:flex-col">
               <p className="hidden px-2 pb-1 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground lg:block">
-                {group.title}
+                {t(`settings.groups.${group.id}`, { defaultValue: group.title })}
               </p>
               {group.sections.map((section) => {
                 const isActive = section.id === active?.id

@@ -4,11 +4,11 @@
  * Standard JSON.parse silently keeps the last value — this fails the build instead.
  *
  * Usage:
- *   node scripts/check-json-duplicate-keys.mjs
+ *   node scripts/check-json-duplicate-keys.mjs  (all locale files)
  *   node scripts/check-json-duplicate-keys.mjs path/to/file.json
  */
 
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -185,25 +185,30 @@ export function findDuplicateJsonKeys(str) {
 }
 
 function main() {
-  const file = process.argv[2] ?? DEFAULT_FILE
-  const raw = readFileSync(file, "utf8")
-  try {
-    const dups = findDuplicateJsonKeys(raw)
-    if (dups.length === 0) {
-      console.log(`No duplicate keys in ${file}`)
-      process.exit(0)
-      return
+  const files = process.argv[2]
+    ? [process.argv[2]]
+    : readdirSync(dirname(DEFAULT_FILE)).filter(name => name.endsWith(".json")).map(name => join(dirname(DEFAULT_FILE), name))
+  let failed = false
+  for (const file of files) {
+    try {
+      const raw = readFileSync(file, "utf8")
+      const dups = findDuplicateJsonKeys(raw)
+      if (dups.length === 0) {
+        console.log(`No duplicate keys in ${file}`)
+        continue
+      }
+      console.error(`Duplicate keys in ${file} (${dups.length}):\n`)
+      for (const { path, key } of dups) {
+        console.error(`  "${key}" at path: ${path || "(root)"}`)
+      }
+      console.error("\nJSON parsers keep the last occurrence — merge objects or rename keys.")
+      failed = true
+    } catch (e) {
+      console.error(`Failed to parse ${file}:`, /** @type {Error} */ (e).message)
+      failed = true
     }
-    console.error(`Duplicate keys in ${file} (${dups.length}):\n`)
-    for (const { path, key } of dups) {
-      console.error(`  "${key}" at path: ${path || "(root)"}`)
-    }
-    console.error("\nJSON parsers keep the last occurrence — merge objects or rename keys.")
-    process.exit(1)
-  } catch (e) {
-    console.error(`Failed to parse ${file}:`, /** @type {Error} */ (e).message)
-    process.exit(1)
   }
+  process.exitCode = failed ? 1 : 0
 }
 
 main()

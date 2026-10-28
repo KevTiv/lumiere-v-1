@@ -14316,7 +14316,19 @@
           "label": "High Contrast",
           "description": "Increase color contrast"
         }
-      }
+      },
+      "language": "Display language",
+      "languageHint": "Your language is applied after you save your profile and follows your account on other devices.",
+      "loanwords": "Kinyarwanda loanwords",
+      "loanwordsHint": "Choose French or English for borrowed technical terms and text that is not yet translated.",
+      "swahiliLoanwordsHint": "Swahili uses English for borrowed technical terms and text that is not yet translated.",
+      "loading": "Loading your profile…",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "emailVerificationHint": "Email changes require identity-provider verification and administrator approval.",
+      "loadError": "Could not load your profile. Reload to try again.",
+      "securityProviderHint": "Your identity provider manages your password and sign-in security.",
+      "manageSecurity": "Manage sign-in security"
     },
     "customFields": {
       "title": "My Custom Fields",
@@ -14594,6 +14606,62 @@
         "tokenRequired": "Access token is required",
         "apiKeyRequired": "API key is required",
         "saveError": "Failed to save credentials"
+      }
+    },
+    "groups": {
+      "account": "Account",
+      "organization": "Organization",
+      "data": "Data & integrations",
+      "platform": "Platform"
+    },
+    "sections": {
+      "profile": {
+        "title": "Profile",
+        "description": "Manage your personal information and preferences"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "description": "Configure how and when you receive notifications"
+      },
+      "appearance": {
+        "title": "Appearance",
+        "description": "Customize the look and feel of your dashboard"
+      },
+      "custom-fields": {
+        "title": "My Custom Fields",
+        "description": "Add personal tracking fields to your journal"
+      },
+      "users": {
+        "title": "User Management",
+        "description": "Add, edit, and manage user accounts"
+      },
+      "roles": {
+        "title": "Roles & Permissions",
+        "description": "Configure roles and access control policies"
+      },
+      "sso": {
+        "title": "SSO",
+        "description": "Single sign-on status and WorkOS account linking"
+      },
+      "form-config": {
+        "title": "Form Configuration",
+        "description": "Configure Journal and Forensic Report fields"
+      },
+      "audit": {
+        "title": "Audit Log",
+        "description": "View system activity and security events"
+      },
+      "organization": {
+        "title": "Organization",
+        "description": "Manage organization settings and configuration"
+      },
+      "ai": {
+        "title": "AI",
+        "description": "Agents, team personas, insights, and usage spend"
+      },
+      "my-profile": {
+        "title": "My profile",
+        "description": "Your name, language and time zone."
       }
     }
   },
