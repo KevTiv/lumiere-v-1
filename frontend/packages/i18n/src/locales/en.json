@@ -1,4 +1,46 @@
 {
+  "recordChanges": {
+    "title": "Changes",
+    "permission": "Business change history",
+    "loading": "Loading changes…",
+    "denied": "You do not have access to this record's change history.",
+    "error": "Change history could not be loaded. Previously loaded changes are hidden.",
+    "retry": "Try again",
+    "refresh": "Refresh changes",
+    "partialCoverage": "This history records description, debit/credit, partner and analytic-account edits made after tracking was enabled. Price and quantity corrections, other operations and earlier changes are not included. Values follow your current field access.",
+    "empty": "No recorded line edits are available for this record.",
+    "emptyPage": "No visible line edits in this page. Continue to check the next page.",
+    "lineUpdated": "Line {{id}} updated",
+    "by": "By {{actor}}",
+    "before": "Before",
+    "after": "After",
+    "noValue": "No value",
+    "loadMore": "Load more changes",
+    "fields": {
+      "name": "Description",
+      "debit": "Debit",
+      "credit": "Credit",
+      "partner": "Partner reference",
+      "analyticAccount": "Analytic account reference",
+      "balance": "Balance",
+      "amountCurrency": "Amount in transaction currency",
+      "residual": "Outstanding balance",
+      "residualCurrency": "Outstanding balance in transaction currency",
+      "debitCurrency": "Debit in transaction currency",
+      "creditCurrency": "Credit in transaction currency"
+    },
+    "fieldsChanged": "{{fields}} changed",
+    "lineReference": "Line {{id}}",
+    "user": "User {{identity}}",
+    "userIdentity": "User identity",
+    "beforeThisSave": "Before this save",
+    "afterThisSave": "After this save",
+    "coverageLead": "Partial history: recorded line edits only.",
+    "coverageDetails": "What this history includes",
+    "refreshing": "Refreshing changes…",
+    "loadingMore": "Loading more changes…",
+    "emptyText": "Empty text"
+  },
   "moduleInsights": {
     "overview": "Overview",
     "insights": "Insights",
@@ -12631,7 +12673,8 @@
         "completed": "Completed",
         "cancelled": "Cancelled",
         "failed": "Failed",
-        "agentSettled": "Agent settled"
+        "agentSettled": "Agent settled",
+        "budgetParked": "Paused: budget limit"
       },
       "questionStatuses": {
         "open": "Open",
@@ -15757,6 +15800,7 @@
       "status": {
         "agentSettled": "Agent settled",
         "awaitingApproval": "Awaiting approval",
+        "budgetParked": "Paused: budget limit",
         "cancelled": "Cancelled",
         "completed": "Completed",
         "failed": "Failed",

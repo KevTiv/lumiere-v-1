@@ -935,11 +935,11 @@ pub fn reconcile_ai_run_effect(
     Ok(())
 }
 
-fn authorize(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
+pub(crate) fn authorize(ctx: &ReducerContext, organization_id: u64) -> Result<(), String> {
     check_permission(ctx, organization_id, "ai_agent_run", "write")
 }
 
-fn load_run(
+pub(crate) fn load_run(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -957,7 +957,7 @@ fn load_run(
     Ok(run)
 }
 
-fn checked_state(
+pub(crate) fn checked_state(
     ctx: &ReducerContext,
     organization_id: u64,
     company_id: u64,
@@ -983,7 +983,7 @@ fn checked_state(
     Ok(state)
 }
 
-fn transition_state_and_run(
+pub(crate) fn transition_state_and_run(
     ctx: &ReducerContext,
     mut state: AiRunLifecycleState,
     event_key: String,
@@ -1016,7 +1016,7 @@ fn transition_state_and_run(
     Ok(())
 }
 
-fn mutate_state<F>(
+pub(crate) fn mutate_state<F>(
     ctx: &ReducerContext,
     state: &mut AiRunLifecycleState,
     idempotency_key: &str,
@@ -1045,7 +1045,7 @@ where
     Ok(())
 }
 
-fn append_event(
+pub(crate) fn append_event(
     ctx: &ReducerContext,
     state: &AiRunLifecycleState,
     event_key: String,
@@ -1072,7 +1072,7 @@ fn append_event(
     });
 }
 
-fn ensure_new_event(ctx: &ReducerContext, key: &str) -> Result<(), String> {
+pub(super) fn ensure_new_event(ctx: &ReducerContext, key: &str) -> Result<(), String> {
     validate_key(
         "idempotency_key",
         key.rsplit(':').next().unwrap_or_default(),
@@ -1090,7 +1090,7 @@ fn ensure_new_event(ctx: &ReducerContext, key: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn replayed(
+pub(crate) fn replayed(
     ctx: &ReducerContext,
     key: &str,
     expected_kind: &str,
@@ -1111,16 +1111,16 @@ fn replayed(
     Ok(false)
 }
 
-fn command_hash(kind: &str, params: &impl Debug) -> String {
+pub(crate) fn command_hash(kind: &str, params: &impl Debug) -> String {
     let canonical = format!("{kind}|{params:?}");
     format!("{:x}", Sha256::digest(canonical.as_bytes()))
 }
 
-fn event_key(organization_id: u64, run_id: u64, idempotency_key: &str) -> String {
+pub(crate) fn event_key(organization_id: u64, run_id: u64, idempotency_key: &str) -> String {
     format!("{organization_id}:{run_id}:{}", idempotency_key.trim())
 }
 
-fn validate_key(name: &str, value: &str) -> Result<(), String> {
+pub(crate) fn validate_key(name: &str, value: &str) -> Result<(), String> {
     let len = value.trim().len();
     if len == 0 || len > MAX_KEY_LEN {
         return Err(format!(
@@ -1130,7 +1130,7 @@ fn validate_key(name: &str, value: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_text(name: &str, value: &str, max: usize) -> Result<(), String> {
+pub(crate) fn validate_text(name: &str, value: &str, max: usize) -> Result<(), String> {
     let len = value.trim().len();
     if len == 0 || len > max {
         return Err(format!("{name} must be between 1 and {max} characters"));
@@ -1147,7 +1147,7 @@ fn validate_optional_json(value: &Option<String>) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_hash(value: &str) -> Result<(), String> {
+pub(super) fn validate_hash(value: &str) -> Result<(), String> {
     if !is_sha256_hex(value) {
         return Err("checkpoint or request hash must be a lowercase SHA-256 hex digest".into());
     }

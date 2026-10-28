@@ -3,6 +3,7 @@ pub mod active_company_matrix_test;
 pub mod adversarial_p0_fixes_test;
 pub mod bank_settlement_lifecycle_test;
 pub mod budgeting_test;
+pub mod business_changes_test;
 pub mod fixed_assets_test;
 pub mod fx_revaluation_test;
 pub mod helpers;
@@ -81,6 +82,8 @@ pub fn run_accounting_fixed_asset_ownership_test(ctx: &ReducerContext) -> Result
 
 #[spacetimedb::reducer]
 pub fn run_accounting_post_invoice_test(ctx: &ReducerContext) -> Result<(), String> {
+    business_changes_test::test_accounting_line_history_is_native_exact_and_replay_safe(ctx)
+        .map_err(|error| format!("trusted accounting change history: {error}"))?;
     invoice_profile_test::test_invoice_profiles_capture_trusted_identity_and_freeze_at_posting(ctx)
         .map_err(|error| format!("invoice profile snapshots: {error}"))?;
     journal_entries_test::test_post_customer_invoice_creates_move_lines(ctx)

@@ -1172,6 +1172,48 @@ pub async fn run_skill_admitted(
         let program = match executor.run(&graph, &program_context).await {
             Ok(program) => program,
             Err(error) => {
+                // Budget-window exhaustion or a provider rate limit parks the
+                // run instead of ending it (plan 7.2). The module refuses
+                // unless no effect is dispatched or uncertain and no
+                // reservation is held; any refusal falls through to failure.
+                if let Some(parked) = super::budget_park::try_park(
+                    &super::budget_park::StdbParkStore {
+                        writer: state.stdb.as_ref(),
+                    },
+                    req.org_id,
+                    req.company_id,
+                    run_id,
+                    &error,
+                    chrono::Utc::now(),
+                    &super::budget_park::ParkPolicy::from_env(),
+                )
+                .await
+                {
+                    verify_current_execution_authority(
+                        &envelope_authority,
+                        &execution_envelope,
+                        &tool_ctx,
+                    )
+                    .await?;
+                    return Ok(RunSkillResponse {
+                        run_id,
+                        run_key,
+                        status: "budget_parked".to_string(),
+                        summary: format!(
+                            "run parked ({}); expected to resume after {}",
+                            parked.reason,
+                            parked.window_resets_at.to_rfc3339()
+                        ),
+                        artifacts: Vec::new(),
+                        citations: Vec::new(),
+                        steps: Vec::new(),
+                        agent_id: agent.agent_id,
+                        skill_key: skill.skill_key,
+                        evidence_claim_ids: Vec::new(),
+                        verification: None,
+                        provenance: None,
+                    });
+                }
                 // A failed execution must not leave a synchronous request running.
                 // Provider attempts and reservations keep their own durable states;
                 // completing the run never releases uncertain provider spend.

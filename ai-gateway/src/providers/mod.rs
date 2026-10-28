@@ -1,5 +1,11 @@
 pub mod embed;
+#[allow(dead_code)] // consumed by follow-up orchestration wiring
+pub mod events;
 pub mod factory;
+#[allow(dead_code)] // consumed by follow-up fallback wiring
+pub mod handoff;
+#[allow(dead_code)] // descriptor route consumes the manifest types later
+pub mod instance;
 pub mod llm;
 pub mod parser;
 pub mod vision;
@@ -7,6 +13,11 @@ pub mod web_search;
 
 pub use embed::EmbedProvider;
 pub use factory::{build, Providers};
+#[allow(unused_imports)]
+pub use instance::{
+    CapabilityManifest, ProviderCapability, ProviderDriver, ProviderInstance, ProviderRegistry,
+    SelectionRecord,
+};
 
 use anyhow::{anyhow, Context, Result};
 use std::time::Duration;
@@ -129,7 +140,7 @@ fn metadata_request(
 }
 
 #[cfg(test)]
-mod readiness_tests {
+pub(super) mod readiness_tests {
     use super::*;
 
     #[test]
@@ -223,7 +234,7 @@ mod readiness_tests {
             .is_err());
     }
 
-    fn test_config() -> Config {
+    pub(super) fn test_config() -> Config {
         Config {
             port: 8080,
             internal_secret: None,

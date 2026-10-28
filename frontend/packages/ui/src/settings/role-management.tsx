@@ -494,7 +494,7 @@ export function RoleManagement() {
                                       checked={allSelected}
                                       onCheckedChange={() => handleToggleAllActions(resource.resource, resource.actions)}
                                     />
-                                    <span className="text-sm">{resource.label}</span>
+                                    <span className="text-sm">{resource.resource === "business_history" ? t("recordChanges.permission") : resource.label}</span>
                                   </div>
                                   <div className="flex gap-1">
                                     {resource.actions.map(action => (

@@ -400,7 +400,10 @@ impl LlmClient {
 
         // Error bodies may echo signed/private history. Never read or attach
         // them to errors: the spend layer persists provider error messages.
-        check_mistral_status(resp.status())?;
+        check_mistral_response(
+            resp.status(),
+            resp.headers().get(reqwest::header::RETRY_AFTER),
+        )?;
         let body = resp
             .json()
             .await
@@ -647,16 +650,37 @@ impl LlmClient {
 #[error("provider rejected completion with HTTP {status}")]
 pub(crate) struct ProviderRejection {
     status: u16,
+    /// Provider-supplied `Retry-After` delay in seconds, when it sent one.
+    retry_after_secs: Option<u64>,
 }
 
 impl ProviderRejection {
     pub(crate) fn retryable(&self) -> bool {
         self.status == 429
     }
+
+    /// The provider's own reset hint for a retryable rejection. Only the
+    /// delta-seconds form is honoured; an HTTP-date is treated as absent.
+    pub(crate) fn retry_after(&self) -> Option<std::time::Duration> {
+        self.retry_after_secs.map(std::time::Duration::from_secs)
+    }
+}
+
+/// Parse a `Retry-After` header value in delta-seconds form.
+pub(crate) fn parse_retry_after(value: Option<&reqwest::header::HeaderValue>) -> Option<u64> {
+    value?.to_str().ok()?.trim().parse::<u64>().ok()
 }
 
 /// Classify direct Mistral HTTP status without reading private error bodies.
 pub(crate) fn check_mistral_status(status: reqwest::StatusCode) -> Result<()> {
+    check_mistral_response(status, None)
+}
+
+/// As [`check_mistral_status`], carrying the provider's `Retry-After` hint.
+pub(crate) fn check_mistral_response(
+    status: reqwest::StatusCode,
+    retry_after: Option<&reqwest::header::HeaderValue>,
+) -> Result<()> {
     if status.is_success() {
         return Ok(());
     }
@@ -665,6 +689,7 @@ pub(crate) fn check_mistral_status(status: reqwest::StatusCode) -> Result<()> {
     if matches!(status.as_u16(), 400 | 401 | 403 | 404 | 413 | 422 | 429) {
         return Err(ProviderRejection {
             status: status.as_u16(),
+            retry_after_secs: parse_retry_after(retry_after),
         }
         .into());
     }

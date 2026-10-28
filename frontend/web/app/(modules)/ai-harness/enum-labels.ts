@@ -42,6 +42,7 @@ const RUN_STATUS_KEYS: Record<string, string> = {
   cancelled: "aiHarness.enums.runStatuses.cancelled",
   failed: "aiHarness.enums.runStatuses.failed",
   agent_settled: "aiHarness.enums.runStatuses.agentSettled",
+  budget_parked: "aiHarness.enums.runStatuses.budgetParked",
 }
 
 const QUESTION_STATUS_KEYS: Record<string, string> = {
