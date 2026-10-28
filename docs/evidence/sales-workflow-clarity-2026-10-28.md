@@ -28,3 +28,18 @@ The grouping of order status, items, payment and customer details uses the struc
 Reproduce the browser checks with `pnpm --dir frontend/web test:e2e:sales-workflow`. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` when using an existing Chromium binary. Setting `SALES_WORKFLOW_REVIEW_DIR` also captures the before/after panes during the desktop check. The PR adds this browser suite to the existing frontend CI job.
 
 The authenticated draft-create helper now asserts navigation to the exact saved quotation and its guidance. That live-stack assertion, stock/credit/approval consequences, operator task testing and deployed alpha smoke checks have not been executed in this environment. No claim of persisted end-to-end acceptance or measured utilization improvement is made.
+
+## CI follow-up
+
+The first remote E2E run exposed outdated shared helpers and older test expectations:
+
+- Navigation omitted `tab=dashboard`, assuming every module still opened Dashboard by default. Dashboard navigation is now explicit and preserves company scope.
+- Exact-value selection assumed a hidden native select, which searchable RecordPicker fields do not have. Picker options now expose their exact record value; the helper retains support for the older native-select markup.
+- Sequential selectors could use a previous picker while its closing animation was still visible. Helpers now open the requested trigger and wait until its selection popup closes. A production-form fixture reproduced this timeout before the fix, including two successive fields with the same option value.
+- Invoice creation moved into the recommended next action. Its E2E helper now finds the visible action by its accessible button label within the order page.
+- The saved-quotation URL assertion over-escaped the query separator. It now checks the parsed path and query values directly.
+- The message test now chooses Advanced custom reference before editing its conditional record fields. The CRM custom-field test now verifies the intentional safety block, retained input, zero create requests and no new lead, with cleanup in a `finally` block. Atomic EAV creation remains unavailable; the safety block is retained.
+
+Local regression validation: all 13 browser checks passed, including legacy selector compatibility, default-tab navigation, duplicate-name customer selection, expense posting account choices at 600/900px viewport heights, message conditional fields, and the existing Sales workspace checks. Web TypeScript, opaque-record, shared-select, transport and diff checks passed. Fixture route warmup runs before browser interaction timeouts.
+
+The updated full authenticated E2E run is tracked on PR #294. The local fixtures do not substitute for its persisted-effect assertions.

@@ -31,6 +31,7 @@ test.describe("select helper DOM contract", { tag: ["@unauthenticated", "@p0"] }
       option.addEventListener("click", () => {
         const trigger = document.querySelector('[data-testid="form-field-partnerId"]')
         if (trigger) trigger.textContent = option.textContent
+        document.querySelector('[role="listbox"]')?.setAttribute("hidden", "")
       })
     })
 

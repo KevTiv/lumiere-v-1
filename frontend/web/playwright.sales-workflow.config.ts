@@ -2,7 +2,8 @@ import { defineConfig } from '@playwright/test';
 
 // Synthetic props drive actual sales components; this does not prove persisted ERP effects.
 export default defineConfig({
-  testDir: './tests', testMatch: 'sales-workflow-ui.spec.ts', workers: 1,
+  testDir: './tests', testMatch: ['sales-workflow-ui.spec.ts', 'sales-helper-regressions.spec.ts', 'select-helper.spec.ts'], workers: 1,
+  globalSetup: './tests/sales-workflow-warmup.ts',
   use: {
     baseURL: 'http://127.0.0.1:3112', browserName: 'chromium', headless: true,
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : undefined,

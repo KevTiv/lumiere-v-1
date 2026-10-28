@@ -72,7 +72,7 @@ export async function createDraftSaleOrder(page: Page, clientRef: string): Promi
       { timeout: 30_000 },
     )
     .toBeGreaterThan(0)
-  await expect(page).toHaveURL(new RegExp(`/sales/orders/${orderId}\\?tab=lines&created=1$`))
+  await expect(page).toHaveURL((url) => url.pathname === `/sales/orders/${orderId}` && url.searchParams.get("tab") === "lines" && url.searchParams.get("created") === "1")
   await expect(page.getByTestId('sale-order-next-step')).toBeVisible()
   return orderId
 }

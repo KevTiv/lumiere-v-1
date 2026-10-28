@@ -5,12 +5,11 @@ import { parseQueryListResponse } from "@lumiere/api-client"
 import {
   addCustomFormFieldViaSettings,
   deleteCustomFormFieldViaSettings,
+  dismissBlockingDialogs,
   expectNoAppError,
-  fetchLeadIdByName,
   fillField,
   openEntityCreate,
   smokeName,
-  submitForm,
 } from "./helpers"
 
 function customFieldFixture(smokePrefix: string) {
@@ -44,58 +43,38 @@ test.describe("Parity phase 2 — form config mutations", { tag: ["@p0", "@parit
     await expectNoAppError(page)
   })
 
-  test("persists custom field value to EAV on CRM lead create", async ({ page }) => {
+  test("retains custom-field input and creates no lead when atomic EAV creation is unavailable", async ({ page }) => {
     test.setTimeout(180_000)
-
     const { fieldSlug, fieldLabel, fieldId } = customFieldFixture("e2e_eav")
     const leadName = smokeName("eav-lead")
     const customValue = `val-${fieldSlug}`
-
     await addCustomFormFieldViaSettings(page, { fieldKey: fieldSlug, fieldLabel })
-
-    await openEntityCreate(page, "/crm", "crm", "leads", "new-lead")
-    await fillField(page, "contactName", leadName)
-    await fillField(page, "emailFrom", `${leadName}@example.test`)
-    await fillField(page, "expectedRevenue", "250")
-    // Custom fields use fieldId as the ModularForm name
-    await fillField(page, fieldId, customValue)
-
-    const [createRes] = await Promise.all([
-      page.waitForResponse(
-        (res) => matchesOperationResponse(res, "create_lead") && res.ok(),
-        { timeout: 30_000 },
-      ),
-      submitForm(page, "new-lead"),
-    ])
-    expect(createRes.ok()).toBe(true)
-    await expect(page.getByText(leadName).first()).toBeVisible({ timeout: 30_000 })
-
-    const leadId = await fetchLeadIdByName(page, leadName)
-
-    await expect
-      .poll(
-        async () => {
-          const res = await page.request.get("/api/query/record-custom-field-values")
-          if (!res.ok()) return false
-          const rows = parseQueryListResponse(await res.json())
-          return rows.some((row) => {
-            const model = String(row.model ?? "")
-            const recordId = String(row.recordId ?? row.record_id ?? "")
-            const key = String(row.fieldKey ?? row.field_key ?? "")
-            const valueJson = String(row.valueJson ?? row.value_json ?? "")
-            return (
-              model === "crm_lead" &&
-              recordId === String(leadId) &&
-              key === fieldId &&
-              valueJson.includes(customValue)
-            )
-          })
-        },
-        { timeout: 45_000 },
-      )
-      .toBeTruthy()
-
-    await deleteCustomFormFieldViaSettings(page, fieldId)
+    try {
+      await openEntityCreate(page, "/crm", "crm", "leads", "new-lead")
+      await fillField(page, "contactName", leadName)
+      await fillField(page, "emailFrom", `${leadName}@example.test`)
+      await fillField(page, "expectedRevenue", "250")
+      await fillField(page, fieldId, customValue)
+      const creates: string[] = []
+      page.on("request", (request) => {
+        if (request.method() === "POST" && matchesOperationResponse(request, "create_lead")) creates.push(request.url())
+      })
+      const modal = page.getByTestId("form-modal-new-lead")
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await page.getByTestId("form-submit-new-lead").click()
+        await expect(modal.getByText(/Saving custom fields during creation is not available yet/)).toBeVisible()
+        await expect(modal.getByTestId("form-field-contactName")).toHaveValue(leadName)
+        await expect(modal.getByTestId(`form-field-${fieldId}`)).toHaveValue(customValue)
+        expect(creates).toEqual([])
+      }
+      const response = await page.request.get("/api/query/leads")
+      expect(response.ok()).toBe(true)
+      expect(parseQueryListResponse(await response.json()).filter((row) => row.name === leadName || row.contactName === leadName)).toEqual([])
+      // Keep the safety block until the create command can atomically save the EAV values.
+    } finally {
+      await dismissBlockingDialogs(page)
+      await deleteCustomFormFieldViaSettings(page, fieldId)
+    }
     await expectNoAppError(page)
   })
 })
